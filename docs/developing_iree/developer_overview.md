@@ -179,7 +179,7 @@ For example, to execute the contents of
 [iree/tools/test/simple.mlir](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir):
 
 ```shell
-$ ../iree-build/iree/tools:iree/run-mlir \
+$ ../iree-build/iree/tools:iree-run-mlir \
   $PWD/iree/tools/test/simple.mlir \
   -function-input="i32=-2" \
   -iree-hal-target-backends=vmla
