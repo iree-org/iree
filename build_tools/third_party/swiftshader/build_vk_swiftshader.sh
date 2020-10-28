@@ -35,7 +35,7 @@ set -e
 # Afterward, you'll need to set the `VK_ICD_FILENAMES` environment variable to
 # the absolute path of the `vk_swiftshader_icd.json` manifest file. This tells
 # the Vulkan loader on your system to load it. Assuming you use the default
-# installation directory this can be done on not-windows via:
+# installation directory this can be done on not-Windows via:
 #
 #   export VK_ICD_FILENAMES="${HOME?}/.swiftshader/Linux/vk_swiftshader_icd.json"
 #
