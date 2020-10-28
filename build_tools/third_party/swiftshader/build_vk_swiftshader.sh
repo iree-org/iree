@@ -32,16 +32,16 @@ set -e
 # Note that you will need a working CMake installation for this script to
 # succeed. On Windows, Visual Studio 2019 is recommended.
 #
-# Afterward you'll need to set the VK_ICD_FILENAMES environment variable to the
-# absolute path of the corresponding `vk_swiftshader_icd.json` manifest file to
-# tell the Vulkan loader on your system to load it. Assuming you use the default
+# Afterward, you'll need to set the `VK_ICD_FILENAMES` environment variable to
+# the absolute path of the `vk_swiftshader_icd.json` manifest file. This tells
+# the Vulkan loader on your system to load it. Assuming you use the default
 # installation directory this can be done on not-windows via:
 #
 #   export VK_ICD_FILENAMES="${HOME?}/.swiftshader/Linux/vk_swiftshader_icd.json"
 #
 # or on windows via:
 #
-#   set VK_ICD_FILENAMES="${USERPROFILE?}"\.swiftshader\Windows\vk_swiftshader_icd.json
+#   set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 #
 # If you used a custom instllation directory then the correct path will be
 # printed to stdout.
