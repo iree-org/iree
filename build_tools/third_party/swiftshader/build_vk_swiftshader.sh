@@ -39,7 +39,7 @@ set -e
 #
 #   export VK_ICD_FILENAMES="${HOME?}/.swiftshader/Linux/vk_swiftshader_icd.json"
 #
-# or on windows via:
+# or on Windows via:
 #
 #   set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 #
