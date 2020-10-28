@@ -27,6 +27,7 @@ CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
 
 iree_lit_test_suite(
     name = "lit",
+    size = "medium",
     srcs = glob(
         ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS,
@@ -35,7 +36,10 @@ iree_lit_test_suite(
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
-    tags = ["hostonly"],
+    tags = [
+        "hostonly",
+        "optonly",  # swiftshader is too slow in dbg
+    ],
 )
 
 iree_check_single_backend_test_suite(

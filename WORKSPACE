@@ -299,5 +299,15 @@ maybe(
     path = "third_party/cpuinfo",
 )
 
+GOOGLE_RESEARCH_COMMIT = "1dbf7f4af77ac032ddcf68a7978cc056897015a7"
+
+http_archive(
+    name = "kws_streaming",
+    build_file = "@//:build_tools/third_party/kws_streaming/BUILD.overlay",
+    sha256 = "cdb0b71914999a9cb11b5a80eb16769687c9714d9ac706e6c1cf081c3afbd976",
+    strip_prefix = "google-research-{}/kws_streaming".format(GOOGLE_RESEARCH_COMMIT),
+    url = "https://github.com/google-research/google-research/archive/{}.tar.gz".format(GOOGLE_RESEARCH_COMMIT),
+)
+
 # Bootstrap TensorFlow deps last so that ours can take precedence.
 tf_repositories()

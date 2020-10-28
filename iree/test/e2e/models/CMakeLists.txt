@@ -27,6 +27,7 @@ iree_lit_test_suite(
     iree::tools::iree-run-mlir
   LABELS
     "hostonly"
+    "optonly"
 )
 
 iree_check_single_backend_test_suite(
