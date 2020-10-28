@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
 
 # This script builds SwiftShader's Vulkan ICD. By default, it creates a
 # `.swiftshader` installation directory in your OS's home directory (`HOME` on
@@ -49,7 +48,9 @@ set -e
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
+set +e  # Ignore errors if not found.
 CYGPATH="$(which cygpath 2>/dev/null)"
+set -e
 
 if [[ -z "${CYGPATH?}" ]]; then
   # Anything that isn't Windows.
@@ -76,7 +77,7 @@ git checkout "${SWIFTSHADER_COMMIT?}"
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 
-echo "Installing to ${SWIFTSHADER_INSTALL_DIR}"
+echo "Installing to ${SWIFTSHADER_INSTALL_DIR?}"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}" ]]; then
   echo "  Install directory already exists, cleaning it"
   rm -rf "${SWIFTSHADER_INSTALL_DIR?}"
