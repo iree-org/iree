@@ -76,7 +76,9 @@ git checkout "${SWIFTSHADER_COMMIT?}"
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 
+echo "Installing to ${SWIFTSHADER_INSTALL_DIR}"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}" ]]; then
+  echo "  Install directory already exists, cleaning it"
   rm -rf "${SWIFTSHADER_INSTALL_DIR?}"
 fi
 
