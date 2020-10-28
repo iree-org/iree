@@ -25,14 +25,16 @@ build --compilation_mode=opt
 common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
-# Enables unix-style runfiles link trees (requires symlink permission).
+
+# Includes a startup option, so we can't put this in a config, but it doesn't
+# hurt anything on non-windows platforms.
+# Enables unix-style runfiles link trees on Windows. Requires enabling symlink
+# permissions: Enable Developer Mode in the Developer Settings page of the
+# system settings. See
 # https://docs.bazel.build/versions/master/windows.html#enable-symlink-support
-# See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
-# Generally: Enable Developer Mode in the Developer Settings page of the
-# system settings. Matches --enable_runfiles in the msvc config, but this is a
-# startup option, so cannot be in a config. Doesn't hurt anything on non-windows
-# platforms though.
+# and https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
 startup --windows_enable_symlinks
+build --enable_runfiles
 
 
 # TODO: Transition to the explicit init_py mechanism. See #2405
@@ -281,12 +283,6 @@ build:_msvc_base --per_file_copt=farmhash@/wd4319 # zero extending to T of great
 build:_msvc_base --linkopt=/IGNORE:4217 # mismatch import/export declspec
 build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 
-# Enables unix-style runfiles link trees (requires symlink permission).
-# https://docs.bazel.build/versions/master/windows.html#enable-symlink-support
-# See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
-# Generally: Enable Developer Mode in the Developer Settings page of the
-# system settings.
-build:_msvc_base --enable_runfiles
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
 build:_msvc_base --copt=/arch:AVX
