@@ -58,7 +58,7 @@ if [[ -z "${CYGPATH?}" ]]; then
 else
   # Windows.
   BASE_DIR="${1:-${USERPROFILE?}}"
-  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\\.swiftshader'
+  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\.swiftshader'
 fi
 
 SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
