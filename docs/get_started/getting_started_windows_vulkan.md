@@ -80,20 +80,20 @@ SwiftShader's Vulkan ICD (Installable Client Driver).
 
 IREE has a
 [helper script](https://github.com/google/iree/blob/main/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
-for building SwiftShader from source using CMake. Replace
-`<swiftshader-install-dir>` with the directory you want to install it in.
+for building SwiftShader from source using CMake.
 
 ```shell
-$ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh <swiftshader-install-dir>
+$ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
 ```
 
 <!-- TODO(scotttodd): Steps to download prebuilt binaries when they exist -->
 
 After building, the script will prompt your to add a variable `VK_ICD_FILENAMES`
-to your environment to tell the Vulkan loader to use the ICD.
+to your environment to tell the Vulkan loader to use the ICD. Assuming it was
+installed in the default location, this can be done via:
 
 ```powershell
-> $env:VK_ICD_FILENAMES = Resolve-Path "<swiftshader-install-dir>/Windows/vk_swiftshader_icd.json"
+> set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 ```
 
 ### Support in Bazel Tests
