@@ -15,26 +15,54 @@
 # limitations under the License.
 set -e
 
-# Call this script to build SwiftShader's Vulkan ICD:
-#   $ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
+# This script builds SwiftShader's Vulkan ICD. By default, it creates a
+# `.swiftshader` installation directory in your OS's home directory (`HOME` on
+# not-windows, `USERPROFILE` on windows):
 #
-# The default installation directory is `${HOME?}/.swiftshader`, but it can be
-# overridden as follows:
-#   $ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh <swiftshader-install-dir>
+#   bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
+#
+# The parent directory for the installation can be overridden using the first
+# positional argument:
+#
+#   bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh <parent-dir>
+#
+# If the `.swiftshader` installation dir already exists, it will be deleted and
+# rebuilt.
 #
 # Note that you will need a working CMake installation for this script to
 # succeed. On Windows, Visual Studio 2019 is recommended.
 #
-# Afterwards, set the VK_ICD_FILENAMES environment variable to the absolute
-# path of the corresponding vk_swiftshader_icd.json manifest file so the Vulkan
-# loader on your system loads it.
+# Afterward you'll need to set the VK_ICD_FILENAMES environment variable to the
+# absolute path of the corresponding `vk_swiftshader_icd.json` manifest file to
+# tell the Vulkan loader on your system to load it. Assuming you use the default
+# installation directory this can be done on not-windows via:
+#
+#   export VK_ICD_FILENAMES="${HOME?}/.swiftshader/Linux/vk_swiftshader_icd.json"
+#
+# or on windows via:
+#
+#   set VK_ICD_FILENAMES="${USERPROFILE?}"\.swiftshader\Windows\vk_swiftshader_icd.json
+#
+# If you used a custom instllation directory then the correct path will be
+# printed to stdout.
 #
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
+CYGPATH="$(which cygpath 2>/dev/null)"
+
+if [[ -z "${CYGPATH?}" ]]; then
+  # Anything that isn't Windows.
+  BASE_DIR="${1:-${HOME?}}"
+  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}/.swiftshader"
+else
+  # Windows.
+  BASE_DIR="${1:-${USERPROFILE?}}"
+  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\\.swiftshader'
+fi
+
 SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
 SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
-SWIFTSHADER_INSTALL_DIR="${1:-${HOME?}/.swiftshader}"
 
 #  Clone swiftshader and checkout the appropriate commit.
 git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
@@ -70,5 +98,5 @@ echo "Ensure the following variable is set in your enviroment:"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
   echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
 else
-  echo '  $env:VK_ICD_FILENAMES = Resolve-Path' '"'"${SWIFTSHADER_INSTALL_DIR?}/Windows/vk_swiftshader_icd.json"'"'
+  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\\Windows\\vk_swiftshader_icd.json'
 fi
