@@ -98,5 +98,5 @@ echo "Ensure the following variable is set in your enviroment:"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
   echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
 else
-  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\\Windows\\vk_swiftshader_icd.json'
+  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\Windows\vk_swiftshader_icd.json'
 fi
