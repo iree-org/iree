@@ -38,9 +38,12 @@ PYBIND_FEATURES = select({
     ],
 })
 
-PYBIND_EXTENSION_COPTS = [
-    "-fvisibility=hidden",
-]
+PYBIND_EXTENSION_COPTS = select({
+    "//iree:iree_is_msvc": [],
+    "//conditions:default": [
+        "-fvisibility=hidden",
+    ],
+})
 
 # Optional deps to enable an intree TensorFlow python. This build configuration
 # defaults to getting TensorFlow from the python environment (empty).
