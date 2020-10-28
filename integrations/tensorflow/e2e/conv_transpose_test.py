@@ -26,11 +26,11 @@ class ConvTransposeModule(tf.Module):
       tf.TensorSpec([1, 16, 16, 32], tf.float32),
       tf.TensorSpec([1, 1, 32, 32], tf.float32),
   ])
-  def conv2d_transpose_same(self, filt, out_backprop):
+  def conv2d_transpose_same(self, filt, img):
     input_sizes = [1, 1, 264, 16]
     strides = [1, 1, 8, 1]
     padding = "VALID"
-    return tf.nn.conv2d_transpose(out_backprop,
+    return tf.nn.conv2d_transpose(img,
                                   filt,
                                   input_sizes,
                                   strides,
@@ -47,10 +47,10 @@ class ConvTransposeTest(tf_test_utils.TracedModuleTestCase):
   # yapf: disable
   def test_transposed(self):
     def transposed(module):
-      f = tf_utils.ndarange([1, 16, 16, 32])
-      u = tf_utils.ndarange([1, 1, 32, 32])
+      kernel = tf_utils.ndarange([1, 16, 16, 32])
+      img = tf_utils.ndarange([1, 1, 32, 32])
 
-      module.conv2d_transpose_same(f, u)
+      module.conv2d_transpose_same(kernel, img)
     self.compare_backends(transposed, self._modules)
   # yapf: enable
 
