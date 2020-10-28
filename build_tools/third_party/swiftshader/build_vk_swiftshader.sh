@@ -43,7 +43,7 @@ set -e
 #
 #   set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 #
-# If you used a custom instllation directory then the correct path will be
+# If you used a custom installation directory then the correct path will be
 # printed to stdout.
 #
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
