@@ -52,7 +52,7 @@ TEST_SUITES_TO_HEADERS = {
         f'End to end tests of {KWS_LINK} models',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         f'End to end tests of {KWS_LINK} models in internal streaming mode',
-    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
+    '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'End to end tests of tf.keras.applications vision models on Imagenet',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'End to end tests of TensorFlow slim vision models',
@@ -65,7 +65,7 @@ TEST_SUITE_TO_ROW_ID_KEY = {
         'model',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         'model',
-    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
+    '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'model',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'model',
@@ -78,7 +78,7 @@ SINGLE_SOURCE_SUITES = {
         'keyword_spotting_streaming_test',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         'keyword_spotting_streaming_test',
-    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
+    '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'vision_model_test',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'slim_vision_model_test',
