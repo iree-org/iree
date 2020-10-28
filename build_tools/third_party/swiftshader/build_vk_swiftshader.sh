@@ -36,15 +36,11 @@ SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
 SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
 SWIFTSHADER_INSTALL_DIR="${1:-${HOME?}/.swiftshader}"
 
-# Ensure that we're at the top level iree/ git directory.
-IREE_DIR="$(git rev-parse --show-toplevel)"
-
 #  Clone swiftshader and checkout the appropriate commit.
 git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
 cd "${SWIFTSHADER_DIR?}"
 git pull origin master --ff-only
 git checkout "${SWIFTSHADER_COMMIT?}"
-cd "${IREE_DIR?}"
 
 # Install swiftshader in SWIFTSHADER_INSTALL_DIR.
 # Options:
@@ -74,5 +70,5 @@ echo "Ensure the following variable is set in your enviroment:"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
   echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
 else
-  echo '  $env:VK_ICD_FILENAMES = Resolve-Path' "${SWIFTSHADER_INSTALL_DIR?}/Windows/vk_swiftshader_icd.json"
+  echo '  $env:VK_ICD_FILENAMES = Resolve-Path' '"'"${SWIFTSHADER_INSTALL_DIR?}/Windows/vk_swiftshader_icd.json"'"'
 fi
