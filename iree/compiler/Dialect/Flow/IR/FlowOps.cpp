@@ -491,6 +491,14 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 // flow.executable
 //===----------------------------------------------------------------------===//
 
+DispatchEntryOp ExecutableOp::getDispatchEntryOp() {
+  auto dispatchEntryOps =
+      llvm::to_vector<1>(getBlock().getOps<DispatchEntryOp>());
+  assert(dispatchEntryOps.size() == 1 &&
+         "executable must have one dispatch entry");
+  return dispatchEntryOps.front();
+}
+
 void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);

@@ -161,12 +161,24 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // undo all of our work!
   passManager.addPass(IREE::Flow::createRematerializeDispatchConstantsPass());
 
-  // Outline the dispatch regions into their own functions. This separates the
-  // sequencer functions performing dispatches from the dispatchees.
+  // Outline the dispatch regions into their own functions wrapped in
+  // executables. This separates sequencer functions performing dispatches from
+  // dispatchees.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+  // Deduplicate executables created from dispatch regions.
+  // Note: this only deduplicates identical executables. We could in addition
+  // generalize executables to prune further (e.g. by promoting a dimension to
+  // an argument if two executables differ only in that one dimension).
+  passManager.addNestedPass<ExecutableOp>(createComputeExecutableHashesPass());
+  // Barrier between computing hashes and comparing them.
+  // TODO(scotttodd): Find a better way to represent this?
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addNestedPass<ExecutableOp>(createFindDuplicateExecutablesPass());
+  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Convert any leftover ops outside of dispatch regions to flow ops.
   passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());

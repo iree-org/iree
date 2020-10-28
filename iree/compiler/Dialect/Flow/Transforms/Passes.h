@@ -132,9 +132,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createCreateBenchmarkFuncs();
 // Optimizations
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): pass to dedupe similar executables (by making dynamically
-// shaped, adjusting types, etc).
-
 // Outlines large tensor constants into flow.variables at the module level.
 //
 // NOTE: a total guess :) this feels like about the most per-dispatch-buffer
@@ -142,6 +139,17 @@ std::unique_ptr<OperationPass<ModuleOp>> createCreateBenchmarkFuncs();
 static constexpr size_t kMinLargeConstantSize = 256;
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize = kMinLargeConstantSize);
+
+// Computes hashes of executable ops for future deduplication.
+std::unique_ptr<OperationPass<ExecutableOp>>
+createComputeExecutableHashesPass();
+
+// Finds which executables are duplicates of earlier executables.
+std::unique_ptr<OperationPass<ExecutableOp>>
+createFindDuplicateExecutablesPass();
+
+// Deduplicates executables that share hashes.
+std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass();
 
 //===----------------------------------------------------------------------===//
 // Stream Formation and Folding
@@ -191,8 +199,10 @@ inline void registerFlowPasses() {
   createFoldCompatibleDispatchRegionsPass();
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
-  createOutlineLargeConstantsPass();
   createCreateBenchmarkFuncs();
+  createComputeExecutableHashesPass();
+  createFindDuplicateExecutablesPass();
+  createDeduplicateExecutablesPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();
   createStripAndSplatConstantVariablesPass();
