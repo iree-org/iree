@@ -15,26 +15,26 @@
 # limitations under the License.
 set -e
 
-# Call this script **from the project root** to build SwiftShader's Vulkan ICD:
+# Call this script to build SwiftShader's Vulkan ICD:
 #   $ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
+#
+# The default installation directory is `${HOME?}/.swiftshader`, but it can be
+# overridden as follows:
+#   $ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh <swiftshader-install-dir>
 #
 # Note that you will need a working CMake installation for this script to
 # succeed. On Windows, Visual Studio 2019 is recommended.
 #
 # Afterwards, set the VK_ICD_FILENAMES environment variable to the absolute
 # path of the corresponding vk_swiftshader_icd.json manifest file so the Vulkan
-# loader on your system loads it, for example:
-#   Windows
-#   $ set VK_ICD_FILENAMES=C:\dev\iree\build-swiftshader\Windows\vk_swiftshader_icd.json
-#
-#   Linux
-#   $ VK_ICD_FILENAMES=/dev/iree/build-swiftshader/Linux/vk_swiftshader_icd.json
+# loader on your system loads it.
 #
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
 SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
 SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
+SWIFTSHADER_INSTALL_DIR="${1:-${HOME?}/.swiftshader}"
 
 # Ensure that we're at the top level iree/ git directory.
 IREE_DIR="$(git rev-parse --show-toplevel)"
@@ -46,18 +46,17 @@ git pull origin master --ff-only
 git checkout "${SWIFTSHADER_COMMIT?}"
 cd "${IREE_DIR?}"
 
-# Generate build system in build-swiftshader/
-#
+# Install swiftshader in SWIFTSHADER_INSTALL_DIR.
 # Options:
 #   - 64 bit platform and host compiler
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 
-if [[ -d "build-swiftshader" ]]; then
-  rm -rf build-swiftshader/
+if [[ -d "${SWIFTSHADER_INSTALL_DIR?}" ]]; then
+  rm -rf "${SWIFTSHADER_INSTALL_DIR?}"
 fi
 
-cmake -B build-swiftshader/ \
+cmake -B "${SWIFTSHADER_INSTALL_DIR?}" \
     -GNinja \
     -DSWIFTSHADER_BUILD_VULKAN=ON \
     -DSWIFTSHADER_BUILD_EGL=OFF \
@@ -68,8 +67,12 @@ cmake -B build-swiftshader/ \
     "${SWIFTSHADER_DIR?}"
 
 # Build the project, choosing just the vk_swiftshader target.
-cmake --build build-swiftshader/ --config Release --target vk_swiftshader
+cmake --build "${SWIFTSHADER_INSTALL_DIR?}" --config Release --target vk_swiftshader
 
-# Outputs if successful:
-#   Linux:   build-swiftshader/Linux/libvk_swiftshader.so
-#   Windows: build-swiftshader/Windows/vk_swiftshader.dll
+echo
+echo "Ensure the following variable is set in your enviroment:"
+if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
+  echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
+else
+  echo '  $env:VK_ICD_FILENAMES = Resolve-Path' "${SWIFTSHADER_INSTALL_DIR?}/Windows/vk_swiftshader_icd.json"
+fi
