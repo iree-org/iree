@@ -84,7 +84,7 @@ class StripAndSplatConstantVariablesPass
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createStripAndSplatConstantVariablesPass() {
-  return std::make_unique<StripAndSplatConstantVariablesPass>();  // NOLINT
+  return std::make_unique<StripAndSplatConstantVariablesPass>();
 }
 
 static PassRegistration<StripAndSplatConstantVariablesPass> pass(
