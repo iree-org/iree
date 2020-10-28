@@ -26,9 +26,9 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Function.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -136,7 +136,7 @@ void DeclareNumWorkgroupsFnPass::runOnOperation() {
   OwningRewritePatternList patterns;
   MLIRContext *context = &getContext();
   patterns.insert<DeclareNumWorkgroupsFn>(context);
-  applyPatternsAndFoldGreedily(getOperation(), patterns);
+  applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass() {

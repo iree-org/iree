@@ -85,7 +85,7 @@ class ConvertHLOToShapePass
     conversionPatterns.insert<ConvertDynamicIota>(&getContext());
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns))) {
+                                      std::move(conversionPatterns)))) {
       return signalPassFailure();
     }
   }

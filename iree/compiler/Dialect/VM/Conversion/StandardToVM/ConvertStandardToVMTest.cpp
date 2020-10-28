@@ -47,7 +47,8 @@ class ConvertStandardToVMTestPass
     // NOTE: we allow other dialects besides just VM during this pass as we are
     // only trying to eliminate the std ops. When used as part of a larger set
     // of rewrites a full conversion should be used instead.
-    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       return signalPassFailure();
     }
   }

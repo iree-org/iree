@@ -173,7 +173,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     }
   }
 
-  if (failed(applyFullConversion(moduleOp, target, patterns))) {
+  if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
     return moduleOp.emitError() << "unable to fully apply conversion to module";
   }
 

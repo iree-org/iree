@@ -28,6 +28,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -54,7 +55,7 @@ class MaterializeShapeCalculationsPass
     populateMaterializeShapeCalculationsConversionPatterns(conversionPatterns,
                                                            context);
     if (failed(applyPartialConversion(getOperation(), target,
-                                      conversionPatterns))) {
+                                      std::move(conversionPatterns)))) {
       signalPassFailure();
       return;
     }
@@ -70,7 +71,7 @@ class MaterializeShapeCalculationsPass
     RankedDimsOp::getCanonicalizationPatterns(patterns, context);
     TieShapeOp::getCanonicalizationPatterns(patterns, context);
     FromExtentTensorOp::getCanonicalizationPatterns(patterns, context);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

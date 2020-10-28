@@ -51,7 +51,7 @@ def VM_ModuleOp : VM_Op<"module", [
   // the auto-generated builders do not guarantee that.
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{StringRef name}]>,
+    OpBuilderDAG<(ins "StringRef":$name)>,
   ];
 
   let extraClassDeclaration = [{
@@ -95,11 +95,9 @@ def VM_FuncOp : VM_Op<"func", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      StringRef name,
-      FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<MutableDictionaryAttr> argAttrs = {}
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$name, "FunctionType":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<MutableDictionaryAttr>", "{}">:$argAttrs)>,
   ];
 
   let extraClassDeclaration = [{
@@ -159,14 +157,12 @@ def VM_ExportOp : VM_Op<"export", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      FuncOp functionRef,
-      StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
-    }]>,
-    OpBuilder<[{
-      FlatSymbolRefAttr functionRef,
-      StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
-    }]>,
+    OpBuilderDAG<(ins "FuncOp":$functionRef,
+      CArg<"StringRef", [{""}]>:$exportName,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilderDAG<(ins "FlatSymbolRefAttr":$functionRef,
+      CArg<"StringRef", [{""}]>:$exportName,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 }
 
@@ -189,11 +185,9 @@ def VM_ImportOp : VM_Op<"import", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      StringRef name,
-      FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<MutableDictionaryAttr> argAttrs = {}
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$name, "FunctionType":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<MutableDictionaryAttr>", "{}">:$argAttrs)>,
   ];
 
   let extraClassDeclaration = [{
@@ -267,11 +261,10 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      StringRef name, bool isMutable, Type type,
-      Optional<StringRef> initializer, Optional<Attribute> initialValue,
-      ArrayRef<NamedAttribute> attrs = {}
-    }], [{
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+      "Optional<StringRef>":$initializer, "Optional<Attribute>":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    [{
       $_state.addAttribute(SymbolTable::getSymbolAttrName(),
                           $_builder.getStringAttr(name));
       if (isMutable) {
@@ -287,24 +280,23 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       $_state.addAttribute("type", TypeAttr::get(type));
       $_state.attributes.append(attrs.begin(), attrs.end());
     }]>,
-    OpBuilder<[{
-      StringRef name, bool isMutable, IREE::VM::FuncOp initializer,
-      ArrayRef<NamedAttribute> attrs = {}
-    }], [{
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable,
+      "IREE::VM::FuncOp":$initializer,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    [{
       build($_builder, $_state, name, isMutable,
             initializer.getType().getResult(0), initializer.getName(),
             llvm::None, attrs);
     }]>,
-    OpBuilder<[{
-      StringRef name, bool isMutable, Type type, Attribute initialValue,
-      ArrayRef<NamedAttribute> attrs = {}
-    }], [{
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+      "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    [{
       build($_builder, $_state, name, isMutable, type, llvm::None, initialValue,
             attrs);
     }]>,
-    OpBuilder<[{
-      StringRef name, bool isMutable, Type type, ArrayRef<NamedAttribute> attrs = {}
-    }], [{
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    [{
       build($_builder, $_state, name, isMutable, type, llvm::None, llvm::None,
             attrs);
     }]>,
@@ -626,12 +618,8 @@ class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
     ])> {
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      Attribute value
-    }]>,
-    OpBuilder<[{
-      }] # ctype # [{ value
-    }]>,
+    OpBuilderDAG<(ins "Attribute":$value)>,
+    OpBuilderDAG<(ins ctype:$value)>,
   ];
 
   let extraClassDeclaration = [{
@@ -701,7 +689,7 @@ class VM_ConstIntegerZeroOp<I type, string mnemonic, VM_OPC opcode,
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{}]>,
+    OpBuilderDAG<(ins)>,
   ];
 }
 
@@ -742,9 +730,7 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      Type objectType
-    }]>,
+    OpBuilderDAG<(ins "Type":$objectType)>,
   ];
 
   let hasFolder = 1;
@@ -775,10 +761,8 @@ def VM_RodataOp : VM_Op<"rodata", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      StringRef name,
-      ElementsAttr value, ArrayRef<NamedAttribute> attrs = {}
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$name, "ElementsAttr":$value,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 }
 
@@ -808,14 +792,10 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      StringRef rodataName,
-      ArrayRef<NamedAttribute> attrs = {}
-    }]>,
-    OpBuilder<[{
-      RodataOp rodataOp,
-      ArrayRef<NamedAttribute> attrs = {}
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$rodataName,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilderDAG<(ins "RodataOp":$rodataOp,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
   let verifier = [{ return verify$cppClass(*this); }];
@@ -1949,9 +1929,8 @@ def VM_BranchOp : VM_Op<"br", [
   ];
 
   let builders = [
-    OpBuilder<[{
-      Block *dest, ValueRange destOperands = {}
-    }], [{
+    OpBuilderDAG<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands),
+    [{
       $_state.addSuccessors(dest);
       $_state.addOperands(destOperands);
   }]>];
@@ -2014,17 +1993,16 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   ];
 
   let builders = [
-    OpBuilder<[{
-      Value condition,
-      Block *trueDest, ValueRange trueOperands,
-      Block *falseDest, ValueRange falseOperands
-    }], [{
+    OpBuilderDAG<(ins "Value":$condition, "Block *":$trueDest,
+      "ValueRange":$trueOperands, "Block *":$falseDest,
+      "ValueRange":$falseOperands),
+    [{
       build($_builder, $_state, condition, trueOperands, falseOperands, trueDest,
             falseDest);
-    }]>, OpBuilder<[{
-      Value condition,
-      Block *trueDest, Block *falseDest, ValueRange falseOperands = {}
-    }], [{
+    }]>,
+  OpBuilderDAG<(ins "Value":$condition, "Block *":$trueDest,
+    "Block *":$falseDest, CArg<"ValueRange", "{}">:$falseOperands),
+  [{
       build($_builder, $_state, condition, trueDest, ValueRange(), falseDest,
             falseOperands);
     }]>
@@ -2150,23 +2128,23 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      IREE::VM::FuncOp callee, ValueRange operands = {}
-    }], [{
+    OpBuilderDAG<(ins "IREE::VM::FuncOp":$callee,
+      CArg<"ValueRange", "{}">:$operands),
+    [{
       $_state.addOperands(operands);
       $_state.addAttribute("callee", $_builder.getSymbolRefAttr(callee));
       $_state.addTypes(callee.getType().getResults());
     }]>,
-    OpBuilder<[{
-      FlatSymbolRefAttr callee, ArrayRef<Type> resultTypes, ValueRange operands = {}
-    }], [{
+    OpBuilderDAG<(ins "FlatSymbolRefAttr":$callee,
+      "ArrayRef<Type>":$resultTypes, CArg<"ValueRange", "{}">:$operands),
+    [{
       $_state.addOperands(operands);
       $_state.addAttribute("callee", callee);
       $_state.addTypes(resultTypes);
     }]>,
-    OpBuilder<[{
-      StringRef callee, ArrayRef<Type> resultTypes, ValueRange operands = {}
-    }], [{
+    OpBuilderDAG<(ins "StringRef":$callee, "ArrayRef<Type>":$resultTypes,
+      CArg<"ValueRange", "{}">:$operands),
+    [{
       build($_builder, $_state, $_builder.getSymbolRefAttr(callee),
             resultTypes, operands);
     }]>,
@@ -2205,11 +2183,12 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      FlatSymbolRefAttr callee,
-      ArrayRef<Type> resultTypes, ArrayRef<int16_t> segmentSizes = {},
-      ArrayRef<Type> segmentTypes = {}, ValueRange operands = {}
-    }], [{
+    OpBuilderDAG<(ins "FlatSymbolRefAttr":$callee,
+      "ArrayRef<Type>":$resultTypes,
+      CArg<"ArrayRef<int16_t>", "{}">:$segmentSizes,
+      CArg<"ArrayRef<Type>", "{}">:$segmentTypes,
+      CArg<"ValueRange", "{}">:$operands),
+    [{
       $_state.addAttribute("callee", callee);
       $_state.addAttribute("segment_sizes",
           DenseIntElementsAttr::get(
@@ -2256,7 +2235,8 @@ def VM_ReturnOp : VM_Op<"return", [
   ];
 
   let builders = [
-    OpBuilder<[{}], [{
+    OpBuilderDAG<(ins),
+    [{
       build($_builder, $_state, llvm::None);
     }]>,
   ];
@@ -2301,9 +2281,8 @@ def VM_FailOp : VM_Op<"fail", [
   ];
 
   let builders = [
-    OpBuilder<[{
-      Value status, StringRef message = ""
-    }], [{
+    OpBuilderDAG<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
+    [{
       build(
           $_builder, $_state, status,
           message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
@@ -2347,16 +2326,15 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
   );
 
   let builders = [
-    OpBuilder<[{
-      Value condition, Value status, StringRef message = ""
-    }], [{
+    OpBuilderDAG<(ins "Value":$condition, "Value":$status,
+      CArg<"StringRef", [{""}]>:$message),
+    [{
       build(
           $_builder, $_state, condition, status,
           message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
     }]>,
-    OpBuilder<[{
-      Value status, StringRef message = ""
-    }], [{
+    OpBuilderDAG<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
+    [{
       build($_builder, $_state, status, status, message);
     }]>,
   ];
@@ -2401,9 +2379,8 @@ class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 
   let builders = [
-    OpBuilder<[{
-      Value value, StringRef message = ""
-    }], [{
+    OpBuilderDAG<(ins "Value":$value, CArg<"StringRef", [{""}]>:$message),
+    [{
       build(
           $_builder, $_state, value,
           message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
@@ -2426,9 +2403,9 @@ class VM_BinaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 
   let builders = [
-    OpBuilder<[{
-      Value lhs, Value rhs, StringRef message = ""
-    }], [{
+    OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs,
+      CArg<"StringRef", [{""}]>:$message),
+    [{
       build(
           $_builder, $_state, lhs, rhs,
           message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
@@ -2570,9 +2547,8 @@ def VM_BreakOp : VM_Op<"break", [
   ];
 
   let builders = [
-    OpBuilder<[{
-      Block *dest, ValueRange destOperands = {}
-    }], [{
+    OpBuilderDAG<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands),
+    [{
       $_state.addSuccessors(dest);
       $_state.addOperands(destOperands);
   }]>];
@@ -2624,9 +2600,9 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   ];
 
   let builders = [
-    OpBuilder<[{
-      Value condition, Block *dest, ValueRange destOperands = {}
-    }], [{
+    OpBuilderDAG<(ins "Value":$condition, "Block *":$dest,
+      CArg<"ValueRange", "{}">:$destOperands),
+    [{
       $_state.addOperands({condition});
       $_state.addOperands(destOperands);
       $_state.addSuccessors(dest);

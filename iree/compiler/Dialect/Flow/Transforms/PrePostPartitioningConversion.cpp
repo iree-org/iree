@@ -103,7 +103,7 @@ class PrePartitioningConversionPass
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns))) {
+                                      std::move(conversionPatterns)))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }
@@ -133,7 +133,7 @@ class PostPartitioningConversionPass
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns))) {
+                                      std::move(conversionPatterns)))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }

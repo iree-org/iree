@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 // Pass to combine instructions across ForOp boundary. It is common when doing
 // incremental lowering to generate transient ops that cancel each others out.
@@ -135,7 +136,7 @@ struct ForOpCanonicalizationPass
     FuncOp fn = getFunction();
     OwningRewritePatternList patterns;
     patterns.insert<ForOpArgFolding>(fn.getContext());
-    applyPatternsAndFoldGreedily(fn, patterns);
+    applyPatternsAndFoldGreedily(fn, std::move(patterns));
   }
 };
 }  // namespace

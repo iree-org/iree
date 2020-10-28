@@ -97,7 +97,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   target.addIllegalOp<TF::TensorListConcatV2Op>();
   target.addIllegalOp<TF::TensorListStackOp>();
 
-  if (failed(applyPartialConversion(func, target, patterns))) {
+  if (failed(applyPartialConversion(func, target, std::move(patterns)))) {
     func.emitError() << "unable to lower to tf_tensorlist dialect";
     return signalPassFailure();
   }

@@ -360,7 +360,7 @@ void VectorizeMemRefPass::runOnOperation() {
       return !memrefUsageAnalysis->transferConvert(op);
     return true;
   });
-  if (failed(applyPartialConversion(module, target, patterns)))
+  if (failed(applyPartialConversion(module, target, std::move(patterns))))
     return signalPassFailure();
 }
 

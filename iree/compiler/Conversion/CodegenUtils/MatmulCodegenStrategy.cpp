@@ -49,6 +49,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -212,7 +213,7 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
   // Emplace patterns one at a time while also maintaining a simple chained
   // state transition.
   unsigned stepCount = 0;
-  SmallVector<OwningRewritePatternList, 4> stage1Patterns;
+  SmallVector<FrozenRewritePatternList, 4> stage1Patterns;
   auto zeroState = Identifier::get(std::to_string(stepCount), context);
   auto currentState = zeroState;
   for (auto &t : transformationSequence) {
@@ -235,7 +236,7 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
     promoteSingleIterationLoops(cast<FuncOp>(op));
     return success();
   };
-  linalg::applyStagedPatterns(func, stage1Patterns, stage2Patterns,
+  linalg::applyStagedPatterns(func, stage1Patterns, std::move(stage2Patterns),
                               stage3Transforms);
 
   auto postStageTransforms = [this](Operation *op) {
@@ -267,13 +268,13 @@ static void cpuLowering(
               ContractionOpToMatmulOpLowering, ContractionOpLowering>(
           vectorTransformsOptions, context);
 
-  applyPatternsAndFoldGreedily(func, vectorContractLoweringPatterns);
+  applyPatternsAndFoldGreedily(func, std::move(vectorContractLoweringPatterns));
 
   // Programmatic controlled lowering of vector.transfer only.
   OwningRewritePatternList vectorToLoopsPatterns;
   populateVectorToSCFConversionPatterns(vectorToLoopsPatterns, context,
                                         vectorToSCFOptions);
-  applyPatternsAndFoldGreedily(func, vectorToLoopsPatterns);
+  applyPatternsAndFoldGreedily(func, std::move(vectorToLoopsPatterns));
 }
 
 MatmulCodegenStrategy &MatmulCodegenStrategy::setDefaultCPULowering() {

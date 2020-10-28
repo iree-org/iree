@@ -137,7 +137,7 @@ class ConversionPass
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
-                                      conversionPatterns))) {
+                                      std::move(conversionPatterns)))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }
