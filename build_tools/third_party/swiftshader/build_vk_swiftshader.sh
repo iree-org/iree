@@ -35,15 +35,15 @@ set -e
 # Afterward, you'll need to set the `VK_ICD_FILENAMES` environment variable to
 # the absolute path of the `vk_swiftshader_icd.json` manifest file. This tells
 # the Vulkan loader on your system to load it. Assuming you use the default
-# installation directory this can be done on not-windows via:
+# installation directory this can be done on not-Windows via:
 #
 #   export VK_ICD_FILENAMES="${HOME?}/.swiftshader/Linux/vk_swiftshader_icd.json"
 #
-# or on windows via:
+# or on Windows via:
 #
 #   set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 #
-# If you used a custom instllation directory then the correct path will be
+# If you used a custom installation directory then the correct path will be
 # printed to stdout.
 #
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
@@ -58,7 +58,7 @@ if [[ -z "${CYGPATH?}" ]]; then
 else
   # Windows.
   BASE_DIR="${1:-${USERPROFILE?}}"
-  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\\.swiftshader'
+  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\.swiftshader'
 fi
 
 SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
@@ -76,7 +76,9 @@ git checkout "${SWIFTSHADER_COMMIT?}"
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 
+echo "Installing to ${SWIFTSHADER_INSTALL_DIR}"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}" ]]; then
+  echo "  Install directory already exists, cleaning it"
   rm -rf "${SWIFTSHADER_INSTALL_DIR?}"
 fi
 
@@ -98,5 +100,5 @@ echo "Ensure the following variable is set in your enviroment:"
 if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
   echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
 else
-  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\\Windows\\vk_swiftshader_icd.json'
+  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\Windows\vk_swiftshader_icd.json'
 fi
