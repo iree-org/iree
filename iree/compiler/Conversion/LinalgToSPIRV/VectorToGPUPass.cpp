@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===---- VectorToGPUPass.cpp - Pass for the final SPIR-V conversion
-//-------===//
+//===---- VectorToGPUPass.cpp - Pass for the final SPIR-V conversion ------===//
 //
 // This file implement a pass to convert vector dialect operations to GPU
 // operations distributed across a subgroup.
@@ -53,12 +52,8 @@ static const int subgroupSize = 32;
 struct ConvertVectorToGPUPass
     : public PassWrapper<ConvertVectorToGPUPass, OperationPass<FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry.insert<AffineDialect,
-                    gpu::GPUDialect,
-                    scf::SCFDialect,
+    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
                     vector::VectorDialect>();
-    // clang-format on
   }
 
   void runOnOperation() override;
