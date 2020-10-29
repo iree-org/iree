@@ -425,6 +425,7 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
 // VMLA Ops: Convolution
 //===----------------------------------------------------------------------===//
 
+// Handles both Convolutions and Transpose convolutions.
 def VLMA_ConvOp : VMLA_Op<"conv", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_Buffer:$input,
