@@ -479,7 +479,8 @@ TEST(Conv2d, NoDilation) {
   Shape strides = {1, 1};
   Shape pad_h = {0, 0};
   Shape pad_w = {0, 0};
-  Shape dilation = {1, 1};
+  Shape lhs_dilation = {1, 1};
+  Shape rhs_dilation = {1, 1};
   std::vector<float> input_buffer(GetShapeElementCount(input_shape));
   std::vector<float> filter_buffer(GetShapeElementCount(filter_shape));
   std::vector<float> expected_dst = {1310, 1466, 1622, 1778,
@@ -492,10 +493,10 @@ TEST(Conv2d, NoDilation) {
   }
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
-  IREE_EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape,
-                                        filter_buffer, filter_shape,
-                                        absl::MakeSpan(dst_buffer), dst_shape,
-                                        strides, pad_h, pad_w, dilation, 1));
+  IREE_EXPECT_OK(Conv2D::Execute<float>(
+      input_buffer, input_shape, filter_buffer, filter_shape,
+      absl::MakeSpan(dst_buffer), dst_shape, strides, pad_h, pad_w,
+      lhs_dilation, rhs_dilation, 1));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
@@ -509,7 +510,8 @@ TEST(Conv2d, DepthwiseConv) {
   Shape strides = {1, 1};
   Shape pad_h = {0, 0};
   Shape pad_w = {0, 0};
-  Shape dilation = {1, 1};
+  Shape lhs_dilation = {1, 1};
+  Shape rhs_dilation = {1, 1};
   std::vector<float> input_buffer(GetShapeElementCount(input_shape));
   std::vector<float> filter_buffer(GetShapeElementCount(filter_shape));
   std::vector<float> expected_dst = {
@@ -524,10 +526,10 @@ TEST(Conv2d, DepthwiseConv) {
   }
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
-  IREE_EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape,
-                                        filter_buffer, filter_shape,
-                                        absl::MakeSpan(dst_buffer), dst_shape,
-                                        strides, pad_h, pad_w, dilation, 2));
+  IREE_EXPECT_OK(Conv2D::Execute<float>(
+      input_buffer, input_shape, filter_buffer, filter_shape,
+      absl::MakeSpan(dst_buffer), dst_shape, strides, pad_h, pad_w,
+      lhs_dilation, rhs_dilation, 2));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);

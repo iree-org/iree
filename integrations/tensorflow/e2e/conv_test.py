@@ -30,6 +30,28 @@ class Conv2dModule(tf.Module):
     return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
 
   @tf.function(input_signature=[
+      tf.TensorSpec([1, 4, 5, 1], tf.float32),
+      tf.TensorSpec([2, 2, 1, 1], tf.float32),
+  ])
+  def conv2d_1451x2211_dilated_valid(self, img, kernel):
+    return tf.nn.conv2d(img,
+                        kernel, [1, 1, 1, 1],
+                        "VALID",
+                        dilations=[1, 2, 1, 1],
+                        name="result")
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([1, 4, 5, 2], tf.float32),
+      tf.TensorSpec([2, 2, 2, 3], tf.float32),
+  ])
+  def conv2d_1452x2223_dilated_valid(self, img, kernel):
+    return tf.nn.conv2d(img,
+                        kernel, [1, 1, 1, 1],
+                        "VALID",
+                        dilations=[1, 2, 1, 1],
+                        name="result")
+
+  @tf.function(input_signature=[
       tf.TensorSpec([2, 4, 5, 1], tf.float32),
       tf.TensorSpec([1, 1, 1, 1], tf.float32),
   ])
@@ -109,21 +131,35 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
   # yapf: disable
   def test_id_batch_size_1(self):
     def id_batch_size_1(module):
-      i = tf_utils.ndarange([1, 4, 5, 1])
-      k = np.ones([1, 1, 1, 1], dtype=np.float32)
+      i = tf_utils.uniform([1, 4, 5, 1])
+      k = tf_utils.uniform([1, 1, 1, 1], dtype=np.float32)
       module.conv2d_1451x1111_valid(i, k)
+    self.compare_backends(id_batch_size_1, self._modules)
+
+  def test_id_dilated(self):
+    def id_batch_size_1(module):
+      i = tf_utils.uniform([1, 4, 5, 1])
+      k = tf_utils.uniform([2, 2, 1, 1], dtype=np.float32)
+      module.conv2d_1451x2211_dilated_valid(i, k)
+    self.compare_backends(id_batch_size_1, self._modules)
+
+  def test_id_multichannel_dilated(self):
+    def id_batch_size_1(module):
+      i = tf_utils.uniform([1, 4, 5, 2])
+      k = tf_utils.uniform([2, 2, 2, 3], dtype=np.float32)
+      module.conv2d_1452x2223_dilated_valid(i, k)
     self.compare_backends(id_batch_size_1, self._modules)
 
   def test_id_batch_size_2(self):
     def id_batch_size_2(module):
-      i = tf_utils.ndarange([2, 4, 5, 1])
-      k = np.ones([1, 1, 1, 1], dtype=np.float32)
+      i = tf_utils.uniform([2, 4, 5, 1])
+      k = tf_utils.uniform([1, 1, 1, 1], dtype=np.float32)
       module.conv2d_2451x1111_valid(i, k)
     self.compare_backends(id_batch_size_2, self._modules)
 
   def test_asymmetric_kernel(self):
     def asymmetric_kernel(module):
-      i = tf_utils.ndarange([1, 4, 5, 1])
+      i = tf_utils.uniform([1, 4, 5, 1])
       k = np.array([[1, 4, 2], [-2, 0, 1]],
                    dtype=np.float32).reshape(2, 3, 1, 1)
       module.conv2d_1451x2311_valid(i, k)

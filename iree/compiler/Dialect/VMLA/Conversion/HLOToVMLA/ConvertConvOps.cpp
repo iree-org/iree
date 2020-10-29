@@ -138,12 +138,6 @@ struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
     fill_optional(op.lhs_dilation(), &lhsDilation);
     fill_optional(op.rhs_dilation(), &rhsDilation);
 
-    // Lower only what VMLA runtime supports.
-    if (rhsDilation[0] != 1 || rhsDilation[1] != 1) {
-      op.emitWarning() << "De-convoution isn't supported";
-      return failure();
-    }
-
     if (batchGroupCount != 1) {
       op.emitWarning() << "Batch group convoution isn't supported";
       return failure();

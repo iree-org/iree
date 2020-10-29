@@ -82,7 +82,6 @@ TFLITE_FAILING = [
 # keep sorted
 VMLA_FAILING = [
     "batch_to_space_nd_test.py",
-    "conv_transpose_test.py",
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",

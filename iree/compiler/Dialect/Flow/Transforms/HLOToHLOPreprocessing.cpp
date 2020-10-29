@@ -114,6 +114,16 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
     if (!hasPadding(op)) return failure();
     auto inputType = op.lhs().getType().cast<ShapedType>();
     int rank = inputType.getRank();
+
+    // We can't extract padding if the left hand side has dilation.
+    if (op.lhs_dilation().hasValue()) {
+      for (auto val : op.lhs_dilation().getValue().getIntValues()) {
+        if (val != 1) {
+          return failure();
+        }
+      }
+    }
+
     SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
     paddingLow.append(rank, 0);
     paddingHigh.append(rank, 0);
