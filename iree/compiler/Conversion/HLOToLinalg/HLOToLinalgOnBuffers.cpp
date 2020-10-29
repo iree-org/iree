@@ -758,12 +758,9 @@ LogicalResult ReduceWindowOpConversion::apply(
   auto memrefType = MemRefType::get(shapes, type);
   auto fakeWindowDims = rewriter.create<AllocOp>(loc, memrefType);
 
-  llvm::SmallVector<Attribute, 4> strides;
-  if (op.window_strides().hasValue()) {
-    strides.insert(strides.begin(),
-                   op.window_strides().getValue().getAttributeValues().begin(),
-                   op.window_strides().getValue().getAttributeValues().end());
-  }
+  llvm::SmallVector<Attribute, 4> strides(
+      op.window_strides().getAttributeValues().begin(),
+      op.window_strides().getAttributeValues().end());
   auto stridesArg = ArrayAttr::get(strides, op.getContext());
 
   // TODO(hanchung): Use template lambda after migrating to C++20.
