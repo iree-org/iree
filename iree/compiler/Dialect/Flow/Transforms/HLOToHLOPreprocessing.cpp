@@ -115,6 +115,7 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
     auto inputType = op.lhs().getType().cast<ShapedType>();
     int rank = inputType.getRank();
 
+    // TODO(suderman): Add proper support for padding + dilation for codegen.
     // We can't extract padding if the left hand side has dilation.
     if (op.lhs_dilation().hasValue()) {
       for (auto val : op.lhs_dilation().getValue().getIntValues()) {
