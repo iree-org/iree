@@ -66,8 +66,18 @@ clone the repository, initialize its submodules, and configure:
 ```
 
 > Tip:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;Clone to a short path like `C:\projects\` to avoid
+> issues with Windows maximum path lengths (260 characters).
+
+> Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
+
+> Tip:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;configure_bazel.py only detects that you have Windows
+> and will output the default `--config=windows` to `configured.bazelrc`, which
+> assumes the latest version of MSVC. To avoid some warnings, you may want to
+> replace it with `--config=msvc2017`.
 
 ### Build
 

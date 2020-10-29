@@ -88,11 +88,12 @@ $ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
 
 <!-- TODO(scotttodd): Steps to download prebuilt binaries when they exist -->
 
-After building, set the `VK_ICD_FILENAMES` environment variable so the Vulkan
-loader uses the ICD:
+After building, the script will prompt your to add a variable `VK_ICD_FILENAMES`
+to your environment to tell the Vulkan loader to use the ICD. Assuming it was
+installed in the default location, this can be done via:
 
 ```powershell
-> $env:VK_ICD_FILENAMES = Resolve-Path "build-swiftshader/Windows/vk_swiftshader_icd.json"
+> set VK_ICD_FILENAMES=%USERPROFILE%\.swiftshader\Windows\vk_swiftshader_icd.json
 ```
 
 ### Support in Bazel Tests

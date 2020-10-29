@@ -27,7 +27,8 @@
 #include <iterator>
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -257,7 +258,8 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
         newFn.setAttr(namedAttr.first, namedAttr.second);
     }
     // Need special handling for the number of workgroups function.
-    if (FuncOp numWorkgroupsFn = getNumWorkgroupsFn(oldFn)) {
+    if (FuncOp numWorkgroupsFn =
+            getNumWorkgroupsFn(oldFn, getNumWorkgroupsFnAttrName())) {
       FuncOp newNumWorkgroupsFn =
           builder.create<FuncOp>(loc, newFnName.str() + "__num_workgroups__",
                                  numWorkgroupsFn.getType());
@@ -296,7 +298,8 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   moduleOp.setAttr(getEntryPointScheduleAttrName(),
                    builder.getArrayAttr(entryPoints));
 
-  if (FuncOp numWorkgroupsFn = getNumWorkgroupsFn(oldFn)) {
+  if (FuncOp numWorkgroupsFn =
+          getNumWorkgroupsFn(oldFn, getNumWorkgroupsFnAttrName())) {
     LLVM_DEBUG({
       llvm::dbgs() << "Erased num workgroups fn func @"
                    << numWorkgroupsFn.getName() << " for func @"

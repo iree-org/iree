@@ -419,6 +419,9 @@ cc_library(
 cc_test(
     name = "synchronization_benchmark",
     srcs = ["synchronization_benchmark.cc"],
+    tags = [
+        "nowindows",  # TODO(#3615) make this link on windows
+    ],
     deps = [
         ":synchronization",
         "//iree/testing:benchmark_main",
@@ -429,6 +432,9 @@ cc_test(
 cc_test(
     name = "synchronization_test",
     srcs = ["synchronization_test.cc"],
+    tags = [
+        "nowindows",  # TODO(#3615) make this link on windows
+    ],
     deps = [
         ":synchronization",
         "//iree/testing:gtest",
@@ -491,6 +497,9 @@ cc_library(
 cc_test(
     name = "threading_benchmark",
     srcs = ["threading_benchmark.cc"],
+    tags = [
+        "nowindows",  # TODO(#3615) make this link on windows
+    ],
     deps = [
         ":threading",
         "//iree/testing:benchmark_main",
@@ -503,6 +512,9 @@ cc_test(
     srcs = [
         "threading_impl.h",
         "threading_test.cc",
+    ],
+    tags = [
+        "nowindows",  # TODO(#3615) make this link on windows
     ],
     deps = [
         ":synchronization",

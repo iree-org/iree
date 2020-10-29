@@ -6,7 +6,7 @@ module {
   // CHECK:   linalg.conv
 
   func @kernel_fusable_fill_conv_ops()
-  attributes {vkspv.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
+  attributes {hal.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dim = hal.interface.load.constant offset = 0 : index
     %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
@@ -40,7 +40,7 @@ module {
   // CHECK:   linalg.matmul
 
   func @kernel_fusable_fill_matmul_ops()
-  attributes {vkspv.num_workgroups_fn = @kernel_fusable_fill_matmul_ops_num_workgroups__} {
+  attributes {hal.num_workgroups_fn = @kernel_fusable_fill_matmul_ops_num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dimM = hal.interface.load.constant offset = 0 : index
     %dimN = hal.interface.load.constant offset = 1 : index
@@ -76,7 +76,7 @@ module {
   // CHECK: func @kernel_fusable_pooling()
   // CHECK:   linalg.fill
   // CHECK:   linalg.pooling
-  func @kernel_fusable_pooling() attributes {vkspv.num_workgroups_fn = @kernel_fusable_pooling__num_workgroups__} {
+  func @kernel_fusable_pooling() attributes {hal.num_workgroups_fn = @kernel_fusable_pooling__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<?x?xf32>
@@ -100,7 +100,7 @@ module {
 
 // -----
 
-// CHECK: module attributes {vkspv.entry_point_schedule = ["kernel_dispatch_0", "kernel_dispatch_1"]}
+// CHECK: module attributes {hal.entry_point_schedule = ["kernel_dispatch_0", "kernel_dispatch_1"]}
 module {
   // CHECK: func @kernel_dispatch_1()
   // CHECK:   %[[ZERO:.+]] = constant
@@ -123,7 +123,7 @@ module {
   // CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
   // CHECK:   return
 
-  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
+  func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dim = hal.interface.load.constant offset = 0 : index
     %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
@@ -151,10 +151,10 @@ module {
 
 // -----
 
-// CHECK: module attributes {vkspv.entry_point_schedule = ["kernel_dispatch_0", "kernel_dispatch_1", "kernel_dispatch_2"]}
+// CHECK: module attributes {hal.entry_point_schedule = ["kernel_dispatch_0", "kernel_dispatch_1", "kernel_dispatch_2"]}
 module {
 //      CHECK: func @kernel_dispatch_2()
-// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN2:.+]]}
+// CHECK-SAME: {hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN2:.+]]}
 //      CHECK:   %[[DIM:.+]] = hal.interface.load.constant
 //      CHECK:   %[[SHAPE1:.+]] = shapex.make_ranked_shape %[[DIM]]
 //      CHECK:   %[[SHAPE2:.+]] = shapex.make_ranked_shape %[[DIM]]
@@ -169,7 +169,7 @@ module {
 //      CHECK: func @[[NUM_WORKGROUPS_FN2]]
 
 //      CHECK: func @kernel_dispatch_1()
-// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN1:.+]]}
+// CHECK-SAME: {hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN1:.+]]}
 //      CHECK:   %[[C0:.+]] = constant 0 : index
 //      CHECK:   %[[C1:.+]] = constant 1 : index
 //      CHECK:   scf.parallel (%{{.*}}) = (%[[C0]]) to (%[[C1]]) step (%[[C1]])
@@ -179,7 +179,7 @@ module {
 //      CHECK: func @[[NUM_WORKGROUPS_FN1]]
 
 //      CHECK: func @kernel_dispatch_0()
-// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN0:.+]]}
+// CHECK-SAME: {hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN0:.+]]}
 //      CHECK:   %[[ZERO:.+]] = constant
 //      CHECK:   %[[DIM:.+]] = hal.interface.load.constant
 //      CHECK:   %[[SHAPE:.+]] = shapex.make_ranked_shape %[[DIM]]
@@ -190,7 +190,7 @@ module {
 
 //      CHECK: func @[[NUM_WORKGROUPS_FN0]]
 
-  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
+  func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -226,10 +226,10 @@ module {
 
 // Nothing to do if there is just one Linalg op.
 
-// CHECK-NOT: vkspv.entry_point_schedule
+// CHECK-NOT: hal.entry_point_schedule
 module {
   // CHECK-LABEL: @kernel()
-  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
+  func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x2x2x512xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
@@ -275,7 +275,7 @@ module {
 
 module {
   func @subview_interleaved()
-  attributes {vkspv.num_workgroups_fn = @subview_interleaved__num_workgroups__} {
+  attributes {hal.num_workgroups_fn = @subview_interleaved__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
@@ -295,7 +295,7 @@ module {
 }
 
 //      CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 12 + d1 + 53)>
-//      CHECK: module attributes {vkspv.entry_point_schedule =
+//      CHECK: module attributes {hal.entry_point_schedule =
 // CHECK-SAME:   ["subview_interleaved_dispatch_0",
 // CHECK-SAME:    "subview_interleaved_dispatch_1"]}
 //      CHECK: func @subview_interleaved_dispatch_1()
@@ -318,7 +318,7 @@ module {
 
 module {
   func @reshape_interleaved()
-  attributes {vkspv.num_workgroups_fn = @reshape_interleaved__num_workgroups__} {
+  attributes {hal.num_workgroups_fn = @reshape_interleaved__num_workgroups__} {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<1x2x4xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
@@ -349,7 +349,7 @@ module {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//      CHECK: module attributes {vkspv.entry_point_schedule =
+//      CHECK: module attributes {hal.entry_point_schedule =
 // CHECK-SAME:   ["reshape_interleaved_dispatch_0",
 // CHECK-SAME:    "reshape_interleaved_dispatch_1"]}
 //      CHECK: func @reshape_interleaved_dispatch_1()
@@ -369,7 +369,7 @@ module {
 
 module {
   func @predict_ex_dispatch_0()
-  attributes {vkspv.num_workgroups_fn = @predict_ex_dispatch_0__num_workgroups__} {
+  attributes {hal.num_workgroups_fn = @predict_ex_dispatch_0__num_workgroups__} {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x512x1xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<4x8x16xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x512x1xf32>
@@ -397,7 +397,7 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
-//      CHECK: module attributes {vkspv.entry_point_schedule =
+//      CHECK: module attributes {hal.entry_point_schedule =
 // CHECK-SAME:   ["predict_ex_dispatch_0_dispatch_0",
 // CHECK-SAME:    "predict_ex_dispatch_0_dispatch_1"]}
 //      CHECK: func @predict_ex_dispatch_0_dispatch_1

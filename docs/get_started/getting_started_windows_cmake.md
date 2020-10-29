@@ -62,6 +62,10 @@ clone the repository and initialize its submodules:
 ```
 
 > Tip:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;Clone to a short path like `C:\projects\` to avoid
+> issues with Windows maximum path lengths (260 characters).
+
+> Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 

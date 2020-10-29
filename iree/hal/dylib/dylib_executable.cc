@@ -149,10 +149,11 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
   IREE_TRACE_SCOPE_DYNAMIC(dispatch_state->entry_name);
 
-  auto entry_function =
-      (void (*)(void**, int32_t*))dispatch_state->entry_function;
+  auto entry_function = (void (*)(void**, int32_t*, int32_t, int32_t,
+                                  int32_t))dispatch_state->entry_function;
   entry_function(dispatch_state->args.data(),
-                 dispatch_state->push_constant.data());
+                 dispatch_state->push_constant.data(), workgroup_xyz[0],
+                 workgroup_xyz[1], workgroup_xyz[2]);
 
   return OkStatus();
 }
