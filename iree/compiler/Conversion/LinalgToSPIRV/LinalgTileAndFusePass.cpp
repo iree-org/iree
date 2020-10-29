@@ -521,6 +521,8 @@ static void applyVectorTransformation(FuncOp funcOp) {
   }
 
   {
+    // TODO(ravishankarm): remove this transformation once allocations get
+    // inserted at the top of the function.
     linalg::hoistViewAllocOps(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
 
