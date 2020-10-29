@@ -714,7 +714,6 @@ class VMLAModuleState final {
     const auto input_example_shape = input_shape.subspan(1, 3);
     const auto output_example_shape = dst_shape.subspan(1, 3);
     const auto filter_shape_4d = filter_shape.subspan(0, 4);
-    const auto dilation = lhs_dilation.subspan(0, 2);
     const auto pad_h = padding.subspan(0, 2);
     const auto pad_w = padding.subspan(2, 2);
     const auto window_strides_2d = window_strides.subspan(0, 2);
@@ -736,7 +735,8 @@ class VMLAModuleState final {
       IREE_RETURN_IF_ERROR(kernels::Conv2D::Execute(
           input_example, input_example_shape, filter_buffer, filter_shape_4d,
           output_example, output_example_shape, window_strides_2d, pad_h, pad_w,
-          dilation, feature_group_count));
+          lhs_dilation.subspan(0, 2), rhs_dilation.subspan(0, 2),
+          feature_group_count));
     }
     return OkStatus();
   }
