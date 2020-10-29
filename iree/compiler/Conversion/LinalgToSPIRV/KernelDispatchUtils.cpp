@@ -225,11 +225,11 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  if (options.useVectorization && succeeded(getConfigForCooperativeMatmul(
-                                      op, options, resourceLimits, tileSizes,
-                                      workgroupSize, numSubgroups))) {
+  if (options.enableVectorization && succeeded(getConfigForCooperativeMatmul(
+                                         op, options, resourceLimits, tileSizes,
+                                         workgroupSize, numSubgroups))) {
     return success();
-  } else if (options.useVectorization &&
+  } else if (options.enableVectorization &&
              succeeded(getTargetSpecificConfig(op, options, resourceLimits,
                                                tileSizes, workgroupSize,
                                                numSubgroups))) {

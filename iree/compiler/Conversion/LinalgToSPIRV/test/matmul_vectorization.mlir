@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse{use-vectorization},canonicalize,cse" %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse{use-vectorization use-workgroup-memory},canonicalize,cse" %s | IreeFileCheck %s -check-prefix=PROMOTE
+// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse,canonicalize,cse" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse,canonicalize,cse" -iree-spirv-enable-vectorization -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s -check-prefix=PROMOTE
 
 module attributes {
   spv.target_env =
