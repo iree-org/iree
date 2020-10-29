@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRSupport
     MLIRVector
     flatbuffers
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target

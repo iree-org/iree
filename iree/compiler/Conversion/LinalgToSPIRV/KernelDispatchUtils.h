@@ -47,30 +47,6 @@ struct SPIRVCodegenOptions;
 
 namespace iree_compiler {
 
-/// Generates a function that computes the number of workgroups as
-///  [ceil(`parallelLoopRange`[2] / `tileSizes`[2]),
-///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
-///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
-/// distributed across workgroups.
-LogicalResult createNumWorkgroupsFromResultShape(PatternRewriter &rewriter,
-                                                 linalg::LinalgOp linalgOp,
-                                                 FuncOp entryPointFn,
-                                                 ArrayRef<int64_t> tileSizes);
-
-/// Generates a function that computes the number of workgroups as
-///  ceil(`parallelLoopRange`[0] * `parallelLoopRange`[1] * ... *
-///       `parallelLoopRange`[n-1]  /  `workgroupSizeX`)
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
-/// distributed across workgroups.
-LogicalResult createNumWorkgroupsFromLinearizedResultShape(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    int64_t workgroupSizeX);
-
-/// For a given `entryPointFn` return the function that computes the number of
-/// workgroups to use at launch time.
-FuncOp getNumWorkgroupsFn(FuncOp entryPointFn);
-
 /// Store the tile sizes to use at different levels of tiling as a vector of
 /// vectors.
 /// - First level tiling maps to workgroups.

@@ -5,7 +5,7 @@ module attributes {
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
                      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @matmul_tile() attributes {vkspv.num_workgroups_fn = @matmul_tile__num_workgroups__} {
+  func @matmul_tile() attributes {hal.num_workgroups_fn = @matmul_tile__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -57,7 +57,7 @@ module attributes {
                     {max_compute_workgroup_invocations = 128 : i32,
                      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @conv_no_padding_tile()
-    attributes {vkspv.num_workgroups_fn = @conv_no_padding_tile__num_workgroups__} {
+    attributes {hal.num_workgroups_fn = @conv_no_padding_tile__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x3x2xf32>
     %1 = iree.placeholder for "interace buffer"

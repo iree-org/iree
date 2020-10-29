@@ -18,10 +18,8 @@ iree_cc_library(
   NAME
     LinalgToSPIRV
   HDRS
-    "Attributes.h"
     "CooperativeMatrixAnalysis.h"
     "KernelDispatchUtils.h"
-    "MarkerUtils.h"
     "MemorySpace.h"
     "Passes.h"
     "Utils.h"
@@ -29,11 +27,8 @@ iree_cc_library(
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"
-    "DeclareNumWorkgroupsFnPass.cpp"
     "KernelDispatchUtils.cpp"
-    "LegalizeNumWorkgroupsFnPass.cpp"
     "LinalgTileAndFusePass.cpp"
-    "MarkerUtils.cpp"
     "MatMulVectorizationTest.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
@@ -64,6 +59,7 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToSPIRV
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector

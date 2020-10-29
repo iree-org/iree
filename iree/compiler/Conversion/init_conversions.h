@@ -61,6 +61,9 @@ inline void registerLinalgToSPIRVPasses() {
 inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
     // LinalgToLLVM
+    createConvImg2ColMatmulConversionPass();
+    createLinalgTileAndDistributePass();
+    createMatMulTileAndVectorizePass();
     return true;
   }();
   (void)init_once;
