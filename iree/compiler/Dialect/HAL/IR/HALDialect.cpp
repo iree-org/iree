@@ -40,13 +40,18 @@ namespace {
 struct HALInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
-  bool isLegalToInline(Region *dest, Region *src,
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    // Sure!
+    return true;
+  }
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // Sure!
     return true;
   }
 
-  bool isLegalToInline(Operation *op, Region *dest,
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // Sure!
     return true;
