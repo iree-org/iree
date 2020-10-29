@@ -91,7 +91,7 @@ function(iree_check_test)
 
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_TEST_NAME "${_PACKAGE_PATH}:${_RULE_NAME}")
+  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   # Case for cross-compiling towards Android.
   if(ANDROID)
