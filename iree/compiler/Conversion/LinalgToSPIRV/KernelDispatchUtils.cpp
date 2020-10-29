@@ -197,6 +197,27 @@ static LogicalResult getConfigForCooperativeMatmul(
   return success();
 }
 
+/// Launch configuration for different known GPU configuration.
+static LogicalResult getTargetSpecificConfig(
+    linalg::MatmulOp op, const SPIRVCodegenOptions &options,
+    spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
+    std::array<int64_t, 3> &workgroupSize,
+    std::array<int64_t, 3> &numSubgroups) {
+  if (spirv::lookupTargetEnv(op).getVendorID() != spirv::Vendor::ARM)
+    return failure();
+  workgroupSize[0] = resourceLimits.subgroup_size().getInt();
+  workgroupSize[1] = 1;
+  workgroupSize[2] = 1;
+  SmallVector<int64_t, 4> ts = {8, 64, 4};
+  tileSizes.emplace_back(ts);
+  // No tiling at the subgroup level since this target doesn't use subgroup op
+  // or shared memory.
+  tileSizes.emplace_back();
+  SmallVector<int64_t, 4> threadTs = {ts[0], ts[1] / workgroupSize[0], ts[2]};
+  tileSizes.emplace_back(threadTs);
+  return success();
+}
+
 template <>
 LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 const SPIRVCodegenOptions &options,
@@ -207,6 +228,11 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
   if (options.useVectorization && succeeded(getConfigForCooperativeMatmul(
                                       op, options, resourceLimits, tileSizes,
                                       workgroupSize, numSubgroups))) {
+    return success();
+  } else if (options.useVectorization &&
+             succeeded(getTargetSpecificConfig(op, options, resourceLimits,
+                                               tileSizes, workgroupSize,
+                                               numSubgroups))) {
     return success();
   }
   unsigned maxWorkgroupSize =
@@ -368,13 +394,36 @@ static Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize(OpTy op) {
 template <>
 Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
     vector::ContractionOp op) {
-  spirv::ResourceLimitsAttr resourceLimits =
-      spirv::lookupTargetEnv(op).getResourceLimits();
-  return getCooperativeMatmulSubgroupSize(
-      resourceLimits, op.getLhsType().getElementType(),
-      op.getRhsType().getElementType(),
-      op.getAccType().cast<VectorType>().getElementType(),
-      op.getResultType().cast<VectorType>().getElementType());
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
+      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+    spirv::ResourceLimitsAttr resourceLimits =
+        spirv::lookupTargetEnv(op).getResourceLimits();
+    return getCooperativeMatmulSubgroupSize(
+        resourceLimits, op.getLhsType().getElementType(),
+        op.getRhsType().getElementType(),
+        op.getAccType().cast<VectorType>().getElementType(),
+        op.getResultType().cast<VectorType>().getElementType());
+  } else {
+    // Map to vec4 fma operations.
+    return SmallVector<int64_t, 4>({1, 4, 1});
+  }
+}
+
+template <>
+Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
+    vector::TransferReadOp op) {
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
+      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+    // Don't unroll cooperative martrix load as they should match the size of
+    // the contract.
+    return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
+                                   op.getVectorType().getDimSize(1));
+  } else {
+    // Map to load4.
+    return SmallVector<int64_t, 4>({1, 4});
+  }
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
@@ -384,6 +433,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
   }
 
   DISPATCH(vector::ContractionOp)
+  DISPATCH(vector::TransferReadOp)
 
 #undef DISPATCH
   return llvm::None;

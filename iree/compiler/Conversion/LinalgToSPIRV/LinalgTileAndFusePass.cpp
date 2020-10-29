@@ -31,6 +31,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/Function.h"
@@ -40,6 +41,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/LoopUtils.h"
 
 #define DEBUG_TYPE "iree-linalg-tile-and-fuse"
 
@@ -407,6 +409,59 @@ static void populateTilingToSubgroupPatterns(
           getVectorizeMarker(), context));
 }
 
+//===----------------------------------------------------------------------===//
+// Patterns and methods for thread tiling.
+//===----------------------------------------------------------------------===//
+
+/// Patterns for third level tiling to target threads.
+static void populateTilingToThreadPatterns(MLIRContext *context,
+                                           const LaunchConfig &launchConfig,
+                                           OwningRewritePatternList &patterns) {
+  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
+      getInnerTileSizeFn =
+          [&launchConfig](OpBuilder &builder,
+                          Operation *operation) -> SmallVector<Value, 4> {
+    ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 2);
+    if (tileSizes.empty()) return {};
+    SmallVector<Value, 4> tileSizesVal;
+    tileSizesVal.reserve(tileSizes.size());
+    for (auto val : tileSizes) {
+      tileSizesVal.push_back(
+          builder.create<ConstantIndexOp>(operation->getLoc(), val));
+    }
+    return tileSizesVal;
+  };
+
+  auto getThreadProcInfoFn = [&launchConfig](
+                                 OpBuilder &builder, Location loc,
+                                 ArrayRef<Range> parallelLoopRanges) {
+    Type indexType = builder.getIndexType();
+    SmallVector<linalg::ProcInfo, 2> procInfo(2);
+    procInfo[1] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                                   builder.getStringAttr("x")),
+                   builder.create<ConstantIndexOp>(
+                       loc, launchConfig.getWorkgroupSize()[0])};
+    procInfo[0] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                                   builder.getStringAttr("y")),
+                   builder.create<ConstantIndexOp>(
+                       loc, launchConfig.getWorkgroupSize()[1])};
+    return procInfo;
+  };
+  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
+      getThreadProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>>(
+      context,
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(subgroupDistributionOptions),
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getVectorizeMarker(), context));
+}
+
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
@@ -436,6 +491,9 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
+  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>>(
+      context,
+      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
   patterns.insert<vector::UnrollVectorPattern<vector::ContractionOp>>(
       context,
       vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
@@ -549,9 +607,26 @@ void LinalgTileAndFusePass::runOnOperation() {
         applyPatternsAndFoldGreedily(funcOp,
                                      std::move(secondLevelTilingPatterns));
         applyCanonicalizationPatterns(context, funcOp);
+        promoteSingleIterationLoops(funcOp);
 
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Second level Tiling  ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+
+      {
+        OwningRewritePatternList thirdLevelTilingPatterns;
+        populateTilingToThreadPatterns(context, launchConfig,
+                                       thirdLevelTilingPatterns);
+        applyPatternsAndFoldGreedily(funcOp,
+                                     std::move(thirdLevelTilingPatterns));
+        applyCanonicalizationPatterns(context, funcOp);
+        promoteSingleIterationLoops(funcOp);
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After Third level Tiling  ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
@@ -573,8 +648,25 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList vectorUnrollPatterns;
         populateVectorUnrollPatterns(context, vectorUnrollPatterns);
         applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
+
+        OwningRewritePatternList canonicalizationPatterns;
+        vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns,
+                                                     context);
+        applyPatternsAndFoldGreedily(funcOp,
+                                     std::move(canonicalizationPatterns));
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vector Unroll ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+
+      {
+        linalg::hoistViewAllocOps(funcOp);
+        linalg::hoistRedundantVectorTransfers(funcOp);
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After Hoisting ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
