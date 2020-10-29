@@ -25,7 +25,7 @@ For the test https://github.com/google/iree/tree/main/iree/base/arena_test.cc
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/base:arena_test
+$ ctest -R iree/base/arena_test
 ```
 
 With Bazel, run this from the repo root:
@@ -115,7 +115,7 @@ https://github.com/google/iree/tree/main/iree/compiler/Dialect/VMLA/Conversion/H
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/test:math_ops.mlir.test
+$ ctest -R iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/test/math_ops.mlir.test
 ```
 
 With Bazel, run this from the repo root:

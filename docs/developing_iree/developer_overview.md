@@ -146,7 +146,7 @@ that executes the simple `simple.vmfb` compiled from `simple.mlir` above on
 IREE's VMLA driver:
 
 ```shell
-$ ../iree-build/iree/tools:iree/run-module \
+$ ../iree-build/iree/tools/iree/run-module \
   --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
@@ -188,7 +188,7 @@ For example, to execute the contents of
 [iree/tools/test/simple.mlir](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir):
 
 ```shell
-$ ../iree-build/iree/tools:iree/run-mlir \
+$ ../iree-build/iree/tools/iree-run-mlir \
   $PWD/iree/tools/test/simple.mlir \
   -function-input="i32=-2" \
   -iree-hal-target-backends=vmla
@@ -202,7 +202,7 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ ../iree-build/iree/tools:iree-dump-module -- /tmp/simple.b
+$ ../iree-build/iree/tools/iree-dump-module -- /tmp/simple.b
 ```
 
 ### Useful generic flags

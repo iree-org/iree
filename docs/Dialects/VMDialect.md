@@ -1135,7 +1135,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_442
+`value` | Attribute | anonymous_440
 
 #### Results:
 
@@ -1172,7 +1172,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_446
+`value` | Attribute | anonymous_444
 
 #### Results:
 
@@ -1693,7 +1693,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_445
+`initial_value` | Attribute | anonymous_443
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.i64` (::mlir::iree_compiler::IREE::VM::GlobalI64Op)
@@ -1711,7 +1711,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_449
+`initial_value` | Attribute | anonymous_447
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (::mlir::iree_compiler::IREE::VM::GlobalLoadI32Op)
