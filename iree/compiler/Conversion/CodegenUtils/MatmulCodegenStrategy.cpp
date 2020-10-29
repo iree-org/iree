@@ -253,7 +253,7 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
     }
     OwningRewritePatternList patterns;
     vector::populateVectorSlicesLoweringPatterns(patterns, op->getContext());
-    applyPatternsAndFoldGreedily(op, patterns);
+    applyPatternsAndFoldGreedily(op, std::move(patterns));
   };
   postStageTransforms(func);
   if (lowering != nullptr) lowering(func);
