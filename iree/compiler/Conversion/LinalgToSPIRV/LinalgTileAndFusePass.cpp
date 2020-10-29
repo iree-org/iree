@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- LinalgTilingOnBuffers.cpp - Tile and fuse Linalg on Buffers --------===//
+//===- LinalgTileAndFusePass.cpp - Tile and fuse Linalg on Buffers --------===//
 //
 // Implements a pass to tile and fuse linalg operations on buffers.
 //
 //===----------------------------------------------------------------------===//
+
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
@@ -48,34 +49,46 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-/// Returns true if the linalg op has padding attribute, and that it has
-/// non-zero entries.
-template <typename OpTy>
-static bool hasPadding(OpTy op) {
-  Optional<DenseIntElementsAttr> padding = op.padding();
-  if (!padding) return false;
-  return llvm::any_of(padding.getValue(),
-                      [](APInt v) -> bool { return !v.isNullValue(); });
+/// Returns a Linalg marker that replaces existing markers.
+linalg::LinalgMarker getLinalgReplaceMarker(StringRef maker,
+                                            MLIRContext *context) {
+  return linalg::LinalgMarker(ArrayRef<Identifier>(),
+                              Identifier::get(maker, context));
+}
+
+/// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
+/// it with `replaceMarker`.
+linalg::LinalgMarker getLinalgMatchAndReplaceMarker(
+    ArrayRef<StringRef> matchMarkers, StringRef replaceMarker,
+    MLIRContext *context) {
+  SmallVector<Identifier, 2> markers;
+  markers.reserve(matchMarkers.size());
+  for (StringRef marker : matchMarkers) {
+    markers.emplace_back(Identifier::get(marker, context));
+  }
+  return linalg::LinalgMarker(markers, Identifier::get(replaceMarker, context));
 }
 
 //===----------------------------------------------------------------------===//
-// Pass and patterns
+// Main pass
 //===----------------------------------------------------------------------===//
 
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
-struct LinalgTileAndFusePass
+class LinalgTileAndFusePass
     : public PassWrapper<LinalgTileAndFusePass, OperationPass<ModuleOp>> {
+ public:
   LinalgTileAndFusePass() = default;
-  LinalgTileAndFusePass(const SPIRVCodegenOptions &passedOptions) {
-    options = passedOptions;
-  }
-  LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
+  LinalgTileAndFusePass(const SPIRVCodegenOptions &passOptions)
+      : options(passOptions) {}
+  LinalgTileAndFusePass(const LinalgTileAndFusePass &pass)
+      : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
                     scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
   }
+
   void runOnOperation() override;
 
  private:
@@ -110,26 +123,33 @@ struct LinalgTileAndFusePass
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// Patterns to tile computation to map to workgroups.
+// Patterns to tile computation to map to workgroups
 //===----------------------------------------------------------------------===//
 
-/// Distribution options for operations when targeting workgroups.
-static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-    [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
-          builder, loc, parallelLoopRanges.size());
-    },
-    {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-     linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-     linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+/// Returns the distribution options for operations when targeting workgroups.
+static linalg::LinalgLoopDistributionOptions getWorkgroupDistributionOptions() {
+  linalg::LinalgLoopDistributionOptions options;
+
+  options.procInfo = [](OpBuilder &builder, Location loc,
+                        ArrayRef<Range> parallelLoopRanges) {
+    return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
+        builder, loc, parallelLoopRanges.size());
+  };
+  options.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+
+  return options;
+}
 
 namespace {
 /// Pattern for tiling operations. Updates the workgroup size in the surrounding
 /// function operation if tiling succeeds, and generates the function that
 /// computes the number of workgroups for the launch.
 template <typename LinalgOpTy>
-struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
+class TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
+ public:
   TileToWorkgroupsPattern(MLIRContext *context,
                           const linalg::LinalgDependenceGraph &dependenceGraph,
                           linalg::LinalgTilingOptions options,
@@ -160,6 +180,9 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
     return success();
   }
 
+ private:
+  using Base = linalg::LinalgBaseTilingPattern;
+
   const linalg::LinalgDependenceGraph &dependenceGraph;
   const LaunchConfig &launchConfig;
 };
@@ -168,9 +191,9 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
 /// surrounding function operation if tiling succeeds, and generates the
 /// function that computes the number of workgroups for the launch..
 template <typename LinalgOpTy>
-struct TileAndFuseToWorkgroupsPattern
+class TileAndFuseToWorkgroupsPattern
     : public linalg::LinalgTileAndFusePattern<LinalgOpTy> {
-  using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
+ public:
   TileAndFuseToWorkgroupsPattern(
       MLIRContext *context,
       const linalg::LinalgDependenceGraph &dependenceGraph,
@@ -178,9 +201,7 @@ struct TileAndFuseToWorkgroupsPattern
       const LaunchConfig &launchConfig, PatternBenefit benefit = 1)
       : Base(context, dependenceGraph, tilingOptions,
              linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
-             marker,
-             linalg::LinalgMarker(ArrayRef<Identifier>(),
-                                  Identifier::get(getDeleteMarker(), context)),
+             marker, getLinalgReplaceMarker(getDeleteMarker(), context),
              benefit),
         dependenceGraph(dependenceGraph),
         launchConfig(launchConfig) {}
@@ -200,6 +221,9 @@ struct TileAndFuseToWorkgroupsPattern
     return success();
   }
 
+ private:
+  using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
+
   const linalg::LinalgDependenceGraph &dependenceGraph;
   const LaunchConfig &launchConfig;
 };
@@ -210,10 +234,9 @@ static void populateTilingToWorkgroupPatterns(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     const LaunchConfig &launchConfig, OwningRewritePatternList &patterns) {
   // Function to compute first level tiling values.
-  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
-      getOuterTileSizeFn =
-          [&launchConfig](OpBuilder &builder,
-                          Operation *operation) -> SmallVector<Value, 4> {
+  auto getOuterTileSizeFn = [&launchConfig](
+                                OpBuilder &builder,
+                                Operation *operation) -> SmallVector<Value, 4> {
     ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 0);
     if (tileSizes.empty()) return {};
     SmallVector<Value, 4> tileSizesVal;
@@ -224,6 +247,7 @@ static void populateTilingToWorkgroupPatterns(
     }
     return tileSizesVal;
   };
+
   patterns.insert<TileAndFuseToWorkgroupsPattern<linalg::BatchMatmulOp>,
                   TileAndFuseToWorkgroupsPattern<linalg::ConvOp>,
                   TileAndFuseToWorkgroupsPattern<linalg::MatmulOp>,
@@ -238,12 +262,10 @@ static void populateTilingToWorkgroupPatterns(
                   TileToWorkgroupsPattern<linalg::PoolingSumOp>>(
       context, dependenceGraph,
       linalg::LinalgTilingOptions()
-          .setDistributionOptions(workgroupDistributionOptions)
+          .setDistributionOptions(getWorkgroupDistributionOptions())
           .setTileSizeComputationFunction(getOuterTileSizeFn)
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      linalg::LinalgMarker(ArrayRef<Identifier>(),
-                           Identifier::get(getWorkgroupMarker(), context)),
-      launchConfig);
+      getLinalgReplaceMarker(getWorkgroupMarker(), context), launchConfig);
 }
 
 //===----------------------------------------------------------------------===//
@@ -273,16 +295,16 @@ struct PromoteMatmulSubviewsPattern
 // memory. Two reasons this is not done right now:
 // 1) Linalg when tiling doesnt create a subview for the filter (since none of
 //    its dimensions are tiled. This needs to be relaxed (maybe by using an
-//    option.
-// 2) Maybe there are better alternatives for handling filter (using different
-//    StorageClasses, since for inference workloads these are model
+//    option).
+// 2) Maybe there are better alternatives for handling filter like using
+//    different storage classes, since for inference workloads these are model
 //    constants. This is TBD.
-struct PromoteConvolutionSubviewsPattern
+struct PromoteConvSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
-  PromoteConvolutionSubviewsPattern(MLIRContext *context,
-                                    linalg::LinalgPromotionOptions options,
-                                    linalg::LinalgMarker marker,
-                                    PatternBenefit benefit = 1)
+  PromoteConvSubviewsPattern(MLIRContext *context,
+                             linalg::LinalgPromotionOptions options,
+                             linalg::LinalgMarker marker,
+                             PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::ConvOp>(
             context,
             options.setOperandsToPromote({1}).setUseFullTileBuffers(
@@ -293,20 +315,18 @@ struct PromoteConvolutionSubviewsPattern
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns
-      .insert<PromoteMatmulSubviewsPattern, PromoteConvolutionSubviewsPattern>(
-          context,
-          linalg::LinalgPromotionOptions()
-              .setAllocationDeallocationFns(allocateWorkgroupMemory,
-                                            deallocateWorkgroupMemory)
-              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
-          linalg::LinalgMarker(
-              Identifier::get(getWorkgroupMarker(), context),
-              Identifier::get(getWorkgroupMemoryMarker(), context)));
+  patterns.insert<PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern>(
+      context,
+      linalg::LinalgPromotionOptions()
+          .setAllocationDeallocationFns(allocateWorkgroupMemory,
+                                        deallocateWorkgroupMemory)
+          .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
+      getLinalgMatchAndReplaceMarker(getWorkgroupMarker(),
+                                     getWorkgroupMemoryMarker(), context));
 }
 
 //===----------------------------------------------------------------------===//
-// Patterns and methods for subgroup tiling.
+// Patterns to tile computation to map to subgroups
 //===----------------------------------------------------------------------===//
 
 /// Computes the Value for subgroupID along each dimension given number of
@@ -346,10 +366,9 @@ struct TileMatmulSubgroupPattern
 static void populateTilingToSubgroupPatterns(
     MLIRContext *context, const LaunchConfig &launchConfig,
     OwningRewritePatternList &patterns) {
-  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
-      getInnerTileSizeFn =
-          [&launchConfig](OpBuilder &builder,
-                          Operation *operation) -> SmallVector<Value, 4> {
+  auto getInnerTileSizeFn = [&launchConfig](
+                                OpBuilder &builder,
+                                Operation *operation) -> SmallVector<Value, 4> {
     ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 1);
     if (tileSizes.empty()) return {};
     SmallVector<Value, 4> tileSizesVal;
@@ -368,21 +387,21 @@ static void populateTilingToSubgroupPatterns(
         launchConfig.getNumSubgroups().take_front(parallelLoopRanges.size());
     return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
   };
+
   linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
       getSubgroupProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+
   patterns.insert<TileMatmulSubgroupPattern>(
       context,
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(subgroupDistributionOptions),
-      linalg::LinalgMarker(
-          /*matchDisjunction=*/{Identifier::get(getWorkgroupMemoryMarker(),
-                                                context),
-                                Identifier::get(getWorkgroupMarker(), context)},
-          /*replacement=*/Identifier::get(getVectorizeMarker(), context)));
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getVectorizeMarker(), context));
 }
 
 //====---------------------------------------------------------------------===//
@@ -409,7 +428,7 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
 }
 
 //====---------------------------------------------------------------------===//
-// Patterns for unrolling vectors.
+// Patterns for unrolling vectors
 //====---------------------------------------------------------------------===//
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
@@ -420,6 +439,10 @@ static void populateVectorUnrollPatterns(MLIRContext *context,
   vector::populateVectorToVectorCanonicalizationPatterns(patterns, context);
   vector::populateVectorToVectorTransformationPatterns(patterns, context);
 }
+
+//====---------------------------------------------------------------------===//
+// Main pass implementation
+//====---------------------------------------------------------------------===//
 
 void LinalgTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
