@@ -36,7 +36,12 @@ namespace iree_compiler {
 struct ShapeInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
-  bool isLegalToInline(Operation* op, Region* dest,
+  // Allow all call operations to be inlined.
+  bool isLegalToInline(Operation* call, Operation* callable,
+                       bool wouldBeCloned) const final {
+    return true;
+  }
+  bool isLegalToInline(Operation* op, Region* dest, bool wouldBeCloned,
                        BlockAndValueMapping& valueMapping) const final {
     return true;
   }
