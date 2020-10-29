@@ -251,6 +251,9 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
       hoistRedundantVectorTransfers(cast<FuncOp>(op));
       hoistRedundantCopies(cast<FuncOp>(op));
     }
+    OwningRewritePatternList patterns;
+    vector::populateVectorSlicesLoweringPatterns(patterns, op->getContext());
+    applyPatternsAndFoldGreedily(op, patterns);
   };
   postStageTransforms(func);
   if (lowering != nullptr) lowering(func);
