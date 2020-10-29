@@ -394,11 +394,12 @@ static Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize(OpTy op) {
 template <>
 Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
     vector::ContractionOp op) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  auto targetEnvAttr = spirv::lookupTargetEnv(op);
+  auto targetEnv = spirv::TargetEnv(targetEnvAttr);
   if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
       targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     spirv::ResourceLimitsAttr resourceLimits =
-        spirv::lookupTargetEnv(op).getResourceLimits();
+        targetEnvAttr.getResourceLimits();
     return getCooperativeMatmulSubgroupSize(
         resourceLimits, op.getLhsType().getElementType(),
         op.getRhsType().getElementType(),

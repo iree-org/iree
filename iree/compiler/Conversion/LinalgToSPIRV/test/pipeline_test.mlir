@@ -12,8 +12,7 @@ module attributes {
       [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
        SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
       ARM:IntegratedGPU,
-      {cooperative_matrix_properties_nv = [],
-       max_compute_shared_memory_size = 32768 : i32,
+      {max_compute_shared_memory_size = 32768 : i32,
        max_compute_workgroup_invocations = 512 : i32,
        max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>} {
