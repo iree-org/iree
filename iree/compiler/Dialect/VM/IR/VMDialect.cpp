@@ -117,7 +117,12 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
 struct VMInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
-  bool isLegalToInline(Region *dest, Region *src,
+  // Allow all call operations to be inlined.
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    return true;
+  }
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
 
@@ -132,7 +137,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     return true;
   }
 
-  bool isLegalToInline(Operation *op, Region *dest,
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
     return true;
