@@ -304,7 +304,7 @@ function(iree_py_test)
 
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
+  set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
 
   foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
