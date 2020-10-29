@@ -46,13 +46,17 @@ package(
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
-    for src in glob(["*_test.py"])
+    for src in glob(
+        ["*_test.py"],
+        exclude = ["facessd_p20_test.py"],
+    )
 ]
 
 # Special cases to exclude from automatically expanding targets for all
 # backends.
 # keep sorted
 SPECIAL_CASES = [
+    "facessd_p20_test.py",
     "mobile_bert_squad_test.py",
 ]
 
@@ -214,6 +218,54 @@ iree_e2e_test_suite(
     reference_backend = "tf",
     tags = [
         "external",
+        "guitar",
+        "manual",
+        "no-remote",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "facessd_p20_tests",
+    backends_to_srcs = {
+        "tf": ["facessd_p20_test.py"],
+        "tflite": ["facessd_p20_test.py"],
+        "iree_vmla": ["facessd_p20_test.py"],
+    },
+    data = [
+        "//third_party/mlir_edge/model_curriculum/saved_models/facessd_p20:facessd_p20.sm",
+    ],
+    reference_backend = "tf",
+    tags = [
+        "external",
+        "guitar",
+        "manual",
+        "no-remote",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "facessd_p20_tests_failing",
+    backends_to_srcs = {
+        "iree_llvmjit": ["facessd_p20_test.py"],
+        "iree_vulkan": ["facessd_p20_test.py"],
+    },
+    data = [
+        "//third_party/mlir_edge/model_curriculum/saved_models/facessd_p20:facessd_p20.sm",
+    ],
+    reference_backend = "tf",
+    tags = [
+        "external",
+        "failing",
         "guitar",
         "manual",
         "no-remote",
