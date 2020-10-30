@@ -42,7 +42,7 @@ struct SPIRVCodegenOptions {
 // Returns SPIR-V CodeGen options from command-line options.
 SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions();
 
-// Helper methods to get code generation options from command-line options
+// Helper methods to get each code generation option from command-line option.
 
 bool getSPIRVEnableVectorizationClOption();
 
