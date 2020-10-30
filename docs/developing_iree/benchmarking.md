@@ -104,11 +104,11 @@ Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 We also benchmark the performance of individual parts of the IREE system in
 isolation. IREE breaks a model down to dispatch functions. To benchmark all the
 dispatch functions, generate an IREE module with
-`-iree-mlir-to-benchmark-vm-bytecode-module` for the target backend:
+`-iree-mlir-to-executable-benchmark-vm-module` for the target backend:
 
 ```shell
 $ build/iree/tools/iree-translate \
-  -iree-mlir-to-benchmark-vm-bytecode-module \
+  -iree-mlir-to-executable-benchmark-vm-module \
   -iree-hal-target-backends=vmla \
   iree/test/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb

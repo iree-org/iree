@@ -170,7 +170,7 @@ void registerIREEVMTranslation() {
       translateFromMLIRToVMBytecodeModuleWithFlags);
 
   TranslateFromMLIRRegistration toBenchmarkVMBytecodeModuleWithFlags(
-      "iree-mlir-to-benchmark-vm-bytecode-module",
+      "iree-mlir-to-executable-benchmark-vm-module",
       translateFromMLIRToBenchmarkVMBytecodeModuleWithFlags);
 
 #ifdef IREE_HAVE_EMITC_DIALECT
