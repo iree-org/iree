@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# This script assumes Debian Linux. It could easily be modified to run on any Unix,
+# as the Debian assumption is only to automatically install some packages,
+# (Tracy dependencies). With a bit more work it could be made to support other OSes
+# such as Windows, but that's not at all handled yet.
+
 function print_status {
   echo -e "\e[96m$@\e[39m"
 }
@@ -171,14 +176,14 @@ cmake -G Ninja ../iree \
   -DIREE_HOST_CXX_COMPILER=`which "$CXX"` \
   -DIREE_ENABLE_RUNTIME_TRACING=ON
 
-cmake --build .
+cmake --build . --target iree_tools_iree-translate
 
 popd
 echo
 
 print_status "Compiling the input MLIR file into a IREE module..."
 
-IREE_COMPILED_MODULE=/tmp/android_module.fbvm
+IREE_COMPILED_MODULE=/tmp/android_module.vmfb
 IREE_LOG=/tmp/iree-translate.log
 
 rm -rf "${IREE_COMPILED_MODULE}"
@@ -189,7 +194,7 @@ IREE_LLVMAOT_LINKER_PATH="${IREE_LLVMAOT_LINKER_PATH}" \
     --iree-mlir-to-vm-bytecode-module \
     --iree-llvm-target-triple=aarch64-linux-android \
     /tmp/iree/modules/MobileBertSquad/iree_input.mlir \
-    -o /tmp/android_module.fbvm \
+    -o "${IREE_COMPILED_MODULE}" \
     2>"${IREE_LOG}"
 
 if [ ! -f "${IREE_COMPILED_MODULE}" ]
@@ -203,8 +208,10 @@ fi
 
 echo
 
+DEVICE_IREE_COMPILED_MODULE=/data/local/tmp/android_module.vmfb
+
 print_status "Pushing the compiled module to the device..."
-adb push /tmp/android_module.fbvm /data/local/tmp
+adb push "${IREE_COMPILED_MODULE}" "${DEVICE_IREE_COMPILED_MODULE}"
 echo
 
 print_status "Pushing the IREE benchmarking program to the device..."
@@ -233,6 +240,6 @@ adb shell \
     taskset 80 \
       data/local/tmp/iree-benchmark-module \
         --driver=dylib \
-        --module_file=/data/local/tmp/android_module.fbvm \
+        --module_file="${DEVICE_IREE_COMPILED_MODULE}" \
         --function_inputs="${FUNCTION_INPUTS}" \
         --entry_function="${ENTRY_FUNCTION}"
