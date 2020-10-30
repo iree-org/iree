@@ -24,10 +24,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Creates wo kind of benchmark funcs:
-//   - Walks through all the execuatable ops and creates Funcs to invoke them.
-//   - Walks through all exported functions, create a func with dummy inputs,
-//     and explicitly remove export attribute from old functions.
+// Creates two kind of benchmark functions:
+//   - Creates exported functions to invoke each executable op.
+//   - Clones each exported functions (including those just created) with
+//     placeholder constant inputs instead of arguments and removes the
+//     exported attribute from the old functions.
 // The input are provided using flow.variable and flow.lookup.
 class CreateBenchmarkFuncs
     : public PassWrapper<CreateBenchmarkFuncs, OperationPass<ModuleOp>> {
