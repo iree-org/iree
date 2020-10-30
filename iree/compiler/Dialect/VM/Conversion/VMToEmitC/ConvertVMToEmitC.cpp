@@ -89,7 +89,8 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<IREE::VM::VMDialect>();
     target.addIllegalOp<IREE::VM::AddI32Op>();
 
-    if (failed(applyFullConversion(getOperation(), target, patterns))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
