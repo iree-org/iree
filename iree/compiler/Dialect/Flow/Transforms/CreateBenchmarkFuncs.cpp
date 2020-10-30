@@ -94,7 +94,7 @@ class CreateBenchmarkFuncs
 
       OpBuilder::InsertionGuard gaurd(builder);
       builder.setInsertionPoint(newFuncOp);
-      auto blockBuilder = OpBuilder(block, block->begin());
+      auto blockBuilder = OpBuilder::atBlockBegin(block);
       BlockAndValueMapping mapping;
       for (auto iter : llvm::enumerate(funcOp.getType().getInputs())) {
         auto arg =
