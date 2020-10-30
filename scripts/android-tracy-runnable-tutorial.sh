@@ -208,7 +208,7 @@ adb push /tmp/android_module.fbvm /data/local/tmp
 echo
 
 print_status "Pushing the IREE benchmarking program to the device..."
-adb push iree-build-android/iree/tools/iree-benchmark-module /data/local/tmp
+adb push "${IREE_BUILD_ANDROID}"/iree/tools/iree-benchmark-module /data/local/tmp
 echo
 
 print_status "Setting up TCP port forwarding to let Tracy connect with the benchmark running on the device..."
