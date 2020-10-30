@@ -289,7 +289,7 @@ android_ndk_repository(
 )
 ```
 
-TODO(hanchung): Point the Android setup to somewhere outside IREE, e.g.,
+TODO(hanchung): Place the Android setup to somewhere outside IREE, e.g.,
 TensorFlow.
 
 Then you can configure the TFLite `benchmark_model` binary in the following
