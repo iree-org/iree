@@ -1,14 +1,22 @@
 #!/bin/bash
 
-# Stop on error.
-set -e
-
 function print_status {
   echo -e "\e[96m$@\e[39m"
 }
 
 # Environment variables. They can be set manually, or will use the following defaults.
 # IREE_ROOT and ANDROID_NDK are empty by default, must be defined by the user.
+#
+# To make this script very easy to play with, this script will also default to
+# benchmarking a specific NN model (currently MobileBert encoder), and will take
+# care of generating its input MLIR form and of setting the right --function_inputs
+# and --entry_function for it. To use this script on any other specific NN model,
+# define the following environment variables:
+# IREE_INPUT_MLIR
+# FUNCTION_INPUTS
+# ENTRY_FUNCTION
+
+DEFAULT_IREE_INPUT_MLIR="/tmp/iree/modules/MobileBertSquad/iree_input.mlir"
 
 : ${IREE_ROOT:=""}
 : ${IREE_BUILD_ANDROID:="$HOME/iree-build-android"}
@@ -16,10 +24,11 @@ function print_status {
 : ${PYTHON_BIN:=python3}
 : ${CC:=clang}
 : ${CXX:=clang++}
-: ${IREE_INPUT_MLIR:=/tmp/iree/modules/MobileBertSquad/iree_input.mlir}
+: ${IREE_INPUT_MLIR:="${DEFAULT_IREE_INPUT_MLIR}"}
 : ${ANDROID_NDK:=""}
 : ${IREE_LLVMAOT_LINKER_PATH:="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang++ -static-libstdc++ -O3"}
-
+: ${FUNCTION_INPUTS:=""}
+: ${ENTRY_FUNCTION:=""}
 # Validation of the environment variables.
 
 if [ -z "${IREE_ROOT}" ]
@@ -68,6 +77,20 @@ then
   exit 1
 fi
 
+# If we're playing with the default input MLIR, preset some reasonable
+# FUNCTION_INPUTS and ENTRY_FUNCTION if they haven't been set.
+# Otherwise, they must be provided.
+if [[ -z "${FUNCTION_INPUTS}" || -z "${ENTRY_FUNCTION}" ]]
+then
+  if [[ "${IREE_INPUT_MLIR}" == "${DEFAULT_IREE_INPUT_MLIR}" ]]
+  then
+    FUNCTION_INPUTS="1x384xi32,1x384xi32,1x384xi32"
+    ENTRY_FUNCTION="serving_default"
+  else
+    print_status "Please specify FUNCTION_INPUTS and ENTRY_FUNCTION appropriately for your IREE_INPUT_MLIR (${IREE_INPUT_MLIR})"
+  fi
+fi
+
 print_status "Running with the following environment variables:"
 print_status "ANDROID_NDK=${ANDROID_NDK}"
 print_status "IREE_LLVMAOT_LINKER_PATH=${IREE_LLVMAOT_LINKER_PATH}"
@@ -78,6 +101,9 @@ print_status "PYTHON_BIN=${PYTHON_BIN}"
 print_status "CC=${CC}"
 print_status "CXX=${CXX}"
 print_status "IREE_INPUT_MLIR=${IREE_INPUT_MLIR}"
+print_status "FUNCTION_INPUTS=${FUNCTION_INPUTS}"
+print_status "ENTRY_FUNCTION=${ENTRY_FUNCTION}"
+
 echo
 
 print_status "Ensuring that we have Tracy source code..."
@@ -111,7 +137,7 @@ print_status "Ensuring that we have the input MLIR file..."
 if [ ! -f "${IREE_INPUT_MLIR}" ]
 then
   print_status "Set IREE_INPUT_MLIR to point to some iree input MLIR file. Not found at current value ${IREE_INPUT_MLIR}."
-  if [ "${IREE_INPUT_MLIR}" == "/tmp/iree/modules/MobileBertSquad/iree_input.mlir" ]
+  if [ "${IREE_INPUT_MLIR}" == "${DEFAULT_IREE_INPUT_MLIR}" ]
   then
     print_status "Okay, we actually know how to generate that file, ${IREE_INPUT_MLIR}, but it will take a while."
     print_status "Press the return key to continue..."
@@ -141,12 +167,9 @@ cmake -G Ninja ../iree \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF  \
-  -DIREE_HOST_C_COMPILER=`which clang` \
-  -DIREE_HOST_CXX_COMPILER=`which clang++` \
-  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-  -DIREE_ENABLE_RUNTIME_TRACING=ON \
-  -DIREE_ENABLE_ASAN=ON
+  -DIREE_HOST_C_COMPILER=`which "$CC"` \
+  -DIREE_HOST_CXX_COMPILER=`which "$CXX"` \
+  -DIREE_ENABLE_RUNTIME_TRACING=ON
 
 cmake --build .
 
@@ -211,5 +234,5 @@ adb shell \
       data/local/tmp/iree-benchmark-module \
         --driver=dylib \
         --module_file=/data/local/tmp/android_module.fbvm \
-        --function_inputs='1x384xi32,1x384xi32,1x384xi32' \
-        --entry_function=serving_default
+        --function_inputs="${FUNCTION_INPUTS}" \
+        --entry_function="${ENTRY_FUNCTION}"
