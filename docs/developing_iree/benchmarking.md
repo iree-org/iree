@@ -114,7 +114,7 @@ $ build/iree/tools/iree-translate \
   -o /tmp/fullyconnected.vmfb
 ```
 
-and then benchmark all exported dispatch function (and all exported functions)
+and then benchmark all exported dispatch functions (and all exported functions)
 in that module:
 
 ```
