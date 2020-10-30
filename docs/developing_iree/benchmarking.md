@@ -99,7 +99,7 @@ BM_RunModule/process_time/real_time      0.011 ms        0.014 ms        61654
 
 Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 
-## Microbenchmarks
+## Executable Benchmarks
 
 We also benchmark the performance of individual parts of the IREE system in
 isolation. IREE breaks a model down to dispatch functions. To benchmark all the
