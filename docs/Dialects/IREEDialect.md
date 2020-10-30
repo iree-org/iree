@@ -183,3 +183,61 @@ stripped during translation.
   ...
 
 ```
+
+### `iree.workgroup_id` (::mlir::iree_compiler::IREE::WorkgroupIdOp)
+
+Get grid index of an iree workgoup among a specific dimension.
+
+
+Syntax:
+
+```
+operation ::= `iree.workgroup_id` attr-dict `:` type($result)
+```
+
+IREE workgroups are logically distributed among a hypergrid, each point sampled 
+from the grid corresponds to a logical thread. For example in a 3d grid case 
+the op quries (x, y, z) dimensions:
+
+```mlir
+ %0 = iree.workgroup_id {dimension = "x"} : index
+ %1 = iree.workgroup_id {dimension = "y"} : index
+ %2 = iree.workgroup_id {dimension = "z"} : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::StringAttr | string attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `iree.workgoup_size` (::mlir::iree_compiler::IREE::WorkgroupSizeOp)
+
+Get grid size of an iree thread among a specific dimension
+
+
+Syntax:
+
+```
+operation ::= `iree.workgoup_size` attr-dict `:` type($result)
+```
+
+Get grid size of an iree workgroups among a specific dimension
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::StringAttr | string attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
