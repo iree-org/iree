@@ -20,6 +20,7 @@
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
+#include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
@@ -175,6 +176,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createCSEPass());
   if (options.useVectorization) {
     pm.addPass(createVectorizeMemref());
+    pm.addPass(createForOpCanonicalizationPass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
   }

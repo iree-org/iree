@@ -166,8 +166,8 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
                        absl::Span<const T> filter_buffer,
                        ShapeSpan filter_shape, absl::Span<T> dst_buffer,
                        ShapeSpan dst_shape, ShapeSpan window_strides,
-                       ShapeSpan pad_h, ShapeSpan pad_w, ShapeSpan dilation,
-                       const int32_t groups) {
+                       ShapeSpan pad_h, ShapeSpan pad_w, ShapeSpan lhs_dilation,
+                       ShapeSpan rhs_dilation, const int32_t groups) {
   const std::array<int32_t, 3> input_strides = {input_shape[1] * input_shape[2],
                                                 input_shape[2], 1};
   const std::array<int32_t, 4> filter_strides = {
@@ -184,21 +184,25 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
     for (int wo = 0; wo < dst_shape[1]; wo++) {
       for (int g = 0; g < groups; ++g) {
         for (int kh = 0; kh < filter_shape[0]; kh++) {
-          const int ih = ho * window_strides[0] + kh - pad_h[0];
+          int ih = ho * window_strides[0] + kh * rhs_dilation[0] - pad_h[0];
           // left-right padding condition.
-          if (ih < 0 || ih >= input_shape[0]) continue;
+          if (ih < 0 || ih % lhs_dilation[0]) continue;
+          ih = ih / lhs_dilation[0];
+          if (ih >= input_shape[0]) continue;
           for (int kw = 0; kw < filter_shape[1]; kw++) {
             // top-bottom padding condition.
-            const int iw = wo * window_strides[1] + kw - pad_w[0];
-            if (iw < 0 || iw >= input_shape[1]) continue;
+            int iw = wo * window_strides[1] + kw * rhs_dilation[1] - pad_w[0];
+            if (iw < 0 || iw % lhs_dilation[1]) continue;
+            iw = iw / lhs_dilation[1];
+            if (iw >= input_shape[1]) continue;
             for (int co = 0; co < output_group_size; co++) {
               const int cg_o = g * output_group_size + co;
               const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + cg_o;
               T dst_value = T(0);
               for (int ci = 0; ci < input_group_size; ci++) {
                 const int cg_i = g * input_group_size + ci;
-                const int w_i = kh * dilation[0] * filter_strides[0] +
-                                kw * dilation[1] * filter_strides[1] +
+                const int w_i = kh * filter_strides[0] +
+                                kw * filter_strides[1] +
                                 cg_i * filter_strides[2] + co;
                 const int x_i =
                     ih * input_strides[0] + iw * input_strides[1] + cg_i;
