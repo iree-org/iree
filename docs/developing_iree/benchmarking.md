@@ -123,9 +123,8 @@ $ build/iree/tools/iree-benchmark-module
   --driver=vmla
 ```
 
-Without specifying any `entry_function`, `iree-benchmark-module` will register
-all exported functions (and dispatch functions) to benchmarking if they do not
-have to specify inputs.
+If no `entry_function` is specified, `iree-benchmark-module` will register a
+benchmark for each exported function that takes no inputs.
 
 You will see output like:
 
