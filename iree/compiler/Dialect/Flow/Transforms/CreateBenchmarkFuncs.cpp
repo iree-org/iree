@@ -33,19 +33,17 @@ namespace Flow {
 class CreateBenchmarkFuncs
     : public PassWrapper<CreateBenchmarkFuncs, OperationPass<ModuleOp>> {
  public:
-  CreateBenchmarkFuncs() = default;
-
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
     auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
     SymbolTable moduleSymbols(moduleOp);
-    Location loc = builder.getUnknownLoc();
     for (auto execOp : moduleOp.getOps<IREE::Flow::ExecutableOp>()) {
       for (auto& op : execOp.getBlock()) {
         auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op);
         if (!dispatchEntryOp) continue;
         auto execFuncOp = execOp.getInnerModule().lookupSymbol<FuncOp>(
             dispatchEntryOp.function_ref());
+        Location loc = execFuncOp.getLoc();
 
         // Create a funcOp to invoke the dispatch function.
         std::string funcName = std::string(execFuncOp.getName()) + "_entry";
@@ -56,13 +54,13 @@ class CreateBenchmarkFuncs
         Block* block = funcOp.addEntryBlock();
 
         // Build the body of the FuncOp.
-        OpBuilder::InsertionGuard gaurd(builder);
+        OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPoint(funcOp);
         auto blockBuilder = OpBuilder(block, block->begin());
         SmallVector<Value, 4> args;
         for (auto inputType : execFuncOp.getType().getInputs()) {
-          args.push_back(
-              getDummyInput(builder, blockBuilder, inputType, moduleSymbols));
+          args.push_back(getDummyInput(builder, blockBuilder, loc, inputType,
+                                       moduleSymbols));
         }
 
         // TODO(hanchung): Use a real workload instead? We can probably
@@ -85,7 +83,7 @@ class CreateBenchmarkFuncs
         continue;
       }
 
-      loc = funcOp.getLoc();
+      Location loc = funcOp.getLoc();
       auto funcType =
           builder.getFunctionType({}, funcOp.getType().getResults());
       std::string funcName = std::string(funcOp.getName()) + "_dummy_args";
@@ -93,13 +91,13 @@ class CreateBenchmarkFuncs
       newFuncOp.setAttr("iree.module.export", builder.getUnitAttr());
       Block* block = newFuncOp.addEntryBlock();
 
-      OpBuilder::InsertionGuard gaurd(builder);
+      OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPoint(newFuncOp);
       auto blockBuilder = OpBuilder::atBlockBegin(block);
       BlockAndValueMapping mapping;
       for (auto iter : llvm::enumerate(funcOp.getType().getInputs())) {
-        auto arg =
-            getDummyInput(builder, blockBuilder, iter.value(), moduleSymbols);
+        auto arg = getDummyInput(builder, blockBuilder, loc, iter.value(),
+                                 moduleSymbols);
         mapping.map(funcOp.getArgument(iter.index()), arg);
       }
       for (auto& op : funcOp.getRegion().begin()->getOperations()) {
@@ -111,21 +109,14 @@ class CreateBenchmarkFuncs
   }
 
  private:
-  std::string getUniqueName(const SymbolTable& moduleSymbols) {
-    std::string baseName = "_benchmark_input_";
-    std::string name;
-    do {
-      name = baseName + std::to_string(uniqueId++);
-    } while (moduleSymbols.lookup(name) != nullptr);
-    return name;
-  }
-
   Value getDummyInput(OpBuilder& moduleBuilder, OpBuilder& blockBuilder,
-                      Type inputType, const SymbolTable& moduleSymbols) {
-    Location loc = moduleBuilder.getUnknownLoc();
+                      Location loc, Type inputType,
+                      const SymbolTable& moduleSymbols) {
+    std::string baseName = "_benchmark_input_";
+    std::string name = baseName + std::to_string(uniqueId++);
     auto attr = blockBuilder.getZeroAttr(inputType);
     auto variableOp =
-        moduleBuilder.create<VariableOp>(loc, getUniqueName(moduleSymbols),
+        moduleBuilder.create<VariableOp>(loc, name,
                                          /*isMutable=*/false, inputType, attr);
     SymbolTable::setSymbolVisibility(variableOp,
                                      SymbolTable::Visibility::Private);
