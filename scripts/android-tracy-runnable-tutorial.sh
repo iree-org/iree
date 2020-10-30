@@ -184,7 +184,7 @@ IREE_LOG=/tmp/iree-translate.log
 rm -rf "${IREE_COMPILED_MODULE}"
 
 IREE_LLVMAOT_LINKER_PATH="${IREE_LLVMAOT_LINKER_PATH}" \
-  iree-build-android/host/bin/iree-translate \
+  "${IREE_BUILD_ANDROID}/host/bin/iree-translate" \
     --iree-hal-target-backends=dylib-llvm-aot \
     --iree-mlir-to-vm-bytecode-module \
     --iree-llvm-target-triple=aarch64-linux-android \
