@@ -22,7 +22,9 @@ iree_lit_test_suite(
     "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
+    iree::tools::iree-benchmark-module
     iree::tools::iree-run-mlir
+    iree::tools::iree-translate-module
   LABELS
     "hostonly"
 )
