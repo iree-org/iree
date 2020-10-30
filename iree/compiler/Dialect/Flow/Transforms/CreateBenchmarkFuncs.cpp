@@ -74,7 +74,7 @@ class CreateBenchmarkFuncs
     }
 
     // TODO(#3577): Move below part to a separate pass and use CallOp instead of
-    // clone the region. The CallOp is materialized in an easlier stage. We
+    // clone the region. The CallOp is materialized in an earlier stage. We
     // don't expect to see it at flow level.
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
       if (!funcOp.getAttr("iree.module.export")) {
