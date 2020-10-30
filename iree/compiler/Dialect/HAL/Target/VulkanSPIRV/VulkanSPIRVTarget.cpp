@@ -60,20 +60,13 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
-
+  targetOptions.codegenOptions = getSPIRVCodegenOptionsFromClOptions();
   if (!clVulkanTargetEnv.empty()) {
     targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   } else {
     targetOptions.vulkanTargetEnv =
         Vulkan::getTargetEnvForTriple(clVulkanTargetTriple);
   }
-
-  SPIRVCodegenOptions &codegenOptions = targetOptions.codegenOptions;
-  codegenOptions.workgroupSize = getSPIRVWorkgroupSizeClOption();
-  codegenOptions.tileSizes = getSPIRVTileSizeClOption();
-  codegenOptions.enableVectorization = getSPIRVEnableVectorizationClOption();
-  codegenOptions.useWorkgroupMemory = getSPIRVUseWorkgroupMemoryClOption();
-  codegenOptions.vectorizeMemref = getSPIRVVectorizeMemrefClOption();
 
   return targetOptions;
 }

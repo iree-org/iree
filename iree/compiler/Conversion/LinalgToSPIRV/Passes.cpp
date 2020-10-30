@@ -54,19 +54,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
-// Returns SPIR-V CodeGen options from command-line options.
-SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
-  SPIRVCodegenOptions options;
-  options.workgroupSize = getSPIRVWorkgroupSizeClOption();
-  options.tileSizes = getSPIRVTileSizeClOption();
-  options.enableVectorization = getSPIRVEnableVectorizationClOption();
-  options.useWorkgroupMemory = getSPIRVUseWorkgroupMemoryClOption();
-  options.vectorizeMemref = getSPIRVVectorizeMemrefClOption();
-  return options;
-}
-}  // namespace
-
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
   //===--------------------------------------------------------------------===//

@@ -46,6 +46,16 @@ static llvm::cl::list<unsigned> clWorkgroupSizes(
 namespace mlir {
 namespace iree_compiler {
 
+SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
+  SPIRVCodegenOptions options;
+  options.workgroupSize = getSPIRVWorkgroupSizeClOption();
+  options.tileSizes = getSPIRVTileSizeClOption();
+  options.enableVectorization = getSPIRVEnableVectorizationClOption();
+  options.useWorkgroupMemory = getSPIRVUseWorkgroupMemoryClOption();
+  options.vectorizeMemref = getSPIRVVectorizeMemrefClOption();
+  return options;
+}
+
 bool getSPIRVEnableVectorizationClOption() { return clEnableVectorization; }
 
 llvm::SmallVector<unsigned, 3> getSPIRVTileSizeClOption() {

@@ -39,6 +39,9 @@ struct SPIRVCodegenOptions {
   bool vectorizeMemref = false;
 };
 
+// Returns SPIR-V CodeGen options from command-line options.
+SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions();
+
 // Helper methods to get code generation options from command-line options
 
 bool getSPIRVEnableVectorizationClOption();
