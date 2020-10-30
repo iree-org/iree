@@ -280,7 +280,7 @@ environment](https://www.tensorflow.org/lite/guide/build_android#set_up_build_en
 To build TensorFlow tools with Android:
 
 - Run `./configure` under TensorFlow repo.
-- Add below section to TensorFlow WORKSPACE file.
+- Add the following section to the TensorFlow WORKSPACE file.
 
 ```
 android_ndk_repository(
@@ -289,7 +289,8 @@ android_ndk_repository(
 )
 ```
 
-XXX: Point the above instructions to somewhere outside IREE, e.g., TensorFlow.
+TODO(hanchung): Point the Android setup to somewhere outside IREE, e.g.,
+TensorFlow.
 
 Then you can configure the TFLite `benchmark_model` binary in the following
 ways:
@@ -407,9 +408,10 @@ name of the `.tflite` graph that you need to benchmark _may_ be different from
 the name of the trace that you want to benchmark, but you can use `cat` on
 the `graph_path` file to verify the correct `.tflite` filename if you're unsure.
 
-Tips: Sometimes `benchmark_tool` falls back to use CPU even when `use_gpu` is
-set. To get more information, you can turn on traces in the tool by
-`adb shell setprop debug.tflite.trace 1`.
+Tip:<br>
+nbsp;&nbsp;&nbsp;&nbsp;Sometimes `benchmark_tool` falls back to use CPU even
+when `use_gpu` is set. To get more information, you can turn on traces in the
+tool by `adb shell setprop debug.tflite.trace 1`.
 
 ### Profile
 
