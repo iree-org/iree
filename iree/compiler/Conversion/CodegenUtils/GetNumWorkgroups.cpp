@@ -110,7 +110,7 @@ LogicalResult createNumWorkgroupsFromResultShape(
   if (!numWorkgroupsFn) return failure();
 
   Location loc = linalgOp.getLoc();
-  OpBuilder::InsertionGuard gaurd(rewriter);
+  OpBuilder::InsertionGuard guard(rewriter);
   Optional<SmallVector<Value, 2>> parallelLoopRange =
       getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
   if (!parallelLoopRange) return failure();
@@ -144,7 +144,7 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
   }
 
   Location loc = linalgOp.getLoc();
-  OpBuilder::InsertionGuard gaurd(rewriter);
+  OpBuilder::InsertionGuard guard(rewriter);
   Optional<SmallVector<Value, 2>> parallelLoopRange =
       getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
   if (!parallelLoopRange) return failure();
