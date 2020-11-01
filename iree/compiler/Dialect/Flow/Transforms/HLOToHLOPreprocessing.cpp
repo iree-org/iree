@@ -24,6 +24,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 
@@ -730,14 +731,24 @@ struct HLOToHLOPreprocessing
 
   void runOnFunction() override {
     MLIRContext *context = &getContext();
+    ConversionTarget conversionTarget(*context);
+    OwningRewritePatternList conversionPatterns;
+    // Note that various input modalities may do their own legalization of
+    // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
+    // whether it was legalized away at a higher level.
+    chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
+    conversionTarget.addLegalDialect<shape::ShapeDialect, mhlo::MhloDialect,
+                                     mlir::StandardOpsDialect>();
+    conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
+    if (failed(applyPartialConversion(getFunction(), conversionTarget,
+                                      std::move(conversionPatterns)))) {
+      return signalPassFailure();
+    }
+
     OwningRewritePatternList patterns;
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    // Note that various input modalities may do their own legalization of
-    // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
-    // whether it was legalized away at a higher level.
-    chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
                     DecomposeExpM1Pattern>(context);
