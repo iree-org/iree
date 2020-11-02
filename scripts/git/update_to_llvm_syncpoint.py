@@ -157,7 +157,8 @@ def get_commit(path, rev="HEAD"):
 
 
 def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_commit):
-  utils.execute(["git", "fetch"], cwd=llvm_bazel_path)
+  # Explicitly specify tags. We need these.
+  utils.execute(["git", "fetch", "--tags"], cwd=llvm_bazel_path)
 
   if llvm_bazel_commit not in COMMIT_OPTIONS:
     return get_commit(llvm_bazel_path, rev=llvm_bazel_commit)
