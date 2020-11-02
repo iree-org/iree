@@ -118,6 +118,13 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_PYTHON_BINDINGS=${_CONFIG_BUILD_PYTHON_BINDINGS}
         -DIREE_BUILD_JAVA_BINDINGS=${_CONFIG_BUILD_JAVA_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
+        -DIREE_ENABLE_ASAN=${IREE_ENABLE_ASAN}
+        -DIREE_ENABLE_MSAN=${IREE_ENABLE_MSAN}
+        -DIREE_ENABLE_TSAN=${IREE_ENABLE_TSAN}
+        -DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}
+        -DLLVM_CCACHE_BUILD=${LLVM_CCACHE_BUILD}
+        -DCMAKE_VERBOSE_MAKEFILE=${CMAKE_VERBOSE_MAKEFILE}
+        
         # LINT.ThenChange(
         #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
         #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
