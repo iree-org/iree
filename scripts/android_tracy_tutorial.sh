@@ -176,7 +176,9 @@ cmake -G Ninja ../iree \
   -DIREE_HOST_CXX_COMPILER=`which "$CXX"` \
   -DIREE_ENABLE_RUNTIME_TRACING=ON
 
-cmake --build . --target iree_tools_iree-translate
+cmake --build . --target \
+  iree_tools_iree-translate \
+  iree_tools_iree-benchmark-module
 
 popd
 echo
