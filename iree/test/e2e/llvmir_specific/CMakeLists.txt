@@ -24,7 +24,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     llvm
   COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion"
+    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
+    "-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize=false"
 )
 
 iree_check_single_backend_test_suite(
@@ -37,5 +38,5 @@ iree_check_single_backend_test_suite(
   DRIVER
     llvm
   COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-tile-and-distrobute"
+    "-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize"
 )

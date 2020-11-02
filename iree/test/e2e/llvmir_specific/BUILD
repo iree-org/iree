@@ -23,12 +23,16 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# TODO(ataei): Enable tile and distribution of img2col conversion.
 iree_check_single_backend_test_suite(
     name = "check_llvm-ir-conv_img2col",
     srcs = [
         "conv.mlir",
     ],
-    compiler_flags = ["-iree-codegen-linalg-to-llvm-conv-img2col-conversion"],
+    compiler_flags = [
+        "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true",
+        "-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize=false",
+    ],
     driver = "llvm",
     target_backend = "llvm-ir",
 )
@@ -38,7 +42,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "dot.mlir",
     ],
-    compiler_flags = ["-iree-codegen-linalg-to-llvm-tile-and-distrobute"],
+    compiler_flags = ["-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize"],
     driver = "llvm",
     target_backend = "llvm-ir",
 )

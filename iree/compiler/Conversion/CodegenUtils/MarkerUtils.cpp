@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
@@ -30,6 +31,8 @@ const StringLiteral VectorTransforms::kVectorTransformMarker =
 StringRef getFusedMarker() { return "fused_numprocs_ge_numiters"; }
 
 StringRef getWorkgroupMarker() { return "workgroup"; }
+
+StringRef getWorkgroupL1TileMarker() { return "workgroup_l1_tile"; }
 
 StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
 

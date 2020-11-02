@@ -18,12 +18,32 @@
 
 namespace mlir {
 class Operation;
+class Value;
+class OpBuilder;
+class Operation;
 
 namespace iree_compiler {
 
+enum class TilingLevel {
+  // Tile linalg operations to workgroup threads.
+  WorkGroupTiles = 0,
+  // Tile linalg operation on workgroup thread into L1 block tiles.
+  Level1Tiles = 1,
+  // Tile linalg operations on L1 block tiles into vector tiles.
+  Level2Tiles = 2
+};
+
 class CPUKernelDispatch {
  public:
-  llvm::SmallVector<int64_t, 4> getTileSizes(Operation* op) const;
+  template <TilingLevel tilingLevel>
+  llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) const;
+};
+
+struct TileSizeFn {
+  template <TilingLevel tilingLevel>
+  static llvm::SmallVector<Value, 4> get(CPUKernelDispatch cpuKernelDispatch,
+                                         OpBuilder &builder,
+                                         Operation *operation);
 };
 
 }  // namespace iree_compiler
