@@ -117,13 +117,6 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
   return contents;
 }
 
-Status GetModuleContentsFromFlags(std::string& module_data) {
-  IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
-  auto module_file = absl::GetFlag(FLAGS_module_file);
-  IREE_ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(module_file));
-  return iree::OkStatus();
-}
-
 // TODO(hanchung): Consider to refactor this out and reuse in iree-run-module.
 // This class helps organize required resources for IREE. The order of
 // construction and destruction for resources matters. And the lifetime of
