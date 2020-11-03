@@ -81,6 +81,9 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  entry_names_.resize(entry_points.size());
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   for (int i = 0; i < entry_functions_.size(); ++i) {
     void* symbol = executable_library_->GetSymbol(entry_points[i]->c_str());
     if (!symbol) {

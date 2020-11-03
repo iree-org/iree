@@ -135,54 +135,6 @@ set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
-# Sanitizer configurations
-#-------------------------------------------------------------------------------
-
-include(CheckCXXCompilerFlag)
-if(${IREE_ENABLE_ASAN})
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
-  check_cxx_compiler_flag(-fsanitize=address COMPILER_SUPPORTS_ASAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_ASAN})
-    list(APPEND IREE_DEFAULT_COPTS "-fsanitize=address")
-    if(ANDROID)
-      list(APPEND IREE_DEFAULT_LINKOPTS "-fuse-ld=gold")
-    endif()
-  else()
-    message(FATAL_ERROR "The compiler does not support address sanitizer "
-                        "or is missing configuration for address sanitizer")
-  endif()
-endif()
-if(${IREE_ENABLE_MSAN})
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=memory")
-  check_cxx_compiler_flag(-fsanitize=memory COMPILER_SUPPORTS_MSAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_MSAN})
-    list(APPEND IREE_DEFAULT_COPTS "-fsanitize=memory")
-    if(ANDROID)
-      list(APPEND IREE_DEFAULT_LINKOPTS "-fuse-ld=gold")
-    endif()
-  else()
-    message(FATAL_ERROR "The compiler does not support memory sanitizer "
-                        "or is missing configuration for memory sanitizer")
-  endif()
-endif()
-if(${IREE_ENABLE_TSAN})
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=thread")
-  check_cxx_compiler_flag(-fsanitize=thread COMPILER_SUPPORTS_TSAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_TSAN})
-    list(APPEND IREE_DEFAULT_COPTS "-fsanitize=thread")
-    if(ANDROID)
-      list(APPEND IREE_DEFAULT_LINKOPTS "-fuse-ld=gold")
-    endif()
-  else()
-    message(FATAL_ERROR "The compiler does not support thread sanitizer "
-                        "or is missing configuration for thread sanitizer")
-  endif()
-endif()
-
-#-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------
 

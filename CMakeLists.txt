@@ -229,6 +229,14 @@ option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
+
+if (${IREE_ENABLE_CCACHE})
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+      set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+  endif()
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE utility definitions
@@ -236,6 +244,7 @@ option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
 
 include(iree_macros)
 include(iree_copts)
+include(sanitizers)
 include(iree_whole_archive_link)
 include(iree_cc_binary)
 include(iree_cc_library)
@@ -261,7 +270,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # IREE compilation flags
 #-------------------------------------------------------------------------------
 
-iree_append_list_to_string(CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 iree_append_list_to_string(CMAKE_C_FLAGS_DEBUG ${IREE_C_FLAGS_DEBUG_LIST})
 iree_append_list_to_string(CMAKE_CXX_FLAGS_DEBUG ${IREE_CXX_FLAGS_DEBUG_LIST})
 
