@@ -76,7 +76,10 @@ Command arguments description:
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
-    for src in glob(["*_test.py"])
+    for src in glob(
+        ["*_test.py"],
+        exclude = ["keyword_spotting_streaming_test.py"],
+    )
 ]
 
 SPECIAL_CASES = [
@@ -487,6 +490,18 @@ iree_e2e_cartesian_product_test_suite(
         ],
     },
     main = "keyword_spotting_streaming_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
+    ],
+)
+
+iree_py_binary(
+    name = "keyword_spotting_streaming_test_manual",
+    srcs = ["keyword_spotting_streaming_test.py"],
+    main = "keyword_spotting_streaming_test.py",
+    python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         "@kws_streaming//:models_lib",
