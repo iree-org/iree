@@ -135,26 +135,6 @@ set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
-# Sanitizer configurations
-#-------------------------------------------------------------------------------
-
-if(${IREE_ENABLE_ASAN})
-  list(APPEND IREE_DEFAULT_COPTS "-fsanitize=address")
-endif()
-if(${IREE_ENABLE_MSAN})
-  list(APPEND IREE_DEFAULT_COPTS "-fsanitize=memory")
-endif()
-if(${IREE_ENABLE_TSAN})
-  list(APPEND IREE_DEFAULT_COPTS "-fsanitize=thread")
-endif()
-if(ANDROID)
-  # Work around https://github.com/android/ndk/issues/1088
-  if(${IREE_ENABLE_ASAN} OR ${IREE_ENABLE_MSAN} OR ${IREE_ENABLE_TSAN})
-    list(APPEND IREE_DEFAULT_LINKOPTS "-fuse-ld=gold")
-  endif()
-endif()
-
-#-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------
 
