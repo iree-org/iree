@@ -50,52 +50,39 @@ MODE_ENUM_TO_MODE = {
     'non_streaming': modes.Modes.NON_STREAM_INFERENCE,
     'internal_streaming': modes.Modes.STREAM_INTERNAL_STATE_INFERENCE,
 }
-MODE_TO_INPUT_SHAPE = {
-    'non_streaming': (1, 16000),
-    'internal_streaming': (1, 320),
-}
-
-
-def get_input_shape():
-  return MODE_TO_INPUT_SHAPE[FLAGS.mode]
-
-
-def initialize_model():
-  params = model_params.HOTWORD_MODEL_PARAMS[FLAGS.model]
-  params = model_flags.update_flags(params)
-  model = models.MODELS[params.model_name](params)
-
-  if FLAGS.mode == 'internal_streaming':
-    mode = MODE_ENUM_TO_MODE[FLAGS.mode]
-    input_shape = get_input_shape()
-    params.batch_size = input_shape[0]
-    params.desired_samples = input_shape[1]
-    model = utils.to_streaming_inference(model, flags=params, mode=mode)
-
-  return model
 
 
 class KeywordSpottingModule(tf.Module):
 
-  def __init__(self):
+  def __init__(self, model):
     super().__init__()
-    self.m = initialize_model()
+    self.m = model
     self.m.predict = lambda x: self.m.call(x, training=False)
-    self.predict = tf.function(
-        input_signature=[tf.TensorSpec(get_input_shape())])(self.m.predict)
+    input_signature = [tf.TensorSpec(shape) for shape in self.input_shapes]
+    self.predict = tf.function(input_signature=input_signature)(self.m.predict)
+
+  @classmethod
+  def create_module(cls):
+    model = utils.get_model_with_default_params(FLAGS.model,
+                                                MODE_ENUM_TO_MODE[FLAGS.mode])
+    cls.input_shapes = [tensor.shape for tensor in model.inputs]
+    return cls(model)
 
 
 class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(KeywordSpottingModule,
-                                                    exported_names=['predict'])
+    self._modules = tf_test_utils.compile_tf_module(
+        KeywordSpottingModule.create_module, exported_names=['predict'])
+    self._input_shapes = KeywordSpottingModule.input_shapes
 
   def test_predict(self):
 
     def predict(module):
-      module.predict(tf_utils.uniform(get_input_shape()), atol=1e-5)
+      inputs = [tf_utils.uniform(shape) for shape in self._input_shapes]
+      inputs = inputs if len(inputs) > 1 else inputs[0]
+      module.predict(inputs, atol=1e-5)
 
     self.compare_backends(predict, self._modules)
 
