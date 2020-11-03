@@ -236,6 +236,7 @@ option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
 
 include(iree_macros)
 include(iree_copts)
+include(sanitizers)
 include(iree_whole_archive_link)
 include(iree_cc_binary)
 include(iree_cc_library)
