@@ -31,7 +31,7 @@ module attributes {
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0
 //   CHECK-DAG:   %[[ALLOC1:.+]] = alloc() : memref<8x32xf32, 3>
-//   CHECK-DAG:     %[[ALLOC2:.+]] = alloc() : memref<32x16xf32, 3>
+//   CHECK-DAG:   %[[ALLOC2:.+]] = alloc() : memref<32x16xf32, 3>
 //       CHECK:   scf.for
 //       CHECK:     %[[ARG0SV:.+]] = subview %[[ARG0]]
 //       CHECK:     %[[ARG1SV:.+]] = subview %[[ARG1]]
