@@ -30,12 +30,12 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createConversionPass(targetOptions));
-  passManager.addPass(createHoistInlinedRodataPass());
-  passManager.addPass(createGlobalInitializationPass());
+  passManager.addNestedPass<VM::ModuleOp>(createHoistInlinedRodataPass());
+  passManager.addNestedPass<VM::ModuleOp>(createGlobalInitializationPass());
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());
   passManager.addPass(createSymbolDCEPass());
-  passManager.addPass(createSinkDefiningOpsPass());
+  passManager.addNestedPass<VM::ModuleOp>(createSinkDefiningOpsPass());
 }
 
 void registerVMTransformPassPipeline() {
