@@ -79,7 +79,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ .
+$ cmake -G Ninja -B ../iree-build/ .
 ```
 
 Note: this should use `Clang` by default on macOS. `GCC` is not fully supported

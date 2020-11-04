@@ -32,7 +32,6 @@ func @dot(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> attri
 ```
 ### IR Dump After Canonicalizer
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -75,7 +74,6 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -86,7 +84,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -97,7 +94,6 @@ module {
 ```
 ### IR Dump After Inliner
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -124,7 +120,6 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::LegalizeInputTypesPass
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -220,7 +215,6 @@ func @dot(%arg0: tensor<?x?xf32> {iree.reflection = {}}, %arg1: !shapex.ranked_s
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::DispatchabilityAnalysisPass
 ```
-
 module {
   func @dot(%arg0: tensor<?x?xf32> {iree.reflection = {}}, %arg1: !shapex.ranked_shape<[?,?]> {iree.reflection = {}}, %arg2: tensor<?x?xf32> {iree.reflection = {}}, %arg3: !shapex.ranked_shape<[?,?]> {iree.reflection = {}}) -> (tensor<?x?xf32> {iree.reflection = {}}, !shapex.ranked_shape<[?,?]> {iree.reflection = {}}) attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
     %0 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
@@ -329,7 +323,6 @@ func @dot(%arg0: tensor<?x?xf32> {iree.reflection = {}}, %arg1: !shapex.ranked_s
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegionsPass
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -568,7 +561,6 @@ func @dot(%arg0: tensor<?x?xf32> {iree.reflection = {}}, %arg1: !shapex.ranked_s
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineLargeConstantsPass
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -610,7 +602,6 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -652,7 +643,6 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -693,7 +683,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::IdentifyConstantPoolsPass
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -734,7 +723,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeConstantPoolBuffersPass
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -775,7 +763,6 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -816,7 +803,6 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-
 module {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
@@ -857,7 +843,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfacesPass
 ```
-
 module {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io attributes {push_constants = 6 : i32} {
@@ -2943,7 +2928,6 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::ConvertToHALPass
 ```
-
 module {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io attributes {push_constants = 6 : i32} {
@@ -3178,7 +3162,6 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: index {iree.reflecti
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::PublicABIGenerationPass
 ```
-
 module {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io attributes {push_constants = 6 : i32} {
@@ -3297,7 +3280,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::LinkExecutablesPass
 ```
-
 module {
   hal.executable @linked_vmla attributes {sym_visibility = "private"} {
     hal.interface @legacy_io_0 attributes {push_constants = 6 : i32} {
@@ -3416,7 +3398,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::ResolveEntryPointOrdinalsPass
 ```
-
 module {
   hal.executable @linked_vmla attributes {sym_visibility = "private"} {
     hal.interface @legacy_io_0 attributes {push_constants = 6 : i32} {
@@ -3679,7 +3660,6 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeResourceCachesPass
 ```
-
 module {
   hal.variable @_executable_linked_vmla mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
@@ -3939,7 +3919,6 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MemoizeDeviceQueriesPass
 ```
-
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
@@ -4577,7 +4556,6 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After SymbolDCE
 ```
-
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
@@ -4685,7 +4663,6 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
@@ -4793,7 +4770,6 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::VM::ConversionPass
 ```
-
 module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
@@ -5372,7 +5348,6 @@ vm.module @module {
 ```
 ### IR Dump After Inliner
 ```
-
 module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
@@ -5559,7 +5534,6 @@ module {
 ```
 ### IR Dump After CSE
 ```
-
 module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
@@ -5746,7 +5720,6 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-
 module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
@@ -6065,7 +6038,6 @@ vm.module @module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::DropCompilerHintsPass
 ```
-
 module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
