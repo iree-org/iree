@@ -40,7 +40,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  passManager.addPass(createHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
@@ -77,7 +77,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Materialize default arg/result reflection metadata.
   // This pass must come before any 1:N type expansion that will not be retained
   // in the public ABI (i.e. loose shape dims, etc).
-  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createMaterializeExportedReflection());
 
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:
@@ -88,13 +89,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createExpandFunctionDynamicDimsPass());
 
   // Merge arg/result reflection metadata.
   // NOTE(laurenzo): This will eventually not be the right place for this as
   // it should happen after the HAL has further annotated the exported
   // functions (such as with synthetic barrier arguments).
-  passManager.addPass(IREE::Flow::createMergeExportedReflection());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createMergeExportedReflection());
 
   //----------------------------------------------------------------------------
   // Shape materialization for buffer assignment and stream formation.
@@ -119,9 +122,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // during dispatch/stream formation versus having such a large phase
   // ordering constraint.
   //----------------------------------------------------------------------------
-  passManager.addPass(Shape::createTieDynamicShapesPass());
-  passManager.addPass(Shape::createMaterializeShapeCalculationsPass());
-  passManager.addPass(Shape::createHoistShapeCalculationsPass());
+  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createMaterializeShapeCalculationsPass());
+  passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
 
   //----------------------------------------------------------------------------
   // Partitioning and dispatch region formation
@@ -152,14 +156,17 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createDispatchabilityAnalysisPass());
 
   // Create all of the dispatch regions, CSE their workloads, and fold.
-  passManager.addPass(IREE::Flow::createIdentifyDispatchRegions2Pass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createIdentifyDispatchRegions2Pass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addPass(IREE::Flow::createFoldCompatibleDispatchRegionsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createFoldCompatibleDispatchRegionsPass());
 
   // Note that as we are rematerializing things here it's critical we do not run
   // the canonicalizer/CSE between now and when we outline - otherwise it'll
   // undo all of our work!
-  passManager.addPass(IREE::Flow::createRematerializeDispatchConstantsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createRematerializeDispatchConstantsPass());
 
   // Outline the dispatch regions into their own functions. This separates the
   // sequencer functions performing dispatches from the dispatchees.
@@ -190,7 +197,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // arbitrary ordering.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
-  passManager.addPass(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -216,9 +223,11 @@ void registerFlowTransformPassPipeline() {
 
 void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createCreateBenchmarkFuncs());
-  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
-  passManager.addPass(IREE::Flow::createMergeExportedReflection());
-  passManager.addPass(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createMaterializeExportedReflection());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createMergeExportedReflection());
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addPass(createSymbolDCEPass());

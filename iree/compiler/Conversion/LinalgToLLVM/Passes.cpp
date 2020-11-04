@@ -48,19 +48,19 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg.ConvOp -> (Img2Col packing + matmul)
   if (convImg2ColConversion) {
-    passManager.addPass(createConvImg2ColMatmulConversionPass());
+    passManager.addNestedPass<FuncOp>(createConvImg2ColMatmulConversionPass());
   }
   // Linalg -> Vectors Ops.
-  passManager.addPass(createMatMulTileAndVectorizePass());
+  passManager.addNestedPass<FuncOp>(createMatMulTileAndVectorizePass());
   // Linalg -> SCF
-  passManager.addPass(createConvertLinalgToLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // SCF -> STD
-  passManager.addPass(createLowerToCFGPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
@@ -81,7 +81,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
 
   // HLO -> Linalg on buffers.
-  passManager.addPass(createDecomposeHLOClampPass());
+  passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
   addHLOToLinalgOnBuffersPasses(passManager);
 
   // Linalg -> LLVM passes.

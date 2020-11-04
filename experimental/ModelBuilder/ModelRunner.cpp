@@ -148,8 +148,8 @@ static void addVulkanLoweringPass(mlir::PassManager& manager) {
 
 static void addCPULoweringPass(mlir::PassManager& manager) {
   // Set up compiler passes.
-  manager.addPass(mlir::createConvertVectorToSCFPass());
-  manager.addPass(mlir::createConvertLinalgToLoopsPass());
+  manager.addNestedPass<mlir::FuncOp>(mlir::createConvertVectorToSCFPass());
+  manager.addNestedPass<mlir::FuncOp>(mlir::createConvertLinalgToLoopsPass());
   manager.addPass(mlir::createConvertLinalgToLLVMPass());
   manager.addPass(mlir::createConvertVectorToLLVMPass());
   manager.addPass(mlir::createLowerToLLVMPass());
@@ -167,7 +167,8 @@ mlir::ModelRunner::getDefaultMLIRPassBuilder() {
 
 void mlir::ModelRunner::runLoweringPass(
     std::function<void(mlir::PassManager&)> passBuilder) {
-  PassManager manager(module->getContext());
+  PassManager manager(module->getContext(),
+                      mlir::OpPassManager::Nesting::Implicit);
   if (mlirDebug) {
     manager.getContext()->disableMultithreading();
     manager.enableIRPrinting([](Pass*, Operation*) { return true; },
