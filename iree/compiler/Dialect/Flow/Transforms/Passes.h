@@ -192,6 +192,7 @@ inline void registerFlowPasses() {
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
   createCreateBenchmarkFuncs();
+  createOutlineLargeConstantsPass();
   createDeduplicateExecutablesPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();
