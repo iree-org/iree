@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -test-iree-flow-dispatchability %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -test-iree-flow-dispatchability %s | IreeFileCheck %s
 
 // CHECK-LABEL: @empty
 // CHECK-SAME: dispatchable = true

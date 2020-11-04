@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-split-dispatch-function -verify-diagnostics %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-codegen-split-dispatch-function -verify-diagnostics %s | IreeFileCheck %s
 
 module {
   // CHECK: func @kernel_fusable_fill_conv_ops

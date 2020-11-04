@@ -1,6 +1,6 @@
 // Tests printing and parsing of hal.buffer ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @buffer_allocator
 func @buffer_allocator() -> !hal.allocator {
