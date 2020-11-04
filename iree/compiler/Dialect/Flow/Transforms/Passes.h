@@ -144,10 +144,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
 std::unique_ptr<OperationPass<ExecutableOp>>
 createComputeExecutableHashesPass();
 
-// Finds which executables are duplicates of earlier executables.
-std::unique_ptr<OperationPass<ExecutableOp>>
-createFindDuplicateExecutablesPass();
-
 // Deduplicates executables that share hashes.
 std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass();
 
@@ -201,7 +197,6 @@ inline void registerFlowPasses() {
   createOutlineDispatchRegionsPass();
   createCreateBenchmarkFuncs();
   createComputeExecutableHashesPass();
-  createFindDuplicateExecutablesPass();
   createDeduplicateExecutablesPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();

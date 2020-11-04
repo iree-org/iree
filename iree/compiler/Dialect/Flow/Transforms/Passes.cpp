@@ -174,10 +174,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
   passManager.addNestedPass<ExecutableOp>(createComputeExecutableHashesPass());
-  // Barrier between computing hashes and comparing them.
-  // TODO(scotttodd): Find a better way to represent this?
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addNestedPass<ExecutableOp>(createFindDuplicateExecutablesPass());
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Convert any leftover ops outside of dispatch regions to flow ops.

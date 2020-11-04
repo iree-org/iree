@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/Flow/Analysis/ExecutableHashAnalysis.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -54,26 +55,33 @@ class DeduplicateExecutablesPass
     SmallVector<ExecutableOp, 3> duplicateExecutableOps;
     DenseMap<Attribute, Attribute> entryPointRefReplacements;
 
-    for (auto executableOp : executableOps) {
-      auto duplicateOpSym =
-          executableOp.getAttrOfType<SymbolRefAttr>("duplicate_of");
-      if (!duplicateOpSym) {
-        continue;
-      }
-      auto duplicateOp =
-          dyn_cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
-              moduleOp, duplicateOpSym.getLeafReference()));
+    // For each executable, find the first executable which it is equivalent to.
+    for (int i = executableOps.size() - 1; i >= 0; --i) {
+      auto possiblyDuplicateExecutable = executableOps[i];
+      auto hashAnalysis =
+          getChildAnalysis<ExecutableHashAnalysis>(possiblyDuplicateExecutable);
 
-      auto oldSymbolRefAttr = builder.getSymbolRefAttr(
-          executableOp.getName(),
-          {builder.getSymbolRefAttr(
-              executableOp.getDispatchEntryOp().sym_name())});
-      auto newSymbolRefAttr = builder.getSymbolRefAttr(
-          duplicateOp.getName(),
-          {builder.getSymbolRefAttr(
-              duplicateOp.getDispatchEntryOp().sym_name())});
-      entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
-      duplicateExecutableOps.push_back(executableOp);
+      for (int j = 0; j < i; ++j) {
+        auto comparisonExecutable = executableOps[j];
+        auto comparisonHashAnalysis =
+            getChildAnalysis<ExecutableHashAnalysis>(comparisonExecutable);
+
+        if (hashAnalysis.hashCode != comparisonHashAnalysis.hashCode) {
+          continue;
+        }
+
+        auto oldSymbolRefAttr = builder.getSymbolRefAttr(
+            possiblyDuplicateExecutable.getName(),
+            {builder.getSymbolRefAttr(
+                possiblyDuplicateExecutable.getDispatchEntryOp().sym_name())});
+        auto newSymbolRefAttr = builder.getSymbolRefAttr(
+            comparisonExecutable.getName(),
+            {builder.getSymbolRefAttr(
+                comparisonExecutable.getDispatchEntryOp().sym_name())});
+        entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
+        duplicateExecutableOps.push_back(possiblyDuplicateExecutable);
+        break;
+      }
     }
 
     totalExecutables = executableOps.size();
@@ -83,12 +91,6 @@ class DeduplicateExecutablesPass
     replaceEntryPointUses(moduleOp, entryPointRefReplacements);
     for (auto executableOp : duplicateExecutableOps) {
       executableOp.erase();
-    }
-
-    // Clean up our working attributes.
-    for (auto executableOp : moduleOp.getOps<ExecutableOp>()) {
-      executableOp.removeAttr("func_hash");
-      executableOp.removeAttr("duplicate_of");
     }
 
     // TODO(scotttodd): rewrite executable indices, filling in gaps?

@@ -12,38 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/Analysis/ExecutableHashAnalysis.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#ifndef IREE_COMPILER_DIALECT_FLOW_ANALYSIS_EXECUTABLEHASHANALYSIS_H_
+#define IREE_COMPILER_DIALECT_FLOW_ANALYSIS_EXECUTABLEHASHANALYSIS_H_
+
 #include "llvm/ADT/Hashing.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-class ComputeExecutableHashesPass
-    : public PassWrapper<ComputeExecutableHashesPass,
-                         OperationPass<ExecutableOp>> {
+// Analysis of an IREE::Flow::ExecutableOp that distills it down to a hash code.
+class ExecutableHashAnalysis {
  public:
-  void runOnOperation() override {
-    auto &funcOpHashAnalysis = getAnalysis<ExecutableHashAnalysis>();
-    markAllAnalysesPreserved();
-  }
+  explicit ExecutableHashAnalysis(Operation *op);
+
+  llvm::hash_code hashCode;
 };
-
-std::unique_ptr<OperationPass<ExecutableOp>>
-createComputeExecutableHashesPass() {
-  return std::make_unique<ComputeExecutableHashesPass>();
-}
-
-static PassRegistration<ComputeExecutableHashesPass> pass(
-    "iree-flow-compute-executable-hashes",
-    "Computes and caches hashes of executable ops");
 
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_FLOW_ANALYSIS_EXECUTABLEHASHANALYSIS_H_

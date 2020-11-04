@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-compute-executable-hashes -iree-flow-find-duplicate-executables -iree-flow-dedupliclate-executables %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-compute-executable-hashes -iree-flow-dedupliclate-executables %s | IreeFileCheck %s
 
 // CHECK-LABEL: flow.executable @single_executable_ex_dispatch_0
 flow.executable @single_executable_ex_dispatch_0 {
