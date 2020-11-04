@@ -1,6 +1,6 @@
 // Tests printing and parsing of hal.buffer_view ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // -----
 

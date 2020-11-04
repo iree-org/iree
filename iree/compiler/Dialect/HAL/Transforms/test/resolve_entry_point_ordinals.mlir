@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-resolve-entry-point-ordinals %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-resolve-entry-point-ordinals %s | IreeFileCheck %s
 
 // CHECK: module {
 module {

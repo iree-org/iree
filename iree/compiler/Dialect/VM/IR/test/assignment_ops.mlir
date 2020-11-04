@@ -1,6 +1,6 @@
 // Tests printing and parsing of assignment ops.
 
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @select_i32
 vm.module @my_module {
