@@ -64,3 +64,4 @@ func @duplicate_executables(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 
 // TODO(scotttodd): example with multiple flow.dispatch.entry ops
+// TODO(scotttodd): example with same ops but different arguments (float vs int)

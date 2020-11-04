@@ -61,6 +61,14 @@ bool areRegionsEquivalent(Region *lhs, Region *rhs) {
         return false;
       }
 
+      // We want to check the operand _types_, but don't care if the actual
+      // operand references differ (as they live in separate modules anyway).
+      if (!std::equal(lhsOp.operand_type_begin(), lhsOp.operand_type_end(),
+                      rhsOp.operand_type_begin())) {
+        return false;
+      }
+
+      // If the operations have regions, recurse into them (depth-first).
       if (lhsOp.getNumRegions() != rhsOp.getNumRegions()) {
         return false;
       }
@@ -80,12 +88,28 @@ bool areRegionsEquivalent(Region *lhs, Region *rhs) {
 bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   auto lhsModule = lhs.getInnerModule();
   auto rhsModule = rhs.getInnerModule();
+
+  // Must have the same number of entry point ops, with the same attributes.
+  // Entry point op symbol names are expected to differ, that won't affect
+  // equivalence.
+  auto lhsEntryOps = llvm::to_vector<1>(lhsModule.getOps<DispatchEntryOp>());
+  auto rhsEntryOps = llvm::to_vector<1>(rhsModule.getOps<DispatchEntryOp>());
+  if (lhsEntryOps.size() != rhsEntryOps.size()) {
+    return false;
+  }
+  for (int i = 0; i < lhsEntryOps.size(); ++i) {
+    if (lhsEntryOps[i].getAttrs() != rhsEntryOps[i].getAttrs()) {
+      return false;
+    }
+  }
+
+  // Must have the same number of functions, with each listed in the same order
+  // and with equivalent regions inside.
   auto lhsFuncOps = llvm::to_vector<1>(lhsModule.getOps<FuncOp>());
   auto rhsFuncOps = llvm::to_vector<1>(rhsModule.getOps<FuncOp>());
   if (lhsFuncOps.size() != rhsFuncOps.size()) {
     return false;
   }
-
   for (int i = 0; i < lhsFuncOps.size(); ++i) {
     auto lhsRegion = lhsFuncOps[i].getCallableRegion();
     auto rhsRegion = rhsFuncOps[i].getCallableRegion();
@@ -122,6 +146,9 @@ class DeduplicateExecutablesPass
           continue;
         }
 
+        // Found an equivalent executable! Record it and move on to the next.
+        duplicateExecutableOps.push_back(executableOp);
+
         // Record entry point reference replacements.
         auto dispatchEntryOps = llvm::to_vector<1>(
             executableOp.getBlock().getOps<DispatchEntryOp>());
@@ -139,7 +166,6 @@ class DeduplicateExecutablesPass
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 
-        duplicateExecutableOps.push_back(executableOp);
         break;
       }
     }
