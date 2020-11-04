@@ -61,3 +61,6 @@ func @duplicate_executables(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %2 = flow.dispatch @duplicate_executables_ex_dispatch_2::@duplicate_executables_rgn_dispatch_2[%c4 : index](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
 }
+
+
+// TODO(scotttodd): example with multiple flow.dispatch.entry ops

@@ -287,7 +287,6 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
-    IREE::Flow::DispatchEntryOp getDispatchEntryOp();
 
     ::mlir::ModuleOp getInnerModule() {
       return *getBlock().getOps<::mlir::ModuleOp>().begin();
