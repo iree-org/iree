@@ -401,6 +401,19 @@ KEYWORD_SPOTTING_MODELS = [
     "ds_tc_resnet",
 ]
 
+NON_STREAMING_KEYWORD_SPOTTING_MODELS = [
+    "att_mh_rnn",
+    "att_rnn",
+    "ds_cnn",
+    "inception",
+    "inception_resnet",
+    "mobilenet",
+    "mobilenet_v2",
+    "svdf_resnet",
+    "tc_resnet",
+    "xception",
+]
+
 iree_e2e_cartesian_product_test_suite(
     name = "keyword_spotting_tests",
     srcs = ["keyword_spotting_streaming_test.py"],
@@ -452,18 +465,7 @@ iree_e2e_cartesian_product_test_suite(
         },
         {
             # These models do not currently support streaming.
-            "model": [
-                "att_mh_rnn",
-                "att_rnn",
-                "ds_cnn",
-                "inception",
-                "inception_resnet",
-                "mobilenet",
-                "mobilenet_v2",
-                "svdf_resnet",
-                "tc_resnet",
-                "xception",
-            ],
+            "model": NON_STREAMING_KEYWORD_SPOTTING_MODELS,
         },
         {
             # Failing on IREE:
@@ -478,6 +480,46 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "mode": "internal_streaming",
+        "model": KEYWORD_SPOTTING_MODELS,
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "keyword_spotting_streaming_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
+    ],
+)
+
+iree_e2e_cartesian_product_test_suite(
+    name = "keyword_spotting_external_streaming_tests",
+    srcs = ["keyword_spotting_streaming_test.py"],
+    failing_configurations = [
+        {
+            # A bug in keras causes the external steraming conversion to fail
+            # when TensorFlow 2.x is used.
+            "target_backends": [
+                "tf",
+                "tflite",
+                "iree_vmla",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+        {
+            # These models do not currently support streaming.
+            "model": NON_STREAMING_KEYWORD_SPOTTING_MODELS,
+        },
+    ],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "mode": "external_streaming",
         "model": KEYWORD_SPOTTING_MODELS,
         "target_backends": [
             "tf",
