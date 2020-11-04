@@ -81,7 +81,7 @@ class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
 
     def predict(module):
       inputs = [tf_utils.uniform(shape) for shape in self._input_shapes]
-      inputs = inputs if len(inputs) > 1 else inputs[0]
+      inputs = inputs[0] if len(inputs) == 1 else inputs
       module.predict(inputs, atol=1e-5)
 
     self.compare_backends(predict, self._modules)
