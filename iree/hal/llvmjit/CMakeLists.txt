@@ -55,9 +55,9 @@ iree_cc_library(
     "llvmjit_driver_module.cc"
   DEPS
     ::llvmjit_driver
+    LLVMAArch64CodeGen
     LLVMSupport
     LLVMX86CodeGen
-    LLVMAArch64CodeGen
     iree::base::init
     iree::base::status
     iree::hal::driver_registry

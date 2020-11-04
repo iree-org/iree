@@ -65,6 +65,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         #TODO(ataei): Link with native target dep.
         "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//llvm:AArch64CodeGen",
     ],
     alwayslink = 1,
 )
