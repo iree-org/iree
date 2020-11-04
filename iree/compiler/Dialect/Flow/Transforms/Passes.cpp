@@ -173,7 +173,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Note: this only deduplicates identical executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addNestedPass<ExecutableOp>(createComputeExecutableHashesPass());
+  // DO NOT SUBMIT - doesn't work with multithreading (don't print for hash)
+  // passManager.addNestedPass<ExecutableOp>(createComputeExecutableHashesPass());
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Convert any leftover ops outside of dispatch regions to flow ops.

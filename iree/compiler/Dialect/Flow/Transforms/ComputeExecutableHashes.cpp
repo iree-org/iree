@@ -14,9 +14,6 @@
 
 #include "iree/compiler/Dialect/Flow/Analysis/ExecutableHashAnalysis.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "llvm/ADT/Hashing.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -29,7 +26,7 @@ class ComputeExecutableHashesPass
                          OperationPass<ExecutableOp>> {
  public:
   void runOnOperation() override {
-    auto &funcOpHashAnalysis = getAnalysis<ExecutableHashAnalysis>();
+    getAnalysis<ExecutableHashAnalysis>();
     markAllAnalysesPreserved();
   }
 };
