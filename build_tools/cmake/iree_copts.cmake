@@ -267,16 +267,6 @@ if(IREE_USE_LINKER)
   set(LLVM_USE_LINKER ${IREE_USE_LINKER} CACHE STRING "" FORCE)
 endif()
 
-# TODO: This should go in add_iree_mlir_src_dep at the top level.
-if(IREE_MLIR_DEP_MODE STREQUAL "BUNDLED")
-  list(APPEND IREE_COMMON_INCLUDE_DIRS
-    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
-    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-  )
-endif()
-
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
 # tools in LLVM.
@@ -289,10 +279,10 @@ iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
+  ${PROJECT_BINARY_DIR}/third_party/tensorflow
+  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
+  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
 )
 
 #-------------------------------------------------------------------------------

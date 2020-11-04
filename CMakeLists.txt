@@ -306,7 +306,11 @@ set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 # etc).
 function(add_bundled_mlir_dependent_projects)
   if(${IREE_ENABLE_EMITC})
-  add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
+    add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
+  endif()
+
+  if(${IREE_BUILD_COMPILER})
+    add_subdirectory(third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
   endif()
 endfunction()
 
@@ -323,17 +327,27 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+
+  # Set include directories
+  include_directories(${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include)
+  include_directories(${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include)
+  include_directories(${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include)
+  include_directories(${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include)
 endfunction()
 
 if(${IREE_ENABLE_MLIR})
   if(${IREE_MLIR_DEP_MODE} STREQUAL "DISABLED")
     message(STATUS "Not adding MLIR/LLVM dep due to IREE_MLIR_DEP_MODE=DISABLED")
   elseif(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    # TODO: See iree_copts.cmake where it sets include directories for this
-    # case. This should be cleaned up to be all in one place or the other for
-    # all modes.
     message(STATUS "Adding bundled LLVM source dependency")
     add_iree_mlir_src_dep("third_party/llvm-project")
+
+    # Extend module path to allow submodules to use LLVM and MLIR CMake modules
+    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/lib/cmake/mlir")
+    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+
+    # Set build option to use MHLO alongside with bundled MLIR
+    set(MHLO_BUILD_EMBEDDED ON)
   elseif(${IREE_MLIR_DEP_MODE} STREQUAL "INSTALLED")
     # Deps of installed MLIR/LLVM packages.
     find_package(ZLIB)  # See: https://reviews.llvm.org/D79219
