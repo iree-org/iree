@@ -414,8 +414,6 @@ iree_e2e_cartesian_product_test_suite(
                 "ds_tc_resnet",
                 "gru",  # b/162067867
                 "lstm",  # b/162067867
-                "svdf_resnet",  # b/171512071
-                "xception",  # b/171512071
             ],
             "target_backends": [
                 "iree_vmla",
