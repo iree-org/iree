@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-outline-dispatch-regions -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-outline-dispatch-regions -canonicalize %s | IreeFileCheck %s
 // NOTE: Most of the common cases for outlining are tested via
 // transformation.mlir; however, this test performs some specific tests
 // of corner cases that are easier to access at this level.

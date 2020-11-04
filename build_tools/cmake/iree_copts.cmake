@@ -44,7 +44,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Set clang diagnostics. These largely match the set of warnings used within
     # Google. They have not been audited super carefully by the IREE team but
     # are generally thought to be a good set and consistency with those used
-    # internally is very useful when importing. If you feel hat some of these
+    # internally is very useful when importing. If you feel that some of these
     # should be different, please raise an issue!
     "-Wall"
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-shape-hoist-shape-calculations %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics -iree-shape-hoist-shape-calculations %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>, %arg1: index) {

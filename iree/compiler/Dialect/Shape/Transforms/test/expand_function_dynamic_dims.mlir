@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-shape-expand-function-dynamic-dims %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics -iree-shape-expand-function-dynamic-dims %s | IreeFileCheck %s
 
 // CHECK-LABEL: @staticFunctionArgs
 // CHECK-NOT: ranked_shape

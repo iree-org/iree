@@ -75,16 +75,23 @@ build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 # This is a good compromise between runtime and debugability.
 build:generic_clang --copt=-UNDEBUG
 
-# Treat warnings in-workspace as errors.
-build:generic_clang --per_file_copt=-external/.*@-Werror
+# Treat warnings as errors...
+build:generic_clang --copt=-Werror --host_copt=-Werror
 # ...and silence them outside of the workspace.
 build:generic_clang --per_file_copt=external/.*@-w
+# ...and silence them on host builds. There is no host_per_file_copt and
+# everything we build in the host configuration we either also build in the
+# target configuration or is external, so we can't control it.
+# If/when Bazel supports --host_per_file_copt, we could use that instead:
+# https://github.com/bazelbuild/bazel/issues/12406.
+# Would need to then make all the --copt below duplicated with --host_copt.
+build:generic_clang --host_copt=-w
 
 # LINT.IfChange(clang_diagnostics)
 # Set clang diagnostics. These largely match the set of warnings used within
 # Google. They have not been audited super carefully by the IREE team but are
 # generally thought to be a good set and consistency with those used internally
-# is very useful when importing. If you feel hat some of these should be
+# is very useful when importing. If you feel that some of these should be
 # different, please raise an issue!
 
 build:generic_clang --copt=-Wall
