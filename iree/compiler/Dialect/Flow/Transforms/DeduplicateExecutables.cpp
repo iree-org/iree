@@ -39,6 +39,63 @@ void replaceEntryPointUses(mlir::ModuleOp moduleOp,
   }
 }
 
+bool areRegionsEquivalent(Region *lhs, Region *rhs) {
+  if (lhs->getBlocks().size() != rhs->getBlocks().size()) {
+    return false;
+  }
+
+  auto blockPairs = llvm::zip(lhs->getBlocks(), rhs->getBlocks());
+  for (auto blockPair : blockPairs) {
+    auto &lhsBlock = std::get<0>(blockPair);
+    auto &rhsBlock = std::get<1>(blockPair);
+    if (lhsBlock.getOperations().size() != rhsBlock.getOperations().size()) {
+      return false;
+    }
+
+    auto opPairs =
+        llvm::zip(lhsBlock.getOperations(), rhsBlock.getOperations());
+    for (auto opPair : opPairs) {
+      auto &lhsOp = std::get<0>(opPair);
+      auto &rhsOp = std::get<1>(opPair);
+      if (!OperationEquivalence::isEquivalentTo(
+              &lhsOp, &rhsOp, OperationEquivalence::IgnoreOperands)) {
+        return false;
+      }
+
+      if (lhsOp.getNumRegions() != rhsOp.getNumRegions()) {
+        return false;
+      }
+      auto lhsRegions = lhsOp.getRegions();
+      auto rhsRegions = rhsOp.getRegions();
+      for (int i = 0; i < lhsRegions.size(); ++i) {
+        if (!areRegionsEquivalent(&lhsRegions[i], &rhsRegions[i])) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
+  auto lhsModule = lhs.getInnerModule();
+  auto rhsModule = rhs.getInnerModule();
+  auto lhsFuncOps = llvm::to_vector<1>(lhsModule.getOps<FuncOp>());
+  auto rhsFuncOps = llvm::to_vector<1>(rhsModule.getOps<FuncOp>());
+  if (lhsFuncOps.size() != rhsFuncOps.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < lhsFuncOps.size(); ++i) {
+    auto lhsRegion = lhsFuncOps[i].getCallableRegion();
+    auto rhsRegion = rhsFuncOps[i].getCallableRegion();
+    return areRegionsEquivalent(lhsRegion, rhsRegion);
+  }
+
+  return true;
+}
+
 }  // namespace
 
 class DeduplicateExecutablesPass
@@ -58,15 +115,17 @@ class DeduplicateExecutablesPass
     // For each executable, find the first executable which it is equivalent to.
     for (int i = executableOps.size() - 1; i >= 0; --i) {
       auto executableOp = executableOps[i];
-      auto hashAnalysis =
-          getChildAnalysis<ExecutableHashAnalysis>(executableOp);
+      // auto hashAnalysis =
+      //     getChildAnalysis<ExecutableHashAnalysis>(executableOp);
 
       for (int j = 0; j < i; ++j) {
         auto comparisonExecutableOp = executableOps[j];
-        auto comparisonHashAnalysis =
-            getChildAnalysis<ExecutableHashAnalysis>(comparisonExecutableOp);
+        // auto comparisonHashAnalysis =
+        //     getChildAnalysis<ExecutableHashAnalysis>(comparisonExecutableOp);
 
-        if (hashAnalysis.hashCode != comparisonHashAnalysis.hashCode) {
+        // Fast hash comparison first, then full equivalence check.
+        if (/* hashAnalysis.hashCode != comparisonHashAnalysis.hashCode || */
+            !areExecutablesEquivalent(executableOp, comparisonExecutableOp)) {
           continue;
         }
 
