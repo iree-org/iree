@@ -26,12 +26,9 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-// TODO(gcmn): Allow stdin in a non-gross way. The benchmark framework invokes
-// the benchmarking function multiple times, so we have to do something to only
-// process stdin once. Probably requires dynamic benchmark registration.
-ABSL_FLAG(std::string, module_file, "",
+ABSL_FLAG(std::string, module_file, "-",
           "File containing the module to load that contains the entry "
-          "function. Required and cannot be stdin.");
+          "function. Defaults to stdin.");
 
 ABSL_FLAG(std::string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
@@ -107,11 +104,17 @@ void RegisterModuleBenchmarks(
       ->Unit(benchmark::kMillisecond);
 }
 
-Status GetModuleContentsFromFlags(std::string& module_data) {
+StatusOr<std::string> GetModuleContentsFromFlags() {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = absl::GetFlag(FLAGS_module_file);
-  IREE_ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(module_file));
-  return iree::OkStatus();
+  std::string contents;
+  if (module_file == "-") {
+    contents = std::string{std::istreambuf_iterator<char>(std::cin),
+                           std::istreambuf_iterator<char>()};
+  } else {
+    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
+  }
+  return contents;
 }
 
 // TODO(hanchung): Consider to refactor this out and reuse in iree-run-module.
@@ -161,7 +164,7 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE0("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
-    IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(module_data_));
+    IREE_ASSIGN_OR_RETURN(module_data_, GetModuleContentsFromFlags());
 
     IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
     IREE_RETURN_IF_ERROR(
