@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/Analysis/ExecutableHashAnalysis.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -115,17 +114,11 @@ class DeduplicateExecutablesPass
     // For each executable, find the first executable which it is equivalent to.
     for (int i = executableOps.size() - 1; i >= 0; --i) {
       auto executableOp = executableOps[i];
-      // auto hashAnalysis =
-      //     getChildAnalysis<ExecutableHashAnalysis>(executableOp);
 
       for (int j = 0; j < i; ++j) {
         auto comparisonExecutableOp = executableOps[j];
-        // auto comparisonHashAnalysis =
-        //     getChildAnalysis<ExecutableHashAnalysis>(comparisonExecutableOp);
 
-        // Fast hash comparison first, then full equivalence check.
-        if (/* hashAnalysis.hashCode != comparisonHashAnalysis.hashCode || */
-            !areExecutablesEquivalent(executableOp, comparisonExecutableOp)) {
+        if (!areExecutablesEquivalent(executableOp, comparisonExecutableOp)) {
           continue;
         }
 

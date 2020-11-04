@@ -23,11 +23,9 @@ cc_library(
     srcs = [
         "Dispatchability.cpp",
         "DispatchabilityTest.cpp",
-        "ExecutableHashAnalysis.cpp",
     ],
     hdrs = [
         "Dispatchability.h",
-        "ExecutableHashAnalysis.h",
         "TestPasses.h",
     ],
     deps = [

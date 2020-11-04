@@ -140,11 +140,7 @@ static constexpr size_t kMinLargeConstantSize = 256;
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize = kMinLargeConstantSize);
 
-// Computes hashes of executable ops for future deduplication.
-std::unique_ptr<OperationPass<ExecutableOp>>
-createComputeExecutableHashesPass();
-
-// Deduplicates executables that share hashes.
+// Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass();
 
 //===----------------------------------------------------------------------===//
@@ -196,7 +192,6 @@ inline void registerFlowPasses() {
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
   createCreateBenchmarkFuncs();
-  createComputeExecutableHashesPass();
   createDeduplicateExecutablesPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();

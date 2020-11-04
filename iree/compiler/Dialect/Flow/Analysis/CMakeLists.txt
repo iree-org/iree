@@ -19,12 +19,10 @@ iree_cc_library(
     Analysis
   HDRS
     "Dispatchability.h"
-    "ExecutableHashAnalysis.h"
     "TestPasses.h"
   SRCS
     "Dispatchability.cpp"
     "DispatchabilityTest.cpp"
-    "ExecutableHashAnalysis.cpp"
   DEPS
     LLVMSupport
     MLIRIR

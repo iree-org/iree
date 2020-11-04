@@ -170,11 +170,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Deduplicate executables created from dispatch regions.
-  // Note: this only deduplicates identical executables. We could in addition
+  // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  // DO NOT SUBMIT - doesn't work with multithreading (don't print for hash)
-  // passManager.addNestedPass<ExecutableOp>(createComputeExecutableHashesPass());
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Convert any leftover ops outside of dispatch regions to flow ops.
