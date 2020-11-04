@@ -211,7 +211,8 @@ StatusOr<std::string> PrepareModule(
   hal_target_options.targets = {std::move(target_backend)};
   auto vm_target_options =
       mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
-  mlir::PassManager pass_manager(mlir_module->getContext(), verifyPasses);
+  mlir::PassManager pass_manager(mlir_module->getContext());
+  pass_manager.enableVerifier(verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(

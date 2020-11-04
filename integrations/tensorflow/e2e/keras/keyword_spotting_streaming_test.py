@@ -27,10 +27,10 @@ from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 from kws_streaming.layers import modes
+from kws_streaming.models import model_flags
 from kws_streaming.models import model_params
 from kws_streaming.models import models
 from kws_streaming.models import utils
-from kws_streaming.train import model_flags
 
 FLAGS = flags.FLAGS
 

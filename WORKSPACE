@@ -299,12 +299,12 @@ maybe(
     path = "third_party/cpuinfo",
 )
 
-GOOGLE_RESEARCH_COMMIT = "1dbf7f4af77ac032ddcf68a7978cc056897015a7"
+GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"
 
 http_archive(
     name = "kws_streaming",
     build_file = "@//:build_tools/third_party/kws_streaming/BUILD.overlay",
-    sha256 = "cdb0b71914999a9cb11b5a80eb16769687c9714d9ac706e6c1cf081c3afbd976",
+    sha256 = "1e3260536491840a011ee12cae4f55878ed6a0dd8fdf7d15cd768836d55cb89c",
     strip_prefix = "google-research-{}/kws_streaming".format(GOOGLE_RESEARCH_COMMIT),
     url = "https://github.com/google-research/google-research/archive/{}.tar.gz".format(GOOGLE_RESEARCH_COMMIT),
 )

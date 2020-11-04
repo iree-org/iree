@@ -108,7 +108,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(options));
   if (options.useVectorizeMemrefPass) {
-    pm.addPass(createLoadStoreVectorizationPass());
+    pm.addNestedPass<FuncOp>(createLoadStoreVectorizationPass());
   }
   pm.addPass(createCanonicalizerPass());
 
@@ -152,7 +152,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     hal.inteface.load.constant op. There are no std.dim ops left
   //     in the IR.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createResolveShapeOpsPass());
+  pm.addNestedPass<FuncOp>(createResolveShapeOpsPass());
 
   //===--------------------------------------------------------------------===//
   // Legalize the function that computes the number of workgroups to be runnable
@@ -254,7 +254,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //   - All XLA HLO ops are converted.
   //   - All Linalg ops are operating on buffers.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createDecomposeHLOClampPass());
+  pm.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
   addHLOToLinalgOnBuffersPasses(pm);
 
   //===--------------------------------------------------------------------===//

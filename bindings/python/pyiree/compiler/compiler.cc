@@ -377,7 +377,8 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
 
 void CompilerModuleBundle::RunPassPipeline(
     const std::vector<std::string>& pipelines) {
-  mlir::PassManager pm(context_->mlir_context());
+  mlir::PassManager pm(context_->mlir_context(),
+                       mlir::OpPassManager::Nesting::Implicit);
   mlir::applyPassManagerCLOptions(pm);
   auto crash_reproducer_path = context_->crash_reproducer_path();
   if (crash_reproducer_path) {
