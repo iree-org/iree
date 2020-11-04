@@ -16,11 +16,6 @@ set(TF_MLIR_HLO_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
 )
 
-set(TF_MLIR_HLO_COPTS_BASE
-  "-I${IREE_ROOT_DIR}/third_party/tensorflow/"
-  "-I${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/"
-)
-
 external_cc_library(
   PACKAGE
     tensorflow
@@ -29,19 +24,6 @@ external_cc_library(
   ROOT
     ${TF_MLIR_HLO_SRC_ROOT}
   DEPS
-    absl::core_headers
-    LLVMSupport
-    MLIRAnalysis
-    MLIRInferTypeOpInterface
-    MLIRIR
-    MLIRPass
-    MLIRShape
-    MLIRSideEffectInterfaces
-    MLIRStandard
-    MLIRSupport
-    MLIRTransforms
-    MLIRTransformUtils
-    MLIRViewLikeInterface
     MhloDialect
     MhloInferFusibilityOpInterface
     LmhloDialect
