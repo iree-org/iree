@@ -27,6 +27,7 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
   pm.addNestedPass<FuncOp>(createHLOToLinalgOnBuffersPass());
 }
 
