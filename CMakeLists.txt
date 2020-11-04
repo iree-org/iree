@@ -371,7 +371,6 @@ if(${IREE_ENABLE_MLIR})
     message(FATAL "Unsupported IREE_MLIR_DEP_MODE=${IREE_MLIR_DEP_MODE}")
   endif()
 
-  include(external_tablegen_library)
   add_bundled_mlir_dependent_projects()
 endif()
 
