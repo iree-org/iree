@@ -43,12 +43,13 @@ flags.DEFINE_string(
     'See https://github.com/google-research/google-research/blob/master/kws_streaming/models/models.py#L38-L58'
 )
 flags.DEFINE_enum('mode', 'non_streaming',
-                  ['non_streaming', 'internal_streaming'],
+                  ['non_streaming', 'internal_streaming', 'external_streaming'],
                   'Mode to execute the model in.')
 
 MODE_ENUM_TO_MODE = {
     'non_streaming': modes.Modes.NON_STREAM_INFERENCE,
     'internal_streaming': modes.Modes.STREAM_INTERNAL_STATE_INFERENCE,
+    'external_streaming': modes.Modes.STREAM_EXTERNAL_STATE_INFERENCE,
 }
 
 
