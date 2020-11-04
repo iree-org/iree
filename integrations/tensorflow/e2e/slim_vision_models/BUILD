@@ -164,7 +164,7 @@ iree_e2e_cartesian_product_test_suite(
         "nokokoro",
         "notap",
     ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+    deps = INTREE_TENSORFLOW_PY_DEPS + INTREE_TF_HUB_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
