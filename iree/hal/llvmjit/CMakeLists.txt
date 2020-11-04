@@ -57,6 +57,7 @@ iree_cc_library(
     ::llvmjit_driver
     LLVMSupport
     LLVMX86CodeGen
+    LLVMAArch64CodeGen
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
