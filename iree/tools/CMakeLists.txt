@@ -172,7 +172,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       MLIRAffine
       MLIRAffineTransforms
-      MLIRConversionPasses
       MLIRGPU
       MLIRGPUToSPIRVTransforms
       MLIRIR
