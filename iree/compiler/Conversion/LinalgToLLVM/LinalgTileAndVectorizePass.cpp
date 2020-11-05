@@ -36,16 +36,11 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
              benefit) {}
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
-    // erased.
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
     SmallVector<Value, 4> tensorResults;
-    if (!funcOp ||
-        failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
+    if (failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
         !tensorResults.empty()) {
       return failure();
     }
-
     rewriter.eraseOp(op);
     return success();
   }

@@ -38,8 +38,8 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
 
-  passManager.addNestedPass<ModuleOp>(createLinalgTileAndDistributePass());
-  passManager.addNestedPass<ModuleOp>(createLegalizeNumWorkgroupsFnPass());
+  passManager.addPass(createLinalgTileAndDistributePass());
+  passManager.addPass(createLegalizeNumWorkgroupsFnPass());
 
   // Linalg.ConvOp -> (Img2Col packing + matmul).
   // After convolution is tiled and distributed among workgroups its converted
