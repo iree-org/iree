@@ -72,7 +72,7 @@ module {
   // CHECK-SAME:   [%[[ONE]], %[[ONE]]]
   // CHECK-SAME:   [%[[DIM0]], %[[DIM1]]]
   // CHECK-SAME:   [%[[ONE]], %[[ONE]]]
-  // CHECK-SAME: : memref<3x4xi32> to memref<?x?xi32, #map0>
+  // CHECK-SAME: : memref<3x4xi32> to memref<?x?xi32, #map>
   //       CHECK: linalg.copy
   func @slice_stride_part()
     attributes {signature = (tensor<3x4xi32>) -> (tensor<1x2xi32>)} {

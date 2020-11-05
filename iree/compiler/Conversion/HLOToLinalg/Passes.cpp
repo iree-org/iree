@@ -23,11 +23,12 @@ namespace mlir {
 namespace iree_compiler {
 
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
-  pm.addPass(createHLOToLinalgOnTensorsPass());
-  pm.addPass(createLinalgFoldUnitExtentDimsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createFusionOfTensorOpsPass());
-  pm.addPass(createHLOToLinalgOnBuffersPass());
+  pm.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass());
+  pm.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createHLOToLinalgOnBuffersPass());
 }
 
 static PassPipelineRegistration<> hloToLinalgOnBuffersPipeline(

@@ -197,6 +197,23 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_passes_and_dialects
+    HDRS
+      "init_dialects.h"
+      "init_passes.h"
+    DEPS
+      ::init_compiler_modules
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
+      ::init_xla_dialects
+      iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::HLOToLinalg
+      iree::compiler::Dialect::HAL::Conversion::Passes
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
       init_compiler_modules
     HDRS
       "init_compiler_modules.h"
@@ -246,42 +263,12 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "iree-opt-main.cc"
     DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
+      ::init_passes_and_dialects
       ::init_targets
-      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIROptLib
-      MLIRParser
-      MLIRPass
-      MLIRTransformUtils
       MLIRSupport
-      iree::compiler::Conversion::init_conversions
-      iree::compiler::Conversion::HLOToLinalg
-      iree::compiler::Dialect::Flow::Analysis
-      iree::compiler::Dialect::Flow::IR
-      iree::compiler::Dialect::Flow::Transforms
-      iree::compiler::Dialect::HAL::Conversion::FlowToHAL
-      iree::compiler::Dialect::HAL::Conversion::HALToVM
-      iree::compiler::Dialect::HAL::Conversion::Passes
-      iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::IREE::IR
-      iree::compiler::Dialect::IREE::Transforms
-      iree::compiler::Dialect::Sequence::IR
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
-      iree::compiler::Dialect::VM::Analysis
-      iree::compiler::Dialect::VM::Conversion::StandardToVM
-      iree::compiler::Dialect::VM::IR
-      iree::compiler::Dialect::VM::Transforms
-      iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-      iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
-      iree::compiler::Dialect::VMLA::Transforms
-      iree::compiler::Dialect::Vulkan::IR
-      iree::compiler::Translation::IREEVM
-      tensorflow::mlir_hlo
       ${IREE_OPT_CONDITIONAL_DEPS}
     PUBLIC
   )
@@ -330,11 +317,8 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "iree-run-mlir-main.cc"
     DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
+      ::init_passes_and_dialects
       ::init_targets
-      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIRParser
@@ -366,6 +350,7 @@ if(${IREE_BUILD_COMPILER})
 endif(${IREE_BUILD_COMPILER})
 
 # If cross-compiling, we need to declare iree-translate under host configuration
+
 # unconditionally because we need to run it on host to generate VM modules
 # for tests.
 if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)

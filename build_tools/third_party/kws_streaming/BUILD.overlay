@@ -20,7 +20,6 @@ py_library(
     name = "train_lib",
     srcs = [
         "train/base_parser.py",
-        "train/model_flags.py",
         "train/test.py",
         "train/train.py",
     ],
@@ -48,6 +47,7 @@ py_library(
         "models/lstm.py",
         "models/mobilenet.py",
         "models/mobilenet_v2.py",
+        "models/model_flags.py",
         "models/model_params.py",
         "models/models.py",
         "models/svdf.py",
@@ -58,6 +58,7 @@ py_library(
     ],
     srcs_version = "PY3",
     deps = [
+        ":input_data_lib",
         ":layers_compat",
         ":layers_lib",
     ],

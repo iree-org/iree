@@ -1,6 +1,6 @@
 // Tests printing and parsing of hal.command_buffer ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @make_memory_barrier
 func @make_memory_barrier() -> tuple<i32, i32> {

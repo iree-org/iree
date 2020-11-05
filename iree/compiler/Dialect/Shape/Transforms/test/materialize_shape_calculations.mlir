@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-shape-materialize-calculations -iree-shape-cleanup-placeholders %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics -iree-shape-materialize-calculations -iree-shape-cleanup-placeholders %s | IreeFileCheck %s
 
 // CHECK-LABEL: @compileTime
 // CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<?x2xf32>

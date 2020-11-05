@@ -88,22 +88,31 @@ class CreateBenchmarkFuncs
           builder.getFunctionType({}, funcOp.getType().getResults());
       std::string funcName = std::string(funcOp.getName()) + "_dummy_args";
       auto newFuncOp = builder.create<FuncOp>(loc, funcName, funcType);
-      newFuncOp.setAttr("iree.module.export", builder.getUnitAttr());
-      Block* block = newFuncOp.addEntryBlock();
 
+      // Insert module-scope ops before the new function.
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPoint(newFuncOp);
-      auto blockBuilder = OpBuilder::atBlockBegin(block);
-      BlockAndValueMapping mapping;
-      for (auto iter : llvm::enumerate(funcOp.getType().getInputs())) {
-        auto arg = getDummyInput(builder, blockBuilder, loc, iter.value(),
-                                 moduleSymbols);
-        mapping.map(funcOp.getArgument(iter.index()), arg);
-      }
-      for (auto& op : funcOp.getRegion().begin()->getOperations()) {
-        blockBuilder.clone(op, mapping);
-      }
 
+      // Instead of operating on `newFuncOp`, we clone a FuncOp. This is because
+      // we need to set the mapper before cloning blocks. However, the mapping
+      // values must be created within a block, so it will be within the block
+      // scope. The implementation creates dummy inputs to the entry block of
+      // the cloned function, and replaces all uses with them. In the end, we
+      // erase all the arguments and clone the modified function into
+      // ` newFuncOp`.
+      FuncOp clonedFuncOp = funcOp.clone();
+      auto blockBuilder = OpBuilder::atBlockBegin(&(*clonedFuncOp.begin()));
+      for (int i = 0, e = clonedFuncOp.getNumArguments(); i < e; ++i) {
+        auto arg = clonedFuncOp.getArgument(i);
+        auto newArg = getDummyInput(builder, blockBuilder, loc, arg.getType(),
+                                    moduleSymbols);
+        arg.replaceAllUsesWith(newArg);
+      }
+      clonedFuncOp.eraseArguments(llvm::to_vector<4>(
+          llvm::seq<unsigned>(0, clonedFuncOp.getNumArguments())));
+      BlockAndValueMapping mapping;
+      clonedFuncOp.cloneInto(newFuncOp, mapping);
+      newFuncOp.setAttr("iree.module.export", builder.getUnitAttr());
       funcOp.removeAttr("iree.module.export");
     }
   }

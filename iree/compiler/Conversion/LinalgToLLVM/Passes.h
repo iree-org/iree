@@ -36,7 +36,7 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizePass();
 /// linalg::MatmulOp.
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 
-std::unique_ptr<FunctionPass> createLinalgTileAndDistributePass();
+std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
 
 /// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
 /// followed by linalg::MatmulOp.

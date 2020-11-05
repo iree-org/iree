@@ -1,6 +1,6 @@
 // Tests printing and parsing of hal.allocator ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @allocator_compute_size
 func @allocator_compute_size() -> index {
