@@ -449,7 +449,8 @@ static void populateTilingToInvocationPatterns(
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>>(
       context,
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
@@ -467,7 +468,8 @@ static void populateTilingToInvocationPatterns(
 static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                  linalg::LinalgVectorizationPattern<linalg::FillOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
 }
@@ -489,10 +491,9 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
-  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>>(
-      context,
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
-  patterns.insert<vector::UnrollVectorPattern<vector::ContractionOp>>(
+  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>,
+                  vector::UnrollVectorPattern<vector::ContractionOp>,
+                  vector::UnrollVectorPattern<vector::TransferWriteOp>>(
       context,
       vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
   vector::populateVectorToVectorCanonicalizationPatterns(patterns, context);
