@@ -147,6 +147,9 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(
       linalg::GenericOp genericOp, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
+    if (genericOp.getNumInputs() == 0) {
+      return failure();
+    }
     if (llvm::any_of(genericOp.iterator_types(), [](Attribute attr) {
           return attr.cast<StringAttr>().getValue() !=
                  getParallelIteratorTypeName();
