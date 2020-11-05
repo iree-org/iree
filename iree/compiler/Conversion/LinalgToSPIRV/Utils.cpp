@@ -63,6 +63,16 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
                                         OperationFolder *folder) {
+  // Allocate the memory into the entry block of the parent FuncOp. This better
+  // aligns with the semantics of this memory which is available at the entry of
+  // the function.
+  OpBuilder::InsertionGuard guard(b);
+  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  if (!funcOp) {
+    subview.emitError("expected op to be within std.func");
+    return llvm::None;
+  }
+  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
   // The bounding subview size is expected to be constant. This specified the
   // shape of the allocation.
   SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
@@ -79,9 +89,14 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
 }
 
 LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  auto allocOp = buffer.getDefiningOp<AllocOp>();
-  b.create<DeallocOp>(allocOp.getLoc(), buffer);
-  return success();
+  // There is no utility of an explicit deallocation (as of now). Instead the
+  // workgroup memory is effectively stack memory that is automatically dead at
+  // the end of the function. The SPIR-V lowering treats such deallocs as
+  // no-ops. So dont insert it in the first place, rather just check that the
+  // deallocation is for workgroup memory.
+  MemRefType bufferType = buffer.getType().dyn_cast<MemRefType>();
+  if (!bufferType) return failure();
+  return success(bufferType.getMemorySpace() == getWorkgroupMemorySpace());
 }
 
 template <typename GPUIdOp, typename GPUCountOp>
@@ -148,5 +163,15 @@ template SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts<GPUGlobalId, GPUGlobalCount>(OpBuilder &builder,
                                                          Location loc,
                                                          unsigned numDims);
+
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return attr.cast<StringAttr>().getValue() ==
+               getParallelIteratorTypeName();
+      })
+      .size();
+}
 }  // namespace iree_compiler
 }  // namespace mlir

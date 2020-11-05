@@ -34,18 +34,10 @@ class LogicalResult;
 namespace iree_compiler {
 
 static constexpr int kNumGPUDims = 3;
-
-/// Updates the workgroup size used for the dispatch region.
-LogicalResult updateWorkGroupSize(FuncOp funcOp,
-                                  ArrayRef<int64_t> workGroupSize);
-
 /// Allocation callback for allocation workgroup local memory.
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
                                         OperationFolder *folder);
-
-/// Deallocation callback for allocation workgroup local memory.
-LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
 
 /// Function used as callback for copyin/copyout in promotion pattern used
 /// to promote subviews to workgroup memory when the number of threads is
@@ -53,15 +45,24 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
 /// copy is lowered to.
 LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
 
-class GPUGlobalId;
-class GPUGlobalCount;
+/// Deallocation callback for allocation workgroup local memory.
+LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.
+class GPUGlobalId;
+class GPUGlobalCount;
 template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
                                                              Location loc,
                                                              unsigned numDims);
+
+/// Function to get number of outer parallel loops of a linalgOp
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+
+/// Updates the workgroup size used for the dispatch region.
+LogicalResult updateWorkGroupSize(FuncOp funcOp,
+                                  ArrayRef<int64_t> workGroupSize);
 }  // namespace iree_compiler
 }  // namespace mlir
 
