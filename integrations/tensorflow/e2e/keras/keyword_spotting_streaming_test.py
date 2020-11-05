@@ -55,27 +55,30 @@ MODE_ENUM_TO_MODE = {
 
 class KeywordSpottingModule(tf.Module):
 
-  def __init__(self, model):
+  def __init__(self):
     super().__init__()
-    self.m = model
+    self.m = utils.get_model_with_default_params(FLAGS.model,
+                                                 MODE_ENUM_TO_MODE[FLAGS.mode])
+    self.write_input_shapes_to_cls(self.m)
     self.m.predict = lambda x: self.m.call(x, training=False)
     input_signature = [tf.TensorSpec(shape) for shape in self.input_shapes]
     self.predict = tf.function(input_signature=input_signature)(self.m.predict)
 
   @classmethod
-  def create_module(cls):
-    model = utils.get_model_with_default_params(FLAGS.model,
-                                                MODE_ENUM_TO_MODE[FLAGS.mode])
+  def write_input_shapes_to_cls(cls, model):
+    # We store the input shapes on the cls because we need access to them to
+    # generate the random inputs. Lists are not valid exported names, so we
+    # cannot access them from the module instance itself, and instead we store
+    # the input shapes on the test case below.
     cls.input_shapes = [tensor.shape for tensor in model.inputs]
-    return cls(model)
 
 
 class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(
-        KeywordSpottingModule.create_module, exported_names=['predict'])
+    self._modules = tf_test_utils.compile_tf_module(KeywordSpottingModule,
+                                                    exported_names=['predict'])
     self._input_shapes = KeywordSpottingModule.input_shapes
 
   def test_predict(self):
@@ -96,7 +99,8 @@ def main(argv):
   if FLAGS.model not in ALL_MODELS:
     raise ValueError(f'Unsupported model: {FLAGS.model}.\n'
                      f'Expected one of {MODELS_HELP}.')
-  KeywordSpottingModule.__name__ = f'kws_{FLAGS.model}'
+  KeywordSpottingModule.__name__ = os.path.join('keyword_spotting', FLAGS.model,
+                                                FLAGS.mode)
 
   tf.test.main()
 
