@@ -12,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load(
+    "//iree:build_defs.oss.bzl",
+    "INTREE_FILECHECK_TARGET",
+)
+load(
+    "//bindings/python:build_defs.oss.bzl",
+    "INTREE_TENSORFLOW_PY_DEPS",
+    "iree_py_test",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,11 +28,19 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = glob(["*.mlir"]),
+iree_py_test(
+    name = "saved_model_adopt_exports",
+    srcs = [
+        "saved_model_adopt_exports.py",
+    ],
+    args = [
+        "--filecheck_binary=$(rootpath %s)" % INTREE_FILECHECK_TARGET,
+    ],
     data = [
-        "//integrations/tensorflow/compiler:iree-tf-opt",
-        "//iree/tools:IreeFileCheck",
+        INTREE_FILECHECK_TARGET,
+    ],
+    python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
