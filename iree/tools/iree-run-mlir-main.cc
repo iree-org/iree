@@ -57,11 +57,8 @@
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/tools/init_compiler_modules.h"
-#include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_mlir_dialects.h"
+#include "iree/tools/init_dialects.h"
 #include "iree/tools/init_targets.h"
-#include "iree/tools/init_xla_dialects.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -503,10 +500,7 @@ extern "C" int main(int argc, char** argv) {
   }
 
   mlir::DialectRegistry registry;
-  mlir::registerMlirDialects(registry);
-  mlir::iree_compiler::registerIreeDialects(registry);
-  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
-  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
