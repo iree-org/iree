@@ -44,28 +44,12 @@ iree_pyext_library(
   PYEXT_DEPS
     bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    # Transforms. Adopted from the Bazel variable COMPILER::DEPS.
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::VM::Transforms
-    # Targets. Adopted from the Bazel variable COMPILER::DEPS.
-    iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOT
-    iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR
-    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
-    iree::tools::init_compiler_modules
-    iree::tools::init_iree_passes_and_dialects
-    iree::tools::init_mlir_passes_and_dialects
+    iree::tools::init_passes_and_dialects
     iree::tools::init_targets
-    iree::tools::init_xla_dialects
     LLVMSupport
     MLIRIR
-    MLIRSCFTransforms
     MLIRParser
     MLIRPass
 )

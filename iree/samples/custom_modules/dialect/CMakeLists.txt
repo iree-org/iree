@@ -89,39 +89,9 @@ iree_cc_binary(
     LLVMSupport
     MLIRIR
     MLIROptLib
-    MLIRParser
-    MLIRPass
     MLIRSupport
-    MLIRTransformUtils
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::init_conversions
-    iree::compiler::Dialect::Flow::Analysis
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::HAL::Conversion::Passes
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::Shape::Conversion
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::VM::Analysis
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Transforms
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
-    iree::compiler::Dialect::VMLA::Transforms
-    iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Translation::IREEVM
-    iree::tools::init_compiler_modules
-    iree::tools::init_iree_passes_and_dialects
-    iree::tools::init_mlir_passes_and_dialects
+    iree::tools::init_passes_and_dialects
     iree::tools::init_targets
-    iree::tools::init_xla_dialects
-    tensorflow::mlir_hlo
 )
 
 iree_cc_binary(
