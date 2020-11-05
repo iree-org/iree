@@ -630,6 +630,61 @@ func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shap
 func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After CSE
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::MatMulTileAndVectorizePass
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After LinalgLowerToLoops
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After CSE
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After SCFToStandard
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After CSE
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
 ```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
@@ -704,57 +759,38 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-    %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c0 = constant 0 : index
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-    %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c0 = constant 0 : index
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  return
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
+### IR Dump After CSE
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::MatMulTileAndVectorizePass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After LinalgLowerToLoops
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c0 = constant 0 : index
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  return
+}
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
@@ -935,580 +971,540 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c1024 = constant 1024 : index
-    %c4 = constant 4 : index
-    %cst = constant 0.000000e+00 : f32
-    %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
-    %c2 = constant 2 : index
-    %c3 = constant 3 : index
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    scf.for %arg0 = %c0 to %c32 step %c1 {
-      scf.for %arg1 = %c0 to %c64 step %c1 {
-        store %cst, %0[%arg0, %arg1] : memref<32x64xf32>
-      }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c1024 = constant 1024 : index
+  %c4 = constant 4 : index
+  %cst = constant 0.000000e+00 : f32
+  %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  scf.for %arg0 = %c0 to %c32 step %c1 {
+    scf.for %arg1 = %c0 to %c64 step %c1 {
+      store %cst, %0[%arg0, %arg1] : memref<32x64xf32>
     }
-    scf.for %arg0 = %c0 to %c1024 step %c64 {
-      %3 = subview %1[0, %arg0] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %4 = subview %2[%arg0, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %5 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
-      scf.for %arg1 = %c0 to %c64 step %c32 {
-        scf.for %arg2 = %c0 to %c64 step %c32 {
-          %6 = subview %3[0, %arg2] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          %7 = subview %4[%arg2, %arg1] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %8 = subview %5[0, %arg1] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          scf.for %arg3 = %c0 to %c32 step %c4 {
-            scf.for %arg4 = %c0 to %c32 step %c4 {
-              scf.for %arg5 = %c0 to %c32 step %c4 {
-                %9 = subview %6[%arg3, %arg5] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-                %10 = subview %7[%arg5, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %11 = subview %8[%arg3, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %12 = vector.transfer_read %9[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %13 = vector.insert %12, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-                %14 = vector.transfer_read %9[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %15 = vector.insert %14, %13 [1] : vector<4xf32> into vector<4x4xf32>
-                %16 = vector.transfer_read %9[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %17 = vector.insert %16, %15 [2] : vector<4xf32> into vector<4x4xf32>
-                %18 = vector.transfer_read %9[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %19 = vector.insert %18, %17 [3] : vector<4xf32> into vector<4x4xf32>
-                %20 = vector.transfer_read %10[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %21 = vector.transfer_read %10[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %22 = vector.transfer_read %10[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %23 = vector.transfer_read %10[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %24 = vector.transfer_read %11[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %25 = vector.insert %24, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-                %26 = vector.transfer_read %11[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %27 = vector.insert %26, %25 [1] : vector<4xf32> into vector<4x4xf32>
-                %28 = vector.transfer_read %11[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %29 = vector.insert %28, %27 [2] : vector<4xf32> into vector<4x4xf32>
-                %30 = vector.transfer_read %11[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %31 = vector.insert %30, %29 [3] : vector<4xf32> into vector<4x4xf32>
-                %32 = vector.transpose %19, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
-                %33 = vector.extract %32[0] : vector<4x4xf32>
-                %34 = vector.outerproduct %33, %20, %31 : vector<4xf32>, vector<4xf32>
-                %35 = vector.extract %32[1] : vector<4x4xf32>
-                %36 = vector.outerproduct %35, %21, %34 : vector<4xf32>, vector<4xf32>
-                %37 = vector.extract %32[2] : vector<4x4xf32>
-                %38 = vector.outerproduct %37, %22, %36 : vector<4xf32>, vector<4xf32>
-                %39 = vector.extract %32[3] : vector<4x4xf32>
-                %40 = vector.outerproduct %39, %23, %38 : vector<4xf32>, vector<4xf32>
-                %41 = vector.extract %40[0] : vector<4x4xf32>
-                vector.transfer_write %41, %11[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %42 = vector.extract %40[1] : vector<4x4xf32>
-                vector.transfer_write %42, %11[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %43 = vector.extract %40[2] : vector<4x4xf32>
-                vector.transfer_write %43, %11[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %44 = vector.extract %40[3] : vector<4x4xf32>
-                vector.transfer_write %44, %11[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-              }
+  }
+  scf.for %arg0 = %c0 to %c1024 step %c64 {
+    %3 = subview %1[0, %arg0] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %4 = subview %2[%arg0, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %5 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
+    scf.for %arg1 = %c0 to %c64 step %c32 {
+      scf.for %arg2 = %c0 to %c64 step %c32 {
+        %6 = subview %3[0, %arg2] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %7 = subview %4[%arg2, %arg1] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %8 = subview %5[0, %arg1] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        scf.for %arg3 = %c0 to %c32 step %c4 {
+          scf.for %arg4 = %c0 to %c32 step %c4 {
+            scf.for %arg5 = %c0 to %c32 step %c4 {
+              %9 = subview %6[%arg3, %arg5] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %10 = subview %7[%arg5, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %11 = subview %8[%arg3, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %12 = vector.transfer_read %9[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %13 = vector.insert %12, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+              %14 = vector.transfer_read %9[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %15 = vector.insert %14, %13 [1] : vector<4xf32> into vector<4x4xf32>
+              %16 = vector.transfer_read %9[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %17 = vector.insert %16, %15 [2] : vector<4xf32> into vector<4x4xf32>
+              %18 = vector.transfer_read %9[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %19 = vector.insert %18, %17 [3] : vector<4xf32> into vector<4x4xf32>
+              %20 = vector.transfer_read %10[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %21 = vector.transfer_read %10[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %22 = vector.transfer_read %10[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %23 = vector.transfer_read %10[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %24 = vector.transfer_read %11[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %25 = vector.insert %24, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+              %26 = vector.transfer_read %11[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %27 = vector.insert %26, %25 [1] : vector<4xf32> into vector<4x4xf32>
+              %28 = vector.transfer_read %11[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %29 = vector.insert %28, %27 [2] : vector<4xf32> into vector<4x4xf32>
+              %30 = vector.transfer_read %11[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %31 = vector.insert %30, %29 [3] : vector<4xf32> into vector<4x4xf32>
+              %32 = vector.transpose %19, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
+              %33 = vector.extract %32[0] : vector<4x4xf32>
+              %34 = vector.outerproduct %33, %20, %31 : vector<4xf32>, vector<4xf32>
+              %35 = vector.extract %32[1] : vector<4x4xf32>
+              %36 = vector.outerproduct %35, %21, %34 : vector<4xf32>, vector<4xf32>
+              %37 = vector.extract %32[2] : vector<4x4xf32>
+              %38 = vector.outerproduct %37, %22, %36 : vector<4xf32>, vector<4xf32>
+              %39 = vector.extract %32[3] : vector<4x4xf32>
+              %40 = vector.outerproduct %39, %23, %38 : vector<4xf32>, vector<4xf32>
+              %41 = vector.extract %40[0] : vector<4x4xf32>
+              vector.transfer_write %41, %11[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %42 = vector.extract %40[1] : vector<4x4xf32>
+              vector.transfer_write %42, %11[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %43 = vector.extract %40[2] : vector<4x4xf32>
+              vector.transfer_write %43, %11[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %44 = vector.extract %40[3] : vector<4x4xf32>
+              vector.transfer_write %44, %11[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
             }
           }
         }
       }
     }
-    return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+  return
 }
 
 ```
 ### IR Dump After CSE
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c1024 = constant 1024 : index
-    %c4 = constant 4 : index
-    %cst = constant 0.000000e+00 : f32
-    %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
-    %c2 = constant 2 : index
-    %c3 = constant 3 : index
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    scf.for %arg0 = %c0 to %c32 step %c1 {
-      scf.for %arg1 = %c0 to %c64 step %c1 {
-        store %cst, %0[%arg0, %arg1] : memref<32x64xf32>
-      }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c1024 = constant 1024 : index
+  %c4 = constant 4 : index
+  %cst = constant 0.000000e+00 : f32
+  %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  scf.for %arg0 = %c0 to %c32 step %c1 {
+    scf.for %arg1 = %c0 to %c64 step %c1 {
+      store %cst, %0[%arg0, %arg1] : memref<32x64xf32>
     }
-    scf.for %arg0 = %c0 to %c1024 step %c64 {
-      %3 = subview %1[0, %arg0] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %4 = subview %2[%arg0, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %5 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
-      scf.for %arg1 = %c0 to %c64 step %c32 {
-        scf.for %arg2 = %c0 to %c64 step %c32 {
-          %6 = subview %3[0, %arg2] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          %7 = subview %4[%arg2, %arg1] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %8 = subview %5[0, %arg1] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          scf.for %arg3 = %c0 to %c32 step %c4 {
-            scf.for %arg4 = %c0 to %c32 step %c4 {
-              scf.for %arg5 = %c0 to %c32 step %c4 {
-                %9 = subview %6[%arg3, %arg5] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-                %10 = subview %7[%arg5, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %11 = subview %8[%arg3, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %12 = vector.transfer_read %9[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %13 = vector.insert %12, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-                %14 = vector.transfer_read %9[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %15 = vector.insert %14, %13 [1] : vector<4xf32> into vector<4x4xf32>
-                %16 = vector.transfer_read %9[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %17 = vector.insert %16, %15 [2] : vector<4xf32> into vector<4x4xf32>
-                %18 = vector.transfer_read %9[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-                %19 = vector.insert %18, %17 [3] : vector<4xf32> into vector<4x4xf32>
-                %20 = vector.transfer_read %10[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %21 = vector.transfer_read %10[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %22 = vector.transfer_read %10[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %23 = vector.transfer_read %10[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %24 = vector.transfer_read %11[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %25 = vector.insert %24, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-                %26 = vector.transfer_read %11[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %27 = vector.insert %26, %25 [1] : vector<4xf32> into vector<4x4xf32>
-                %28 = vector.transfer_read %11[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %29 = vector.insert %28, %27 [2] : vector<4xf32> into vector<4x4xf32>
-                %30 = vector.transfer_read %11[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-                %31 = vector.insert %30, %29 [3] : vector<4xf32> into vector<4x4xf32>
-                %32 = vector.transpose %19, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
-                %33 = vector.extract %32[0] : vector<4x4xf32>
-                %34 = vector.outerproduct %33, %20, %31 : vector<4xf32>, vector<4xf32>
-                %35 = vector.extract %32[1] : vector<4x4xf32>
-                %36 = vector.outerproduct %35, %21, %34 : vector<4xf32>, vector<4xf32>
-                %37 = vector.extract %32[2] : vector<4x4xf32>
-                %38 = vector.outerproduct %37, %22, %36 : vector<4xf32>, vector<4xf32>
-                %39 = vector.extract %32[3] : vector<4x4xf32>
-                %40 = vector.outerproduct %39, %23, %38 : vector<4xf32>, vector<4xf32>
-                %41 = vector.extract %40[0] : vector<4x4xf32>
-                vector.transfer_write %41, %11[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %42 = vector.extract %40[1] : vector<4x4xf32>
-                vector.transfer_write %42, %11[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %43 = vector.extract %40[2] : vector<4x4xf32>
-                vector.transfer_write %43, %11[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                %44 = vector.extract %40[3] : vector<4x4xf32>
-                vector.transfer_write %44, %11[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-              }
+  }
+  scf.for %arg0 = %c0 to %c1024 step %c64 {
+    %3 = subview %1[0, %arg0] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %4 = subview %2[%arg0, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %5 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
+    scf.for %arg1 = %c0 to %c64 step %c32 {
+      scf.for %arg2 = %c0 to %c64 step %c32 {
+        %6 = subview %3[0, %arg2] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %7 = subview %4[%arg2, %arg1] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %8 = subview %5[0, %arg1] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        scf.for %arg3 = %c0 to %c32 step %c4 {
+          scf.for %arg4 = %c0 to %c32 step %c4 {
+            scf.for %arg5 = %c0 to %c32 step %c4 {
+              %9 = subview %6[%arg3, %arg5] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %10 = subview %7[%arg5, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %11 = subview %8[%arg3, %arg4] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %12 = vector.transfer_read %9[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %13 = vector.insert %12, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+              %14 = vector.transfer_read %9[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %15 = vector.insert %14, %13 [1] : vector<4xf32> into vector<4x4xf32>
+              %16 = vector.transfer_read %9[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %17 = vector.insert %16, %15 [2] : vector<4xf32> into vector<4x4xf32>
+              %18 = vector.transfer_read %9[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+              %19 = vector.insert %18, %17 [3] : vector<4xf32> into vector<4x4xf32>
+              %20 = vector.transfer_read %10[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %21 = vector.transfer_read %10[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %22 = vector.transfer_read %10[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %23 = vector.transfer_read %10[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %24 = vector.transfer_read %11[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %25 = vector.insert %24, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+              %26 = vector.transfer_read %11[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %27 = vector.insert %26, %25 [1] : vector<4xf32> into vector<4x4xf32>
+              %28 = vector.transfer_read %11[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %29 = vector.insert %28, %27 [2] : vector<4xf32> into vector<4x4xf32>
+              %30 = vector.transfer_read %11[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+              %31 = vector.insert %30, %29 [3] : vector<4xf32> into vector<4x4xf32>
+              %32 = vector.transpose %19, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
+              %33 = vector.extract %32[0] : vector<4x4xf32>
+              %34 = vector.outerproduct %33, %20, %31 : vector<4xf32>, vector<4xf32>
+              %35 = vector.extract %32[1] : vector<4x4xf32>
+              %36 = vector.outerproduct %35, %21, %34 : vector<4xf32>, vector<4xf32>
+              %37 = vector.extract %32[2] : vector<4x4xf32>
+              %38 = vector.outerproduct %37, %22, %36 : vector<4xf32>, vector<4xf32>
+              %39 = vector.extract %32[3] : vector<4x4xf32>
+              %40 = vector.outerproduct %39, %23, %38 : vector<4xf32>, vector<4xf32>
+              %41 = vector.extract %40[0] : vector<4x4xf32>
+              vector.transfer_write %41, %11[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %42 = vector.extract %40[1] : vector<4x4xf32>
+              vector.transfer_write %42, %11[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %43 = vector.extract %40[2] : vector<4x4xf32>
+              vector.transfer_write %43, %11[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %44 = vector.extract %40[3] : vector<4x4xf32>
+              vector.transfer_write %44, %11[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
             }
           }
         }
       }
     }
-    return
   }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+  return
 }
 
 ```
 ### IR Dump After SCFToStandard
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c1024 = constant 1024 : index
-    %c4 = constant 4 : index
-    %cst = constant 0.000000e+00 : f32
-    %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
-    %c2 = constant 2 : index
-    %c3 = constant 3 : index
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    br ^bb1(%c0 : index)
-  ^bb1(%3: index):  // 2 preds: ^bb0, ^bb5
-    %4 = cmpi "slt", %3, %c32 : index
-    cond_br %4, ^bb2, ^bb6
-  ^bb2:  // pred: ^bb1
-    br ^bb3(%c0 : index)
-  ^bb3(%5: index):  // 2 preds: ^bb2, ^bb4
-    %6 = cmpi "slt", %5, %c64 : index
-    cond_br %6, ^bb4, ^bb5
-  ^bb4:  // pred: ^bb3
-    store %cst, %0[%3, %5] : memref<32x64xf32>
-    %7 = addi %5, %c1 : index
-    br ^bb3(%7 : index)
-  ^bb5:  // pred: ^bb3
-    %8 = addi %3, %c1 : index
-    br ^bb1(%8 : index)
-  ^bb6:  // pred: ^bb1
-    br ^bb7(%c0 : index)
-  ^bb7(%9: index):  // 2 preds: ^bb6, ^bb23
-    %10 = cmpi "slt", %9, %c1024 : index
-    cond_br %10, ^bb8, ^bb24
-  ^bb8:  // pred: ^bb7
-    %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
-    br ^bb9(%c0 : index)
-  ^bb9(%14: index):  // 2 preds: ^bb8, ^bb22
-    %15 = cmpi "slt", %14, %c64 : index
-    cond_br %15, ^bb10, ^bb23
-  ^bb10:  // pred: ^bb9
-    br ^bb11(%c0 : index)
-  ^bb11(%16: index):  // 2 preds: ^bb10, ^bb21
-    %17 = cmpi "slt", %16, %c64 : index
-    cond_br %17, ^bb12, ^bb22
-  ^bb12:  // pred: ^bb11
-    %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    br ^bb13(%c0 : index)
-  ^bb13(%21: index):  // 2 preds: ^bb12, ^bb20
-    %22 = cmpi "slt", %21, %c32 : index
-    cond_br %22, ^bb14, ^bb21
-  ^bb14:  // pred: ^bb13
-    br ^bb15(%c0 : index)
-  ^bb15(%23: index):  // 2 preds: ^bb14, ^bb19
-    %24 = cmpi "slt", %23, %c32 : index
-    cond_br %24, ^bb16, ^bb20
-  ^bb16:  // pred: ^bb15
-    br ^bb17(%c0 : index)
-  ^bb17(%25: index):  // 2 preds: ^bb16, ^bb18
-    %26 = cmpi "slt", %25, %c32 : index
-    cond_br %26, ^bb18, ^bb19
-  ^bb18:  // pred: ^bb17
-    %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
-    %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
-    %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
-    %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
-    %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
-    %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
-    %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
-    %51 = vector.extract %50[0] : vector<4x4xf32>
-    %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
-    %53 = vector.extract %50[1] : vector<4x4xf32>
-    %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
-    %55 = vector.extract %50[2] : vector<4x4xf32>
-    %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
-    %57 = vector.extract %50[3] : vector<4x4xf32>
-    %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
-    %59 = vector.extract %58[0] : vector<4x4xf32>
-    vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %60 = vector.extract %58[1] : vector<4x4xf32>
-    vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %61 = vector.extract %58[2] : vector<4x4xf32>
-    vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %62 = vector.extract %58[3] : vector<4x4xf32>
-    vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %63 = addi %25, %c4 : index
-    br ^bb17(%63 : index)
-  ^bb19:  // pred: ^bb17
-    %64 = addi %23, %c4 : index
-    br ^bb15(%64 : index)
-  ^bb20:  // pred: ^bb15
-    %65 = addi %21, %c4 : index
-    br ^bb13(%65 : index)
-  ^bb21:  // pred: ^bb13
-    %66 = addi %16, %c32 : index
-    br ^bb11(%66 : index)
-  ^bb22:  // pred: ^bb11
-    %67 = addi %14, %c32 : index
-    br ^bb9(%67 : index)
-  ^bb23:  // pred: ^bb9
-    %68 = addi %9, %c64 : index
-    br ^bb7(%68 : index)
-  ^bb24:  // pred: ^bb7
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c1024 = constant 1024 : index
+  %c4 = constant 4 : index
+  %cst = constant 0.000000e+00 : f32
+  %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  br ^bb1(%c0 : index)
+^bb1(%3: index):  // 2 preds: ^bb0, ^bb5
+  %4 = cmpi "slt", %3, %c32 : index
+  cond_br %4, ^bb2, ^bb6
+^bb2:  // pred: ^bb1
+  br ^bb3(%c0 : index)
+^bb3(%5: index):  // 2 preds: ^bb2, ^bb4
+  %6 = cmpi "slt", %5, %c64 : index
+  cond_br %6, ^bb4, ^bb5
+^bb4:  // pred: ^bb3
+  store %cst, %0[%3, %5] : memref<32x64xf32>
+  %7 = addi %5, %c1 : index
+  br ^bb3(%7 : index)
+^bb5:  // pred: ^bb3
+  %8 = addi %3, %c1 : index
+  br ^bb1(%8 : index)
+^bb6:  // pred: ^bb1
+  br ^bb7(%c0 : index)
+^bb7(%9: index):  // 2 preds: ^bb6, ^bb23
+  %10 = cmpi "slt", %9, %c1024 : index
+  cond_br %10, ^bb8, ^bb24
+^bb8:  // pred: ^bb7
+  %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
+  br ^bb9(%c0 : index)
+^bb9(%14: index):  // 2 preds: ^bb8, ^bb22
+  %15 = cmpi "slt", %14, %c64 : index
+  cond_br %15, ^bb10, ^bb23
+^bb10:  // pred: ^bb9
+  br ^bb11(%c0 : index)
+^bb11(%16: index):  // 2 preds: ^bb10, ^bb21
+  %17 = cmpi "slt", %16, %c64 : index
+  cond_br %17, ^bb12, ^bb22
+^bb12:  // pred: ^bb11
+  %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  br ^bb13(%c0 : index)
+^bb13(%21: index):  // 2 preds: ^bb12, ^bb20
+  %22 = cmpi "slt", %21, %c32 : index
+  cond_br %22, ^bb14, ^bb21
+^bb14:  // pred: ^bb13
+  br ^bb15(%c0 : index)
+^bb15(%23: index):  // 2 preds: ^bb14, ^bb19
+  %24 = cmpi "slt", %23, %c32 : index
+  cond_br %24, ^bb16, ^bb20
+^bb16:  // pred: ^bb15
+  br ^bb17(%c0 : index)
+^bb17(%25: index):  // 2 preds: ^bb16, ^bb18
+  %26 = cmpi "slt", %25, %c32 : index
+  cond_br %26, ^bb18, ^bb19
+^bb18:  // pred: ^bb17
+  %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
+  %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
+  %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
+  %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
+  %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
+  %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
+  %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
+  %51 = vector.extract %50[0] : vector<4x4xf32>
+  %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
+  %53 = vector.extract %50[1] : vector<4x4xf32>
+  %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
+  %55 = vector.extract %50[2] : vector<4x4xf32>
+  %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
+  %57 = vector.extract %50[3] : vector<4x4xf32>
+  %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
+  %59 = vector.extract %58[0] : vector<4x4xf32>
+  vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %60 = vector.extract %58[1] : vector<4x4xf32>
+  vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %61 = vector.extract %58[2] : vector<4x4xf32>
+  vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %62 = vector.extract %58[3] : vector<4x4xf32>
+  vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %63 = addi %25, %c4 : index
+  br ^bb17(%63 : index)
+^bb19:  // pred: ^bb17
+  %64 = addi %23, %c4 : index
+  br ^bb15(%64 : index)
+^bb20:  // pred: ^bb15
+  %65 = addi %21, %c4 : index
+  br ^bb13(%65 : index)
+^bb21:  // pred: ^bb13
+  %66 = addi %16, %c32 : index
+  br ^bb11(%66 : index)
+^bb22:  // pred: ^bb11
+  %67 = addi %14, %c32 : index
+  br ^bb9(%67 : index)
+^bb23:  // pred: ^bb9
+  %68 = addi %9, %c64 : index
+  br ^bb7(%68 : index)
+^bb24:  // pred: ^bb7
+  return
 }
 
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c1024 = constant 1024 : index
-    %c4 = constant 4 : index
-    %cst = constant 0.000000e+00 : f32
-    %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
-    %c2 = constant 2 : index
-    %c3 = constant 3 : index
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    br ^bb1(%c0 : index)
-  ^bb1(%3: index):  // 2 preds: ^bb0, ^bb4
-    %4 = cmpi "slt", %3, %c32 : index
-    cond_br %4, ^bb2(%c0 : index), ^bb5(%c0 : index)
-  ^bb2(%5: index):  // 2 preds: ^bb1, ^bb3
-    %6 = cmpi "slt", %5, %c64 : index
-    cond_br %6, ^bb3, ^bb4
-  ^bb3:  // pred: ^bb2
-    store %cst, %0[%3, %5] : memref<32x64xf32>
-    %7 = addi %5, %c1 : index
-    br ^bb2(%7 : index)
-  ^bb4:  // pred: ^bb2
-    %8 = addi %3, %c1 : index
-    br ^bb1(%8 : index)
-  ^bb5(%9: index):  // 2 preds: ^bb1, ^bb18
-    %10 = cmpi "slt", %9, %c1024 : index
-    cond_br %10, ^bb6, ^bb19
-  ^bb6:  // pred: ^bb5
-    %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
-    br ^bb7(%c0 : index)
-  ^bb7(%14: index):  // 2 preds: ^bb6, ^bb17
-    %15 = cmpi "slt", %14, %c64 : index
-    cond_br %15, ^bb8(%c0 : index), ^bb18
-  ^bb8(%16: index):  // 2 preds: ^bb7, ^bb16
-    %17 = cmpi "slt", %16, %c64 : index
-    cond_br %17, ^bb9, ^bb17
-  ^bb9:  // pred: ^bb8
-    %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    br ^bb10(%c0 : index)
-  ^bb10(%21: index):  // 2 preds: ^bb9, ^bb15
-    %22 = cmpi "slt", %21, %c32 : index
-    cond_br %22, ^bb11(%c0 : index), ^bb16
-  ^bb11(%23: index):  // 2 preds: ^bb10, ^bb14
-    %24 = cmpi "slt", %23, %c32 : index
-    cond_br %24, ^bb12(%c0 : index), ^bb15
-  ^bb12(%25: index):  // 2 preds: ^bb11, ^bb13
-    %26 = cmpi "slt", %25, %c32 : index
-    cond_br %26, ^bb13, ^bb14
-  ^bb13:  // pred: ^bb12
-    %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
-    %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
-    %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
-    %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
-    %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
-    %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
-    %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
-    %51 = vector.extract %50[0] : vector<4x4xf32>
-    %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
-    %53 = vector.extract %50[1] : vector<4x4xf32>
-    %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
-    %55 = vector.extract %50[2] : vector<4x4xf32>
-    %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
-    %57 = vector.extract %50[3] : vector<4x4xf32>
-    %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
-    %59 = vector.extract %58[0] : vector<4x4xf32>
-    vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %60 = vector.extract %58[1] : vector<4x4xf32>
-    vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %61 = vector.extract %58[2] : vector<4x4xf32>
-    vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %62 = vector.extract %58[3] : vector<4x4xf32>
-    vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %63 = addi %25, %c4 : index
-    br ^bb12(%63 : index)
-  ^bb14:  // pred: ^bb12
-    %64 = addi %23, %c4 : index
-    br ^bb11(%64 : index)
-  ^bb15:  // pred: ^bb11
-    %65 = addi %21, %c4 : index
-    br ^bb10(%65 : index)
-  ^bb16:  // pred: ^bb10
-    %66 = addi %16, %c32 : index
-    br ^bb8(%66 : index)
-  ^bb17:  // pred: ^bb8
-    %67 = addi %14, %c32 : index
-    br ^bb7(%67 : index)
-  ^bb18:  // pred: ^bb7
-    %68 = addi %9, %c64 : index
-    br ^bb5(%68 : index)
-  ^bb19:  // pred: ^bb5
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c1024 = constant 1024 : index
+  %c4 = constant 4 : index
+  %cst = constant 0.000000e+00 : f32
+  %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  br ^bb1(%c0 : index)
+^bb1(%3: index):  // 2 preds: ^bb0, ^bb4
+  %4 = cmpi "slt", %3, %c32 : index
+  cond_br %4, ^bb2(%c0 : index), ^bb5(%c0 : index)
+^bb2(%5: index):  // 2 preds: ^bb1, ^bb3
+  %6 = cmpi "slt", %5, %c64 : index
+  cond_br %6, ^bb3, ^bb4
+^bb3:  // pred: ^bb2
+  store %cst, %0[%3, %5] : memref<32x64xf32>
+  %7 = addi %5, %c1 : index
+  br ^bb2(%7 : index)
+^bb4:  // pred: ^bb2
+  %8 = addi %3, %c1 : index
+  br ^bb1(%8 : index)
+^bb5(%9: index):  // 2 preds: ^bb1, ^bb18
+  %10 = cmpi "slt", %9, %c1024 : index
+  cond_br %10, ^bb6, ^bb19
+^bb6:  // pred: ^bb5
+  %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
+  br ^bb7(%c0 : index)
+^bb7(%14: index):  // 2 preds: ^bb6, ^bb17
+  %15 = cmpi "slt", %14, %c64 : index
+  cond_br %15, ^bb8(%c0 : index), ^bb18
+^bb8(%16: index):  // 2 preds: ^bb7, ^bb16
+  %17 = cmpi "slt", %16, %c64 : index
+  cond_br %17, ^bb9, ^bb17
+^bb9:  // pred: ^bb8
+  %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  br ^bb10(%c0 : index)
+^bb10(%21: index):  // 2 preds: ^bb9, ^bb15
+  %22 = cmpi "slt", %21, %c32 : index
+  cond_br %22, ^bb11(%c0 : index), ^bb16
+^bb11(%23: index):  // 2 preds: ^bb10, ^bb14
+  %24 = cmpi "slt", %23, %c32 : index
+  cond_br %24, ^bb12(%c0 : index), ^bb15
+^bb12(%25: index):  // 2 preds: ^bb11, ^bb13
+  %26 = cmpi "slt", %25, %c32 : index
+  cond_br %26, ^bb13, ^bb14
+^bb13:  // pred: ^bb12
+  %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
+  %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
+  %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
+  %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
+  %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
+  %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
+  %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
+  %51 = vector.extract %50[0] : vector<4x4xf32>
+  %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
+  %53 = vector.extract %50[1] : vector<4x4xf32>
+  %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
+  %55 = vector.extract %50[2] : vector<4x4xf32>
+  %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
+  %57 = vector.extract %50[3] : vector<4x4xf32>
+  %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
+  %59 = vector.extract %58[0] : vector<4x4xf32>
+  vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %60 = vector.extract %58[1] : vector<4x4xf32>
+  vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %61 = vector.extract %58[2] : vector<4x4xf32>
+  vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %62 = vector.extract %58[3] : vector<4x4xf32>
+  vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %63 = addi %25, %c4 : index
+  br ^bb12(%63 : index)
+^bb14:  // pred: ^bb12
+  %64 = addi %23, %c4 : index
+  br ^bb11(%64 : index)
+^bb15:  // pred: ^bb11
+  %65 = addi %21, %c4 : index
+  br ^bb10(%65 : index)
+^bb16:  // pred: ^bb10
+  %66 = addi %16, %c32 : index
+  br ^bb8(%66 : index)
+^bb17:  // pred: ^bb8
+  %67 = addi %14, %c32 : index
+  br ^bb7(%67 : index)
+^bb18:  // pred: ^bb7
+  %68 = addi %9, %c64 : index
+  br ^bb5(%68 : index)
+^bb19:  // pred: ^bb5
+  return
 }
 
 ```
 ### IR Dump After CSE
 ```
-module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c1024 = constant 1024 : index
-    %c4 = constant 4 : index
-    %cst = constant 0.000000e+00 : f32
-    %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
-    %c2 = constant 2 : index
-    %c3 = constant 3 : index
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    br ^bb1(%c0 : index)
-  ^bb1(%3: index):  // 2 preds: ^bb0, ^bb4
-    %4 = cmpi "slt", %3, %c32 : index
-    cond_br %4, ^bb2(%c0 : index), ^bb5(%c0 : index)
-  ^bb2(%5: index):  // 2 preds: ^bb1, ^bb3
-    %6 = cmpi "slt", %5, %c64 : index
-    cond_br %6, ^bb3, ^bb4
-  ^bb3:  // pred: ^bb2
-    store %cst, %0[%3, %5] : memref<32x64xf32>
-    %7 = addi %5, %c1 : index
-    br ^bb2(%7 : index)
-  ^bb4:  // pred: ^bb2
-    %8 = addi %3, %c1 : index
-    br ^bb1(%8 : index)
-  ^bb5(%9: index):  // 2 preds: ^bb1, ^bb18
-    %10 = cmpi "slt", %9, %c1024 : index
-    cond_br %10, ^bb6, ^bb19
-  ^bb6:  // pred: ^bb5
-    %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
-    br ^bb7(%c0 : index)
-  ^bb7(%14: index):  // 2 preds: ^bb6, ^bb17
-    %15 = cmpi "slt", %14, %c64 : index
-    cond_br %15, ^bb8(%c0 : index), ^bb18
-  ^bb8(%16: index):  // 2 preds: ^bb7, ^bb16
-    %17 = cmpi "slt", %16, %c64 : index
-    cond_br %17, ^bb9, ^bb17
-  ^bb9:  // pred: ^bb8
-    %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    br ^bb10(%c0 : index)
-  ^bb10(%21: index):  // 2 preds: ^bb9, ^bb15
-    %22 = cmpi "slt", %21, %c32 : index
-    cond_br %22, ^bb11(%c0 : index), ^bb16
-  ^bb11(%23: index):  // 2 preds: ^bb10, ^bb14
-    %24 = cmpi "slt", %23, %c32 : index
-    cond_br %24, ^bb12(%c0 : index), ^bb15
-  ^bb12(%25: index):  // 2 preds: ^bb11, ^bb13
-    %26 = cmpi "slt", %25, %c32 : index
-    cond_br %26, ^bb13, ^bb14
-  ^bb13:  // pred: ^bb12
-    %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
-    %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
-    %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
-    %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
-    %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
-    %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
-    %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
-    %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
-    %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
-    %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
-    %51 = vector.extract %50[0] : vector<4x4xf32>
-    %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
-    %53 = vector.extract %50[1] : vector<4x4xf32>
-    %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
-    %55 = vector.extract %50[2] : vector<4x4xf32>
-    %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
-    %57 = vector.extract %50[3] : vector<4x4xf32>
-    %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
-    %59 = vector.extract %58[0] : vector<4x4xf32>
-    vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %60 = vector.extract %58[1] : vector<4x4xf32>
-    vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %61 = vector.extract %58[2] : vector<4x4xf32>
-    vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %62 = vector.extract %58[3] : vector<4x4xf32>
-    vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %63 = addi %25, %c4 : index
-    br ^bb12(%63 : index)
-  ^bb14:  // pred: ^bb12
-    %64 = addi %23, %c4 : index
-    br ^bb11(%64 : index)
-  ^bb15:  // pred: ^bb11
-    %65 = addi %21, %c4 : index
-    br ^bb10(%65 : index)
-  ^bb16:  // pred: ^bb10
-    %66 = addi %16, %c32 : index
-    br ^bb8(%66 : index)
-  ^bb17:  // pred: ^bb8
-    %67 = addi %14, %c32 : index
-    br ^bb7(%67 : index)
-  ^bb18:  // pred: ^bb7
-    %68 = addi %9, %c64 : index
-    br ^bb5(%68 : index)
-  ^bb19:  // pred: ^bb5
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
+func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  %c1024 = constant 1024 : index
+  %c4 = constant 4 : index
+  %cst = constant 0.000000e+00 : f32
+  %cst_0 = constant opaque<"", "0xDEADBEEF"> : vector<4x4xf32>
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  br ^bb1(%c0 : index)
+^bb1(%3: index):  // 2 preds: ^bb0, ^bb4
+  %4 = cmpi "slt", %3, %c32 : index
+  cond_br %4, ^bb2(%c0 : index), ^bb5(%c0 : index)
+^bb2(%5: index):  // 2 preds: ^bb1, ^bb3
+  %6 = cmpi "slt", %5, %c64 : index
+  cond_br %6, ^bb3, ^bb4
+^bb3:  // pred: ^bb2
+  store %cst, %0[%3, %5] : memref<32x64xf32>
+  %7 = addi %5, %c1 : index
+  br ^bb2(%7 : index)
+^bb4:  // pred: ^bb2
+  %8 = addi %3, %c1 : index
+  br ^bb1(%8 : index)
+^bb5(%9: index):  // 2 preds: ^bb1, ^bb18
+  %10 = cmpi "slt", %9, %c1024 : index
+  cond_br %10, ^bb6, ^bb19
+^bb6:  // pred: ^bb5
+  %11 = subview %1[0, %9] [32, 64] [1, 1]  : memref<32x1024xf32> to memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %12 = subview %2[%9, 0] [64, 64] [1, 1]  : memref<1024x64xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %13 = subview %0[0, 0] [32, 64] [1, 1]  : memref<32x64xf32> to memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>>
+  br ^bb7(%c0 : index)
+^bb7(%14: index):  // 2 preds: ^bb6, ^bb17
+  %15 = cmpi "slt", %14, %c64 : index
+  cond_br %15, ^bb8(%c0 : index), ^bb18
+^bb8(%16: index):  // 2 preds: ^bb7, ^bb16
+  %17 = cmpi "slt", %16, %c64 : index
+  cond_br %17, ^bb9, ^bb17
+^bb9:  // pred: ^bb8
+  %18 = subview %11[0, %16] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %19 = subview %12[%16, %14] [32, 32] [1, 1]  : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %20 = subview %13[0, %14] [32, 32] [1, 1]  : memref<32x64xf32, affine_map<(d0, d1) -> (d0 * 64 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  br ^bb10(%c0 : index)
+^bb10(%21: index):  // 2 preds: ^bb9, ^bb15
+  %22 = cmpi "slt", %21, %c32 : index
+  cond_br %22, ^bb11(%c0 : index), ^bb16
+^bb11(%23: index):  // 2 preds: ^bb10, ^bb14
+  %24 = cmpi "slt", %23, %c32 : index
+  cond_br %24, ^bb12(%c0 : index), ^bb15
+^bb12(%25: index):  // 2 preds: ^bb11, ^bb13
+  %26 = cmpi "slt", %25, %c32 : index
+  cond_br %26, ^bb13, ^bb14
+^bb13:  // pred: ^bb12
+  %27 = subview %18[%21, %25] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %28 = subview %19[%25, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %29 = subview %20[%21, %23] [4, 4] [1, 1]  : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %30 = vector.transfer_read %27[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %31 = vector.insert %30, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %32 = vector.transfer_read %27[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %33 = vector.insert %32, %31 [1] : vector<4xf32> into vector<4x4xf32>
+  %34 = vector.transfer_read %27[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %35 = vector.insert %34, %33 [2] : vector<4xf32> into vector<4x4xf32>
+  %36 = vector.transfer_read %27[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
+  %37 = vector.insert %36, %35 [3] : vector<4xf32> into vector<4x4xf32>
+  %38 = vector.transfer_read %28[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %39 = vector.transfer_read %28[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %40 = vector.transfer_read %28[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %41 = vector.transfer_read %28[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %42 = vector.transfer_read %29[%c0, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %43 = vector.insert %42, %cst_0 [0] : vector<4xf32> into vector<4x4xf32>
+  %44 = vector.transfer_read %29[%c1, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %45 = vector.insert %44, %43 [1] : vector<4xf32> into vector<4x4xf32>
+  %46 = vector.transfer_read %29[%c2, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %47 = vector.insert %46, %45 [2] : vector<4xf32> into vector<4x4xf32>
+  %48 = vector.transfer_read %29[%c3, %c0], %cst {masked = [false]} : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, vector<4xf32>
+  %49 = vector.insert %48, %47 [3] : vector<4xf32> into vector<4x4xf32>
+  %50 = vector.transpose %37, [1, 0] : vector<4x4xf32> to vector<4x4xf32>
+  %51 = vector.extract %50[0] : vector<4x4xf32>
+  %52 = vector.outerproduct %51, %38, %49 : vector<4xf32>, vector<4xf32>
+  %53 = vector.extract %50[1] : vector<4x4xf32>
+  %54 = vector.outerproduct %53, %39, %52 : vector<4xf32>, vector<4xf32>
+  %55 = vector.extract %50[2] : vector<4x4xf32>
+  %56 = vector.outerproduct %55, %40, %54 : vector<4xf32>, vector<4xf32>
+  %57 = vector.extract %50[3] : vector<4x4xf32>
+  %58 = vector.outerproduct %57, %41, %56 : vector<4xf32>, vector<4xf32>
+  %59 = vector.extract %58[0] : vector<4x4xf32>
+  vector.transfer_write %59, %29[%c0, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %60 = vector.extract %58[1] : vector<4x4xf32>
+  vector.transfer_write %60, %29[%c1, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %61 = vector.extract %58[2] : vector<4x4xf32>
+  vector.transfer_write %61, %29[%c2, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %62 = vector.extract %58[3] : vector<4x4xf32>
+  vector.transfer_write %62, %29[%c3, %c0] {masked = [false]} : vector<4xf32>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %63 = addi %25, %c4 : index
+  br ^bb12(%63 : index)
+^bb14:  // pred: ^bb12
+  %64 = addi %23, %c4 : index
+  br ^bb11(%64 : index)
+^bb15:  // pred: ^bb11
+  %65 = addi %21, %c4 : index
+  br ^bb10(%65 : index)
+^bb16:  // pred: ^bb10
+  %66 = addi %16, %c32 : index
+  br ^bb8(%66 : index)
+^bb17:  // pred: ^bb8
+  %67 = addi %14, %c32 : index
+  br ^bb7(%67 : index)
+^bb18:  // pred: ^bb7
+  %68 = addi %9, %c64 : index
+  br ^bb5(%68 : index)
+^bb19:  // pred: ^bb5
+  return
 }
 
 ```
