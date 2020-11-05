@@ -43,6 +43,18 @@ static llvm::cl::list<unsigned> clWorkgroupSizes(
     llvm::cl::desc("Set workgroup size to use for SPIR-V code generation"),
     llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
+static llvm::SmallVector<unsigned, 3> getSPIRVTileSizeClOption() {
+  llvm::SmallVector<unsigned, 3> sizes;
+  sizes.assign(clTileSizes.begin(), clTileSizes.end());
+  return sizes;
+}
+
+static llvm::SmallVector<unsigned, 3> getSPIRVWorkgroupSizeClOption() {
+  llvm::SmallVector<unsigned, 3> sizes;
+  sizes.assign(clWorkgroupSizes.begin(), clWorkgroupSizes.end());
+  return sizes;
+}
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -50,28 +62,10 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   SPIRVCodegenOptions options;
   options.workgroupSize = getSPIRVWorkgroupSizeClOption();
   options.tileSizes = getSPIRVTileSizeClOption();
-  options.enableVectorization = getSPIRVEnableVectorizationClOption();
-  options.useWorkgroupMemory = getSPIRVUseWorkgroupMemoryClOption();
-  options.vectorizeMemref = getSPIRVVectorizeMemrefClOption();
+  options.enableVectorization = clEnableVectorization;
+  options.useWorkgroupMemory = clUseWorkgroupMemory;
+  options.vectorizeMemref = clVectorizeMemref;
   return options;
-}
-
-bool getSPIRVEnableVectorizationClOption() { return clEnableVectorization; }
-
-llvm::SmallVector<unsigned, 3> getSPIRVTileSizeClOption() {
-  llvm::SmallVector<unsigned, 3> sizes;
-  sizes.assign(clTileSizes.begin(), clTileSizes.end());
-  return sizes;
-}
-
-bool getSPIRVUseWorkgroupMemoryClOption() { return clUseWorkgroupMemory; }
-
-bool getSPIRVVectorizeMemrefClOption() { return clVectorizeMemref; }
-
-llvm::SmallVector<unsigned, 3> getSPIRVWorkgroupSizeClOption() {
-  llvm::SmallVector<unsigned, 3> sizes;
-  sizes.assign(clWorkgroupSizes.begin(), clWorkgroupSizes.end());
-  return sizes;
 }
 
 }  // namespace iree_compiler

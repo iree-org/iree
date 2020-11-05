@@ -662,10 +662,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
 static PassRegistration<LinalgTileAndFusePass> pass(
     "iree-codegen-linalg-tile-and-fuse",
     "Tile and fuse Linalg operations on buffers", [] {
-      SPIRVCodegenOptions options;
-      options.enableVectorization = getSPIRVEnableVectorizationClOption();
-      options.useWorkgroupMemory = getSPIRVUseWorkgroupMemoryClOption();
-
+      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
       return std::make_unique<LinalgTileAndFusePass>(options);
     });
 

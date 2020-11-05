@@ -42,18 +42,6 @@ struct SPIRVCodegenOptions {
 // Returns SPIR-V CodeGen options from command-line options.
 SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions();
 
-// Helper methods to get each code generation option from command-line option.
-
-bool getSPIRVEnableVectorizationClOption();
-
-llvm::SmallVector<unsigned, 3> getSPIRVTileSizeClOption();
-
-bool getSPIRVUseWorkgroupMemoryClOption();
-
-bool getSPIRVVectorizeMemrefClOption();
-
-llvm::SmallVector<unsigned, 3> getSPIRVWorkgroupSizeClOption();
-
 }  // namespace iree_compiler
 }  // namespace mlir
 
