@@ -107,9 +107,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(options));
-  if (options.useVectorizeMemrefPass) {
-    pm.addNestedPass<FuncOp>(createLoadStoreVectorizationPass());
-  }
+  pm.addNestedPass<FuncOp>(createLoadStoreVectorizationPass());
   pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
