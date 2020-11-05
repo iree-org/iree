@@ -25,8 +25,8 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
@@ -51,12 +51,12 @@ namespace llvm {
 template <>
 struct DenseMapInfo<mlir::iree_compiler::IREE::PlaceholderOp> {
   static mlir::iree_compiler::IREE::PlaceholderOp getEmptyKey() {
-    auto pointer = llvm::DenseMapInfo<void *>::getEmptyKey();
+    auto pointer = DenseMapInfo<void *>::getEmptyKey();
     return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
         pointer);
   }
   static mlir::iree_compiler::IREE::PlaceholderOp getTombstoneKey() {
-    auto pointer = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    auto pointer = DenseMapInfo<void *>::getTombstoneKey();
     return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
         pointer);
   }
@@ -165,7 +165,7 @@ spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
   return variable;
 }
 
-// Returns the (set, binding) pair for the given placeholder op.
+/// Returns the (set, binding) pair for the given placeholder op.
 std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(
     IREE::PlaceholderOp op) {
   auto bindingOp =
@@ -174,35 +174,33 @@ std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(
   return {bindingOp.set(), bindingOp.binding()};
 }
 
-// Returns a map from placeholder ops to whether they represents a resource that
-// should be marked as alias in SPIR-V.
-llvm::DenseMap<IREE::PlaceholderOp, bool> getResourcesAndTheirAliasStatus(
-    ModuleOp module) {
-  llvm::DenseMap<IREE::PlaceholderOp, bool> resourceToAliasStatus;
+/// Returns the set of resources that should be marked as aliased in SPIR-V.
+llvm::DenseSet<IREE::PlaceholderOp> getAliasedResources(ModuleOp module) {
+  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
 
   for (FuncOp func : module.getOps<FuncOp>()) {
     // Collect all placeholder ops and their (set, binding) pairs in this
     // function.
     SmallVector<IREE::PlaceholderOp, 4> placeholderOps;
     SmallVector<std::pair<uint32_t, uint32_t>, 4> setBindings;
+    llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
     func.walk([&](IREE::PlaceholderOp op) {
       placeholderOps.emplace_back(op);
       setBindings.emplace_back(getPlaceholderSetAndBinding(op));
+      ++setBindingCount[setBindings.back()];
     });
-
-    llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
-    for (const auto &sb : setBindings) ++setBindingCount[sb];
 
     // Perform analysis to determine whether we need to mark the resource as
     // alias. This should happen when we have multiple resources binding to the
     // same (set, binding) pair and they are used in the same function.
     for (unsigned i = 0; i < placeholderOps.size(); ++i) {
-      resourceToAliasStatus[placeholderOps[i]] =
-          setBindingCount[setBindings[i]] > 1;
+      if (setBindingCount[setBindings[i]] > 1) {
+        aliasedResources.insert(placeholderOps[i]);
+      }
     }
   }
 
-  return resourceToAliasStatus;
+  return aliasedResources;
 }
 
 }  // namespace
@@ -227,19 +225,18 @@ struct HALInterfaceLoadConstantConverter final
 /// the address to a global variable representing the resource buffer.
 struct IREEPlaceholderConverter final
     : public OpConversionPattern<IREE::PlaceholderOp> {
-  IREEPlaceholderConverter(
-      TypeConverter &typeConverter, MLIRContext *context,
-      llvm::DenseMap<IREE::PlaceholderOp, bool> resourceToAliasStatus,
-      PatternBenefit benefit = 1)
+  IREEPlaceholderConverter(TypeConverter &typeConverter, MLIRContext *context,
+                           llvm::DenseSet<IREE::PlaceholderOp> aliasedResources,
+                           PatternBenefit benefit = 1)
       : OpConversionPattern(typeConverter, context, benefit),
-        resourceToAliasStatus(std::move(resourceToAliasStatus)) {}
+        aliasedResources(std::move(aliasedResources)) {}
 
   LogicalResult matchAndRewrite(
       IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 
  private:
-  llvm::DenseMap<IREE::PlaceholderOp, bool> resourceToAliasStatus;
+  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
 };
 
 /// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
@@ -442,13 +439,13 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
 
-  auto phIt = resourceToAliasStatus.find(phOp);
   // We always create a new resource variable for the placeholder and use the
   // placeholder op's pointer address as the `id`.
   spirv::GlobalVariableOp varOp = insertResourceVariable(
       phOp.getLoc(), convertedType,
       reinterpret_cast<uint64_t>(phOp.getOperation()), bindingOp.set(),
-      bindingOp.binding(), phIt->second, *moduleOp.getBody());
+      bindingOp.binding(), aliasedResources.contains(phOp),
+      *moduleOp.getBody());
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();
@@ -488,9 +485,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateVectorToSPIRVPatterns(context, typeConverter, patterns,
                                 cooperativeMatrixAnalysis);
   patterns.insert<HALInterfaceLoadConstantConverter>(typeConverter, context);
-  auto resourceToAliasStatus = getResourcesAndTheirAliasStatus(moduleOp);
+  auto aliasedResources = getAliasedResources(moduleOp);
   patterns.insert<IREEPlaceholderConverter>(typeConverter, context,
-                                            std::move(resourceToAliasStatus));
+                                            std::move(aliasedResources));
   patterns.insert<LinalgReshapeConverter>(context, typeConverter);
 
   std::unique_ptr<ConversionTarget> target =
