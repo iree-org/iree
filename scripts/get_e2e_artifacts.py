@@ -43,6 +43,10 @@ SUITE_NAME_TO_TARGET = {
         '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
     'keras_tests':
         '//integrations/tensorflow/e2e/keras:keras_tests',
+    'keyword_spotting_tests':
+        '//integrations/tensorflow/e2e/keras:keyword_spotting_tests',
+    'keyword_spotting_internal_streaming_tests':
+        '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests',
     'imagenet_non_hermetic_tests':
         '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests',
     'slim_vision_tests':

@@ -31,24 +31,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-COMPILER_DEPS = [
-    # Transforms.
-    "//iree/compiler/Dialect/Flow/Transforms",
-    "//iree/compiler/Dialect/HAL/Target",
-    "//iree/compiler/Dialect/HAL/Transforms",
-    "//iree/compiler/Dialect/Shape/IR",
-    "//iree/compiler/Dialect/Shape/Transforms",
-    "//iree/compiler/Dialect/VM/Transforms",
-
-    # Targets.
-    "//iree/compiler/Dialect/HAL/Target/VMLA",
-    "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
-    "//iree/compiler/Dialect/HAL/Target/LLVM/IR:LLVMIR",
-    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    "//iree/compiler/Dialect/VM/Target:init_targets",
-    "//iree/compiler/Dialect/VM/Target/Bytecode",
-]
-
 iree_py_library(
     name = "compiler",
     srcs = [
@@ -84,17 +66,14 @@ pybind_cc_library(
     hdrs = [
         "compiler.h",
     ],
-    deps = COMPILER_DEPS + [
+    deps = [
         "//bindings/python/pyiree/common",
-        "//iree/tools:init_compiler_modules",
-        "//iree/tools:init_iree_passes_and_dialects",
-        "//iree/tools:init_mlir_passes_and_dialects",
+        "//iree/compiler/Dialect/VM/Target:init_targets",
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
-        "//iree/tools:init_xla_dialects",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
     ],
