@@ -104,6 +104,7 @@ cc_library(
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
@@ -130,6 +131,23 @@ cc_library(
 )
 
 cc_library(
+    name = "init_passes_and_dialects",
+    hdrs = [
+        "init_dialects.h",
+        "init_passes.h",
+    ],
+    deps = [
+        ":init_compiler_modules",
+        ":init_iree_passes_and_dialects",
+        ":init_mlir_passes_and_dialects",
+        ":init_xla_dialects",
+        "//iree/compiler/Conversion:init_conversions",
+        "//iree/compiler/Conversion/HLOToLinalg",
+        "//iree/compiler/Dialect/HAL/Conversion:Passes",
+    ],
+)
+
+cc_library(
     name = "init_compiler_modules",
     hdrs = ["init_compiler_modules.h"],
     deps = [
@@ -143,11 +161,11 @@ cc_library(
     name = "init_targets",
     srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
-    copts = [
-        "-DIREE_HAVE_LLVMAOT_TARGET",
-        "-DIREE_HAVE_LLVMIR_TARGET",
-        "-DIREE_HAVE_VMLA_TARGET",
-        "-DIREE_HAVE_VULKANSPIRV_TARGET",
+    local_defines = [
+        "IREE_HAVE_LLVMAOT_TARGET",
+        "IREE_HAVE_LLVMIR_TARGET",
+        "IREE_HAVE_VMLA_TARGET",
+        "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
@@ -184,44 +202,12 @@ cc_library(
     name = "iree_opt_main",
     srcs = ["iree-opt-main.cc"],
     deps = [
-        ":init_compiler_modules",
-        ":init_iree_passes_and_dialects",
-        ":init_mlir_passes_and_dialects",
+        ":init_passes_and_dialects",
         ":init_targets",
-        ":init_xla_dialects",
-        "//iree/compiler/Conversion:init_conversions",
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Dialect/Flow/Analysis",
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/Dialect/HAL/Conversion:Passes",
-        "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
-        "//iree/compiler/Dialect/HAL/Transforms",
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/IREE/Transforms",
-        "//iree/compiler/Dialect/Sequence/IR",
-        "//iree/compiler/Dialect/Shape/Conversion",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
-        "//iree/compiler/Dialect/VM/Analysis",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
-        "//iree/compiler/Dialect/VM/Transforms",
-        "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
-        "//iree/compiler/Dialect/VMLA/Conversion/VMLAToVM",
-        "//iree/compiler/Dialect/VMLA/Transforms",
-        "//iree/compiler/Dialect/Vulkan/IR",
-        "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TransformUtils",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_control_flow",
     ],
 )
 
@@ -238,11 +224,8 @@ iree_cc_binary(
     srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
     deps = [
-        ":init_compiler_modules",
-        ":init_iree_passes_and_dialects",
-        ":init_mlir_passes_and_dialects",
+        ":init_passes_and_dialects",
         ":init_targets",
-        ":init_xla_dialects",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
