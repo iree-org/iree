@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @expand_buffer_view_const
 func @expand_buffer_view_const() -> !hal.buffer_view {

@@ -36,8 +36,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-// This function may be called to register the IREE passes with the
-// global registry.
+// Registers IREE passes with the global registry.
 inline void registerAllIreePasses() {
   IREE::Flow::registerFlowPasses();
   IREE::Flow::registerFlowAnalysisTestPasses();

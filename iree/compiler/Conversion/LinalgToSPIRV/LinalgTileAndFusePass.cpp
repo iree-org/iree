@@ -495,9 +495,6 @@ static void applyVectorTransformation(FuncOp funcOp) {
   }
 
   {
-    // TODO(ravishankarm): remove this transformation once allocations get
-    // inserted at the top of the function.
-    linalg::hoistViewAllocOps(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
 
     LLVM_DEBUG({
@@ -533,7 +530,10 @@ void LinalgTileAndFusePass::runOnOperation() {
     LaunchConfig launchConfig;
     SmallVector<Operation *, 4> linalgOpsVec(linalgOps.begin(),
                                              linalgOps.end());
-    if (failed(launchConfig.init(context, options, linalgOpsVec))) {
+    linalg::Aliases aliases;
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    if (failed(launchConfig.init(context, dependenceGraph, options,
+                                 linalgOpsVec))) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
     }
@@ -558,11 +558,6 @@ void LinalgTileAndFusePass::runOnOperation() {
     });
 
     {
-      // Compute the Linalg Dependence Graph.
-      linalg::Aliases aliases;
-      linalg::LinalgDependenceGraph dependenceGraph =
-          linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, funcOp);
-
       OwningRewritePatternList firstLevelTilingPatterns;
       populateTilingToWorkgroupPatterns(context, dependenceGraph, launchConfig,
                                         firstLevelTilingPatterns);

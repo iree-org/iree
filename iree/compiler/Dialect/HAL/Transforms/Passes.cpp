@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -50,7 +51,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Handle large constants (weights/params/etc) first so that we can use the
   // resulting constant pools to determine the interfaces.
   passManager.addPass(createIdentifyConstantPoolsPass(targetOptions));
-  passManager.addPass(createPackConstantPoolStoragePass());
+  passManager.addNestedPass<ConstantPoolOp>(
+      createPackConstantPoolStoragePass());
   passManager.addPass(createMaterializeConstantPoolBuffersPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createSymbolDCEPass());
@@ -63,7 +65,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // directly call TargetBackend::buildTranslationPassPipeline function. For now
   // we need to run each backend translation in isolation and we do that within
   // this pass.
-  passManager.addPass(createTranslateExecutablesPass(targetOptions));
+  passManager.addNestedPass<ExecutableOp>(
+      createTranslateExecutablesPass(targetOptions));
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
@@ -72,7 +75,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // on explicit shape types (such as ranked_shape). After this pass, these
   // composite types will be expanded to primitives (i.e. one 'index' for each
   // dynamic dim in the case of ranked_shape).
-  passManager.addPass(Shape::createExpandFunctionRankedShapeDimsPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createExpandFunctionRankedShapeDimsPass());
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -107,7 +111,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
-  passManager.addPass(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -115,7 +119,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // TODO(#1036): run this once per hal.executable.target in a nested pass
   // manager so that we have as many passes as hal.executable.target ops.
   if (transformOptions.serializeExecutables) {
-    passManager.addPass(createSerializeExecutablesPass(targetOptions));
+    passManager.addNestedPass<ExecutableOp>(
+        createSerializeExecutablesPass(targetOptions));
     // NOTE: symbol DCE will destroy executable target contents, so only run it
     // if we serialized things.
     passManager.addPass(createSymbolDCEPass());

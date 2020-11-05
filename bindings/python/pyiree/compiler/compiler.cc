@@ -19,19 +19,11 @@
 
 #include "bindings/python/pyiree/common/binding.h"
 #include "bindings/python/pyiree/common/status_utils.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/tools/init_compiler_modules.h"
-#include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_iree_passes.h"
-#include "iree/tools/init_mlir_dialects.h"
-#include "iree/tools/init_mlir_passes.h"
+#include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
-#include "iree/tools/init_xla_dialects.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -75,14 +67,8 @@ bool LLVMOnceInit() {
       llvm::sys::DefaultOneShotPipeSignalHandler);
   llvm::sys::PrintStackTraceOnErrorSignal("pyiree");
 
+  mlir::iree_compiler::registerAllPasses();
   mlir::iree_compiler::registerHALTargetBackends();
-  mlir::iree_compiler::registerVMTargets();
-
-  // Register all MLIR Core passes.
-  mlir::registerMlirPasses();
-
-  // Register IREE dialects.
-  mlir::iree_compiler::registerAllIreePasses();
 
   // Register any pass manager command line options.
   mlir::registerPassManagerCLOptions();
@@ -91,13 +77,6 @@ bool LLVMOnceInit() {
   std::vector<const char*> default_options = {program_name.c_str(), nullptr};
   llvm::cl::ParseCommandLineOptions(1, default_options.data());
   return true;
-}
-
-void registerDialects(DialectRegistry& registry) {
-  mlir::registerMlirDialects(registry);
-  mlir::registerXLADialects(registry);
-  mlir::iree_compiler::registerIreeDialects(registry);
-  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
 }
 
 void SetupLLVMModule(pybind11::module m) {
@@ -288,7 +267,7 @@ void DiagnosticCapture::ClearDiagnostics() { diagnostics_.clear(); }
 
 CompilerContextBundle::CompilerContextBundle()
     : default_capture_(&mlir_context_, nullptr) {
-  registerDialects(mlir_context_.getDialectRegistry());
+  mlir::iree_compiler::registerAllDialects(mlir_context_.getDialectRegistry());
 }
 CompilerContextBundle::~CompilerContextBundle() = default;
 
@@ -377,7 +356,8 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
 
 void CompilerModuleBundle::RunPassPipeline(
     const std::vector<std::string>& pipelines) {
-  mlir::PassManager pm(context_->mlir_context());
+  mlir::PassManager pm(context_->mlir_context(),
+                       mlir::OpPassManager::Nesting::Implicit);
   mlir::applyPassManagerCLOptions(pm);
   auto crash_reproducer_path = context_->crash_reproducer_path();
   if (crash_reproducer_path) {

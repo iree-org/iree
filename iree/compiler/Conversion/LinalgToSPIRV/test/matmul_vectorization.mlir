@@ -274,19 +274,19 @@ module attributes {
 //  PROMOTE-DAG:  %[[C16:.+]] = constant 16
 //  PROMOTE-DAG:  %[[C32:.+]] = constant 32
 //  PROMOTE-DAG:  %[[C48:.+]] = constant 48
+//  PROMOTE-DAG:  %[[ALLOC1:.+]] = alloc() : memref<128x32xf16, 3>
+//  PROMOTE-DAG:  %[[ALLOC2:.+]] = alloc() : memref<32x128xf16, 3>
 
-//  PROMOTE:    %[[ALLOC1:.+]] = alloc()
-//  PROMOTE:    %[[ALLOC2:.+]] = alloc()
-//  PROMOTE:    %[[RESULT_SUBVIEW:.+]] = subview %[[RET0]]
-//  PROMOTE:    %[[WGMEM_LHS_SUBVIEW:.+]] = subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
-//  PROMOTE:    %[[WGMEM_RHS_SUBVIEW:.+]] = subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
-//  PROMOTE:    %[[SG_X:.+]] = gpu.subgroup_id
-//  PROMOTE:    %[[SG_Y:.+]] = divi_signed %[[SG_X]], %[[C2]]
-//  PROMOTE:    %[[SGOFFSET_Y:.+]] = affine.apply #[[MAP4]]()[%[[SG_Y]]]
-//  PROMOTE:    %[[SG_LHS_SUBVIEW:.+]] = subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
-//  PROMOTE:    %[[SGOFFSET_X:.+]] = affine.apply #[[MAP4]]()[%[[SG_X]]]
-//  PROMOTE:    %[[SG_RHS_SUBVIEW:.+]] = subview %[[WGMEM_RHS_SUBVIEW]][0, %[[SGOFFSET_X]]]
-//  PROMOTE:    %[[SG_RESULT_SUBVIEW:.+]] = subview %[[RESULT_SUBVIEW]][%[[SGOFFSET_Y]], %[[SGOFFSET_X]]]
+//      PROMOTE:  %[[RESULT_SUBVIEW:.+]] = subview %[[RET0]]
+//      PROMOTE:  %[[WGMEM_LHS_SUBVIEW:.+]] = subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
+//      PROMOTE:  %[[WGMEM_RHS_SUBVIEW:.+]] = subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
+//      PROMOTE:  %[[SG_X:.+]] = gpu.subgroup_id
+//      PROMOTE:  %[[SG_Y:.+]] = divi_signed %[[SG_X]], %[[C2]]
+//      PROMOTE:  %[[SGOFFSET_Y:.+]] = affine.apply #[[MAP4]]()[%[[SG_Y]]]
+//      PROMOTE:  %[[SG_LHS_SUBVIEW:.+]] = subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
+//      PROMOTE:  %[[SGOFFSET_X:.+]] = affine.apply #[[MAP4]]()[%[[SG_X]]]
+//      PROMOTE:  %[[SG_RHS_SUBVIEW:.+]] = subview %[[WGMEM_RHS_SUBVIEW]][0, %[[SGOFFSET_X]]]
+//      PROMOTE:  %[[SG_RESULT_SUBVIEW:.+]] = subview %[[RESULT_SUBVIEW]][%[[SGOFFSET_Y]], %[[SGOFFSET_X]]]
 
 //  PROMOTE-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
 // PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C0]]]

@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-transformation-pipeline -iree-flow-export-dispatches %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-transformation-pipeline -iree-flow-export-dispatches %s | IreeFileCheck %s
 
 module {
   func @two_dispatch(%arg0: tensor<5x3xf32>, %arg1: tensor<3x5xf32>) -> (tensor<5x5xf32>, tensor<3x5xf32>) attributes { iree.module.export } {
@@ -36,3 +36,23 @@ module {
 //     CHECK:   %[[DISPATCH_RES1:.+]] = flow.dispatch
 //     CHECK:   %[[DISPATCH_RES2:.+]] = flow.dispatch
 //     CHECK:   flow.return %[[DISPATCH_RES1]], %[[DISPATCH_RES2]] : tensor<5x5xf32>, tensor<3x5xf32>
+
+// -----
+
+func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> attributes { iree.module.export }  {
+  %res = "mhlo.while"(%start) ( {
+  ^bb0(%count: tensor<i32>):
+    %1 = "mhlo.compare"(%count, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    "mhlo.return"(%1) : (tensor<i1>) -> ()
+  },  {
+  ^bb0(%count: tensor<i32>):
+    %1 = mhlo.add %count, %count : tensor<i32>
+    "mhlo.return"(%1) : (tensor<i32>) -> ()
+  }) : (tensor<i32>) -> tensor<i32>
+  return %res : tensor<i32>
+}
+
+// CHECK: func @while_dummy_args
+// CHECK: %{{.+}} = flow.variable.load @{{.+}} : tensor<i32>
+// CHECK: %{{.+}} = flow.variable.load @{{.+}} : tensor<i32>
+// CHECK: br ^bb1

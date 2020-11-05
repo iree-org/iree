@@ -25,10 +25,12 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
@@ -318,9 +320,9 @@ Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
   return attr.getValue();
 }
 
-LogicalResult LaunchConfig::init(MLIRContext *context,
-                                 const SPIRVCodegenOptions &options,
-                                 ArrayRef<Operation *> linalgOps) {
+LogicalResult LaunchConfig::init(
+    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+    const SPIRVCodegenOptions &options, ArrayRef<Operation *> linalgOps) {
   unsigned numTiledOps = 0;
   auto setKey = [&](Operation *op) -> std::string {
     std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
@@ -373,6 +375,63 @@ LogicalResult LaunchConfig::init(MLIRContext *context,
     DISPATCH(linalg::PoolingSumOp)
 
 #undef DISPATCH
+  }
+
+  if (!rootOperation) {
+    // No root operations found. Dont need to do anything.
+    return success();
+  }
+
+  // Check the dependencies going into and out of the root operation. For now
+  // only the following dependencies are supported
+  // - WAW dependencies going into the root operation.
+  // - RAW dependencies going out of the root operation.
+  // - WAW dependencies going out of the root operation.
+  // i.e. there are no RAW dependences going into the root operation.
+  auto inRAWDependencies = dependenceGraph.getDependencesInto(
+      *rootOperation, linalg::LinalgDependenceGraph::RAW);
+  if (!inRAWDependencies.empty()) {
+    return rootOperation->getOperation()->emitError(
+        "unhandled fusion of root operation with producer");
+  }
+  auto dependences =
+      dependenceGraph.getDependentOperations(rootOperation.getValue());
+  unsigned numOuterParallel = getNumOuterParallelLoops(*rootOperation);
+
+  // Check that for all dependences into and out of the root operation,
+  // - The result expressions of the indexing maps of the fused view in the
+  //   producer and consumer must match for the parallel loops.
+  for (auto dependence :
+       dependenceGraph.getDependentOperations(rootOperation.getValue())) {
+    Optional<unsigned> viewIndex =
+        rootOperation->getIndexOfShapedOperand(dependence.indexingView);
+    AffineMap indexingMap = rootOperation->getIndexingMap(*viewIndex);
+    linalg::LinalgOp fusedOp =
+        cast<linalg::LinalgOp>(dependence.dependentOpView.op);
+    Optional<unsigned> fusedViewIndex =
+        fusedOp.getIndexOfShapedOperand(dependence.dependentOpView.view);
+    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(*fusedViewIndex);
+    if (indexingMap.getNumResults() < numOuterParallel ||
+        fusedIndexingMap.getNumResults() < numOuterParallel ||
+        !llvm::all_of(
+            llvm::seq<unsigned>(0, numOuterParallel),
+            [&indexingMap, fusedIndexingMap](unsigned i) {
+              return indexingMap.getResult(i).isa<AffineDimExpr>() &&
+                     fusedIndexingMap.getResult(i).isa<AffineDimExpr>() &&
+                     indexingMap.getResult(i) == fusedIndexingMap.getResult(i);
+            })) {
+      return rootOperation->getOperation()->emitError(
+          "unhandled fusion of root operation with all operations in the "
+          "dispatch region");
+    }
+  }
+  // The dependent operations get the same tile size information as the root
+  // operation. To propogate that information, just use the same key as the root
+  // operation.
+  for (auto dependence : dependences) {
+    dependence.dependentOpView.op->setAttr(
+        Identifier::get(kLaunchInfoKey, context),
+        StringAttr::get(getKey(*rootOperation).getValue(), context));
   }
 
   // TODO(ravishankarm): Verify that the set configurations is within the device

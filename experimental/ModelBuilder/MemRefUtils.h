@@ -211,7 +211,7 @@ std::pair<void *, void *> allocAligned(
 // of type PointwiseInitializer. Can optionally take specific `alloc` and `free`
 // functions.
 template <typename T, int N, typename FreeFunType = decltype(&::free)>
-std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>
+std::unique_ptr<::UnrankedMemRefType<T>, FreeFunType>
 makeInitializedUnrankedDescriptor(
     const std::array<int64_t, N> &shape, LinearInitializer<T> init,
     llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>(),
@@ -222,7 +222,7 @@ makeInitializedUnrankedDescriptor(
   auto *data = static_cast<T *>(allocated.first);
   auto *alignedData = static_cast<T *>(allocated.second);
   for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
-  return std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>(
+  return std::unique_ptr<::UnrankedMemRefType<T>, FreeFunType>(
       detail::allocUnrankedDescriptor<T, N>(data, alignedData, shape, alloc),
       freeFun);
 }
