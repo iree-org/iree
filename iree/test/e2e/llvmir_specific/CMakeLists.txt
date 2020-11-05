@@ -25,18 +25,4 @@ iree_check_single_backend_test_suite(
     llvm
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
-    "-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize=false"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-dot_tile_and_distribute
-  SRCS
-    "dot.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-tile-distribute-and-vectorize"
 )

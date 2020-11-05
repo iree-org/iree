@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
