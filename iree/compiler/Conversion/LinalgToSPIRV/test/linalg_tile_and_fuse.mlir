@@ -84,7 +84,7 @@ module attributes {
 //       CHECK:   linalg.conv
 //  CHECK-SAME:     %[[ARG0]], %[[VIEW1]], %[[VIEW2]]
 //  CHECK-SAME:     "workgroup"
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
@@ -158,7 +158,7 @@ module attributes {
 //  CHECK-SAME:     "workgroup"
 //  CHECK-SAME:     ins(%[[VIEW0]], %[[VIEW1]]
 //  CHECK-SAME:     outs(%[[VIEW2]]
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
 //   CHECK-DAG:   %[[C7:.+]] = constant 7 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
@@ -222,7 +222,7 @@ module attributes {
 //       CHECK:   linalg.pooling_max
 //  CHECK-SAME:     %[[VIEW0]], %[[ARG1]], %[[VIEW2]]
 //  CHECK-SAME:     "workgroup"
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C32:.+]] = constant 32
@@ -288,7 +288,7 @@ module attributes {
 //       CHECK:   linalg.pooling_max
 //  CHECK-SAME:     %[[VIEW0]], %[[ARG1]], %[[VIEW2]]
 //  CHECK-SAME:     "workgroup"
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C32:.+]] = constant 32
 //   CHECK-DAG:   %[[C31:.+]] = constant 31

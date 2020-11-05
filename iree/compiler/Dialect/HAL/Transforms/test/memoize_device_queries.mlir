@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-hal-memoize-device-queries %s | IreeFileCheck %s
 
 //      CHECK: hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1
-//      CHECK: func @_device_match_id_0_initializer() -> i1
+//      CHECK: func private @_device_match_id_0_initializer() -> i1
 // CHECK-NEXT:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %[[IS_MATCH:.+]] = hal.device.match.id %[[DEVICE]], pattern = ["vulkan-v1.?-*"] : (!hal.device) -> i1
 // CHECK-NEXT:   return %[[IS_MATCH]] : i1
