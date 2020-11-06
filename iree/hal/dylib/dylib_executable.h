@@ -48,7 +48,7 @@ class DyLibExecutable final : public HostExecutable {
  private:
   Status Initialize(ExecutableSpec spec);
 
-  std::string executable_library_temp_path_;
+  absl::InlinedVector<std::string, 4> temp_file_paths_;
   std::unique_ptr<DynamicLibrary> executable_library_;
   std::vector<void*> entry_functions_;
 

@@ -16,6 +16,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
@@ -33,9 +34,11 @@ DyLibExecutable::DyLibExecutable() = default;
 
 DyLibExecutable::~DyLibExecutable() {
   IREE_TRACE_SCOPE0("DyLibExecutable::dtor");
+  // TODO(benvanik): move to an atexit handler when tracing is enabled.
+  // executable_library_.release();
   executable_library_.reset();
-  if (!executable_library_temp_path_.empty()) {
-    file_io::DeleteFile(executable_library_temp_path_).IgnoreError();
+  for (const auto& file_path : temp_file_paths_) {
+    file_io::DeleteFile(file_path).IgnoreError();
   }
 }
 
@@ -58,26 +61,45 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   // library APIs work with files. We could instead use in-memory files on
   // platforms where that is convenient.
   std::string base_name = "dylib_executable";
-  IREE_ASSIGN_OR_RETURN(executable_library_temp_path_,
+  IREE_ASSIGN_OR_RETURN(auto library_temp_path,
                         file_io::GetTempFile(base_name));
-  // Add platform-specific file extensions so opinionated dynamic library
-  // loaders are more likely to find the file:
+  temp_file_paths_.push_back(library_temp_path);
+
+// Add platform-specific file extensions so opinionated dynamic library
+// loaders are more likely to find the file:
 #if defined(IREE_PLATFORM_WINDOWS)
-  executable_library_temp_path_ += ".dll";
+  library_temp_path += ".dll";
 #else
-  executable_library_temp_path_ += ".so";
+  library_temp_path += ".so";
 #endif
 
   absl::string_view embedded_library_data(
       reinterpret_cast<const char*>(
           dylib_executable_def->library_embedded()->data()),
       dylib_executable_def->library_embedded()->size());
-  IREE_RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
-                                                embedded_library_data));
+  IREE_RETURN_IF_ERROR(
+      file_io::SetFileContents(library_temp_path, embedded_library_data));
 
-  IREE_ASSIGN_OR_RETURN(
-      executable_library_,
-      DynamicLibrary::Load(executable_library_temp_path_.c_str()));
+  IREE_ASSIGN_OR_RETURN(executable_library_,
+                        DynamicLibrary::Load(library_temp_path.c_str()));
+
+  if (dylib_executable_def->debug_database_filename() &&
+      dylib_executable_def->debug_database_embedded()) {
+    IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
+    absl::string_view debug_database_filename(
+        dylib_executable_def->debug_database_filename()->data(),
+        dylib_executable_def->debug_database_filename()->size());
+    absl::string_view debug_database_data(
+        reinterpret_cast<const char*>(
+            dylib_executable_def->debug_database_embedded()->data()),
+        dylib_executable_def->debug_database_embedded()->size());
+    auto debug_database_path = file_path::JoinPaths(
+        file_path::DirectoryName(library_temp_path), debug_database_filename);
+    temp_file_paths_.push_back(debug_database_path);
+    IREE_IGNORE_ERROR(
+        file_io::SetFileContents(debug_database_path, debug_database_data));
+    executable_library_->AttachDebugDatabase(debug_database_path.c_str());
+  }
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());

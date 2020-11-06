@@ -119,12 +119,14 @@ iree_cc_library(
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
+    ::file_path
     ::logging
     ::status
     ::target_platform
     ::tracing
     absl::memory
     absl::span
+    absl::strings
   PUBLIC
 )
 
