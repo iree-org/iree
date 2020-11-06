@@ -5,4 +5,6 @@ func private @private_symbol()
 
 // CHECK-LABEL: @public_symbol
 // CHECK-SAME: {iree.module.export}
-func @public_symbol()
+func @public_symbol() {
+  return
+}

@@ -7,7 +7,7 @@ hal.variable @v_initialized_const = 4 : i32
 
 // CHECK: vm.global.ref @v_initialized init(@initializer) : !vm.ref<!hal.buffer>
 hal.variable @v_initialized init(@initializer) : !hal.buffer
-func @initializer() -> !hal.buffer
+func private @initializer() -> !hal.buffer
 
 // -----
 
