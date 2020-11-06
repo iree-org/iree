@@ -173,11 +173,16 @@ class DeduplicateExecutablesPass
     remainingExecutables = totalExecutables - executablesDeduplicated;
 
     replaceEntryPointUses(moduleOp, entryPointRefReplacements);
+
+    // Remove the duplicate executables now that they are no longer referenced.
+    //
+    // Note: removing executables can leave gaps in numbering if they were
+    // originally numbered. While we could renumber them, we choose to keep
+    // original names (numbers and all) to make it easier to track executables
+    // through this pass.
     for (auto executableOp : duplicateExecutableOps) {
       executableOp.erase();
     }
-
-    // TODO(scotttodd): rewrite executable indices, filling in gaps?
   }
 
  private:
