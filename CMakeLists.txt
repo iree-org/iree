@@ -327,12 +327,6 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-
-  # Set include directories
-  include_directories(${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include)
-  include_directories(${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include)
-  include_directories(${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include)
-  include_directories(${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include)
 endfunction()
 
 if(${IREE_ENABLE_MLIR})
@@ -345,6 +339,16 @@ if(${IREE_ENABLE_MLIR})
     # Extend module path to allow submodules to use LLVM and MLIR CMake modules
     list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/lib/cmake/mlir")
     list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+
+    # Set include directories
+    list(APPEND LLVM_INCLUDE_DIRS
+      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
+    )
+    list(APPEND MLIR_INCLUDE_DIRS
+      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+    )
 
     # Set build option to use MHLO alongside with bundled MLIR
     set(MHLO_BUILD_EMBEDDED ON)
