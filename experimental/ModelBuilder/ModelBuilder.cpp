@@ -239,19 +239,21 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
                                                     ArrayRef<Type> returnTypes,
                                                     ValueRange values) {
   auto &builder = ScopedContext::getBuilderRef();
-  auto funcOp =
+  auto callerFunc =
       builder.getInsertionBlock()->getParent()->getParentOfType<FuncOp>();
-  Operation *func = SymbolTable::lookupNearestSymbolFrom(funcOp, functionName);
-  if (!func) {
+  FuncOp calleeFunc =
+      SymbolTable::lookupNearestSymbolFrom<FuncOp>(callerFunc, functionName);
+  if (!calleeFunc) {
     OpBuilder::InsertionGuard insertGuard(builder);
-    auto module = funcOp.getParentOfType<ModuleOp>();
+    auto module = callerFunc.getParentOfType<ModuleOp>();
     builder.setInsertionPointToStart(module.getBody());
-    func = builder.create<FuncOp>(
+    calleeFunc = builder.create<FuncOp>(
         module.getLoc(), functionName,
         FunctionType::get(SmallVector<Type, 4>(values.getTypes()), returnTypes,
                           builder.getContext()));
+    calleeFunc.setPrivate();
   }
-  return std_call(builder.getSymbolRefAttr(func), returnTypes, values);
+  return std_call(calleeFunc, values);
 }
 
 MLIRFuncOpConfig &MLIRFuncOpConfig::setNoInline(bool v) {
@@ -292,7 +294,10 @@ void MLIRFuncOpConfig::apply(FuncOp &f) {
   if (emitCInterface)
     f.setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));
 
-  if (!declOnly) f.addEntryBlock();
+  if (!declOnly)
+    f.addEntryBlock();
+  else
+    f.setPrivate();
 }
 
 // -----------------------------------------------------------------------------
