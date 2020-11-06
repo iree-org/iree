@@ -108,8 +108,8 @@ struct DyLibDispatchState : public HostExecutable::DispatchState {
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   void* entry_function = nullptr;
-  absl::InlinedVector<void*, 4> args;
-  absl::InlinedVector<int32_t, 4> push_constant;
+  std::array<void*, 32> args;
+  std::array<uint32_t, 32> push_constants;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -127,6 +127,7 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   dispatch_state->entry_function = entry_functions_[params.entry_point];
 
+  int binding_count = 0;
   for (size_t set = 0; set < params.set_bindings.size(); ++set) {
     for (size_t binding = 0; binding < params.set_bindings[set].size();
          ++binding) {
@@ -136,13 +137,10 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
                                 MemoryAccessBitfield::kWrite, io_binding.offset,
                                 io_binding.length));
       auto data = memory.mutable_data();
-
-      dispatch_state->args.push_back(data);
+      dispatch_state->args[binding_count++] = data;
     }
   }
-  for (int i = 0; i < params.push_constants->values.size(); ++i) {
-    dispatch_state->push_constant.push_back(params.push_constants->values[i]);
-  }
+  dispatch_state->push_constants = params.push_constants->values;
 
   return std::move(dispatch_state);
 }
@@ -152,10 +150,10 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
   IREE_TRACE_SCOPE_DYNAMIC(dispatch_state->entry_name);
 
-  auto entry_function = (void (*)(void**, int32_t*, int32_t, int32_t,
+  auto entry_function = (void (*)(void**, uint32_t*, int32_t, int32_t,
                                   int32_t))dispatch_state->entry_function;
   entry_function(dispatch_state->args.data(),
-                 dispatch_state->push_constant.data(), workgroup_xyz[0],
+                 dispatch_state->push_constants.data(), workgroup_xyz[0],
                  workgroup_xyz[1], workgroup_xyz[2]);
 
   return OkStatus();

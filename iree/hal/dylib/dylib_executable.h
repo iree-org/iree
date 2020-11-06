@@ -50,10 +50,10 @@ class DyLibExecutable final : public HostExecutable {
 
   std::string executable_library_temp_path_;
   std::unique_ptr<DynamicLibrary> executable_library_;
-  absl::InlinedVector<void*, 4> entry_functions_;
+  std::vector<void*> entry_functions_;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  absl::InlinedVector<const char*, 4> entry_names_;
+  std::vector<const char*> entry_names_;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 };
 
