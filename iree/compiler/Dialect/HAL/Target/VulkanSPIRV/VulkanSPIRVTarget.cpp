@@ -106,18 +106,6 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
   std::string name() const override { return "vulkan_spirv"; }
   std::string filter_pattern() const override { return "vulkan*"; }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry.insert<AffineDialect,
-                    Vulkan::VulkanDialect,
-                    gpu::GPUDialect,
-                    linalg::LinalgDialect,
-                    scf::SCFDialect,
-                    spirv::SPIRVDialect,
-                    vector::VectorDialect>();
-    // clang-format on
-  }
-
   BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
     // Picked from here to start:
     // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=minStorageBufferOffsetAlignment&platform=android
@@ -132,6 +120,10 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
                                       b.getIndexAttr(minBufferOffsetAlignment),
                                       b.getIndexAttr(maxBufferRange),
                                       b.getIndexAttr(minBufferRangeAlignment));
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
   }
 
   void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,

@@ -128,20 +128,16 @@ class TargetBackend {
   // call to matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
   virtual std::string filter_pattern() const = 0;
 
-  // Register dependent dialects for the TargetBackend.
-  // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
-  // expected to register the dialects it will create entities for (Operations,
-  // Types, Attributes), other than dialects that exist in the input. These are
-  // the dialects that will be used in |declareTargetOps| and
-  // |buildTranslationPassPipeline|.
-  // TODO(#1036): We might be able to get rid of this with dynamic pass
-  // registration.
-  virtual void getDependentDialects(DialectRegistry &registry) const {}
-
   // Queries for compile-time known buffer constraints.
   // These should conservatively represent the min/max values even if the
   // backend may support others at runtime.
   virtual BufferConstraintsAttr queryBufferConstraints(MLIRContext *context);
+
+  // Register dependent dialects for the TargetBackend.
+  // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
+  // expected to register the dialects it will create entities for (Operations,
+  // Types, Attributes) in |declareTargetOps|.
+  virtual void getDependentDialects(DialectRegistry &registry) const {}
 
   // Creates an interface representing the bindings and push constants required
   // to dispatch the executable. Interfaces used across backends and executables
@@ -282,12 +278,7 @@ class TargetBackend {
   //       module { spv.module { ... } }
   //     }
   //   }
-  // TODO(benvanik): migrate this to the dynamic pipeline pass infra when it
-  // exists. This will likely change to be a function that registers handlers
-  // for target-specific name, attributes, etc. For now the executable target
-  // is passed to allow snooping.
-  virtual void buildTranslationPassPipeline(
-      IREE::HAL::ExecutableTargetOp targetOp, OpPassManager &passManager) = 0;
+  virtual void buildTranslationPassPipeline(OpPassManager &passManager) = 0;
 
   // Links compatible executables within the provided |moduleOp| together into
   // zero or more new linked executables. Implementations should move

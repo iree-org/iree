@@ -36,8 +36,7 @@ class SPIRVTargetBackend : public TargetBackend {
                               IREE::HAL::ExecutableOp executableOp,
                               spirv::TargetEnvAttr spvTargetEnv);
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
-                                    OpPassManager &passManager) override;
+  void buildTranslationPassPipeline(OpPassManager &passManager) override;
 
   LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
                                DeviceSwitchRewriter &switchRewriter) override;
