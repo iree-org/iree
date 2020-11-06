@@ -87,6 +87,11 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   auto lhsModule = lhs.getInnerModule();
   auto rhsModule = rhs.getInnerModule();
 
+  // TODO(scotttodd): Generalize: replace special cases with just calling
+  //   areRegionsEquivalent() on module.getBodyRegion(). We want to ignore
+  //   operation names and sym_name attrs, which
+  //   OperationEquivalence::isEquivalentTo() does not support [yet].
+
   // Must have the same number of entry point ops, with the same attributes.
   // Entry point op symbol names are expected to differ, that won't affect
   // equivalence.
