@@ -38,6 +38,10 @@ StringRef getWorkgroupMarker();
 /// workgroups and operands promoted to scratchspace memory.
 StringRef getWorkgroupMemoryMarker();
 
+/// Marker to denote that a linalg operation on workgoups has been partitioned
+/// to workgroups L1 tiles.
+StringRef getWorkgroupL1TileMarker();
+
 /// Marker for copy operations that are moving data from StorageClass to
 /// Workgroup memory.
 StringRef getCopyToWorkgroupMemoryMarker();

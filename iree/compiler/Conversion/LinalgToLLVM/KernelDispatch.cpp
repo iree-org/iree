@@ -15,23 +15,141 @@
 
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-llvm::SmallVector<int64_t, 4> getTileSizesImpl(linalg::MatmulOp op) {
-  return {128, 128};
+static llvm::cl::opt<int> matmulWorkgroupTileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-workgroup-tile-size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(64));
+
+static llvm::cl::opt<int> matmulL1TileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-l1-tile-size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(32));
+
+static llvm::cl::opt<int> matmulL2TileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-l2-tile-size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(4));
+
+static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-workgroup-tile-"
+    "size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(32));
+
+static llvm::cl::opt<int> batchMatmulL1TileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-l1-tile-size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(16));
+
+static llvm::cl::opt<int> batchMatmulL2TileSize(
+    "iree-codegen-linalg-to-llvm-kernel-dispatch-batch-matmul-l2-tile-size",
+    llvm::cl::desc(
+        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
+    llvm::cl::init(4));
+
+struct TileOpParameters {
+  template <typename OpT, TilingLevel tilingLevel>
+  static llvm::SmallVector<int64_t, 4> getSizes(OpT op);
+};
+
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::WorkGroupTiles>(
+    linalg::MatmulOp op) {
+  return {matmulWorkgroupTileSize, matmulWorkgroupTileSize};
 }
 
-llvm::SmallVector<int64_t, 4> CPUKernelDispatch::getTileSizes(
-    Operation* op) const {
-  if (isa<linalg::MatmulOp>(op)) {
-    return getTileSizesImpl(dyn_cast<linalg::MatmulOp>(op));
-  }
-  return {1, 1, 1};
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::Level1Tiles>(
+    linalg::MatmulOp op) {
+  return {matmulL1TileSize, matmulL1TileSize, matmulL1TileSize};
 }
+
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::Level2Tiles>(
+    linalg::MatmulOp op) {
+  return {matmulL2TileSize, matmulL2TileSize, matmulL2TileSize};
+}
+
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::WorkGroupTiles>(
+    linalg::BatchMatmulOp op) {
+  return {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize};
+}
+
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::Level1Tiles>(
+    linalg::BatchMatmulOp op) {
+  return {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
+          batchMatmulL1TileSize};
+}
+
+template <>
+llvm::SmallVector<int64_t, 4>
+TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::Level2Tiles>(
+    linalg::BatchMatmulOp op) {
+  return {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
+          batchMatmulL2TileSize};
+}
+
+#define DEFINE_TILE_OP_GET_SIZES(TileLevel)                                 \
+  template <>                                                               \
+  llvm::SmallVector<int64_t, 4> CPUKernelDispatch::getTileSizes<TileLevel>( \
+      Operation * op) const {                                               \
+    if (isa<linalg::MatmulOp>(op)) {                                        \
+      return TileOpParameters::getSizes<linalg::MatmulOp, TileLevel>(       \
+          dyn_cast<linalg::MatmulOp>(op));                                  \
+    }                                                                       \
+    if (isa<linalg::BatchMatmulOp>(op)) {                                   \
+      return TileOpParameters::getSizes<linalg::BatchMatmulOp, TileLevel>(  \
+          dyn_cast<linalg::BatchMatmulOp>(op));                             \
+    }                                                                       \
+    return {1, 1, 1};                                                       \
+  }
+
+DEFINE_TILE_OP_GET_SIZES(TilingLevel::WorkGroupTiles)
+DEFINE_TILE_OP_GET_SIZES(TilingLevel::Level1Tiles)
+DEFINE_TILE_OP_GET_SIZES(TilingLevel::Level2Tiles)
+#undef DEFINE_TILE_OP_GET_SIZES
+
+#define DEFINE_TILE_SIZE_FN(TileLevel)                                     \
+  template <>                                                              \
+  SmallVector<Value, 4> TileSizeFn::get<TileLevel>(                        \
+      CPUKernelDispatch cpuKernelDispatch, OpBuilder & builder,            \
+      Operation * operation) {                                             \
+    auto tileSizes = cpuKernelDispatch.getTileSizes<TileLevel>(operation); \
+    if (tileSizes.empty()) return {};                                      \
+    SmallVector<Value, 4> tileSizesVal;                                    \
+    tileSizesVal.reserve(tileSizes.size());                                \
+    for (auto val : tileSizes) {                                           \
+      tileSizesVal.push_back(                                              \
+          builder.create<ConstantIndexOp>(operation->getLoc(), val));      \
+    }                                                                      \
+    return tileSizesVal;                                                   \
+  }
+
+DEFINE_TILE_SIZE_FN(TilingLevel::WorkGroupTiles)
+DEFINE_TILE_SIZE_FN(TilingLevel::Level1Tiles)
+DEFINE_TILE_SIZE_FN(TilingLevel::Level2Tiles)
+
+#undef DEFINE_TILE_SIZE_FN
 
 }  // namespace iree_compiler
 }  // namespace mlir

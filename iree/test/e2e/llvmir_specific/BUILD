@@ -28,17 +28,9 @@ iree_check_single_backend_test_suite(
     srcs = [
         "conv.mlir",
     ],
-    compiler_flags = ["-iree-codegen-linalg-to-llvm-conv-img2col-conversion"],
-    driver = "llvm",
-    target_backend = "llvm-ir",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_llvm-ir-dot_tile_and_distribute",
-    srcs = [
-        "dot.mlir",
+    compiler_flags = [
+        "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true",
     ],
-    compiler_flags = ["-iree-codegen-linalg-to-llvm-tile-and-distrobute"],
     driver = "llvm",
     target_backend = "llvm-ir",
 )
