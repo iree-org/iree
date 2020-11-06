@@ -14,8 +14,10 @@
 
 // IREE translation main entry function.
 //
-// We need this entry function because we want to register PassManager CLI
-// options, which is missing in MLIR's translation main entry function.
+// Note that this differs from mlir-translate and similar because we use the
+// PassManger and do transformations on the IR before translating to other
+// formats. Thus we use our own main entry function because we register
+// Dialects and PassManager CLI options.
 
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
@@ -57,14 +59,8 @@ static llvm::cl::opt<bool> splitInputFile(
                    "process each chunk independently"),
     llvm::cl::init(false));
 
-// TODO(#2958): We shouldn't need to register dialects here if translations
-// correctly declare the dialects they support.
-// TODO(#2958): Investigate whether we can use mlir-translate.cpp as an entry
-// point.
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-  // TODO(#2958): We shouldn't need to register dialects here if translations
-  // correctly declare the dialects they support.
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
 #ifdef IREE_HAVE_EMITC_DIALECT
