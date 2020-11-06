@@ -80,6 +80,7 @@ cc_library(
         "LLVMTargetOptions.h",
     ],
     deps = [
+        "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",

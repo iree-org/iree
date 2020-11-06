@@ -31,16 +31,33 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+static llvm::CodeGenOpt::Level passBuilderOptLevelToCodeGenOptLevel(
+    const llvm::PassBuilder::OptimizationLevel &level) {
+  switch (level.getSpeedupLevel()) {
+    case 0:
+      return llvm::CodeGenOpt::None;
+    case 1:
+      return llvm::CodeGenOpt::Less;
+    case 2:
+    default:
+      return llvm::CodeGenOpt::Default;
+    case 3:
+      return llvm::CodeGenOpt::Aggressive;
+  }
+}
+
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
     const LLVMTargetOptions &targetOptions) {
   std::string errorMessage;
   auto target = llvm::TargetRegistry::lookupTarget(targetOptions.targetTriple,
                                                    errorMessage);
   if (!target) return nullptr;
-  // TODO(ataei): Once we have an AOT backend pass cpu and cpu-features
   std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
-      targetOptions.targetTriple, "generic" /* cpu e.g k8*/,
-      "" /* cpu features e.g avx512fma*/, targetOptions.options, {}));
+      targetOptions.targetTriple, targetOptions.targetCPU /* cpu e.g k8*/,
+      targetOptions.targetCPUFeatures /* cpu features e.g avx512fma*/,
+      targetOptions.options, {}, {},
+      passBuilderOptLevelToCodeGenOptLevel(targetOptions.optLevel),
+      /*JIT=*/false));
   return machine;
 }
 
@@ -68,10 +85,12 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.registerLoopAnalyses(loopAnalysisManager);
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
-  llvm::ModulePassManager modulePassManager;
-  modulePassManager =
-      passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
-  modulePassManager.run(*module, moduleAnalysisManager);
+  if (options.optLevel != llvm::PassBuilder::OptimizationLevel::O0) {
+    llvm::ModulePassManager modulePassManager;
+    modulePassManager =
+        passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
+    modulePassManager.run(*module, moduleAnalysisManager);
+  }
 
   if (llvm::verifyModule(*module)) return failure();
 
