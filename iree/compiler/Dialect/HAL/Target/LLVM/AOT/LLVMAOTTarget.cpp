@@ -16,7 +16,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTargetLinker.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -46,16 +46,20 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     // multi-threading issues.
     llvm::LLVMContext context;
 
-    // Remove all private functions, e.g tile size calcuations.
-    SmallVector<FuncOp, 4> nonPublicFn;
-    for (auto func : targetOp.getInnerModule().getOps<FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(func) !=
-          SymbolTable::Visibility::Public) {
-        nonPublicFn.push_back(func);
-      }
-    }
-    for (auto func : nonPublicFn) {
-      func.erase();
+    // We name our files after the executable name so that they are easy to
+    // track both during compilation (logs/artifacts/etc), as outputs (final
+    // intermediate code/binary files), and at runtime (loaded
+    // libraries/symbols/etc).
+    auto libraryName =
+        targetOp.getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+
+    // TODO(#3737): don't add functions we don't want to serialize to the
+    // module. Right now workgroup count calculation functions end up in here
+    // as std.func ops and not just the llvm.func ops we expect.
+    auto illegalFuncOps =
+        llvm::to_vector<4>(targetOp.getInnerModule().getOps<FuncOp>());
+    for (auto funcOp : illegalFuncOps) {
+      funcOp.erase();
     }
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
@@ -63,63 +67,107 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     auto llvmModule =
         mlir::translateModuleToLLVMIR(targetOp.getInnerModule(), context);
     if (!llvmModule) {
-      return failure();
+      return targetOp.emitError() << "failed to translate the MLIR LLVM "
+                                     "dialect to the native llvm::Module";
     }
 
+    // Export all entry points such that they are accessible on the dynamic
+    // libraries we generate.
     iree::DyLibExecutableDefT dyLibExecutableDef;
-    // Create invocation function an populate entry_points.
-    auto entryPointOps = targetOp.getBlock().getOps<ExecutableEntryPointOp>();
-
-    for (auto entryPointOp : entryPointOps) {
+    SmallVector<StringRef, 8> entryPointNames;
+    for (auto entryPointOp :
+         targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
       dyLibExecutableDef.entry_points.push_back(
           std::string(entryPointOp.sym_name()));
+      entryPointNames.push_back(entryPointOp.sym_name());
     }
 
-    // LLVMIR opt passes.
+    // Try to grab a linker tool based on the options (and target environment).
+    llvm::Triple targetTriple(options_.targetTriple);
+    auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
+    if (!linkerTool) {
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to find a target linker for the given target triple '"
+             << options_.targetTriple << "'";
+    }
+
+    // Configure the module with any code generation options required later by
+    // linking (such as initializer functions).
+    if (failed(
+            linkerTool->configureModule(llvmModule.get(), entryPointNames))) {
+      return targetOp.emitError()
+             << "failed to configure LLVM module for target linker";
+    }
+
+    // LLVM opt passes that perform code generation optimizations/transformation
+    // similar to what a frontend would do before passing to linking.
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
-      targetOp.emitError("Can't create target machine for target triple: " +
-                         options_.targetTriple);
-      return failure();
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to create target machine for target triple '"
+             << options_.targetTriple << "'";
     }
-
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
-
     if (failed(
             runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
-      return targetOp.emitError(
-          "Can't build LLVMIR opt passes for ExecutableOp module");
+      return targetOp.emitError()
+             << "failed to run LLVM-IR opt passes for IREE::HAL::ExecutableOp "
+                "targeting '"
+             << options_.targetTriple << "'";
     }
 
-    std::string objData;
-    if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                    &objData))) {
-      return targetOp.emitError("Can't compile LLVMIR module to an obj");
+    // Emit object files.
+    SmallVector<Artifact, 4> objectFiles;
+    {
+      // NOTE: today we just use a single object file, however if we wanted to
+      // scale code generation and linking we'd want to generate one per
+      // function (or something like that).
+      std::string objectData;
+      if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
+                                      &objectData))) {
+        return targetOp.emitError()
+               << "failed to compile LLVM-IR module to an object file";
+      }
+      auto objectFile = Artifact::createTemporary(libraryName, "obj");
+      auto &os = objectFile.outputFile->os();
+      os << objectData;
+      os.flush();
+      os.close();
+      objectFiles.push_back(std::move(objectFile));
     }
 
-    std::string sharedLibData;
-    const char *linkerToolPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
-    if (linkerToolPath != nullptr) {
-      auto sharedLibDataStatus = linkLLVMAOTObjects(linkerToolPath, objData);
-      if (!sharedLibDataStatus.ok()) {
-        return targetOp.emitError(
-            "Can't link executable and generate target dylib, using linker "
-            "toolchain: '" +
-            std::string(linkerToolPath) + "'");
-      }
-      sharedLibData = sharedLibDataStatus.value();
-    } else {
-      auto sharedLibDataStatus = linkLLVMAOTObjectsWithLLDElf(objData);
-      if (!sharedLibDataStatus.ok()) {
-        return targetOp.emitError(
-            "Can't link executable and generate target dylib using "
-            "lld::elf::link");
-      }
-      sharedLibData = sharedLibDataStatus.value();
+    // Link the generated object files into a dylib.
+    auto linkArtifactsOr =
+        linkerTool->linkDynamicLibrary(libraryName, objectFiles);
+    if (!linkArtifactsOr.hasValue()) {
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to link executable and generate target dylib using "
+                "linker toolchain "
+             << linkerTool->getToolPath();
     }
-    dyLibExecutableDef.library_embedded = {sharedLibData.begin(),
-                                           sharedLibData.end()};
+    auto &linkArtifacts = linkArtifactsOr.getValue();
+    dyLibExecutableDef.library_embedded =
+        linkArtifacts.libraryFile.read().getValueOr(std::vector<int8_t>());
+    if (dyLibExecutableDef.library_embedded.empty()) {
+      return targetOp.emitError() << "failed to read back dylib temp file at "
+                                  << linkArtifacts.libraryFile.path;
+    }
+
+    if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
+      dyLibExecutableDef.debug_database_embedded =
+          linkArtifacts.debugFile.read().getValue();
+      assert(!dyLibExecutableDef.debug_database_embedded.empty());
+      dyLibExecutableDef.debug_database_filename =
+          llvm::sys::path::filename(linkArtifacts.debugFile.path).str();
+    }
+
+    if (options_.keepLinkerArtifacts) {
+      return mlir::emitRemark(targetOp.getLoc())
+             << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
+             << "    " << linkArtifacts.libraryFile.path;
+      linkArtifacts.keepAllFiles();
+    }
 
     ::flatbuffers::FlatBufferBuilder fbb;
     auto executableOffset =
