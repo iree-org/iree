@@ -154,21 +154,15 @@ class DeduplicateExecutablesPass
         duplicateExecutableOps.push_back(duplicateExecutableOp);
 
         // Record entry point reference replacements.
-        auto duplicateDispatchEntryOps = llvm::to_vector<1>(
-            duplicateExecutableOp.getBlock().getOps<DispatchEntryOp>());
-        auto referenceDispatchEntryOps = llvm::to_vector<1>(
-            referenceExecutableOp.getBlock().getOps<DispatchEntryOp>());
-        assert(duplicateDispatchEntryOps.size() ==
-               referenceDispatchEntryOps.size());
-        for (int k = 0; k < duplicateDispatchEntryOps.size(); ++k) {
+        for (auto entryOpPair : llvm::zip(
+                 duplicateExecutableOp.getBlock().getOps<DispatchEntryOp>(),
+                 referenceExecutableOp.getBlock().getOps<DispatchEntryOp>())) {
           auto oldSymbolRefAttr = builder.getSymbolRefAttr(
               duplicateExecutableOp.getName(),
-              {builder.getSymbolRefAttr(
-                  duplicateDispatchEntryOps[k].sym_name())});
+              {builder.getSymbolRefAttr(std::get<0>(entryOpPair).sym_name())});
           auto newSymbolRefAttr = builder.getSymbolRefAttr(
               referenceExecutableOp.getName(),
-              {builder.getSymbolRefAttr(
-                  referenceDispatchEntryOps[k].sym_name())});
+              {builder.getSymbolRefAttr(std::get<1>(entryOpPair).sym_name())});
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 
