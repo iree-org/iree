@@ -273,8 +273,10 @@ def main(argv):
   if FLAGS.layer not in LAYER_TO_INPUT_SHAPES:
     raise ValueError(f"Unrecognized layer: '{FLAGS.layer}'.")
   dynamic_batch_str = 'dynamic_batch' if FLAGS.dynamic_batch else 'static_batch'
+  training_str = 'training' if FLAGS.training else 'non_training'
+  settings_str = f'{dynamic_batch_str}_{training_str}'
   KerasLayersModule.__name__ = os.path.join('keras_layers', FLAGS.layer,
-                                            dynamic_batch_str)
+                                            settings_str)
 
   tf.test.main()
 
