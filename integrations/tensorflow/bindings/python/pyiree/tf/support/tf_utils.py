@@ -790,8 +790,10 @@ def tflite_module_bytes_to_tflite_interpreters(
 class _TfLiteFunctionWrapper(_FunctionWrapper):
   """Wraps a TFLite interpreter and makes it behave like a python function."""
 
-  def __init__(self, interpreter: tf.lite.Interpreter):
+  def __init__(self, interpreter: tf.lite.Interpreter,
+               output_names: Sequence[str]):
     self._interpreter = interpreter
+    self._output_names = output_names
 
   def __call__(self, *args,
                **kwargs) -> Union[Dict[str, Any], Tuple[Any], np.ndarray]:
@@ -803,6 +805,13 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
     self._interpreter.allocate_tensors()
 
     if len(args):
+      # Specifically to get TFLite to work with keras models that take a list of
+      # inputs instead of a sequence of args as their inputs, because it decides
+      # to change the input signature but it still technically works if you
+      # ignore that it does that.
+      if len(args) == 1 and isinstance(args[0], list):
+        args = args[0]
+
       for arg, detail in zip(args, self._interpreter.get_input_details()):
         self._interpreter.set_tensor(detail["index"], arg)
     else:
@@ -813,24 +822,18 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
 
     # Extract the outputs from the TFLite interpreter.
     outputs = []
-    is_dict = False
     for detail in self._interpreter.get_output_details():
       value = _normalize_numpy(self._interpreter.get_tensor(detail["index"]))
-      name = detail["name"]
-      if name != "Identity":
-        # If the name of any output is "Identity" then we expect the entire
-        # output to be a single array or tuple of arrays.
-        if len(outputs) and not is_dict:
-          raise ValueError(
-              f"Encountered a named output '{name}' after {len(outputs)} "
-              "non-named outputs")
-        is_dict = True
-        outputs.append([name, value])
+      if self._output_names is not None:
+        name = detail["name"]
+        if name not in self._output_names:
+          raise ValueError(f"Expected '{name}' to be in {self._output_names}")
+        outputs.append([detail["name"], value])
       else:
         outputs.append(value)
 
     # Process them to match the output of the tf.Module.
-    if is_dict:
+    if self._output_names is not None:
       return dict(outputs)
     else:
       if len(outputs) == 1:
@@ -847,6 +850,7 @@ class TfLiteCompiledModule(CompiledModule):
       backend_info: "BackendInfo",
       compiled_paths: Dict[str, str],
       interpreters: Dict[str, tf.lite.Interpreter],
+      output_names: Sequence[str] = None,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -860,6 +864,7 @@ class TfLiteCompiledModule(CompiledModule):
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._interpreters = interpreters
+    self._output_names = output_names
 
   @classmethod
   def create_from_class(cls,
@@ -915,7 +920,8 @@ class TfLiteCompiledModule(CompiledModule):
         output_names)
     interpreters, compiled_paths = tflite_module_bytes_to_tflite_interpreters(
         tflite_module_bytes, artifacts_dir)
-    return cls(module_name, backend_info, compiled_paths, interpreters)
+    return cls(module_name, backend_info, compiled_paths, interpreters,
+               output_names)
 
   def reinitialize(self):
     """Reinitializes all stateful variables."""
@@ -927,7 +933,7 @@ class TfLiteCompiledModule(CompiledModule):
     if not attr in self._interpreters:
       raise AttributeError(
           f"The TFLite module does not have an interpreter for '{attr}'")
-    return _TfLiteFunctionWrapper(self._interpreters[attr])
+    return _TfLiteFunctionWrapper(self._interpreters[attr], self._output_names)
 
   def tflite_serializable(self) -> bool:
     return self.compiled_paths is not None
