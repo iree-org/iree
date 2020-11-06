@@ -77,7 +77,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions executableOptions);
 
 // Translates hal.executable.target ops via a nested translation pipeline.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTranslateExecutablesPass(TargetOptions executableOptions);
 
 // Calls into each target backend to have it link multiple hal.executables

@@ -33,7 +33,7 @@ namespace HAL {
 
 class TranslateExecutablesPass
     : public PassWrapper<TranslateExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableOp>> {
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   explicit TranslateExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {
@@ -58,23 +58,19 @@ class TranslateExecutablesPass
   }
 
   void runOnOperation() override {
-    auto executableOp = getOperation();
-    auto targetOps = llvm::to_vector<4>(
-        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
-    for (auto targetOp : targetOps) {
-      for (auto &pipeline : pipelines_) {
-        if (!TargetBackend::matchPattern(
-                pipeline.targetBackend->filter_pattern(),
-                targetOp.target_backend_filter().str())) {
-          continue;
-        }
-        if (failed(runPipeline(*pipeline.passManager,
-                               targetOp.getInnerModule()))) {
-          targetOp.emitError() << "failed to run translation of source "
-                                  "executable to target executable for backend "
-                               << targetOp.target_backend_filter();
-          return signalPassFailure();
-        }
+    auto targetOp = getOperation();
+    for (auto &pipeline : pipelines_) {
+      if (!TargetBackend::matchPattern(
+              pipeline.targetBackend->filter_pattern(),
+              targetOp.target_backend_filter().str())) {
+        continue;
+      }
+      if (failed(
+              runPipeline(*pipeline.passManager, targetOp.getInnerModule()))) {
+        targetOp.emitError() << "failed to run translation of source "
+                                "executable to target executable for backend "
+                             << targetOp.target_backend_filter();
+        return signalPassFailure();
       }
     }
   }
@@ -89,7 +85,7 @@ class TranslateExecutablesPass
   llvm::SmallVector<Pipeline, 4> pipelines_;
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTranslateExecutablesPass(TargetOptions executableOptions) {
   return std::make_unique<TranslateExecutablesPass>(executableOptions);
 }
