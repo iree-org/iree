@@ -80,13 +80,37 @@ void LLVMBaseTargetBackend::buildTranslationPassPipeline(
   buildLLVMTransformPassPipeline(passManager);
 }
 
+static FileLineColLoc findFirstFileLoc(Location baseLoc) {
+  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
+    for (auto &childLoc : loc.getLocations()) {
+      auto childResult = findFirstFileLoc(childLoc);
+      if (childResult) return childResult;
+    }
+  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+    return loc;
+  }
+  return FileLineColLoc{};
+}
+
+static std::string guessModuleName(mlir::ModuleOp moduleOp) {
+  std::string moduleName =
+      moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
+  if (!moduleName.empty()) return moduleName;
+  FileLineColLoc loc = findFirstFileLoc(moduleOp.getLoc());
+  return llvm::sys::path::stem(loc.getFilename()).str();
+}
+
 LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
   OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
   auto executableOps =
       llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
 
+  // Guess a module name, if needed, to make the output files readable.
+  auto moduleName = guessModuleName(moduleOp);
+
   // Create our new "linked" hal.executable.
-  std::string linkedExecutableName = llvm::formatv("linked_{0}", name());
+  std::string linkedExecutableName =
+      llvm::formatv("{0}_linked_{1}", moduleName, name());
   auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
       moduleOp.getLoc(), linkedExecutableName);
   SymbolTable::setSymbolVisibility(linkedExecutableOp,

@@ -11,31 +11,33 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_
-
-#include <string>
-
-#include "iree/base/status.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LinkerTool.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Calls linker tool to link objData and returns shared library blob.
-iree::StatusOr<std::string> linkLLVMAOTObjects(
-    const std::string& linkerToolPath, const std::string& objData);
-// Use lld::elf::link for linking objData and returns shared library blob.
-iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
-    const std::string& objData);
+// TODO(benvanik): add other platforms:
+// createMacLinkerTool using ld64.lld
+// createWasmLinkerTool wasm-ld
+
+std::unique_ptr<LinkerTool> createUnixLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+std::unique_ptr<LinkerTool> createWindowsLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+
+// static
+std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+  if (targetTriple.isOSWindows() || targetTriple.isWindowsMSVCEnvironment()) {
+    return createWindowsLinkerTool(targetTriple, targetOptions);
+  }
+  return createUnixLinkerTool(targetTriple, targetOptions);
+}
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_
