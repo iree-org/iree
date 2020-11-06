@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -32,7 +33,6 @@ namespace HAL {
 class LinkExecutablesPass
     : public PassWrapper<LinkExecutablesPass, OperationPass<mlir::ModuleOp>> {
  public:
-  LinkExecutablesPass() : executableOptions_(getTargetOptionsFromFlags()) {}
   explicit LinkExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
@@ -71,7 +71,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
 
 static PassRegistration<LinkExecutablesPass> pass(
     "iree-hal-link-executables",
-    "Links together hal.executables depending on target backend rules");
+    "Links together hal.executables depending on target backend rules", [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<LinkExecutablesPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

@@ -107,8 +107,6 @@ namespace {
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
-  ConvertHALToVMPass()
-      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
   explicit ConvertHALToVMPass(IREE::VM::TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -157,7 +155,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
 
 static PassRegistration<ConvertHALToVMPass> pass(
     "iree-convert-hal-to-vm",
-    "Convert the IREE HAL dialect to the IREE VM dialect");
+    "Convert the IREE HAL dialect to the IREE VM dialect", [] {
+      auto options = IREE::VM::getTargetOptionsFromFlags();
+      return std::make_unique<ConvertHALToVMPass>(options);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir
