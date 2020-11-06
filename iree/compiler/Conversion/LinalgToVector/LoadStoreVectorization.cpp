@@ -147,6 +147,13 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
   LogicalResult matchAndRewrite(
       linalg::GenericOp genericOp, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
+    // If a generic op does not take any input, it means it's working on
+    // constants and those operations do not have canonicalization patterns to
+    // fold it. For now just ignore to vectorize it.
+    if (genericOp.getNumInputs() == 0) {
+      return failure();
+    }
+
     if (llvm::any_of(genericOp.iterator_types(), [](Attribute attr) {
           return attr.cast<StringAttr>().getValue() !=
                  getParallelIteratorTypeName();
