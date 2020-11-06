@@ -87,24 +87,13 @@ SPECIAL_CASES = [
     "vision_model_test.py",
 ]
 
-TFLITE_FAILING = [
-    "lstm_test.py",
-]
+TFLITE_FAILING = []
 
-VMLA_FAILING = [
-    "lstm_test.py",
-]
+VMLA_FAILING = []
 
-LLVM_FAILING = [
-    # TODO(silvasean): Get this test working on IREE.
-    "lstm_test.py",  # Needs TensorList with current Keras implementation.
-    "lstm_static_test.py",  # TODO(silvasean): Get this test working on other backends.
-]
+LLVM_FAILING = []
 
-VULKAN_FAILING = [
-    "lstm_test.py",
-    "lstm_static_test.py",
-]
+VULKAN_FAILING = []
 
 TF_PASSING = glob(
     ["*_test.py"],
