@@ -47,6 +47,10 @@ bool areRegionsEquivalent(Region *lhs, Region *rhs) {
   for (auto blockPair : llvm::zip(lhs->getBlocks(), rhs->getBlocks())) {
     auto &lhsBlock = std::get<0>(blockPair);
     auto &rhsBlock = std::get<1>(blockPair);
+    // Warning: .size() is linear time.
+    // We could instead iterate through both lists of operations explicitly,
+    // stopping when operations are not equivalent, OR either list runs out of
+    // operations early.
     if (lhsBlock.getOperations().size() != rhsBlock.getOperations().size()) {
       return false;
     }
