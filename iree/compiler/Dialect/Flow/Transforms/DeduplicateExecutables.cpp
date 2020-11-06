@@ -140,32 +140,35 @@ class DeduplicateExecutablesPass
 
     // For each executable, find the first executable which it is equivalent to.
     for (int i = executableOps.size() - 1; i >= 0; --i) {
-      auto executableOp = executableOps[i];
+      auto duplicateExecutableOp = executableOps[i];
 
       for (int j = 0; j < i; ++j) {
-        auto comparisonExecutableOp = executableOps[j];
+        auto referenceExecutableOp = executableOps[j];
 
-        if (!areExecutablesEquivalent(executableOp, comparisonExecutableOp)) {
+        if (!areExecutablesEquivalent(duplicateExecutableOp,
+                                      referenceExecutableOp)) {
           continue;
         }
 
         // Found an equivalent executable! Record it and move on to the next.
-        duplicateExecutableOps.push_back(executableOp);
+        duplicateExecutableOps.push_back(duplicateExecutableOp);
 
         // Record entry point reference replacements.
-        auto dispatchEntryOps = llvm::to_vector<1>(
-            executableOp.getBlock().getOps<DispatchEntryOp>());
-        auto comparisonDispatchEntryOps = llvm::to_vector<1>(
-            comparisonExecutableOp.getBlock().getOps<DispatchEntryOp>());
-        assert(dispatchEntryOps.size() == comparisonDispatchEntryOps.size());
-        for (int k = 0; k < dispatchEntryOps.size(); ++k) {
+        auto duplicateDispatchEntryOps = llvm::to_vector<1>(
+            duplicateExecutableOp.getBlock().getOps<DispatchEntryOp>());
+        auto referenceDispatchEntryOps = llvm::to_vector<1>(
+            referenceExecutableOp.getBlock().getOps<DispatchEntryOp>());
+        assert(duplicateDispatchEntryOps.size() ==
+               referenceDispatchEntryOps.size());
+        for (int k = 0; k < duplicateDispatchEntryOps.size(); ++k) {
           auto oldSymbolRefAttr = builder.getSymbolRefAttr(
-              executableOp.getName(),
-              {builder.getSymbolRefAttr(dispatchEntryOps[k].sym_name())});
-          auto newSymbolRefAttr = builder.getSymbolRefAttr(
-              comparisonExecutableOp.getName(),
+              duplicateExecutableOp.getName(),
               {builder.getSymbolRefAttr(
-                  comparisonDispatchEntryOps[k].sym_name())});
+                  duplicateDispatchEntryOps[k].sym_name())});
+          auto newSymbolRefAttr = builder.getSymbolRefAttr(
+              referenceExecutableOp.getName(),
+              {builder.getSymbolRefAttr(
+                  referenceDispatchEntryOps[k].sym_name())});
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 
