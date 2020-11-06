@@ -63,84 +63,96 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
 
-  OwningRewritePatternList l1patterns, l2patterns;
-  CPUKernelDispatch cpuKernelDispatch;
+  // Workgroup tiling.
+  {
+    // First level of tiling patterns. (workgroups memory)
+    OwningRewritePatternList l1patterns, l2patterns;
+    CPUKernelDispatch cpuKernelDispatch;
+    l1patterns.insert<TileWorkgroups<linalg::MatmulOp>,
+                      TileWorkgroups<linalg::BatchMatmulOp>>(
+        context,
+        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+            [&cpuKernelDispatch](OpBuilder &builder, Operation *operation)
+                -> SmallVector<Value, 4> {
+              return TileSizeFn::get<TilingLevel::Level1Tiles>(
+                  cpuKernelDispatch, builder, operation);
+            }),
+        linalg::LinalgMarker(
+            Identifier::get(getWorkgroupMarker(), context),
+            Identifier::get(getWorkgroupL1TileMarker(), context)));
 
-  // First level of tiling patterns. (workgroups memory)
-  l1patterns.insert<TileWorkgroups<linalg::MatmulOp>,
-                    TileWorkgroups<linalg::BatchMatmulOp>>(
-      context,
-      linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-          [&cpuKernelDispatch](OpBuilder &builder,
-                               Operation *operation) -> SmallVector<Value, 4> {
-            return TileSizeFn::get<TilingLevel::Level1Tiles>(
-                cpuKernelDispatch, builder, operation);
-          }),
-      linalg::LinalgMarker(
-          Identifier::get(getWorkgroupMarker(), context),
-          Identifier::get(getWorkgroupL1TileMarker(), context)));
+    // Second level of tiling patterns. (workgroups memroey -> vectors)
+    l2patterns.insert<TileWorkgroups<linalg::MatmulOp>,
+                      TileWorkgroups<linalg::BatchMatmulOp>>(
+        context,
+        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+            [&cpuKernelDispatch](OpBuilder &builder, Operation *operation)
+                -> SmallVector<Value, 4> {
+              return TileSizeFn::get<TilingLevel::Level2Tiles>(
+                  cpuKernelDispatch, builder, operation);
+            }),
+        linalg::LinalgMarker(
+            Identifier::get(getWorkgroupL1TileMarker(), context),
+            Identifier::get(getVectorizeMarker(), context)));
 
-  // Second level of tiling patterns. (workgroups memroey -> vectors)
-  l2patterns.insert<TileWorkgroups<linalg::MatmulOp>,
-                    TileWorkgroups<linalg::BatchMatmulOp>>(
-      context,
-      linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-          [&cpuKernelDispatch](OpBuilder &builder,
-                               Operation *operation) -> SmallVector<Value, 4> {
-            return TileSizeFn::get<TilingLevel::Level2Tiles>(
-                cpuKernelDispatch, builder, operation);
-          }),
-      linalg::LinalgMarker(Identifier::get(getWorkgroupL1TileMarker(), context),
-                           Identifier::get(getVectorizeMarker(), context)));
-
-  // Apply tiling.
-  applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
-  applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
+    // Apply tiling.
+    applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
+    applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
+  }
 
   // Apply canonicalization.
-  OwningRewritePatternList canonicalizationPatterns;
-  canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
-  AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+  {
+    OwningRewritePatternList canonicalizationPatterns;
+    canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
+    AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                               context);
+    AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+    SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+  }
 
-  // Apply vectorization.
-  OwningRewritePatternList vectorizationPatterns;
-  vectorizationPatterns
-      .insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
-              linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>>(
-          context,
-          linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
-  applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+  // Apply vectorization patterns.
+  {
+    OwningRewritePatternList vectorizationPatterns;
+    vectorizationPatterns
+        .insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>>(
+            context, linalg::LinalgMarker(
+                         Identifier::get(getVectorizeMarker(), context)));
+    applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+  }
 
   // Apply vector specific operation lowering.
-  vector::VectorTransformsOptions vectorTransformsOptions =
-      vector::VectorTransformsOptions().setVectorTransformsOptions(
-          vector::VectorContractLowering::OuterProduct);
-  OwningRewritePatternList vectorContractLoweringPatterns;
-  vectorContractLoweringPatterns
-      .insert<ContractionOpToOuterProductOpLowering,
-              ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-          vectorTransformsOptions, context);
-  applyPatternsAndFoldGreedily(funcOp,
-                               std::move(vectorContractLoweringPatterns));
+  {
+    vector::VectorTransformsOptions vectorTransformsOptions =
+        vector::VectorTransformsOptions().setVectorTransformsOptions(
+            vector::VectorContractLowering::OuterProduct);
+    OwningRewritePatternList vectorContractLoweringPatterns;
+    vectorContractLoweringPatterns
+        .insert<ContractionOpToOuterProductOpLowering,
+                ContractionOpToMatmulOpLowering, ContractionOpLowering>(
+            vectorTransformsOptions, context);
+    applyPatternsAndFoldGreedily(funcOp,
+                                 std::move(vectorContractLoweringPatterns));
+  }
 
   // Programmatic controlled lowering of vector.transfer only.
-  VectorTransferToSCFOptions vectorToSCFOptions =
-      VectorTransferToSCFOptions().setUnroll(true);
-  OwningRewritePatternList vectorToLoopsPatterns;
-  populateVectorToSCFConversionPatterns(vectorToLoopsPatterns, context,
-                                        vectorToSCFOptions);
-  // Hosit hierarchical tiling indexing and other loop invariant transfer ops
-  // computation.
-  linalg::hoistViewAllocOps(funcOp);
-  linalg::hoistRedundantVectorTransfers(funcOp);
+  {
+    VectorTransferToSCFOptions vectorToSCFOptions =
+        VectorTransferToSCFOptions().setUnroll(true);
+    OwningRewritePatternList vectorToLoopsPatterns;
+    populateVectorToSCFConversionPatterns(vectorToLoopsPatterns, context,
+                                          vectorToSCFOptions);
+    // Hosit hierarchical tiling indexing and other loop invariant transfer ops
+    // computation.
+    linalg::hoistViewAllocOps(funcOp);
+    linalg::hoistRedundantVectorTransfers(funcOp);
 
-  // TODO(ataei): Move this to common vector dialect patterns.
-  populateStdLegalizationPatternsForSPIRVLowering(context,
-                                                  vectorToLoopsPatterns);
-  applyPatternsAndFoldGreedily(funcOp, std::move(vectorToLoopsPatterns));
+    // TODO(ataei): Move this to common vector dialect patterns.
+    populateStdLegalizationPatternsForSPIRVLowering(context,
+                                                    vectorToLoopsPatterns);
+    applyPatternsAndFoldGreedily(funcOp, std::move(vectorToLoopsPatterns));
+  }
 }
 
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass() {
