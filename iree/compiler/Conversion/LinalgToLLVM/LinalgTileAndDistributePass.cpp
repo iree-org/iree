@@ -74,7 +74,8 @@ struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
          failed(createNumWorkgroupsFromResultShape(
              rewriter, cast<linalg::LinalgOp>(op), funcOp,
              getNumWorkgroupsFnAttrName(),
-             cpuKernelDispatch.getTileSizes(op))))) {
+             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(
+                 op))))) {
       return failure();
     }
     rewriter.eraseOp(op);
@@ -111,7 +112,7 @@ struct TileAndFuseToCPUThreads
         failed(createNumWorkgroupsFromResultShape(
             rewriter, cast<linalg::LinalgOp>(op), funcOp,
             getNumWorkgroupsFnAttrName().str(),
-            cpuKernelDispatch.getTileSizes(op)))) {
+            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op)))) {
       return failure();
     }
     return success();
@@ -148,22 +149,6 @@ void LinalgTileAndDistributePass::runOnOperation() {
 
   CPUKernelDispatch cpuKernelDispatch;
 
-  // Function to compute first level tiling values.
-  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
-      getOuterTileSizeFn =
-          [&cpuKernelDispatch](OpBuilder &builder,
-                               Operation *operation) -> SmallVector<Value, 4> {
-    auto tileSizes = cpuKernelDispatch.getTileSizes(operation);
-    if (tileSizes.empty()) return {};
-    SmallVector<Value, 4> tileSizesVal;
-    tileSizesVal.reserve(tileSizes.size());
-    for (auto val : tileSizes) {
-      tileSizesVal.push_back(
-          builder.create<ConstantIndexOp>(operation->getLoc(), val));
-    }
-    return tileSizesVal;
-  };
-
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
@@ -179,10 +164,18 @@ void LinalgTileAndDistributePass::runOnOperation() {
             .setDistributionOptions(workgroupDistributionOptions)
             .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops);
     tileSizes.empty()
-        ? linalgTilingOptions.setTileSizeComputationFunction(getOuterTileSizeFn)
+        ? linalgTilingOptions.setTileSizeComputationFunction(
+              [&cpuKernelDispatch](
+                  OpBuilder &builder,
+                  Operation *operation) -> SmallVector<Value, 4> {
+                return TileSizeFn::get<TilingLevel::WorkGroupTiles>(
+                    cpuKernelDispatch, builder, operation);
+              })
         : linalgTilingOptions.setTileSizes(ArrayRef<int64_t>(tileSizes));
     patterns.insert<TileAndFuseToCPUThreads<linalg::MatmulOp>,
-                    TileToCPUThreads<linalg::MatmulOp>>(
+                    TileAndFuseToCPUThreads<linalg::BatchMatmulOp>,
+                    TileToCPUThreads<linalg::MatmulOp>,
+                    TileToCPUThreads<linalg::BatchMatmulOp>>(
         context, dependenceGraph, cpuKernelDispatch, linalgTilingOptions,
         linalg::LinalgMarker(ArrayRef<Identifier>(),
                              Identifier::get(getWorkgroupMarker(), context)));

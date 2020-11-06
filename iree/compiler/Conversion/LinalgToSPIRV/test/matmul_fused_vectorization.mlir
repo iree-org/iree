@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-to-spirv-pipeline" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse,canonicalize,cse" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
 module attributes {
   spv.target_env =
@@ -24,6 +24,8 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4096x4096xf32>
     %ret0 = iree.placeholder for "interface buffer"
       {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4096x4096xf32>
+    %cst = constant 0.000000e+00 : f32
+    linalg.fill(%ret0, %cst) : memref<4096x4096xf32>, f32
     linalg.matmul ins(%arg0, %arg1 : memref<4096x4096xf32>, memref<4096x4096xf32>)
                  outs(%ret0 : memref<4096x4096xf32>)
     return
@@ -39,11 +41,12 @@ module attributes {
   }
 }
 
-//    CHECK-LABEL: spv.func @matmul_static_shape
-// CHECK-COUNT-8:    spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-//          CHECK:   spv.loop
-// CHECK-COUNT-12:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-32:   spv.FMul %{{.*}}, %{{.*}} : vector<4xf32>
-// CHECK-COUNT-8:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
-
-
+//    CHECK-LABEL: func @matmul_static_shape
+//  CHECK-COUNT-8:   vector.transfer_write
+//  CHECK-COUNT-8:   vector.transfer_read
+//          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
+// CHECK-COUNT-12:     vector.transfer_read
+// CHECK-COUNT-32:     vector.contract
+//      CHECK:         scf.yield
+//  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
+//          CHECK:    return

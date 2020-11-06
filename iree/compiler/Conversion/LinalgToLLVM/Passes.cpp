@@ -34,24 +34,23 @@ static llvm::cl::opt<bool> convImg2ColConversion(
                    "linag.matmul"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> llvmLinalgTileAndDistributePass(
-    "iree-codegen-linalg-to-llvm-tile-and-distrobute",
-    llvm::cl::desc("Tile and distribute linalg ops among iree threads"),
-    llvm::cl::init(false));
-
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
-  // Distribute linalg op among a 3d grid of parallel threads.
-  if (llvmLinalgTileAndDistributePass) {
-    passManager.addPass(createLinalgTileAndDistributePass());
-    passManager.addPass(createLegalizeNumWorkgroupsFnPass());
-  }
+  // Distribute linalg op among a 3d grid of parallel threads. Tile each
+  // workgroup thread memory then vectorize the linalg op.
 
-  // Linalg.ConvOp -> (Img2Col packing + matmul)
+  passManager.addPass(createLinalgTileAndDistributePass());
+  passManager.addPass(createLegalizeNumWorkgroupsFnPass());
+
+  // Linalg.ConvOp -> (Img2Col packing + matmul).
+  // After convolution is tiled and distributed among workgroups its converted
+  // before vectorize workgroup workload.
   if (convImg2ColConversion) {
     passManager.addNestedPass<FuncOp>(createConvImg2ColMatmulConversionPass());
   }
-  // Linalg -> Vectors Ops.
-  passManager.addNestedPass<FuncOp>(createMatMulTileAndVectorizePass());
+
+  passManager.addNestedPass<FuncOp>(
+      createLinalgTileAndVectorizeWorkgroupsPass());
+
   // Linalg -> SCF
   passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

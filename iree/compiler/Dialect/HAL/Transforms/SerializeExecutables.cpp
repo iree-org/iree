@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -33,8 +34,6 @@ class SerializeExecutablesPass
     : public PassWrapper<SerializeExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  SerializeExecutablesPass()
-      : executableOptions_(getTargetOptionsFromFlags()) {}
   explicit SerializeExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
@@ -71,7 +70,10 @@ createSerializeExecutablesPass(TargetOptions executableOptions) {
 
 static PassRegistration<SerializeExecutablesPass> pass(
     "iree-hal-serialize-executables",
-    "Serializes hal.executable.target ops to hal.executable.binary ops");
+    "Serializes hal.executable.target ops to hal.executable.binary ops", [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<SerializeExecutablesPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

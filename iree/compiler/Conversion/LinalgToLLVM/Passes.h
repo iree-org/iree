@@ -20,23 +20,15 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Options that can be used to configure LLVMIR codegeneration.
-struct LLVMIRCodegenOptions {
-  SmallVector<int64_t, 3> workgroupSize = {};
-  SmallVector<int64_t, 3> tileSizes = {};
-  bool useWorkgroupMemory = false;
-  bool useVectorization = false;
-  bool useVectorPass = false;
-};
-
-/// Converts linalg::MatmulOp into LLVM dialect
-std::unique_ptr<FunctionPass> createMatMulTileAndVectorizePass();
-
 /// Converts linalg::ConvOp into packed img2col operation followed by
 /// linalg::MatmulOp.
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 
+/// Distribute linalg ops among iree.workgroup logical threads.
 std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
+
+/// Vectorize linalg ops executed in the same iree.workgroup.
+std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 
 /// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
 /// followed by linalg::MatmulOp.

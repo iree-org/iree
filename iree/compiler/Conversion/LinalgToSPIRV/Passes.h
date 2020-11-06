@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -22,15 +23,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// Options that can be used to configure SPIR-V codegeneration.
-struct SPIRVCodegenOptions {
-  SmallVector<int64_t, 3> workgroupSize = {};
-  SmallVector<int64_t, 3> tileSizes = {};
-  bool useWorkgroupMemory = false;
-  bool useVectorization = false;
-  bool useVectorizeMemrefPass = false;
-};
 
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the

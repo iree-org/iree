@@ -227,11 +227,11 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  if (options.useVectorization && succeeded(getConfigForCooperativeMatmul(
-                                      op, options, resourceLimits, tileSizes,
-                                      workgroupSize, numSubgroups))) {
+  if (options.enableVectorization && succeeded(getConfigForCooperativeMatmul(
+                                         op, options, resourceLimits, tileSizes,
+                                         workgroupSize, numSubgroups))) {
     return success();
-  } else if (options.useVectorization &&
+  } else if (options.enableVectorization &&
              succeeded(getTargetSpecificConfig(op, options, resourceLimits,
                                                tileSizes, workgroupSize,
                                                numSubgroups))) {
@@ -486,6 +486,22 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
   }
 }
 
+template <>
+Optional<SmallVector<int64_t, 4>>
+getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
+      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+    // Don't unroll cooperative martrix store as they should match the size of
+    // the contract.
+    return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
+                                   op.getVectorType().getDimSize(1));
+  } else {
+    // Map to store4.
+    return SmallVector<int64_t, 4>({1, 4});
+  }
+}
+
 Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
 #define DISPATCH(opname)                            \
   if (isa<opname>(op)) {                            \
@@ -494,6 +510,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
 
   DISPATCH(vector::ContractionOp)
   DISPATCH(vector::TransferReadOp)
+  DISPATCH(vector::TransferWriteOp)
 
 #undef DISPATCH
   return llvm::None;

@@ -157,3 +157,18 @@ func @not_4s() {
 // CHECK-LABEL: func @not_4s
 //   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x3xf32>
 //   CHECK-DAG: iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x3xf32>
+
+// -----
+
+// CHECK-LABEL: func @cst
+//       CHECK: iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
+func @cst() {
+  %cst = constant 1.001000e+00 : f32
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
+  linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : memref<4xf32>) {
+  ^bb0(%arg0: f32):  // no predecessors
+    %1 = rsqrt %cst : f32
+    linalg.yield %1 : f32
+  }
+  return
+}

@@ -1,31 +1,35 @@
-// RUN: iree-opt --iree-codegen-linalg-to-llvm-matmul-vectorization-pass -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-llvm-linalg-tile-and-distribute -iree-codegen-linalg-to-llvm-workgroups-vectorization-pass -split-input-file %s | IreeFileCheck %s
 
 func @matmul_128x128x128(%arg0 : memref<128x128xf32>, %arg1: memref<128x128xf32>, %arg2: memref<128x128xf32>) {
     linalg.matmul ins(%arg0, %arg1 : memref<128x128xf32>, memref<128x128xf32>) outs(%arg2 : memref<128x128xf32>)
     return
 }
+// CHECK: #[[MAP0:.+]] =  affine_map<()[s0] -> (s0 * 64)>
+// CHECK: #[[MAP1:.+]] =  affine_map<(d0, d1) -> (d1)>
 // CHECK-LABEL: func @matmul_128x128x128
-//  CHECK-SAME: (%[[ARG0:.+]]: memref<128x128xf32>, %[[ARG1:.+]]: memref<128x128xf32>, %[[ARG2:.+]]: memref<128x128xf32>)
-//   CHECK-DAG: %[[L3END:.+]] = constant 128 : index
-//   CHECK-DAG: %[[L3STEP:.+]] = constant 64 : index
-//   CHECK-DAG: %[[L1STEP:.+]] = constant 4 : index
-//   CHECK-DAG: %[[L2STEP:.+]] = constant 32 : index
-//   CHECK-DAG: %[[START:.+]] = constant 0 : index
-//       CHECK: scf.for %[[IL3:.+]] = %[[START]] to %[[L3END]] step %[[L3STEP]]
-//       CHECK:   scf.for %[[JL3:.+]] = %[[START]] to %[[L3END]] step %[[L3STEP]]
-//       CHECK:     scf.for %[[KL3:.+]] = %[[START]] to %[[L3END]] step %[[L3STEP]]
-//       CHECK:       %[[ARG0_TILE_L3:.+]] = subview %[[ARG0]][%[[IL3]], %[[KL3]]] [64, 64] [1, 1] : memref<128x128xf32> to memref<64x64xf32
-//       CHECK:       %[[ARG1_TILE_L3:.+]] = subview %[[ARG1]][%[[KL3]], %[[JL3]]] [64, 64] [1, 1] : memref<128x128xf32> to memref<64x64xf32
-//       CHECK:       %[[ARG2_TILE_L3:.+]] = subview %[[ARG2]][%[[IL3]], %[[JL3]]] [64, 64] [1, 1] : memref<128x128xf32> to memref<64x64xf32
-//       CHECK:       scf.for %[[IL2:.+]] = %[[START]] to %[[L3STEP]] step %[[L2STEP]]
-//       CHECK:         scf.for %[[JL2:.+]] = %[[START]] to %[[L3STEP]] step %[[L2STEP]]
-//       CHECK:           scf.for %[[KL2:.+]] = %[[START]] to %[[L3STEP]] step %[[L2STEP]]
-//       CHECK:             %[[ARG0_TILE_L2:.+]] = subview %[[ARG0_TILE_L3]][%[[IL2]], %[[KL2]]] [32, 32] [1, 1] : memref<64x64xf32
-//       CHECK:             %[[ARG1_TILE_L2:.+]] = subview %[[ARG1_TILE_L3]][%[[KL2]], %[[JL2]]] [32, 32] [1, 1] : memref<64x64xf32
-//       CHECK:             %[[ARG2_TILE_L2:.+]] = subview %[[ARG2_TILE_L3]][%[[IL2]], %[[JL2]]] [32, 32] [1, 1] : memref<64x64xf32
-//       CHECK:             scf.for %[[IL1:.+]] = %[[START]] to %[[L2STEP]] step %[[L1STEP]]
-//       CHECK:               scf.for %[[JL1:.+]] = %[[START]] to %[[L2STEP]] step %[[L1STEP]]
-//       CHECK:                 scf.for %[[KL1:.+]] = %[[START]] to %[[L2STEP]] step %[[L1STEP]]
-//       CHECK:                   %[[ARG0_TILE_L1:.+]] = subview %[[ARG0_TILE_L2]][%[[IL1]], %[[KL1]]] [4, 4] [1, 1] : memref<32x32xf32
-//       CHECK:                   %[[ARG1_TILE_L1:.+]] = subview %[[ARG1_TILE_L2]][%[[KL1]], %[[JL1]]] [4, 4] [1, 1] : memref<32x32xf32
-//       CHECK:                   %[[ARG2_TILE_L1:.+]] = subview %[[ARG2_TILE_L2]][%[[IL1]], %[[JL1]]] [4, 4] [1, 1] : memref<32x32xf32
+// CHECK-SAME: (%[[ARG0:.+]]: memref<128x128xf32>, %[[ARG1:.+]]: memref<128x128xf32>, %[[ARG2:.+]]: memref<128x128xf32>)
+// CHECK-DaG: %[[WORKGROUP_TILE_X:.+]] = iree.workgroup_id {dimension = "x"} : index
+// CHECK-DAG: %[[WORKGROUP_TILE_Y:.+]] = iree.workgroup_id {dimension = "y"} : index
+// CHECK-DAG: %[[START:.+]] = constant 0
+// CHECK-DAG: %[[WORGKROUP_SIZE:.+]] = constant 64
+// CHECK-DAG: %[[VECTOR_SIZE:.+]] = constant 4
+// CHECK-DAG: %[[L1_SIZE:.+]] = constant 32
+// CHECK-DAG: %[[KDIM_SIZE:.+]] = constant 128
+// CHECK:     scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {
+// CHECK:       scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {
+// CHECK:         scf.for {{.*}} = %[[START]] to %[[KDIM_SIZE]] step %[[L1_SIZE]] {
+// CHECK:           scf.for {{.*}} = %[[START]] to %[[L1_SIZE]] step %[[VECTOR_SIZE]] {
+// CHECK:             scf.for {{.*}} = %[[START]] to %[[L1_SIZE]] step %[[VECTOR_SIZE]] {
+// CHECK:               %[[VEC_C_0:.+]] = vector.transfer_read %[[ARG2]]
+// CHECK:               %[[VEC_C_1:.+]] = vector.transfer_read %[[ARG2]]
+// CHECK:               %[[VEC_C_2:.+]] = vector.transfer_read %[[ARG2]]
+// CHECK:               %[[VEC_C_3:.+]] = vector.transfer_read %[[ARG2]]
+// CHECK:                  scf.for {{.*}} = %[[START]] to %[[L1_SIZE]] step %[[VECTOR_SIZE]]
+// CHECK:                    %[[VEC_A_0:.+]] = vector.transfer_read %[[ARG0]]
+// CHECK:                    %[[VEC_A_1:.+]] = vector.transfer_read %[[ARG0]]
+// CHECK:                    %[[VEC_A_2:.+]] = vector.transfer_read %[[ARG0]]
+// CHECK:                    %[[VEC_A_3:.+]] = vector.transfer_read %[[ARG0]]
+// CHECK:                    %[[VEC_B_0:.+]] = vector.transfer_read %[[ARG1]]
+// CHECK:                    %[[VEC_b_1:.+]] = vector.transfer_read %[[ARG1]]
+// CHECK:                    %[[VEC_B_2:.+]] = vector.transfer_read %[[ARG1]]
+// CHECK:                    %[[VEC_B_3:.+]] = vector.transfer_read %[[ARG1]]

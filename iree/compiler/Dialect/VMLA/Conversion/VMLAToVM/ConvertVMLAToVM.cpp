@@ -374,8 +374,6 @@ namespace {
 class ConvertVMLAToVMPass
     : public PassWrapper<ConvertVMLAToVMPass, OperationPass<ModuleOp>> {
  public:
-  ConvertVMLAToVMPass()
-      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
   explicit ConvertVMLAToVMPass(IREE::VM::TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -428,7 +426,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass(
 
 static PassRegistration<ConvertVMLAToVMPass> pass(
     "iree-convert-vmla-to-vm",
-    "Convert the IREE VMLA dialect to the IREE VM dialect");
+    "Convert the IREE VMLA dialect to the IREE VM dialect", [] {
+      auto options = IREE::VM::getTargetOptionsFromFlags();
+      return std::make_unique<ConvertVMLAToVMPass>(options);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

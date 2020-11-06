@@ -25,8 +25,7 @@ namespace VM {
 
 class TypeConverter : public mlir::TypeConverter {
  public:
-  explicit TypeConverter(
-      TargetOptions targetOptions = getTargetOptionsFromFlags());
+  explicit TypeConverter(TargetOptions targetOptions);
 
   const TargetOptions& targetOptions() const { return targetOptions_; }
 

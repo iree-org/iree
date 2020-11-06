@@ -39,6 +39,7 @@ iree_cc_library(
     flatbuffers
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
+    iree::compiler::Conversion::LinalgToSPIRV::CodeGenOptionUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
