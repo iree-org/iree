@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
 
+DROPOUT = 0.5
 DIM = 4
 RANK_2_INPUT = [DIM] * 2
 RANK_3_INPUT = [DIM] * 3
@@ -118,7 +119,7 @@ LAYER_TO_KWARGS = {
     'ActivityRegularization': dict(),
     'Add': dict(),
     'AdditiveAttention': dict(),
-    'AlphaDropout': dict(rate=0.9),
+    'AlphaDropout': dict(rate=DROPOUT),
     'Attention': dict(),
     'Average': dict(),
     'AveragePooling1D': dict(),
@@ -139,13 +140,13 @@ LAYER_TO_KWARGS = {
     'Dense': dict(units=4),
     'DepthwiseConv2D': dict(kernel_size=3),
     'Dot': dict(axes=(1, 2)),
-    'Dropout': dict(rate=0.9),
+    'Dropout': dict(rate=DROPOUT),
     'ELU': dict(),
     'Embedding': dict(input_dim=4, output_dim=2),
     'Flatten': dict(),
     'GRU': dict(units=4, return_sequences=True),
     'GRUCell': dict(units=4),
-    'GaussianDropout': dict(rate=0.9),
+    'GaussianDropout': dict(rate=DROPOUT),
     'GaussianNoise': dict(stddev=1.0),
     'GlobalAveragePooling1D': dict(),
     'GlobalAveragePooling2D': dict(),
@@ -180,9 +181,9 @@ LAYER_TO_KWARGS = {
     'SimpleRNN': dict(units=4, return_sequences=True),
     'SimpleRNNCell': dict(units=4),
     'Softmax': dict(),
-    'SpatialDropout1D': dict(rate=0.9),
-    'SpatialDropout2D': dict(rate=0.9),
-    'SpatialDropout3D': dict(rate=0.9),
+    'SpatialDropout1D': dict(rate=DROPOUT),
+    'SpatialDropout2D': dict(rate=DROPOUT),
+    'SpatialDropout3D': dict(rate=DROPOUT),
     'Subtract': dict(),
     'ThresholdedReLU': dict(),
     'UpSampling1D': dict(),
@@ -193,11 +194,19 @@ LAYER_TO_KWARGS = {
     'ZeroPadding3D': dict(),
 }
 
+# Layers that allow specifying the 'dropout' kwarg.
+DROPOUT_LAYERS = [
+    'AdditiveAttention', 'Attention', 'ConvLSTM2D', 'GRU', 'GRUCell', 'LSTM',
+    'LSTMCell', 'MultiHeadAttention', 'SimpleRNN', 'SimpleRNNCell'
+]
+
 flags.DEFINE_string('layer', 'Dense',
                     f'One of {list(LAYER_TO_INPUT_SHAPES.keys())}.')
 flags.DEFINE_bool(
     'dynamic_batch', False,
     'Whether or not to compile the layer with a dynamic batch size.')
+flags.DEFINE_bool('training', False,
+                  'Whether or not to compile the layer in training mode.')
 
 
 def get_input(shape: Sequence[int]) -> tf.keras.layers.Input:
@@ -215,8 +224,10 @@ class KerasLayersModule(tf.Module):
   def __init__(self):
     super().__init__()
     layer_class = getattr(tf.keras.layers, FLAGS.layer)
-    kwargs = LAYER_TO_KWARGS[FLAGS.layer]
     input_shapes = LAYER_TO_INPUT_SHAPES[FLAGS.layer]
+    kwargs = LAYER_TO_KWARGS[FLAGS.layer]
+    if FLAGS.training and FLAGS.layer in DROPOUT_LAYERS:
+      kwargs['dropout'] = DROPOUT
 
     # Create a wrapped keras layer.
     inputs = normalize([get_input(shape) for shape in input_shapes])
@@ -232,7 +243,8 @@ class KerasLayersModule(tf.Module):
     input_signature = [tf.TensorSpec(shape) for shape in input_shapes]
     if len(input_signature) > 1:
       input_signature = [input_signature]
-    self.call = tf.function(input_signature=input_signature)(self.m.call)
+    self.call = tf.function(input_signature=input_signature)(
+        lambda x: self.m(x, training=FLAGS.training))
 
 
 class KerasLayersTest(tf_test_utils.TracedModuleTestCase):

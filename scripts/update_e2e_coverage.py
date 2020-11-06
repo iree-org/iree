@@ -46,10 +46,12 @@ TEST_SUITES_TO_HEADERS = {
         'End to end TensorFlow tests',
     '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
         'End to end test of MobileBert on SQuAD',
-    '//integrations/tensorflow/e2e/keras/layers:layers_static_batch_tests':
-        'End to end tests of tf.keras layers with static batch sizes',
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'End to end tests of tf.keras layers with static batch sizes in inference mode',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
         'End to end tests of tf.keras layers with dynamic batch sizes',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
+        'End to end tests of tf.keras layers in training mode',
     '//integrations/tensorflow/e2e/keras:keras_tests':
         'End to end tests written using tf.keras',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
@@ -65,9 +67,11 @@ TEST_SUITES_TO_HEADERS = {
 # Key to use as the name of the rows in the left column for each test in the
 # suite.
 TEST_SUITE_TO_ROW_ID_KEY = {
-    '//integrations/tensorflow/e2e/keras/layers:layers_static_batch_tests':
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
         'layer',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
+        'layer',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
         'layer',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'model',
@@ -82,9 +86,11 @@ TEST_SUITE_TO_ROW_ID_KEY = {
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
-    '//integrations/tensorflow/e2e/keras/layers:layers_static_batch_tests':
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
         'layer_test',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
+        'layer_test',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
         'layer_test',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'keyword_spotting_streaming_test',

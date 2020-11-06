@@ -51,6 +51,11 @@ package(
     )
 ]
 
+# These layers were selected by:
+#   1. Getting all subclasses of `tf.keras.layers.Layer`
+#   2. Removing deperacated layers based on the tf.keras docs.
+#   3. Removing irrelevant layers
+#   4. Removing layers that don't fit in the testing framework (Wrappers, DenseFeatures, ...)
 LAYERS = [
     "Activation",
     "ActivityRegularization",
@@ -204,13 +209,14 @@ FAILING_STATIC = [
 ]
 
 iree_e2e_cartesian_product_test_suite(
-    name = "layers_static_batch_tests",
+    name = "layers_tests",
     srcs = ["layers_test.py"],
     failing_configurations = FAILING_STATIC,
     flags_to_values = {
         "reference_backend": "tf",
         "layer": LAYERS,
         "dynamic_batch": False,
+        "training": False,
         "target_backends": [
             "tf",
             "tflite",
@@ -314,6 +320,89 @@ iree_e2e_cartesian_product_test_suite(
         "reference_backend": "tf",
         "layer": LAYERS,
         "dynamic_batch": True,
+        "training": False,
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "layers_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+FAILING_TRAINING = FAILING_STATIC + [
+    {
+        # Failing on TFLite:
+        "layer": [
+            "AlphaDropout",
+            "BatchNormalization",
+            "GRU",
+            "GaussianDropout",
+            "GaussianNoise",
+            "LSTM",
+            "SimpleRNN",
+        ],
+        "target_backends": "tflite",
+    },
+    {
+        # Failing on IREE
+        "layer": [
+            "AdditiveAttention",
+            "AlphaDropout",
+            "Attention",
+            "Dropout",
+            "GRU",
+            "GaussianDropout",
+            "GaussianNoise",
+            "LSTM",
+            "SpatialDropout1D",
+            "SpatialDropout2D",
+            "SpatialDropout3D",
+        ],
+        "target_backends": [
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+]
+
+# Layers that mention a training kwarg in their doc.
+LAYERS_WITH_TRAINING_BEHAVIOR = [
+    "AdditiveAttention",
+    "AlphaDropout",
+    "Attention",
+    "BatchNormalization",
+    "ConvLSTM2D",
+    "Dropout",
+    "GRU",
+    "GRUCell",
+    "GaussianDropout",
+    "GaussianNoise",
+    "LSTM",
+    "LSTMCell",
+    "MultiHeadAttention",
+    "SimpleRNN",
+    "SimpleRNNCell",
+    "SpatialDropout1D",
+    "SpatialDropout2D",
+    "SpatialDropout3D",
+]
+
+iree_e2e_cartesian_product_test_suite(
+    name = "layers_training_tests",
+    srcs = ["layers_test.py"],
+    failing_configurations = FAILING_TRAINING,
+    flags_to_values = {
+        "reference_backend": "tf",
+        "layer": LAYERS_WITH_TRAINING_BEHAVIOR,
+        "dynamic_batch": False,
+        "training": True,
         "target_backends": [
             "tf",
             "tflite",
