@@ -16,6 +16,18 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    CodeGenOptionUtils
+  HDRS
+    "CodeGenOptionUtils.h"
+  SRCS
+    "CodeGenOptionUtils.cpp"
+  DEPS
+    LLVMSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     LinalgToSPIRV
   HDRS
     "CooperativeMatrixAnalysis.h"
@@ -36,6 +48,7 @@ iree_cc_library(
     "VectorToGPUPass.cpp"
     "VectorizeMemref.cpp"
   DEPS
+    ::CodeGenOptionUtils
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard

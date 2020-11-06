@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse=use-workgroup-memory -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse -iree-spirv-use-workgroup-memory -canonicalize -cse %s | IreeFileCheck %s
 
 module attributes {
   spv.target_env =
