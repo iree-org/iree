@@ -26,8 +26,9 @@ namespace {
 
 // Replaces each usage of an entry point with its original symbol name with a
 // new symbol name.
-void replaceEntryPointUses(mlir::ModuleOp moduleOp,
-                           const DenseMap<Attribute, Attribute> &replacements) {
+void replaceEntryPointUses(
+    mlir::ModuleOp moduleOp,
+    const DenseMap<Attribute, SymbolRefAttr> &replacements) {
   for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
     funcOp.walk([&](DispatchOp dispatchOp) {
       auto it = replacements.find(dispatchOp.entry_point());
@@ -136,7 +137,7 @@ class DeduplicateExecutablesPass
     auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     SmallVector<ExecutableOp, 3> duplicateExecutableOps;
-    DenseMap<Attribute, Attribute> entryPointRefReplacements;
+    DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;
 
     // For each executable, find the first executable which it is equivalent to.
     for (int i = executableOps.size() - 1; i >= 0; --i) {
