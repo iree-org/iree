@@ -204,7 +204,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass() {
 }
 
 static PassRegistration<DeduplicateExecutablesPass> pass(
-    "iree-flow-dedupliclate-executables",
+    "iree-flow-deduplicate-executables",
     "Deduplicates executables that are identical");
 
 }  // namespace Flow
