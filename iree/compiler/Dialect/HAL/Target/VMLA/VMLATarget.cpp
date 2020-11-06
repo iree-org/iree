@@ -98,8 +98,7 @@ class VMLATargetBackend final : public TargetBackend {
     registry.insert<VM::VMDialect, VMLA::VMLADialect>();
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
-                                    OpPassManager &passManager) override {
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
     IREE::VMLA::buildVMLATransformPassPipeline(passManager);
 
     // TODO(#614): remove this when the std->vm conversion isn't looking for

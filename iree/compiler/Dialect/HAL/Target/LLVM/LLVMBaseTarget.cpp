@@ -75,19 +75,8 @@ void replaceEntryPointUses(mlir::ModuleOp moduleOp,
 LLVMBaseTargetBackend::LLVMBaseTargetBackend(LLVMTargetOptions options)
     : options_(std::move(options)) {}
 
-void LLVMBaseTargetBackend::getDependentDialects(
-    DialectRegistry &registry) const {
-  // clang-format off
-    registry.insert<AffineDialect,
-                    linalg::LinalgDialect,
-                    LLVM::LLVMDialect,
-                    scf::SCFDialect,
-                    vector::VectorDialect>();
-  // clang-format on
-}
-
 void LLVMBaseTargetBackend::buildTranslationPassPipeline(
-    ExecutableTargetOp targetOp, OpPassManager &passManager) {
+    OpPassManager &passManager) {
   buildLLVMTransformPassPipeline(passManager);
 }
 
