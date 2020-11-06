@@ -62,12 +62,12 @@ struct TileAndVectorizeWorkgroups
 void TileAndVectorizeWorkgroups::runOnFunction() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
+  CPUKernelDispatch cpuKernelDispatch;
 
-  // Workgroup tiling.
+  // Workgroup first level of tiling.
   {
     // First level of tiling patterns. (workgroups memory)
-    OwningRewritePatternList l1patterns, l2patterns;
-    CPUKernelDispatch cpuKernelDispatch;
+    OwningRewritePatternList l1patterns;
     l1patterns.insert<TileWorkgroups<linalg::MatmulOp>,
                       TileWorkgroups<linalg::BatchMatmulOp>>(
         context,
@@ -81,7 +81,12 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
             Identifier::get(getWorkgroupMarker(), context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
-    // Second level of tiling patterns. (workgroups memroey -> vectors)
+    applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
+  }
+
+  // Second level of tiling. (workgroups memroey -> vectors)
+  {
+    OwningRewritePatternList l2patterns;
     l2patterns.insert<TileWorkgroups<linalg::MatmulOp>,
                       TileWorkgroups<linalg::BatchMatmulOp>>(
         context,
@@ -95,8 +100,6 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
-    // Apply tiling.
-    applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
     applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
   }
 
