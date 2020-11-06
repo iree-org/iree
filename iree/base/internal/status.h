@@ -309,7 +309,12 @@ IREE_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
 #undef IREE_CHECK_OK
 #undef IREE_QCHECK_OK
 #undef IREE_DCHECK_OK
-#define IREE_CHECK_OK(val) IREE_CHECK(::iree::IsOk(val)) << (val)
+#define IREE_CHECK_OK_IMPL(status, val) \
+  auto status = ::iree::Status(val);    \
+  IREE_CHECK(::iree::IsOk(status)) << (status)
+#define IREE_CHECK_OK(val) \
+  IREE_CHECK_OK_IMPL(IREE_STATUS_IMPL_CONCAT_(_status, __LINE__), val)
+
 #define IREE_QCHECK_OK(val) IREE_QCHECK_EQ(::iree::StatusCode::kOk, (val))
 #define IREE_DCHECK_OK(val) IREE_DCHECK_EQ(::iree::StatusCode::kOk, (val))
 
