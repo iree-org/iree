@@ -232,6 +232,7 @@ class KerasLayersModule(tf.Module):
     # Create a wrapped keras layer.
     inputs = normalize([get_input(shape) for shape in input_shapes])
     if FLAGS.layer == 'MultiHeadAttention':
+      # TODO(meadowlark): Fix this if keras updates their API to be consistent.
       outputs = layer_class(**kwargs)(*inputs)
     else:
       outputs = layer_class(**kwargs)(inputs)

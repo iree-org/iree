@@ -53,7 +53,7 @@ package(
 
 # These layers were selected by:
 #   1. Getting all subclasses of `tf.keras.layers.Layer`
-#   2. Removing deperacated layers based on the tf.keras docs.
+#   2. Removing deperacated layers based on the tf.keras docs
 #   3. Removing irrelevant layers
 #   4. Removing layers that don't fit in the testing framework (Wrappers, DenseFeatures, ...)
 LAYERS = [
