@@ -153,17 +153,6 @@ FAILING_STATIC = [
         "target_backends": "tflite",
     },
     {
-        # Failing on TFLite and VMLA
-        "layer": [
-            "Conv3DTranspose",
-            "Conv3D",
-        ],
-        "target_backends": [
-            "tflite",
-            "iree_vmla",
-        ],
-    },
-    {
         # Failing on IREE
         "layer": [
             "ConvLSTM2D",
@@ -180,6 +169,14 @@ FAILING_STATIC = [
             "iree_llvmjit",
             "iree_vulkan",
         ],
+    },
+    {
+        # Failing on VMLA
+        "layer": [
+            "Conv3DTranspose",
+            "Conv3D",
+        ],
+        "target_backends": "iree_vmla",
     },
     {
         # Failing on LLVM and Vulkan
@@ -304,9 +301,7 @@ FAILING_DYNAMIC = FAILING_STATIC + [
     },
     {
         # Failing on Vulkan
-        "layer": [
-            "Embedding",
-        ],
+        "layer": "Embedding",
         "target_backends": "iree_vulkan",
     },
 ]
