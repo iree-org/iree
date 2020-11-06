@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse{use-vectorization},canonicalize,cse" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse,canonicalize,cse" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
 module attributes {
   spv.target_env =

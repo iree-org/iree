@@ -31,6 +31,8 @@ StringRef getFusedMarker() { return "fused_numprocs_ge_numiters"; }
 
 StringRef getWorkgroupMarker() { return "workgroup"; }
 
+StringRef getWorkgroupL1TileMarker() { return "workgroup_l1_tile"; }
+
 StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
 
 StringRef getWorkgroupNumItemsGENumItersMarker() {

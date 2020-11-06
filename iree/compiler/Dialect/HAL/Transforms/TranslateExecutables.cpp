@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -34,8 +35,6 @@ class TranslateExecutablesPass
     : public PassWrapper<TranslateExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  TranslateExecutablesPass()
-      : TranslateExecutablesPass(getTargetOptionsFromFlags()) {}
   explicit TranslateExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {
     for (auto &targetBackend :
@@ -97,7 +96,10 @@ createTranslateExecutablesPass(TargetOptions executableOptions) {
 
 static PassRegistration<TranslateExecutablesPass> pass(
     "iree-hal-translate-executables",
-    "Translates hal.executable.target via the target backend pipelines");
+    "Translates hal.executable.target via the target backend pipelines", [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<TranslateExecutablesPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

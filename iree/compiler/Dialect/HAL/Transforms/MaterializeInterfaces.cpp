@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -344,7 +345,6 @@ static LogicalResult declareTargetOps(TargetOptions targetOptions,
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  MaterializeInterfacesPass() : targetOptions_(getTargetOptionsFromFlags()) {}
   explicit MaterializeInterfacesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -405,7 +405,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
 
 static PassRegistration<MaterializeInterfacesPass> pass(
     "iree-hal-materialize-interfaces",
-    "Materializes hal.executable ops from flow.executable ops");
+    "Materializes hal.executable ops from flow.executable ops", [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<MaterializeInterfacesPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

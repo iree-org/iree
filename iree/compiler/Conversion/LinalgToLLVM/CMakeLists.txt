@@ -25,9 +25,10 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LinalgTileAndDistributePass.cpp"
-    "MatMulVectorization.cpp"
+    "LinalgTileAndVectorizePass.cpp"
     "Passes.cpp"
   DEPS
+    LLVMSupport
     MLIRAffineToStandard
     MLIRIR
     MLIRLLVMIR
@@ -39,6 +40,7 @@ iree_cc_library(
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
+    MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM
