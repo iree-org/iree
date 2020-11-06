@@ -43,17 +43,15 @@ bool areRegionsEquivalent(Region *lhs, Region *rhs) {
     return false;
   }
 
-  auto blockPairs = llvm::zip(lhs->getBlocks(), rhs->getBlocks());
-  for (auto blockPair : blockPairs) {
+  for (auto blockPair : llvm::zip(lhs->getBlocks(), rhs->getBlocks())) {
     auto &lhsBlock = std::get<0>(blockPair);
     auto &rhsBlock = std::get<1>(blockPair);
     if (lhsBlock.getOperations().size() != rhsBlock.getOperations().size()) {
       return false;
     }
 
-    auto opPairs =
-        llvm::zip(lhsBlock.getOperations(), rhsBlock.getOperations());
-    for (auto opPair : opPairs) {
+    for (auto opPair :
+         llvm::zip(lhsBlock.getOperations(), rhsBlock.getOperations())) {
       auto &lhsOp = std::get<0>(opPair);
       auto &rhsOp = std::get<1>(opPair);
       if (!OperationEquivalence::isEquivalentTo(
