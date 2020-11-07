@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:18.04 AS final
-
-RUN apt-get update && apt-get install -y wget
+FROM gcr.io/iree-oss/util AS base
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 

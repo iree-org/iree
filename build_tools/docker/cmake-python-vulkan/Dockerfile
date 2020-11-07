@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A base image for building IREE using CMake and running Vulkan tests. Requires
-# a child image to provide a Vulkan ICD.
+# A base image for building IREE using CMake and running Vulkan tests.
+# This image provides the Vulkan SDK. Requires a child image to provide
+# a Vulkan ICD.
 
 FROM gcr.io/iree-oss/cmake-python AS final
 
@@ -28,4 +29,5 @@ ENV PATH="${VULKAN_SDK}/bin:$PATH"
 # Symlink the Vulkan loader a system library directory. This is needed to allow
 # Vulkan applications to find the Vulkan loader. It also avoids using
 # LD_LIBRARY_PATH, which is not supported well by Docker.
-RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/
+RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
+  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/

@@ -64,7 +64,7 @@ IMAGES_TO_DEPENDENCIES = {
     'rbe-toolchain': ['vulkan'],
     'swiftshader': ['cmake'],
     'util': [],
-    'vulkan': [],
+    'vulkan': ['util'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
