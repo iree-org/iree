@@ -2276,48 +2276,41 @@ vm.module @module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::TranslateExecutablesPass
 ```
-hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vmla, filter="vmla" {
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-    module {
-      vm.module @module {
-        vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-          %zero = vm.const.i32.zero : i32
-          %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-          %c131072 = vm.const.i32 131072 : i32
-          %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-          %c1 = vm.const.i32 1 : i32
-          %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-          %c262144 = vm.const.i32 262144 : i32
-          %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-          %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-          %c1024 = vm.const.i32 1024 : i32
-          %c64 = vm.const.i32 64 : i32
-          vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-          %c8192 = vm.const.i32 8192 : i32
-          %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-          %c32 = vm.const.i32 32 : i32
-          vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-          %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-          %c2 = vm.const.i32 2 : i32
-          vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-          %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-          vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
-          vm.return
-        }
-        vm.export @dot_ex_dispatch_0
-        vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-        vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-        vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
-        vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
-        vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
-        vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+hal.executable.target @vmla, filter="vmla" {
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  module {
+    vm.module @module {
+      vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+        %zero = vm.const.i32.zero : i32
+        %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+        %c131072 = vm.const.i32 131072 : i32
+        %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+        %c1 = vm.const.i32 1 : i32
+        %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+        %c262144 = vm.const.i32 262144 : i32
+        %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+        %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+        %c1024 = vm.const.i32 1024 : i32
+        %c64 = vm.const.i32 64 : i32
+        vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+        %c8192 = vm.const.i32 8192 : i32
+        %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+        %c32 = vm.const.i32 32 : i32
+        vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+        %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+        %c2 = vm.const.i32 2 : i32
+        vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+        %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+        vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+        vm.return
       }
+      vm.export @dot_ex_dispatch_0
+      vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, sym_visibility = "private"}
+      vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {sym_visibility = "private"}
+      vm.import @vmla.transpose.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %permutation : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+      vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     }
   }
 }

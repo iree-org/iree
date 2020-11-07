@@ -605,51 +605,6 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After LinalgFoldUnitExtentDims
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After Canonicalizer
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After CSE
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
-```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
-
-```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
 ```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
@@ -664,6 +619,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
 ```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
+```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %c0 = constant 0 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -672,6 +632,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
   return
 }
+
+```
+### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
@@ -688,6 +653,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
 ```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
+```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %c0 = constant 0 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -696,6 +666,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
   return
 }
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
@@ -712,6 +687,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
 ```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After LinalgFoldUnitExtentDims
+```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %c0 = constant 0 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -720,6 +700,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
   return
 }
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
 ### IR Dump After Canonicalizer
@@ -736,6 +721,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
+```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %c0 = constant 0 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -748,6 +738,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+
+```
+### IR Dump After CSE
+```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %c0 = constant 0 : index
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -756,6 +751,11 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
   return
 }
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
+```
+func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
@@ -2125,110 +2125,103 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::TranslateExecutablesPass
 ```
-hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-        spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-        spv.globalVariable @__resource_var_0_1__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-        spv.globalVariable @__resource_var_0_0__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-        spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-        spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-          %0 = spv.constant 0.000000e+00 : f32
-          %1 = spv.constant 8 : i32
-          %2 = spv.constant 16 : i32
-          %3 = spv.constant 1 : i32
-          %4 = spv.constant 1024 : i32
-          %5 = spv.constant 0 : i32
-          %6 = spv.constant 64 : i32
-          %7 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-          %8 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          %9 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-          %11 = spv.Load "Input" %10 : vector<3xi32>
-          %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
-          %13 = spv.Load "Input" %10 : vector<3xi32>
-          %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
-          %15 = spv.IMul %14, %1 : i32
-          %16 = spv.IMul %12, %2 : i32
-          %17 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-          %18 = spv.Load "Input" %17 : vector<3xi32>
-          %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
-          %20 = spv.Load "Input" %17 : vector<3xi32>
-          %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
-          %22 = spv.SLessThan %21, %1 : i32
-          %23 = spv.SLessThan %19, %2 : i32
-          %24 = spv.LogicalAnd %22, %23 : i1
-          spv.selection {
-            spv.BranchConditional %24, ^bb1, ^bb2
-          ^bb1:  // pred: ^bb0
-            %25 = spv.IAdd %15, %21 : i32
-            %26 = spv.IAdd %16, %19 : i32
-            %27 = spv.IMul %25, %6 : i32
-            %28 = spv.IAdd %27, %26 : i32
-            %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-            spv.Store "StorageBuffer" %29, %0 : f32
-            spv.Branch ^bb2
-          ^bb2:  // 2 preds: ^bb0, ^bb1
-            spv._merge
-          }
-          spv.selection {
-            spv.BranchConditional %24, ^bb1, ^bb2
-          ^bb1:  // pred: ^bb0
-            spv.loop {
-              spv.Branch ^bb1(%5 : i32)
-            ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
-              %26 = spv.SLessThan %25, %4 : i32
-              spv.BranchConditional %26, ^bb2, ^bb3
-            ^bb2:  // pred: ^bb1
-              %27 = spv.IAdd %15, %21 : i32
-              %28 = spv.IMul %27, %4 : i32
-              %29 = spv.IAdd %28, %25 : i32
-              %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              %31 = spv.Load "StorageBuffer" %30 : f32
-              %32 = spv.IAdd %16, %19 : i32
-              %33 = spv.IMul %25, %6 : i32
-              %34 = spv.IAdd %33, %32 : i32
-              %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              %36 = spv.Load "StorageBuffer" %35 : f32
-              %37 = spv.IMul %27, %6 : i32
-              %38 = spv.IAdd %37, %32 : i32
-              %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
-              %40 = spv.Load "StorageBuffer" %39 : f32
-              %41 = spv.FMul %31, %36 : f32
-              %42 = spv.FAdd %40, %41 : f32
-              spv.Store "StorageBuffer" %39, %42 : f32
-              %43 = spv.IAdd %25, %3 : i32
-              spv.Branch ^bb1(%43 : i32)
-            ^bb3:  // pred: ^bb1
-              spv._merge
-            }
-            spv.Branch ^bb2
-          ^bb2:  // 2 preds: ^bb0, ^bb1
-            spv._merge
-          }
-          spv.Return
+hal.executable.target @vulkan_spirv, filter="vulkan*" {
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
+    spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+      spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+      spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+      spv.globalVariable @__resource_var_0_1__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      spv.globalVariable @__resource_var_0_0__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        %0 = spv.constant 0.000000e+00 : f32
+        %1 = spv.constant 8 : i32
+        %2 = spv.constant 16 : i32
+        %3 = spv.constant 1 : i32
+        %4 = spv.constant 1024 : i32
+        %5 = spv.constant 0 : i32
+        %6 = spv.constant 64 : i32
+        %7 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+        %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+        %11 = spv.Load "Input" %10 : vector<3xi32>
+        %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
+        %13 = spv.Load "Input" %10 : vector<3xi32>
+        %14 = spv.CompositeExtract %13[1 : i32] : vector<3xi32>
+        %15 = spv.IMul %14, %1 : i32
+        %16 = spv.IMul %12, %2 : i32
+        %17 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+        %18 = spv.Load "Input" %17 : vector<3xi32>
+        %19 = spv.CompositeExtract %18[0 : i32] : vector<3xi32>
+        %20 = spv.Load "Input" %17 : vector<3xi32>
+        %21 = spv.CompositeExtract %20[1 : i32] : vector<3xi32>
+        %22 = spv.SLessThan %21, %1 : i32
+        %23 = spv.SLessThan %19, %2 : i32
+        %24 = spv.LogicalAnd %22, %23 : i1
+        spv.selection {
+          spv.BranchConditional %24, ^bb1, ^bb2
+        ^bb1:  // pred: ^bb0
+          %25 = spv.IAdd %15, %21 : i32
+          %26 = spv.IAdd %16, %19 : i32
+          %27 = spv.IMul %25, %6 : i32
+          %28 = spv.IAdd %27, %26 : i32
+          %29 = spv.AccessChain %7[%5, %28] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %29, %0 : f32
+          spv.Branch ^bb2
+        ^bb2:  // 2 preds: ^bb0, ^bb1
+          spv._merge
         }
-        spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
-        spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+        spv.selection {
+          spv.BranchConditional %24, ^bb1, ^bb2
+        ^bb1:  // pred: ^bb0
+          spv.loop {
+            spv.Branch ^bb1(%5 : i32)
+          ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
+            %26 = spv.SLessThan %25, %4 : i32
+            spv.BranchConditional %26, ^bb2, ^bb3
+          ^bb2:  // pred: ^bb1
+            %27 = spv.IAdd %15, %21 : i32
+            %28 = spv.IMul %27, %4 : i32
+            %29 = spv.IAdd %28, %25 : i32
+            %30 = spv.AccessChain %8[%5, %29] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %31 = spv.Load "StorageBuffer" %30 : f32
+            %32 = spv.IAdd %16, %19 : i32
+            %33 = spv.IMul %25, %6 : i32
+            %34 = spv.IAdd %33, %32 : i32
+            %35 = spv.AccessChain %9[%5, %34] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %36 = spv.Load "StorageBuffer" %35 : f32
+            %37 = spv.IMul %27, %6 : i32
+            %38 = spv.IAdd %37, %32 : i32
+            %39 = spv.AccessChain %7[%5, %38] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
+            %40 = spv.Load "StorageBuffer" %39 : f32
+            %41 = spv.FMul %31, %36 : f32
+            %42 = spv.FAdd %40, %41 : f32
+            spv.Store "StorageBuffer" %39, %42 : f32
+            %43 = spv.IAdd %25, %3 : i32
+            spv.Branch ^bb1(%43 : i32)
+          ^bb3:  // pred: ^bb1
+            spv._merge
+          }
+          spv.Branch ^bb2
+        ^bb2:  // 2 preds: ^bb0, ^bb1
+          spv._merge
+        }
+        spv.Return
       }
-      func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
-        %c4 = constant 4 : index
-        %c1 = constant 1 : index
-        return %c4, %c4, %c1 : index, index, index
-      }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
+      spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
+      spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
+    }
+    func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+      %c4 = constant 4 : index
+      %c1 = constant 1 : index
+      return %c4, %c4, %c1 : index, index, index
+    }
+    hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
