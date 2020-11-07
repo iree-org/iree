@@ -88,7 +88,7 @@ NAVI_ORDER_DICT = {
     'design_roadmap.md': 5,
     'objectives.md': 6,
     'xla_op_coverage.md': 7,
-    'tf_e2e_coverage.md': 8,
+    # 'Tensorflow Coverage' is 8,
     'iree_community.md': 9,
     # 'Design Docs' is 10.
     # 'IR Conversion Examples' is 11.
@@ -121,6 +121,12 @@ NAVI_ORDER_DICT = {
 
     # Within 'Using IREE' use explicit ordering.
     'using_colab.md': 1,
+
+    # Within 'TensorFlow Coverage' use explicit ordering.
+    'tf_base_coverage.md': 1,
+    'tf_keras_coverage.md': 2,
+    'language_and_speech_coverage.md': 3,
+    'vision_coverage.md': 4,
 }
 
 # A dictionary containing source directory to section tile mappings.
@@ -137,12 +143,16 @@ DIRECTORY_TITLE_DICT = {
     'get_started': 'Getting Started',
     'ir_examples': 'IR Conversion Examples',
     'using_iree': 'Using IREE',
+    'tensorflow_coverage': 'TensorFlow Coverage',
 }
 
 # A dictionary containing the supporting JavaScript files for each doc.
 JS_FILES_DICT = {
     'xla_op_coverage.md': ['js/add_classes.js'],
-    'tf_e2e_coverage.md': ['js/add_classes.js'],
+    'tf_base_coverage.md': ['js/add_classes.js'],
+    'tf_keras_coverage.md': ['js/add_classes.js'],
+    'language_and_speech_coverage.md': ['js/add_classes.js'],
+    'vision_coverage.md': ['js/add_classes.js'],
 }
 
 
