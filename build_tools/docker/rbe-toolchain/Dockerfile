@@ -88,8 +88,8 @@ ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
 
 ENV PATH="${VULKAN_SDK}/bin:$PATH"
 
-# Symlink the Vulkan loader a system library directory. This is needed to allow
-# Vulkan applications to find the Vulkan loader. It also avoids using
+# Symlink the Vulkan loader to a system library directory. This is needed to
+# allow Vulkan applications to find the Vulkan loader. It also avoids using
 # LD_LIBRARY_PATH, which is not supported well by Docker.
 RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
   && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
