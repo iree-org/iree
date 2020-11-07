@@ -63,7 +63,7 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 rbe_autoconfig(
     name = "rbe_default",
     base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:98a61f58ec6d1c18bafb6e9d248948de10d2e37e49426e9f317723611404a198",
+    digest = "sha256:417ffe630a3a933b93e6b06aea7d4969fdbc1b120e26e674be108b8a849e0e8c",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
     use_checked_in_confs = "Force",
