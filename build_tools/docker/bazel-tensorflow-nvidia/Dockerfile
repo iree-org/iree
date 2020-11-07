@@ -18,4 +18,4 @@
 FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y nvidia-driver-440
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-440=440.100-0ubuntu0.18.04.1
