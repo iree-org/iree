@@ -615,6 +615,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     LINKOPTS
       ${IREE_LINKOPTS_TRACING}
     DEPS
+      ::target_platform
       absl::core_headers
     DEFINES
       # TODO(#2114): Change the mode to 2.
