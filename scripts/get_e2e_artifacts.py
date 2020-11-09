@@ -43,6 +43,12 @@ SUITE_NAME_TO_TARGET = {
         '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
     'keras_tests':
         '//integrations/tensorflow/e2e/keras:keras_tests',
+    'layers_tests':
+        '//integrations/tensorflow/e2e/keras/layers:layers_tests',
+    'layers_dynamic_batch_tests':
+        '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests',
+    'layers_training_tests':
+        '//integrations/tensorflow/e2e/keras/layers:layers_training_tests',
     'keyword_spotting_tests':
         '//integrations/tensorflow/e2e/keras:keyword_spotting_tests',
     'keyword_spotting_internal_streaming_tests':

@@ -15,13 +15,9 @@
 """Tests of streamable Keyword Spotting models implemented in Keras."""
 
 import os
-import sys
-import pathlib
 
 from absl import app
 from absl import flags
-from absl import logging
-import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf

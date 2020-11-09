@@ -98,7 +98,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.addPass(createConvertToGPUPass());
   if (options.enableVectorization) {
-    pm.addPass(createVectorToGPUPass());
+    pm.addNestedPass<FuncOp>(createVectorToGPUPass());
   }
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
@@ -152,7 +152,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createCSEPass());
   if (options.enableVectorization) {
     pm.addPass(createVectorizeMemref());
-    pm.addPass(createForOpCanonicalizationPass());
+    pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
   }

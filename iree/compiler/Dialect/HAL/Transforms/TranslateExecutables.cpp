@@ -33,52 +33,59 @@ namespace HAL {
 
 class TranslateExecutablesPass
     : public PassWrapper<TranslateExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableOp>> {
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   explicit TranslateExecutablesPass(TargetOptions executableOptions)
-      : executableOptions_(executableOptions) {}
+      : executableOptions_(executableOptions) {
+    for (auto &targetBackend :
+         matchTargetBackends(executableOptions_.targets)) {
+      auto pm = std::make_unique<OpPassManager>(
+          ModuleOp::getOperationName(), OpPassManager::Nesting::Implicit);
+      targetBackend->buildTranslationPassPipeline(*pm);
+      pipelines_.push_back({std::move(targetBackend), std::move(pm)});
+    }
+  }
+
+  TranslateExecutablesPass(const TranslateExecutablesPass &other)
+      : TranslateExecutablesPass(other.executableOptions_) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<HALDialect>();
 
-    auto targetBackends = matchTargetBackends(executableOptions_.targets);
-    for (auto &targetBackend : targetBackends) {
-      targetBackend->getDependentDialects(registry);
+    for (auto &pipeline : pipelines_) {
+      pipeline.passManager->getDependentDialects(registry);
     }
   }
 
   void runOnOperation() override {
-    auto executableOp = getOperation();
-    auto targetOps = llvm::to_vector<4>(
-        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
-    for (auto targetOp : targetOps) {
-      // TODO(#1036): this will be what we want the dynamic pass manager to
-      // do for us: we want to nest all of the backend passes on a source op
-      // that matches their target_backend_filter pattern.
-      for (auto &targetBackend :
-           matchTargetBackends({targetOp.target_backend_filter().str()})) {
-        // Run the nested pass manager. This is effectively the same as
-        // launching a new iree-opt, and as such won't integrate well with the
-        // logging/pass instrumentation of the parent pass manager.
-        PassManager targetPassManager(targetOp.getContext());
-        applyPassManagerCLOptions(targetPassManager);
-        targetBackend->buildTranslationPassPipeline(targetOp,
-                                                    targetPassManager);
-        if (failed(targetPassManager.run(targetOp.getInnerModule()))) {
-          targetOp.emitError() << "failed to run translation of source "
-                                  "executable to target executable for backend "
-                               << targetOp.target_backend_filter();
-          return signalPassFailure();
-        }
+    auto targetOp = getOperation();
+    for (auto &pipeline : pipelines_) {
+      if (!TargetBackend::matchPattern(
+              pipeline.targetBackend->filter_pattern(),
+              targetOp.target_backend_filter().str())) {
+        continue;
+      }
+      if (failed(
+              runPipeline(*pipeline.passManager, targetOp.getInnerModule()))) {
+        targetOp.emitError() << "failed to run translation of source "
+                                "executable to target executable for backend "
+                             << targetOp.target_backend_filter();
+        return signalPassFailure();
       }
     }
   }
 
  private:
+  struct Pipeline {
+    std::unique_ptr<TargetBackend> targetBackend;
+    std::unique_ptr<OpPassManager> passManager;
+  };
+
   TargetOptions executableOptions_;
+  llvm::SmallVector<Pipeline, 4> pipelines_;
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTranslateExecutablesPass(TargetOptions executableOptions) {
   return std::make_unique<TranslateExecutablesPass>(executableOptions);
 }

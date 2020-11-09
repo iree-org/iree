@@ -26,6 +26,7 @@ import subprocess
 
 import utils
 
+TENSORFLOW_COVERAGE_DIR = 'tensorflow_coverage'
 REFERENCE_BACKEND = 'tf'
 # Assumes that tests are expanded for the tf, iree_vmla, iree_llvmjit and
 # iree_vulkan backends.
@@ -41,13 +42,56 @@ KWS_LINK = (
     'https://github.com/google-research/google-research/tree/master/kws_streaming'
 )
 KWS_LINK = f'[Keyword Spotting Streaming]({KWS_LINK})'
+
+COVERAGE_GROUP_TO_TEST_SUITES = {
+    'tf_base_coverage': ['//integrations/tensorflow/e2e:e2e_tests'],
+    'tf_keras_coverage': [
+        '//integrations/tensorflow/e2e/keras/layers:layers_tests',
+        '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests',
+        '//integrations/tensorflow/e2e/keras/layers:layers_training_tests',
+    ],
+    'language_and_speech_coverage': [
+        '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
+        '//integrations/tensorflow/e2e/keras:keyword_spotting_tests',
+        '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests',
+    ],
+    'vision_coverage': [
+        '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests',
+        '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests',
+    ],
+}
+
+COVERAGE_GROUP_TO_TITLE = {
+    'tf_base_coverage': 'TensorFlow Base APIs',
+    'tf_keras_coverage': 'TensorFlow Keras Layers',
+    'language_and_speech_coverage': 'Language and Speech Models',
+    'vision_coverage': 'Vision Models',
+}
+
+COVERAGE_GROUP_TO_DESCRIPTION = {
+    'tf_base_coverage':
+        ('Tests of the `tf`, `tf.math`, `tf.nn`, `tf.signal` and `tf.strings` '
+         'APIs.'),
+    'tf_keras_coverage':
+        ('Tests of `tf.keras.layers` compiled with static shapes, dynamic '
+         'shapes and training enabled.'),
+    'language_and_speech_coverage':
+        'Tests of MobileBert and streamable Keyword Spotting models.',
+    'vision_coverage':
+        'Tests of Keras and Slim vision models.',
+}
+
 TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'End to end tests of tf.keras layers with static batch sizes in inference mode',
+    '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
+        'End to end tests of tf.keras layers with dynamic batch sizes',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
+        'End to end tests of tf.keras layers in training mode',
     '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
         'End to end test of MobileBert on SQuAD',
-    '//integrations/tensorflow/e2e/keras:keras_tests':
-        'End to end tests written using tf.keras',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         f'End to end tests of {KWS_LINK} models',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
@@ -58,9 +102,21 @@ TEST_SUITES_TO_HEADERS = {
         'End to end tests of TensorFlow slim vision models',
 }
 
+TEST_SUITES_TO_NOTES = {
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests': (
+        '**Note:** Layers like `Dropout` are listed as passing in this table,\n'
+        'but they function similar to identity layers in these tests. **See \n'
+        'the third table for the coverage of these layers during training.**'),
+}
 # Key to use as the name of the rows in the left column for each test in the
 # suite.
 TEST_SUITE_TO_ROW_ID_KEY = {
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'layer',
+    '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
+        'layer',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
+        'layer',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'model',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
@@ -74,6 +130,12 @@ TEST_SUITE_TO_ROW_ID_KEY = {
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
+    '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'layers_test',
+    '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
+        'layers_test',
+    '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
+        'layers_test',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'keyword_spotting_streaming_test',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
@@ -96,17 +158,11 @@ FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 MAIN_URL = 'https://github.com/google/iree/tree/main'
 TARGETS_URL = os.path.join(MAIN_URL, 'iree/compiler/Dialect/HAL/Target')
 
-E2E_COVERAGE_DESCRIPTION = f"""# TensorFlow End to End Coverage
-There are three backend [targets]({TARGETS_URL}) in IREE:
-
-- vmla
-- llvm-ir
-- vulkan-spirv
-
-The table shows the supported TensorFlow functions and models on each backend.
-It is auto-generated from IREE's test status.
-
-"""
+BACKEND_INFO = f"""IREE has three backend
+[targets]({TARGETS_URL}):
+`vmla`, `llvm-ir` and `vulkan-spirv`. We also test TFLite in our infrastructure
+for benchmarking purposes. The coverage tables below are automatically generated
+from IREE's test suites."""
 
 
 def parse_arguments():
@@ -202,7 +258,10 @@ def generate_table(test_suite):
     table[test_info['row_id']][backend_index] = True
 
   # Create a header for the coverage table.
+  reference_index = ordered_backends.index(REFERENCE_BACKEND)
   ordered_backend_titles = list(BACKENDS_TO_TITLES.values())
+  # Remove the reference backend from the table header.
+  ordered_backend_titles.pop(reference_index)
   first_row = ['target'] + ordered_backend_titles
   second_row = [':-:' for _ in first_row]
 
@@ -213,6 +272,8 @@ def generate_table(test_suite):
     # coverage of the other backends.
     if not backends[ordered_backends.index(REFERENCE_BACKEND)]:
       continue
+    # Remove the reference backend from the row now that we know it's passing.
+    backends.pop(reference_index)
 
     # Skip any rows defined in the TARGET_EXCLUSION_FILTERS.
     if any(re.match(pattern, row_id) for pattern in TARGET_EXCLUSION_FILTERS):
@@ -226,16 +287,34 @@ def generate_table(test_suite):
   return utils.create_markdown_table(rows)
 
 
-if __name__ == '__main__':
-  args = parse_arguments()
+def generate_coverage_doc(coverage_group, coverage_dir):
+  paragraphs = [
+      f'# {COVERAGE_GROUP_TO_TITLE[coverage_group]}',
+      COVERAGE_GROUP_TO_DESCRIPTION[coverage_group],
+      BACKEND_INFO,
+  ]
+  header = '\n\n'.join(paragraphs) + '\n\n'
 
   content = []
-  for test_suite, header in TEST_SUITES_TO_HEADERS.items():
-    content.append(f'## {header}')
+  for test_suite in COVERAGE_GROUP_TO_TEST_SUITES[coverage_group]:
+    content.append(f'## {TEST_SUITES_TO_HEADERS[test_suite]}')
+    if test_suite in TEST_SUITES_TO_NOTES:
+      content.append(TEST_SUITES_TO_NOTES[test_suite])
+
     content.append(generate_table(test_suite))
   content = '\n\n'.join(content) + '\n'  # Trailing newline.
 
-  table_path = os.path.join(args.build_dir, 'doc', 'tf_e2e_coverage.md')
+  table_path = os.path.join(coverage_dir, f'{coverage_group}.md')
   with open(table_path, 'w', encoding='utf-8') as f:
-    f.write(E2E_COVERAGE_DESCRIPTION)
+    f.write(header)
     f.write(content)
+
+
+if __name__ == '__main__':
+  args = parse_arguments()
+  coverage_dir = os.path.join(args.build_dir, 'doc', TENSORFLOW_COVERAGE_DIR)
+  os.makedirs(coverage_dir, exist_ok=True)
+
+  for coverage_group in COVERAGE_GROUP_TO_TEST_SUITES:
+    generate_coverage_doc(coverage_group, coverage_dir)
+    print()

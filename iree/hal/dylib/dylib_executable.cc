@@ -16,6 +16,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
@@ -33,9 +34,11 @@ DyLibExecutable::DyLibExecutable() = default;
 
 DyLibExecutable::~DyLibExecutable() {
   IREE_TRACE_SCOPE0("DyLibExecutable::dtor");
+  // TODO(benvanik): move to an atexit handler when tracing is enabled.
+  // executable_library_.release();
   executable_library_.reset();
-  if (!executable_library_temp_path_.empty()) {
-    file_io::DeleteFile(executable_library_temp_path_).IgnoreError();
+  for (const auto& file_path : temp_file_paths_) {
+    file_io::DeleteFile(file_path).IgnoreError();
   }
 }
 
@@ -58,26 +61,45 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   // library APIs work with files. We could instead use in-memory files on
   // platforms where that is convenient.
   std::string base_name = "dylib_executable";
-  IREE_ASSIGN_OR_RETURN(executable_library_temp_path_,
+  IREE_ASSIGN_OR_RETURN(auto library_temp_path,
                         file_io::GetTempFile(base_name));
-  // Add platform-specific file extensions so opinionated dynamic library
-  // loaders are more likely to find the file:
+  temp_file_paths_.push_back(library_temp_path);
+
+// Add platform-specific file extensions so opinionated dynamic library
+// loaders are more likely to find the file:
 #if defined(IREE_PLATFORM_WINDOWS)
-  executable_library_temp_path_ += ".dll";
+  library_temp_path += ".dll";
 #else
-  executable_library_temp_path_ += ".so";
+  library_temp_path += ".so";
 #endif
 
   absl::string_view embedded_library_data(
       reinterpret_cast<const char*>(
           dylib_executable_def->library_embedded()->data()),
       dylib_executable_def->library_embedded()->size());
-  IREE_RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
-                                                embedded_library_data));
+  IREE_RETURN_IF_ERROR(
+      file_io::SetFileContents(library_temp_path, embedded_library_data));
 
-  IREE_ASSIGN_OR_RETURN(
-      executable_library_,
-      DynamicLibrary::Load(executable_library_temp_path_.c_str()));
+  IREE_ASSIGN_OR_RETURN(executable_library_,
+                        DynamicLibrary::Load(library_temp_path.c_str()));
+
+  if (dylib_executable_def->debug_database_filename() &&
+      dylib_executable_def->debug_database_embedded()) {
+    IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
+    absl::string_view debug_database_filename(
+        dylib_executable_def->debug_database_filename()->data(),
+        dylib_executable_def->debug_database_filename()->size());
+    absl::string_view debug_database_data(
+        reinterpret_cast<const char*>(
+            dylib_executable_def->debug_database_embedded()->data()),
+        dylib_executable_def->debug_database_embedded()->size());
+    auto debug_database_path = file_path::JoinPaths(
+        file_path::DirectoryName(library_temp_path), debug_database_filename);
+    temp_file_paths_.push_back(debug_database_path);
+    IREE_IGNORE_ERROR(
+        file_io::SetFileContents(debug_database_path, debug_database_data));
+    executable_library_->AttachDebugDatabase(debug_database_path.c_str());
+  }
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());
@@ -108,8 +130,8 @@ struct DyLibDispatchState : public HostExecutable::DispatchState {
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   void* entry_function = nullptr;
-  absl::InlinedVector<void*, 4> args;
-  absl::InlinedVector<int32_t, 4> push_constant;
+  std::array<void*, 32> args;
+  std::array<uint32_t, 32> push_constants;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -127,6 +149,7 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   dispatch_state->entry_function = entry_functions_[params.entry_point];
 
+  int binding_count = 0;
   for (size_t set = 0; set < params.set_bindings.size(); ++set) {
     for (size_t binding = 0; binding < params.set_bindings[set].size();
          ++binding) {
@@ -136,13 +159,10 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
                                 MemoryAccessBitfield::kWrite, io_binding.offset,
                                 io_binding.length));
       auto data = memory.mutable_data();
-
-      dispatch_state->args.push_back(data);
+      dispatch_state->args[binding_count++] = data;
     }
   }
-  for (int i = 0; i < params.push_constants->values.size(); ++i) {
-    dispatch_state->push_constant.push_back(params.push_constants->values[i]);
-  }
+  dispatch_state->push_constants = params.push_constants->values;
 
   return std::move(dispatch_state);
 }
@@ -152,10 +172,10 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
   IREE_TRACE_SCOPE_DYNAMIC(dispatch_state->entry_name);
 
-  auto entry_function = (void (*)(void**, int32_t*, int32_t, int32_t,
+  auto entry_function = (void (*)(void**, uint32_t*, int32_t, int32_t,
                                   int32_t))dispatch_state->entry_function;
   entry_function(dispatch_state->args.data(),
-                 dispatch_state->push_constant.data(), workgroup_xyz[0],
+                 dispatch_state->push_constants.data(), workgroup_xyz[0],
                  workgroup_xyz[1], workgroup_xyz[2]);
 
   return OkStatus();

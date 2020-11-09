@@ -28,9 +28,10 @@ table DyLibExecutableDef {
   // TODO(scotttodd): Format of files, platform information (x86/arm/etc.)
   library_embedded:[byte];
 
-  // TODO(scotttodd): Relative file path from this flatbuffer file
+  debug_database_filename:string;
+  debug_database_embedded:[byte];
 
-  // TODO(scotttodd): pdb debug symbols
+  // TODO(scotttodd): Relative file path from this flatbuffer file
 }
 
 root_type DyLibExecutableDef;

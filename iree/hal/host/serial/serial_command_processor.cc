@@ -144,7 +144,10 @@ Status SerialCommandProcessor::PushDescriptorSet(
   }
 
   auto& set_bindings = descriptor_sets_[set];
-  set_bindings = {bindings.begin(), bindings.end()};
+  set_bindings.resize(bindings.size());
+  for (size_t i = 0; i < bindings.size(); ++i) {
+    set_bindings[i] = bindings[i];
+  }
 
   return OkStatus();
 }

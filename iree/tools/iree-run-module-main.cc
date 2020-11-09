@@ -96,11 +96,16 @@ Status Run() {
 
   std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
-  IREE_RETURN_IF_ERROR(input_module->lookup_function(
-      input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{function_name.data(), function_name.size()},
-      &function))
-      << "looking up function '" << function_name << "'";
+  if (function_name.empty()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "No --entry_function= specified";
+  } else {
+    IREE_RETURN_IF_ERROR(input_module->lookup_function(
+        input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        iree_string_view_t{function_name.data(), function_name.size()},
+        &function))
+        << "looking up function '" << function_name << "'";
+  }
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
   IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));

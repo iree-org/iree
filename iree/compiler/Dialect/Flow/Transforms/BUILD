@@ -22,6 +22,7 @@ cc_library(
     name = "Transforms",
     srcs = [
         "CreateBenchmarkFuncs.cpp",
+        "DeduplicateExecutables.cpp",
         "DispatchConfig.cpp",
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",

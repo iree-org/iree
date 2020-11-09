@@ -14,6 +14,8 @@
 
 #include "iree/base/tracing.h"
 
+#include "iree/base/target_platform.h"
+
 // Textually include the Tracy implementation.
 // We do this here instead of relying on an external build target so that we can
 // ensure our configuration specified in tracing.h is picked up.
@@ -24,6 +26,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+#if defined(TRACY_ENABLE) && defined(IREE_PLATFORM_WINDOWS)
+static HANDLE iree_dbghelp_mutex;
+void IREEDbgHelpInit() { iree_dbghelp_mutex = CreateMutex(NULL, FALSE, NULL); }
+void IREEDbgHelpLock() { WaitForSingleObject(iree_dbghelp_mutex, INFINITE); }
+void IREEDbgHelpUnlock() { ReleaseMutex(iree_dbghelp_mutex); }
+#endif  // TRACY_ENABLE && IREE_PLATFORM_WINDOWS
 
 #if IREE_TRACING_FEATURES != 0
 

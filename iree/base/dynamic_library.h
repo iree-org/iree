@@ -56,6 +56,10 @@ class DynamicLibrary {
   // Gets the name of the library file that is loaded.
   const std::string& file_name() const { return file_name_; }
 
+  // Loads a debug database (PDB/DWARF/etc) from the given path providing debug
+  // symbols for this library and attaches it to the symbol store (if active).
+  virtual void AttachDebugDatabase(const char* database_file_name) {}
+
   // Gets the address of a symbol with the given name in the loaded library.
   // Returns NULL if the symbol could not be found.
   virtual void* GetSymbol(const char* symbol_name) const = 0;
