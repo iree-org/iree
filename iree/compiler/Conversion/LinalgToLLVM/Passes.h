@@ -24,10 +24,14 @@ namespace iree_compiler {
 /// linalg::MatmulOp.
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 
-/// Distribute linalg ops among iree.workgroup logical threads.
+/// Converts linalg.conv into linalg.generic with a CPU-friendly iteration
+/// order.
+std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
+
+/// Distributes linalg ops among iree.workgroup logical threads.
 std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
 
-/// Vectorize linalg ops executed in the same iree.workgroup.
+/// Vectorizes linalg ops executed in the same iree.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 
 /// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
@@ -35,7 +39,7 @@ std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 void populateConvImg2ColMatmulConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
-/// Pass to perform final conversion to LLVM dialect.
+/// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
