@@ -16,8 +16,8 @@ func @f(%arg0: tensor<3x4xf32>, %arg1: tensor<4x5xf32>) -> tensor<3x5xf32> {
 
 // -----
 
-// CHECK-LABEL: func @f
-func @f(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+// CHECK-LABEL: func private @f
+func private @f(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-DAG: [[SORT:%.+]] = vmla.sort.pseudo %arg0
   // CHECK-DAG: [[GATHER:%.+]] = "mhlo.torch_index_select"(%arg0, [[SORT]]) {batch_dims = 0 : i64, dim = 0 : i64}
   %sort = "mhlo.sort"(%arg0) ( {
@@ -32,8 +32,8 @@ func @f(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "p
 
 // -----
 
-// CHECK-LABEL: func @f
-func @f(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> attributes { sym_visibility = "private" } {
+// CHECK-LABEL: func private @f
+func private @f(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-DAG: [[SORT:%.+]] = vmla.sort.pseudo %arg0
   // CHECK-DAG: [[GATHER:%.+]] = "mhlo.torch_index_select"(%arg0, [[SORT]]) {batch_dims = 1 : i64, dim = 1 : i64}
   %sort = "mhlo.sort"(%arg0) ( {
@@ -66,8 +66,8 @@ func @f(%arg0: tensor<3xf32>) -> tensor<5x6x3xf32> {
 
 // -----
 
-// CHECK-LABEL: func @f
-func @f(%arg0: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> attributes { sym_visibility = "private" } {
+// CHECK-LABEL: func private @f
+func private @f(%arg0: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> {
   // CHECK-DAG: [[REAL:%.+]] = "mhlo.real"(%arg0)
   // CHECK-DAG: [[IMAG:%.+]] = "mhlo.imag"(%arg0)
   // CHECK-DAG: [[REAL_OUT:%.+]], [[IMAG_OUT:%.+]] = vmla.fft.pseudo [[REAL]], [[IMAG]]
