@@ -47,6 +47,7 @@ cc_library(
         "alignment.h",
         "atomics.h",
         "bitfield.h",
+        "debugging.h",
         "math.h",
         "memory.h",
         "target_platform.h",
