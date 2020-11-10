@@ -477,6 +477,11 @@ iree_cc_library(
     "-DVK_NO_PROTOTYPES"
     # Only needed in the implementation cc and not by external users.
     "-DVMA_STATIC_VULKAN_FUNCTIONS=0"
+    # Silence some warnings.
+    "-Wno-nullability-completeness"
+    # Note: IREE_DEFAULT_COPTS sets -Wthread-safety-analysis, so we can't
+    #   disable here without switching off of iree_cc_library or refactoring
+    # "-Wno-thread-safety-analysis"
   INCLUDES
     ${VMA_SRC_ROOT}
   DEPS
