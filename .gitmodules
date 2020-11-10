@@ -1,6 +1,3 @@
-[submodule "third_party/pffft"]
-	path = third_party/pffft
-	url = https://bitbucket.org/jpommier/pffft.git
 [submodule "third_party/abseil-cpp"]
 	path = third_party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp.git
@@ -65,4 +62,3 @@
 [submodule "third_party/llvm-bazel"]
 	path = third_party/llvm-bazel
 	url = https://github.com/google/llvm-bazel.git
-
