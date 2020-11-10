@@ -993,6 +993,22 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
   return iree_time_now() + timeout_ns;
 }
 
+IREE_API_EXPORT iree_duration_t
+iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns) {
+  if (deadline_ns == IREE_TIME_INFINITE_PAST) {
+    return IREE_DURATION_ZERO;
+  } else if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
+    return IREE_DURATION_INFINITE;
+  } else {
+    // We have either already passed the deadline (and can turn this into a
+    // poll) or want to do nanos->millis. We round up so that a deadline of 1ns
+    // results in 1ms as it should still wait, vs. if it was actually 0ns
+    // indicating the user intended a poll.
+    iree_time_t now_ns = iree_time_now();
+    return deadline_ns < now_ns ? IREE_DURATION_ZERO : deadline_ns - now_ns;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // iree_allocator_t
 //===----------------------------------------------------------------------===//

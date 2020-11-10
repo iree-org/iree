@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,538 +14,803 @@
 
 #include "iree/base/wait_handle.h"
 
-#include <unistd.h>
+#include <thread>
 
-#include <string>
-#include <thread>  // NOLINT
-#include <type_traits>
-
-#include "absl/time/time.h"
-#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-
-// StatusOr<bool> will be true if the status is ok, which is bad.
-#define ASSERT_STATUSOR_TRUE(x) ASSERT_TRUE(x.value())
-#define ASSERT_STATUSOR_FALSE(x) ASSERT_FALSE(x.value())
 
 namespace iree {
 namespace {
 
-using ::testing::_;
-using ::testing::Return;
+// We don't want to wait too long in here but when we are testing that timeouts
+// work as expected we do have to sometimes wait. These are set to hopefully
+// reduce flakes and not hang a build bot forever if something is broken :)
+constexpr iree_duration_t kShortTimeoutNS = 1000000ull;     // 1ms
+constexpr iree_duration_t kLongTimeoutNS = 60000000000ull;  // 1min
 
-// Tests the AlwaysSignaling helper.
-TEST(WaitHandleTest, AlwaysSignaling) {
-  IREE_ASSERT_OK(WaitHandle::AlwaysSignaling().Wait());
-  EXPECT_FALSE(WaitHandle::AlwaysSignaling().DebugString().empty());
+//===----------------------------------------------------------------------===//
+// IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
+
+// TODO(benvanik): tests wrapping external eventfds.
+
+#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
+
+//===----------------------------------------------------------------------===//
+// IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
+
+// TODO(benvanik): tests wrapping external sync files.
+
+#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
+
+//===----------------------------------------------------------------------===//
+// IREE_WAIT_PRIMITIVE_TYPE_PIPE
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
+
+// TODO(benvanik): tests wrapping external pipes.
+
+#endif  // IREE_HAVE_WAIT_TYPE_PIPE
+
+//===----------------------------------------------------------------------===//
+// IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_HAVE_WAIT_TYPE_WIN32_HANDLE)
+
+// TODO(benvanik): tests wrapping external win32 handles.
+
+#endif  // IREE_HAVE_WAIT_TYPE_WIN32_HANDLE
+
+//===----------------------------------------------------------------------===//
+// iree_event_t
+//===----------------------------------------------------------------------===//
+// NOTE: this is testing the user-visible behavior of iree_event_t and the use
+// of functions like iree_wait_one is not exhaustive as that is tested
+// elsewhere.
+
+// Tests that we don't leak.
+TEST(Event, Lifetime) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event));
+  iree_event_deinitialize(&event);
 }
 
-// Tests the AlwaysFailing helper.
-TEST(WaitHandleTest, AlwaysFailing) {
-  ASSERT_FALSE(WaitHandle::AlwaysFailing().Wait().ok());
-  EXPECT_FALSE(WaitHandle::AlwaysFailing().DebugString().empty());
+TEST(Event, WaitOneInitialFalse) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_deinitialize(&event);
 }
 
-// Tests the basic lifecycle of a permanently signaled wait handle.
-TEST(WaitHandleTest, LifecyclePermanentSignaled) {
-  // Just to be sure it's ok to safely no-op a WaitHandle value.
-  WaitHandle wh_never_used;
-  (void)wh_never_used;
-
-  // Try waiting; should return immediately.
-  WaitHandle wh0;
-  IREE_ASSERT_OK(wh0.Wait());
-
-  // Waits on multiple permanent handles should be ok.
-  WaitHandle wh1;
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh0, &wh1}));
+TEST(Event, WaitOneInitialTrue) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &event));
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_deinitialize(&event);
 }
 
-// Tests moving permanent WaitHandles around.
-TEST(WaitHandleTest, MovePermanent) {
-  WaitHandle wh0;
-  WaitHandle wh1{std::move(wh0)};
-  WaitHandle wh2 = std::move(wh1);
-  wh1 = std::move(wh2);
+TEST(Event, SetWait) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
+
+  // Initially unset.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  // Set and wait.
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  // Set should be sticky until reset manually.
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  // Resetting should unsignal the event.
+  iree_event_reset(&event);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  iree_event_deinitialize(&event);
 }
 
-// Tests moving around real handles (that may require closing).
-TEST(WaitHandleTest, MoveRealHandle) {
-  ManualResetEvent fence0;
-  WaitHandle wh0 = fence0.OnSet();
-  WaitHandle wh1{std::move(wh0)};
-  WaitHandle wh2 = std::move(wh1);
-  wh1 = std::move(wh2);
+// Tests that we can use set/reset and that certain behavior (such as sets
+// without intervening resets) is allowed. Note that this does not wait and is
+// just testing the client behavior; it's possible to implement these such that
+// a set while another set is pending fails and we want to verify that here.
+TEST(Event, SetReset) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
 
-  // Now overwrite the handle value to force a close.
-  ManualResetEvent fence1;
-  WaitHandle wh3 = fence1.OnSet();
-  wh1 = std::move(wh3);
-  wh1 = WaitHandle();  // Ensure handle dies first.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  iree_event_reset(&event);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_reset(&event);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+
+  iree_event_deinitialize(&event);
 }
 
-// Tests the various forms of waiting on a single WaitHandle.
-// Since these just call WaitAll we leave the involved testing to those.
-TEST(WaitHandleTest, SingleWait) {
-  WaitHandle wh;
-  IREE_ASSERT_OK(wh.Wait());
-  IREE_ASSERT_OK(wh.Wait(Now() + absl::Seconds(1)));
-  IREE_ASSERT_OK(wh.Wait(absl::Seconds(1)));
-  ASSERT_STATUSOR_TRUE(wh.TryWait());
-}
+TEST(Event, BlockingBehavior) {
+  iree_event_t main_to_thread;
+  IREE_ASSERT_OK(
+      iree_event_initialize(/*initial_state=*/false, &main_to_thread));
+  iree_event_t thread_to_main;
+  IREE_ASSERT_OK(
+      iree_event_initialize(/*initial_state=*/false, &thread_to_main));
 
-// Tests using WaitAll with no valid handles. This should no-op.
-TEST(WaitHandleTest, WaitAllNop) {
-  IREE_ASSERT_OK(WaitHandle::WaitAll({}));
-  IREE_ASSERT_OK(WaitHandle::WaitAll({nullptr}));
-  IREE_ASSERT_OK(WaitHandle::WaitAll({nullptr, nullptr}));
-}
+  // Spinup a thread to signal the event.
+  // Note that it waits on the main_to_thread event until we get further along.
+  bool did_run_thread = false;
+  std::thread thread([&]() {
+    // Wait for main thread to signal (below).
+    IREE_ASSERT_OK(iree_wait_one(&main_to_thread, IREE_TIME_INFINITE_FUTURE));
 
-// Tests polling with WaitAll with multiple wait handles.
-TEST(WaitHandleTest, WaitAllPoll) {
-  ManualResetEvent fence0;
-  WaitHandle wh0 = fence0.OnSet();
-  ManualResetEvent fence1;
-  WaitHandle wh1 = fence1.OnSet();
+    // Set something so we know this ran at all.
+    did_run_thread = true;
 
-  // Poll; should return immediately with timeout.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh0, &wh1}, InfinitePast())));
-
-  // Notify fence1.
-  IREE_ASSERT_OK(fence1.Set());
-
-  // Poll; should return immediately with timeout as fence1 is not signaled.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh0, &wh1}, InfinitePast())));
-
-  // Notify fence0.
-  IREE_ASSERT_OK(fence0.Set());
-
-  // Poll again; should return immediately with success.
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh0, &wh1}, InfinitePast()));
-}
-
-// Tests waiting when the first file handle is invalid. This is to verify a
-// workaround for bad poll() behavior with fds[0] == -1.
-TEST(WaitHandleTest, WaitAllWithInvalid0) {
-  ManualResetEvent fence;
-  WaitHandle wh = fence.OnSet();
-
-  // Poll; should return immediately with timeout as fence is not signaled.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({nullptr, &wh}, InfinitePast())));
-
-  // Notify fence.
-  IREE_ASSERT_OK(fence.Set());
-
-  // Poll again; should return immediately with success.
-  IREE_ASSERT_OK(WaitHandle::WaitAll({nullptr, &wh}, InfinitePast()));
-}
-
-// Tests exceeding the timeout deadline with WaitAll.
-TEST(WaitHandleTest, WaitAllTimeout) {
-  ManualResetEvent fence;
-  WaitHandle wh = fence.OnSet();
-
-  // Wait with timeout on the unsignaled fence:
-  // Via polling (should never block):
-  ASSERT_TRUE(IsDeadlineExceeded(WaitHandle::WaitAll({&wh}, InfinitePast())));
-  ASSERT_STATUSOR_FALSE(WaitHandle::TryWaitAll({&wh}));
-  // Via time in the near future (should block):
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh}, Milliseconds(250))));
-  // Via time in the past, should exceed deadline.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh}, Milliseconds(-250))));
-
-  // Notify and ensure no more timeouts.
-  IREE_ASSERT_OK(fence.Set());
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh}, InfinitePast()));
-  ASSERT_STATUSOR_TRUE(WaitHandle::TryWaitAll({&wh}));
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh}, Milliseconds(250)));
-
-  // Via time in the past, should exceed deadline even if signaled.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh}, Milliseconds(-250))));
-}
-
-// Tests using WaitAll to wait on other threads.
-TEST(WaitHandleTest, WaitAllThreaded) {
-  // Spin up two threads.
-  ManualResetEvent fence0;
-  std::thread t0{[&]() {
-    ::usleep(absl::ToInt64Microseconds(Milliseconds(250)));
-    IREE_ASSERT_OK(fence0.Set());
-  }};
-  ManualResetEvent fence1;
-  std::thread t1{[&]() {
-    ::usleep(absl::ToInt64Microseconds(Milliseconds(250)));
-    IREE_ASSERT_OK(fence1.Set());
-  }};
-
-  // Wait on both threads to complete.
-  WaitHandle wh0 = fence0.OnSet();
-  WaitHandle wh1 = fence1.OnSet();
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh0, &wh1}));
-
-  t0.join();
-  t1.join();
-}
-
-// Tests using WaitAll with multiple wait handles from the same fence.
-TEST(WaitHandleTest, WaitAllSameSource) {
-  ManualResetEvent fence;
-  WaitHandle wh0 = fence.OnSet();
-  WaitHandle wh1 = fence.OnSet();
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh0, &wh1}, InfinitePast())));
-  IREE_ASSERT_OK(fence.Set());
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh0, &wh1}));
-}
-
-// Tests using WaitAll with literally the same wait handles.
-TEST(WaitHandleTest, WaitAllSameHandle) {
-  ManualResetEvent fence;
-  WaitHandle wh = fence.OnSet();
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAll({&wh, &wh}, InfinitePast())));
-  IREE_ASSERT_OK(fence.Set());
-  IREE_ASSERT_OK(WaitHandle::WaitAll({&wh, &wh}));
-}
-
-// Tests WaitAll when a wait handle fails.
-TEST(WaitHandleTest, WaitAllFailure) {
-  WaitHandle good_wh;
-  // Create a purposefully bad handle to induce an error.
-  WaitHandle bad_wh = WaitHandle::AlwaysFailing();
-  // Should fail with some posixy error.
-  ASSERT_FALSE(WaitHandle::WaitAll({&good_wh, &bad_wh}).ok());
-}
-
-// Tests using WaitAny with no valid handles. This should no-op.
-TEST(WaitHandleTest, WaitAnyNop) {
-  ASSERT_TRUE(IsInvalidArgument(WaitHandle::WaitAny({}).status()));
-  IREE_ASSERT_OK_AND_ASSIGN(int index, WaitHandle::WaitAny({nullptr}));
-  ASSERT_EQ(0, index);
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::WaitAny({nullptr, nullptr}));
-  ASSERT_EQ(0, index);
-}
-
-// Tests polling with WaitAny with multiple wait handles.
-TEST(WaitHandleTest, WaitAnyPoll) {
-  ManualResetEvent fence0;
-  WaitHandle wh0 = fence0.OnSet();
-  ManualResetEvent fence1;
-  WaitHandle wh1 = fence1.OnSet();
-
-  // Poll; should return immediately with timeout.
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()).status()));
-
-  // Notify fence1.
-  IREE_ASSERT_OK(fence1.Set());
-
-  // Poll; should return immediately with fence1 signaled.
-  IREE_ASSERT_OK_AND_ASSIGN(int index,
-                            WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()));
-  EXPECT_EQ(1, index);
-
-  // Notify fence0.
-  IREE_ASSERT_OK(fence0.Set());
-
-  // Poll again; should return immediately; which one is signaled is undefined.
-  IREE_ASSERT_OK_AND_ASSIGN(index,
-                            WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()));
-  ASSERT_TRUE(index == 0 || index == 1);
-}
-
-// Tests exceeding the timeout deadline with WaitAny.
-TEST(WaitHandleTest, WaitAnyTimeout) {
-  ManualResetEvent fence0;
-  WaitHandle wh0 = fence0.OnSet();
-  ManualResetEvent fence1;
-  WaitHandle wh1 = fence1.OnSet();
-
-  // Wait with timeout on the unsignaled fences:
-  // Via polling (should never block):
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()).status()));
-  IREE_ASSERT_OK_AND_ASSIGN(int index, WaitHandle::TryWaitAny({&wh0, &wh1}));
-  ASSERT_EQ(-1, index);
-  // Via time in the near future (should block):
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh0, &wh1}, Milliseconds(250)).status()));
-
-  // Notify one of the fences. Should return immediately.
-  IREE_ASSERT_OK(fence1.Set());
-  IREE_ASSERT_OK_AND_ASSIGN(index,
-                            WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()));
-  ASSERT_EQ(1, index);
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::TryWaitAny({&wh0, &wh1}));
-  ASSERT_EQ(1, index);
-  IREE_ASSERT_OK_AND_ASSIGN(
-      index, WaitHandle::WaitAny({&wh0, &wh1}, Milliseconds(250)));
-  ASSERT_EQ(1, index);
-
-  // The unnotified fence should still timeout.
-  ASSERT_TRUE(
-      IsDeadlineExceeded(WaitHandle::WaitAny({&wh0}, InfinitePast()).status()));
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::TryWaitAny({&wh0}));
-  ASSERT_EQ(-1, index);
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh0}, Milliseconds(250)).status()));
-
-  // Notify last fence and ensure complete.
-  IREE_ASSERT_OK(fence0.Set());
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::WaitAny({&wh0}, InfinitePast()));
-  ASSERT_EQ(0, index);
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::TryWaitAny({&wh0}));
-  ASSERT_EQ(0, index);
-  IREE_ASSERT_OK_AND_ASSIGN(index,
-                            WaitHandle::WaitAny({&wh0}, Milliseconds(250)));
-  ASSERT_EQ(0, index);
-}
-
-// Tests using WaitAny to wait on other threads.
-TEST(WaitHandleTest, WaitAnyThreaded) {
-  // Spin up two threads.
-  // t1 will wait on t0 such that they will act in sequence.
-  ManualResetEvent fence0;
-  std::thread t0{[&]() {
-    ::usleep(absl::ToInt64Microseconds(Milliseconds(250)));
-    IREE_ASSERT_OK(fence0.Set());
-  }};
-  ManualResetEvent fence1;
-  std::thread t1{[&]() {
-    IREE_ASSERT_OK(fence0.OnSet().Wait());
-    ::usleep(absl::ToInt64Microseconds(Milliseconds(250)));
-    IREE_ASSERT_OK(fence1.Set());
-  }};
-
-  // Wait on both threads. We expect 0 to complete first.
-  WaitHandle wh0 = fence0.OnSet();
-  WaitHandle wh1 = fence1.OnSet();
-  IREE_ASSERT_OK_AND_ASSIGN(int index, WaitHandle::WaitAny({&wh0, &wh1}));
-  ASSERT_EQ(0, index);
-
-  // Now wait for thread 1.
-  IREE_ASSERT_OK_AND_ASSIGN(index, WaitHandle::WaitAny({&wh1}));
-  ASSERT_EQ(0, index);
-
-  t0.join();
-  t1.join();
-}
-
-// Tests using WaitAny with multiple wait handles from the same fence.
-TEST(WaitHandleTest, WaitAnySameSource) {
-  ManualResetEvent fence;
-  WaitHandle wh0 = fence.OnSet();
-  WaitHandle wh1 = fence.OnSet();
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh0, &wh1}, InfinitePast()).status()));
-  IREE_ASSERT_OK(fence.Set());
-  IREE_ASSERT_OK_AND_ASSIGN(int index, WaitHandle::WaitAny({&wh0, &wh1}));
-  ASSERT_TRUE(index == 0 || index == 1);
-}
-
-// Tests using WaitAny with literally the same wait handles.
-TEST(WaitHandleTest, WaitAnySameHandle) {
-  ManualResetEvent fence;
-  WaitHandle wh = fence.OnSet();
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAny({&wh, &wh}, InfinitePast()).status()));
-  IREE_ASSERT_OK(fence.Set());
-  IREE_ASSERT_OK_AND_ASSIGN(int index, WaitHandle::WaitAny({&wh, &wh}));
-  ASSERT_TRUE(index == 0 || index == 1);
-}
-
-// Tests WaitAny when a wait handle fails.
-TEST(WaitHandleTest, WaitAnyFailure) {
-  WaitHandle good_wh;
-  // Create a purposefully bad handle to induce an error.
-  WaitHandle bad_wh = WaitHandle::AlwaysFailing();
-  // Should fail with some posixy error.
-  ASSERT_FALSE(WaitHandle::WaitAny({&good_wh, &bad_wh}).ok());
-}
-
-// ManualResetEvent with innards exposed. Meh.
-class ExposedManualResetEvent : public ManualResetEvent {
- public:
-  using ManualResetEvent::AcquireFdForWait;
-  using ManualResetEvent::TryResolveWakeOnFd;
-};
-
-// Mock type for the WaitableObject methods.
-class MockWaitableObject : public ::testing::StrictMock<WaitableObject> {
- public:
-  MockWaitableObject() : ::testing::StrictMock<WaitableObject>() {}
-
-  MOCK_METHOD(std::string, DebugString, (), (const, override));
-  MOCK_METHOD((StatusOr<std::pair<FdType, int>>), AcquireFdForWait,
-              (Time deadline_ns), (override));
-  MOCK_METHOD(StatusOr<bool>, TryResolveWakeOnFd, (int fd), (override));
-
-  WaitHandle OnSomething() { return WaitHandle(add_ref(this)); }
-};
-
-// Tests normal AcquireFdForWait + TryResolveWakeOnFd use.
-TEST(WaitableObjectTest, AcquireAndResolve) {
-  MockWaitableObject mwo;
-  WaitHandle wh = mwo.OnSomething();
-
-  // Use a MRE for testing, as we can just use its fd.
-  ExposedManualResetEvent mre;
-
-  // Try waiting; we should see the AcquireFdForWait and then return because
-  // the fd has not been resolved.
-  EXPECT_CALL(mwo, AcquireFdForWait(_)).WillOnce([&](Time deadline_ns) {
-    // Return the valid FD from the MRE.
-    return mre.AcquireFdForWait(deadline);
+    // Notify the caller thread.
+    iree_event_set(&thread_to_main);
   });
-  ASSERT_STATUSOR_FALSE(wh.TryWait());
 
-  // Signal the MRE.
-  IREE_ASSERT_OK(mre.Set());
+  // The thread may take some time to spin up; it must wait for us to allow it
+  // to run its body though so we should be fine here.
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  ASSERT_FALSE(did_run_thread);
 
-  // Try waiting again; we should get the AcquireFdForWait and then also get
-  // the TryResolveWakeOnFd.
-  EXPECT_CALL(mwo, AcquireFdForWait(_)).WillOnce([&](Time deadline_ns) {
-    // Return the valid (and now signaled) FD from the MRE.
-    return mre.AcquireFdForWait(deadline);
+  // Allow the thread to continue and wait for it to exit.
+  iree_event_set(&main_to_thread);
+  IREE_ASSERT_OK(iree_wait_one(&thread_to_main, IREE_TIME_INFINITE_FUTURE));
+  ASSERT_TRUE(did_run_thread);
+
+  thread.join();
+  iree_event_deinitialize(&main_to_thread);
+  iree_event_deinitialize(&thread_to_main);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_wait_set_t
+//===----------------------------------------------------------------------===//
+
+// Tests basic usage of the wait set API without waiting.
+TEST(WaitSet, Lifetime) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
+
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, event));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, event));
+  iree_wait_set_erase(wait_set, event);
+  iree_wait_set_clear(wait_set);
+  iree_wait_set_free(wait_set);
+
+  iree_event_deinitialize(&event);
+}
+
+TEST(WaitSet, UnreasonableCapacity) {
+  iree_wait_set_t* wait_set = NULL;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_wait_set_allocate(1 * 1024 * 1024, iree_allocator_system(),
+                             &wait_set));
+}
+
+// Tests that inserting the same handles multiple times is tracked correctly.
+TEST(WaitSet, Deduplication) {
+  iree_event_t ev_unset, ev_dupe;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_dupe));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // We want to test for duplication on ev_dupe here so ensure it's added.
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+
+  // Wait should succeed immediately because ev_dupe is set (and our wake handle
+  // should be ev_dupe).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0,
+            memcmp(&ev_dupe.value, &wake_handle.value, sizeof(ev_dupe.value)));
+
+  // Erase the events one at a time and ensure we still get the expected number
+  // of waits on ev_dupe.
+  iree_wait_set_erase(wait_set, wake_handle);
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0,
+            memcmp(&ev_dupe.value, &wake_handle.value, sizeof(ev_dupe.value)));
+  iree_wait_set_erase(wait_set, wake_handle);
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0,
+            memcmp(&ev_dupe.value, &wake_handle.value, sizeof(ev_dupe.value)));
+  iree_wait_set_erase(wait_set, wake_handle);
+
+  // Now there should just be ev_unset present in the set and a poll will fail.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_dupe);
+}
+
+// Tests that clear handles things right in the face of dupes.
+TEST(WaitSet, Clear) {
+  iree_event_t ev_unset, ev_dupe;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_dupe));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // We want to test for duplication o n ev_dupe here.
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_dupe));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+
+  // Wait should succeed immediately because ev_dupe is set (and our wake handle
+  // should be ev_dupe).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0,
+            memcmp(&ev_dupe.value, &wake_handle.value, sizeof(ev_dupe.value)));
+
+  // Erase all events from the set.
+  iree_wait_set_clear(wait_set);
+
+  // No more events remaining; should pass immediately.
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_dupe);
+}
+
+// Tests iree_wait_all when polling (deadline_ns = IREE_TIME_INFINITE_PAST).
+TEST(WaitSet, WaitAllPolling) {
+  iree_event_t ev_unset_0, ev_unset_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  iree_event_t ev_set_0, ev_set_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // Polls when empty should never block.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_all(wait_set, IREE_TIME_INFINITE_PAST));
+
+  // Polls with only unset handles should never block.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_all(wait_set, IREE_TIME_INFINITE_PAST));
+
+  // Polls with only set handles should return immediately.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(iree_wait_all(wait_set, IREE_TIME_INFINITE_PAST));
+
+  // Polls with mixed set/unset should never succeed.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_all(wait_set, IREE_TIME_INFINITE_PAST));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
+  iree_event_deinitialize(&ev_set_0);
+  iree_event_deinitialize(&ev_set_1);
+}
+
+// Tests iree_wait_all with timeouts (deadline_ns = non-zero).
+TEST(WaitSet, WaitAllTimeout) {
+  iree_event_t ev_unset_0, ev_unset_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  iree_event_t ev_set_0, ev_set_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // Timeouts when empty should never block.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_all(wait_set, iree_time_now() + kShortTimeoutNS));
+
+  // Timeouts with only unset handles should block (and then expire).
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  constexpr iree_duration_t kShortTimeoutNS = 1000000ull;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_all(wait_set, iree_time_now() + kShortTimeoutNS));
+
+  // Timeouts with only set handles should return immediately.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(iree_wait_all(wait_set, iree_time_now() + kShortTimeoutNS));
+
+  // Timeouts with mixed set/unset should never succeed.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_all(wait_set, iree_time_now() + kShortTimeoutNS));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
+  iree_event_deinitialize(&ev_set_0);
+  iree_event_deinitialize(&ev_set_1);
+}
+
+// Tests iree_wait_all when blocking (deadline_ns = IREE_TIME_INFINITE_FUTURE).
+TEST(WaitSet, WaitAllBlocking) {
+  iree_event_t thread_to_main;
+  IREE_ASSERT_OK(
+      iree_event_initialize(/*initial_state=*/false, &thread_to_main));
+  iree_event_t ev_set_0, ev_set_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // Throw in some other set handles so that we are multi-waiting for just the
+  // thread_to_main event to be set.
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+
+  // Wait forever (no timeout).
+  // We approximate that by forking off a thread to signal our local event. We
+  // can assume that a moderate wait is enough to verify the forever behavior as
+  // otherwise we are probably just messing up the math and will timeout.
+  std::thread thread([&]() {
+    // Notify the caller thread after sleeping (to ensure it's not polling).
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    iree_event_set(&thread_to_main);
   });
-  EXPECT_CALL(mwo, TryResolveWakeOnFd(_)).WillOnce(Return(true));
-  ASSERT_STATUSOR_TRUE(wh.TryWait());
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, thread_to_main));
+  IREE_ASSERT_OK(iree_wait_all(wait_set, IREE_TIME_INFINITE_FUTURE));
+
+  thread.join();
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&thread_to_main);
+  iree_event_deinitialize(&ev_set_0);
+  iree_event_deinitialize(&ev_set_1);
 }
 
-// Tests timing out in AcquireFdForWait.
-TEST(WaitableObjectTest, AcquireFdForWaitTimeout) {
-  ManualResetEvent mre;
-  WaitHandle always_wait = mre.OnSet();
-  WaitHandle always_signal = WaitHandle::AlwaysSignaling();
-  MockWaitableObject mwo;
-  WaitHandle wh = mwo.OnSomething();
+// Tests iree_wait_all when one or more handles are duplicated.
+TEST(WaitSet, WaitAllDuplicates) {
+  iree_event_t ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
 
-  // Make the AcquireFdForWait take longer than the timeout. We should hit
-  // deadline exceeded even though always_wait hasn't be signaled.
-  EXPECT_CALL(mwo, AcquireFdForWait(_)).WillOnce([](Time deadline_ns) {
-    ::usleep(absl::ToInt64Microseconds(Milliseconds(10)));
-    return std::make_pair(WaitableObject::FdType::kPermanent,
-                          WaitableObject::kInvalidFd);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+
+  // Wait should succeed immediately because ev_set is set.
+  IREE_ASSERT_OK(iree_wait_all(wait_set, IREE_TIME_INFINITE_PAST));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_set);
+}
+
+// Tests iree_wait_any; note that this is only focused on testing the wait.
+TEST(WaitSet, WaitAny) {
+  iree_event_t ev_unset, ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+
+  // Wait should succeed immediately because ev_set is set (and our wake handle
+  // should be ev_set).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&ev_set.value, &wake_handle.value, sizeof(ev_set.value)));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_set);
+}
+
+// Tests iree_wait_any when polling (deadline_ns = IREE_TIME_INFINITE_PAST).
+TEST(WaitSet, WaitAnyPolling) {
+  iree_event_t ev_unset_0, ev_unset_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  iree_event_t ev_set_0, ev_set_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  iree_wait_handle_t empty_handle;
+  memset(&empty_handle, 0, sizeof(empty_handle));
+
+  // Polls when empty should never block and return an empty wake handle.
+  // This is so that if the caller touches the wake_handle they at least have
+  // initialized memory.
+  iree_wait_set_clear(wait_set);
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&empty_handle, &wake_handle, sizeof(empty_handle)));
+
+  // Polls with only unset handles should never block.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&empty_handle, &wake_handle, sizeof(empty_handle)));
+
+  // Polls with only set handles should return immediately.
+  // Note that which handle is returned is not specified.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_TRUE(
+      0 ==
+          memcmp(&ev_set_0.value, &wake_handle.value, sizeof(ev_set_0.value)) ||
+      0 == memcmp(&ev_set_1.value, &wake_handle.value, sizeof(ev_set_1.value)));
+
+  // Polls with mixed set/unset should return immediately.
+  // Note that which handle is returned is not specified but we know it should
+  // at least be one of the signaled ones.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_TRUE(
+      0 ==
+          memcmp(&ev_set_0.value, &wake_handle.value, sizeof(ev_set_0.value)) ||
+      0 == memcmp(&ev_set_1.value, &wake_handle.value, sizeof(ev_set_1.value)));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
+  iree_event_deinitialize(&ev_set_0);
+  iree_event_deinitialize(&ev_set_1);
+}
+
+// Tests iree_wait_any with timeouts (deadline_ns = non-zero).
+TEST(WaitSet, WaitAnyTimeout) {
+  iree_event_t ev_unset_0, ev_unset_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  iree_event_t ev_set_0, ev_set_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  iree_wait_handle_t empty_handle;
+  memset(&empty_handle, 0, sizeof(empty_handle));
+
+  // Timeouts when empty should never block.
+  iree_wait_set_clear(wait_set);
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, iree_time_now() + kShortTimeoutNS, &wake_handle));
+  EXPECT_EQ(0, memcmp(&empty_handle, &wake_handle, sizeof(empty_handle)));
+
+  // Timeouts with only unset handles should block (and then expire).
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  constexpr iree_duration_t kShortTimeoutNS = 1000000ull;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, iree_time_now() + kShortTimeoutNS, &wake_handle));
+  EXPECT_EQ(0, memcmp(&empty_handle, &wake_handle, sizeof(empty_handle)));
+
+  // Timeouts with only set handles should return immediately and have one of
+  // the set handles as the wake handle.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, iree_time_now() + kShortTimeoutNS, &wake_handle));
+  EXPECT_TRUE(
+      0 ==
+          memcmp(&ev_set_0.value, &wake_handle.value, sizeof(ev_set_0.value)) ||
+      0 == memcmp(&ev_set_1.value, &wake_handle.value, sizeof(ev_set_1.value)));
+
+  // Timeouts with mixed set/unset should return immediately and have one of the
+  // set handles as the wake handle.
+  iree_wait_set_clear(wait_set);
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set_1));
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, iree_time_now() + kShortTimeoutNS, &wake_handle));
+  EXPECT_TRUE(
+      0 ==
+          memcmp(&ev_set_0.value, &wake_handle.value, sizeof(ev_set_0.value)) ||
+      0 == memcmp(&ev_set_1.value, &wake_handle.value, sizeof(ev_set_1.value)));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
+  iree_event_deinitialize(&ev_set_0);
+  iree_event_deinitialize(&ev_set_1);
+}
+
+// Tests iree_wait_any when blocking (deadline_ns = IREE_TIME_INFINITE_FUTURE).
+TEST(WaitSet, WaitAnyBlocking) {
+  iree_event_t thread_to_main;
+  IREE_ASSERT_OK(
+      iree_event_initialize(/*initial_state=*/false, &thread_to_main));
+  iree_event_t ev_unset_0, ev_unset_1;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  // Throw in some unset handles so that we are multi-waiting for just the
+  // thread_to_main event to be set.
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+
+  // Wait forever (no timeout).
+  // We approximate that by forking off a thread to signal our local event. We
+  // can assume that a moderate wait is enough to verify the forever behavior as
+  // otherwise we are probably just messing up the math and will timeout.
+  std::thread thread([&]() {
+    // Notify the caller thread after sleeping (to ensure it's not polling).
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    iree_event_set(&thread_to_main);
   });
-  ASSERT_TRUE(IsDeadlineExceeded(
-      WaitHandle::WaitAll({&wh, &always_signal}, Now() - Milliseconds(250))));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, thread_to_main));
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_FUTURE, &wake_handle));
+  EXPECT_EQ(0, memcmp(&thread_to_main.value, &wake_handle.value,
+                      sizeof(thread_to_main.value)));
+
+  thread.join();
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&thread_to_main);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
 }
 
-// Tests TryResolveWakeOnFd when a handle is a permanent kSignaledFd.
-TEST(WaitableObjectTest, SignaledFd) {
-  MockWaitableObject mwo;
-  WaitHandle wh = mwo.OnSomething();
+// Tests that an iree_wait_any followed by an iree_wait_set_erase properly
+// chooses the right handle to erase.
+TEST(WaitSet, WaitAnyErase) {
+  iree_event_t ev_unset_0, ev_unset_1;
+  iree_event_t ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_0));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
 
-  // Return the kSignaledFd handle and expect that we still get our notify call.
-  // We can do this multiple times.
-  for (int i = 0; i < 4; ++i) {
-    EXPECT_CALL(mwo, AcquireFdForWait(_))
-        .WillOnce(Return(std::make_pair(WaitableObject::FdType::kPermanent,
-                                        WaitableObject::kSignaledFd)));
-    EXPECT_CALL(mwo, TryResolveWakeOnFd(WaitableObject::kSignaledFd))
-        .WillOnce(Return(true));
-    ASSERT_STATUSOR_TRUE(wh.TryWait());
-  }
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_1));
+
+  // Wait should succeed immediately because ev_set is set (and our wake handle
+  // should be ev_set).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&ev_set.value, &wake_handle.value, sizeof(ev_set.value)));
+
+  // Erase the woken handle.
+  // NOTE: to get the behavior we want to test we must pass wake_handle here and
+  // not the ev_set value.
+  iree_wait_set_erase(wait_set, wake_handle);
+
+  // Try to wait again; this time we should timeout because only ev_unset_*
+  // remains in the set.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset_0);
+  iree_event_deinitialize(&ev_unset_1);
+  iree_event_deinitialize(&ev_set);
 }
 
-// Tests that waiting will not resolve if TryResolveWakeOnFd returns false.
-TEST(WaitableObjectTest, UnresolvedWake) {
-  MockWaitableObject mwo;
-  WaitHandle wh = mwo.OnSomething();
+// Tests that an iree_wait_any followed by an iree_wait_set_erase properly
+// chooses the right handle to erase (the tail one).
+TEST(WaitSet, WaitAnyEraseTail) {
+  iree_event_t ev_unset, ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
 
-  // Fail to resolve the first time.
-  // Since we are only trying to wait it should bail.
-  EXPECT_CALL(mwo, AcquireFdForWait(_))
-      .WillOnce(Return(std::make_pair(WaitableObject::FdType::kPermanent,
-                                      WaitableObject::kSignaledFd)));
-  EXPECT_CALL(mwo, TryResolveWakeOnFd(WaitableObject::kSignaledFd))
-      .WillOnce(Return(false));
-  ASSERT_STATUSOR_FALSE(wh.TryWait());
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
 
-  // Resolve on the next try.
-  EXPECT_CALL(mwo, AcquireFdForWait(_))
-      .WillOnce(Return(std::make_pair(WaitableObject::FdType::kPermanent,
-                                      WaitableObject::kSignaledFd)));
-  EXPECT_CALL(mwo, TryResolveWakeOnFd(WaitableObject::kSignaledFd))
-      .WillOnce(Return(true));
-  ASSERT_STATUSOR_TRUE(wh.TryWait());
+  // Wait should succeed immediately because ev_set is set (and our wake handle
+  // should be ev_set).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&ev_set.value, &wake_handle.value, sizeof(ev_set.value)));
+
+  // Erase the woken handle.
+  // NOTE: to get the behavior we want to test we must pass wake_handle here and
+  // not the ev_set value.
+  iree_wait_set_erase(wait_set, wake_handle);
+
+  // Try to wait again; this time we should timeout because only ev_unset
+  // remains in the set.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_set);
 }
 
-// Tests the normal lifecycle of a ManualResetEvent.
-TEST(ManualResetEventTest, Lifecycle) {
-  ManualResetEvent ev;
-  EXPECT_FALSE(ev.DebugString().empty());
-  WaitHandle wh0 = ev.OnSet();
-  EXPECT_EQ(ev.DebugString(), wh0.DebugString());
-  WaitHandle wh1 = ev.OnSet();
-  EXPECT_EQ(ev.DebugString(), wh1.DebugString());
-  // Should not be set.
-  ASSERT_STATUSOR_FALSE(wh0.TryWait());
-  ASSERT_STATUSOR_FALSE(wh1.TryWait());
-  // Set should be sticky.
-  IREE_ASSERT_OK(ev.Set());
-  ASSERT_STATUSOR_TRUE(wh0.TryWait());
-  ASSERT_STATUSOR_TRUE(wh1.TryWait());
-  // Reset should clear.
-  IREE_ASSERT_OK(ev.Reset());
-  ASSERT_STATUSOR_FALSE(wh0.TryWait());
-  ASSERT_STATUSOR_FALSE(wh1.TryWait());
-  // Setting again should enable the previous WaitHandles to be signaled.
-  IREE_ASSERT_OK(ev.Set());
-  ASSERT_STATUSOR_TRUE(wh0.TryWait());
-  ASSERT_STATUSOR_TRUE(wh1.TryWait());
+// Tests that an iree_wait_any followed by an iree_wait_set_erase without using
+// the wake_handle still erases the correct handle.
+TEST(WaitSet, WaitAnyEraseSplit) {
+  iree_event_t ev_unset, ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+  iree_wait_set_t* wait_set = NULL;
+  IREE_ASSERT_OK(
+      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
+  IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
+
+  // Wait should succeed immediately because ev_set is set (and our wake handle
+  // should be ev_set).
+  iree_wait_handle_t wake_handle;
+  IREE_ASSERT_OK(
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+  EXPECT_EQ(0, memcmp(&ev_set.value, &wake_handle.value, sizeof(ev_set.value)));
+
+  // Erase the woken handle *WITHOUT* using the wake_handle.
+  iree_wait_set_erase(wait_set, ev_set);
+
+  // Try to wait again; this time we should timeout because only ev_unset
+  // remains in the set.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_any(wait_set, IREE_TIME_INFINITE_PAST, &wake_handle));
+
+  iree_wait_set_free(wait_set);
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_set);
 }
 
-// Tests moving ManualResetEvents around.
-TEST(ManualResetEventTest, Move) {
-  ManualResetEvent ev0;
-  WaitHandle wh = ev0.OnSet();
-  ManualResetEvent ev1{std::move(ev0)};
-  ManualResetEvent ev2 = std::move(ev1);
-  ev1 = std::move(ev2);
-  IREE_ASSERT_OK(ev1.Set());
-  ASSERT_STATUSOR_TRUE(wh.TryWait());
+// Tests iree_wait_one when polling (deadline_ns = IREE_TIME_INFINITE_PAST).
+TEST(WaitSet, WaitOnePolling) {
+  iree_event_t ev_unset, ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+
+  // Polling (don't block even if unset).
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_wait_one(&ev_unset, IREE_TIME_INFINITE_PAST));
+  IREE_ASSERT_OK(iree_wait_one(&ev_set, IREE_TIME_INFINITE_PAST));
+
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_set);
 }
 
-// Tests redundantly setting and resetting ManualResetEvents.
-TEST(ManualResetEventTest, RedundantUse) {
-  ManualResetEvent ev;
-  IREE_ASSERT_OK(ev.Reset());
-  IREE_ASSERT_OK(ev.Reset());
-  ASSERT_FALSE(ev.OnSet().TryWait().value());
-  IREE_ASSERT_OK(ev.Set());
-  IREE_ASSERT_OK(ev.Set());
-  ASSERT_TRUE(ev.OnSet().TryWait().value());
-  IREE_ASSERT_OK(ev.Reset());
-  ASSERT_FALSE(ev.OnSet().TryWait().value());
+// Tests iree_wait_one with timeouts (deadline_ns = non-zero).
+TEST(WaitSet, WaitOneTimeout) {
+  iree_event_t ev_unset, ev_set;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset));
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
+
+  // Force a timeout by waiting on an event that'll never get set.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_one(&ev_unset, iree_time_now() + kShortTimeoutNS));
+
+  // Ensure we return immediately when waiting on a set value (and not wait
+  // 100 years because we messed up our math).
+  IREE_ASSERT_OK(iree_wait_one(&ev_set, iree_time_now() + kLongTimeoutNS));
+
+  iree_event_deinitialize(&ev_unset);
+  iree_event_deinitialize(&ev_set);
 }
 
-// Tests waiting on an initially-set ManualResetEvent;
-TEST(ManualResetEventTest, SetThenWait) {
-  ManualResetEvent ev;
-  IREE_ASSERT_OK(ev.Set());
-  ASSERT_TRUE(ev.OnSet().TryWait().value());
-}
+// Tests iree_wait_one when blocking (deadline_ns = IREE_TIME_INFINITE_FUTURE).
+TEST(WaitSet, WaitOneBlocking) {
+  iree_event_t thread_to_main;
+  IREE_ASSERT_OK(
+      iree_event_initialize(/*initial_state=*/false, &thread_to_main));
 
-// Tests that dangling an event will not wake waiters.
-// This is intentional (for now); we could with a bit of wrangling make it so
-// that WaitableObjects tracked their waiters and ensured they were all cleaned
-// up, but that seems hard. Don't drop your objects.
-TEST(ManualResetEventTest, NeverSet) {
-  ManualResetEvent ev;
-  WaitHandle wh = ev.OnSet();
-  ASSERT_STATUSOR_FALSE(wh.TryWait());
-  // Kill event to unblock waiters.
-  ev = ManualResetEvent();
-  // Waiter should not have woken.
-  ASSERT_STATUSOR_FALSE(wh.TryWait());
+  // Wait forever (no timeout).
+  // We approximate that by forking off a thread to signal our local event. We
+  // can assume that a moderate wait is enough to verify the forever behavior as
+  // otherwise we are probably just messing up the math and will timeout.
+  std::thread thread([&]() {
+    // Notify the caller thread after sleeping (to ensure it's not polling).
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    iree_event_set(&thread_to_main);
+  });
+  IREE_ASSERT_OK(iree_wait_one(&thread_to_main, IREE_TIME_INFINITE_FUTURE));
+
+  thread.join();
+  iree_event_deinitialize(&thread_to_main);
 }
 
 }  // namespace

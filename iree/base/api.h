@@ -788,6 +788,12 @@ IREE_API_EXPORT iree_time_t iree_time_now();
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 
+// Converts an absolute deadline time to a relative timeout duration.
+// This handles the special cases of IREE_TIME_INFINITE_PAST and
+// IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
+IREE_API_EXPORT iree_duration_t
+iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
+
 //===----------------------------------------------------------------------===//
 // iree_allocator_t (std::allocator-like interface)
 //===----------------------------------------------------------------------===//

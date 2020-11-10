@@ -534,34 +534,34 @@ cc_library(
     ],
 )
 
-# Dependent code has been removed and wait_handle is currently incompatible
-# with Windows, so excluding entirely.
-# See google/iree/65
-# cc_library(
-#     name = "wait_handle",
-#     srcs = ["wait_handle.cc"],
-#     hdrs = ["wait_handle.h"],
-#     deps = [
-#         ":logging",
-#         ":ref_ptr",
-#         ":status",
-#         ":time",
-#         "@com_google_absl//absl/base:core_headers",
-#         "@com_google_absl//absl/container:fixed_array",
-#         "@com_google_absl//absl/strings",
-#         "@com_google_absl//absl/time",
-#         "@com_google_absl//absl/types:span",
-#     ],
-# )
+cc_library(
+    name = "wait_handle",
+    srcs = [
+        "wait_handle.c",
+        "wait_handle_epoll.c",
+        "wait_handle_kqueue.c",
+        "wait_handle_poll.c",
+        "wait_handle_posix.c",
+        "wait_handle_posix.h",
+        "wait_handle_win32.c",
+    ],
+    hdrs = ["wait_handle.h"],
+    copts = [
+        "-D_GNU_SOURCE=1",
+    ],
+    deps = [
+        ":api",
+        ":target_platform",
+        ":tracing",
+    ],
+)
 
-# cc_test(
-#     name = "wait_handle_test",
-#     srcs = ["wait_handle_test.cc"],
-#     deps = [
-#         ":status",
-#         ":wait_handle",
-#         "@com_google_absl//absl/time",
-#         "//iree/testing:gtest",
-#         "//iree/testing:gtest_main",
-#     ],
-# )
+cc_test(
+    name = "wait_handle_test",
+    srcs = ["wait_handle_test.cc"],
+    deps = [
+        ":wait_handle",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
