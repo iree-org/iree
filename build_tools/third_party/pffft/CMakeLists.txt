@@ -25,8 +25,6 @@ external_cc_library(
     "src/pffft.c"
   HDRS
     "src/pffft.h"
-  INCLUDES
-    "${PFFFT_ROOT}/src"
 )
 
 external_cc_library(
@@ -37,11 +35,9 @@ external_cc_library(
   ROOT
     ${PFFFT_ROOT}
   SRCS
-    "src/fftpack.c"
+    "fftpack.c"
   HDRS
-    "src/fftpack.h"
-  INCLUDES
-    "${PFFFT_ROOT}/src"
+    "fftpack.h"
 )
 
 external_cc_library(
@@ -52,7 +48,7 @@ external_cc_library(
   ROOT
     ${PFFFT_ROOT}
   SRCS
-    "src/test_pffft.c"
+    "test_pffft.c"
   DEPS
     pffft::fftpack
     pffft::pffft

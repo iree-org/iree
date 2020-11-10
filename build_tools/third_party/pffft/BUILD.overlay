@@ -7,13 +7,10 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "pffft",
     srcs = [
-        "src/pffft.c",
+        "pffft.c",
     ],
     hdrs = [
-        "src/pffft.h",
-    ],
-    includes = [
-        "src",
+        "pffft.h",
     ],
 )
 
@@ -21,13 +18,10 @@ cc_library(
     name = "fftpack",
     testonly = 1,
     srcs = [
-        "src/fftpack.c",
+        "fftpack.c",
     ],
     hdrs = [
-        "src/fftpack.h",
-    ],
-    includes = [
-        "src",
+        "fftpack.h",
     ],
     visibility = ["//visibility:private"],
 )
@@ -36,7 +30,7 @@ cc_binary(
     name = "pffft_test",
     testonly = 1,
     srcs = [
-        "src/test_pffft.c",
+        "test_pffft.c",
     ],
     deps = [
         ":fftpack",
