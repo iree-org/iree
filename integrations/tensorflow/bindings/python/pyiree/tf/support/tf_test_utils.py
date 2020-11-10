@@ -693,6 +693,73 @@ def compile_tf_signature_def_saved_model(
   return _global_modules
 
 
+def tf_function_unittest(
+    input_generator: tf_utils.InputGeneratorType = tf_utils.uniform,
+    atol: float = None,
+    rtol: float = None,
+    name: str = None,
+    **tf_function_kwargs):
+  """Creates a tf.function that can be used to generate unittests.
+
+  Args:
+    input_generator:
+      an optional callable taking a shape and dtype that returns input data for
+      the unittest.
+    atol:
+      optional, the absolute tolerance to use when comparing the decorated
+      function's output.
+    rtol:
+      optional, the relative tolerance to use when comparing the decorated
+      function's output.
+    name:
+      optional, the name to reference this function with. Must be used if
+      decorating a lambda.
+
+  Returns:
+    A tf.function with the additional attributes 'input_generator' (from above)
+    'trace_kwargs' (from 'atol' and 'rtol' above), and with an updated
+    __name__ attribute if 'name' was specified.
+  """
+
+  def _store_unittest_info(function):
+    function = tf.function(**tf_function_kwargs)(function)
+    function.input_generator = lambda: tf_utils.generate_inputs(
+        function.input_signature, input_generator)
+    function.trace_kwargs = dict(atol=atol, rtol=rtol)
+
+    if name is not None:
+      function.__name__ = name
+    elif function.__name__ == "<lambda>":
+      raise ValueError("The 'name' kwarg must be provided when decorating a "
+                       "lambda function.")
+    return function
+
+  return _store_unittest_info
+
+
+class TestModule(tf.Module):
+  """Thin wrapper of tf.Module with helper methods for tf_function_unittests."""
+
+  @classmethod
+  def get_tf_function_unittests(cls):
+    """Get all tf_function_unittest-created tf.functions on the class."""
+    tf_function_unittests = []
+    for name in dir(cls):
+      value = getattr(cls, name)
+      if hasattr(value, 'input_generator'):
+        tf_function_unittests.append(value)
+
+    if not len(tf_function_unittests):
+      raise ValueError(
+          "'get_tf_function_unittests' was called but no unittests were found.")
+    return tf_function_unittests
+
+  @classmethod
+  def get_exported_names(cls):
+    """Get the names of all tf_function_unittest-created tf.functions"""
+    return [function.__name__ for function in cls.get_tf_function_unittests()]
+
+
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
 
@@ -702,6 +769,33 @@ class TracedModuleTestCase(tf.test.TestCase):
     self._modules.ref_module.reinitialize()
     for module in self._modules.tar_modules:
       module.reinitialize()
+
+  @classmethod
+  def generate_unittests(cls, module_class: Type[TestModule]):
+    """Generates unittests for each 'tf_function_unittest' on 'module_class'."""
+    for function in module_class.get_tf_function_unittests():
+      # We have to pass the closure argument 'funcion' to 'trace' via a kwarg
+      # instead of using it directly in the body because 'function' is
+      # overwritten in each iteration of this loop, and python will only use
+      # the most recent version of 'function'. If we didn't do this, then we
+      # would only test the last function in this loop. The same is true for
+      # passing 'trace' to 'unittest'.
+
+      # Runs the inputs through a (traced) module.
+      def trace(module, function=function):
+        getattr(module, function.__name__)(*function.input_generator(),
+                                           **function.trace_kwargs)
+      trace.__name__ = function.__name__
+
+      # Runs 'trace' on modules compiled to each backend and compares them.
+      def unittest(self, trace=trace):
+        self.compare_backends(trace, self._modules)
+      unittest.__name__ = f"test_{function.__name__}"
+
+      # Make 'unittest' a function on the TracedModuleTestCase, which tells
+      # the test runner to run it.
+      setattr(cls, unittest.__name__, unittest)
+
 
   def compare_backends(self, trace_function: Callable[[TracedModule], None],
                        modules: Modules) -> None:
