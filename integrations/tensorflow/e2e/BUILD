@@ -81,20 +81,17 @@ TFLITE_FAILING = [
 
 # keep sorted
 VMLA_FAILING = [
-    "batch_to_space_nd_test.py",
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
-    "space_to_batch_nd_test.py",
     "strings_test.py",
 ]
 
 # keep sorted
 LLVM_FAILING = [
-    "batch_to_space_nd_test.py",
     "broadcast_to_test.py",
     "broadcasting_test.py",
     "conv_transpose_test.py",
@@ -112,13 +109,11 @@ LLVM_FAILING = [
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "space_to_batch_nd_test.py",
     "strings_test.py",
 ]
 
 # keep sorted
 VULKAN_FAILING = [
-    "batch_to_space_nd_test.py",
     "bool_test.py",
     "broadcast_to_test.py",
     "broadcasting_test.py",
@@ -137,7 +132,6 @@ VULKAN_FAILING = [
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "space_to_batch_nd_test.py",
     "strings_test.py",
 ]
 

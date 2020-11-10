@@ -49,6 +49,9 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     for (auto *op : context->getRegisteredOperations())
       op->getCanonicalizationPatterns(canonicalizePatterns, context);
 
+    // Add TF->TF lowering patterns.
+    TF::PopulateLoweringTFPatterns(context, &canonicalizePatterns);
+
     OwningRewritePatternList patterns;
     // Note that the `OperationConverter` orders patterns lexicographically by:
     // 1) Ascending legalization depth (i.e., minimum number of patterns
@@ -58,9 +61,6 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
 
     // Add TF->HLO legalization patterns.
     PopulateLegalizeTfPatterns(context, &patterns);
-
-    // Add TF->TF lowering patterns.
-    TF::PopulateLoweringTFPatterns(context, &patterns);
 
     // Populate with CHLO->HLO lowerings to account for TF ops legalized to
     // CHLO first.
@@ -86,18 +86,18 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     FrozenRewritePatternList frozenCanonicalizePatterns(
         std::move(canonicalizePatterns));
     while (true) {
+      if (failed(
+              applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {
+        return signalPassFailure();
+      }
+
       if (failed(applyPartialConversion(op, target, frozenPatterns,
                                         &unconvertedOps))) {
         return signalPassFailure();
       }
 
       if (prevUnconvertedOps == unconvertedOps) break;
-
       prevUnconvertedOps = std::move(unconvertedOps);
-      if (failed(
-              applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {
-        return signalPassFailure();
-      }
     }
   }
 
