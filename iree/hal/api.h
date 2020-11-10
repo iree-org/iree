@@ -717,6 +717,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
     iree_hal_buffer_t* buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length);
 
+// Copies data from the provided |source_buffer| into the |target_buffer|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t data_length);
+
 // Maps the buffer to be accessed as a host pointer into |out_mapped_memory|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
