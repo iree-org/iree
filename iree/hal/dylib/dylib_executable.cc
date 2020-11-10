@@ -103,9 +103,7 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  entry_names_.resize(entry_points.size());
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  IREE_TRACE(entry_names_.resize(entry_points.size()));
   for (int i = 0; i < entry_functions_.size(); ++i) {
     void* symbol = executable_library_->GetSymbol(entry_points[i]->c_str());
     if (!symbol) {
@@ -114,9 +112,7 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
     }
     entry_functions_[i] = symbol;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-    entry_names_[i] = entry_points[i]->c_str();
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+    IREE_TRACE(entry_names_[i] = entry_points[i]->c_str());
   }
 
   return OkStatus();
@@ -125,9 +121,7 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
 struct DyLibDispatchState : public HostExecutable::DispatchState {
   DyLibDispatchState() = default;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  const char* entry_name = nullptr;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  IREE_TRACE(const char* entry_name = nullptr);
 
   void* entry_function = nullptr;
   std::array<void*, 32> args;
@@ -144,9 +138,7 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
   }
 
   auto dispatch_state = make_ref<DyLibDispatchState>();
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  dispatch_state->entry_name = entry_names_[params.entry_point];
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  IREE_TRACE(dispatch_state->entry_name = entry_names_[params.entry_point]);
   dispatch_state->entry_function = entry_functions_[params.entry_point];
 
   int binding_count = 0;
