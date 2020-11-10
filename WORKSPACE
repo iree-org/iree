@@ -229,12 +229,6 @@ maybe(
 
 maybe(
     local_repository,
-    name = "spirv_tools",
-    path = "third_party/spirv_tools",
-)
-
-maybe(
-    local_repository,
     name = "spirv_headers",
     path = "third_party/spirv_headers",
 )
