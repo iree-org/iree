@@ -228,19 +228,6 @@ maybe(
 )
 
 maybe(
-    new_local_repository,
-    name = "glslang",
-    build_file = "build_tools/third_party/glslang/BUILD.overlay",
-    path = "third_party/glslang",
-)
-
-maybe(
-    local_repository,
-    name = "spirv_tools",
-    path = "third_party/spirv_tools",
-)
-
-maybe(
     local_repository,
     name = "spirv_headers",
     path = "third_party/spirv_headers",
