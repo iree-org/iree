@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -36,7 +37,6 @@ namespace HAL {
 class IdentifyConstantPoolsPass
     : public PassWrapper<IdentifyConstantPoolsPass, OperationPass<ModuleOp>> {
  public:
-  IdentifyConstantPoolsPass() : targetOptions_(getTargetOptionsFromFlags()) {}
   explicit IdentifyConstantPoolsPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -310,7 +310,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
 static PassRegistration<IdentifyConstantPoolsPass> pass(
     "iree-hal-identify-constant-pools",
     "Combines constant variables into one or more hal.constant_pools based on "
-    "usage semantics.");
+    "usage semantics.",
+    [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<IdentifyConstantPoolsPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

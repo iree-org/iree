@@ -74,6 +74,7 @@ iree_cc_library(
     flatbuffers
     iree::base::dynamic_library
     iree::base::file_io
+    iree::base::file_path
     iree::base::status
     iree::base::tracing
     iree::hal::executable

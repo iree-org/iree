@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -35,8 +36,6 @@ class MaterializeResourceCachesPass
     : public PassWrapper<MaterializeResourceCachesPass,
                          OperationPass<ModuleOp>> {
  public:
-  MaterializeResourceCachesPass()
-      : targetOptions_(getTargetOptionsFromFlags()) {}
   explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -352,7 +351,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 
 static PassRegistration<MaterializeResourceCachesPass> pass(
     "iree-hal-materialize-resource-caches",
-    "Materializes hal.executable resource caches and rewrites lookups.");
+    "Materializes hal.executable resource caches and rewrites lookups.", [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<MaterializeResourceCachesPass>(options);
+    });
 
 }  // namespace HAL
 }  // namespace IREE

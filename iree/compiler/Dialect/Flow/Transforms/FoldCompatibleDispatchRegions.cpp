@@ -199,7 +199,7 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
       if (isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp,
               mhlo::DotOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-              mhlo::SliceOp>(op)) {
+              mhlo::SliceOp, mhlo::TorchIndexSelectOp>(op)) {
         return false;
       }
     }

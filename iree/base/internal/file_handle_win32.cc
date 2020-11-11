@@ -15,15 +15,21 @@
 #include "iree/base/internal/file_handle_win32.h"
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_replace.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
 namespace iree {
 
+static void CanonicalizePath(std::string *path) {
+  absl::StrReplaceAll({{"/", "\\"}}, path);
+}
+
 // static
 StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenRead(std::string path,
                                                            DWORD file_flags) {
+  CanonicalizePath(&path);
   HANDLE handle = ::CreateFileA(
       /*lpFileName=*/path.c_str(), /*dwDesiredAccess=*/GENERIC_READ,
       /*dwShareMode=*/FILE_SHARE_READ, /*lpSecurityAttributes=*/nullptr,
@@ -49,6 +55,7 @@ StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenRead(std::string path,
 // static
 StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenWrite(std::string path,
                                                             DWORD file_flags) {
+  CanonicalizePath(&path);
   HANDLE handle = ::CreateFileA(
       /*lpFileName=*/path.c_str(), /*dwDesiredAccess=*/GENERIC_WRITE,
       /*dwShareMode=*/FILE_SHARE_DELETE, /*lpSecurityAttributes=*/nullptr,

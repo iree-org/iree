@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -178,7 +179,8 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       return srcOp.emitRemark() << "unsupported const type for dialect";
     }
     // TODO(#2878): use getTypeConverter() when we pass it upon creation.
-    IREE::VM::TypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(
+        IREE::VM::getTargetOptionsFromFlags());
     auto targetType = typeConverter.convertType(srcOp.getType());
     switch (targetType.getIntOrFloatBitWidth()) {
       case 1:

@@ -28,10 +28,7 @@ class LLVMBaseTargetBackend : public TargetBackend {
  public:
   explicit LLVMBaseTargetBackend(LLVMTargetOptions options);
 
-  void getDependentDialects(DialectRegistry &registry) const override;
-
-  void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
-                                    OpPassManager &passManager) override;
+  void buildTranslationPassPipeline(OpPassManager &passManager) override;
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override;
 

@@ -119,12 +119,14 @@ iree_cc_library(
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
+    ::file_path
     ::logging
     ::status
     ::target_platform
     ::tracing
     absl::memory
     absl::span
+    absl::strings
   PUBLIC
 )
 
@@ -615,6 +617,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     LINKOPTS
       ${IREE_LINKOPTS_TRACING}
     DEPS
+      ::target_platform
       absl::core_headers
     DEFINES
       # TODO(#2114): Change the mode to 2.

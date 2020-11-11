@@ -71,14 +71,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
   std::string filter_pattern() const override { return "metal*"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry.insert<AffineDialect,
-                    gpu::GPUDialect,
-                    linalg::LinalgDialect,
-                    scf::SCFDialect,
-                    spirv::SPIRVDialect,
-                    vector::VectorDialect>();
-    // clang-format on
+    registry.insert<spirv::SPIRVDialect>();
   }
 
   void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,

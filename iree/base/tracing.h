@@ -157,8 +157,17 @@
 #define TRACY_CALLSTACK 1
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
 
+// Guard tracy use of DbgHelp on Windows via IREEDbgHelp* functions.
+// All our own usage of DbgHelp must be guarded with the same lock.
+#define TRACY_DBGHELP_LOCK IREEDbgHelp
+
 // TODO(#1926): upstream a TRACY_NO_FRAME_IMAGE flag to remove the frame
 // compression thread and dxt1 compression code.
+
+// We don't care about vsync events as they can pollute traces and don't have
+// much meaning in our workloads. If integrators still want them we can expose
+// this as a tracing feature flag.
+#define TRACY_NO_VSYNC_CAPTURE 1
 
 // Flush the settings we have so far; settings after this point will be
 // overriding values set by Tracy itself.

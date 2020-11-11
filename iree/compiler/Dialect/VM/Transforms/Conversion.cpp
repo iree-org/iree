@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <tuple>
 
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
@@ -79,7 +80,6 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 class ConversionPass
     : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
  public:
-  ConversionPass() : targetOptions_(getTargetOptionsFromFlags()) {}
   explicit ConversionPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -153,7 +153,11 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
 }
 
 static PassRegistration<ConversionPass> pass(
-    "iree-vm-conversion", "Converts from various dialects to the VM dialect");
+    "iree-vm-conversion", "Converts from various dialects to the VM dialect",
+    [] {
+      auto options = getTargetOptionsFromFlags();
+      return std::make_unique<ConversionPass>(options);
+    });
 
 }  // namespace VM
 }  // namespace IREE

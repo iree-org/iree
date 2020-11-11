@@ -19,6 +19,19 @@ package(
 )
 
 cc_library(
+    name = "CodeGenOptionUtils",
+    srcs = [
+        "CodeGenOptionUtils.cpp",
+    ],
+    hdrs = [
+        "CodeGenOptionUtils.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+cc_library(
     name = "LinalgToSPIRV",
     srcs = [
         "ConvertToGPUPass.cpp",
@@ -41,6 +54,7 @@ cc_library(
         "Utils.h",
     ],
     deps = [
+        ":CodeGenOptionUtils",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/HLOToHLO",

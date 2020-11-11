@@ -16,6 +16,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -48,29 +49,6 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  static llvm::cl::opt<bool> clUseVectorizeMemrefPass(
-      "iree-spirv-use-vectorize-memref-pass",
-      llvm::cl::desc(
-          "Enable use of Memref vectorization in SPIR-V code generation"),
-      llvm::cl::init(false));
-
-  static llvm::cl::opt<bool> clUseWorkgroupMemory(
-      "iree-spirv-use-workgroup-memory",
-      llvm::cl::desc(
-          "Enable use of workgroup memory in SPIR-V code generation"),
-      llvm::cl::init(false));
-
-  static llvm::cl::list<unsigned> clWorkgroupSize(
-      "iree-spirv-workgroup-size",
-      llvm::cl::desc(
-          "Workgroup size to use for XLA-HLO to Linalg to SPIR-V path"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
-
-  static llvm::cl::list<unsigned> clTileSizes(
-      "iree-spirv-tile-size",
-      llvm::cl::desc("Tile size to use for tiling Linalg operations"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
-
   static llvm::cl::opt<std::string> clVulkanTargetTriple(
       "iree-vulkan-target-triple", llvm::cl::desc("Vulkan target triple"),
       llvm::cl::init("swiftshader-unknown-unknown"));
@@ -82,19 +60,14 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.codegenOptions.workgroupSize.assign(clWorkgroupSize.begin(),
-                                                    clWorkgroupSize.end());
-  targetOptions.codegenOptions.tileSizes.assign(clTileSizes.begin(),
-                                                clTileSizes.end());
-  targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
-  targetOptions.codegenOptions.useVectorizeMemrefPass =
-      clUseVectorizeMemrefPass;
+  targetOptions.codegenOptions = getSPIRVCodegenOptionsFromClOptions();
   if (!clVulkanTargetEnv.empty()) {
     targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   } else {
     targetOptions.vulkanTargetEnv =
         Vulkan::getTargetEnvForTriple(clVulkanTargetTriple);
   }
+
   return targetOptions;
 }
 
@@ -133,18 +106,6 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
   std::string name() const override { return "vulkan_spirv"; }
   std::string filter_pattern() const override { return "vulkan*"; }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry.insert<AffineDialect,
-                    Vulkan::VulkanDialect,
-                    gpu::GPUDialect,
-                    linalg::LinalgDialect,
-                    scf::SCFDialect,
-                    spirv::SPIRVDialect,
-                    vector::VectorDialect>();
-    // clang-format on
-  }
-
   BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
     // Picked from here to start:
     // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=minStorageBufferOffsetAlignment&platform=android
@@ -159,6 +120,10 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
                                       b.getIndexAttr(minBufferOffsetAlignment),
                                       b.getIndexAttr(maxBufferRange),
                                       b.getIndexAttr(minBufferRangeAlignment));
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
   }
 
   void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,

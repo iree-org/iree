@@ -15,6 +15,7 @@
 """Macro for building e2e tests from a single source with multiple flags."""
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
+load("//build_tools/bazel:deep_copy.bzl", "deep_copy")
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
     "get_driver",
@@ -129,6 +130,10 @@ def iree_e2e_cartesian_product_test_suite(
     """
     if not "target_backends" in flags_to_values:
         fail("`target_backends` must be a key in `flags_to_values`.")
+
+    # Bazel will implictly mutate this variable's state if it is not copied.
+    # This allows failing configurations to be reused in BUILD files.
+    failing_configurations = deep_copy(failing_configurations)
 
     # Normalize flags_to_values to always have lists as its values.
     # e.g. {use_external_data: True} -> {use_external_data: [True]}

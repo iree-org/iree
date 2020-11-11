@@ -23,6 +23,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -81,7 +82,6 @@ namespace {
 class LinalgTileAndFusePass
     : public PassWrapper<LinalgTileAndFusePass, OperationPass<ModuleOp>> {
  public:
-  LinalgTileAndFusePass() = default;
   LinalgTileAndFusePass(const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass)
@@ -96,32 +96,6 @@ class LinalgTileAndFusePass
 
  private:
   SPIRVCodegenOptions options;
-
-  // TODO: Find a common place to put these options. They are defined three
-  // times, once here, once for the pass pipeline and once for the binary.
-  ListOption<int64_t> tileSizes{
-      *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
-
-  ListOption<int64_t> workgroupSize{
-      *this, "workgroup-size",
-      llvm::cl::desc(
-          "Number of workgroups to dispatch for the SPIR-V module; at most "
-          "three integers standarding for the x, y, and z dimension; "
-          "additional arguments will be ignored (used only for testing)"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
-
-  Option<bool> useWorkgroupMemory{
-      *this, "use-workgroup-memory",
-      llvm::cl::desc(
-          "Enable use of workgroup memory in SPIR-V code generation pipeline"),
-      llvm::cl::init(false)};
-
-  Option<bool> useVectorization{
-      *this, "use-vectorization",
-      llvm::cl::desc(
-          "Enable use of vectorization in SPIR-V code generation pipeline"),
-      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -449,7 +423,8 @@ static void populateTilingToInvocationPatterns(
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>>(
       context,
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
@@ -467,7 +442,8 @@ static void populateTilingToInvocationPatterns(
 static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                  linalg::LinalgVectorizationPattern<linalg::FillOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
 }
@@ -489,10 +465,9 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
-  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>>(
-      context,
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
-  patterns.insert<vector::UnrollVectorPattern<vector::ContractionOp>>(
+  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>,
+                  vector::UnrollVectorPattern<vector::ContractionOp>,
+                  vector::UnrollVectorPattern<vector::TransferWriteOp>>(
       context,
       vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
   vector::populateVectorToVectorCanonicalizationPatterns(patterns, context);
@@ -538,14 +513,6 @@ static void applyVectorTransformation(FuncOp funcOp) {
 void LinalgTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp module = getOperation();
-
-  // Override options with command line values.
-  if (!tileSizes.empty())
-    options.tileSizes.assign(tileSizes.begin(), tileSizes.end());
-  if (!workgroupSize.empty())
-    options.workgroupSize.assign(workgroupSize.begin(), workgroupSize.end());
-  if (useWorkgroupMemory) options.useWorkgroupMemory = true;
-  if (useVectorization) options.useVectorization = true;
 
   LLVM_DEBUG(
       llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";);
@@ -627,7 +594,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
     }
 
-    if (options.useVectorization) {
+    if (options.enableVectorization) {
       {
         OwningRewritePatternList secondLevelTilingPatterns;
         populateTilingToSubgroupPatterns(context, launchConfig,
@@ -695,8 +662,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
 
 static PassRegistration<LinalgTileAndFusePass> pass(
     "iree-codegen-linalg-tile-and-fuse",
-    "Tile and fuse Linalg operations on buffers",
-    [] { return std::make_unique<LinalgTileAndFusePass>(); });
+    "Tile and fuse Linalg operations on buffers", [] {
+      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
+      return std::make_unique<LinalgTileAndFusePass>(options);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

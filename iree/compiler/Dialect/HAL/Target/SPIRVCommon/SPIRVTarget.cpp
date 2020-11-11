@@ -62,7 +62,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
 }
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
-    IREE::HAL::ExecutableTargetOp targetOp, OpPassManager &passManager) {
+    OpPassManager &passManager) {
   buildSPIRVTransformPassPipeline(passManager, spvCodeGenOptions_);
 }
 
