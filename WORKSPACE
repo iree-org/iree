@@ -286,6 +286,13 @@ maybe(
     path = "third_party/cpuinfo",
 )
 
+maybe(
+    new_local_repository,
+    name = "pffft",
+    build_file = "build_tools/third_party/pffft/BUILD.overlay",
+    path = "third_party/pffft",
+)
+
 GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"
 
 http_archive(
