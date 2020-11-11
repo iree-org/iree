@@ -23,6 +23,7 @@
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -58,14 +59,15 @@ struct LegalizeTieShapeOp : OpRewritePattern<Shape::TieShapeOp> {
   }
 };
 
-/// Pattern to remove dead `iree.placeholder` ops. They arent removed since they
-/// are tagged as having `MemoryEffect`.
-struct RemoveDeadPlaceholderOp : OpRewritePattern<IREE::PlaceholderOp> {
-  using OpRewritePattern<IREE::PlaceholderOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::PlaceholderOp phOp,
+/// Pattern to remove dead ops that arent removed since they are tagged as
+/// having `MemoryEffect`.
+template <typename OpTy>
+struct RemoveDeadMemEffectOp : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
-    if (phOp.use_empty()) {
-      rewriter.eraseOp(phOp);
+    if (op.use_empty()) {
+      rewriter.eraseOp(op);
       return success();
     }
     return failure();
@@ -84,7 +86,8 @@ struct LegalizeNumWorkgroupsFnPass
 
 static void populateLegalizeNumWorkgroupsFnPattern(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<LegalizeTieShapeOp, RemoveDeadPlaceholderOp>(context);
+  patterns.insert<LegalizeTieShapeOp, RemoveDeadMemEffectOp<AllocaOp>,
+                  RemoveDeadMemEffectOp<IREE::PlaceholderOp>>(context);
 }
 
 void LegalizeNumWorkgroupsFnPass::runOnOperation() {
