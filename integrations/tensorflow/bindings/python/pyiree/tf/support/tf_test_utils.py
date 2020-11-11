@@ -732,6 +732,9 @@ def tf_function_unittest(
   def _store_unittest_info(function):
     function = tf.function(**tf_function_kwargs)(function)
 
+    # Used to identify that the tf.function was created by this decorator.
+    function.is_tf_function_unittest = True
+
     # Set function.get_trace_args.
     if input_args is not None:
       # Override the input_generator.
@@ -779,7 +782,7 @@ class TestModule(tf.Module):
     tf_function_unittests = []
     for name in dir(cls):
       value = getattr(cls, name)
-      if hasattr(value, 'input_generator'):
+      if hasattr(value, 'is_tf_function_unittest'):
         tf_function_unittests.append(value)
 
     if not len(tf_function_unittests):
