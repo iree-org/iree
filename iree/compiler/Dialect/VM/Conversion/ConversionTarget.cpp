@@ -24,14 +24,20 @@ VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
   if (!innerModuleOp) {
     OpBuilder builder(outerModuleOp.getBodyRegion());
     builder.setInsertionPoint(outerModuleOp);
+    mlir::ModuleOp tempModuleOp =
+        builder.create<ModuleOp>(outerModuleOp.getLoc());
+    tempModuleOp.getBodyRegion().takeBody(outerModuleOp.getBodyRegion());
 
-    innerModuleOp = builder.create<ModuleOp>(outerModuleOp.getLoc(),
-                                             outerModuleOp.getName());
-    innerModuleOp.getBodyRegion().takeBody(outerModuleOp.getBodyRegion());
     outerModuleOp.getBodyRegion().getBlocks().push_back(new Block());
+    builder.setInsertionPointToStart(outerModuleOp.getBody());
+    innerModuleOp = builder.create<ModuleOp>(
+        outerModuleOp.getBodyRegion().getLoc(), outerModuleOp.getName());
+    innerModuleOp.getBodyRegion().takeBody(tempModuleOp.getBodyRegion());
 
     builder.setInsertionPointToEnd(outerModuleOp.getBody());
     builder.create<mlir::ModuleTerminatorOp>(outerModuleOp.getLoc());
+
+    tempModuleOp.erase();
   }
   return std::make_pair(outerModuleOp, innerModuleOp);
 }
