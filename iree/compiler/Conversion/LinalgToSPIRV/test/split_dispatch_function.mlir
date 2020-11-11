@@ -166,7 +166,7 @@ module {
 //      CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
 //      CHECK:   return
 
-//      CHECK: func @[[NUM_WORKGROUPS_FN2]]
+//      CHECK: func private @[[NUM_WORKGROUPS_FN2]]
 
 //      CHECK: func @kernel_dispatch_1()
 // CHECK-SAME: {hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN1:.+]]}
@@ -176,7 +176,7 @@ module {
 //      CHECK:     scf.yield
 //      CHECK:   return
 
-//      CHECK: func @[[NUM_WORKGROUPS_FN1]]
+//      CHECK: func private @[[NUM_WORKGROUPS_FN1]]
 
 //      CHECK: func @kernel_dispatch_0()
 // CHECK-SAME: {hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN0:.+]]}
@@ -188,7 +188,7 @@ module {
 //      CHECK:   linalg.fill(%[[TS]], %[[ZERO]])
 //      CHECK:   return
 
-//      CHECK: func @[[NUM_WORKGROUPS_FN0]]
+//      CHECK: func private @[[NUM_WORKGROUPS_FN0]]
 
   func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32

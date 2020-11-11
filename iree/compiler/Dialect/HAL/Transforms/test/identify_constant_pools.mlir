@@ -27,7 +27,7 @@ func @immutable_variables() -> (tensor<1xf32>, tensor<4xf32>, tensor<3xi8>) {
 
 // CHECK: flow.variable @variable_0 mutable init(@variable_0_initializer)
 flow.variable @variable_0 mutable dense<3.0> : tensor<128xf32>
-// CHECK-NEXT: func @variable_0_initializer() -> tensor<128xf32>
+// CHECK-NEXT: func private @variable_0_initializer() -> tensor<128xf32>
 // CHECK-NEXT:   [[CONST:%.+]] = hal.constant_pool.load @_const_pool_init::@variable_0 : tensor<128xf32>
 // CHECK-NEXT:   return [[CONST]] : tensor<128xf32>
 // CHECK-NEXT: }
