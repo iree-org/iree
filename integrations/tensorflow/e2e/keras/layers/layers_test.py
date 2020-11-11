@@ -59,7 +59,7 @@ def generate_configs(default_config: Config,
   return configs
 
 
-# A dict mapping tf.keras.layers names to either a single configuration or a
+# A dict mapping tf.keras.layers names to either a single Config or a
 # dict mapping exported_names to Configs. Each entry will be normalized
 # to be a dict mapping exported_names to Configs, with a default exported_name
 # of 'default'.
@@ -507,8 +507,14 @@ flags.DEFINE_bool(
     'Whether or not to compile the layer with a dynamic batch size.')
 flags.DEFINE_bool('training', False,
                   'Whether or not to compile the layer in training mode.')
-flags.DEFINE_bool('test_full_api', False, '')
-flags.DEFINE_bool('list_layers_with_full_api_tests', False, '')
+flags.DEFINE_bool(
+    'test_full_api', False,
+    'Whether or not to test multiple layer configurations using non-required '
+    'kwargs.')
+flags.DEFINE_bool(
+  'list_layers_with_full_api_tests', False,
+  'Whether or not to print out all layers with non-default configurations (and '
+  'skip running the tests).')
 
 
 def get_configs() -> Dict[str, Config]:
@@ -613,12 +619,14 @@ def main(argv):
   # Set up name for saving artifacts.
   dynamic_batch_str = 'dynamic_batch' if FLAGS.dynamic_batch else 'static_batch'
   training_str = 'training' if FLAGS.training else 'non_training'
-  settings_str = f'{dynamic_batch_str}_{training_str}'
+  full_api_str = 'full_api' if FLAGS.test_full_api else 'default_api'
+  settings_str = f'{full_api_str}_{dynamic_batch_str}_{training_str}'
   KerasLayersModule.__name__ = os.path.join('keras_layers', FLAGS.layer,
                                             settings_str)
 
-  # Add the layer configuration test functions to the module class and then
-  # generate unittests for each of them.
+  # Use the configurations for FLAGS.layer to add the tf.functions we wish
+  # to test to the KerasLayersModule, and then generate unittests for each of
+  # them.
   KerasLayersModule.configure_class()
   KerasLayersTest.generate_unittests(KerasLayersModule)
   tf.test.main()
