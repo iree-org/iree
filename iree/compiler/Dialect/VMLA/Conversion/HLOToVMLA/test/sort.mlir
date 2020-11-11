@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-vmla-pre-conversion-lowering -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
-func @sort1D(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+func private @sort1D(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-DAG: [[C16:%.+]] = constant 16 : index
   // CHECK-DAG: [[RS:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[4]>
   // CHECK-DAG: [[BL:%.+]] = vmla.buffer.alloc byte_length = [[C16]] : !vmla.buffer
@@ -18,8 +18,8 @@ func @sort1D(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility
 }
 
 
-// CHECK-LABEL: func @sort2D
-func @sort2D(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> attributes { sym_visibility = "private" } {
+// CHECK-LABEL: func private @sort2D
+func private @sort2D(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-DAG: [[C64:%.+]] = constant 64 : index
   // CHECK-DAG: [[RS:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[4,4]>
   // CHECK-DAG: [[BL:%.+]] = vmla.buffer.alloc byte_length = [[C64]] : !vmla.buffer

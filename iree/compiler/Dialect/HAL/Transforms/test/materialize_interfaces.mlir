@@ -24,7 +24,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
     // CHECK-NEXT:   hal.interface.store.tensor %[[RET0]], @legacy_io::@ret0, offset = %[[ZERO]] : tensor<4xf32>
     // CHECK-NEXT:   return
     // CHECK-NEXT: }
-    // CHECK-NEXT: func @simpleMath_rgn_dispatch_0_impl
+    // CHECK-NEXT: func private @simpleMath_rgn_dispatch_0_impl
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -64,7 +64,7 @@ flow.executable @bools_ex_dispatch_0 {
     // CHECK-NEXT:   hal.interface.store.tensor %[[RET0_I8]], @legacy_io::@ret0, offset = %[[ZERO]] : tensor<4xi8>
     // CHECK-NEXT:   return
     // CHECK-NEXT: }
-    // CHECK-NEXT: func @bools_rgn_dispatch_0_impl(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1>
+    // CHECK-NEXT: func private @bools_rgn_dispatch_0_impl(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1>
     func @bools_rgn_dispatch_0(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1> {
       %0 = mhlo.and %arg0, %arg1 : tensor<4xi1>
       %c = mhlo.constant dense<[false, false, true, false]> : tensor<4xi1>
@@ -96,7 +96,7 @@ flow.executable @shaped_dispatch {
     //  CHECK-NEXT:   hal.interface.store.tensor %[[RET0]], @legacy_io::@ret0, offset = %[[ZERO]] : tensor<7x?x10xf32>
     //  CHECK-NEXT:   return
     //  CHECK-NEXT: }
-    //  CHECK-NEXT: func @entry_impl
+    //  CHECK-NEXT: func private @entry_impl
     func @entry(%arg0: tensor<?x7x10xf32>, %arg1: index, %arg2: index) -> tensor<7x?x10xf32> {
       %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[?,7,10]>
       %1 = shapex.make_ranked_shape %arg2 : (index) -> !shapex.ranked_shape<[7,?,10]>

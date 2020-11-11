@@ -126,7 +126,7 @@ module attributes {
 //       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 //       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[C12:.+]] = constant 12 : index
 //       CHECK:   return %[[C12]], %[[C1]], %[[C1]]
@@ -179,7 +179,7 @@ module attributes {
 //  CHECK-NEXT:     store
 //  CHECK-NEXT:     return
 
-//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //       CHECK:   return %[[C1]], %[[C1]], %[[C1]]
 
