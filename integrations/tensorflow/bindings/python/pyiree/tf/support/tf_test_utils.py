@@ -693,15 +693,16 @@ def compile_tf_signature_def_saved_model(
   return _global_modules
 
 
-def tf_function_unittest(
-    input_generator: tf_utils.InputGeneratorType = tf_utils.uniform,
-    input_args: Sequence[Any] = None,
-    input_kwargs: Dict[str, Any] = None,
-    atol: float = None,
-    rtol: float = None,
-    name: str = None,
-    **tf_function_kwargs):
+def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
+                         input_args: Sequence[Any] = None,
+                         atol: float = None,
+                         rtol: float = None,
+                         name: str = None,
+                         **tf_function_kwargs):
   """Creates a tf.function that can be used to generate unittests.
+
+  If 'input_generator' and 'input_args' are unspecified then the function will
+  be tested using random uniform data.
 
   Args:
     input_generator:
@@ -709,10 +710,6 @@ def tf_function_unittest(
       the unittest.
     input_args:
       an optional sequence of values to pass as positional args to the function.
-      This overrides 'input_generator'.
-    input_args:
-      an optional Dict of keyword arguments to pass to the function. This
-      overrides 'input_generator'. 'rtol' and 'atol' cannot be specified.
     atol:
       optional, the absolute tolerance to use when comparing the decorated
       function's output.
@@ -723,6 +720,9 @@ def tf_function_unittest(
       optional, the name to reference this function with. Must be used if
       decorating a lambda.
 
+  Raises:
+    ValueError: if 'input_generator' and 'input_args' are both specified.
+
   Returns:
     A tf.function with the additional attributes 'input_generator' (from above)
     'trace_kwargs' (from 'atol' and 'rtol' above), and with an updated
@@ -730,36 +730,31 @@ def tf_function_unittest(
   """
 
   def _store_unittest_info(function):
+    # Validate arguments.
+    if input_generator is not None and input_args is not None:
+      raise ValueError(
+          "'input_generator' and 'input_args' cannot both be specified.")
+
     function = tf.function(**tf_function_kwargs)(function)
 
     # Used to identify that the tf.function was created by this decorator.
     function.is_tf_function_unittest = True
 
     # Set function.get_trace_args.
-    if input_args is not None:
-      # Override the input_generator.
-      function.get_trace_args = lambda: copy.deepcopy(input_args)
-    elif input_kwargs is not None:
-      # if input_args is None, input_kwargs will still override the
-      # input_generator. This is simpler to implement, but also needs to be the
-      # case because we don't have a way of knowing which 'tf.TensorSpec's a
-      # partial set of input_kwargs should override.
-      function.get_trace_args = lambda: []
-    else:
-      # Generate the input tensors as positional args.
+    if input_generator is not None:
+      # Use the user-specificed input_generator.
       function.get_trace_args = lambda: tf_utils.generate_inputs(
           function.input_signature, input_generator)
+    elif input_args is not None:
+      # Use the user-specified input_args.
+      function.get_trace_args = lambda: copy.deepcopy(input_args)
+    else:
+      # No user data specification – default to using random uniform data.
+      function.get_trace_args = lambda: tf_utils.generate_inputs(
+          function.input_signature, tf_utils.uniform)
 
     # Set function.trace_kwargs.
-    function.trace_kwargs = dict()
-    if input_kwargs is not None:
-      for key, value in input_kwargs.items():
-        if key in ['rtol', 'atol']:
-          raise KeyError(
-              f"'input_kwargs' cannot specify 'rtol' or 'atol', but '{key}' "
-              "was given.")
-        function.trace_kwargs[key] = copy.deepcopy(value)
-    function.trace_kwargs.update(dict(atol=atol, rtol=rtol))
+    function.trace_kwargs = dict(atol=atol, rtol=rtol)
 
     # Set function.__name__.
     if name is not None:

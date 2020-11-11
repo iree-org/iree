@@ -38,7 +38,7 @@ def set_random_seed(seed: int = 0) -> None:
 
 
 InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
-                              Sequence[np.ndarray]]
+                              np.ndarray]
 
 
 def uniform(shape: Sequence[int],

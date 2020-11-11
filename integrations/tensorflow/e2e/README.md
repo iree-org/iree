@@ -156,17 +156,16 @@ This generates two unittests: `test_conv2d_1451x1111_valid` and
 
 #### Configuring `@tf_test_utils.tf_function_unittest`
 
-You can use `@tf_test_utils.tf_function_unittest` to specify an
-`input_generator`, or `input_args` and `input_kwargs` to test data-specific
-behaviors.
+By default `@tf_test_utils.tf_function_unittest` uses uniform random input data
+to numerically test the function, but you can specify an `input_generator` or
+`input_args` to test data-specific behaviors:
 
-`input_generator` defaults to `tf_utils.uniform`, but can also be
-`tf_utils.ndarange`, or any function which takes an `shape` and `dtype`
-as positional args and returns a `np.ndarray`.
+- `input_generator` can be `tf_utils.uniform`, `tf_utils.ndarange`, or any
+function which takes an `shape` and `dtype` as positional args and returns an
+`np.ndarray`.
+- `input_args` is a list of `np.ndarray`s to use as positional arguments.
 
-`input_args` and `input_kwargs` will both override the input provided by
-`input_generator`. These can be any `list` or `dict` of input `np.ndarray`s to
-test the function with.
+The comparison `atol` and `rtol` can also be specified in the decorator.
 
 ### Via test methods
 

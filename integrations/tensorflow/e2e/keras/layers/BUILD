@@ -75,7 +75,7 @@ LAYERS = [
     "Conv2DTranspose",
     "Conv3D",
     "Conv3DTranspose",
-    "ConvLSTM2D",
+    # "ConvLSTM2D",  # TODO(meadowlark): Debug flakiness.
     "Cropping1D",
     "Cropping2D",
     "Cropping3D",
@@ -136,10 +136,6 @@ LAYERS = [
 ]
 
 FAILING_STATIC = [
-    {
-        # This layer is numerically flaky – TODO(meadowlark) create minimal reproducer.
-        "layer": "ConvLSTM2D",
-    },
     {
         # Wrapping these in a tf.function appears to cause a keras bug.
         "layer": [
@@ -253,7 +249,7 @@ LAYERS_WITH_FULL_API_TESTS = [
     "Conv2DTranspose",
     "Conv3D",
     "Conv3DTranspose",
-    "ConvLSTM2D",
+    # "ConvLSTM2D",  # TODO(meadowlark): Debug flakiness.
     "DepthwiseConv2D",
     "GlobalAveragePooling1D",
     "GlobalAveragePooling2D",
@@ -275,10 +271,6 @@ LAYERS_WITH_FULL_API_TESTS = [
 
 FAILING_FULL_API = [
     {
-        # This layer is numerically flaky – TODO(meadowlark) create minimal reproducer.
-        "layer": "ConvLSTM2D",
-    },
-    {
         # Failing on TFLite
         "layer": [
             "AveragePooling3D",
@@ -286,6 +278,7 @@ FAILING_FULL_API = [
             "Conv3D",
             "Conv3DTranspose",
             "ConvLSTM2D",
+            "DepthwiseConv2D",
             "GRU",
             "LocallyConnected1D",
             "LocallyConnected2D",
@@ -371,10 +364,6 @@ iree_e2e_cartesian_product_test_suite(
 )
 
 FAILING_DYNAMIC = [
-    {
-        # This layer is numerically flaky – TODO(meadowlark) create minimal reproducer.
-        "layer": "ConvLSTM2D",
-    },
     {
         # Wrapping these in a tf.function appears to cause a keras bug.
         "layer": [
@@ -502,7 +491,7 @@ LAYERS_WITH_TRAINING_BEHAVIOR = [
     "AlphaDropout",
     "Attention",
     "BatchNormalization",
-    "ConvLSTM2D",
+    # "ConvLSTM2D",  # TODO(meadowlark): Debug flakiness.
     "Dropout",
     "GRU",
     "GRUCell",
@@ -519,10 +508,6 @@ LAYERS_WITH_TRAINING_BEHAVIOR = [
 ]
 
 FAILING_TRAINING = [
-    {
-        # This layer is numerically flaky – TODO(meadowlark) create minimal reproducer.
-        "layer": "ConvLSTM2D",
-    },
     {
         # Wrapping these in a tf.function appears to cause a keras bug.
         "layer": [
