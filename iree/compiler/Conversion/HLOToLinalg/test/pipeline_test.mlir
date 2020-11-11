@@ -87,7 +87,7 @@ module {
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<512xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x512xf32>
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG1]], %[[ARG1]] :
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] :
 //  CHECK-SAME:     outs(%[[RET0]] :
 
 // -----
