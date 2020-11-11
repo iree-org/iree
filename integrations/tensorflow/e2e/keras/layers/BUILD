@@ -137,8 +137,13 @@ LAYERS = [
 
 FAILING_STATIC = [
     {
+        # This layer is numerically flaky – TODO(meadowlark) create minimal reproducer.
+        "layer": "ConvLSTM2D",  # Flaky
+    },
+    {
         # Wrapping these in a tf.function appears to cause a keras bug.
         "layer": [
+            "ConvLSTM2D",
             "GRUCell",
             "LSTMCell",
             "SimpleRNNCell",
