@@ -36,8 +36,10 @@ def set_random_seed(seed: int = 0) -> None:
   random.seed(seed)
   np.random.seed(seed)
 
+
 InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
                               Sequence[np.ndarray]]
+
 
 def uniform(shape: Sequence[int],
             dtype: Union[tf.DType, np.dtype] = np.float32,

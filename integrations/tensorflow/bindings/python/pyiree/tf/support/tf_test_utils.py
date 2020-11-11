@@ -785,17 +785,18 @@ class TracedModuleTestCase(tf.test.TestCase):
       def trace(module, function=function):
         getattr(module, function.__name__)(*function.input_generator(),
                                            **function.trace_kwargs)
+
       trace.__name__ = function.__name__
 
       # Runs 'trace' on modules compiled to each backend and compares them.
       def unittest(self, trace=trace):
         self.compare_backends(trace, self._modules)
+
       unittest.__name__ = f"test_{function.__name__}"
 
       # Make 'unittest' a function on the TracedModuleTestCase, which tells
       # the test runner to run it.
       setattr(cls, unittest.__name__, unittest)
-
 
   def compare_backends(self, trace_function: Callable[[TracedModule], None],
                        modules: Modules) -> None:
