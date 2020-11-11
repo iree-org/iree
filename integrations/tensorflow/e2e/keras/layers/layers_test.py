@@ -512,9 +512,9 @@ flags.DEFINE_bool(
     'Whether or not to test multiple layer configurations using non-required '
     'kwargs.')
 flags.DEFINE_bool(
-  'list_layers_with_full_api_tests', False,
-  'Whether or not to print out all layers with non-default configurations (and '
-  'skip running the tests).')
+    'list_layers_with_full_api_tests', False,
+    'Whether or not to print out all layers with non-default configurations '
+    '(and skip running the tests).')
 
 
 def get_configs() -> Dict[str, Config]:
