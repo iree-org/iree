@@ -37,8 +37,14 @@ CONV_1D_INPUT = [2, 8, 3]
 CONV_2D_INPUT = [2, 8, 8, 3]
 CONV_3D_INPUT = [2, 8, 8, 8, 3]
 
-# A namedtuple storing keyword arguments and shapes to test a
-# tf.keras.layers.Layer with.
+# Configs are namedtuples storing keyword arguments and shapes to test a
+# tf.keras.layers.Layer with. They are used in two ways:
+#   1. To directly specify the kwargs and shapes for a layers test.
+#   2. In 'generate_configs', to specify how to change a default config to
+#      specify a non-default test. In this case, the overriding Config will
+#      exclusively specify the shape of the test if its shape is not None, and
+#      the overriding Config will extend/update the kwargs of the default
+#      Config.
 Config = collections.namedtuple('Config', ['kwargs', 'shapes'])
 # Use old default API for compatibility with Python 3.6.
 Config.__new__.__defaults__ = (dict(), None)

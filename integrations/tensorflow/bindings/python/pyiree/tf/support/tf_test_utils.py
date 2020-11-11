@@ -695,6 +695,8 @@ def compile_tf_signature_def_saved_model(
 
 def tf_function_unittest(
     input_generator: tf_utils.InputGeneratorType = tf_utils.uniform,
+    input_args: Sequence[Any] = None,
+    input_kwargs: Dict[str, Any] = None,
     atol: float = None,
     rtol: float = None,
     name: str = None,
@@ -705,6 +707,12 @@ def tf_function_unittest(
     input_generator:
       an optional callable taking a shape and dtype that returns input data for
       the unittest.
+    input_args:
+      an optional sequence of values to pass as positional args to the function.
+      This overrides 'input_generator'.
+    input_args:
+      an optional Dict of keyword arguments to pass to the function. This
+      overrides 'input_generator'. 'rtol' and 'atol' cannot be specified.
     atol:
       optional, the absolute tolerance to use when comparing the decorated
       function's output.
@@ -723,15 +731,37 @@ def tf_function_unittest(
 
   def _store_unittest_info(function):
     function = tf.function(**tf_function_kwargs)(function)
-    function.input_generator = lambda: tf_utils.generate_inputs(
-        function.input_signature, input_generator)
-    function.trace_kwargs = dict(atol=atol, rtol=rtol)
 
+    # Set function.input_generator.
+    if input_args is not None:
+      # Override the input_generator.
+      function.input_generator = lambda: copy.deepcopy(input_args)
+    elif input_kwargs is not None:
+      # Assume that input_kwargs will supply the input tensors.
+      function.input_generator = lambda: []
+    else:
+      # Generate the input tensors as positional args.
+      function.input_generator = lambda: tf_utils.generate_inputs(
+          function.input_signature, input_generator)
+
+    # Set function.trace_kwargs.
+    function.trace_kwargs = dict()
+    if input_kwargs is not None:
+      for key, value in input_kwargs.items():
+        if key in ['rtol', 'atol']:
+          raise KeyError(
+              f"'input_kwargs' cannot specify 'rtol' or 'atol', but '{key}' "
+              "was given.")
+        function.trace_kwargs[key] = copy.deepcopy(value)
+    function.trace_kwargs.update(dict(atol=atol, rtol=rtol))
+
+    # Set function.__name__.
     if name is not None:
       function.__name__ = name
     elif function.__name__ == "<lambda>":
       raise ValueError("The 'name' kwarg must be provided when decorating a "
                        "lambda function.")
+
     return function
 
   return _store_unittest_info
@@ -796,6 +826,9 @@ class TracedModuleTestCase(tf.test.TestCase):
       # Make 'unittest' a function on the TracedModuleTestCase, which tells
       # the test runner to run it.
       unittest.__name__ = f"test_{function.__name__}"
+      if hasattr(cls, unittest.__name__):
+        raise ValueError("Tried to generate multiple instances of the unittest "
+                         f"'{unittest.__name__}'.")
       setattr(cls, unittest.__name__, unittest)
 
   def compare_backends(self, trace_function: Callable[[TracedModule], None],
