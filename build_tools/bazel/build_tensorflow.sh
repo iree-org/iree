@@ -95,5 +95,4 @@ bazel \
         --test_tag_filters="${TEST_TAG_FILTERS?}" \
         --config=rs \
         --test_output=errors \
-        --color=yes \
         --keep_going
