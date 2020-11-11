@@ -34,9 +34,13 @@ DyLibExecutable::DyLibExecutable() = default;
 
 DyLibExecutable::~DyLibExecutable() {
   IREE_TRACE_SCOPE0("DyLibExecutable::dtor");
-  // TODO(benvanik): move to an atexit handler when tracing is enabled.
-  // executable_library_.release();
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  // Leak the library when tracing, since the profiler may still be reading it.
+  // TODO(benvanik): move to an atexit handler instead, verify with ASAN/MSAN
+  executable_library_.release();
+#else
   executable_library_.reset();
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   for (const auto& file_path : temp_file_paths_) {
     file_io::DeleteFile(file_path).IgnoreError();
   }
