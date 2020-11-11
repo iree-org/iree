@@ -22,13 +22,16 @@ std::pair<mlir::ModuleOp, mlir::ModuleOp>
 VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
   auto innerModuleOp = dyn_cast<ModuleOp>(outerModuleOp.getBody()->front());
   if (!innerModuleOp) {
-    innerModuleOp =
-        ModuleOp::create(outerModuleOp.getLoc(), outerModuleOp.getName());
+    OpBuilder builder(outerModuleOp.getBodyRegion());
+    builder.setInsertionPoint(outerModuleOp);
+
+    innerModuleOp = builder.create<ModuleOp>(outerModuleOp.getLoc(),
+                                             outerModuleOp.getName());
     innerModuleOp.getBodyRegion().takeBody(outerModuleOp.getBodyRegion());
     outerModuleOp.getBodyRegion().getBlocks().push_back(new Block());
-    OpBuilder builder = OpBuilder::atBlockEnd(outerModuleOp.getBody());
+
+    builder.setInsertionPointToEnd(outerModuleOp.getBody());
     builder.create<mlir::ModuleTerminatorOp>(outerModuleOp.getLoc());
-    outerModuleOp.push_back(innerModuleOp);
   }
   return std::make_pair(outerModuleOp, innerModuleOp);
 }
