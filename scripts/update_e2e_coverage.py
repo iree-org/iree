@@ -85,11 +85,17 @@ TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
-        'End to end tests of tf.keras layers with static batch sizes in inference mode',
+        'End to end tests of tf.keras layers (with default configuration and '
+        'static batch sizes in inference mode)',
+    '//integrations/tensorflow/e2e/keras/layers:layers_full_api_tests':
+        'End to end tests of tf.keras layers full APIs '
+        '(with static batch sizes in inference mode)',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
-        'End to end tests of tf.keras layers with dynamic batch sizes',
+        'End to end tests of tf.keras layers with dynamic batch sizes '
+        '(with default configuration in inference mode)',
     '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
-        'End to end tests of tf.keras layers in training mode',
+        'End to end tests of tf.keras layers in training mode (with default'
+        'configuration and static batch sizes)',
     '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
         'End to end test of MobileBert on SQuAD',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
@@ -106,12 +112,18 @@ TEST_SUITES_TO_NOTES = {
     '//integrations/tensorflow/e2e/keras/layers:layers_tests': (
         '**Note:** Layers like `Dropout` are listed as passing in this table,\n'
         'but they function similar to identity layers in these tests. **See \n'
-        'the third table for the coverage of these layers during training.**'),
+        'the third table for the coverage of these layers during training.**\n'
+        '\n',
+        'These tests also only modify required `tf.keras.layers` arguments.\n'
+        'See the full API tests below for coverage on of non-default '
+        'layer configurations.'),
 }
 # Key to use as the name of the rows in the left column for each test in the
 # suite.
 TEST_SUITE_TO_ROW_ID_KEY = {
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'layer',
+    '//integrations/tensorflow/e2e/keras/layers:layers_full_api_tests':
         'layer',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
         'layer',
@@ -131,6 +143,8 @@ TEST_SUITE_TO_ROW_ID_KEY = {
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
+        'layers_test',
+    '//integrations/tensorflow/e2e/keras/layers:layers_full_api_tests':
         'layers_test',
     '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests':
         'layers_test',

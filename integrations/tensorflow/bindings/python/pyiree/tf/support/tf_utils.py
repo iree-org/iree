@@ -37,12 +37,42 @@ def set_random_seed(seed: int = 0) -> None:
   np.random.seed(seed)
 
 
-def uniform(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
-  return np.random.uniform(size=shape).astype(dtype)
+InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
+                              np.ndarray]
 
 
-def ndarange(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
+def uniform(shape: Sequence[int],
+            dtype: Union[tf.DType, np.dtype] = np.float32,
+            low: float = 0.,
+            high: float = 1.) -> np.ndarray:
+  """np.random.uniform with simplified API and dtype control."""
+  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
+  return np.random.uniform(size=shape, low=low, high=high).astype(dtype)
+
+
+def ndarange(shape: Sequence[int],
+             dtype: Union[tf.DType, np.dtype] = np.float32) -> np.ndarray:
+  """np.ndarange for arbitrary input shapes."""
+  dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
+
+
+def generate_inputs(
+    spec,  # Union[Sequence[tf.TensorSpec], tf.TensorSpec]
+    input_generator: InputGeneratorType,
+) -> Sequence[np.ndarray]:
+  """Generates inputs for a given input signature using 'input_generator'."""
+  if isinstance(spec, Sequence):
+    # 'spec' is a sequence of 'tf.TensorSpec'.
+    # Recursively generate inputs.
+    return [generate_inputs(s, input_generator) for s in spec]
+  elif isinstance(spec, tf.TensorSpec):
+    # Handle dynamic shapes (e.g. batches) by substituting an int for None.
+    shape = [size if size is not None else 2 for size in spec.shape]
+    return input_generator(shape, spec.dtype)
+  else:
+    raise TypeError("Expected 'spec' to be a sequence of 'tf.TensorSpec' or "
+                    f"'tf.TensorSpec', but got '{type(spec)}'")
 
 
 def to_mlir_type(dtype: np.dtype) -> str:

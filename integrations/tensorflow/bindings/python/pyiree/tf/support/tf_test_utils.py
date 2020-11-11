@@ -693,6 +693,104 @@ def compile_tf_signature_def_saved_model(
   return _global_modules
 
 
+def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
+                         input_args: Sequence[Any] = None,
+                         atol: float = None,
+                         rtol: float = None,
+                         name: str = None,
+                         **tf_function_kwargs):
+  """Creates a tf.function that can be used to generate unittests.
+
+  If 'input_generator' and 'input_args' are unspecified then the function will
+  be tested using random uniform data.
+
+  Args:
+    input_generator:
+      an optional callable taking a shape and dtype that returns input data for
+      the unittest.
+    input_args:
+      an optional sequence of values to pass as positional args to the function.
+    atol:
+      optional, the absolute tolerance to use when comparing the decorated
+      function's output.
+    rtol:
+      optional, the relative tolerance to use when comparing the decorated
+      function's output.
+    name:
+      optional, the name to reference this function with. Must be used if
+      decorating a lambda.
+
+  Raises:
+    ValueError: if 'input_generator' and 'input_args' are both specified.
+
+  Returns:
+    A tf.function with the additional attributes 'input_generator' (from above)
+    'trace_kwargs' (from 'atol' and 'rtol' above), and with an updated
+    __name__ attribute if 'name' was specified.
+  """
+
+  def _store_unittest_info(function):
+    # Validate arguments.
+    if input_generator is not None and input_args is not None:
+      raise ValueError(
+          "'input_generator' and 'input_args' cannot both be specified.")
+
+    function = tf.function(**tf_function_kwargs)(function)
+
+    # Used to identify that the tf.function was created by this decorator.
+    function.is_tf_function_unittest = True
+
+    # Set function.get_trace_args.
+    if input_generator is not None:
+      # Use the user-specificed input_generator.
+      function.get_trace_args = lambda: tf_utils.generate_inputs(
+          function.input_signature, input_generator)
+    elif input_args is not None:
+      # Use the user-specified input_args.
+      function.get_trace_args = lambda: copy.deepcopy(input_args)
+    else:
+      # No user data specification – default to using random uniform data.
+      function.get_trace_args = lambda: tf_utils.generate_inputs(
+          function.input_signature, tf_utils.uniform)
+
+    # Set function.trace_kwargs.
+    function.trace_kwargs = dict(atol=atol, rtol=rtol)
+
+    # Set function.__name__.
+    if name is not None:
+      function.__name__ = name
+    elif function.__name__ == "<lambda>":
+      raise ValueError("The 'name' kwarg must be provided when decorating a "
+                       "lambda function.")
+
+    return function
+
+  return _store_unittest_info
+
+
+class TestModule(tf.Module):
+  """Thin wrapper of tf.Module with helper methods for tf_function_unittests."""
+
+  @classmethod
+  def get_tf_function_unittests(cls):
+    """Get all tf_function_unittest-created tf.functions on the class."""
+    tf_function_unittests = []
+    for name in dir(cls):
+      value = getattr(cls, name)
+      if hasattr(value, 'is_tf_function_unittest'):
+        tf_function_unittests.append(value)
+
+    if not len(tf_function_unittests):
+      raise ValueError(
+          "'get_tf_function_unittests' was called but no unittests were found.")
+    return tf_function_unittests
+
+  @classmethod
+  def get_exported_names(cls):
+    """Get the names of all tf_function_unittest-created tf.functions"""
+    return [function.__name__ for function in cls.get_tf_function_unittests()]
+
+
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
 
@@ -702,6 +800,37 @@ class TracedModuleTestCase(tf.test.TestCase):
     self._modules.ref_module.reinitialize()
     for module in self._modules.tar_modules:
       module.reinitialize()
+
+  @classmethod
+  def generate_unittests(cls, module_class: Type[TestModule]):
+    """Generates unittests for each 'tf_function_unittest' on 'module_class'."""
+    for function in module_class.get_tf_function_unittests():
+      # We have to pass the closure argument 'funcion' to 'trace' via a kwarg
+      # instead of using it directly in the body because 'function' is
+      # overwritten in each iteration of this loop, and python will only use
+      # the most recent version of 'function'. If we didn't do this, then we
+      # would only test the last function in this loop. The same is true for
+      # passing 'trace' to 'unittest'.
+
+      # Runs the inputs through a (traced) module.
+      def trace(module, function=function):
+        getattr(module, function.__name__)(*function.get_trace_args(),
+                                           **function.trace_kwargs)
+
+      # Give the trace the name of the tf.function that it is testing.
+      trace.__name__ = function.__name__
+
+      # Runs 'trace' on modules compiled to each backend and compares them.
+      def unittest(self, trace=trace):
+        self.compare_backends(trace, self._modules)
+
+      # Make 'unittest' a function on the TracedModuleTestCase, which tells
+      # the test runner to run it.
+      unittest.__name__ = f"test_{function.__name__}"
+      if hasattr(cls, unittest.__name__):
+        raise ValueError("Tried to generate multiple instances of the unittest "
+                         f"'{unittest.__name__}'.")
+      setattr(cls, unittest.__name__, unittest)
 
   def compare_backends(self, trace_function: Callable[[TracedModule], None],
                        modules: Modules) -> None:
