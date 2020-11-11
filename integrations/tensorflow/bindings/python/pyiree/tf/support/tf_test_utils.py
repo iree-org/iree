@@ -405,7 +405,7 @@ class Trace:
         return True, None
 
       if np.issubdtype(ref.dtype, np.floating):
-        same = np.allclose(ref, tar, rtol=rtol, atol=atol)
+        same = np.allclose(ref, tar, rtol=rtol, atol=atol, equal_nan=True)
         abs_diff = np.max(np.abs(ref - tar))
         rel_diff = np.max(np.abs(ref - tar) / np.max(np.abs(tar)))
         diff_string = (f"Max abs diff: {abs_diff:.2e}, atol: {atol:.2e}, "

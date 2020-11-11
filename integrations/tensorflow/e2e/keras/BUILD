@@ -191,6 +191,14 @@ iree_e2e_cartesian_product_test_suite(
     srcs = ["vision_model_test.py"],
     failing_configurations = [
         {
+            # Failing on vmla with negative inputs.
+            "model": [
+                "NASNetLarge",
+                "NASNetMobile",
+            ],
+            "target_backends": "iree_vmla",
+        },
+        {
             # Failing on llvm and vulkan:
             "model": [
                 "NASNetLarge",
@@ -283,6 +291,14 @@ iree_e2e_cartesian_product_test_suite(
     size = "enormous",
     srcs = ["vision_model_test.py"],
     failing_configurations = [
+        {
+            # Failing on vmla with negative inputs.
+            "model": [
+                "NASNetLarge",
+                "NASNetMobile",
+            ],
+            "target_backends": "iree_vmla",
+        },
         {
             # Failing vulkan:
             "model": [
