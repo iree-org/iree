@@ -65,10 +65,14 @@ def generate_configs(default_config: Config,
   return configs
 
 
-# A dict mapping tf.keras.layers names to either a single Config or a
-# dict mapping exported_names to Configs. Each entry will be normalized
-# to be a dict mapping exported_names to Configs, with a default exported_name
-# of 'default'.
+# A dict mapping tf.keras.layers names to either a single Config (representing
+# the kwargs and shapes to use to test a Layer) or a dict mapping exported_names
+# to Configs. The latter case is usually automatically generated via
+# 'generate_configs', with the 'Config's in 'override_configs' specifying how
+# to modify the 'default_config's kwargs and shapes.
+#
+# Each entry will be normalized to be a dict mapping exported_names to Configs,
+# with a default exported_name of 'default'.
 LAYER_TO_UNITTEST_CONFIGURATIONS = {
     'Activation':
         Config(dict(activation='relu'), [RANK_2_INPUT]),
