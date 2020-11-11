@@ -22,9 +22,9 @@ external_cc_library(
   ROOT
     ${PFFFT_ROOT}
   SRCS
-    "src/pffft.c"
+    "pffft.c"
   HDRS
-    "src/pffft.h"
+    "pffft.h"
 )
 
 external_cc_library(
