@@ -228,19 +228,6 @@ maybe(
 )
 
 maybe(
-    new_local_repository,
-    name = "glslang",
-    build_file = "build_tools/third_party/glslang/BUILD.overlay",
-    path = "third_party/glslang",
-)
-
-maybe(
-    local_repository,
-    name = "spirv_tools",
-    path = "third_party/spirv_tools",
-)
-
-maybe(
     local_repository,
     name = "spirv_headers",
     path = "third_party/spirv_headers",
@@ -297,6 +284,13 @@ maybe(
     name = "com_github_pytorch_cpuinfo",
     build_file = "build_tools/third_party/cpuinfo/BUILD.overlay",
     path = "third_party/cpuinfo",
+)
+
+maybe(
+    new_local_repository,
+    name = "pffft",
+    build_file = "build_tools/third_party/pffft/BUILD.overlay",
+    path = "third_party/pffft",
 )
 
 GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"

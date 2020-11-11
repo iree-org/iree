@@ -25,6 +25,8 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
@@ -44,6 +46,29 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+namespace llvm {
+template <>
+struct DenseMapInfo<mlir::iree_compiler::IREE::PlaceholderOp> {
+  static mlir::iree_compiler::IREE::PlaceholderOp getEmptyKey() {
+    auto pointer = DenseMapInfo<void *>::getEmptyKey();
+    return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
+        pointer);
+  }
+  static mlir::iree_compiler::IREE::PlaceholderOp getTombstoneKey() {
+    auto pointer = DenseMapInfo<void *>::getTombstoneKey();
+    return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
+        pointer);
+  }
+  static unsigned getHashValue(mlir::iree_compiler::IREE::PlaceholderOp val) {
+    return hash_value(val.getAsOpaquePointer());
+  }
+  static bool isEqual(mlir::iree_compiler::IREE::PlaceholderOp LHS,
+                      mlir::iree_compiler::IREE::PlaceholderOp RHS) {
+    return LHS == RHS;
+  }
+};
+}  // namespace llvm
 
 namespace mlir {
 namespace iree_compiler {
@@ -126,20 +151,58 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
   return builder.create<spirv::LoadOp>(loc, acOp);
 }
 
-/// Gets or inserts a resource evariable of the given `type` in `block` and bind
-/// it to `set` and `binding`.
-spirv::GlobalVariableOp getOrInsertResourceVariable(Location loc, Type type,
-                                                    unsigned set,
-                                                    unsigned binding,
-                                                    Block &block) {
-  auto name = llvm::formatv("__resource_var_{0}_{1}__", set, binding).str();
-  for (auto varOp : block.getOps<spirv::GlobalVariableOp>()) {
-    if (varOp.sym_name() == name) return varOp;
+/// Inserts a resource evariable of the given `type` into `block` and bind
+/// it to `set` and `binding`. `id` uniquely identifies the inserted variable.
+spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
+                                               uint64_t id, unsigned set,
+                                               unsigned binding, bool alias,
+                                               Block &block) {
+  auto name = llvm::formatv("__resource_var_{0}__", id).str();
+  auto builder = OpBuilder::atBlockBegin(&block);
+  auto variable =
+      builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
+  if (alias) variable.setAttr("aliased", builder.getUnitAttr());
+  return variable;
+}
+
+/// Returns the (set, binding) pair for the given placeholder op.
+std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(
+    IREE::PlaceholderOp op) {
+  auto bindingOp =
+      cast<IREE::HAL::InterfaceBindingOp>(SymbolTable::lookupNearestSymbolFrom(
+          op, op.getAttrOfType<SymbolRefAttr>("binding")));
+  return {bindingOp.set(), bindingOp.binding()};
+}
+
+/// Returns the set of resources that should be marked as aliased in SPIR-V.
+llvm::DenseSet<IREE::PlaceholderOp> getAliasedResources(ModuleOp module) {
+  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
+
+  for (FuncOp func : module.getOps<FuncOp>()) {
+    // Collect all placeholder ops and their (set, binding) pairs in this
+    // function.
+    SmallVector<IREE::PlaceholderOp, 4> placeholderOps;
+    SmallVector<std::pair<uint32_t, uint32_t>, 4> setBindings;
+    llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
+    func.walk([&](IREE::PlaceholderOp op) {
+      placeholderOps.emplace_back(op);
+      setBindings.emplace_back(getPlaceholderSetAndBinding(op));
+      ++setBindingCount[setBindings.back()];
+    });
+
+    // Perform analysis to determine whether we need to mark the resource as
+    // alias. This should happen when we have multiple resources binding to the
+    // same (set, binding) pair and they are used in the same function.
+    for (unsigned i = 0; i < placeholderOps.size(); ++i) {
+      if (setBindingCount[setBindings[i]] > 1) {
+        aliasedResources.insert(placeholderOps[i]);
+      }
+    }
   }
 
-  auto builder = OpBuilder::atBlockBegin(&block);
-  return builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
+  return aliasedResources;
 }
+
 }  // namespace
 
 //===----------------------------------------------------------------------===//
@@ -162,11 +225,18 @@ struct HALInterfaceLoadConstantConverter final
 /// the address to a global variable representing the resource buffer.
 struct IREEPlaceholderConverter final
     : public OpConversionPattern<IREE::PlaceholderOp> {
-  using OpConversionPattern::OpConversionPattern;
+  IREEPlaceholderConverter(TypeConverter &typeConverter, MLIRContext *context,
+                           llvm::DenseSet<IREE::PlaceholderOp> aliasedResources,
+                           PatternBenefit benefit = 1)
+      : OpConversionPattern(typeConverter, context, benefit),
+        aliasedResources(std::move(aliasedResources)) {}
 
   LogicalResult matchAndRewrite(
       IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
+
+ private:
+  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
 };
 
 /// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
@@ -369,9 +439,13 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
 
-  spirv::GlobalVariableOp varOp =
-      getOrInsertResourceVariable(phOp.getLoc(), convertedType, bindingOp.set(),
-                                  bindingOp.binding(), *moduleOp.getBody());
+  // We always create a new resource variable for the placeholder and use the
+  // placeholder op's pointer address as the `id`.
+  spirv::GlobalVariableOp varOp = insertResourceVariable(
+      phOp.getLoc(), convertedType,
+      reinterpret_cast<uint64_t>(phOp.getOperation()), bindingOp.set(),
+      bindingOp.binding(), aliasedResources.contains(phOp),
+      *moduleOp.getBody());
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();
@@ -410,8 +484,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   populateVectorToSPIRVPatterns(context, typeConverter, patterns,
                                 cooperativeMatrixAnalysis);
-  patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter>(
-      typeConverter, context);
+  patterns.insert<HALInterfaceLoadConstantConverter>(typeConverter, context);
+  auto aliasedResources = getAliasedResources(moduleOp);
+  patterns.insert<IREEPlaceholderConverter>(typeConverter, context,
+                                            std::move(aliasedResources));
   patterns.insert<LinalgReshapeConverter>(context, typeConverter);
 
   std::unique_ptr<ConversionTarget> target =
