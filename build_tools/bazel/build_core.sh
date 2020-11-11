@@ -84,6 +84,8 @@ bazel \
         --nosystem_rc --nohome_rc --noworkspace_rc \
         --bazelrc=build_tools/bazel/iree.bazelrc \
           test \
+            -t- \
+            --color=yes \
             ${test_env_args[@]} \
             --config=generic_clang \
             --build_tag_filters="${BUILD_TAG_FILTERS?}" \

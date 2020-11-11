@@ -89,10 +89,12 @@ bazel \
         --nosystem_rc --nohome_rc --noworkspace_rc \
         --bazelrc=build_tools/bazel/iree.bazelrc \
           test \
-          ${test_env_args[@]} \
-        --config=generic_clang \
-        --build_tag_filters="${BUILD_TAG_FILTERS?}" \
-        --test_tag_filters="${TEST_TAG_FILTERS?}" \
-        --config=rs \
-        --test_output=errors \
-        --keep_going
+            -t- \
+            --color=yes \
+            ${test_env_args[@]} \
+            --config=generic_clang \
+            --build_tag_filters="${BUILD_TAG_FILTERS?}" \
+            --test_tag_filters="${TEST_TAG_FILTERS?}" \
+            --config=rs \
+            --test_output=errors \
+            --keep_going
