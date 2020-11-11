@@ -725,8 +725,8 @@ tile size is defined by a library call contract, heuristics, or empirically is
 TBD, but expect workgroup sizes in the thousands to millions of invocations vs.
 normal GPU workgroup sizes in the dozens to hundreds of invocations.
 
-To achieve this style of scheduling efficiently we'll likely use
-[marl](https://github.com/google/marl) as the scheduler. This provides
+To achieve this style of scheduling efficiently we'll likely use something like
+[marl](https://github.com/google/marl) as the scheduler. Marl provides
 cross-platform low-overhead fibers and is compatible with this style of
 scheduling as it was built for the Swiftshader software rasterizer.
 
