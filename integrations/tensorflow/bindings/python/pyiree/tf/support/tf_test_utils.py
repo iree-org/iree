@@ -732,16 +732,19 @@ def tf_function_unittest(
   def _store_unittest_info(function):
     function = tf.function(**tf_function_kwargs)(function)
 
-    # Set function.input_generator.
+    # Set function.get_trace_args.
     if input_args is not None:
       # Override the input_generator.
-      function.input_generator = lambda: copy.deepcopy(input_args)
+      function.get_trace_args = lambda: copy.deepcopy(input_args)
     elif input_kwargs is not None:
-      # Assume that input_kwargs will supply the input tensors.
-      function.input_generator = lambda: []
+      # if input_args is None, input_kwargs will still override the
+      # input_generator. This is simpler to implement, but also needs to be the
+      # case because we don't have a way of knowing which 'tf.TensorSpec's a
+      # partial set of input_kwargs should override.
+      function.get_trace_args = lambda: []
     else:
       # Generate the input tensors as positional args.
-      function.input_generator = lambda: tf_utils.generate_inputs(
+      function.get_trace_args = lambda: tf_utils.generate_inputs(
           function.input_signature, input_generator)
 
     # Set function.trace_kwargs.
@@ -813,7 +816,7 @@ class TracedModuleTestCase(tf.test.TestCase):
 
       # Runs the inputs through a (traced) module.
       def trace(module, function=function):
-        getattr(module, function.__name__)(*function.input_generator(),
+        getattr(module, function.__name__)(*function.get_trace_args(),
                                            **function.trace_kwargs)
 
       # Give the trace the name of the tf.function that it is testing.
