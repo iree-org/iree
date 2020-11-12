@@ -40,8 +40,8 @@ import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string("reference_backend", "tf",
                     "The backend to treat as a source of truth.")
-flags.DEFINE_string("target_backends", None,
-                    "Explicit comma-delimited list of target backends.")
+flags.DEFINE_list("target_backends", None,
+                  "Explicit comma-delimited list of target backends.")
 flags.DEFINE_string(
     "artifacts_dir", None,
     "Specifies a directory to dump compilation artifacts and traces to. "
@@ -76,7 +76,7 @@ def _setup_artifacts_dir(module_name: str) -> str:
 
 def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
   """Decodes --target_backends and creates unique ids for them."""
-  backend_names = FLAGS.target_backends.split(",")
+  backend_names = FLAGS.target_backends
   backend_to_index = {k: 0 for k in backend_names if backend_names.count(k) > 1}
   backend_ids = []
 
@@ -140,11 +140,6 @@ class ModuleCall:
                atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
     self.method = method
-
-    for value in inputs:
-      if isinstance(value, tf.Tensor):
-        raise TypeError("Expected inputs to be native python types or numpy "
-                        f"arrays, but got {type(value)}")
 
     # Deepcopy to safegard against mutation.
     self.inputs = copy.deepcopy(inputs)
@@ -573,6 +568,10 @@ class TracedModule:
       tolerances["atol"] = kwargs.pop("atol", None)
       # Only pass these to ModuleCall if they were specified by the user.
       tolerances = {k: v for k, v in tolerances.items() if v is not None}
+
+      # Ensure the inputs are numpy inputs.
+      args = tf_utils.convert_to_numpy(args)
+      kwargs = tf_utils.convert_to_numpy(kwargs)
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)

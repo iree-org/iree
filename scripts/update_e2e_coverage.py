@@ -44,7 +44,12 @@ KWS_LINK = (
 KWS_LINK = f'[Keyword Spotting Streaming]({KWS_LINK})'
 
 COVERAGE_GROUP_TO_TEST_SUITES = {
-    'tf_base_coverage': ['//integrations/tensorflow/e2e:e2e_tests'],
+    'tf_base_coverage': [
+        '//integrations/tensorflow/e2e:e2e_tests',
+        '//integrations/tensorflow/e2e/math:math_tests',
+        '//integrations/tensorflow/e2e/math:math_dynamic_dims_tests',
+        '//integrations/tensorflow/e2e/math:math_complex_tests',
+    ],
     'tf_keras_coverage': [
         '//integrations/tensorflow/e2e/keras/layers:layers_tests',
         '//integrations/tensorflow/e2e/keras/layers:layers_dynamic_batch_tests',
@@ -82,8 +87,16 @@ COVERAGE_GROUP_TO_DESCRIPTION = {
 }
 
 TEST_SUITES_TO_HEADERS = {
+    # tf_base_coverage
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
+    '//integrations/tensorflow/e2e/math:math_tests':
+        'End to end tests of tf.math functions with static dimensions',
+    '//integrations/tensorflow/e2e/math:math_dynamic_dims_tests':
+        'End to end tests of tf.math functions with dynamic dimensions',
+    '//integrations/tensorflow/e2e/math:math_complex_tests':
+        'End to end tests of tf.math functions with complex numbers',
+    # tf_keras_coverage
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
         'End to end tests of tf.keras layers (with default configuration and '
         'static batch sizes in inference mode)',
@@ -96,12 +109,14 @@ TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
         'End to end tests of tf.keras layers in training mode (with default'
         'configuration and static batch sizes)',
+    # language_and_speech_coverage
     '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
         'End to end test of MobileBert on SQuAD',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         f'End to end tests of {KWS_LINK} models',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         f'End to end tests of {KWS_LINK} models in internal streaming mode',
+    # vision_coverage
     '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'End to end tests of tf.keras.applications vision models on Imagenet',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
@@ -109,18 +124,31 @@ TEST_SUITES_TO_HEADERS = {
 }
 
 TEST_SUITES_TO_NOTES = {
+    '//integrations/tensorflow/e2e/math:math_tests': (
+        '**Note:** To be thorough, these tests use high rank tensors and\n'
+        'test int dtypes where TensorFlow allows them to be used. Both of\n'
+        'these choices disproportionately affect TFLite coverage, and\n'
+        'don\'t represent coverage for simple use cases.\n'),
     '//integrations/tensorflow/e2e/keras/layers:layers_tests': (
         '**Note:** Layers like `Dropout` are listed as passing in this table,\n'
         'but they function similar to identity layers in these tests. **See \n'
         'the third table for the coverage of these layers during training.**\n'
         '\n'
         'These tests also only modify required `tf.keras.layers` arguments.\n'
-        'See the full API tests below for coverage on of non-default '
+        'See the full API tests below for coverage on of non-default\n'
         'layer configurations.'),
 }
 # Key to use as the name of the rows in the left column for each test in the
 # suite.
 TEST_SUITE_TO_ROW_ID_KEY = {
+    # tf_base_coverage
+    '//integrations/tensorflow/e2e/math:math_tests':
+        'functions',
+    '//integrations/tensorflow/e2e/math:math_dynamic_dims_tests':
+        'functions',
+    '//integrations/tensorflow/e2e/math:math_complex_tests':
+        'functions',
+    # tf_keras_coverage
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
         'layer',
     '//integrations/tensorflow/e2e/keras/layers:layers_full_api_tests':
@@ -129,10 +157,12 @@ TEST_SUITE_TO_ROW_ID_KEY = {
         'layer',
     '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
         'layer',
+    # language_and_speech_coverage
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'model',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         'model',
+    # vision_coverage
     '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'model',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
@@ -142,6 +172,14 @@ TEST_SUITE_TO_ROW_ID_KEY = {
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
+    # tf_base_coverage
+    '//integrations/tensorflow/e2e/math:math_tests':
+        'math_test',
+    '//integrations/tensorflow/e2e/math:math_dynamic_dims_tests':
+        'math_test',
+    '//integrations/tensorflow/e2e/math:math_complex_tests':
+        'math_test',
+    # tf_keras_coverage
     '//integrations/tensorflow/e2e/keras/layers:layers_tests':
         'layers_test',
     '//integrations/tensorflow/e2e/keras/layers:layers_full_api_tests':
@@ -150,10 +188,12 @@ SINGLE_SOURCE_SUITES = {
         'layers_test',
     '//integrations/tensorflow/e2e/keras/layers:layers_training_tests':
         'layers_test',
+    # language_and_speech_coverage
     '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
         'keyword_spotting_streaming_test',
     '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
         'keyword_spotting_streaming_test',
+    # vision_coverage
     '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests':
         'vision_model_test',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
