@@ -113,7 +113,7 @@ TEST_SUITES_TO_NOTES = {
         '**Note:** Layers like `Dropout` are listed as passing in this table,\n'
         'but they function similar to identity layers in these tests. **See \n'
         'the third table for the coverage of these layers during training.**\n'
-        '\n',
+        '\n'
         'These tests also only modify required `tf.keras.layers` arguments.\n'
         'See the full API tests below for coverage on of non-default '
         'layer configurations.'),
