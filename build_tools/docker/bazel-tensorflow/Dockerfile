@@ -18,3 +18,6 @@ FROM gcr.io/iree-oss/bazel-python AS final
 
 # Install tensorflow.
 RUN python3 -m pip install tf-nightly
+
+# TensorFlow needs zip for testing outputs.
+RUN apt-get update && apt-get install -y zip
