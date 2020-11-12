@@ -88,7 +88,8 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     DenseSet<Operation *> unconvertedOps;
 
     FrozenRewritePatternList frozenPatterns(std::move(patterns));
-    FrozenRewritePatternList frozenCanonicalizePatterns(std::move(canonicalizePatterns));
+    FrozenRewritePatternList frozenCanonicalizePatterns(
+        std::move(canonicalizePatterns));
     FrozenRewritePatternList frozenTfPatterns(std::move(lowerTfPatterns));
     while (true) {
       if (failed(
@@ -96,8 +97,7 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
         return signalPassFailure();
       }
 
-      if (failed(
-              applyPatternsAndFoldGreedily(op, frozenTfPatterns))) {
+      if (failed(applyPatternsAndFoldGreedily(op, frozenTfPatterns))) {
         return signalPassFailure();
       }
 
