@@ -45,6 +45,12 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
   void runOnFunction() override {
     auto op = getFunction();
     MLIRContext *context = op.getContext();
+
+    // Lower TF Patterns must be separate from canonocalization patterns as
+    // they are sometimes inversions of eachother.
+    OwningRewritePatternList lowerTfPatterns;
+    TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
+
     OwningRewritePatternList canonicalizePatterns;
     for (auto *op : context->getRegisteredOperations())
       op->getCanonicalizationPatterns(canonicalizePatterns, context);
@@ -59,8 +65,7 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     // Add TF->HLO legalization patterns.
     PopulateLegalizeTfPatterns(context, &patterns);
 
-    // Add TF->TF lowering patterns.
-    TF::PopulateLoweringTFPatterns(context, &patterns);
+    // TF::PopulateLoweringTFPatterns(context, &patterns);
 
     // Populate with CHLO->HLO lowerings to account for TF ops legalized to
     // CHLO first.
@@ -85,19 +90,24 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     FrozenRewritePatternList frozenPatterns(std::move(patterns));
     FrozenRewritePatternList frozenCanonicalizePatterns(
         std::move(canonicalizePatterns));
+    FrozenRewritePatternList frozenTfPatterns(std::move(lowerTfPatterns));
     while (true) {
+      if (failed(
+              applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {
+        return signalPassFailure();
+      }
+
+      if (failed(applyPatternsAndFoldGreedily(op, frozenTfPatterns))) {
+        return signalPassFailure();
+      }
+
       if (failed(applyPartialConversion(op, target, frozenPatterns,
                                         &unconvertedOps))) {
         return signalPassFailure();
       }
 
       if (prevUnconvertedOps == unconvertedOps) break;
-
       prevUnconvertedOps = std::move(unconvertedOps);
-      if (failed(
-              applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {
-        return signalPassFailure();
-      }
     }
   }
 
