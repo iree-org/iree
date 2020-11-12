@@ -24,6 +24,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Target/LLVMIR.h"
 
 namespace mlir {
@@ -62,6 +63,11 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
       funcOp.erase();
     }
 
+    llvm::Triple targetTriple(options_.targetTriple);
+    targetOp.getInnerModule().setAttr(
+        LLVM::LLVMDialect::getTargetTripleAttrName(),
+        executableBuilder.getStringAttr(targetTriple.str()));
+
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
     auto llvmModule =
@@ -83,7 +89,6 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     }
 
     // Try to grab a linker tool based on the options (and target environment).
-    llvm::Triple targetTriple(options_.targetTriple);
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
     if (!linkerTool) {
       return mlir::emitError(targetOp.getLoc())
