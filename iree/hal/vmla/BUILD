@@ -37,10 +37,12 @@ cc_library(
         # TODO(benvanik): SIMD variants.
         "op_kernels_generic.h",
         "op_kernels_ruy.h",
+        "op_kernels_fft.h",
     ],
     deps = [
         "//iree/base:status",
         "//iree/base:tracing",
+        "//third_party/pffft",
         "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_set",
