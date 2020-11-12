@@ -35,10 +35,10 @@ constexpr int kVecSize = kVectorizationSizeInBits / (sizeof(float) * 8);
 /// Returns a VectorType in `kVectorizationSizeInBits` bits if `t` is a scalar.
 static VectorType getVecType(OpBuilder &builder, Type t) {
   if (!t.isa<IntegerType, FloatType>()) return {};
-  if (t.getIntOrFloatBitWidth() != 32) return {};
-  Type newElemType = t.isa<IntegerType>() ? builder.getI32Type().cast<Type>()
-                                          : builder.getF32Type().cast<Type>();
-  return VectorType::get(kVecSize, newElemType);
+  //if (t.getIntOrFloatBitWidth() != 32) return {};
+  //Type newElemType = t.isa<IntegerType>() ? builder.getI32Type().cast<Type>()
+                                          //: builder.getF32Type().cast<Type>();
+  return VectorType::get(kVecSize, t);
 }
 
 /// Returns the memref of vector converted from `type`.
@@ -63,6 +63,7 @@ static Value legalizeToVectorType(OpBuilder &builder, Value val) {
     return val;
   } else if (type.isIntOrFloat()) {
     auto vecType = getVecType(builder, type);
+    type.dump();
     if (!vecType) return nullptr;
     return builder.createOrFold<vector::BroadcastOp>(val.getLoc(), vecType,
                                                      val);
@@ -123,6 +124,10 @@ struct VectorizeCmpOp : public VectorizeOpBase<VectorizeCmpOp<OpTy>, OpTy> {
   using VectorizeOpBase<VectorizeCmpOp<OpTy>, OpTy>::VectorizeOpBase;
   LogicalResult apply(OpTy op, ArrayRef<Value> args,
                       ConversionPatternRewriter &rewriter) const {
+    Value a = args[0];
+    a.dump();
+    a = args[1];
+    a.dump();
     auto newOp =
         rewriter.create<OpTy>(op.getLoc(), op.predicate(), args[0], args[1]);
     rewriter.replaceOp(op, newOp.getResult());
