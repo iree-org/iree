@@ -79,25 +79,20 @@ RUN apt-get update \
   && python3 -m pip install numpy
 
 ######################## Vulkan SDK ############################################
-ARG VULKAN_SDK_VERSION=1.2.141
 
-# Disable apt-key parse waring. If someone knows how to do whatever the "proper"
-# thing is then feel free. The warning complains about parsing apt-key output,
-# which we're not even doing.
-ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
+ARG VULKAN_SDK_VERSION=1.2.154.0
 
-RUN apt-get update \
-  && apt-get install apt-transport-https
+COPY --from=gcr.io/iree-oss/vulkan /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
-# Note that this image is based on Ubuntu 16.04 (xenial) as opposed to
-# Ubuntu 18.04 (bionic), which we use for our other images.
-RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
-    | apt-key add - \
-  && wget -qO \
-    "/etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION?}-xenial.list" \
-    "http://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION?}/lunarg-vulkan-${VULKAN_SDK_VERSION?}-xenial.list" \
-  && apt-get update \
-  && apt-get install -y vulkan-sdk
+ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
+
+ENV PATH="${VULKAN_SDK}/bin:$PATH"
+
+# Symlink the Vulkan loader to a system library directory. This is needed to
+# allow Vulkan applications to find the Vulkan loader. It also avoids using
+# LD_LIBRARY_PATH, which is not supported well by Docker.
+RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
+  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
 
 ######################## Swiftshader ###########################################
 COPY --from=install-swiftshader /swiftshader /swiftshader

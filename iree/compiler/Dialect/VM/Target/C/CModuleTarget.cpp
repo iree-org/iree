@@ -215,18 +215,21 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output) {
-  PassManager pm(outerModuleOp.getContext());
-
-  pm.addPass(createConvertVMToEmitCPass());
-
-  if (failed(pm.run(outerModuleOp))) {
-    return failure();
-  }
-
-  auto moduleOps = outerModuleOp.getOps<ModuleOp>();
+  auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
     return outerModuleOp.emitError()
            << "outer module does not contain a vm.module op";
+  }
+  auto moduleOp = *moduleOps.begin();
+
+  auto *context = moduleOp.getContext();
+  PassManager passManager(context);
+
+  auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
+  modulePasses.addPass(createConvertVMToEmitCPass());
+
+  if (failed(passManager.run(outerModuleOp))) {
+    return failure();
   }
 
   auto printInclude = [&output](std::string include) {
