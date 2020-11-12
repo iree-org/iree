@@ -274,6 +274,8 @@ FAILING_FULL_API = [
         # Failing on TFLite
         "layer": [
             "AveragePooling3D",
+            "Conv1D",
+            "Conv2D",
             "Conv2DTranspose",
             "Conv3D",
             "Conv3DTranspose",
