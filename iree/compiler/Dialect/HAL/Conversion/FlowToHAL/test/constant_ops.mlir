@@ -56,7 +56,7 @@ func @fn() {
 // TODO(b/145839814): It should not be possible to produce a name collision
 // expected-error @+3 {{redefinition of symbol named '__var_with_initializer_initializer'}}
 // expected-note @+1 {{see existing symbol definition here}}
-func @__var_with_initializer_initializer() -> ()
+func private @__var_with_initializer_initializer() -> ()
 flow.variable @var_with_initializer mutable dense<0.000000e+00> : tensor<f32>
 func @fn() {
   %0 = flow.variable.load @var_with_initializer : tensor<f32>
