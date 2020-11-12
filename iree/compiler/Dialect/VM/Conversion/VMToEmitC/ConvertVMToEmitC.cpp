@@ -46,10 +46,12 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     ArrayAttr args =
         rewriter.getArrayAttr({IntegerAttr::get(rewriter.getIndexType(), 0),
                                IntegerAttr::get(rewriter.getIndexType(), 1)});
+    ArrayAttr templateArgs;
     ValueRange dstOperands{srcAdapter.lhs(), srcAdapter.rhs()};
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
-                                         callee, args, dstOperands);
+                                         callee, args, templateArgs,
+                                         dstOperands);
 
     return success();
   }
