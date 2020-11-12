@@ -546,18 +546,6 @@ Status Sort::Execute(absl::Span<const T> src_buffer,
 }
 
 template <typename T>
-Status Fft::Execute(absl::Span<const T> real_src_buffer,
-                    absl::Span<const T> imag_src_buffer,
-                    absl::Span<T> real_dst_buffer,
-                    absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
-                    ShapeSpan imag_src_shape) {
-  // TODO (natashaknk): implement
-  std::fill(real_dst_buffer.begin(), real_dst_buffer.end(), 1);
-  std::fill(imag_dst_buffer.begin(), imag_dst_buffer.end(), 2);
-  return OkStatus();
-}
-
-template <typename T>
 Status Broadcast::Execute(absl::Span<const T> src_buffer,
                           absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
