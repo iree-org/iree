@@ -50,7 +50,7 @@
 
 // Use absl::Mutex for VMA_MUTEX.
 #define VMA_MUTEX absl::Mutex
-class AbslVmaRWMutex {
+class ABSL_SCOPED_LOCKABLE AbslVmaRWMutex {
  public:
   void LockRead() ABSL_SHARED_LOCK_FUNCTION() { mutex_.ReaderLock(); }
   void UnlockRead() ABSL_UNLOCK_FUNCTION() { mutex_.ReaderUnlock(); }
