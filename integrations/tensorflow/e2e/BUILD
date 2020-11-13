@@ -69,6 +69,7 @@ TFLITE_FAILING = [
     "fft_test.py",
     "finite_test.py",
     "gather_test.py",
+    "image_resize_test.py",
     "mandelbrot_test.py",
     "matrix_ops_dynamic_test.py",
     "resource_ops_test.py",
