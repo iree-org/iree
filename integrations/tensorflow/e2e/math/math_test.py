@@ -488,28 +488,19 @@ def create_function_unittest(config: Config, function_name: str,
       name=exported_name)(wrapped_function)
 
 
-def create_unittests(module: Union["TfMathModule", Type["TfMathModule"]]):
-  """Creates all tf_function_unittests to test and puts them on module."""
-  for function_name in FLAGS.functions:
-    # pytype: disable=attribute-error :\
-    for exported_name, config in FUNCTION_TO_CONFIGS[function_name].items():
-      # pytype: enable=attribute-error :/
-      if is_complex(config) and not FLAGS.test_complex:
-        continue
-      function_unittest = create_function_unittest(config, function_name,
-                                                   exported_name)
-      setattr(module, exported_name, function_unittest)
-
-
 class TfMathModule(tf_test_utils.TestModule):
-
-  @classmethod
-  def configure_class(cls):
-    create_unittests(cls)
 
   def __init__(self):
     super().__init__()
-    create_unittests(self)
+    for function_name in FLAGS.functions:
+      # pytype: disable=attribute-error :\
+      for exported_name, config in FUNCTION_TO_CONFIGS[function_name].items():
+        # pytype: enable=attribute-error :/
+        if is_complex(config) and not FLAGS.test_complex:
+          continue
+        function_unittest = create_function_unittest(config, function_name,
+                                                     exported_name)
+        setattr(module, exported_name, function_unittest)
 
 
 class TfMathTest(tf_test_utils.TracedModuleTestCase):
@@ -517,7 +508,7 @@ class TfMathTest(tf_test_utils.TracedModuleTestCase):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
-        TfMathModule, exported_names=TfMathModule.get_exported_names())
+        TfMathModule, exported_names=TfMathModule.get_tf_function_unittests())
 
 
 def main(argv):
@@ -552,7 +543,6 @@ def main(argv):
   settings_str = os.path.join(function_str, dim_str)
   TfMathModule.__name__ = os.path.join("tf", "math", settings_str)
 
-  TfMathModule.configure_class()
   TfMathTest.generate_unittests(TfMathModule)
   tf.test.main()
 

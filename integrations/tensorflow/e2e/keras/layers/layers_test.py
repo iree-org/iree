@@ -609,7 +609,7 @@ class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         KerasLayersModule,
-        exported_names=KerasLayersModule.get_exported_names())
+        exported_names=KerasLayersModule.get_tf_function_unittests())
 
 
 def main(argv):
