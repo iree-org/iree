@@ -553,7 +553,7 @@ module {
           hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
           return
         }
-        func @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
           %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
           return %0 : tensor<32x64xf32>
         }
@@ -579,7 +579,7 @@ module {
 ### IR Dump After mlir::iree_compiler::{anonymous}::DeclareNumWorkgroupsFnPass
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -588,7 +588,7 @@ module {
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
     return
   }
-  func @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
@@ -603,7 +603,7 @@ module {
 ### IR Dump After Inliner
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -622,7 +622,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
@@ -639,7 +639,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
@@ -656,7 +656,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
@@ -673,7 +673,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
@@ -690,7 +690,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
@@ -707,7 +707,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
@@ -724,7 +724,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After Canonicalizer
@@ -741,7 +741,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
@@ -758,7 +758,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After CSE
@@ -775,7 +775,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
@@ -795,7 +795,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After mlir::iree_compiler::{anonymous}::LinalgTileAndDistributePass
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
@@ -834,7 +834,7 @@ module {
 ### IR Dump After mlir::iree_compiler::{anonymous}::LegalizeNumWorkgroupsFnPass
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c1 = constant 1 : index
     return %c1, %c1, %c1 : index, index, index
   }
@@ -869,7 +869,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -929,7 +929,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After LinalgLowerToLoops
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1005,7 +1005,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1081,7 +1081,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1151,7 +1151,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After SCFToStandard
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1287,7 +1287,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1407,7 +1407,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
   return %c1, %c1, %c1 : index, index, index
 }
@@ -1528,7 +1528,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertToLLVMPass
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c1 = constant 1 : index
     return %c1, %c1, %c1 : index, index, index
   }
@@ -1944,7 +1944,7 @@ module {
 ### IR Dump After Canonicalizer
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c1 = constant 1 : index
     return %c1, %c1, %c1 : index, index, index
   }
@@ -2360,7 +2360,7 @@ module {
 ### IR Dump After CSE
 ```
 module {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c1 = constant 1 : index
     return %c1, %c1, %c1 : index, index, index
   }
@@ -2701,7 +2701,7 @@ module {
 hal.executable.target @llvm_ir, filter="llvm-ir*" {
   hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
   module {
-    func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+    func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
       %c1 = constant 1 : index
       return %c1, %c1, %c1 : index, index, index
     }
@@ -3050,7 +3050,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -3549,7 +3549,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -3947,7 +3947,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -4345,7 +4345,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -4860,20 +4860,20 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module {
   hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     hal.device.switch(%dev : !hal.device)
@@ -4894,7 +4894,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -5284,7 +5284,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -5293,7 +5293,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -5303,7 +5303,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
@@ -5388,27 +5388,27 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
@@ -5432,7 +5432,7 @@ module {
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
           return %c1, %c1, %c1 : index, index, index
         }
@@ -5825,7 +5825,7 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
   %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
   return %0 : i1
@@ -5834,7 +5834,7 @@ func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "priva
 ```
 ### IR Dump After CSE
 ```
-func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
   %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
   return %0 : i1
@@ -5843,7 +5843,7 @@ func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "priva
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -5852,7 +5852,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After CSE
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -5861,7 +5861,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -5871,7 +5871,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After CSE
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -5881,7 +5881,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
@@ -5898,7 +5898,7 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
 ```
 ### IR Dump After CSE
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
@@ -6050,27 +6050,27 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
@@ -6147,27 +6147,27 @@ module {
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1

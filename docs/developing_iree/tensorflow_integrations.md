@@ -81,14 +81,132 @@ model creation.
 
 ## Writing Tests
 
+There are two ways to write tests – via `tf_test_utils.tf_function_unittest` and
+via test methods on a child of `tf_test_utils.TracedModuleTestCase`.
+
+### Via `tf_test_utils.tf_function_unittest`
+
+This is preferred in the cases where
+
+1. Only a single call to the module needs to be tested at once
+2. The inputs are simple to automatically generate or specify inline.
+3. The functions that you want to test are generated automatically from a
+   configuration (e.g. in `.../e2e/keras/layers/layers_test.py`)
+
+Tests are specified by writing modules that inherit from
+`tf_test_utils.TestModule` (which is a thin wrapper around `tf.Module`) with
+methods decorated with `@tf_test_utils.tf_function_unittest` (with is a thin
+wrapper around `tf.function`).
+
+#### Basic example
+
+We use part of `.../e2e/conv_test.py` as an example. The first component is
+the `TestModule` itself:
+
+```python
+class Conv2dModule(tf_test_utils.TestModule):
+
+  # This decorator tells the testing infra to generate a unittest for this
+  # function. The 'input_signature' is required. If no other arguments are
+  # specified then uniform random data is generated from the input signature
+  # to numerically test the function.
+  @tf_test_utils.tf_function_unittest(input_signature=[
+      tf.TensorSpec([1, 4, 5, 1], tf.float32),
+      tf.TensorSpec([1, 1, 1, 1], tf.float32),
+  ])
+  def conv2d_1451x1111_valid(self, img, kernel):
+    return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
+
+  @tf_test_utils.tf_function_unittest(input_signature=[
+      tf.TensorSpec([2, 4, 5, 1], tf.float32),
+      tf.TensorSpec([1, 1, 1, 1], tf.float32),
+  ])
+  def conv2d_2451x1111_valid(self, img, kernel):
+    return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
+```
+
+Second, you need to write a test case that inherits from
+`tf_test_utils.TracedModuleTestCase`. This is essentially boiler plate that
+tells `tf.test.main()` what `tf.Module` to test and allows us to generate
+the unittests we specified above.
+
+```python
+class ConvTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._modules = tf_test_utils.compile_tf_module(Conv2dModule)
+```
+
+Finally, in the `main` function, you need to call
+`.generate_unittests(module_class)` on your `TestCase` to actually generate
+the unittests that we specified:
+
+```python
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
+    tf.enable_v2_behavior()
+  # Generates unittests for all @tf_test_utils.tf_function_unittest decorated
+  # functions on the module class.
+  # Note: if you are automatically generating functions to test they need to be
+  # specified via a `classmethod` prior to this call _as well_ as via `__init__`
+  # to properly handle stateful `tf.function`s.
+  ConvTest.generate_unittests(Conv2dModule)
+  tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)
+```
+
+This generates two unittests: `test_conv2d_1451x1111_valid` and
+`test_conv2d_2451x1111_valid`.
+
+#### Configuring `@tf_test_utils.tf_function_unittest`
+
+By default `@tf_test_utils.tf_function_unittest` uses uniform random input data
+to numerically test the function, but you can specify an `input_generator` or
+`input_args` to test data-specific behaviors:
+
+- `input_generator` can be `tf_utils.uniform`, `tf_utils.ndarange`, or any
+function which takes an `shape` and `dtype` as positional args and returns an
+`np.ndarray`.
+- `input_args` is a list of `np.ndarray`s to use as positional arguments.
+
+The comparison `atol` and `rtol` can also be specified in the decorator.
+
+### Via test methods
+
+This is preferred in the cases where
+
+1. The `tf.function` that you want to test is already defined on the module
+   (e.g. on a downloaded model like in `mobile_bert_test.py`)
+2. The inputs are difficult to specify inline and require multiple function
+   calls / reshaping to create
+3. You want to test multiple consecutive calls to a `tf.function` (e.g. to test
+   mutated state in `ring_buffer_test.py`)
+
 Our tests use a class `TracedModule` to capture and store all of the inputs and
 outputs of a `CompiledModule` in a `Trace`. Each unittest on a `TestCase` uses
 the `compare_backends` method. This method runs the function it is passed with a
 `TracedModule` once for each reference and target backend. The inputs and
 outputs to these modules are then checked for correctness, using the reference
-backend as a source of truth. For example:
+backend as a source of truth.
+
+We use `simple_arithmetic_test.py` as an example:
 
 ```python
+# Create a tf.Module with one or more `@tf.function` decorated methods to test.
+class SimpleArithmeticModule(tf.Module):
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4], tf.float32),
+      tf.TensorSpec([4], tf.float32)
+  ])
+  def simple_mul(self, a, b):
+    return a * b
+
 # Inherit from `TracedModuleTestCase`.
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
@@ -162,12 +280,20 @@ bazel test //integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf
 ## Generated Artifacts
 
 By default, running an E2E test generates a number of compilation, debugging and
-benchmarking artifacts in `/tmp/iree/modules/`. The location of these artifacts
-can be changed via the `--artifacts_dir` flag. The generated directory structure
-for each module is as follows:
+benchmarking artifacts. These artifacts will be saved
+
+- in `/tmp/iree/modules/` when using `bazel run` or `bazel_test` with
+  `--test_arg=--artifacts_dir=/tmp/iree/modules/`.
+- in `bazel-testlogs/integrations/tensorflow/e2e/test_suite_target_name` when
+  using `bazel test` without specifying `--artifacts_dir`.
+
+The generated directory structure for each module is as follows:
 
 ```shell
 /tmp/iree/modules/ModuleName
+  ├── reproducer__backend.mlir
+  │   # If there is a compilation error, a MLIR file that reproduces the error
+  │   # for a specific backend is included.
   ├── tf_input.mlir
   │   # MLIR for ModuleName in TF's input dialect.
   ├── iree_input.mlir

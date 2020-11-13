@@ -19,11 +19,14 @@ IREE has three backend
 for benchmarking purposes. The coverage tables below are automatically generated
 from IREE's test suites.
 
-## End to end tests of tf.keras layers with static batch sizes in inference mode
+## End to end tests of tf.keras layers (with default configuration and static batch sizes in inference mode)
 
 **Note:** Layers like `Dropout` are listed as passing in this table,
 but they function similar to identity layers in these tests. **See 
 the third table for the coverage of these layers during training.**
+
+These tests also only modify required `tf.keras.layers` arguments.
+See the full API tests below for coverage on of non-default layer configurations.
 
 target | tflite | vmla | llvm-ir | vulkan-spirv
 :-: | :-: | :-: | :-: | :-:
@@ -72,9 +75,9 @@ target | tflite | vmla | llvm-ir | vulkan-spirv
 [LocallyConnected1D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [LocallyConnected2D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 [Masking](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
-[MaxPool1D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
-[MaxPool2D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
-[MaxPool3D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
+[MaxPool1D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
+[MaxPool2D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
+[MaxPool3D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 [Maximum](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [Minimum](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [MultiHeadAttention](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
@@ -100,7 +103,7 @@ target | tflite | vmla | llvm-ir | vulkan-spirv
 [ZeroPadding2D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [ZeroPadding3D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 
-## End to end tests of tf.keras layers with dynamic batch sizes
+## End to end tests of tf.keras layers with dynamic batch sizes (with default configuration in inference mode)
 
 target | tflite | vmla | llvm-ir | vulkan-spirv
 :-: | :-: | :-: | :-: | :-:
@@ -177,7 +180,7 @@ target | tflite | vmla | llvm-ir | vulkan-spirv
 [ZeroPadding2D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 [ZeroPadding3D](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/layers/layers_test.py) | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 
-## End to end tests of tf.keras layers in training mode
+## End to end tests of tf.keras layers in training mode (with defaultconfiguration and static batch sizes)
 
 target | tflite | vmla | llvm-ir | vulkan-spirv
 :-: | :-: | :-: | :-: | :-:

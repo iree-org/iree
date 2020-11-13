@@ -553,7 +553,7 @@ module {
           hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
           return
         }
-        func @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
           %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
           return %0 : tensor<32x64xf32>
         }
@@ -579,7 +579,7 @@ module {
 ### IR Dump After mlir::iree_compiler::{anonymous}::DeclareNumWorkgroupsFnPass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -588,7 +588,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
     return
   }
-  func @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
@@ -603,7 +603,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After Inliner
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
@@ -622,7 +622,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
@@ -639,7 +639,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
@@ -656,7 +656,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
@@ -673,7 +673,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
@@ -690,7 +690,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
@@ -707,7 +707,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
@@ -724,7 +724,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After Canonicalizer
@@ -741,7 +741,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
@@ -758,7 +758,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After CSE
@@ -775,7 +775,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
@@ -795,7 +795,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After Canonicalizer
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
@@ -816,7 +816,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After CSE
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
@@ -837,7 +837,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After mlir::iree_compiler::{anonymous}::SplitDispatchFunctionPass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
   func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
@@ -858,7 +858,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After mlir::iree_compiler::{anonymous}::LinalgTileAndFusePass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -896,7 +896,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After Canonicalizer
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -934,7 +934,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertToGPUPass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1055,7 +1055,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After ConvertAffineToStandard
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1172,7 +1172,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After Canonicalizer
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1236,7 +1236,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After CSE
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1292,7 +1292,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After mlir::iree_compiler::{anonymous}::LegalizeNumWorkgroupsFnPass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1344,7 +1344,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ResolveShapeOpsPass
 ```
-func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c4 = constant 4 : index
   %c1 = constant 1 : index
   return %c4, %c4, %c1 : index, index, index
@@ -1395,7 +1395,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After mlir::iree_compiler::{anonymous}::LegalizeNumWorkgroupsFnPass
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1448,7 +1448,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After LegalizeStandardForSPIRV
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1506,7 +1506,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After Canonicalizer
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1564,7 +1564,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After CSE
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>} {
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1621,9 +1621,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   spv.module Logical GLSL450 {
     spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-    spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
     spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__, spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
       %0 = spv.constant 0.000000e+00 : f32
       %1 = spv.constant 8 : i32
@@ -1631,9 +1631,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       %3 = spv.constant 16 : i32
       %4 = spv.constant 0 : i32
       %5 = spv.constant 1 : i32
-      %6 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-      %7 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      %8 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      %6 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      %7 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      %8 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
       %9 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %10 = spv.Load "Input" %9 : vector<3xi32>
       %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
@@ -1735,7 +1735,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       spv.Return
     }
   }
-  func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
     return %c4, %c4, %c1 : index, index, index
@@ -1753,9 +1753,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 spv.module Logical GLSL450 {
   spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %0 = spv.constant 0.000000e+00 : f32
     %1 = spv.constant 8 : i32
@@ -1763,9 +1763,9 @@ spv.module Logical GLSL450 {
     %3 = spv.constant 16 : i32
     %4 = spv.constant 0 : i32
     %5 = spv.constant 1 : i32
-    %6 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %7 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %6 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %9 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %10 = spv.Load "Input" %9 : vector<3xi32>
     %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
@@ -1876,9 +1876,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %0 = spv.constant 0.000000e+00 : f32
     %1 = spv.constant 8 : i32
@@ -1887,9 +1887,9 @@ spv.module Logical GLSL450 {
     %4 = spv.constant 1024 : i32
     %5 = spv.constant 0 : i32
     %6 = spv.constant 64 : i32
-    %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -1970,9 +1970,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 {
   spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %0 = spv.constant 0.000000e+00 : f32
     %1 = spv.constant 8 : i32
@@ -1981,9 +1981,9 @@ spv.module Logical GLSL450 {
     %4 = spv.constant 1024 : i32
     %5 = spv.constant 0 : i32
     %6 = spv.constant 64 : i32
-    %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2059,9 +2059,9 @@ spv.module Logical GLSL450 {
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
   spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
     %0 = spv.constant 0.000000e+00 : f32
     %1 = spv.constant 8 : i32
@@ -2070,9 +2070,9 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
     %4 = spv.constant 1024 : i32
     %5 = spv.constant 0 : i32
     %6 = spv.constant 64 : i32
-    %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2151,9 +2151,9 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
     spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
       spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
       spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-      spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-      spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
       spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
         %0 = spv.constant 0.000000e+00 : f32
         %1 = spv.constant 8 : i32
@@ -2162,9 +2162,9 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
         %4 = spv.constant 1024 : i32
         %5 = spv.constant 0 : i32
         %6 = spv.constant 64 : i32
-        %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-        %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-        %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+        %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
         %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
         %11 = spv.Load "Input" %10 : vector<3xi32>
         %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2233,7 +2233,7 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
       spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
       spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
     }
-    func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+    func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
       %c4 = constant 4 : index
       %c1 = constant 1 : index
       return %c4, %c4, %c1 : index, index, index
@@ -2262,9 +2262,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -2273,9 +2273,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2344,7 +2344,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -2531,9 +2531,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -2542,9 +2542,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2613,7 +2613,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -2693,9 +2693,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -2704,9 +2704,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2775,7 +2775,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -2855,9 +2855,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -2866,9 +2866,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2937,7 +2937,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -3129,20 +3129,20 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 module {
   hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     hal.device.switch(%dev : !hal.device)
@@ -3166,9 +3166,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -3177,9 +3177,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3248,7 +3248,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -3315,7 +3315,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -3324,7 +3324,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -3334,7 +3334,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
@@ -3419,27 +3419,27 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
@@ -3466,9 +3466,9 @@ module {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
           spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
           spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94548072434048__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072414864__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94548072183856__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862926016__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862927104__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.globalVariable @__resource_var_94703862676144__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
             %0 = spv.constant 0.000000e+00 : f32
             %1 = spv.constant 8 : i32
@@ -3477,9 +3477,9 @@ module {
             %4 = spv.constant 1024 : i32
             %5 = spv.constant 0 : i32
             %6 = spv.constant 64 : i32
-            %7 = spv._address_of @__resource_var_94548072183856__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv._address_of @__resource_var_94548072414864__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_94548072434048__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %7 = spv._address_of @__resource_var_94703862676144__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv._address_of @__resource_var_94703862927104__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv._address_of @__resource_var_94703862926016__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3548,7 +3548,7 @@ module {
           spv.EntryPoint "GLCompute" @dot_ex_dispatch_0, @__builtin_var_WorkgroupId__, @__builtin_var_LocalInvocationId__
           spv.ExecutionMode @dot_ex_dispatch_0 "LocalSize", 16, 8, 1
         }
-        func @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) attributes {sym_visibility = "private"} {
+        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c4 = constant 4 : index
           %c1 = constant 1 : index
           return %c4, %c4, %c1 : index, index, index
@@ -3618,7 +3618,7 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
   %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
   return %0 : i1
@@ -3627,7 +3627,7 @@ func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "priva
 ```
 ### IR Dump After CSE
 ```
-func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+func private @_device_match_id_0_initializer() -> i1 {
   %dev = hal.ex.shared_device : !hal.device
   %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
   return %0 : i1
@@ -3636,7 +3636,7 @@ func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "priva
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -3645,7 +3645,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After CSE
 ```
-func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
@@ -3654,7 +3654,7 @@ func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attri
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -3664,7 +3664,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After CSE
 ```
-func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %dev = hal.ex.shared_device : !hal.device
   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
@@ -3674,7 +3674,7 @@ func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {s
 ```
 ### IR Dump After Canonicalizer
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
@@ -3691,7 +3691,7 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
 ```
 ### IR Dump After CSE
 ```
-func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+func private @_executable_cache_initializer() -> !hal.executable_cache {
   %dev = hal.ex.shared_device : !hal.device
   %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
@@ -3845,27 +3845,27 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
@@ -3943,27 +3943,27 @@ module {
 ```
 module {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
-  func @_device_match_id_0_initializer() -> i1 attributes {sym_visibility = "private"} {
+  func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
     %0 = hal.device.match.id %dev, pattern = ["vulkan*"] : (!hal.device) -> i1
     return %0 : i1
   }
   hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
-  func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
+  func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
     %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
-  func @_executable_layout_0_initializer() -> !hal.executable_layout attributes {sym_visibility = "private"} {
+  func private @_executable_layout_0_initializer() -> !hal.executable_layout {
     %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
     %dev = hal.ex.shared_device : !hal.device
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
   hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_visibility = "private"} {
+  func private @_executable_cache_initializer() -> !hal.executable_cache {
     %dev = hal.ex.shared_device : !hal.device
     %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
