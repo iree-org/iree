@@ -16,7 +16,7 @@ flow.variable @v_initialized_const dense<4> : tensor<4xi32>
 
 // CHECK: flow.variable @v_initialized init(@initializer) : tensor<4xi32>
 flow.variable @v_initialized init(@initializer) : tensor<4xi32>
-func @initializer() -> tensor<4xi32>
+func private @initializer() -> tensor<4xi32>
 
 // -----
 
