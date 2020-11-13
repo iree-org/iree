@@ -160,7 +160,6 @@ class ConvertFromExtents : public OpConversionPattern<shape::FromExtentsOp> {
     auto make = rewriter.create<Shape::MakeRankedShapeOp>(
         op.getLoc(), resultType, dynOperands);
 
-    make.dump();
     rewriter.replaceOp(op, make.getResult());
 
     return success();
