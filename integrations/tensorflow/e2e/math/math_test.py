@@ -541,6 +541,8 @@ def main(argv):
     function_str = FLAGS.functions[0]
   dim_str = "dynamic_dims" if FLAGS.dynamic_dims else "static_dims"
   settings_str = os.path.join(function_str, dim_str)
+  # The relative artifacts directory path is calculated from the module name
+  # TODO(meadowlark): provide a better way of overridding this default.
   TfMathModule.__name__ = os.path.join("tf", "math", settings_str)
 
   TfMathTest.generate_unittests(TfMathModule)
