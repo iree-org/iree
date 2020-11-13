@@ -46,6 +46,40 @@ func @f(%arg0: tensor<?xf32>, %index: i32) {
 }
 
 // -----
+// shape.get_extent
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?xf32>) {
+  %c0 = constant 0 : index
+  // CHECK: [[SHAPE:%.+]] = shapex.get_ranked_shape %arg0 : tensor<?xf32> -> !shapex.ranked_shape<[?]>
+  %0 = "shape.shape_of"(%arg0) : (tensor<?xf32>) -> !shape.shape
+
+  // CHECK: [[DIM:%.+]] = shapex.ranked_dim [[SHAPE]][0] : !shapex.ranked_shape<[?]> -> index
+  %result = shape.get_extent %0, %c0 : !shape.shape, index -> !shape.size
+  return
+}
+
+// -----
+// shape.from_extents
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?x?xf32>) {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+
+  // CHECK: [[SHAPE:%.]] = shapex.get_ranked_shape %arg0 : tensor<?x?xf32>
+  %0 = "shape.shape_of"(%arg0) : (tensor<?x?xf32>) -> tensor<2xindex>
+
+  // CHECK: [[DIM0:%.+]] = shapex.ranked_dim [[SHAPE]][0]
+  %dim0 = shape.get_extent %0, %c0 : tensor<2xindex>, index -> index
+
+  // CHECK: [[DIM1:%.+]] = shapex.ranked_dim [[SHAPE]][1]
+  %dim1 = shape.get_extent %0, %c1 : tensor<2xindex>, index -> index
+
+  // CHECK: [[OUT:%.+]] = shapex.make_ranked_shape [[DIM0]], [[DIM1]]
+  %result = "shape.from_extents"(%dim0, %dim1) : (index, index) -> !shape.shape
+  return
+}
+
+// -----
 // shape.broadcast
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) {
