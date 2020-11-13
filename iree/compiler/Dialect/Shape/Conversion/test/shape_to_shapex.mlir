@@ -46,6 +46,28 @@ func @f(%arg0: tensor<?xf32>, %index: i32) {
 }
 
 // -----
+// shape.get_extent
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?xf32>) {
+  %c0 = constant 0 : index
+  // CHECK: %[[SHAPE:.+]] = shapex.get_ranked_shape %arg0 : tensor<?xf32> -> !shapex.ranked_shape<[?]>
+  %0 = "shape.shape_of"(%arg0) : (tensor<?xf32>) -> !shape.shape
+
+  // CHECK: [[DIM:%.+]] = shapex.ranked_dim %[[SHAPE]][0] : !shapex.ranked_shape<[?]> -> index
+  %result = shape.get_extent %0, %c0 : !shape.shape, index -> !shape.size
+  return
+}
+
+// -----
+// shape.from_extents
+// CHECK-LABEL: func @f
+func @f(%arg0: index) {
+  // CHECK: shapex.make_ranked_shape %arg0, %arg0
+  %result = "shape.from_extents"(%arg0, %arg0) : (index, index) -> !shape.shape
+  return
+}
+
+// -----
 // shape.broadcast
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) {

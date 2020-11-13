@@ -121,7 +121,9 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   for (int i = 0; i < lhsFuncOps.size(); ++i) {
     auto lhsRegion = lhsFuncOps[i].getCallableRegion();
     auto rhsRegion = rhsFuncOps[i].getCallableRegion();
-    return areRegionsEquivalent(lhsRegion, rhsRegion);
+    if (!areRegionsEquivalent(lhsRegion, rhsRegion)) {
+      return false;
+    }
   }
 
   return true;

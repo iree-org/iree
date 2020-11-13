@@ -184,7 +184,12 @@ FAILING_STATIC = [
     },
     {
         # Failing on LLVM and Vulkan
-        "layer": "Lambda",
+        "layer": [
+            "Lambda",
+            "MaxPool1D",
+            "MaxPool2D",
+            "MaxPool3D",
+        ],
         "target_backends": [
             "iree_llvmjit",
             "iree_vulkan",
@@ -198,9 +203,6 @@ FAILING_STATIC = [
             "AveragePooling3D",
             "GRU",
             "LSTM",  # TODO(silvasean): Get this test working on Vulkan.
-            "MaxPool1D",
-            "MaxPool2D",
-            "MaxPool3D",
             "ThresholdedReLU",
         ],
         "target_backends": "iree_vulkan",
@@ -322,20 +324,14 @@ FAILING_FULL_API = [
             "AveragePooling2D",
             "AveragePooling3D",
             "Conv1DTranspose",
+            "MaxPool1D",
+            "MaxPool2D",
+            "MaxPool3D",
         ],
         "target_backends": [
             "iree_llvmjit",
             "iree_vulkan",
         ],
-    },
-    {
-        # Failing on Vulkan
-        "layer": [
-            "MaxPool1D",
-            "MaxPool2D",
-            "MaxPool3D",
-        ],
-        "target_backends": "iree_vulkan",
     },
 ]
 

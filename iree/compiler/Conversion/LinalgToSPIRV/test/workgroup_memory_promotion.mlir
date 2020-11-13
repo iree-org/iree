@@ -66,10 +66,9 @@ module attributes {
       : memref<3x4x3x2xf32>, memref<?x?x?x3xf32>, memref<?x?x?x2xf32>
     return
   }
-  func @conv_no_padding_tile__num_workgroups__
+  func private @conv_no_padding_tile__num_workgroups__
     (!shapex.ranked_shape<[3,4,3,2]>, !shapex.ranked_shape<[?,?,?,3]>,
      !shapex.ranked_shape<[?,?,?,2]>) -> (index, index, index)
-    attributes {symbol_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

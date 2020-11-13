@@ -51,7 +51,7 @@ class BatchNormTest(tf_test_utils.TracedModuleTestCase):
       # Note: scaling by a small value to increase numerical stability.
       x = tf_utils.uniform((4, 16)) * 1e-3
       mean = tf_utils.uniform((16,)) * 1e-3
-      variance = tf_utils.uniform((16,)) * 1e-3
+      variance = tf_utils.uniform((16,), low=0.0) * 1e-3
       offset = tf_utils.uniform((16,)) * 1e-3
       scale = tf_utils.uniform((16,)) * 1e-3
       module.batch_norm_inference(x, mean, variance, offset, scale)

@@ -20,6 +20,7 @@
 // execute an entry point function (e.g. total number of workgroups).
 //
 //===----------------------------------------------------------------------===//
+
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
@@ -60,15 +61,15 @@ static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
   return std::make_tuple(nprocs_x, nprocs / nprocs_x);
 }
 
-/// For a given operation `op`, `options` and `resourceLimits` of the hardware
-/// compute the
+/// For a given operation `op`, compute the following configurations according
+/// to SPIR-V `targetEnv` and `options`:
 /// 1) number of tiling levels and tile sizes to use (updates `tileSizes`),
 /// 2) workgroup size to use (updates `workgroupSize`),
 /// 3) number of subgroups to use if two level tiling is used (updates
 ///    `numSubgroups`).
 template <typename T>
-static LogicalResult getOpLaunchConfig(T op, const SPIRVCodegenOptions &options,
-                                       spirv::ResourceLimitsAttr resourceLimits,
+static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
+                                       const SPIRVCodegenOptions &options,
                                        TileSizesListType &tileSizes,
                                        std::array<int64_t, 3> &workgroupSize,
                                        std::array<int64_t, 3> &numSubgroups) {
@@ -78,13 +79,14 @@ static LogicalResult getOpLaunchConfig(T op, const SPIRVCodegenOptions &options,
 /// Launch config for `linalg.batchmatmul`.
 template <>
 LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
+                                const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
-                                spirv::ResourceLimitsAttr resourceLimits,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
+  unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
+                                  .max_compute_workgroup_invocations()
+                                  .getInt();
   std::tie(workgroupSize[0], workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
   workgroupSize[2] = 1;
@@ -134,11 +136,10 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
 /// Launch configuration for using spv.CooperativeMatrixMulAddNV
 /// operations. Needs two levels of tiling.
 static LogicalResult getConfigForCooperativeMatmul(
-    linalg::MatmulOp op, const SPIRVCodegenOptions &options,
-    spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
+    linalg::MatmulOp op, const spirv::TargetEnv &targetEnv,
+    const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
     return failure();
@@ -150,6 +151,7 @@ static LogicalResult getConfigForCooperativeMatmul(
   ShapedType outputType =
       op.output_buffers().front().getType().cast<ShapedType>();
 
+  auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
       getCooperativeMatmulSubgroupSize(
           resourceLimits, lhsType.getElementType(), rhsType.getElementType(),
@@ -201,13 +203,13 @@ static LogicalResult getConfigForCooperativeMatmul(
 
 /// Launch configuration for different known GPU configuration.
 static LogicalResult getTargetSpecificConfig(
-    linalg::MatmulOp op, const SPIRVCodegenOptions &options,
-    spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
+    linalg::MatmulOp op, const spirv::TargetEnv &targetEnv,
+    const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
-  if (spirv::lookupTargetEnv(op).getVendorID() != spirv::Vendor::ARM)
-    return failure();
-  workgroupSize[0] = resourceLimits.subgroup_size().getInt();
+  if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
+
+  workgroupSize[0] = targetEnv.getResourceLimits().subgroup_size().getInt();
   workgroupSize[1] = 1;
   workgroupSize[2] = 1;
   SmallVector<int64_t, 4> ts = {8, 64, 4};
@@ -222,23 +224,25 @@ static LogicalResult getTargetSpecificConfig(
 
 template <>
 LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
+                                const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
-                                spirv::ResourceLimitsAttr resourceLimits,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  if (options.enableVectorization && succeeded(getConfigForCooperativeMatmul(
-                                         op, options, resourceLimits, tileSizes,
-                                         workgroupSize, numSubgroups))) {
+  if (options.enableVectorization &&
+      succeeded(getConfigForCooperativeMatmul(op, targetEnv, options, tileSizes,
+                                              workgroupSize, numSubgroups))) {
     return success();
   } else if (options.enableVectorization &&
-             succeeded(getTargetSpecificConfig(op, options, resourceLimits,
+             succeeded(getTargetSpecificConfig(op, targetEnv, options,
                                                tileSizes, workgroupSize,
                                                numSubgroups))) {
     return success();
   }
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
+
+  unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
+                                  .max_compute_workgroup_invocations()
+                                  .getInt();
   std::tie(workgroupSize[0], workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
   workgroupSize[2] = 1;
@@ -259,13 +263,14 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
 
 template <>
 LogicalResult getOpLaunchConfig(linalg::ConvOp op,
+                                const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
-                                spirv::ResourceLimitsAttr resourceLimits,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
+  unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
+                                  .max_compute_workgroup_invocations()
+                                  .getInt();
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts = {1, tileSizeY, tileSizeX};
@@ -276,12 +281,13 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
 
 template <typename PoolingOpTy>
 static LogicalResult getPoolingOpLaunchConfig(
-    PoolingOpTy op, const SPIRVCodegenOptions &options,
-    spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
+    PoolingOpTy op, const spirv::TargetEnv &targetEnv,
+    const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
+  unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
+                                  .max_compute_workgroup_invocations()
+                                  .getInt();
   // Pooling op seems to be rank polymorphic but is not well specified enough to
   // be able to figure out which dimensions of the output correspond to the
   // pooled dimension and which are not. Need to fix that, but for now just use
@@ -297,15 +303,15 @@ static LogicalResult getPoolingOpLaunchConfig(
   return success();
 }
 
-#define DEFINE_POOLING_OP_CONFIG(opName)                                      \
-  template <>                                                                 \
-  LogicalResult getOpLaunchConfig(                                            \
-      opName op, const SPIRVCodegenOptions &options,                          \
-      spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes, \
-      std::array<int64_t, 3> &workgroupSize,                                  \
-      std::array<int64_t, 3> &numSubgroups) {                                 \
-    return getPoolingOpLaunchConfig(op, options, resourceLimits, tileSizes,   \
-                                    workgroupSize, numSubgroups);             \
+#define DEFINE_POOLING_OP_CONFIG(opName)                                \
+  template <>                                                           \
+  LogicalResult getOpLaunchConfig(                                      \
+      opName op, const spirv::TargetEnv &targetEnv,                     \
+      const SPIRVCodegenOptions &options, TileSizesListType &tileSizes, \
+      std::array<int64_t, 3> &workgroupSize,                            \
+      std::array<int64_t, 3> &numSubgroups) {                           \
+    return getPoolingOpLaunchConfig(op, targetEnv, options, tileSizes,  \
+                                    workgroupSize, numSubgroups);       \
   }
 
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingMaxOp)
@@ -345,22 +351,20 @@ LogicalResult LaunchConfig::init(
 
   if (linalgOps.empty()) return success();
 
-  spirv::ResourceLimitsAttr resourceLimits =
-      spirv::lookupTargetEnv(*linalgOps.begin()).getResourceLimits();
+  spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(*linalgOps.begin()));
 
   Optional<linalg::LinalgOp> rootOperation = {};
 
   for (Operation *op : linalgOps) {
-    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
 #define DISPATCH(opName)                                                      \
-  if (auto lOp = dyn_cast<opName>(linalgOp.getOperation())) {                 \
+  if (auto linalgOp = dyn_cast<opName>(op)) {                                 \
     if (rootOperation) {                                                      \
-      return lOp.emitError(                                                   \
+      return linalgOp.emitError(                                              \
           "unhandled multiple root operations in dispatch region");           \
     }                                                                         \
-    rootOperation = cast<linalg::LinalgOp>(lOp.getOperation());               \
+    rootOperation = cast<linalg::LinalgOp>(linalgOp.getOperation());          \
     TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)];     \
-    if (failed(getOpLaunchConfig(lOp, options, resourceLimits, tileSizesInfo, \
+    if (failed(getOpLaunchConfig(linalgOp, targetEnv, options, tileSizesInfo, \
                                  workgroupSize, numSubgroups))) {             \
       return failure();                                                       \
     }                                                                         \
@@ -455,10 +459,8 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
   auto targetEnv = spirv::TargetEnv(targetEnvAttr);
   if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
       targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    spirv::ResourceLimitsAttr resourceLimits =
-        targetEnvAttr.getResourceLimits();
     return getCooperativeMatmulSubgroupSize(
-        resourceLimits, op.getLhsType().getElementType(),
+        targetEnv.getResourceLimits(), op.getLhsType().getElementType(),
         op.getRhsType().getElementType(),
         op.getAccType().cast<VectorType>().getElementType(),
         op.getResultType().cast<VectorType>().getElementType());

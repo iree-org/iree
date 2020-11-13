@@ -43,8 +43,8 @@ InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
 
 def uniform(shape: Sequence[int],
             dtype: Union[tf.DType, np.dtype] = np.float32,
-            low: float = 0.,
-            high: float = 1.) -> np.ndarray:
+            low: float = -1.0,
+            high: float = 1.0) -> np.ndarray:
   """np.random.uniform with simplified API and dtype control."""
   dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
   return np.random.uniform(size=shape, low=low, high=high).astype(dtype)

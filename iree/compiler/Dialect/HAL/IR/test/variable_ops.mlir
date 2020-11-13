@@ -22,7 +22,7 @@ hal.variable @v_initialized_const2 : i32 = 40 : i64
 
 // CHECK: hal.variable @v_initialized init(@initializer) : !hal.buffer
 hal.variable @v_initialized init(@initializer) : !hal.buffer
-func @initializer() -> !hal.buffer
+func private @initializer() -> !hal.buffer
 
 // -----
 
