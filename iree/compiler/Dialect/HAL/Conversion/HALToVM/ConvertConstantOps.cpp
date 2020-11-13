@@ -34,8 +34,7 @@ class ConstantPoolOpConversion
       auto rodataName = (op.sym_name() + storageOp.sym_name()).str();
       auto rodataOp = rewriter.create<IREE::VM::RodataOp>(
           storageOp.getLoc(), rodataName, storageOp.value());
-      SymbolTable::setSymbolVisibility(rodataOp,
-                                       SymbolTable::Visibility::Private);
+      rodataOp.setPrivate();
     }
     rewriter.eraseOp(op);
     return success();

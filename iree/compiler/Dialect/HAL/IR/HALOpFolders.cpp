@@ -57,8 +57,7 @@ struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
         auto newOp = rewriter.create<VariableOp>(op.getLoc(), op.sym_name(),
                                                  op.is_mutable(), op.type(),
                                                  constResult);
-        SymbolTable::setSymbolVisibility(newOp,
-                                         SymbolTable::getSymbolVisibility(op));
+        newOp.setVisibility(op.getVisibility());
         rewriter.replaceOp(op, {});
         return success();
       }

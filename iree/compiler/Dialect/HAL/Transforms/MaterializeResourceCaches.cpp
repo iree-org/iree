@@ -99,8 +99,7 @@ class MaterializeResourceCachesPass
     auto executableType = ExecutableType::get(executableOp.getContext());
     auto variableOp = moduleBuilder.create<VariableOp>(
         executableOp.getLoc(), symbolName, /*isMutable=*/true, executableType);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
     executableCache_.try_emplace(executableOp.sym_name(), variableOp);
     return variableOp;
   }
@@ -121,14 +120,12 @@ class MaterializeResourceCachesPass
         loc, symbolName,
         /*isMutable=*/false, layoutType, StringRef(initializerName),
         llvm::None);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
     descriptorSetLayoutCache_.try_emplace(bindingsAttr, variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
-    SymbolTable::setSymbolVisibility(initializerOp,
-                                     SymbolTable::Visibility::Private);
+    initializerOp.setPrivate();
     auto *block = initializerOp.addEntryBlock();
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
@@ -165,14 +162,12 @@ class MaterializeResourceCachesPass
     auto variableOp = moduleBuilder.create<VariableOp>(
         loc, symbolName, /*isMutable=*/false, layoutType,
         StringRef(initializerName), llvm::None);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
     executableLayoutCache_.try_emplace(setLayoutsArrayAttr, variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
-    SymbolTable::setSymbolVisibility(initializerOp,
-                                     SymbolTable::Visibility::Private);
+    initializerOp.setPrivate();
     auto *block = initializerOp.addEntryBlock();
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     SmallVector<Value, 4> setLayoutValues;
@@ -208,14 +203,12 @@ class MaterializeResourceCachesPass
 
     // TODO(#1146): we define this as public right now to ensure it remains
     // after DCE.
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Public);
+    // variableOp.setPublic();
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName,
         moduleBuilder.getFunctionType({}, {executableCacheType}));
-    SymbolTable::setSymbolVisibility(initializerOp,
-                                     SymbolTable::Visibility::Private);
+    initializerOp.setPrivate();
     auto *block = initializerOp.addEntryBlock();
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);

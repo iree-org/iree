@@ -82,8 +82,7 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
     auto variableOp = globalBuilder.create<IREE::Flow::VariableOp>(
         globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
         globalTensor.type(), globalTensor.value());
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
   }
 
   // TODO(silvasean): Make this conversion interprocedural.

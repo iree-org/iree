@@ -147,11 +147,8 @@ static Optional<FuncOp> createDispatchEntryThunk(
   auto thunkFuncType = FunctionType::get({}, {}, clonedFuncOp.getContext());
   auto thunkFuncOp = FuncOp::create(clonedFuncOp.getLoc(),
                                     clonedFuncOp.getName(), thunkFuncType);
-  SymbolTable::setSymbolVisibility(thunkFuncOp,
-                                   SymbolTable::Visibility::Public);
   clonedFuncOp.setName((clonedFuncOp.getName() + "_impl").str());
-  SymbolTable::setSymbolVisibility(clonedFuncOp,
-                                   SymbolTable::Visibility::Private);
+  clonedFuncOp.setPrivate();
   clonedFuncOp.getParentRegion()->getBlocks().front().push_front(thunkFuncOp);
 
   // For now we only support tensor types, so bindings are in order.
@@ -286,8 +283,7 @@ static LogicalResult declareEntryPointOps(
 
     // Copy interface bindings into the target module so symbol references work.
     auto inlinedInterfaceOp = interfaceOp.clone();
-    SymbolTable::setSymbolVisibility(inlinedInterfaceOp,
-                                     SymbolTable::Visibility::Private);
+    inlinedInterfaceOp.setPrivate();
     targetOp.getInnerModule().push_back(inlinedInterfaceOp);
   }
   return success();
@@ -369,8 +365,7 @@ class MaterializeInterfacesPass
       builder.setInsertionPointAfter(sourceOp);
       auto exectuableOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
-      SymbolTable::setSymbolVisibility(exectuableOp,
-                                       SymbolTable::Visibility::Private);
+      exectuableOp.setPrivate();
 
       // Add IO ops to define the bindings and how parameters are passed.
       auto interfaceOp = declareInterfaceIO(sourceOp, exectuableOp);
