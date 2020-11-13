@@ -284,6 +284,14 @@ mark_as_advanced(
   CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
 )
 
+if(${IREE_ENABLE_RUNTIME_TRACING})
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")  # Selects Clang or GCC.
+    string (APPEND CMAKE_EXE_LINKER_FLAGS " -ldl")
+  endif()
+endif()
+
+string(APPEND CMAKE_EXE_LINKER_FLAGS -ldl)
+
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
