@@ -300,6 +300,7 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
 #-------------------------------------------------------------------------------
 
 if(IREE_ENABLE_EMITC)
+  set(EMITC_BUILD_EMBEDDED ON)
   set(EMITC_ENABLE_HLO OFF)
   set(EMITC_INCLUDE_TESTS OFF)
 
