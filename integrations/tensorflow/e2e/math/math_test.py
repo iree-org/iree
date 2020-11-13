@@ -493,14 +493,14 @@ class TfMathModule(tf_test_utils.TestModule):
   def __init__(self):
     super().__init__()
     for function_name in FLAGS.functions:
-      # pytype: disable=attribute-error :\
+      # pytype: disable=attribute-error
       for exported_name, config in FUNCTION_TO_CONFIGS[function_name].items():
-        # pytype: enable=attribute-error :/
+        # pytype: enable=attribute-error
         if is_complex(config) and not FLAGS.test_complex:
           continue
         function_unittest = create_function_unittest(config, function_name,
                                                      exported_name)
-        setattr(module, exported_name, function_unittest)
+        setattr(self, exported_name, function_unittest)
 
 
 class TfMathTest(tf_test_utils.TracedModuleTestCase):
@@ -518,9 +518,9 @@ def main(argv):
 
   if FLAGS.list_functions_with_complex_tests:
     for function_name, configs in FUNCTION_TO_CONFIGS.items():
-      # pytype: disable=attribute-error :\
+      # pytype: disable=attribute-error
       for exported_name, config in configs.items():
-        # pytype: enable=attribute-error :/
+        # pytype: enable=attribute-error
         if is_complex(config):
           print(f'    "{function_name}",')
     return

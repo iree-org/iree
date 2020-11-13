@@ -532,6 +532,9 @@ iree_e2e_cartesian_product_test_suite(
 # These tests compile all functions in tf.math at once for testing so that
 # we can run them on the CI with 5 additional targets instead of 640.
 
+# Failing on Kokoro.
+TFLITE_FAILING_KOKORO = TFLITE_FAILING + ["less"]
+
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
 VMLA_FAILING_MULTIPLE = VMLA_FAILING + ["multiply"]
 
@@ -561,7 +564,7 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
         iree_vmla = set_minus(TF_MATH_FUNCTIONS, VMLA_FAILING_MULTIPLE),
         iree_vulkan = set_minus(TF_MATH_FUNCTIONS, VULKAN_FAILING_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
-        tflite = set_minus(TF_MATH_FUNCTIONS, TFLITE_FAILING),
+        tflite = set_minus(TF_MATH_FUNCTIONS, TFLITE_FAILING_KOKORO),
     ).items()
 ]
 
