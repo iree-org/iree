@@ -124,11 +124,11 @@ TEST_SUITES_TO_HEADERS = {
 }
 
 TEST_SUITES_TO_NOTES = {
-    '//integrations/tensorflow/e2e/math:math_tests': (
-        '**Note:** To be thorough, these tests use high rank tensors and\n'
-        'test int dtypes where TensorFlow allows them to be used. Both of\n'
-        'these choices disproportionately affect TFLite coverage, and\n'
-        'don\'t represent coverage for simple use cases.\n'),
+    '//integrations/tensorflow/e2e/math:math_tests':
+        ('**Note:** To be thorough, these tests use high rank tensors and\n'
+         'test int dtypes where TensorFlow allows them to be used. Both of\n'
+         'these choices disproportionately affect TFLite coverage, and\n'
+         'don\'t represent coverage for simple use cases.\n'),
     '//integrations/tensorflow/e2e/keras/layers:layers_tests': (
         '**Note:** Layers like `Dropout` are listed as passing in this table,\n'
         'but they function similar to identity layers in these tests. **See \n'
