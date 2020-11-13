@@ -115,7 +115,7 @@ bool GenerateImpl(const std::string& impl_file,
   GenerateNamespaceOpen(f);
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "alignas(alignof(void*)) static char const file_" << i << "[] = {\n";
-    std::string contents;
+    std::string contents = "";
     if (!SlurpFile(input_files[i], &contents)) {
       std::cerr << "Error reading file " << input_files[i] << "\n";
       return false;
