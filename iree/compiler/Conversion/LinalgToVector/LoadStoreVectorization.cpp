@@ -206,6 +206,7 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
         genericOp.iterator_types(),
         /*doc=*/nullptr,
         /*library_call=*/nullptr,
+        genericOp.sparseAttr(),
         /*symbol_source=*/nullptr);
 
     Region &newRegion = newOp.region();
