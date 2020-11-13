@@ -72,8 +72,7 @@ class StripAndSplatConstantVariablesPass
       builder.setInsertionPointAfter(op);
       auto newOp = builder.create<VariableOp>(
           op.getLoc(), op.sym_name(), op.is_mutable(), op.type(), newValue);
-      SymbolTable::setSymbolVisibility(newOp,
-                                       SymbolTable::getSymbolVisibility(op));
+      newOp.setVisibility(op.getVisibility());
       newOp.setAttr("noinline", UnitAttr::get(builder.getContext()));
       op.erase();
 

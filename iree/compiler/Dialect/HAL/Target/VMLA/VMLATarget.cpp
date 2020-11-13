@@ -117,8 +117,7 @@ class VMLATargetBackend final : public TargetBackend {
     // Create our new "linked" hal.executable.
     auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), "linked_vmla");
-    SymbolTable::setSymbolVisibility(linkedExecutableOp,
-                                     SymbolTable::Visibility::Private);
+    linkedExecutableOp.setPrivate();
     // Add our VMLA hal.executable.target with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableTargetOp>(

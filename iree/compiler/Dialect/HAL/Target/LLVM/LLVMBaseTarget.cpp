@@ -89,8 +89,7 @@ LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
   std::string linkedExecutableName = llvm::formatv("linked_{0}", name());
   auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
       moduleOp.getLoc(), linkedExecutableName);
-  SymbolTable::setSymbolVisibility(linkedExecutableOp,
-                                   SymbolTable::Visibility::Private);
+  linkedExecutableOp.setPrivate();
   // Add our hal.executable.target with an empty module.
   builder.setInsertionPointToStart(linkedExecutableOp.getBody());
   auto linkedTargetOp = builder.create<IREE::HAL::ExecutableTargetOp>(
