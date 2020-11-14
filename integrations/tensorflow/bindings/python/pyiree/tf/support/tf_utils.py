@@ -77,7 +77,7 @@ def apply_function(values, function):
   if isinstance(values, list):
     return [apply_function(v, function) for v in values]
   elif isinstance(values, tuple):
-    return tuple([apply_function(v, function) for v in values])
+    return tuple(apply_function(v, function) for v in values)
   elif isinstance(values, dict):
     return {k: apply_function(v, function) for k, v in values.items()}
   else:
