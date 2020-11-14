@@ -169,7 +169,7 @@ class IdentifyConstantPoolsPass
                       .create<ConstantPoolOp>(moduleBuilder.getUnknownLoc(),
                                               poolName, bufferConstraints);
     moduleSymbolTable.insert(poolOp, moduleBuilder.getInsertionPoint());
-    SymbolTable::setSymbolVisibility(poolOp, SymbolTable::Visibility::Private);
+    poolOp.setPrivate();
 
     // Replace each variable and keep track of the mapping from variable->value.
     // This allows us to do one run through the module to replace usages as a
@@ -187,8 +187,7 @@ class IdentifyConstantPoolsPass
       // Create the constant in the pool.
       auto valueOp = poolBuilder.create<ConstantPoolValueOp>(
           variableOp.getLoc(), variableOp.getName(), value);
-      SymbolTable::setSymbolVisibility(valueOp,
-                                       SymbolTable::Visibility::Nested);
+      valueOp.setNested();
 
       // If the variable is an immutable constant and used in compatible
       // ways we can turn them into constant loads instead. These will avoid
@@ -245,8 +244,7 @@ class IdentifyConstantPoolsPass
     auto initializerFunc = moduleBuilder.create<FuncOp>(
         variableOp.getLoc(), initializerName,
         moduleBuilder.getFunctionType({}, {variableOp.type()}));
-    SymbolTable::setSymbolVisibility(initializerFunc,
-                                     SymbolTable::Visibility::Private);
+    initializerFunc.setPrivate();
     variableOp.removeAttr("initial_value");
     variableOp.setAttr("initializer",
                        moduleBuilder.getSymbolRefAttr(initializerFunc));
