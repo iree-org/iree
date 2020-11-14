@@ -32,7 +32,7 @@
 
 namespace mlir {
 class FuncOp;
-class LogicalResult;
+struct LogicalResult;
 class Operation;
 class PatternRewriter;
 class ShapedType;
