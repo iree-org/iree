@@ -120,12 +120,13 @@ function(iree_cc_binary)
   )
   target_compile_options(${_NAME}
     PRIVATE
+      ${IREE_DEFAULT_COPTS}
       ${_RULE_COPTS}
   )
   target_link_options(${_NAME}
     PRIVATE
-      ${_RULE_LINKOPTS}
       ${IREE_DEFAULT_LINKOPTS}
+      ${_RULE_LINKOPTS}
   )
   iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 

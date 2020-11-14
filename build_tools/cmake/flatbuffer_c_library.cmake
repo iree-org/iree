@@ -138,8 +138,8 @@ function(flatbuffer_c_library)
   target_link_libraries(${_NAME}
     INTERFACE
       flatcc::runtime
-      ${_RULE_LINKOPTS}
       ${IREE_DEFAULT_LINKOPTS}
+      ${_RULE_LINKOPTS}
   )
   target_compile_definitions(${_NAME}
     INTERFACE
