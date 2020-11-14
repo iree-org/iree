@@ -151,7 +151,7 @@ function(iree_get_build_command EXECUTABLE_TARGET)
   if(NOT _RULE_CONFIG)
     set(_RULE_CONFIG "$<CONFIG>")
   endif()
-  if (CMAKE_GENERATOR MATCHES "Make")
+  if(CMAKE_GENERATOR MATCHES "Make")
     # Use special command for Makefiles to support parallelism.
     set(${_RULE_CMDVAR}
         "$(MAKE)" "-C" "${_RULE_BINDIR}" "${EXECUTABLE_TARGET}" PARENT_SCOPE)
