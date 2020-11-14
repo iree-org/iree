@@ -378,14 +378,6 @@ else()
   set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
 endif()
 
-iree_select_compiler_opts(FLATBUFFERS_COPTS
-  CLANG
-    # Flatbuffers has a bunch of incorrect documentation annotations.
-    "-Wno-documentation"
-    "-Wno-documentation-unknown-command"
-)
-list(APPEND IREE_DEFAULT_COPTS ${FLATBUFFERS_COPTS})
-
 #-------------------------------------------------------------------------------
 # Third party: flatcc
 #-------------------------------------------------------------------------------
