@@ -121,8 +121,8 @@ function(flatbuffer_cc_library)
   target_link_libraries(${_NAME}
     INTERFACE
       flatbuffers
-      ${_RULE_LINKOPTS}
       ${IREE_DEFAULT_LINKOPTS}
+      ${_RULE_LINKOPTS}
   )
   target_compile_definitions(${_NAME}
     INTERFACE

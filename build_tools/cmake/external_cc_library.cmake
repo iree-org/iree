@@ -134,8 +134,8 @@ function(external_cc_library)
       PUBLIC
         ${_RULE_DEPS}
       PRIVATE
-        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
     )
     target_compile_definitions(${_NAME}
       PUBLIC
@@ -169,14 +169,14 @@ function(external_cc_library)
     )
     target_compile_options(${_NAME}
       INTERFACE
-        ${_RULE_COPTS}
         ${IREE_DEFAULT_COPTS}
+        ${_RULE_COPTS}
     )
     target_link_libraries(${_NAME}
       INTERFACE
-        ${_RULE_DEPS}
-        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
+        ${_RULE_DEPS}
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
     target_compile_definitions(${_NAME}
