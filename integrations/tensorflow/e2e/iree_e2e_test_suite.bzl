@@ -23,7 +23,7 @@ def get_driver(backend):
         driver = "llvm"
     return driver
 
-def set_minus(include, exclude):
+def set_difference(include, exclude):
     return [
         value
         for value in include

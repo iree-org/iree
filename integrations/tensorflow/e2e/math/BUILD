@@ -27,7 +27,7 @@ load(
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
-    "set_minus",
+    "set_difference",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
@@ -560,11 +560,11 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_minus(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
-        iree_vmla = set_minus(TF_MATH_FUNCTIONS, VMLA_FAILING_MULTIPLE),
-        iree_vulkan = set_minus(TF_MATH_FUNCTIONS, VULKAN_FAILING_MULTIPLE),
+        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
+        iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_MULTIPLE),
+        iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
-        tflite = set_minus(TF_MATH_FUNCTIONS, TFLITE_FAILING_KOKORO),
+        tflite = set_difference(TF_MATH_FUNCTIONS, TFLITE_FAILING_KOKORO),
     ).items()
 ]
 
@@ -783,9 +783,9 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_minus(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
-        iree_vmla = set_minus(TF_MATH_FUNCTIONS, VMLA_FAILING_DYNAMIC_MULTIPLE),
-        iree_vulkan = set_minus(TF_MATH_FUNCTIONS, VULKAN_FAILING_DYNAMIC),
+        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
+        iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_DYNAMIC_MULTIPLE),
+        iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_DYNAMIC),
         tf = TF_MATH_FUNCTIONS,
     ).items()
 ]
@@ -953,9 +953,9 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_minus(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
-        iree_vmla = set_minus(TF_MATH_FUNCTIONS, VMLA_FAILING_COMPLEX_MULTIPLE),
-        iree_vulkan = set_minus(TF_MATH_FUNCTIONS, VULKAN_FAILING_COMPLEX_MULTIPLE),
+        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
+        iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_COMPLEX_MULTIPLE),
+        iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_COMPLEX_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
     ).items()
 ]
