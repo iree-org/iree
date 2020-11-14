@@ -394,7 +394,7 @@ for function_name, configs in FUNCTION_TO_CONFIGS.items():
         f"Unexpected type for value of FUNCTION_TO_CONFIGS {type(configs)}")
 
 flags.DEFINE_list(
-    "functions", "abs",
+    "functions", None,
     f"Any of {list(FUNCTION_TO_CONFIGS.keys())}. If more than one function is "
     "provided then len(--target_backends) must be one.")
 flags.DEFINE_bool(
@@ -529,6 +529,11 @@ def main(argv):
             is_complex(config.signature)):
           print(f'    "{function_name}",')
     return
+
+  if FLAGS.functions is None:
+    raise flags.IllegalFlagValueError(
+        "'--functions' must be specified if "
+        "'--list_functions_with_complex_tests' isn't")
 
   if len(FLAGS.functions) > 1:
     # We only allow testing multiple functions with a single target backend
