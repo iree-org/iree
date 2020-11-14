@@ -15,6 +15,16 @@
 #ifndef IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 #define IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 
-#include "vk_mem_alloc.h"
+// Force all Vulkan calls to go through an indirect pVulkanFunctions interface.
+// https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/configuration.html
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+
+// Allow VMA to query for dynamic functions we may not have provided.
+// TODO(benvanik): see if we can remove this for more predictable failures; we
+// want our code to be printing out nice symbol-not-found errors, not VMA
+// abort()ing.
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+
+#include <vk_mem_alloc.h>
 
 #endif  // IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_

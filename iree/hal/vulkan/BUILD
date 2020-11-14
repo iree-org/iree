@@ -411,21 +411,13 @@ cc_library(
         "vma_allocator.h",
         "vma_buffer.h",
     ],
-    copts = [
-        # Only needed in the implementation cc and not by external users.
-        "-DVMA_STATIC_VULKAN_FUNCTIONS=0",
-    ] + select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-Wno-thread-safety-attributes",  # External code.
-        ],
-    }),
     deps = [
         ":dynamic_symbols",
         ":handle_util",
         ":status_util",
         "//iree/base:logging",
         "//iree/base:status",
+        "//iree/base:target_platform",
         "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:buffer",
