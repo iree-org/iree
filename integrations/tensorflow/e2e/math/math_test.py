@@ -36,7 +36,7 @@ def create_signature_from_args(config: Config) -> Config:
 def configure_dtypes(base_config: Config,
                      dtypes: Sequence[tf.DType],
                      exported_name: str = None) -> Dict[str, Config]:
-  """Uses a Config's signature to replicate the it across multiple dtypes."""
+  """Uses a Config's signature to replicate it across multiple dtypes."""
   if base_config.signature is None:
     raise ValueError("'base_config' must have a signature.")
   incorrect_dtypes = [
