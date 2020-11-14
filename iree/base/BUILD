@@ -103,12 +103,6 @@ cc_library(
         "dynamic_library_win32.cc",
     ],
     hdrs = ["dynamic_library.h"],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-ldl",
-        ],
-    }),
     deps = [
         ":file_path",
         ":logging",
@@ -404,12 +398,6 @@ cc_library(
     name = "synchronization",
     srcs = ["synchronization.c"],
     hdrs = ["synchronization.h"],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-lpthread",
-        ],
-    }),
     deps = [
         ":api",
         ":atomics",
@@ -480,13 +468,6 @@ cc_library(
     copts = [
         "-D_GNU_SOURCE=1",
     ],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-ldl",
-            "-lpthread",
-        ],
-    }),
     deps = [
         ":api",
         ":atomics",
