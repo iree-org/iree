@@ -222,7 +222,6 @@ TFLITE_FAILING = [
     "is_finite",
     "is_non_decreasing",
     "is_strictly_increasing",
-    "l2_normalize",
     "lbeta",
     "lgamma",
     "log1p",
@@ -422,7 +421,6 @@ VULKAN_FAILING = [
     "cosh",
     "count_nonzero",
     "cumprod",
-    "cumsum",
     "cumulative_logsumexp",
     "digamma",
     "divide",  # Failing for integer inputs because iree doesn't output 'f64'.
