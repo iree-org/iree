@@ -23,6 +23,7 @@ iree_cc_library(
   SRCS
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
+    "FastExpConversion.cpp"
     "KernelDispatch.cpp"
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"

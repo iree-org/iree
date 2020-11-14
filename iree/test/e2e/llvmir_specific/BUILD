@@ -34,3 +34,15 @@ iree_check_single_backend_test_suite(
     driver = "llvm",
     target_backend = "llvm-ir",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-ir-exponential_fast",
+    srcs = [
+        "exponential.mlir",
+    ],
+    compiler_flags = [
+        "-iree-codegen-linalg-to-llvm-fast-exp=true",
+    ],
+    driver = "llvm",
+    target_backend = "llvm-ir",
+)

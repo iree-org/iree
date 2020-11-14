@@ -34,6 +34,12 @@ static llvm::cl::opt<bool> convImg2ColConversion(
                    "linag.matmul"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> fastExpConversion(
+    "iree-codegen-linalg-to-llvm-fast-exp",
+    llvm::cl::desc("If true convert llvm.intr.exp into its range reduced "
+                   "polynomial approximation."),
+    llvm::cl::init(false));
+
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
@@ -66,6 +72,11 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+
+  // Approximate llvm.intr.exp with a 4-th order ploynmial in range[0, ln2].
+  if (fastExpConversion) {
+    passManager.addPass(createFastExpApproximationConversionPass());
+  }
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
