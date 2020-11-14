@@ -28,7 +28,7 @@ void InitializeEnvironment(int* argc, char*** argv) {
     auto positional_args = absl::ParseCommandLine(*argc, *argv);
     if (positional_args.size() < *argc) {
       // Edit the passed argument refs to only include positional args.
-      *argc = positional_args.size();
+      *argc = static_cast<int>(positional_args.size());
       for (int i = 0; i < *argc; ++i) {
         (*argv)[i] = positional_args[i];
       }

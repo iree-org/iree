@@ -193,7 +193,7 @@ class HALModuleState final {
 
     size_t buffer_length = source->data.data_length;
     if (length == -1) {
-      length = buffer_length;
+      length = static_cast<size_t>(buffer_length);
     }
     if (length < 0 || offset < 0 || offset > buffer_length ||
         offset + length > buffer_length) {

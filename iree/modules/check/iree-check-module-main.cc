@@ -111,8 +111,8 @@ StatusOr<int> Run(std::string module_file_path) {
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};
   auto module_signature = iree_vm_module_signature(input_module);
-  for (int ordinal = 0; ordinal < module_signature.export_function_count;
-       ++ordinal) {
+  for (iree_host_size_t ordinal = 0;
+       ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
     iree_string_view_t export_name_sv;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(

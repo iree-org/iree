@@ -165,7 +165,7 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
     iree_host_size_t driver_count = 0;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
         iree_allocator_system(), &driver_names, &driver_count));
-    for (int i = 0; i < driver_count; ++i) {
+    for (iree_host_size_t i = 0; i < driver_count; ++i) {
       target_backends.push_back(
           std::string(driver_names[i].data, driver_names[i].size));
     }
@@ -378,7 +378,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 
   Status evaluate_status = OkStatus();
   auto module_signature = iree_vm_module_signature(bytecode_module);
-  for (int i = 0; i < module_signature.export_function_count; ++i) {
+  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
+       ++i) {
     evaluate_status = run_function(i);
     if (!evaluate_status.ok()) {
       break;

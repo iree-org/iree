@@ -39,7 +39,7 @@ size_t GetShapeElementCount(const Shape& shape) {
 }
 
 template <typename T>
-std::vector<T> MakeIota(int size) {
+std::vector<T> MakeIota(size_t size) {
   std::vector<T> v(size);
   std::iota(v.begin(), v.end(), static_cast<T>(1));
   return v;
@@ -390,7 +390,7 @@ TEST(ReduceSum, Scalar) {
                                            absl::MakeSpan(dst_buffer),
                                            dimension, src_shape, dst_shape));
 
-  for (int i = 0; i < dst_buffer.size(); ++i) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
   }
 }
@@ -409,7 +409,7 @@ TEST(ReduceMin, TwoDimensionsToOne) {
                                            absl::MakeSpan(dst_buffer),
                                            dimension, src_shape, dst_shape));
 
-  for (int i = 0; i < dst_buffer.size(); ++i) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
   }
 }
@@ -421,8 +421,8 @@ TEST(PoolingMax, NoOverlapping) {
   Shape strides = {1, 2, 3, 1};
   Shape pad_low = {0, 0, 0, 0};
   std::vector<int> src_buffer = MakeIota<int>(GetShapeElementCount(src_shape));
-  std::vector<int> init_buffer(1, 0.0f);
-  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
+  std::vector<int> init_buffer(1, 0);
+  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0);
   std::vector<int> expected_dst = {9, 12, 21, 24};
 
   IREE_EXPECT_OK(PoolingMax::Execute<int>(
@@ -442,8 +442,8 @@ TEST(PoolingMin, Padding) {
   Shape strides = {1, 1};
   Shape pad_low = {1, 1};
   std::vector<int> src_buffer = MakeIota<int>(GetShapeElementCount(src_shape));
-  std::vector<int> init_buffer(1, 100.0);
-  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
+  std::vector<int> init_buffer(1, 100);
+  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0);
   std::vector<int> expected_dst = {1, 1, 2, 1, 1, 2};
 
   IREE_EXPECT_OK(PoolingMin::Execute<int>(
@@ -467,7 +467,7 @@ TEST(PoolingSum, Overlapping) {
   IREE_EXPECT_OK(PoolingSum::Execute<float>(
       src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
       window_sizes, strides, pad_low));
-  for (int i = 0; i < dst_buffer.size(); ++i) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
   }
 }
@@ -485,10 +485,10 @@ TEST(Conv2d, NoDilation) {
   std::vector<float> filter_buffer(GetShapeElementCount(filter_shape));
   std::vector<float> expected_dst = {1310, 1466, 1622, 1778,
                                      2090, 2246, 2402, 2558};
-  for (int i = 0; i < GetShapeElementCount(input_shape); ++i) {
-    input_buffer[i] = i + 1;
+  for (size_t i = 0; i < GetShapeElementCount(input_shape); ++i) {
+    input_buffer[i] = static_cast<float>(i + 1);
     if (i < GetShapeElementCount(filter_shape)) {
-      filter_buffer[i] = i + 1;
+      filter_buffer[i] = static_cast<float>(i + 1);
     }
   }
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
@@ -498,7 +498,7 @@ TEST(Conv2d, NoDilation) {
       absl::MakeSpan(dst_buffer), dst_shape, strides, pad_h, pad_w,
       lhs_dilation, rhs_dilation, 1));
 
-  for (int i = 0; i < dst_buffer.size(); ++i) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
   }
 }
@@ -518,7 +518,7 @@ TEST(Conv2d, DepthwiseConv) {
       1124, 1196, 1346, 1424, 1256, 1340, 1502, 1592, 1388, 1484, 1658,
       1760, 1520, 1628, 1814, 1928, 1784, 1916, 2126, 2264, 1916, 2060,
       2282, 2432, 2048, 2204, 2438, 2600, 2180, 2348, 2594, 2768};
-  for (int i = 0; i < GetShapeElementCount(input_shape); ++i) {
+  for (size_t i = 0; i < GetShapeElementCount(input_shape); ++i) {
     input_buffer[i] = i + 1;
     if (i < GetShapeElementCount(filter_shape)) {
       filter_buffer[i] = i + 1;
@@ -531,7 +531,7 @@ TEST(Conv2d, DepthwiseConv) {
       absl::MakeSpan(dst_buffer), dst_shape, strides, pad_h, pad_w,
       lhs_dilation, rhs_dilation, 2));
 
-  for (int i = 0; i < dst_buffer.size(); ++i) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
   }
 }
