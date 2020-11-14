@@ -18,7 +18,7 @@
 #include <vulkan/vulkan.h>
 
 #include "iree/hal/buffer.h"
-#include "vk_mem_alloc.h"
+#include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
 namespace iree {
 namespace hal {
