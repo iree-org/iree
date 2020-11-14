@@ -21,14 +21,67 @@ include(AbseilConfigureCopts)
 # By default Abseil strips string literals on mobile platforms, which means
 # we cannot run IREE binaries via command-line with proper options. Turn off
 # the stripping.
-# TODO: we might still want to strip when compiling IREE into Android Java apps.
+# TODO(#3814): remove ABSL flags.
 if(ANDROID)
   add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
 endif()
 
 #-------------------------------------------------------------------------------
-# C++ used within IREE
+# C/C++ options as used within IREE
 #-------------------------------------------------------------------------------
+#
+#         ██     ██  █████  ██████  ███    ██ ██ ███    ██  ██████
+#         ██     ██ ██   ██ ██   ██ ████   ██ ██ ████   ██ ██
+#         ██  █  ██ ███████ ██████  ██ ██  ██ ██ ██ ██  ██ ██   ███
+#         ██ ███ ██ ██   ██ ██   ██ ██  ██ ██ ██ ██  ██ ██ ██    ██
+#          ███ ███  ██   ██ ██   ██ ██   ████ ██ ██   ████  ██████
+#
+# Everything here is added to *every* iree_cc_library/iree_cc_binary/etc.
+# That includes both runtime and compiler components, and these may propagate
+# out to user code interacting with either (such as custom modules).
+#
+# Be extremely judicious in the use of these flags.
+#
+# - Need to disable a warning?
+#   Usually these are encountered in compiler-specific code and can be disabled
+#   in a compiler-specific way. Only add global warning disables when it's clear
+#   that we never want them or that they'll show up in a lot of places.
+#
+#   See: https://stackoverflow.com/questions/3378560/how-to-disable-gcc-warnings-for-a-few-lines-of-code
+#
+# - Need to add a linker dependency?
+#   First figure out if you *really* need it. If it's only required on specific
+#   platforms and in very specific files clang or msvc are used prefer
+#   autolinking. GCC is stubborn and doesn't have autolinking so additional
+#   flags may be required there.
+#
+#   See: https://en.wikipedia.org/wiki/Auto-linking
+#
+# - Need to tweak a compilation mode setting (debug/asserts/etc)?
+#   Don't do that here, and in general *don't do that at all* unless it's behind
+#   a very specific IREE-prefixed cmake flag (like IREE_SIZE_OPTIMIZED).
+#   There's no one-size solution when we are dealing with cross-project and
+#   cross-compiled binaries - there's no safe way to set global options that
+#   won't cause someone to break, and you probably don't really need to do
+#   change that setting anyway. Follow the rule of least surprise: if the user
+#   has CMake's Debug configuration active then don't force things into release
+#   mode, etc.
+#
+# - Need to add an include directory?
+#   Don't do that here. Always prefer to fully-specify the path from the IREE
+#   workspace root when it's known that the compilation will be occuring using
+#   the files within the IREE checkout; for example, instead of adding a global
+#   include path to third_party/foo/ and #include <foo.h>'ing, just
+#   #include "third_party/foo/foo.h". This reduces build configuration, makes it
+#   easier for readers to find the files, etc.
+#
+# - Still think you need to add an include directory? (system includes, etc)
+#   Don't do that here, either. It's highly doubtful that every single target in
+#   all of IREE (both compiler and runtime) on all platforms (both host and
+#   cross-compilation targets) needs your special include directory. Add it on
+#   the COPTS of the target you are using it in and, ideally, private to that
+#   target (used in .c/cc files, not in a .h that leaks the include path
+#   requirements to all consumers of the API).
 
 set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
@@ -97,7 +150,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wthread-safety"
     "-Wthread-safety-beta"
     "-Wunused-comparison"
-    "-Wunused-variable"
     "-Wvla"
     # LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/bazel/iree.bazelrc:clang_diagnostics)
 
@@ -111,27 +163,62 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-gnu-label-as-value"
   CLANG_OR_GCC
     "-Wno-unused-parameter"
+    "-Wno-unused-variable"
     "-Wno-undef"
     "-fvisibility=hidden"
   MSVC_OR_CLANG_CL
+    # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
+    # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
+    # NOTE: this is not really required anymore for build performance but does
+    # work around some issues that crop up with header version compatibility
+    # (abseil has issues with winsock versions).
     "/DWIN32_LEAN_AND_MEAN"
+
+    # Don't allow windows.h to define MIN and MAX and conflict with the STL.
+    # There's no legit use for these macros as any code we are writing ourselves
+    # that we want a MIN/MAX in should be using an IREE-prefixed version
+    # instead: iree_min iree_max
+    # https://stackoverflow.com/a/4914108
+    "/DNOMINMAX"
+
+    # Adds M_PI and other constants to <math.h>/<cmath> (to match non-windows).
+    # https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
     "/D_USE_MATH_DEFINES"
+
+    # Configure exception handling for standard C++ behavior.
+    # - /EHs enables C++ catch-style exceptions
+    # - /EHc breaks unwinding across extern C boundaries, dramatically reducing
+    #   unwind table size and associated exception handling overhead as the
+    #   compiler can assume no exception will ever be thrown within any function
+    #   annotated with extern "C".
+    # https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model
+    #
+    # TODO(benvanik): figure out if we need /EHs - we don't use exceptions in
+    # the runtime and I'm pretty sure LLVM doesn't use them either.
+    "/EHsc"
+
+    # Default max section count is 64k, which is woefully inadequate for some of
+    # the insanely bloated tablegen outputs LLVM/MLIR produces. This cranks it
+    # up to 2^32. It's not great that we have to generate/link files like that
+    # but it's better to not get spurious failures during LTCG.
+    # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
+    "/bigobj"
+
     "/wd4624"
-    # 'inline': used more than once
-    "/wd4141"
-    # 'WIN32_LEAN_AND_MEAN': macro redefinition
-    "/wd4005"
+    "/wd4141"  # duplicate inline attributes
+    "/wd4005"  # macro redefinition
     "/wd4267"
     "/wd4141"
     "/wd4244"
     "/wd4146"
     "/wd4018"
     "/wd4065"
-    # TODO(benvanik): figure out if really required or accidentally enabled.
-    "/EHsc"
-    "/bigobj"
 )
+
+# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
+
+# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
