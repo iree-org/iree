@@ -95,9 +95,9 @@ LogicalResult AddVulkanLaunchWrapper::declareVulkanLaunchFunc(Location loc) {
   vulkanLaunchTypes.insert(vulkanLaunchTypes.end(), args.begin(), args.end());
 
   // Declare vulkan launch function.
-  builder.create<FuncOp>(loc, kVulkanLaunch,
-                         FunctionType::get(vulkanLaunchTypes, ArrayRef<Type>{},
-                                           loc->getContext()));
+  auto type = FunctionType::get(vulkanLaunchTypes, {}, loc->getContext());
+  FuncOp vkLaunch = builder.create<FuncOp>(loc, kVulkanLaunch, type);
+  vkLaunch.setPrivate();
   return success();
 }
 
