@@ -377,21 +377,30 @@ FUNCTION_TO_CONFIGS = {
             generator=lambda *args: tf_utils.uniform(*args, low=3.0, high=4.0)),
 }
 
-# Normalize FUNCTION_TO_CONFIGS as described above.
-for function_name, configs in FUNCTION_TO_CONFIGS.items():
-  if isinstance(configs, Config):
-    FUNCTION_TO_CONFIGS[function_name] = {function_name: configs}
-  elif isinstance(configs, dict):
-    # Prepend the function names to existing exported names to make the logs
-    # readable. Split into two expressions so pytype can understand it.
-    normalized_dict = {
-        f"{function_name}_{config_name}": config
-        for config_name, config in configs.items()
-    }
-    FUNCTION_TO_CONFIGS[function_name] = normalized_dict
-  else:
-    raise TypeError(
-        f"Unexpected type for value of FUNCTION_TO_CONFIGS {type(configs)}")
+
+def normalize_functions_to_configs(
+    functions_to_configs: Dict[str, Union[Config, Dict[str, Config]]]
+) -> Dict[str, Dict[str, Config]]:
+  # Normalize FUNCTION_TO_CONFIGS as described above.
+  normalized = dict()
+  for function_name, configs in functions_to_configs.items():
+    normalized[function_name] = dict()
+    if isinstance(configs, Config):
+      normalized[function_name] = {function_name: configs}
+    elif isinstance(configs, dict):
+      # Prepend the function names to existing exported names to make the logs
+      # readable. Split into two expressions so pytype can understand it.
+      normalized[function_name] = {
+          f"{function_name}_{config_name}": config
+          for config_name, config in configs.items()
+      }
+    else:
+      raise TypeError(
+          f"Unexpected type for value of FUNCTION_TO_CONFIGS {type(configs)}")
+  return normalized
+
+
+FUNCTION_TO_CONFIGS = normalize_functions_to_configs(FUNCTION_TO_CONFIGS)
 
 flags.DEFINE_list(
     "functions", None,
@@ -484,10 +493,7 @@ class TfMathModule(tf_test_utils.TestModule):
   def __init__(self):
     super().__init__()
     for function_name in FLAGS.functions:
-      # pytype: disable=attribute-error
       for config_name, config in FUNCTION_TO_CONFIGS[function_name].items():
-        # pytype: enable=attribute-error
-
         # Create a unittest for each dtype specified by 'config'.
         if config.dtypes is not None:
           for dtype_name, signature in config.iterate_dtypes():
@@ -521,9 +527,7 @@ def main(argv):
 
   if FLAGS.list_functions_with_complex_tests:
     for function_name, configs in FUNCTION_TO_CONFIGS.items():
-      # pytype: disable=attribute-error
       for exported_name, config in configs.items():
-        # pytype: enable=attribute-error
         if ((config.dtypes is not None and
              any(dtype.is_complex for dtype in config.dtypes)) or
             is_complex(config.signature)):
