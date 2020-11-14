@@ -130,8 +130,8 @@ function(iree_cc_library)
     )
     target_compile_options(${_NAME}
       PRIVATE
-        ${_RULE_COPTS}
         ${IREE_DEFAULT_COPTS}
+        ${_RULE_COPTS}
     )
 
   if(_RULE_WHOLEARCHIVE)
@@ -141,8 +141,8 @@ function(iree_cc_library)
     endif()
     target_link_libraries(${_NAME}
       PRIVATE
-        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
     )
 
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
@@ -176,14 +176,14 @@ function(iree_cc_library)
     )
     target_compile_options(${_NAME}
       INTERFACE
-        ${_RULE_COPTS}
         ${IREE_DEFAULT_COPTS}
+        ${_RULE_COPTS}
     )
     target_link_libraries(${_NAME}
       INTERFACE
+        ${IREE_DEFAULT_LINKOPTS}
         ${_RULE_DEPS}
         ${_RULE_LINKOPTS}
-        ${IREE_DEFAULT_LINKOPTS}
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
     target_compile_definitions(${_NAME}
