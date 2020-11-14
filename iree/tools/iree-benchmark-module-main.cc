@@ -223,7 +223,7 @@ class IREEBenchmark {
     iree_vm_function_t function;
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
-    for (int i = 0; i < signature.export_function_count; ++i) {
+    for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
       iree_string_view_t name;
       IREE_CHECK_OK(input_module_->get_function(input_module_->self,
                                                 IREE_VM_FUNCTION_LINKAGE_EXPORT,

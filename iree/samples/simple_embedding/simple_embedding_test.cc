@@ -49,7 +49,7 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   iree_host_size_t driver_count = 0;
   IREE_CHECK_OK(iree_hal_driver_registry_query_available_drivers(
       iree_allocator_system(), &driver_names, &driver_count));
-  for (int i = 0; i < driver_count; ++i) {
+  for (iree_host_size_t i = 0; i < driver_count; ++i) {
     TestParams test_params;
     test_params.driver_name =
         std::string(driver_names[i].data, driver_names[i].size);

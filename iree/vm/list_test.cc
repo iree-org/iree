@@ -101,7 +101,7 @@ TEST_F(VMListTest, UsageI32) {
   EXPECT_EQ(5, iree_vm_list_size(list));
 
   for (iree_host_size_t i = 0; i < 5; ++i) {
-    iree_vm_value_t value = iree_vm_value_make_i32(i);
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
     IREE_ASSERT_OK(iree_vm_list_set_value(list, i, &value));
   }
 
@@ -138,7 +138,7 @@ TEST_F(VMListTest, UsageRef) {
   EXPECT_EQ(5, iree_vm_list_size(list));
 
   for (iree_host_size_t i = 0; i < 5; ++i) {
-    iree_vm_ref_t ref_a = MakeRef<A>(i);
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
     IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, i, &ref_a));
   }
 
@@ -173,11 +173,11 @@ TEST_F(VMListTest, UsageVariant) {
   EXPECT_EQ(10, iree_vm_list_size(list));
 
   for (iree_host_size_t i = 0; i < 5; ++i) {
-    iree_vm_value_t value = iree_vm_value_make_i32(i);
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
     IREE_ASSERT_OK(iree_vm_list_set_value(list, i, &value));
   }
   for (iree_host_size_t i = 5; i < 10; ++i) {
-    iree_vm_ref_t ref_a = MakeRef<A>(i);
+    iree_vm_ref_t ref_a = MakeRef<A>(static_cast<float>(i));
     IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, i, &ref_a));
   }
 

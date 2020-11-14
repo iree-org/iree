@@ -93,10 +93,11 @@ int iree::IreeMain(int argc, char** argv) {
   std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
-  SetupVulkan(iree_vulkan_features, layers.data(), layers.size(),
-              extensions.data(), extensions.size(), g_Allocator, &g_Instance,
-              &g_QueueFamily, &g_PhysicalDevice, &g_Queue, &g_Device,
-              &g_DescriptorPool);
+  SetupVulkan(iree_vulkan_features, layers.data(),
+              static_cast<uint32_t>(layers.size()), extensions.data(),
+              static_cast<uint32_t>(extensions.size()), g_Allocator,
+              &g_Instance, &g_QueueFamily, &g_PhysicalDevice, &g_Queue,
+              &g_Device, &g_DescriptorPool);
 
   // Create Window Surface
   VkSurfaceKHR surface;

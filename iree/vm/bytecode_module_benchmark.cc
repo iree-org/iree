@@ -82,7 +82,7 @@ static iree_status_t native_import_module_create(
 static iree_status_t RunFunction(benchmark::State& state,
                                  absl::string_view function_name,
                                  absl::Span<const int32_t> i32_args,
-                                 int result_count, int batch_size = 1) {
+                                 int result_count, int64_t batch_size = 1) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
@@ -294,7 +294,7 @@ static void BM_LoopSumReference(benchmark::State& state) {
     return i;
   };
   while (state.KeepRunningBatch(state.range(0))) {
-    int ret = loop(state.range(0));
+    int ret = loop(static_cast<int>(state.range(0)));
     benchmark::DoNotOptimize(ret);
     benchmark::ClobberMemory();
   }
