@@ -229,18 +229,29 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-levels-2-and-4-c4200
     "/wd4200"
 
-    # Misc tweaks to better match clang/gcc behavior:
-    "/wd4065"  # switch statement contains 'default' but no 'case' labels
-    "/wd4146"  # operator applied to unsigned type, result still unsigned
-
-    "/wd4141"  # duplicate inline attributes
-    "/wd4005"  # macro redefinition
-    "/wd4267"
-    "/wd4141"
-    "/wd4244"
-    "/wd4146"
+    # "signed/unsigned mismatch in comparison"
+    # This is along the lines of a generic implicit conversion warning but tends
+    # to crop up in code that implicitly treats unsigned size_t values as if
+    # they were signed values instead of properly using ssize_t. In certain
+    # cases where the comparison being performed may be guarding access to
+    # memory this can cause unexpected behavior ("-1ull < 512ull, great let's
+    # dereference buffer[-1ull]!).
+    # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-3-c4018
+    #
+    # TODO(benvanik): remove this (or make it per-file to iree/compiler, as LLVM
+    # tends to not care about these kind of things and it crops up there a lot).
     "/wd4018"
-    "/wd4065"
+
+    # Misc tweaks to better match reasonable clang/gcc behavior:
+    "/wd4005"  # allow: macro redefinition
+    "/wd4065"  # allow: switch statement contains 'default' but no 'case' labels
+    "/wd4141"  # allow: inline used more than once
+    "/wd4624"  # allow: destructor was implicitly defined as deleted
+
+    # TODO(benvanik): confirm these are all still required and document:
+    "/wd4146"  # operator applied to unsigned type, result still unsigned
+    "/wd4244"  # possible loss of data
+    "/wd4267"  # initializing: possible loss of data
 )
 
 if(NOT ANDROID)
