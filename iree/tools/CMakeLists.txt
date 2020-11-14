@@ -127,8 +127,6 @@ if(${IREE_ENABLE_MLIR})
       MLIRTableGen
       iree::compiler::Dialect::IREE::Tools
       iree::compiler::Dialect::VM::Tools
-    LINKOPTS
-      "-lpthread"
     HOSTONLY
   )
 endif()

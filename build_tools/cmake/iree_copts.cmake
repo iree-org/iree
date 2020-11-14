@@ -215,8 +215,24 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4065"
 )
 
-# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
+if(NOT ANDROID)
+  iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
+    CLANG_OR_GCC
+      "-lpthread"
+  )
+else()
+  # Android provides its own pthreads support with no linking required.
+endif()
+
+iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
+  ALL
+    # TODO(benvanik): remove the ABSL usage here; we aren't abseil.
+    "${ABSL_DEFAULT_LINKOPTS}"
+  CLANG_OR_GCC
+    # Required by all modern software, effectively:
+    "-ldl"
+    ${_IREE_PTHREADS_LINKOPTS}
+)
 
 # TODO(benvanik): remove the ABSL usage here; we aren't abseil.
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
