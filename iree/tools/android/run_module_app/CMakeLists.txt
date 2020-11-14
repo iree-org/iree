@@ -47,8 +47,8 @@ iree_cc_library(
     iree::vm
     ${IREE_HAL_DRIVER_MODULES}
   LINKOPTS
-    android
-    log
+    "-landroid"
+    "-llog"
   SHARED
   WHOLEARCHIVE
 )
