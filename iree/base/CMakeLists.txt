@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT (some scotttodd todos remain)
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -98,7 +100,6 @@ iree_cc_test(
     "bitfield_test.cc"
   DEPS
     ::bitfield
-    absl::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -288,8 +289,8 @@ iree_cc_library(
   SRCS
     "init.cc"
   DEPS
-    absl::flags_parse
     ::initializer
+    absl::flags_parse
   PUBLIC
 )
 
