@@ -696,6 +696,8 @@ def compile_tf_signature_def_saved_model(
 # tf_function_unittests because tensorflow.python.eager.def_function.Function
 # is not an API that we can subclass, and storing the information directly
 # that class results in it being deleted at tf.Module initialization.
+# _global_unittest_configs is a dict mapping exported_names to dicts containing
+# a get-function for input args and the tolerance kwargs for the trace.
 global _global_unittest_configs
 _global_unittest_configs = dict()
 
