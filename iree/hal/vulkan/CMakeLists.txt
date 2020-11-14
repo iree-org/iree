@@ -475,21 +475,13 @@ iree_cc_library(
     "vma_buffer.cc"
   COPTS
     "-DVK_NO_PROTOTYPES"
-    # Only needed in the implementation cc and not by external users.
-    "-DVMA_STATIC_VULKAN_FUNCTIONS=0"
-    # Silence some warnings.
-    "-Wno-nullability-completeness"
-    # Note: IREE_DEFAULT_COPTS sets -Wthread-safety-analysis, so we can't
-    #   disable here without switching off of iree_cc_library or refactoring
-    # "-Wno-thread-safety-analysis"
-  INCLUDES
-    ${VMA_SRC_ROOT}
   DEPS
     absl::flat_hash_map
     absl::memory
     absl::synchronization
     iree::base::logging
     iree::base::status
+    iree::base::target_platform
     iree::base::tracing
     iree::hal::allocator
     iree::hal::buffer
@@ -497,6 +489,7 @@ iree_cc_library(
     iree::hal::vulkan::handle_util
     iree::hal::vulkan::status_util
     Vulkan::Headers
+    vulkan_memory_allocator
   PUBLIC
 )
 
