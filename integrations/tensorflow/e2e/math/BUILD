@@ -56,7 +56,8 @@ package(
     )
 ]
 
-# These functions were selected using the TensorFlow documentation.
+# These functions were selected using all of the funcions in the tf.math docs:
+#   https://www.tensorflow.org/api_docs/python/tf/math
 TF_MATH_FUNCTIONS = [
     "abs",
     "accumulate_n",
