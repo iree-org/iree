@@ -18,7 +18,7 @@
 workspace(name = "iree_core")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load(":repo_utils.bzl", "maybe")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ###############################################################################
 # Bazel rules.
