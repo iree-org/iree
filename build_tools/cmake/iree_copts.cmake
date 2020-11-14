@@ -32,10 +32,10 @@ endif()
 
 set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
-set(IREE_ROOT_DIR ${PROJECT_SOURCE_DIR})
+set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}
-  ${PROJECT_BINARY_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
@@ -207,7 +207,7 @@ set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INCLUDE_DIRS
-  "${PROJECT_SOURCE_DIR}/third_party/flatbuffers/include/"
+  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
 
 if(CMAKE_CROSSCOMPILING)
@@ -270,10 +270,10 @@ endif()
 # TODO: This should go in add_iree_mlir_src_dep at the top level.
 if(IREE_MLIR_DEP_MODE STREQUAL "BUNDLED")
   list(APPEND IREE_COMMON_INCLUDE_DIRS
-    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
-    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
   )
 endif()
 
@@ -287,12 +287,12 @@ iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 #-------------------------------------------------------------------------------
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/third_party/tensorflow
-  ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/third_party/tensorflow
-  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
-  ${PROJECT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
 )
 
 #-------------------------------------------------------------------------------
@@ -305,8 +305,8 @@ if(IREE_ENABLE_EMITC)
   set(EMITC_INCLUDE_TESTS OFF)
 
   list(APPEND IREE_COMMON_INCLUDE_DIRS
-    ${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include
-    ${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-emitc/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/mlir-emitc/include
   )
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
 endif()

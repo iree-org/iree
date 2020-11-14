@@ -73,7 +73,7 @@ function(iree_tablegen_doc)
   endwhile()
 
   # Put all dialect docs at one place.
-  set(_DOC_DIR ${PROJECT_BINARY_DIR}/doc/Dialects/)
+  set(_DOC_DIR ${CMAKE_CURRENT_BINARY_DIR}/doc/Dialects/)
   # Set a target to drive copy.
   add_custom_target(${_NAME}_target
             ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}

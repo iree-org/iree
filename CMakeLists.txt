@@ -337,17 +337,17 @@ if(${IREE_ENABLE_MLIR})
     add_iree_mlir_src_dep("third_party/llvm-project")
 
     # Extend module path to allow submodules to use LLVM and MLIR CMake modules
-    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/lib/cmake/mlir")
-    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
 
     # Set include directories
     list(APPEND LLVM_INCLUDE_DIRS
-      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
     )
     list(APPEND MLIR_INCLUDE_DIRS
-      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
     )
 
     # Set build option to use MHLO alongside with bundled MLIR
@@ -439,7 +439,7 @@ if(CMAKE_CROSSCOMPILING)
   add_custom_target(iree_host_flatcc_cli
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different
-        "${PROJECT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
         "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli${IREE_HOST_EXECUTABLE_SUFFIX}"
     DEPENDS iree_host_build_flatcc_cli
     COMMENT "Installing host flatcc..."
