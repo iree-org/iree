@@ -27,7 +27,7 @@ endfunction()
 # Performs a depth-first search through the dependency graph, appending all
 # dependencies of TARGET to the TRANSITIVE_DEPS list.
 function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
-  if (NOT TARGET "${TARGET}")
+  if(NOT TARGET "${TARGET}")
     # Excluded from the project, or invalid name? Just ignore.
     return()
   endif()
@@ -41,7 +41,7 @@ function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
   endif()
 
   set(_RESULT "${${TRANSITIVE_DEPS}}")
-  if (${_TARGET_NAME} IN_LIST _RESULT)
+  if(${_TARGET_NAME} IN_LIST _RESULT)
     # Already visited, ignore.
     return()
   endif()
@@ -51,7 +51,7 @@ function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
   list(APPEND _RESULT ${_TARGET_NAME})
 
   # Check for non-target identifiers again after resolving the alias.
-  if (NOT TARGET ${_TARGET_NAME})
+  if(NOT TARGET ${_TARGET_NAME})
     return()
   endif()
 
@@ -90,7 +90,7 @@ function(iree_whole_archive_link TARGET)
   foreach(_DEP ${_TRANSITIVE_DEPS})
     # Check if _DEP is a library with the ALWAYSLINK property set.
     set(_DEP_IS_ALWAYSLINK OFF)
-    if (TARGET ${_DEP})
+    if(TARGET ${_DEP})
       get_target_property(_DEP_TYPE ${_DEP} TYPE)
       if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
         # Can't be ALWAYSLINK since it's an INTERFACE library.
@@ -110,14 +110,14 @@ function(iree_whole_archive_link TARGET)
       # For macOS, also add a `-Wl,-force_load` version of the dep.
       if(MSVC)
         get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
-        if (_ALIASED_TARGET)
+        if(_ALIASED_TARGET)
           list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
         else()
           list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
         endif()
       elseif(APPLE)
         get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
-        if (_ALIASED_TARGET)
+        if(_ALIASED_TARGET)
           list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load $<TARGET_FILE:${_ALIASED_TARGET}>")
         else()
           list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load $<TARGET_FILE:${_DEP}>")

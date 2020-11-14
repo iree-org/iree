@@ -64,7 +64,7 @@ if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
-if (${IREE_ENABLE_MLIR})
+if(${IREE_ENABLE_MLIR})
   set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
 endif()
 
@@ -92,8 +92,8 @@ set(IREE_ALL_HAL_DRIVERS
   Vulkan
 )
 
-if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
-  set( IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS} )
+if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
+  set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
   # For cross compilation towords Android, we don't want LLVM JIT HAL driver.
   if(ANDROID)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
@@ -231,7 +231,7 @@ option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
-if (${IREE_ENABLE_CCACHE})
+if(${IREE_ENABLE_CCACHE})
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
@@ -259,7 +259,7 @@ include(iree_add_all_subdirs)
 include(iree_check_test)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
   set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
 endif()

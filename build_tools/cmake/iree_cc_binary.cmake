@@ -14,7 +14,7 @@
 
 include(CMakeParseArguments)
 
-if (NOT DEFINED _IREE_CC_BINARY_NAMES)
+if(NOT DEFINED _IREE_CC_BINARY_NAMES)
   set(_IREE_CC_BINARY_NAMES "")
 endif()
 
