@@ -103,11 +103,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-)
-
 iree_cc_library(
   NAME
     dynamic_library
@@ -116,8 +111,6 @@ iree_cc_library(
   SRCS
     "dynamic_library_posix.cc"
     "dynamic_library_win32.cc"
-  LINKOPTS
-    ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
     ::file_path
     ::logging
@@ -459,16 +452,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-if(NOT ANDROID)
-  iree_select_compiler_opts(_SYNCHRONIZATION_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
-else()
-  # Android provides its own pthreads support with no linking required.
-  set(_SYNCHRONIZATION_LINKOPTS "")
-endif()
-
 iree_cc_library(
   NAME
     synchronization
@@ -476,8 +459,6 @@ iree_cc_library(
     "synchronization.h"
   SRCS
     "synchronization.c"
-  LINKOPTS
-    ${_SYNCHRONIZATION_LINKOPTS}
   DEPS
     ::api
     ::atomics
@@ -537,20 +518,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-if(NOT ANDROID)
-  iree_select_compiler_opts(_THREADING_LINKOPTS
-    CLANG_OR_GCC
-      "-ldl"
-      "-lpthread"
-  )
-else()
-  iree_select_compiler_opts(_THREADING_LINKOPTS
-    CLANG_OR_GCC
-      "-ldl"
-      # Android provides its own pthreads support with no linking required.
-  )
-endif()
-
 iree_cc_library(
   NAME
     threading
@@ -564,8 +531,6 @@ iree_cc_library(
     "threading_win32.c"
   COPTS
     "-D_GNU_SOURCE=1"
-  LINKOPTS
-    ${_THREADING_LINKOPTS}
   DEPS
     ::api
     ::atomics
@@ -599,11 +564,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_select_compiler_opts(IREE_LINKOPTS_TRACING
-  GCC_OR_CLANG
-    -ldl
-)
-
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
@@ -614,8 +574,6 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
       "${IREE_ROOT_DIR}/third_party/tracy/TracyC.h"
     SRCS
       "tracing.cc"
-    LINKOPTS
-      ${IREE_LINKOPTS_TRACING}
     DEPS
       ::target_platform
       absl::core_headers
