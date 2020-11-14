@@ -22,27 +22,27 @@ import tensorflow.compat.v2 as tf
 
 class MathModule(tf.Module):
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def abs(self, x):
     return tf.math.abs(x)
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def ceil(self, x):
     return tf.math.ceil(x)
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def cos(self, x):
     return tf.math.cos(x)
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def log(self, x):
     return tf.math.log(x)
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def mod(self, x):
     return tf.math.mod(x, 2.0)
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def fake_quant(self, x):
     return tf.quantization.fake_quant_with_min_max_args(x,
                                                         min=-6,
