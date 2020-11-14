@@ -97,7 +97,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wthread-safety"
     "-Wthread-safety-beta"
     "-Wunused-comparison"
-    "-Wunused-variable"
     "-Wvla"
     # LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/bazel/iree.bazelrc:clang_diagnostics)
 
