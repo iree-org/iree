@@ -533,7 +533,7 @@ iree_e2e_cartesian_product_test_suite(
 # we can run them on the CI with 5 additional targets instead of 640.
 
 # Failing on Kokoro.
-TFLITE_FAILING_KOKORO = TFLITE_FAILING + ["less"]
+TFLITE_FAILING_KOKORO = TFLITE_FAILING + ["angle"]
 
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
 VMLA_FAILING_MULTIPLE = VMLA_FAILING + ["multiply"]

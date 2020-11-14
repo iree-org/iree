@@ -289,6 +289,7 @@ FAILING_FULL_API = [
             "LSTM",
             "MaxPool1D",
             "MaxPool3D",
+            "SeperableConv1D",  # Failing on Kokoro.
             "SimpleRNN",
         ],
         "target_backends": "tflite",
