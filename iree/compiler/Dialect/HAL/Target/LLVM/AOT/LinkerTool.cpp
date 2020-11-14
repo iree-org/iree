@@ -78,7 +78,12 @@ void Artifacts::keepAllFiles() {
 }
 
 std::string LinkerTool::getToolPath() const {
-  return std::string(std::getenv("IREE_LLVMAOT_LINKER_PATH"));
+  char *linkerPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
+  if (linkerPath) {
+    return std::string(linkerPath);
+  } else {
+    return "";
+  }
 }
 
 LogicalResult LinkerTool::runLinkCommand(const std::string &commandLine) {
