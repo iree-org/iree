@@ -281,6 +281,7 @@ build:_msvc_base --copt=/wd4624 # destructor was implicitly defined as deleted
 build:_msvc_base --copt=/wd4005 # macro redefinition
 build:_msvc_base --copt=/wd4267 # initializing: possible loss of data
 build:_msvc_base --copt=/wd4141 # inline used more than once
+build:_msvc_base --copt=/wd4200 # zero-sized array in struct/union
 # new warning with the standards-compliant preprocessor. winbase itself is not standards-compliant
 build:_msvc_base --copt=/wd5105
 build:_msvc_base --per_file_copt=mkl_dnn@/wd4551 # missing argument list
@@ -301,6 +302,7 @@ build:_msvc_base --copt=/DWIN32_LEAN_AND_MEAN
 build:_msvc_base --copt=/DNOMINMAX
 # Yay for security warnings. Boo for non-standard.
 build:_msvc_base --copt=/D_CRT_SECURE_NO_WARNINGS
+build:_msvc_base --copt=/D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES
 # TensorFlow requires the "monolithic" build mode for now on Windows.
 build:_msvc_base --define framework_shared_object=false
 # Necessary for M_* math constants.
