@@ -35,7 +35,7 @@
 #if defined(IREE_PLATFORM_WINDOWS)
 #include <fcntl.h>
 #include <io.h>
-#define IREE_FORCE_BINARY_STDIN() setmode(_fileno(stdin), O_BINARY)
+#define IREE_FORCE_BINARY_STDIN() _setmode(_fileno(stdin), O_BINARY)
 #else
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS

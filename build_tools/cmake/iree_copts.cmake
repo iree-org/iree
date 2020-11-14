@@ -185,6 +185,24 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
     "/D_USE_MATH_DEFINES"
 
+    # Disable the "deprecation" warnings about CRT functions like strcpy.
+    # Though the secure versions *are* better, they aren't portable and as such
+    # just make cross-platform code annoying. One solution is to reimplement
+    # them in a portable fashion and use those - and that's what we try to do
+    # in certain places where we can get away with it. Other uses, like getenv,
+    # are fine as these are not intended for use in core runtime code that needs
+    # to be secure (friends don't let friends ship entire compiler stacks
+    # embedded inside security sensitive applications anyway :).
+    # https://docs.microsoft.com/en-us/cpp/c-runtime-library/security-features-in-the-crt
+    "/D_CRT_SECURE_NO_WARNINGS"
+
+    # With the above said about the "deprecated" functions; this useful flag
+    # will at least try to use them when possible without any change to user
+    # code. Note however because the new versions use templates they won't be
+    # activated in C code; that's fine.
+    # https://docs.microsoft.com/en-us/cpp/c-runtime-library/secure-template-overloads
+    "/D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES"
+
     # Configure exception handling for standard C++ behavior.
     # - /EHs enables C++ catch-style exceptions
     # - /EHc breaks unwinding across extern C boundaries, dramatically reducing
@@ -204,7 +222,18 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
 
-    "/wd4624"
+    # "nonstandard extension used : zero-sized array in struct/union"
+    # This happens with unsized or zero-length arrays at the end of structs,
+    # which is completely valid in C where we do it and get this warning. Shut
+    # it up and rely on the better warnings from clang to catch if we try to
+    # use it where it really matters (on a class that has copy/move ctors, etc).
+    # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-levels-2-and-4-c4200
+    "/wd4200"
+
+    # Misc tweaks to better match clang/gcc behavior:
+    "/wd4065"  # switch statement contains 'default' but no 'case' labels
+    "/wd4146"  # operator applied to unsigned type, result still unsigned
+
     "/wd4141"  # duplicate inline attributes
     "/wd4005"  # macro redefinition
     "/wd4267"
