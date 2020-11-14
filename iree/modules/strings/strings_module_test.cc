@@ -301,7 +301,7 @@ class StringsModuleTest : public ::testing::Test {
     std::vector<iree_string_view_t> out_strings(expected.size());
     IREE_ASSERT_OK(strings_string_tensor_get_elements(
         output_tensor, out_strings.data(), out_strings.size(), 0));
-    for (int i = 0; i < expected.size(); i++) {
+    for (iree_host_size_t i = 0; i < expected.size(); i++) {
       EXPECT_EQ(iree_string_view_compare(out_strings[i], expected[i]), 0)
           << "Expected: " << expected[i].data << " found "
           << out_strings[i].data;

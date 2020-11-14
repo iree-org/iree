@@ -129,8 +129,8 @@ constexpr int Interface::kMaxSets;
 constexpr int Interface::kMaxBindings;
 
 void Interface::Reset() {
-  for (int i = 0; i < bindings_.size(); ++i) {
-    for (int j = 0; j < bindings_[i].size(); ++j) {
+  for (size_t i = 0; i < bindings_.size(); ++i) {
+    for (size_t j = 0; j < bindings_[i].size(); ++j) {
       bindings_[i][j] = {};
     }
   }
@@ -150,7 +150,7 @@ Status Interface::SetConstants(absl::Span<const uint32_t> values) {
            << "Constant value overflow; have " << values.size()
            << " but max is " << kMaxConstants;
   }
-  for (int i = 0; i < values.size(); ++i) {
+  for (size_t i = 0; i < values.size(); ++i) {
     constants_[i] = values[i];
   }
   return OkStatus();

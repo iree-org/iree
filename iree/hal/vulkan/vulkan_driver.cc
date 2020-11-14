@@ -114,9 +114,11 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   create_info.pNext = nullptr;
   create_info.flags = 0;
   create_info.pApplicationInfo = &app_info;
-  create_info.enabledLayerCount = enabled_layer_names.size();
+  create_info.enabledLayerCount =
+      static_cast<uint32_t>(enabled_layer_names.size());
   create_info.ppEnabledLayerNames = enabled_layer_names.data();
-  create_info.enabledExtensionCount = enabled_extension_names.size();
+  create_info.enabledExtensionCount =
+      static_cast<uint32_t>(enabled_extension_names.size());
   create_info.ppEnabledExtensionNames = enabled_extension_names.data();
 
   // If we have the debug_utils extension then we can chain a one-shot messenger

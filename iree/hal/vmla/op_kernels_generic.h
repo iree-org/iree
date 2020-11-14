@@ -96,7 +96,7 @@ inline absl::InlinedVector<size_t, 6> ComputeCopyStrides(ShapeSpan shape,
                                                          size_t element_size) {
   absl::InlinedVector<size_t, 6> strides(shape.size());
   strides.back() = element_size;
-  for (int i = shape.size() - 2; i >= 0; --i) {
+  for (int i = static_cast<int>(shape.size()) - 2; i >= 0; --i) {
     strides[i] = strides[i + 1] * shape[i + 1];
   }
   return strides;
@@ -110,7 +110,7 @@ inline void CopyRegion(absl::Span<const uint8_t> src_buffer,
                        absl::Span<const int32_t> dst_indices,
                        absl::Span<const int32_t> lengths) {
   if (lengths.size() > 1) {
-    for (int i = 0; i < lengths[0]; ++i) {
+    for (int32_t i = 0; i < lengths[0]; ++i) {
       size_t src_offset = src_strides[0] * (src_indices[0] + i);
       size_t dst_offset = dst_strides[0] * (dst_indices[0] + i);
       CopyRegion(src_buffer.subspan(src_offset), src_strides.subspan(1),
@@ -1035,12 +1035,12 @@ void ComputePoolingWindow(absl::Span<const T> src_buffer,
                           absl::Span<const int> src_indices,
                           ShapeSpan src_shape, T init_value,
                           ShapeSpan window_dimensions, T* dst_value) {
-  int rank = src_shape.size();
+  size_t rank = src_shape.size();
   absl::InlinedVector<int, 8> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
-    int flat_idx = 0;
-    for (int i = 0; i < rank; ++i) {
-      int idx = src_indices[i] + window_indices[i];
+    size_t flat_idx = 0;
+    for (size_t i = 0; i < rank; ++i) {
+      size_t idx = src_indices[i] + window_indices[i];
       if (idx < 0 || idx >= src_shape[i]) return init_value;
       flat_idx = flat_idx * src_shape[i] + idx;
     }
@@ -1048,7 +1048,7 @@ void ComputePoolingWindow(absl::Span<const T> src_buffer,
   };
 
   *dst_value = init_value;
-  for (int i = 0, e = GetElementCount(window_dimensions); i < e; ++i) {
+  for (size_t i = 0, e = GetElementCount(window_dimensions); i < e; ++i) {
     KernelImpl()(dst_value, getSrcValue());
     IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
   }
@@ -1060,11 +1060,11 @@ Status GenericPooling(absl::Span<const T> src_buffer,
                       ShapeSpan src_shape, ShapeSpan dst_shape,
                       ShapeSpan window_dimensions, ShapeSpan strides,
                       ShapeSpan pad_low) {
-  int rank = src_shape.size();
+  size_t rank = src_shape.size();
   absl::InlinedVector<int, 8> src_indices(rank, 0);
   absl::InlinedVector<int, 8> dst_indices(rank, 0);
-  for (int i = 0, e = GetElementCount(dst_shape); i < e; ++i) {
-    for (int j = 0; j < rank; ++j) {
+  for (size_t i = 0, e = GetElementCount(dst_shape); i < e; ++i) {
+    for (size_t j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
     }
     ComputePoolingWindow<T, KernelImpl>(src_buffer, src_indices, src_shape,

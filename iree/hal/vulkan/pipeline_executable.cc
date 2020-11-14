@@ -53,7 +53,7 @@ PopulateSpecializationInfo(const VkSpecializationInfoDef* info_def) {
     entry.size = sizeof(uint32_t);
     uint32_t value = entry_def->uint32_value();
     std::memcpy(data.data() + offset, &value, sizeof(value));
-    offset += entry.size;
+    offset += static_cast<uint32_t>(entry.size);
   }
 
   return {std::move(entries), std::move(data)};
@@ -130,7 +130,8 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
   std::tie(spec_entries, spec_data) =
       PopulateSpecializationInfo(spirv_executable_def.specialization_info());
   VkSpecializationInfo specialization_info;
-  specialization_info.mapEntryCount = spec_entries.size();
+  specialization_info.mapEntryCount =
+      static_cast<uint32_t>(spec_entries.size());
   specialization_info.pMapEntries = spec_entries.data();
   specialization_info.dataSize = spec_data.size();
   specialization_info.pData = spec_data.data();
@@ -173,7 +174,8 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
   // Warning: leak checks remain disabled if an error is returned.
   IREE_DISABLE_LEAK_CHECKS();
   VK_RETURN_IF_ERROR(syms->vkCreateComputePipelines(
-      *logical_device, pipeline_cache, pipeline_create_infos.size(),
+      *logical_device, pipeline_cache,
+      static_cast<uint32_t>(pipeline_create_infos.size()),
       pipeline_create_infos.data(), logical_device->allocator(),
       pipelines.data()));
   IREE_ENABLE_LEAK_CHECKS();

@@ -414,8 +414,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  float lhs_contents[] = {1.0, 1.99999, 0.00001, 4};
-  float rhs_contents[] = {1.00001, 2.0, 0, 4};
+  float lhs_contents[] = {1.0f, 1.99999f, 0.00001f, 4.0f};
+  float rhs_contents[] = {1.00001f, 2.0f, 0.0f, 4.0f};
   int32_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));

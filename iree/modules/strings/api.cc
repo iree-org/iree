@@ -141,7 +141,7 @@ iree_status_t strings_string_tensor_get_rank(
   if (!tensor || !rank) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
-  *rank = tensor->rank;
+  *rank = static_cast<int32_t>(tensor->rank);
   return iree_ok_status();
 }
 

@@ -235,23 +235,36 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # they were signed values instead of properly using ssize_t. In certain
     # cases where the comparison being performed may be guarding access to
     # memory this can cause unexpected behavior ("-1ull < 512ull, great let's
-    # dereference buffer[-1ull]!).
+    # dereference buffer[-1ull]!").
     # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-3-c4018
     #
-    # TODO(benvanik): remove this (or make it per-file to iree/compiler, as LLVM
+    # TODO(#3844): remove this (or make it per-file to iree/compiler, as LLVM
     # tends to not care about these kind of things and it crops up there a lot).
     "/wd4018"
+
+    # Also common in LLVM is mismatching signed/unsigned math. That's even more
+    # dangerous than C4018: almost always these crop up in doing something with
+    # a size_t and a non-size_t value (usually int or something like it) and do
+    # you want out-of-bounds access exploits? Because that's how you get
+    # out-of-bounds access exploits. Before fuzzers took over finding code and
+    # trying to compile it with this warning forced to be an error was a way to
+    # narrow down the places to look for attack vectors. I lived through the
+    # Microsoft SAL/safe-int code red, and once you get used to using the safe
+    # buffer offset/size manipulation functions it eliminates all kinds of
+    # annoying bugs - as well as potential security issues.
+    #
+    # TODO(#3844): work to remove this class of errors from our code. It's
+    # almost entirely in LLVM related stuff so per-file iree/compiler/... would
+    # be fine.
+    "/wd4146"  # operator applied to unsigned type, result still unsigned
+    "/wd4244"  # possible loss of data
+    "/wd4267"  # initializing: possible loss of data
 
     # Misc tweaks to better match reasonable clang/gcc behavior:
     "/wd4005"  # allow: macro redefinition
     "/wd4065"  # allow: switch statement contains 'default' but no 'case' labels
     "/wd4141"  # allow: inline used more than once
     "/wd4624"  # allow: destructor was implicitly defined as deleted
-
-    # TODO(benvanik): confirm these are all still required and document:
-    "/wd4146"  # operator applied to unsigned type, result still unsigned
-    "/wd4244"  # possible loss of data
-    "/wd4267"  # initializing: possible loss of data
 )
 
 if(NOT ANDROID)

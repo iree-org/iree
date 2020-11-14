@@ -173,7 +173,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
 
   uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
   for (uint32_t i = 0; i < compute_queue_count; ++i) {
-    if (!(compute_queue_set.queue_indices & (1 << i))) continue;
+    if (!(compute_queue_set.queue_indices & (1ull << i))) continue;
 
     VkQueue queue = VK_NULL_HANDLE;
     syms->vkGetDeviceQueue(*logical_device,
@@ -195,7 +195,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
 
   uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);
   for (uint32_t i = 0; i < transfer_queue_count; ++i) {
-    if (!(transfer_queue_set.queue_indices & (1 << i))) continue;
+    if (!(transfer_queue_set.queue_indices & (1ull << i))) continue;
 
     VkQueue queue = VK_NULL_HANDLE;
     syms->vkGetDeviceQueue(*logical_device,
@@ -367,7 +367,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   QueueSet compute_queue_set = {};
   compute_queue_set.queue_family_index = queue_family_info.dispatch_index;
   for (uint32_t i = 0; i < queue_family_info.dispatch_queue_count; ++i) {
-    compute_queue_set.queue_indices |= 1 << i;
+    compute_queue_set.queue_indices |= 1ull << i;
   }
   QueueSet transfer_queue_set = {};
   transfer_queue_set.queue_family_index = queue_family_info.transfer_index;
@@ -377,7 +377,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     base_queue_index = queue_family_info.dispatch_index;
   }
   for (uint32_t i = 0; i < queue_family_info.transfer_queue_count; ++i) {
-    transfer_queue_set.queue_indices |= 1 << (i + base_queue_index);
+    transfer_queue_set.queue_indices |= 1ull << (i + base_queue_index);
   }
 
   // Emulate timeline semaphores if associated functions are not defined.

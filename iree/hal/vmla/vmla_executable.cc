@@ -88,7 +88,7 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
 
   entry_functions_.resize(
       iree_vm_module_signature(bytecode_module).export_function_count);
-  for (int i = 0; i < entry_functions_.size(); ++i) {
+  for (size_t i = 0; i < entry_functions_.size(); ++i) {
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
         bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
         &entry_functions_[i], nullptr));
@@ -134,7 +134,7 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
   auto* interface = &dispatch_state->interface;
   IREE_RETURN_IF_ERROR(interface->SetConstants(params.push_constants->values));
 
-  for (int set_ordinal = 0; set_ordinal < params.set_bindings.size();
+  for (size_t set_ordinal = 0; set_ordinal < params.set_bindings.size();
        ++set_ordinal) {
     for (const auto& binding : params.set_bindings[set_ordinal]) {
       // TODO(benvanik): plumb binding directly into VMLA to avoid this.
@@ -167,7 +167,7 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
       /*element_type=*/nullptr,
       /*interface*/ 1 + /*workgroup_xyz[3]*/ 3, &input_list));
   iree_vm_list_push_ref_retain(input_list, &dispatch_state->interface_ref);
-  for (int i = 0; i < workgroup_xyz.size(); ++i) {
+  for (size_t i = 0; i < workgroup_xyz.size(); ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(workgroup_xyz[i]);
     iree_vm_list_push_value(input_list, &value);
   }
