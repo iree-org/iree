@@ -66,7 +66,7 @@ def ndarange(shape: Sequence[int],
 def random_permutation(
     shape: Sequence[int],
     dtype: Union[tf.DType, np.dtype] = np.float32) -> np.ndarray:
-  """Returns a random permutation of 'np.prod(shape)' numbers."""
+  """Returns a random permutation of [0, np.prod(shape))."""
   values = ndarange(shape, dtype)
   np.random.shuffle(values)
   return values
