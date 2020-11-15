@@ -14,18 +14,24 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 
 #define DEBUG_TYPE "workgroup-calculation"
 
 namespace mlir {
 namespace iree_compiler {
+
 FuncOp getNumWorkgroupsFn(FuncOp entryPointFn,
                           llvm::StringRef numWorkgroupsFnAttr) {
   SymbolRefAttr attr =
@@ -43,10 +49,25 @@ FuncOp getNumWorkgroupsFn(FuncOp entryPointFn,
   return numWorkgroupsFn;
 }
 
-/// Computes the bounds of the parallel loops partitioned across workgroups.
-static Optional<SmallVector<Value, 2>> getParallelLoopRange(
-    PatternRewriter &rewriter, FuncOp numWorkgroupsFn, Location loc,
-    linalg::LinalgOp linalgOp) {
+// TODO: This method is templated on the builder type since the `OpBuilder`
+// doesnt have an erase method. Just erasing the op leads to segfaults when the
+// builder is `PatternRewriter` since the rewriter doesn't know the op was
+// deleted. This can be simplified a lot when this issue is fixed.
+template <typename BuilderTy>
+static void eraseOp(BuilderTy &builder, Operation *op) {
+  builder.eraseOp(op);
+}
+template <>
+void eraseOp(OpBuilder &builder, Operation *op) {
+  op->erase();
+}
+
+/// Computes the bounds of the loops of the `linalgOp`.
+template <typename BuilderTy>
+static Optional<SmallVector<Value, 4>> getLoopRange(BuilderTy &builder,
+                                                    Location loc,
+                                                    FuncOp numWorkgroupsFn,
+                                                    linalg::LinalgOp linalgOp) {
   if (!numWorkgroupsFn.empty()) {
     numWorkgroupsFn.emitError("num workgroups fn expected to be empty");
     return {};
@@ -56,77 +77,105 @@ static Optional<SmallVector<Value, 2>> getParallelLoopRange(
                  << numWorkgroupsFn.getName();
   });
 
-  rewriter.setInsertionPointToEnd(numWorkgroupsFn.addEntryBlock());
+  builder.createBlock(&numWorkgroupsFn.getBody(), {},
+                      numWorkgroupsFn.getType().getInputs());
   llvm::SetVector<Operation *> slice;
   getBackwardSlice(linalgOp, &slice);
   BlockAndValueMapping mapper;
   for (Operation *op : slice) {
-    rewriter.clone(*op, mapper);
+    builder.clone(*op, mapper);
   }
   // Clone the linalg operation just to compute the loop bounds.
   linalg::LinalgOp clonedLinalgOp =
-      rewriter.clone(*linalgOp.getOperation(), mapper);
-  Optional<SmallVector<Value, 4>> bounds =
-      getLoopRanges(rewriter, clonedLinalgOp);
-  unsigned numParallelLoops = linalgOp.iterator_types()
-                                  .getValue()
-                                  .take_while([](Attribute attr) -> bool {
-                                    return attr.cast<StringAttr>().getValue() ==
-                                           getParallelIteratorTypeName();
-                                  })
-                                  .size();
-  SmallVector<Value, 2> returnVals(
-      bounds->begin(), std::next(bounds->begin(), numParallelLoops));
-  rewriter.eraseOp(clonedLinalgOp);
-  return returnVals;
+      builder.clone(*linalgOp.getOperation(), mapper);
+  auto loopRange = clonedLinalgOp.createLoopRanges(builder, loc);
+  if (llvm::any_of(loopRange, [](Range range) {
+        return !matchPattern(range.stride, m_One()) ||
+               !matchPattern(range.offset, m_Zero());
+      })) {
+    linalgOp.emitError("unhandled non-unit stride loop range");
+    return llvm::None;
+  }
+  SmallVector<Value, 4> bounds = llvm::to_vector<4>(
+      llvm::map_range(loopRange, [](Range range) { return range.size; }));
+  eraseOp<BuilderTy>(builder, clonedLinalgOp);
+  return bounds;
 }
 
 /// Utility method to build IR that computes ceil(`numerator` / `denominator`)
-static Value buildCeilDiv(PatternRewriter &rewriter, Location loc,
-                          Value numerator, Value denominator) {
-  Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-  Value t = rewriter.create<AddIOp>(
-      loc, numerator, rewriter.create<SubIOp>(loc, denominator, one));
-  return rewriter.create<SignedDivIOp>(loc, t, denominator);
+static Value buildCeilDiv(OpBuilder &builder, Location loc, Value numerator,
+                          Value denominator) {
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value t = builder.create<AddIOp>(
+      loc, numerator, builder.create<SubIOp>(loc, denominator, one));
+  return builder.create<SignedDivIOp>(loc, t, denominator);
 }
 
 /// Utility method to build IR that computes ceil(`numerator` / `denominator`)
 /// when denominator is a constant.
-static Value buildCeilDivConstDenominator(PatternRewriter &rewriter,
-                                          Location loc, Value numerator,
+static Value buildCeilDivConstDenominator(OpBuilder &builder, Location loc,
+                                          Value numerator,
                                           int64_t denominator) {
-  return buildCeilDiv(rewriter, loc, numerator,
-                      rewriter.create<ConstantIndexOp>(loc, denominator));
+  return buildCeilDiv(builder, loc, numerator,
+                      builder.create<ConstantIndexOp>(loc, denominator));
 }
 
-LogicalResult createNumWorkgroupsFromResultShape(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes) {
+template <class BuilderTy>
+static LogicalResult createNumWorkgroupsFromResultShapeImpl(
+    BuilderTy &builder, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
+    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes,
+    ArrayRef<unsigned> distributedLoops) {
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
       linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
   if (!numWorkgroupsFn) return failure();
 
   Location loc = linalgOp.getLoc();
-  OpBuilder::InsertionGuard guard(rewriter);
-  Optional<SmallVector<Value, 2>> parallelLoopRange =
-      getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
-  if (!parallelLoopRange) return failure();
-  Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-  SmallVector<Value, 3> returnValues(3, one);
-  for (size_t i = 0, e = std::min<size_t>(parallelLoopRange->size(), 3); i != e;
-       ++i) {
-    if (tileSizes[e - i - 1] != 0) {
-      returnValues[i] = buildCeilDivConstDenominator(
-          rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+  OpBuilder::InsertionGuard guard(builder);
+  auto loopRange = getLoopRange(builder, loc, numWorkgroupsFn, linalgOp);
+  if (!loopRange) return failure();
+
+  SmallVector<Value, 4> numWorkgroups;
+  DenseSet<unsigned> distributedLoopsSet(distributedLoops.begin(),
+                                         distributedLoops.end());
+  for (auto size : enumerate(tileSizes)) {
+    if (size.value() && distributedLoopsSet.count(size.index())) {
+      Value num = buildCeilDivConstDenominator(
+          builder, loc, (*loopRange)[size.index()], size.value());
+      numWorkgroups.push_back(num);
     }
   }
-  rewriter.create<mlir::ReturnOp>(loc, returnValues);
+  SmallVector<Value, 4> resultValues =
+      llvm::to_vector<4>(llvm::reverse(numWorkgroups));
+  Value one = builder.template create<ConstantIndexOp>(loc, 1);
+  resultValues.resize(3, one);
+  builder.template create<mlir::ReturnOp>(loc, resultValues);
   return success();
 }
 
-LogicalResult createNumWorkgroupsFromLinearizedResultShape(
+LogicalResult createNumWorkgroupsFromResultShape(
+    OpBuilder &builder, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
+    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes,
+    ArrayRef<unsigned> distributedLoops) {
+  return createNumWorkgroupsFromResultShapeImpl<OpBuilder>(
+      builder, linalgOp, entryPointFn, numWorkgroupsFnAttr, tileSizes,
+      distributedLoops);
+}
+
+LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, int64_t workgroupSizeX) {
+    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes) {
+  SmallVector<unsigned, 4> distributedLoops =
+      llvm::to_vector<4>(llvm::seq<unsigned>(
+          0, std::min<unsigned>(3, getNumOuterParallelLoops(linalgOp))));
+  return createNumWorkgroupsFromResultShapeImpl<PatternRewriter>(
+      rewriter, linalgOp, entryPointFn, numWorkgroupsFnAttr, tileSizes,
+      distributedLoops);
+}
+
+LogicalResult createNumWorkgroupsFromLinearizedResultShape(
+    ConversionPatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+    FuncOp entryPointFn, llvm::StringRef numWorkgroupsFnAttr,
+    int64_t workgroupSizeX) {
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
       linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
   if (!numWorkgroupsFn) return failure();
@@ -142,12 +191,13 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
 
   Location loc = linalgOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
-  Optional<SmallVector<Value, 2>> parallelLoopRange =
-      getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
-  if (!parallelLoopRange) return failure();
+  Optional<SmallVector<Value, 4>> loopRange =
+      getLoopRange(rewriter, loc, numWorkgroupsFn, linalgOp);
+  if (!loopRange) return failure();
+  unsigned numParallelLoops = getNumOuterParallelLoops(linalgOp);
   Value one = rewriter.create<ConstantIndexOp>(loc, 1);
   SmallVector<Value, 3> returnValues(3, one);
-  for (auto range : *parallelLoopRange) {
+  for (auto range : ArrayRef<Value>(*loopRange).take_front(numParallelLoops)) {
     returnValues[0] = rewriter.create<MulIOp>(loc, range, returnValues[0]);
   }
   returnValues[0] = buildCeilDivConstDenominator(rewriter, loc, returnValues[0],

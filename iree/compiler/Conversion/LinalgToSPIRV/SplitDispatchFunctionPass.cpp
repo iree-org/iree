@@ -38,6 +38,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -67,33 +68,18 @@ static bool isFusableWithCurrentOpsList(
 
   linalg::LinalgOp dstOp = dyn_cast<linalg::LinalgOp>(nextOp);
   linalg::LinalgOp srcOp = dyn_cast<linalg::LinalgOp>(currOpsList.back());
-  if (dstOp && srcOp) {
-    // TODO(#2963): This splits independent linalg opreations into its own
-    // dispatch, but in reality if the iteration domain of the ops are the same,
-    // and they have all iterator types parallel, they could be put in the same
-    // dispatch region.
-    if (!dependenceGraph.hasDependenceFrom(srcOp, dstOp)) return false;
+  if (!dstOp || !srcOp) return true;
 
-#define ADD_FUSABLE_PAIR(SrcOpTy, DstOpTy, DependenceTy)             \
-  if (isa<SrcOpTy>(srcOp.getOperation()) &&                          \
-      isa<DstOpTy>(dstOp.getOperation()) &&                          \
-      dependenceGraph.hasDependenceFrom(srcOp, dstOp, DependenceTy)) \
-    return true;
-
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp,
-                     linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,
-                     linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp,
-                     linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp,
-                     linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp,
-                     linalg::LinalgDependenceGraph::DependenceType::WAW)
-
-#undef ADD_FUSABLE_PAIR
-  }
-  return false;
+  Optional<SmallVector<int64_t, 4>> srcLoopBounds =
+      linalg::getStaticLoopRanges(srcOp);
+  Optional<SmallVector<int64_t, 4>> dstLoopBounds =
+      linalg::getStaticLoopRanges(dstOp);
+  if (!srcLoopBounds || !dstLoopBounds) return false;
+  for (unsigned i : llvm::seq<unsigned>(
+           0, std::min(3u, std::min(getNumOuterParallelLoops(srcOp),
+                                    getNumOuterParallelLoops(dstOp)))))
+    if ((*srcLoopBounds)[i] != (*dstLoopBounds)[i]) return false;
+  return true;
 }
 
 /// For the list of operations in `ops` returns a list of lists where each list
