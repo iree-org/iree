@@ -146,7 +146,7 @@ iree_cc_library(
     iree::hal::executable_spec
     iree::hal::host::host_buffer
     iree::hal::host::host_executable
-    iree::schemas::vmla_executable_def_cc_fbs
+    iree::schemas::vmla_executable_def_c_fbs
     iree::vm::bytecode_module
     iree::vm::context
     iree::vm::instance
