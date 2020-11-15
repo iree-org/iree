@@ -103,15 +103,3 @@ flatbuffer_cc_library(
     "--gen-object-api"
   PUBLIC
 )
-
-iree_cc_embed_data(
-  NAME
-    reflection_data
-  CC_FILE_OUTPUT
-    "reflection_data.cc"
-  H_FILE_OUTPUT
-    "reflection_data.h"
-  CPP_NAMESPACE
-    "iree::schemas"
-  PUBLIC
-)
