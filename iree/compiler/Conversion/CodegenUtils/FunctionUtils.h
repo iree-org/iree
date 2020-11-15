@@ -18,6 +18,9 @@
 #include "mlir/IR/Function.h"
 
 namespace mlir {
+namespace linalg {
+class LinalgOp;
+}
 namespace iree_compiler {
 
 /// Returns true if the given `func` is a kernel dispatch entry point.
@@ -32,6 +35,9 @@ inline const char* getBindingAttrName() { return "binding"; }
 inline const char* getOperandResultNumAttrName() {
   return "operand_result_index";
 }
+
+/// Function to get number of outer parallel loops of a linalgOp
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 
 }  // namespace iree_compiler
 }  // namespace mlir
