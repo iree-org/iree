@@ -71,16 +71,16 @@ iree_cc_library(
   DEPS
     absl::inlined_vector
     absl::span
-    flatbuffers
     iree::base::dynamic_library
     iree::base::file_io
     iree::base::file_path
+    iree::base::flatcc
     iree::base::status
     iree::base::tracing
     iree::hal::executable
     iree::hal::executable_spec
     iree::hal::host::host_executable
-    iree::schemas::dylib_executable_def_cc_fbs
+    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
 
