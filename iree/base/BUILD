@@ -227,24 +227,6 @@ cc_test(
 )
 
 cc_library(
-    name = "flatbuffer_util",
-    srcs = ["flatbuffer_util.cc"],
-    hdrs = ["flatbuffer_util.h"],
-    deps = [
-        ":file_mapping",
-        ":memory",
-        ":ref_ptr",
-        ":status",
-        ":tracing",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
     name = "init",
     srcs = ["init.cc"],
     hdrs = ["init.h"],
