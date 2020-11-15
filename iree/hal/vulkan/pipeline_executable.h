@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_H_
 #define IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include <vector>
 

@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-
-set(VMA_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
-)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
@@ -27,17 +21,15 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::extensibility_util
+    ::vulkan_device
+    ::vulkan_driver
+    ::vulkan_headers
     iree::base::api
     iree::base::tracing
     iree::hal::api
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::extensibility_util
-    iree::hal::vulkan::vulkan_device
-    iree::hal::vulkan::vulkan_driver
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -48,14 +40,12 @@ iree_cc_library(
     "debug_reporter.h"
   SRCS
     "debug_reporter.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::status_util
+    ::vulkan_headers
     iree::base::status
     iree::base::tracing
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -66,16 +56,13 @@ iree_cc_library(
     "descriptor_pool_cache.h"
   SRCS
     "descriptor_pool_cache.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::handle_util
+    ::status_util
     absl::inlined_vector
     iree::base::ref_ptr
     iree::base::tracing
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -86,20 +73,17 @@ iree_cc_library(
     "descriptor_set_arena.h"
   SRCS
     "descriptor_set_arena.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::descriptor_pool_cache
+    ::pipeline_executable
+    ::status_util
+    ::vma_allocator
     iree::base::alignment
     iree::base::arena
     iree::base::math
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
-    iree::hal::vulkan::descriptor_pool_cache
-    iree::hal::vulkan::pipeline_executable
-    iree::hal::vulkan::status_util
-    iree::hal::vulkan::vma_allocator
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -110,9 +94,18 @@ iree_cc_library(
     "direct_command_buffer.h"
   SRCS
     "direct_command_buffer.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::descriptor_pool_cache
+    ::descriptor_set_arena
+    ::dynamic_symbols
+    ::handle_util
+    ::native_descriptor_set
+    ::native_event
+    ::pipeline_executable
+    ::pipeline_executable_layout
+    ::status_util
+    ::vma_allocator
+    ::vulkan_headers
     absl::core_headers
     absl::inlined_vector
     absl::synchronization
@@ -120,15 +113,6 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
-    iree::hal::vulkan::descriptor_pool_cache
-    iree::hal::vulkan::descriptor_set_arena
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::native_event
-    iree::hal::vulkan::pipeline_executable
-    iree::hal::vulkan::status_util
-    iree::hal::vulkan::vma_allocator
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -139,23 +123,21 @@ iree_cc_library(
     "direct_command_queue.h"
   SRCS
     "direct_command_queue.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::direct_command_buffer
+    ::dynamic_symbols
+    ::handle_util
+    ::native_timeline_semaphore
+    ::status_util
+    ::vulkan_headers
     absl::core_headers
     absl::synchronization
+    iree::base::api
     iree::base::arena
     iree::base::memory
     iree::base::status
-    iree::base::time
     iree::base::tracing
     iree::hal::command_queue
-    iree::hal::vulkan::direct_command_buffer
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::native_timeline_semaphore
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -167,9 +149,8 @@ iree_cc_library(
     "dynamic_symbols.h"
   SRCS
     "dynamic_symbols.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::vulkan_headers
     absl::core_headers
     absl::memory
     absl::span
@@ -179,7 +160,6 @@ iree_cc_library(
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -188,15 +168,13 @@ iree_cc_test(
     dynamic_symbols_test
   SRCS
     "dynamic_symbols_test.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
-    iree::hal::vulkan::status_util
-    iree::hal::vulkan::dynamic_symbols
+    ::dynamic_symbols
+    ::status_util
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
-    "nokokoro"
+    "driver=vulkan"
 )
 
 iree_cc_library(
@@ -206,20 +184,23 @@ iree_cc_library(
     "emulated_timeline_semaphore.h"
   SRCS
     "emulated_timeline_semaphore.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
     ::handle_util
     ::status_util
     ::timepoint_util
+    ::vulkan_headers
+    absl::core_headers
     absl::inlined_vector
     absl::synchronization
+    absl::utility
+    iree::base::api
     iree::base::intrusive_list
+    iree::base::ref_ptr
     iree::base::status
     iree::base::time
     iree::base::tracing
     iree::hal::semaphore
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -230,16 +211,14 @@ iree_cc_library(
     "extensibility_util.h"
   SRCS
     "extensibility_util.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::status_util
+    ::vulkan_headers
     absl::span
     iree::base::memory
     iree::base::status
     iree::base::tracing
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -248,33 +227,13 @@ iree_cc_library(
     handle_util
   HDRS
     "handle_util.h"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
-    absl::inlined_vector
+    ::dynamic_symbols
+    ::extensibility_util
+    ::vulkan_headers
     absl::synchronization
     absl::utility
     iree::base::ref_ptr
-    iree::hal::command_queue
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::extensibility_util
-    Vulkan::Headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    native_descriptor_set
-  HDRS
-    native_descriptor_set.h
-  SRCS
-    native_descriptor_set.cc
-  COPTS
-    "-DVK_NO_PROTOTYPES"
-  DEPS
-    ::handle_util
-    iree::hal::descriptor_set
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -285,12 +244,24 @@ iree_cc_library(
     "native_event.h"
   SRCS
     "native_event.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
     ::handle_util
+    ::vulkan_headers
     iree::hal::event
-    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    native_descriptor_set
+  HDRS
+    "native_descriptor_set.h"
+  SRCS
+    "native_descriptor_set.cc"
+  DEPS
+    ::handle_util
+    ::vulkan_headers
+    iree::hal::descriptor_set
   PUBLIC
 )
 
@@ -301,14 +272,13 @@ iree_cc_library(
     "native_timeline_semaphore.h"
   SRCS
     "native_timeline_semaphore.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
     ::handle_util
     ::status_util
+    ::vulkan_headers
+    absl::synchronization
     iree::base::tracing
     iree::hal::semaphore
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -319,9 +289,11 @@ iree_cc_library(
     "pipeline_cache.h"
   SRCS
     "pipeline_cache.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::handle_util
+    ::pipeline_executable
+    ::status_util
+    ::vulkan_headers
     absl::inlined_vector
     absl::synchronization
     iree::base::status
@@ -329,10 +301,6 @@ iree_cc_library(
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::pipeline_executable
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -343,13 +311,12 @@ iree_cc_library(
     "pipeline_executable.h"
   SRCS
     "pipeline_executable.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
     ::handle_util
     ::native_descriptor_set
     ::pipeline_executable_layout
     ::status_util
+    ::vulkan_headers
     absl::inlined_vector
     iree::base::memory
     iree::base::status
@@ -359,7 +326,6 @@ iree_cc_library(
     iree::hal::executable_layout
     iree::hal::executable_spec
     iree::schemas::spirv_executable_def_c_fbs
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -370,15 +336,13 @@ iree_cc_library(
     "pipeline_executable_layout.h"
   SRCS
     "pipeline_executable_layout.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::handle_util
+    ::vulkan_headers
     absl::inlined_vector
     absl::span
     iree::hal::descriptor_set_layout
     iree::hal::executable_layout
-    iree::hal::vulkan::handle_util
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -390,6 +354,7 @@ iree_cc_library(
   SRCS
     "renderdoc_capture_manager.cc"
   DEPS
+    absl::span
     iree::base::dynamic_library
     iree::base::logging
     iree::base::status
@@ -407,20 +372,26 @@ iree_cc_library(
     "serializing_command_queue.h"
   SRCS
     "serializing_command_queue.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
     ::direct_command_buffer
+    ::dynamic_symbols
     ::emulated_timeline_semaphore
     ::handle_util
     ::status_util
     ::timepoint_util
+    absl::core_headers
     absl::inlined_vector
+    absl::span
     absl::synchronization
+    iree::base::api
+    iree::base::intrusive_list
+    iree::base::memory
+    iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
+    iree::hal::command_buffer
     iree::hal::command_queue
-    Vulkan::Headers
+    iree::hal::semaphore
   PUBLIC
 )
 
@@ -431,11 +402,9 @@ iree_cc_library(
     "status_util.h"
   SRCS
     "status_util.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::vulkan_headers
     iree::base::status
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -446,17 +415,19 @@ iree_cc_library(
     "timepoint_util.h"
   SRCS
     "timepoint_util.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
     ::handle_util
+    ::status_util
+    ::vulkan_headers
+    absl::core_headers
     absl::synchronization
+    absl::utility
     iree::base::intrusive_list
     iree::base::ref_ptr
     iree::base::status
     iree::base::time
     iree::base::tracing
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -471,9 +442,11 @@ iree_cc_library(
     "internal_vk_mem_alloc.h"
     "vma_allocator.cc"
     "vma_buffer.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::handle_util
+    ::status_util
+    ::vulkan_headers
     absl::flat_hash_map
     absl::memory
     absl::synchronization
@@ -483,10 +456,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::allocator
     iree::hal::buffer
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
     vulkan_memory_allocator
   PUBLIC
 )
@@ -498,8 +467,6 @@ iree_cc_library(
     "vulkan_device.h"
   SRCS
     "vulkan_device.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
     ::descriptor_pool_cache
     ::direct_command_buffer
@@ -509,17 +476,19 @@ iree_cc_library(
     ::extensibility_util
     ::handle_util
     ::native_descriptor_set
+    ::native_event
     ::native_timeline_semaphore
     ::pipeline_cache
     ::pipeline_executable_layout
     ::serializing_command_queue
     ::status_util
     ::vma_allocator
+    ::vulkan_headers
     absl::inlined_vector
     absl::memory
+    absl::span
     absl::strings
     absl::synchronization
-    absl::span
     iree::base::math
     iree::base::memory
     iree::base::status
@@ -532,7 +501,6 @@ iree_cc_library(
     iree::hal::device
     iree::hal::driver
     iree::hal::semaphore
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -543,9 +511,14 @@ iree_cc_library(
     "vulkan_driver.h"
   SRCS
     "vulkan_driver.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::debug_reporter
+    ::dynamic_symbols
+    ::extensibility_util
+    ::renderdoc_capture_manager
+    ::status_util
+    ::vulkan_device
+    ::vulkan_headers
     absl::inlined_vector
     iree::base::memory
     iree::base::status
@@ -553,13 +526,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
-    iree::hal::vulkan::debug_reporter
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::extensibility_util
-    iree::hal::vulkan::renderdoc_capture_manager
-    iree::hal::vulkan::status_util
-    iree::hal::vulkan::vulkan_device
-    Vulkan::Headers
   PUBLIC
 )
 
@@ -568,16 +534,24 @@ iree_cc_library(
     vulkan_driver_module
   SRCS
     "vulkan_driver_module.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
   DEPS
+    ::dynamic_symbols
+    ::vulkan_driver
     absl::flags
     iree::base::init
     iree::base::status
     iree::base::tracing
     iree::hal::driver_registry
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::vulkan_driver
   ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vulkan_headers
+  HDRS
+    "vulkan_headers.h"
+  DEPS
+    Vulkan::Headers
   PUBLIC
 )

@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
