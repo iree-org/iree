@@ -37,7 +37,7 @@ cc_library(
         "//iree/hal/vulkan:api",
         "@dear_imgui",
         "@dear_imgui//:imgui_sdl_vulkan",
-        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+        "@iree_vulkan_headers//:vulkan_headers",
         "@sdl2//:SDL2",
         "@vulkan_sdk//:sdk",
     ],

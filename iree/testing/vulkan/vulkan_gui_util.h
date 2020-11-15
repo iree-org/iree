@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// IREE's Vulkan HAL is built with VK_NO_PROTOTYPES so Vulkan can be loaded
-// dynamically. Using utilities defined in this header means to link against
-// the Vulkan SDK statically, so we want prototypes to be included.
-#undef VK_NO_PROTOTYPES
-
 #include <SDL.h>
 #include <SDL_vulkan.h>
 #include <vulkan/vulkan.h>
