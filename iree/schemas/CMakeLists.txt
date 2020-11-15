@@ -27,19 +27,6 @@ flatbuffer_c_library(
   PUBLIC
 )
 
-flatbuffer_cc_library(
-  NAME
-    bytecode_module_def_cc_fbs
-  SRCS
-    "bytecode_module_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
-  PUBLIC
-)
-
 flatbuffer_c_library(
   NAME
     dylib_executable_def_c_fbs
