@@ -36,7 +36,20 @@ namespace iree_compiler {
 ///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
 ///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
 /// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
-/// distributed across workgroups.
+///  distributed across workgroups. `distributedLoops` are the loop dimensions
+///  that are distributed.
+LogicalResult createNumWorkgroupsFromResultShape(
+    OpBuilder &builder, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
+    llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes,
+    llvm::ArrayRef<unsigned> distributedLoops);
+
+/// Generates a function that computes the number of workgroups as
+///  [ceil(`parallelLoopRange`[2] / `tileSizes`[2]),
+///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
+///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
+/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
+/// distributed across workgroups. Assumes that upto 3 outer parallel loops of
+/// the `linalgOp` are distributed.
 LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
     llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes);
@@ -47,17 +60,14 @@ LogicalResult createNumWorkgroupsFromResultShape(
 /// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
 /// distributed across workgroups.
 LogicalResult createNumWorkgroupsFromLinearizedResultShape(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, int64_t workgroupSizeX);
+    ConversionPatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+    FuncOp entryPointFn, llvm::StringRef numWorkgroupsFnAttr,
+    int64_t workgroupSizeX);
 
 /// For a given `entryPointFn` return the function that computes the number of
 /// workgroups to use at launch time.
 FuncOp getNumWorkgroupsFn(FuncOp entryPointFn,
                           llvm::StringRef numWorkgroupsFnAttr);
-
-LogicalResult createNumWorkgroupsFromLinearizedResultShape(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, int64_t workgroupSizeX);
 
 /// The codegeneration emits a function `numWorkgroupsFn` for each entry point
 /// function. This function has arguments the !shapex.ranked_shape for all the

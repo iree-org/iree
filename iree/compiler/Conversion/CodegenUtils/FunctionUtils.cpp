@@ -24,5 +24,15 @@ bool isEntryPoint(FuncOp func) {
          SymbolTable::Visibility::Public;
 }
 
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return attr.cast<StringAttr>().getValue() ==
+               getParallelIteratorTypeName();
+      })
+      .size();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
