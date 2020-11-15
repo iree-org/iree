@@ -23,6 +23,7 @@ flatbuffer_c_library(
     "--reader"
     "--builder"
     "--verifier"
+    "--json"
   PUBLIC
 )
 

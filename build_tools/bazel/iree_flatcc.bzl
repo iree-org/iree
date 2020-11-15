@@ -37,6 +37,9 @@ def iree_flatbuffer_c_library(
             outs += ["%s_builder.h" % (out_stem)]
         if arg == "--verifier":
             outs += ["%s_verifier.h" % (out_stem)]
+        if arg == "--json":
+            outs += ["%s_json_parser.h" % (out_stem)]
+            outs += ["%s_json_printer.h" % (out_stem)]
 
     native.genrule(
         name = name + "_gen",
