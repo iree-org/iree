@@ -30,6 +30,7 @@ extern "C" {
 #include "flatcc/flatcc_builder.h"
 #include "flatcc/reflection/flatbuffers_common_reader.h"
 #include "flatcc/reflection/flatbuffers_common_builder.h"
+#include "flatcc/flatcc_json_printer.h"
 // clang-format on
 }  // extern "C"
 
@@ -55,6 +56,12 @@ class FlatbufferBuilder {
 
   operator flatcc_builder_t *() { return &builder; }
 
+  // Creates a string with the given string contents (including zeros).
+  flatbuffers_string_ref_t createString(StringRef value) {
+    if (value.empty()) return 0;
+    return flatbuffers_string_create(*this, value.data(), value.size());
+  }
+
   // Creates a string vector containing all strings in the given range.
   template <typename RangeTy>
   flatbuffers_string_vec_ref_t createStringVec(RangeTy &&Range) {
@@ -62,8 +69,38 @@ class FlatbufferBuilder {
         llvm::to_vector<8>(llvm::map_range(Range, [&](StringRef value) {
           return flatbuffers_string_create(*this, value.data(), value.size());
         }));
+    if (stringRefs.empty()) return 0;
     return flatbuffers_string_vec_create(*this, stringRefs.data(),
                                          stringRefs.size());
+  }
+
+  // Creates an offset vector with the given values. The source values will not
+  // be modified.
+  flatbuffers_vec_ref_t createOffsetVec(ArrayRef<flatcc_builder_ref_t> values) {
+    if (values.empty()) return 0;
+    return flatcc_builder_create_offset_vector(*this, values.data(),
+                                               values.size());
+  }
+
+  // Creates an offset vector with the given values.
+  // Unlike createOffsetVec this will destroy the input values array during
+  // serialization but be much faster.
+  flatbuffers_vec_ref_t createOffsetVecDestructive(
+      SmallVectorImpl<flatcc_builder_ref_t> &values) {
+    if (values.empty()) return 0;
+    return flatcc_builder_create_offset_vector_direct(*this, values.data(),
+                                                      values.size());
+  }
+
+  // Creates an [int32] vec with the contents of the given range.
+  template <typename RangeTy>
+  flatbuffers_int32_vec_ref_t createInt32Vec(RangeTy &&Range) {
+    if (llvm::empty(Range)) return 0;
+    flatbuffers_int32_vec_start(*this);
+    for (int32_t v : Range) {
+      flatbuffers_int32_vec_push_create(*this, v);
+    }
+    return flatbuffers_int32_vec_end(*this);
   }
 
   // Provides a raw_ostream that |fn| can use to directly stream into a [uint8]
@@ -83,6 +120,36 @@ class FlatbufferBuilder {
   // Captures the current contents of the flatbuffer builder and returns them
   // as a shaped `vector<SIZExi8>` dense attr. The builder is left unmodified.
   DenseIntElementsAttr getBufferAttr(MLIRContext *context);
+
+  // Copies the current contents of the flatbuffer builder to the target output
+  // stream. The builder is left unmodified.
+  //
+  // This is reduces a significant large allocation that can happen when trying
+  // to stitch together all of the pages that were allocated in the emitter as
+  // the flatbuffer was constructed; here we can just walk over each page and
+  // write it out in order without any allocations.
+  LogicalResult copyToStream(llvm::raw_ostream &output);
+
+  using print_json_fn_t = int (*)(flatcc_json_printer_t *ctx, const char *buf,
+                                  size_t bufsiz);
+
+  // Prints the flatbuffer in its canonical JSON format to the given stream.
+  // The builder is left unmodified.
+  //
+  // |pretty| enables newlines and indentation; somewhat useful for lit testing
+  // (as large byte buffers end up with a byte per line!).
+  //
+  // |includeDefaults| will force all values, including those that would not
+  // be serialized to the binary format due to the default value (0, etc) being
+  // omitted.
+  //
+  // NOTE: JSON representations will also differ structurally from the binary
+  // format as reused tables are printed wherever they are used as opposed to
+  // referencing the same bytes; meaning that this can't be used to verify that
+  // we are correctly memoizing strings/structures/etc.
+  LogicalResult printJsonToStream(bool pretty, bool includeDefaults,
+                                  print_json_fn_t print_json_fn,
+                                  llvm::raw_ostream &output);
 
  private:
   flatcc_builder_t builder;

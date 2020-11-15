@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
+load("//iree:build_defs.oss.bzl", "iree_build_test")
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 
 package(
@@ -20,18 +20,6 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-FLATC_ARGS = [
-    # Preserve workspace-relative include paths in generated code.
-    "--keep-prefix",
-    # Use C++11 'enum class' for enums.
-    "--scoped-enums",
-    # Include reflection tables used for dumping debug representations.
-    "--reflect-names",
-    # Generate FooT types for unpack/pack support. Note that this should only
-    # be used in tooling as the code size/runtime overhead is non-trivial.
-    "--gen-object-api",
-]
 
 FLATCC_ARGS = [
     "--reader",
@@ -44,12 +32,6 @@ iree_flatbuffer_c_library(
     name = "bytecode_module_def_c_fbs",
     srcs = ["bytecode_module_def.fbs"],
     flatcc_args = FLATCC_ARGS,
-)
-
-iree_flatbuffer_cc_library(
-    name = "bytecode_module_def_cc_fbs",
-    srcs = ["bytecode_module_def.fbs"],
-    flatc_args = FLATC_ARGS,
 )
 
 iree_flatbuffer_c_library(
@@ -86,7 +68,6 @@ iree_build_test(
     name = "schema_build_test",
     targets = [
         ":bytecode_module_def_c_fbs",
-        ":bytecode_module_def_cc_fbs",
         ":dylib_executable_def_c_fbs",
         ":llvmir_executable_def_c_fbs",
         ":metal_executable_def_c_fbs",
