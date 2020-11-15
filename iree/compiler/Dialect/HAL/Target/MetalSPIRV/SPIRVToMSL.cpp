@@ -32,9 +32,9 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
   using CompilerMSL::CompilerMSL;
 
   MetalShader::ThreadGroupSize getWorkgroupSizeForEntryPoint(
-      const std::string& entryName) {
+      StringRef entryName) {
     const auto& entryPoint = get_entry_point(
-        entryName, spv::ExecutionModel::ExecutionModelGLCompute);
+        entryName.str(), spv::ExecutionModel::ExecutionModelGLCompute);
     const auto& workgroupSize = entryPoint.workgroup_size;
     // TODO(antiagainst): support specialization constant.
     if (workgroupSize.constant != 0) return {0, 0, 0};
@@ -104,13 +104,13 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 }  // namespace
 
 llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
-    llvm::ArrayRef<uint32_t> spvBinary, const std::string& entryPoint) {
+    llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
   // All spirv-cross operations work on the current entry point. It should be
   // set right after the cross compiler construction.
   spvCrossCompiler.set_entry_point(
-      entryPoint, spv::ExecutionModel::ExecutionModelGLCompute);
+      entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
 
   // Explicitly set the argument buffer index for each SPIR-V resource variable.
   auto descriptors = spvCrossCompiler.getBufferSetBindingPairs();

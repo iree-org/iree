@@ -33,15 +33,17 @@ FLATC_ARGS = [
     "--gen-object-api",
 ]
 
+FLATCC_ARGS = [
+    "--reader",
+    "--builder",
+    "--verifier",
+    "--json",
+]
+
 iree_flatbuffer_c_library(
     name = "bytecode_module_def_c_fbs",
     srcs = ["bytecode_module_def.fbs"],
-    flatcc_args = [
-        "--reader",
-        "--builder",
-        "--verifier",
-        "--json",
-    ],
+    flatcc_args = FLATCC_ARGS,
 )
 
 iree_flatbuffer_cc_library(
@@ -50,10 +52,22 @@ iree_flatbuffer_cc_library(
     flatc_args = FLATC_ARGS,
 )
 
+iree_flatbuffer_c_library(
+    name = "dylib_executable_def_c_fbs",
+    srcs = ["dylib_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+)
+
 iree_flatbuffer_cc_library(
     name = "dylib_executable_def_cc_fbs",
     srcs = ["dylib_executable_def.fbs"],
     flatc_args = FLATC_ARGS,
+)
+
+iree_flatbuffer_c_library(
+    name = "llvmir_executable_def_c_fbs",
+    srcs = ["llvmir_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
 )
 
 iree_flatbuffer_cc_library(
@@ -62,16 +76,34 @@ iree_flatbuffer_cc_library(
     flatc_args = FLATC_ARGS,
 )
 
+iree_flatbuffer_c_library(
+    name = "metal_executable_def_c_fbs",
+    srcs = ["metal_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+)
+
 iree_flatbuffer_cc_library(
     name = "metal_executable_def_cc_fbs",
     srcs = ["metal_executable_def.fbs"],
     flatc_args = FLATC_ARGS,
 )
 
+iree_flatbuffer_c_library(
+    name = "spirv_executable_def_c_fbs",
+    srcs = ["spirv_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+)
+
 iree_flatbuffer_cc_library(
     name = "spirv_executable_def_cc_fbs",
     srcs = ["spirv_executable_def.fbs"],
     flatc_args = FLATC_ARGS,
+)
+
+iree_flatbuffer_c_library(
+    name = "vmla_executable_def_c_fbs",
+    srcs = ["vmla_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
 )
 
 iree_flatbuffer_cc_library(
@@ -83,11 +115,12 @@ iree_flatbuffer_cc_library(
 iree_build_test(
     name = "schema_build_test",
     targets = [
+        ":bytecode_module_def_c_fbs",
         ":bytecode_module_def_cc_fbs",
-        ":dylib_executable_def_cc_fbs",
-        ":llvmir_executable_def_cc_fbs",
-        ":metal_executable_def_cc_fbs",
-        ":spirv_executable_def_cc_fbs",
-        ":vmla_executable_def_cc_fbs",
+        ":dylib_executable_def_c_fbs",
+        ":llvmir_executable_def_c_fbs",
+        ":metal_executable_def_c_fbs",
+        ":spirv_executable_def_c_fbs",
+        ":vmla_executable_def_c_fbs",
     ],
 )

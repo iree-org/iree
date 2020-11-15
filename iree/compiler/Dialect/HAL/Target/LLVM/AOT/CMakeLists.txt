@@ -37,11 +37,13 @@ iree_cc_library(
     LLVMX86CodeGen
     MLIRLLVMIR
     MLIRTargetLLVMIR
+    flatccrt
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
-    iree::schemas::dylib_executable_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
 

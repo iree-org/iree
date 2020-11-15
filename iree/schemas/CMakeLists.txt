@@ -40,6 +40,19 @@ flatbuffer_cc_library(
   PUBLIC
 )
 
+flatbuffer_c_library(
+  NAME
+    dylib_executable_def_c_fbs
+  SRCS
+    "dylib_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
+
 flatbuffer_cc_library(
   NAME
     dylib_executable_def_cc_fbs
@@ -50,6 +63,19 @@ flatbuffer_cc_library(
     "--scoped-enums"
     "--reflect-names"
     "--gen-object-api"
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
+    llvmir_executable_def_c_fbs
+  SRCS
+    "llvmir_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
@@ -66,6 +92,19 @@ flatbuffer_cc_library(
   PUBLIC
 )
 
+flatbuffer_c_library(
+  NAME
+    metal_executable_def_c_fbs
+  SRCS
+    "metal_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
+
 flatbuffer_cc_library(
   NAME
     metal_executable_def_cc_fbs
@@ -79,6 +118,19 @@ flatbuffer_cc_library(
   PUBLIC
 )
 
+flatbuffer_c_library(
+  NAME
+    spirv_executable_def_c_fbs
+  SRCS
+    "spirv_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
+
 flatbuffer_cc_library(
   NAME
     spirv_executable_def_cc_fbs
@@ -89,6 +141,19 @@ flatbuffer_cc_library(
     "--scoped-enums"
     "--reflect-names"
     "--gen-object-api"
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
+    vmla_executable_def_c_fbs
+  SRCS
+    "vmla_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
