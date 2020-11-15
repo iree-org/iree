@@ -196,14 +196,6 @@ maybe(
     path = "third_party/googletest",
 )
 
-# Note that TensorFlow provides this as "flatbuffers" which is wrong.
-# It is only used for TFLite and may cause ODR issues if not fixed.
-maybe(
-    local_repository,
-    name = "com_github_google_flatbuffers",
-    path = "third_party/flatbuffers",
-)
-
 maybe(
     new_local_repository,
     name = "com_github_dvidelabs_flatcc",

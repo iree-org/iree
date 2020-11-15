@@ -499,17 +499,6 @@ class BuildFileFunctions(object):
                             f"{flatcc_args_block}"
                             f"  PUBLIC\n)\n\n")
 
-  def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):
-    name_block = self._convert_name_block(name)
-    srcs_block = self._convert_srcs_block(srcs)
-    flatc_args_block = self._convert_flatc_args_block(flatc_args)
-
-    self.converter.body += (f"flatbuffer_cc_library(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{flatc_args_block}"
-                            f"  PUBLIC\n)\n\n")
-
   def gentbl(self,
              name,
              tblgen,
