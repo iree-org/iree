@@ -68,8 +68,6 @@ class ABSL_SCOPED_LOCKABLE AbslVmaRWMutex {
 };
 #define VMA_RW_MUTEX AbslVmaRWMutex
 
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
-
 #define VMA_IMPLEMENTATION
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 

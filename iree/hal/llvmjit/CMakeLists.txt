@@ -27,6 +27,8 @@ iree_cc_library(
     "llvmjit_device.cc"
   DEPS
     ::llvmjit_executable_cache
+    iree::base::flatcc
+    iree::base::status
     iree::base::tracing
     iree::hal::host::host_local_device
   PUBLIC
@@ -77,7 +79,6 @@ iree_cc_library(
     LLVMOrcJIT
     LLVMSupport
     absl::span
-    iree::base::flatcc
     iree::base::status
     iree::base::tracing
     iree::hal::buffer

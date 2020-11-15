@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_EVENT_H_
 #define IREE_HAL_VULKAN_NATIVE_EVENT_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include "iree/hal/event.h"
 #include "iree/hal/vulkan/handle_util.h"
