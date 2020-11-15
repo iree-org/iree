@@ -88,11 +88,9 @@ iree_cc_binary(
   SRCS
     "iree-dump-module-main.cc"
   DEPS
-    flatbuffers
-    iree::base::file_io
-    iree::base::flatbuffer_util
-    iree::base::init
-    iree::schemas::bytecode_module_def_cc_fbs
+    flatccrt
+    iree::base::file_mapping
+    iree::schemas::bytecode_module_def_c_fbs
 )
 
 iree_cc_binary(

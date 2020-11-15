@@ -58,11 +58,9 @@ iree_cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
-        "//iree/base:file_io",  # build-cleaner: keep
-        "//iree/base:flatbuffer_util",
-        "//iree/base:init",
-        "//iree/schemas:bytecode_module_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/base:file_mapping",
+        "//iree/schemas:bytecode_module_def_c_fbs",
+        "@com_github_dvidelabs_flatcc//:runtime",
     ],
 )
 
