@@ -22,7 +22,6 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/pipeline_executable.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
 
 namespace iree {
 namespace hal {
