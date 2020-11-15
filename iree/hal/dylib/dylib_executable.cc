@@ -62,7 +62,7 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
     }
   }
 
-  if (!flatbuffers_int8_vec_len(
+  if (!flatbuffers_uint8_vec_len(
           iree_DyLibExecutableDef_library_embedded_get(executable_def))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable library_embedded is missing/empty");
@@ -130,26 +130,22 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   library_temp_path += ".so";
 #endif
 
-  // TODO(#3845): use dlopen on an fd with either dlopen(/proc/self/fd/NN),
-  // fdlopen, or android_dlopen_ext to avoid needing to write the file to disk.
-  // Can fallback to memfd_create + dlopen where available, and fallback from
-  // that to disk (maybe just windows/mac).
-  flatbuffers_int8_vec_t embedded_library_vec =
+  flatbuffers_uint8_vec_t embedded_library_vec =
       iree_DyLibExecutableDef_library_embedded_get(executable_def);
   IREE_RETURN_IF_ERROR(file_io::SetFileContents(
       library_temp_path,
       absl::string_view(reinterpret_cast<const char*>(embedded_library_vec),
-                        flatbuffers_int8_vec_len(embedded_library_vec))));
+                        flatbuffers_uint8_vec_len(embedded_library_vec))));
 
   IREE_ASSIGN_OR_RETURN(executable_library_,
                         DynamicLibrary::Load(library_temp_path.c_str()));
 
   flatbuffers_string_t debug_database_filename =
       iree_DyLibExecutableDef_debug_database_filename_get(executable_def);
-  flatbuffers_int8_vec_t debug_database_embedded_vec =
+  flatbuffers_uint8_vec_t debug_database_embedded_vec =
       iree_DyLibExecutableDef_debug_database_embedded_get(executable_def);
   if (flatbuffers_string_len(debug_database_filename) &&
-      flatbuffers_int8_vec_len(debug_database_embedded_vec)) {
+      flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
     IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
     auto debug_database_path = file_path::JoinPaths(
         file_path::DirectoryName(library_temp_path),
@@ -160,7 +156,7 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
         debug_database_path,
         absl::string_view(
             reinterpret_cast<const char*>(debug_database_embedded_vec),
-            flatbuffers_int8_vec_len(debug_database_embedded_vec))));
+            flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
     executable_library_->AttachDebugDatabase(debug_database_path.c_str());
   }
 

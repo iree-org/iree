@@ -57,7 +57,7 @@ static iree_status_t iree_hal_vmla_executable_flatbuffer_verify(
   iree_VMLAExecutableDef_table_t executable_def =
       iree_VMLAExecutableDef_as_root(flatbuffer_data.data);
 
-  if (flatbuffers_int8_vec_len(
+  if (flatbuffers_uint8_vec_len(
           iree_VMLAExecutableDef_bytecode_module_get(executable_def)) < 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable bytecode_module is missing/empty");
@@ -114,10 +114,10 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
       iree_VMLAExecutableDef_as_root(executable_data.data);
 
   // Load bytecode module from the executable spec.
-  flatbuffers_int8_vec_t bytecode_module_vec =
+  flatbuffers_uint8_vec_t bytecode_module_vec =
       iree_VMLAExecutableDef_bytecode_module_get(executable_def);
   iree_const_byte_span_t bytecode_module_data = iree_make_const_byte_span(
-      bytecode_module_vec, flatbuffers_int8_vec_len(bytecode_module_vec));
+      bytecode_module_vec, flatbuffers_uint8_vec_len(bytecode_module_vec));
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
       bytecode_module_data, iree_allocator_null(), iree_allocator_system(),
