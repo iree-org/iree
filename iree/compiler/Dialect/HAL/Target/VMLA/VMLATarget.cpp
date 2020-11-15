@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -23,11 +22,10 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
-#include "iree/schemas/vmla_executable_def_generated.h"
-#include "llvm/ADT/ScopeExit.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/vmla_executable_def_builder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/OperationSupport.h"
@@ -216,35 +214,30 @@ class VMLATargetBackend final : public TargetBackend {
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpBuilder &executableBuilder) override {
-    // Serialize the VM module to bytes.
-    std::string byteStreamValue;
-    llvm::raw_string_ostream byte_stream(byteStreamValue);
+    // Serialize the VM module to bytes directly into a flatbuffer.
+    FlatbufferBuilder builder;
     IREE::VM::BytecodeTargetOptions bytecodeOptions;
-    if (failed(translateModuleToBytecode(targetOp.getInnerModule(),
-                                         bytecodeOptions, byte_stream))) {
+    auto dataRef = builder.streamUint8Vec([&](raw_ostream &stream) {
+      return succeeded(translateModuleToBytecode(targetOp.getInnerModule(),
+                                                 bytecodeOptions, stream));
+    });
+    if (!dataRef) {
       return targetOp.emitError() << "failed to serialize converted VM module";
     }
 
     // Pack the executable definition and get the bytes with the proper header.
     // The header is used to verify the contents at runtime.
-    ::flatbuffers::FlatBufferBuilder fbb;
-    iree::VMLAExecutableDefT vmlaExecutableDef;
-    vmlaExecutableDef.bytecode_module.resize(byteStreamValue.size());
-    std::memcpy(vmlaExecutableDef.bytecode_module.data(),
-                byteStreamValue.data(), byteStreamValue.size());
-    auto executableOffset =
-        iree::VMLAExecutableDef::Pack(fbb, &vmlaExecutableDef);
-    iree::FinishVMLAExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    iree_VMLAExecutableDef_start_as_root(builder);
+    iree_VMLAExecutableDef_bytecode_module_add(builder, dataRef);
+    iree_VMLAExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
+    // NOTE: this snapshots the flatbuffer builder data at the time it is called
+    // and future changes will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::VMLA),
-        std::move(bytes));
-
+        builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
 

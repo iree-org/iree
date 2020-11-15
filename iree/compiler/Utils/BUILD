@@ -23,9 +23,11 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
+        "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
     ],
     hdrs = [
+        "FlatbufferUtils.h",
         "GraphUtils.h",
         "PatternUtils.h",
     ],
@@ -38,6 +40,11 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@com_github_dvidelabs_flatcc//:runtime",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+
+        # HACK: work around copts being unsupported in bazel-to-cmake to get
+        # the flatcc deps.
+        "//iree/schemas:vmla_executable_def_c_fbs",  # build-cleaner: keep
     ],
 )

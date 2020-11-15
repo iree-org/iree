@@ -36,7 +36,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRSupport
     MLIRVector
-    flatbuffers
+    flatccrt
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Conversion::LinalgToSPIRV::CodeGenOptionUtils
@@ -45,6 +45,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
-    iree::schemas::spirv_executable_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )

@@ -43,8 +43,8 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   auto module_def =
       ::flatbuffers::GetRoot<LLVMIRExecutableDef>(spec.executable_data.data());
   auto data =
-      reinterpret_cast<const char*>(module_def->llvmir_module()->data());
-  const int size = module_def->llvmir_module()->size();
+      reinterpret_cast<const char*>(module_def->bitcode_module()->data());
+  const int size = module_def->bitcode_module()->size();
   auto mem_buffer = llvm::MemoryBuffer::getMemBufferCopy(
       llvm::StringRef(data, size), "llvm-ir");
   auto llvm_context = std::make_unique<llvm::LLVMContext>();
