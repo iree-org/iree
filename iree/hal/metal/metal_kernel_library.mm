@@ -18,42 +18,100 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
+// NOTE: starting to port this to ObjC.
+
+// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// runtime. There are still some conditions we must be aware of (such as omitted
+// names on functions with internal linkage), however we shouldn't need to
+// bounds check anything within the flatbuffer after this succeeds.
+static iree_status_t iree_hal_metal_executable_flatbuffer_verify(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer data is not present or less than 16 bytes (%zu total)",
+                            flatbuffer_data.data_length);
+  }
+
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret =
+      iree_MetalExecutableDef_verify_as_root(flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_MetalExecutableDef_table_t executable_def =
+      iree_MetalExecutableDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_MetalExecutableDef_entry_points_get(executable_def);
+  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  for (size_t i = 0; i < entry_point_count; ++i) {
+    if (!flatbuffers_string_len(flatbuffers_string_vec_at(entry_points_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu has no name", i);
+    }
+  }
+
+  iree_MetalThreadgroupSize_vec_t threadgroup_sizes_vec =
+      iree_MetalExecutableDef_threadgroup_sizes(executable_def);
+  size_t threadgroup_size_count = iree_MetalThreadgroupSize_vec_len(threadgroup_sizes_vec);
+  if (!metal_executable_def.threadgroup_sizes() ||
+      metal_executable_def.threadgroup_sizes()->size() == 0) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No threadgroup sizes present";
+  }
+
+  flatbuffers_string_vec_t shader_sources_vec =
+      iree_MetalExecutableDef_shader_sources_get(executable_def);
+  size_t shader_source_count = flatbuffers_string_vec_len(shader_sources_vec);
+  for (size_t i = 0; i < shader_source_count; ++i) {
+    if (!flatbuffers_string_len(flatbuffers_string_vec_at(shader_sources_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "executable shader source %zu is empty",
+                              i);
+    }
+  }
+
+  if (entry_point_count != threadgroup_size_count || entry_point_count != shader_source_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "mismatch among the numbers of entry points (%zu), thread group sizes "
+                            "(%zu), and source strings (%zu)",
+                            entry_point_count, threadgroup_size_count, shader_source_count);
+  }
+
+  return iree_ok_status();
+}
+
 namespace iree {
 namespace hal {
 namespace metal {
 
 // static
-StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
-    id<MTLDevice> device, ExecutableCachingModeBitfield mode,
-    const MetalExecutableDef& metal_executable_def) {
+StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(id<MTLDevice> device,
+                                                                 ExecutableCachingModeBitfield mode,
+                                                                 const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("MetalKernelLibrary::Create");
-  if (!metal_executable_def.entry_points() || metal_executable_def.entry_points()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No entry points defined";
-  }
-  if (!metal_executable_def.threadgroup_sizes() ||
-      metal_executable_def.threadgroup_sizes()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No threadgroup sizes present";
-  }
-  if (!metal_executable_def.shader_sources() ||
-      metal_executable_def.shader_sources()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No MSL source string present";
-  }
 
-  const auto& entry_points = *metal_executable_def.entry_points();
-  const auto& threadgroup_sizes = *metal_executable_def.threadgroup_sizes();
-  const auto& msl_sources = *metal_executable_def.shader_sources();
+  // Verify and fetch the executable flatbuffer wrapper.
+  iree_const_byte_span_t executable_data =
+      iree_make_const_byte_span(spec.executable_data.data(), spec.executable_data.size());
+  IREE_RETURN_IF_ERROR(iree_hal_metal_executable_flatbuffer_verify(executable_data));
+  iree_MetalExecutableDef_table_t executable_def =
+      iree_MetalExecutableDef_as_root(executable_data.data);
 
-  if (entry_points.size() != threadgroup_sizes.size() ||
-      entry_points.size() != msl_sources.size()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Mismatch among the numbers of entry points, thread group sizes, and source strings";
-  }
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_MetalExecutableDef_entry_points_get(executable_def);
+  iree_MetalThreadgroupSize_vec_t threadgroup_sizes_vec =
+      iree_MetalExecutableDef_threadgroup_sizes(executable_def);
+  flatbuffers_string_vec_t shader_sources_vec =
+      iree_MetalExecutableDef_shader_sources_get(executable_def);
 
   // Compile each MSL source string into a MTLLibrary and get the MTLFunction for the entry point to
   // build the pipeline state object.
 
-  absl::InlinedVector<id<MTLLibrary>, 1> libraries;
-  absl::InlinedVector<KernelObjects, 1> kernel_objects;
+  absl::InlinedVector<id<MTLLibrary>, 4> libraries;
+  absl::InlinedVector<KernelObjects, 4> kernel_objects;
 
   MTLCompileOptions* msl_compile_options = [MTLCompileOptions new];
   msl_compile_options.languageVersion = MTLLanguageVersion2_0;
@@ -71,12 +129,15 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
   // debugging purposes but bad for performance. Enable offline compilation and make that as the
   // default.
 
-  for (int i = 0; i < msl_sources.size(); ++i) {
+  for (size_t entry_ordinal = 0; entry_ordinal < flatbuffers_string_vec_len(shader_sources_vec);
+       ++entry_ordinal) {
+    flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, entry_ordinal);
     @autoreleasepool {
       NSError* error = nil;
 
-      NSString* shader_source = [NSString stringWithCString:msl_sources[i]->c_str()
-                                                   encoding:[NSString defaultCStringEncoding]];
+      NSString* shader_source =
+          [NSString stringWithCString:flatbuffers_string_vec_at(shader_sources_vec, entry_ordinal)
+                             encoding:[NSString defaultCStringEncoding]];
       id<MTLLibrary> library = [device newLibraryWithSource:shader_source
                                                     options:msl_compile_options
                                                       error:&error];
@@ -89,7 +150,7 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
       }
       libraries.push_back(library);
 
-      NSString* entry_point = [NSString stringWithCString:entry_points[i]->c_str()
+      NSString* entry_point = [NSString stringWithCString:entry_point
                                                  encoding:[NSString defaultCStringEncoding]];
       id<MTLFunction> function = [library newFunctionWithName:entry_point];
       if (!function) {
@@ -98,8 +159,7 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
         NSLog(@"Original MSL source: %@", shader_source);
 #endif
         return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Cannot find entry point '" << entry_points[i] << "' in shader source index "
-               << i;
+               << "Cannot find entry point '" << entry_point << "' in shader source index " << i;
       }
 
       id<MTLComputePipelineState> pso = [device newComputePipelineStateWithFunction:function
@@ -112,17 +172,18 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
         return InvalidArgumentErrorBuilder(IREE_LOC) << "Invalid MSL source";
       }
 
-      kernel_objects.push_back(KernelObjects{function, *threadgroup_sizes[i], pso});
+      kernel_objects.push_back(KernelObjects{
+          function, iree_MetalThreadgroupSize_vec_at(threadgroup_sizes_vec, entry_ordinal), pso});
     }
   }
 
-  return assign_ref(new MetalKernelLibrary([device retain], std::move(libraries),
-                                           std::move(kernel_objects)));
+  return assign_ref(
+      new MetalKernelLibrary([device retain], std::move(libraries), std::move(kernel_objects)));
 }
 
 MetalKernelLibrary::MetalKernelLibrary(id<MTLDevice> device,
-                                       absl::InlinedVector<id<MTLLibrary>, 1> libraries,
-                                       absl::InlinedVector<KernelObjects, 1> kernel_objects)
+                                       absl::InlinedVector<id<MTLLibrary>, 4> libraries,
+                                       absl::InlinedVector<KernelObjects, 4> kernel_objects)
     : device_(device),
       libraries_(std::move(libraries)),
       kernel_objects_(std::move(kernel_objects)) {}
@@ -143,7 +204,7 @@ StatusOr<id<MTLFunction>> MetalKernelLibrary::GetKernelForEntryPoint(int ordinal
   return kernel_objects_[ordinal].function;
 }
 
-StatusOr<MetalThreadgroupSize> MetalKernelLibrary::GetThreadgroupSizeForEntryPoint(
+StatusOr<iree_MetalThreadgroupSize_t> MetalKernelLibrary::GetThreadgroupSizeForEntryPoint(
     int ordinal) const {
   if (ordinal < 0 || ordinal >= kernel_objects_.size()) {
     return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;

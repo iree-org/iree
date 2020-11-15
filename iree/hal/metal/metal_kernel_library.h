@@ -24,7 +24,11 @@
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_spec.h"
-#include "iree/schemas/metal_executable_def_generated.h"
+
+// NOTE: include order matters:
+#include "flatcc/reflection/flatbuffers_common_reader.h"
+#include "iree/schemas/metal_executable_def_reader.h"
+#include "iree/schemas/metal_executable_def_verifier.h"
 
 namespace iree {
 namespace hal {
@@ -41,7 +45,7 @@ class MetalKernelLibrary final : public Executable {
  public:
   static StatusOr<ref_ptr<MetalKernelLibrary>> Create(
       id<MTLDevice> device, ExecutableCachingModeBitfield mode,
-      const MetalExecutableDef& metal_executable_def);
+      const ExecutableSpec& spec);
   ~MetalKernelLibrary() override;
 
   bool supports_debugging() const override { return false; }
@@ -50,7 +54,7 @@ class MetalKernelLibrary final : public Executable {
   StatusOr<id<MTLFunction>> GetKernelForEntryPoint(int ordinal) const;
 
   // Returns the threadgroup size for the entry point with the given |ordinal|.
-  StatusOr<MetalThreadgroupSize> GetThreadgroupSizeForEntryPoint(
+  StatusOr<iree_MetalThreadgroupSize_t> GetThreadgroupSizeForEntryPoint(
       int ordinal) const;
 
   // Returns the pipeline state object for the entry point with the given
@@ -61,7 +65,7 @@ class MetalKernelLibrary final : public Executable {
  private:
   struct KernelObjects {
     id<MTLFunction> function;
-    MetalThreadgroupSize threadgroup_size;
+    iree_MetalThreadgroupSize_t threadgroup_size;
     // Baked pipeline state object.
     id<MTLComputePipelineState> pipeline_state;
   };
@@ -69,14 +73,13 @@ class MetalKernelLibrary final : public Executable {
   // Creates a MetalKernelLibrary assuming all Metal objects are already
   // retained before passing in.
   MetalKernelLibrary(id<MTLDevice> device,
-                     absl::InlinedVector<id<MTLLibrary>, 1> libraries,
-                     absl::InlinedVector<KernelObjects, 1> kernel_objects,
-                     std::string tag);
+                     absl::InlinedVector<id<MTLLibrary>, 4> libraries,
+                     absl::InlinedVector<KernelObjects, 4> kernel_objects);
 
   id<MTLDevice> device_;
 
-  absl::InlinedVector<id<MTLLibrary>, 1> libraries_;
-  absl::InlinedVector<KernelObjects, 1> kernel_objects_;
+  absl::InlinedVector<id<MTLLibrary>, 4> libraries_;
+  absl::InlinedVector<KernelObjects, 4> kernel_objects_;
 };
 
 }  // namespace metal
