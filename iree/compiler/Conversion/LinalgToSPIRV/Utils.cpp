@@ -163,15 +163,5 @@ template SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts<GPUGlobalId, GPUGlobalCount>(OpBuilder &builder,
                                                          Location loc,
                                                          unsigned numDims);
-
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return attr.cast<StringAttr>().getValue() ==
-               getParallelIteratorTypeName();
-      })
-      .size();
-}
 }  // namespace iree_compiler
 }  // namespace mlir
