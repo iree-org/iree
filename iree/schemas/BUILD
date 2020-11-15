@@ -58,12 +58,6 @@ iree_flatbuffer_c_library(
     flatcc_args = FLATCC_ARGS,
 )
 
-iree_flatbuffer_cc_library(
-    name = "dylib_executable_def_cc_fbs",
-    srcs = ["dylib_executable_def.fbs"],
-    flatc_args = FLATC_ARGS,
-)
-
 iree_flatbuffer_c_library(
     name = "llvmir_executable_def_c_fbs",
     srcs = ["llvmir_executable_def.fbs"],
