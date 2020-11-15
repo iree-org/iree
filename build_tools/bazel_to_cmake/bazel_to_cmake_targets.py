@@ -65,7 +65,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
-    "@com_github_google_flatbuffers//:flatbuffers": ["flatbuffers"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatccrt"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],

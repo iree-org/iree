@@ -14,7 +14,6 @@
 
 """Common Bazel definitions for IREE."""
 
-load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@rules_cc//cc:defs.bzl", _cc_binary = "cc_binary", _cc_library = "cc_library")
 
 # Target to the FileCheck binary.
@@ -67,20 +66,6 @@ def iree_build_test(name, targets):
     This is currently undefined in bazel and is preserved for compatibility.
     """
     pass
-
-# The OSS build currently has issues with generating flatbuffer reflections.
-# It is hard-coded to disabled here (and in iree_flatbuffer_cc_library) until triaged/fixed.
-FLATBUFFER_SUPPORTS_REFLECTIONS = False
-
-def iree_flatbuffer_cc_library(**kwargs):
-    """Wrapper for the flatbuffer_cc_library."""
-
-    # TODO(laurenzo): The bazel rule for reflections seems broken in OSS
-    # builds. Fix it and enable by default.
-    flatbuffer_cc_library(
-        gen_reflections = False,
-        **kwargs
-    )
 
 def cc_binary(linkopts = [], **kwargs):
     """Wrapper around low-level cc_binary that adds flags."""

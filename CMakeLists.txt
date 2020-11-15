@@ -396,13 +396,8 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonLibs 3)
 endif()
 
-list(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/flatbuffers/CMake/
-)
-
 include(external_cc_library)
 include(flatbuffer_c_library)
-include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
@@ -412,7 +407,6 @@ add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_AL
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
@@ -427,14 +421,6 @@ if(CMAKE_CROSSCOMPILING)
   iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
 
   # Add a custom target to copy the flatc to the binary directory.
-  add_custom_target(iree_host_flatc
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy_if_different
-        "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin"
-    DEPENDS iree_host_build_flatc
-    COMMENT "Installing host flatc..."
-  )
   add_custom_target(iree_host_flatcc_cli
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different

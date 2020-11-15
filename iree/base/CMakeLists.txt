@@ -262,27 +262,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    flatbuffer_util
-  HDRS
-    "flatbuffer_util.h"
-  SRCS
-    "flatbuffer_util.cc"
-  DEPS
-    ::file_mapping
-    ::memory
-    ::ref_ptr
-    ::status
-    ::tracing
-    absl::memory
-    absl::optional
-    absl::span
-    absl::strings
-    flatbuffers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     init
   HDRS
     "init.h"
