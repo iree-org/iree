@@ -180,11 +180,8 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
       pipelines.data()));
   IREE_ENABLE_LEAK_CHECKS();
 
-  auto executable = make_ref<PipelineExecutable>(std::move(logical_device),
-                                                 std::move(pipelines));
-  executable->tag_ =
-      spirv_executable_def.tag() ? spirv_executable_def.tag()->str() : "";
-  return executable;
+  return make_ref<PipelineExecutable>(std::move(logical_device),
+                                      std::move(pipelines));
 }
 
 PipelineExecutable::PipelineExecutable(

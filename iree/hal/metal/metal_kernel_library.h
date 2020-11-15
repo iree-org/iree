@@ -73,9 +73,6 @@ class MetalKernelLibrary final : public Executable {
                      absl::InlinedVector<KernelObjects, 1> kernel_objects,
                      std::string tag);
 
-  // Tag coming from Metal executable FlatBuffer.
-  std::string tag_;
-
   id<MTLDevice> device_;
 
   absl::InlinedVector<id<MTLLibrary>, 1> libraries_;

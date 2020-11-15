@@ -116,17 +116,14 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
     }
   }
 
-  std::string tag = metal_executable_def.tag() ? metal_executable_def.tag()->str() : "";
   return assign_ref(new MetalKernelLibrary([device retain], std::move(libraries),
-                                           std::move(kernel_objects), std::move(tag)));
+                                           std::move(kernel_objects)));
 }
 
 MetalKernelLibrary::MetalKernelLibrary(id<MTLDevice> device,
                                        absl::InlinedVector<id<MTLLibrary>, 1> libraries,
-                                       absl::InlinedVector<KernelObjects, 1> kernel_objects,
-                                       std::string tag)
-    : tag_(std::move(tag)),
-      device_(device),
+                                       absl::InlinedVector<KernelObjects, 1> kernel_objects)
+    : device_(device),
       libraries_(std::move(libraries)),
       kernel_objects_(std::move(kernel_objects)) {}
 

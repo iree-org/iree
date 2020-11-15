@@ -56,7 +56,6 @@ class PipelineExecutable final : public Executable {
 
  private:
   ref_ptr<VkDeviceHandle> logical_device_;
-  std::string tag_;
 
   // One pipeline per entry point.
   absl::InlinedVector<VkPipeline, 1> pipelines_;
