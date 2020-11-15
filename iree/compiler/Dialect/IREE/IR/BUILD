@@ -65,7 +65,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/SideEffectInterfaces.td",
+        "@llvm-project//mlir:SideEffectTdFiles",
     ],
 )
 
@@ -79,6 +79,6 @@ iree_tablegen_doc(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Interfaces/SideEffectInterfaces.td",
+        "@llvm-project//mlir:SideEffectTdFiles",
     ],
 )
