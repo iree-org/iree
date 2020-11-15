@@ -32,10 +32,11 @@ iree_cc_library(
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRSupport
-    flatbuffers
+    flatccrt
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
-    iree::schemas::metal_executable_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::metal_executable_def_c_fbs
   PUBLIC
 )
 

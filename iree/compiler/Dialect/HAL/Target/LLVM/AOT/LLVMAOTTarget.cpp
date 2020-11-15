@@ -20,7 +20,8 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/schemas/dylib_executable_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/dylib_executable_def_builder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
@@ -71,17 +72,6 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
                                      "dialect to the native llvm::Module";
     }
 
-    // Export all entry points such that they are accessible on the dynamic
-    // libraries we generate.
-    iree::DyLibExecutableDefT dyLibExecutableDef;
-    SmallVector<StringRef, 8> entryPointNames;
-    for (auto entryPointOp :
-         targetOp.getBlock().getOps<ExecutableEntryPointOp>()) {
-      dyLibExecutableDef.entry_points.push_back(
-          std::string(entryPointOp.sym_name()));
-      entryPointNames.push_back(entryPointOp.sym_name());
-    }
-
     // Try to grab a linker tool based on the options (and target environment).
     llvm::Triple targetTriple(options_.targetTriple);
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
@@ -93,6 +83,9 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
 
     // Configure the module with any code generation options required later by
     // linking (such as initializer functions).
+    auto entryPointNames = llvm::to_vector<8>(
+        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+                        [&](auto op) { return op.getName(); }));
     if (failed(
             linkerTool->configureModule(llvmModule.get(), entryPointNames))) {
       return targetOp.emitError()
@@ -147,21 +140,6 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
              << linkerTool->getToolPath();
     }
     auto &linkArtifacts = linkArtifactsOr.getValue();
-    dyLibExecutableDef.library_embedded =
-        linkArtifacts.libraryFile.read().getValueOr(std::vector<int8_t>());
-    if (dyLibExecutableDef.library_embedded.empty()) {
-      return targetOp.emitError() << "failed to read back dylib temp file at "
-                                  << linkArtifacts.libraryFile.path;
-    }
-
-    if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
-      dyLibExecutableDef.debug_database_embedded =
-          linkArtifacts.debugFile.read().getValue();
-      assert(!dyLibExecutableDef.debug_database_embedded.empty());
-      dyLibExecutableDef.debug_database_filename =
-          llvm::sys::path::filename(linkArtifacts.debugFile.path).str();
-    }
-
     if (options_.keepLinkerArtifacts) {
       return mlir::emitRemark(targetOp.getLoc())
              << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
@@ -169,20 +147,49 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
       linkArtifacts.keepAllFiles();
     }
 
-    ::flatbuffers::FlatBufferBuilder fbb;
-    auto executableOffset =
-        iree::DyLibExecutableDef::Pack(fbb, &dyLibExecutableDef);
-    iree::FinishDyLibExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    // Embed debug symbols at the end of the flatbuffer by adding first in the
+    // bottoms-up builder.
+    FlatbufferBuilder builder;
+    flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
+    flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
+    if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
+      debugDatabaseRef = builder.streamUint8Vec([&](raw_ostream &stream) {
+        return linkArtifacts.debugFile.readInto(stream);
+      });
+      debugDatabaseFilenameRef = builder.createString(
+          llvm::sys::path::filename(linkArtifacts.debugFile.path));
+    }
+
+    // Embed entire dynamic library output.
+    flatbuffers_uint8_vec_ref_t libraryEmbeddedRef =
+        builder.streamUint8Vec([&](raw_ostream &stream) {
+          return linkArtifacts.libraryFile.readInto(stream);
+        });
+    if (!libraryEmbeddedRef) {
+      return targetOp.emitError() << "failed to read back dylib temp file at "
+                                  << linkArtifacts.libraryFile.path;
+    }
+
+    // Entry point names up from.
+    // TODO(#3580): these won't be needed in the executable_library world.
+    auto entryPointsRef = builder.createStringVec(llvm::map_range(
+        targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+        [&](ExecutableEntryPointOp op) { return op.getName(); }));
+
+    iree_DyLibExecutableDef_start_as_root(builder);
+    iree_DyLibExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
+    iree_DyLibExecutableDef_debug_database_filename_add(
+        builder, debugDatabaseFilenameRef);
+    iree_DyLibExecutableDef_debug_database_embedded_add(builder,
+                                                        debugDatabaseRef);
+    iree_DyLibExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::DyLib),
-        std::move(bytes));
-
+        builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
 };

@@ -25,7 +25,7 @@ table LLVMIRExecutableDef {
   // A map of entry points to string names with the same order as in the executable op.
   entry_points:[string];
   // A serialized llvm::Module object.
-  llvmir_module:[byte];
+  bitcode_module:[byte];
 }
 
 root_type LLVMIRExecutableDef;
