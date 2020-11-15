@@ -36,6 +36,8 @@ cc_library(
     hdrs = ["llvmjit_device.h"],
     deps = [
         ":llvmjit_executable_cache",
+        "//iree/base:flatcc",
+        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_local_device",
     ],
@@ -80,8 +82,7 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_spec",
         "//iree/hal/host:host_executable",
-        "//iree/schemas:llvmir_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/schemas:llvmir_executable_def_c_fbs",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:AsmParser",
         "@llvm-project//llvm:Core",
