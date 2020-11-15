@@ -14,7 +14,6 @@
 
 load("//iree:build_defs.oss.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -90,21 +89,4 @@ iree_build_test(
         ":spirv_executable_def_cc_fbs",
         ":vmla_executable_def_cc_fbs",
     ],
-)
-
-REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
-    "bytecode_module_def.bfbs",
-    "dylib_executable_def.bfbs",
-    "llvmir_executable_def.bfbs",
-    "metal_executable_def.bfbs",
-    "spirv_executable_def.bfbs",
-    "vmla_executable_def.bfbs",
-]
-
-cc_embed_data(
-    name = "reflection_data",
-    srcs = REFLECTION_SRCS,
-    cc_file_output = "reflection_data.cc",
-    cpp_namespace = "iree::schemas",
-    h_file_output = "reflection_data.h",
 )
