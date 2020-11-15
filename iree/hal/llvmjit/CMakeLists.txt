@@ -77,14 +77,14 @@ iree_cc_library(
     LLVMOrcJIT
     LLVMSupport
     absl::span
-    flatbuffers
+    iree::base::flatcc
     iree::base::status
     iree::base::tracing
     iree::hal::buffer
     iree::hal::executable
     iree::hal::executable_spec
     iree::hal::host::host_executable
-    iree::schemas::llvmir_executable_def_cc_fbs
+    iree::schemas::llvmir_executable_def_c_fbs
   PUBLIC
 )
 
