@@ -171,7 +171,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::executable
     iree::hal::executable_spec
-    iree::schemas::metal_executable_def_cc_fbs
+    iree::schemas::metal_executable_def_c_fbs
   LINKOPTS
     "-framework Foundation"
     "-framework Metal"
@@ -202,13 +202,12 @@ iree_cc_library(
     "metal_pipeline_cache.mm"
   DEPS
     ::metal_kernel_library
-    flatbuffers
     iree::base::status
     iree::base::tracing
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::schemas::metal_executable_def_cc_fbs
+    iree::schemas::metal_executable_def_c_fbs
   LINKOPTS
     "-framework Metal"
   PUBLIC
