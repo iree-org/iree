@@ -137,7 +137,7 @@ function(flatbuffer_c_library)
     )
   target_link_libraries(${_NAME}
     INTERFACE
-      flatcc::runtime
+      flatccrt
       ${IREE_DEFAULT_LINKOPTS}
       ${_RULE_LINKOPTS}
   )
@@ -147,6 +147,7 @@ function(flatbuffer_c_library)
   )
   target_compile_options(${_NAME}
     INTERFACE
+      "-I${IREE_ROOT_DIR}/third_party/flatcc/include/"
       "-I${IREE_ROOT_DIR}/third_party/flatcc/include/flatcc/reflection/"
   )
 
