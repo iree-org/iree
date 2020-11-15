@@ -105,19 +105,6 @@ flatbuffer_c_library(
   PUBLIC
 )
 
-flatbuffer_cc_library(
-  NAME
-    spirv_executable_def_cc_fbs
-  SRCS
-    "spirv_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
-  PUBLIC
-)
-
 flatbuffer_c_library(
   NAME
     vmla_executable_def_c_fbs

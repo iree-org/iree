@@ -324,7 +324,6 @@ iree_cc_library(
   DEPS
     absl::inlined_vector
     absl::synchronization
-    flatbuffers
     iree::base::status
     iree::base::tracing
     iree::hal::executable
@@ -333,7 +332,6 @@ iree_cc_library(
     iree::hal::vulkan::handle_util
     iree::hal::vulkan::pipeline_executable
     iree::hal::vulkan::status_util
-    iree::schemas::spirv_executable_def_cc_fbs
     Vulkan::Headers
   PUBLIC
 )
@@ -360,7 +358,7 @@ iree_cc_library(
     iree::hal::executable_cache
     iree::hal::executable_layout
     iree::hal::executable_spec
-    iree::schemas::spirv_executable_def_cc_fbs
+    iree::schemas::spirv_executable_def_c_fbs
     Vulkan::Headers
   PUBLIC
 )

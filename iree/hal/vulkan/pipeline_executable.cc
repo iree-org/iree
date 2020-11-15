@@ -20,44 +20,73 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 
+// NOTE: include order matters:
+#include "flatcc/reflection/flatbuffers_common_reader.h"
+#include "iree/schemas/spirv_executable_def_reader.h"
+#include "iree/schemas/spirv_executable_def_verifier.h"
+
+// NOTE: starting to port this to C.
+
+// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// runtime. There are still some conditions we must be aware of (such as omitted
+// names on functions with internal linkage), however we shouldn't need to
+// bounds check anything within the flatbuffer after this succeeds.
+static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        flatbuffer_data.data_length);
+  }
+
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret = iree_SpirVExecutableDef_verify_as_root(
+      flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_SpirVExecutableDef_table_t executable_def =
+      iree_SpirVExecutableDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_SpirVExecutableDef_entry_points_get(executable_def);
+  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  for (size_t i = 0; i < entry_point_count; ++i) {
+    if (!flatbuffers_string_len(
+            flatbuffers_string_vec_at(entry_points_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu has no name", i);
+    }
+  }
+
+  if (flatbuffers_uint32_vec_len(
+          iree_SpirVExecutableDef_code_get(executable_def)) < 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable SPIR-V code is missing/empty");
+  }
+
+  // TODO(benvanik): pull PopulateSpecializationInfo from history and update.
+  // For now the compiler isn't generating them, and we don't use them.
+  if (iree_SpirVExecutableDef_specialization_info_is_present(executable_def)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "executable uses SPIR-V specialization constants; "
+                            "they need to be revived");
+  }
+
+  return iree_ok_status();
+}
+
 namespace iree {
 namespace hal {
 namespace vulkan {
 
 namespace {
-
-// Generates the baked specialization constant data based on the flatbuffer.
-// We only support uint32_t right now so this is easy.
-// Note that the returned vectors are referenced by pointers in |out_info| and
-// must remain valid until the info is no longer in use.
-std::pair<std::vector<VkSpecializationMapEntry>, std::vector<uint8_t>>
-PopulateSpecializationInfo(const VkSpecializationInfoDef* info_def) {
-  int entry_count =
-      info_def && info_def->map_entries() ? info_def->map_entries()->size() : 0;
-  if (!entry_count) {
-    return {};
-  }
-
-  std::vector<VkSpecializationMapEntry> entries;
-  entries.reserve(entry_count);
-  std::vector<uint8_t> data;
-  data.resize(entry_count * sizeof(uint32_t));
-
-  uint32_t offset = 0;
-  for (const auto* entry_def : *info_def->map_entries()) {
-    if (!entry_def) continue;
-    entries.push_back({});
-    auto& entry = entries.back();
-    entry.constantID = entry_def->constant_id();
-    entry.offset = offset;
-    entry.size = sizeof(uint32_t);
-    uint32_t value = entry_def->uint32_value();
-    std::memcpy(data.data() + offset, &value, sizeof(value));
-    offset += static_cast<uint32_t>(entry.size);
-  }
-
-  return {std::move(entries), std::move(data)};
-}
 
 class VkShaderModuleHandle : public RefObject<VkShaderModuleHandle> {
  public:
@@ -99,48 +128,40 @@ class VkShaderModuleHandle : public RefObject<VkShaderModuleHandle> {
 StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
     PipelineExecutableLayout* executable_layout,
-    ExecutableCachingModeBitfield mode,
-    const SpirVExecutableDef& spirv_executable_def) {
+    ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("PipelineExecutable::Create");
   const auto& syms = logical_device->syms();
-  if (!spirv_executable_def.entry_points() ||
-      spirv_executable_def.entry_points()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No entry points defined";
-  }
-  if (!spirv_executable_def.code()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No SPIR-V code present";
-  }
-  const auto& code = *spirv_executable_def.code();
+
+  // Verify and fetch the executable flatbuffer wrapper.
+  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
+      spec.executable_data.data(), spec.executable_data.size());
+  IREE_RETURN_IF_ERROR(
+      iree_hal_spirv_executable_flatbuffer_verify(executable_data));
+  iree_SpirVExecutableDef_table_t executable_def =
+      iree_SpirVExecutableDef_as_root(executable_data.data);
 
   // Create the shader module.
   VkShaderModuleCreateInfo shader_module_create_info;
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = nullptr;
   shader_module_create_info.flags = 0;
-  shader_module_create_info.codeSize = code.size() * sizeof(uint32_t);
-  shader_module_create_info.pCode = code.data();
+  flatbuffers_uint32_vec_t code_vec =
+      iree_SpirVExecutableDef_code_get(executable_def);
+  shader_module_create_info.codeSize =
+      flatbuffers_uint32_vec_len(code_vec) * sizeof(uint32_t);
+  shader_module_create_info.pCode = code_vec;
   VkShaderModuleHandle shader_module(add_ref(logical_device));
   VK_RETURN_IF_ERROR(syms->vkCreateShaderModule(
       *logical_device, &shader_module_create_info, logical_device->allocator(),
       shader_module.mutable_value()));
 
-  // Specialization info is currently constant against all entry points.
-  std::vector<VkSpecializationMapEntry> spec_entries;
-  std::vector<uint8_t> spec_data;
-  std::tie(spec_entries, spec_data) =
-      PopulateSpecializationInfo(spirv_executable_def.specialization_info());
-  VkSpecializationInfo specialization_info;
-  specialization_info.mapEntryCount =
-      static_cast<uint32_t>(spec_entries.size());
-  specialization_info.pMapEntries = spec_entries.data();
-  specialization_info.dataSize = spec_data.size();
-  specialization_info.pData = spec_data.data();
-
   // Create pipelines for each entry point.
-  const auto& entry_points = *spirv_executable_def.entry_points();
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_SpirVExecutableDef_entry_points_get(executable_def);
   absl::InlinedVector<VkComputePipelineCreateInfo, 1> pipeline_create_infos;
-  pipeline_create_infos.resize(entry_points.size());
-  for (int entry_ordinal = 0; entry_ordinal < entry_points.size();
+  pipeline_create_infos.resize(flatbuffers_string_vec_len(entry_points_vec));
+  for (size_t entry_ordinal = 0;
+       entry_ordinal < flatbuffers_string_vec_len(entry_points_vec);
        ++entry_ordinal) {
     auto& pipeline_create_info = pipeline_create_infos[entry_ordinal];
     pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -164,11 +185,12 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     stage_create_info.flags = 0;
     stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stage_create_info.module = shader_module;
-    stage_create_info.pName = entry_points[entry_ordinal]->c_str();
-    stage_create_info.pSpecializationInfo = &specialization_info;
+    stage_create_info.pName =
+        flatbuffers_string_vec_at(entry_points_vec, entry_ordinal);
+    stage_create_info.pSpecializationInfo = NULL;
   }
   absl::InlinedVector<VkPipeline, 1> pipelines;
-  pipelines.resize(entry_points.size());
+  pipelines.resize(flatbuffers_string_vec_len(entry_points_vec));
 
   // Some ICDs appear to leak in here, out of our control.
   // Warning: leak checks remain disabled if an error is returned.
