@@ -74,7 +74,7 @@ static iree_status_t iree_hal_llvmir_executable_flatbuffer_verify(
     }
   }
 
-  if (!flatbuffers_int8_vec_len(
+  if (!flatbuffers_uint8_vec_len(
           iree_LLVMIRExecutableDef_bitcode_module_get(executable_def))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable bitcode_module is missing/empty");
@@ -100,11 +100,11 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   iree_LLVMIRExecutableDef_table_t executable_def =
       iree_LLVMIRExecutableDef_as_root(executable_data.data);
 
-  flatbuffers_int8_vec_t bitcode_module_vec =
+  flatbuffers_uint8_vec_t bitcode_module_vec =
       iree_LLVMIRExecutableDef_bitcode_module_get(executable_def);
   auto mem_buffer = llvm::MemoryBuffer::getMemBufferCopy(
       llvm::StringRef(reinterpret_cast<const char*>(bitcode_module_vec),
-                      flatbuffers_int8_vec_len(bitcode_module_vec)),
+                      flatbuffers_uint8_vec_len(bitcode_module_vec)),
       "llvm-ir");
   auto llvm_context = std::make_unique<llvm::LLVMContext>();
   llvm::SMDiagnostic sm_diagnostic;

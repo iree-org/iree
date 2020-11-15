@@ -27,7 +27,7 @@ table VMLAExecutableDef {
   // We embed the entire flatbuffer contents opaquely to allow for easier
   // manipulation of the files (such that we can just slice out the bytes and
   // dump them to a file, etc).
-  bytecode_module:[byte];
+  bytecode_module:[ubyte];
 }
 
 root_type VMLAExecutableDef;
