@@ -67,7 +67,7 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    flatcc::runtime
+    flatccrt
     iree::base::alignment
     iree::base::api
     iree::base::tracing
