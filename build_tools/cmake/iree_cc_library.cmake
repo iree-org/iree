@@ -122,7 +122,8 @@ function(iree_cc_library)
     )
     target_include_directories(${_NAME} SYSTEM
       PUBLIC
-        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
     )
     target_include_directories(${_NAME}
       PUBLIC
@@ -172,7 +173,8 @@ function(iree_cc_library)
     add_library(${_NAME} INTERFACE)
     target_include_directories(${_NAME} SYSTEM
       INTERFACE
-        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
     )
     target_compile_options(${_NAME}
       INTERFACE

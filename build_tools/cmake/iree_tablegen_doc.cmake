@@ -53,7 +53,10 @@ function(iree_tablegen_doc)
   endif()
 
 
-  set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
+  set(_INCLUDE_DIRS
+    "${MLIR_INCLUDE_DIRS}"
+    "${IREE_SOURCE_DIR}"
+  )
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
 
