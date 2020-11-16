@@ -466,10 +466,11 @@ if(IREE_ENABLE_EMITC)
   set(EMITC_ENABLE_HLO OFF)
   set(EMITC_INCLUDE_TESTS OFF)
 
-  list(APPEND IREE_COMMON_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-emitc/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/mlir-emitc/include
-  )
+  # TODO(marbre): add these only where required, not globally.
+  # list(APPEND IREE_COMMON_INCLUDE_DIRS
+  #   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-emitc/include
+  #   ${CMAKE_CURRENT_BINARY_DIR}/third_party/mlir-emitc/include
+  # )
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
 endif()
 
