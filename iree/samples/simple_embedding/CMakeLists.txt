@@ -55,7 +55,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
+    iree::vm::cc
   LABELS
     "driver=vulkan"
 )

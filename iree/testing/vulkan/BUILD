@@ -62,7 +62,7 @@ cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/flags:flag",
         "@sdl2//:SDL2",
     ],

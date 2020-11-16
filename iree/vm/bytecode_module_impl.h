@@ -24,12 +24,7 @@
 #endif  // _MSC_VER
 
 #include "iree/base/api.h"
-#include "iree/vm/builtin_types.h"
-#include "iree/vm/module.h"
-#include "iree/vm/ref.h"
-#include "iree/vm/stack.h"
-#include "iree/vm/type_def.h"
-#include "iree/vm/value.h"
+#include "iree/vm/api.h"
 
 // NOTE: include order matters:
 #include "iree/base/flatcc.h"

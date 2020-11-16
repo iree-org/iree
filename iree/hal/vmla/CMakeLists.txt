@@ -68,7 +68,7 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::vm
-    iree::vm::native_module_cc
+    iree::vm::cc
   PUBLIC
 )
 
@@ -77,12 +77,12 @@ iree_cc_library(
     vmla
   HDRS
     "vmla_cache.h"
-    "vmla_device.cc"
     "vmla_device.h"
     "vmla_driver.h"
     "vmla_executable.h"
   SRCS
     "vmla_cache.cc"
+    "vmla_device.cc"
     "vmla_driver.cc"
     "vmla_executable.cc"
   DEPS

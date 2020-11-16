@@ -52,7 +52,7 @@ iree_cc_binary(
     iree::testing::vulkan::vulkan_gui_util
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
+    iree::vm::cc
   LINKOPTS
     "${IREE_TARGET_GUI_LINKOPTS}"
 )

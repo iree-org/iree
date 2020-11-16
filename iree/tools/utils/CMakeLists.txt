@@ -31,7 +31,7 @@ iree_cc_library(
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
+    iree::vm::cc
   PUBLIC
 )
 
