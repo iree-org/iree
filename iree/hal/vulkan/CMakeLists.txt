@@ -61,7 +61,6 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::synchronization
-    absl::utility
     iree::base::dynamic_library
     iree::base::intrusive_list
     iree::base::logging
@@ -156,7 +155,6 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::synchronization
-    absl::utility
     iree::base::alignment
     iree::base::api
     iree::base::arena
