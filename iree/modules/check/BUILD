@@ -15,7 +15,6 @@
 load(
     "//iree:build_defs.oss.bzl",
     "IREE_DRIVER_MODULES",
-    "PLATFORM_VULKAN_DEPS",
     iree_cc_binary = "cc_binary",
 )
 
@@ -65,7 +64,7 @@ iree_cc_binary(
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 cc_library(
