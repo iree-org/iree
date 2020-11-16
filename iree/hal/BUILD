@@ -23,19 +23,6 @@ package(
 )
 
 cc_library(
-    name = "allocator",
-    srcs = ["allocator.cc"],
-    hdrs = ["allocator.h"],
-    deps = [
-        ":buffer",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
     name = "api",
     srcs = ["api.cc"],
     hdrs = [
@@ -45,13 +32,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":api_hdrs",
-        ":buffer",
-        ":command_buffer",
-        ":device",
-        ":driver",
         ":driver_registry",
+        ":hal",
         ":heap_buffer",
-        ":semaphore",
         "//iree/base:api",
         "//iree/base:memory",
         "//iree/base:ref_ptr",
@@ -86,14 +69,86 @@ cc_test(
 )
 
 cc_library(
-    name = "buffer",
-    srcs = ["buffer.cc"],
-    hdrs = ["buffer.h"],
+    name = "command_buffer_validation",
+    srcs = ["command_buffer_validation.cc"],
+    hdrs = ["command_buffer_validation.h"],
     deps = [
-        ":resource",
-        "//iree/base:bitfield",
+        ":hal",
         "//iree/base:logging",
         "//iree/base:status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "device_manager",
+    srcs = ["device_manager.cc"],
+    hdrs = ["device_manager.h"],
+    deps = [
+        ":hal",
+        ":heap_buffer",
+        "//iree/base:status",
+        "//iree/base:time",
+        "//iree/base:tracing",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "driver_registry",
+    srcs = ["driver_registry.cc"],
+    hdrs = ["driver_registry.h"],
+    deps = [
+        ":hal",
+        "//iree/base:initializer",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
+    name = "hal",
+    srcs = [
+        "allocator.cc",
+        "buffer.cc",
+        "command_buffer.cc",
+        "deferred_buffer.cc",
+        "executable_cache.cc",
+    ],
+    hdrs = [
+        "allocator.h",
+        "buffer.h",
+        "command_buffer.h",
+        "command_queue.h",
+        "debug_capture_manager.h",
+        "deferred_buffer.h",
+        "descriptor_set.h",
+        "descriptor_set_layout.h",
+        "device.h",
+        "device_info.h",
+        "device_placement.h",
+        "driver.h",
+        "event.h",
+        "executable.h",
+        "executable_cache.h",
+        "executable_format.h",
+        "executable_layout.h",
+        "executable_spec.h",
+        "resource.h",
+        "semaphore.h",
+        "stack_trace.h",
+    ],
+    deps = [
+        "//iree/base:bitfield",
+        "//iree/base:logging",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "//iree/base:target_platform",
+        "//iree/base:time",
+        "//iree/base:tracing",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
@@ -107,7 +162,7 @@ cc_test(
         "buffer_test.cc",
     ],
     deps = [
-        ":buffer",
+        ":hal",
         ":heap_buffer",
         "//iree/base:status",
         "//iree/testing:gtest",
@@ -116,72 +171,11 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "command_buffer",
-    srcs = ["command_buffer.cc"],
-    hdrs = ["command_buffer.h"],
-    deps = [
-        ":buffer",
-        ":descriptor_set",
-        ":event",
-        ":executable",
-        ":executable_layout",
-        ":resource",
-        "//iree/base:bitfield",
-        "//iree/base:status",
-    ],
-)
-
-cc_library(
-    name = "command_buffer_validation",
-    srcs = ["command_buffer_validation.cc"],
-    hdrs = ["command_buffer_validation.h"],
-    deps = [
-        ":allocator",
-        ":command_buffer",
-        "//iree/base:logging",
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "command_queue",
-    hdrs = ["command_queue.h"],
-    deps = [
-        ":command_buffer",
-        ":semaphore",
-        "//iree/base:bitfield",
-        "//iree/base:status",
-        "//iree/base:time",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "debug_capture_manager",
-    hdrs = ["debug_capture_manager.h"],
-    deps = [
-        "//iree/base:status",
-    ],
-)
-
-cc_library(
-    name = "deferred_buffer",
-    srcs = ["deferred_buffer.cc"],
-    hdrs = ["deferred_buffer.h"],
-    deps = [
-        ":allocator",
-        ":buffer",
-        "//iree/base:status",
-    ],
-)
-
 cc_test(
     name = "deferred_buffer_test",
     srcs = ["deferred_buffer_test.cc"],
     deps = [
-        ":deferred_buffer",
+        ":hal",
         ":heap_buffer",
         "//iree/hal/testing:mock_allocator",
         "//iree/testing:gtest",
@@ -191,187 +185,13 @@ cc_test(
 )
 
 cc_library(
-    name = "descriptor_set",
-    hdrs = ["descriptor_set.h"],
-    deps = [
-        ":buffer",
-        ":resource",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "descriptor_set_layout",
-    hdrs = ["descriptor_set_layout.h"],
-    deps = [
-        ":buffer",
-        ":resource",
-    ],
-)
-
-cc_library(
-    name = "device",
-    hdrs = ["device.h"],
-    deps = [
-        ":allocator",
-        ":buffer",
-        ":command_queue",
-        ":descriptor_set",
-        ":descriptor_set_layout",
-        ":device_info",
-        ":event",
-        ":executable_cache",
-        ":executable_layout",
-        ":semaphore",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/base:target_platform",
-        "//iree/base:time",
-    ],
-)
-
-cc_library(
-    name = "device_info",
-    hdrs = ["device_info.h"],
-    deps = [
-        "//iree/base:bitfield",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "device_manager",
-    srcs = ["device_manager.cc"],
-    hdrs = ["device_manager.h"],
-    deps = [
-        ":allocator",
-        ":buffer",
-        ":command_queue",
-        ":device",
-        ":device_placement",
-        ":executable_format",
-        ":heap_buffer",
-        ":semaphore",
-        "//iree/base:status",
-        "//iree/base:time",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "device_placement",
-    hdrs = ["device_placement.h"],
-)
-
-cc_library(
-    name = "driver",
-    hdrs = ["driver.h"],
-    deps = [
-        ":debug_capture_manager",
-        ":device",
-        ":device_info",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-    ],
-)
-
-cc_library(
-    name = "driver_registry",
-    srcs = ["driver_registry.cc"],
-    hdrs = ["driver_registry.h"],
-    deps = [
-        ":driver",
-        "//iree/base:initializer",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-cc_library(
-    name = "event",
-    hdrs = ["event.h"],
-    deps = [
-        ":resource",
-    ],
-)
-
-cc_library(
-    name = "executable",
-    hdrs = ["executable.h"],
-    deps = [":resource"],
-)
-
-cc_library(
-    name = "executable_cache",
-    srcs = ["executable_cache.cc"],
-    hdrs = ["executable_cache.h"],
-    deps = [
-        ":executable",
-        ":executable_format",
-        ":executable_layout",
-        ":executable_spec",
-        "//iree/base:bitfield",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-    ],
-)
-
-cc_library(
-    name = "executable_format",
-    hdrs = ["executable_format.h"],
-)
-
-cc_library(
-    name = "executable_layout",
-    hdrs = ["executable_layout.h"],
-    deps = [":resource"],
-)
-
-cc_library(
-    name = "executable_spec",
-    hdrs = ["executable_spec.h"],
-    deps = [
-        ":executable_format",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
     name = "heap_buffer",
     srcs = ["heap_buffer.cc"],
     hdrs = ["heap_buffer.h"],
     deps = [
-        ":allocator",
-        ":buffer",
+        ":hal",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_buffer",
     ],
-)
-
-cc_library(
-    name = "resource",
-    hdrs = ["resource.h"],
-    deps = [
-        "//iree/base:ref_ptr",
-    ],
-)
-
-cc_library(
-    name = "semaphore",
-    hdrs = ["semaphore.h"],
-    deps = [
-        ":resource",
-        "//iree/base:status",
-        "//iree/base:time",
-    ],
-)
-
-cc_library(
-    name = "stack_trace",
-    hdrs = ["stack_trace.h"],
 )

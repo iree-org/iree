@@ -97,15 +97,7 @@ iree_cc_library(
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
-    iree::hal::allocator
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
-    iree::hal::executable_spec
+    iree::hal
     iree::hal::host::host_buffer
     iree::hal::host::host_executable
     iree::hal::host::host_local_device
