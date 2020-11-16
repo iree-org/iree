@@ -33,8 +33,8 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     flatccrt
+    iree::base::flatcc
     iree::compiler::Dialect::IREE::IR
-    iree::schemas::vmla_executable_def_c_fbs
     tensorflow::mlir_hlo
   PUBLIC
 )

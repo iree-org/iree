@@ -37,6 +37,7 @@ cc_library(
         "LLVMIRTarget.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMBaseTarget",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIRPasses",
@@ -44,7 +45,6 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Utils",
         "//iree/schemas:llvmir_executable_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:TargetLLVMIR",

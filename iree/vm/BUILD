@@ -62,9 +62,9 @@ cc_library(
         ":value",
         "//iree/base:alignment",
         "//iree/base:api",
+        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/schemas:bytecode_module_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
     ],
 )
 

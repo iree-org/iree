@@ -36,7 +36,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRSupport
     MLIRVector
-    flatccrt
+    iree::base::flatcc
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Conversion::LinalgToSPIRV::CodeGenOptionUtils
