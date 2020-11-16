@@ -54,116 +54,11 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    vmla_cache
+    op_module
   HDRS
-    "vmla_cache.h"
+    "op_module.h"
   SRCS
-    "vmla_cache.cc"
-  DEPS
-    ::vmla_executable
-    iree::base::status
-    iree::base::tracing
-    iree::hal::allocator
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
-    iree::vm::instance
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vmla_device
-  HDRS
-    "vmla_device.h"
-  SRCS
-    "vmla_device.cc"
-  DEPS
-    ::vmla_cache
-    absl::inlined_vector
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::memory
-    iree::base::status
-    iree::base::tracing
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::host::host_local_device
-    iree::vm::instance
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vmla_driver
-  HDRS
-    "vmla_driver.h"
-  SRCS
-    "vmla_driver.cc"
-  DEPS
-    ::vmla_device
-    ::vmla_module
-    iree::base::tracing
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::host::serial::serial_scheduling_model
-    iree::vm::instance
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vmla_driver_module
-  SRCS
-    "vmla_driver_module.cc"
-  DEPS
-    ::vmla_driver
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vmla_executable
-  HDRS
-    "vmla_executable.h"
-  SRCS
-    "vmla_executable.cc"
-  DEPS
-    ::vmla_module
-    absl::inlined_vector
-    absl::span
-    iree::base::flatcc
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_spec
-    iree::hal::host::host_buffer
-    iree::hal::host::host_executable
-    iree::schemas::vmla_executable_def_c_fbs
-    iree::vm::bytecode_module
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::invocation
-    iree::vm::list
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vmla_module
-  HDRS
-    "vmla_module.h"
-  SRCS
-    "vmla_module.cc"
+    "op_module.cc"
   DEPS
     ::op_kernels
     absl::span
@@ -174,5 +69,63 @@ iree_cc_library(
     iree::base::tracing
     iree::vm
     iree::vm::native_module_cc
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla
+  HDRS
+    "vmla_cache.h"
+    "vmla_device.cc"
+    "vmla_device.h"
+    "vmla_driver.h"
+    "vmla_executable.h"
+  SRCS
+    "vmla_cache.cc"
+    "vmla_driver.cc"
+    "vmla_executable.cc"
+  DEPS
+    ::op_module
+    absl::inlined_vector
+    absl::memory
+    absl::span
+    absl::strings
+    iree::base::api
+    iree::base::flatcc
+    iree::base::memory
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::command_queue
+    iree::hal::device
+    iree::hal::device_info
+    iree::hal::driver
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+    iree::hal::executable_spec
+    iree::hal::host::host_buffer
+    iree::hal::host::host_executable
+    iree::hal::host::host_local_device
+    iree::hal::host::serial::serial_scheduling_model
+    iree::schemas::vmla_executable_def_c_fbs
+    iree::vm
+    iree::vm::bytecode_module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_driver_module
+  SRCS
+    "vmla_driver_module.cc"
+  DEPS
+    ::vmla
+    iree::base::init
+    iree::base::status
+    iree::hal::driver_registry
+  ALWAYSLINK
   PUBLIC
 )
