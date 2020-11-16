@@ -15,7 +15,6 @@
 load(
     "//bindings/python:build_defs.oss.bzl",
     "NUMPY_DEPS",
-    "PLATFORM_VULKAN_DEPS",
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
@@ -31,7 +30,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
+DRIVER_DEPS =  [
     "//iree/hal/vulkan:vulkan_driver_module",
     "//iree/hal/llvmjit:llvmjit_driver_module",
     "//iree/hal/vmla:vmla_driver_module",
