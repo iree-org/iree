@@ -170,7 +170,7 @@ bool doesValueDependOnOperation(Value value, Operation *op) {
       return true;
     }
   }
-  return true;
+  return false;
 }
 
 // Returns true if |rhs| transitively depends on any out of |lhs|.
