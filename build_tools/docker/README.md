@@ -69,9 +69,28 @@ python3 build_tools/docker/manage_images.py --images all --tag latest --update_r
 This requires that the tagged image have a repository digest, which means it was
 pushed to or pulled from GCR.
 
+## Update an Image
+
+1. Update the `Dockerfile` for the image that you want to update.
+2. Build the image, push the image to GCR and update all references to the image
+   with the new GCR digest:
+
+   ```shell
+    python3 build_tools/docker/manage_images.py \
+      --image "${IMAGE?}" --build \
+      --push \
+      --update_references
+    ```
+
+3. Commit the changes and send a PR for review. The CI will use the updated
+   digest references to test the new images.
+4. Merge your PR after is approved and all CI tests pass.
+5. On the merged branch, build (but don't push) the images and locally tag them
+   with the `:prod` tag:
+
 ## Deploying New Images
 
-1.  Modify the Dockerfiles as desired.
+1.  Modify the `Dockerfile`s as desired.
 2.  Update `manage_images.py` to include the new image and its dependencies.
 3.  Build and push the new image to GCR and update references to it:
 
@@ -104,3 +123,21 @@ pushed to or pulled from GCR.
     ```shell
     python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --push
     ```
+
+## Debugging
+
+Sometimes old versions of the `:latest` images can be stored locally and produce
+unexpected behaviors. The following commands will download all of the prod
+images and then update the images tagged with `:latest` on your machine (and on
+GCR).
+
+```shell
+# Pull all :prod images
+python3 build_tools/docker/manage_images.py --pull --tag prod --images all
+# Update the :latest images to match the :prod images.
+# If you have a clean workspace this _shouldn't_ require building anything as
+# everything should be cache hits from the :prod images downloaded above, but if
+# the :prod images are behind then that will not be the case and this may take
+# several hours (depending on your machine).
+python3 build_tools/docker/manage_images.py --build --push --update_references --images all
+```
