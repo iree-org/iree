@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/vmla/vmla_module.h"
+#include "iree/hal/vmla/op_module.h"
 
 #include <cstdint>
 
