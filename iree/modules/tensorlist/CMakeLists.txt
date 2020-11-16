@@ -47,7 +47,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
+    iree::vm::cc
 )
 
 iree_cc_library(
@@ -66,6 +66,6 @@ iree_cc_library(
     iree::hal::api
     iree::modules::hal
     iree::vm
-    iree::vm::native_module_cc
+    iree::vm::cc
   PUBLIC
 )

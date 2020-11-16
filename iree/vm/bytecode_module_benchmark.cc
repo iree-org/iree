@@ -19,13 +19,9 @@
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_module_benchmark_module.h"
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
-#include "iree/vm/native_module.h"
-#include "iree/vm/stack.h"
 
 namespace {
 

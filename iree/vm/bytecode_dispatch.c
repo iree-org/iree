@@ -15,8 +15,8 @@
 #include <string.h>
 
 #include "iree/base/tracing.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
-#include "iree/vm/list.h"
 
 //===----------------------------------------------------------------------===//
 // Math utilities, kept here to limit dependencies

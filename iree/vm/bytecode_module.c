@@ -17,9 +17,8 @@
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module_impl.h"
-#include "iree/vm/ref.h"
-#include "iree/vm/stack.h"
 
 // Perform an strcmp between a flatbuffers string and an IREE string view.
 static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,

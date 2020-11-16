@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/native_module.h"
-#include "iree/vm/ref.h"
-#include "iree/vm/stack.h"
+#include "iree/vm/api.h"
 
 // This would be generated together with the functions in the header
 #include "iree/samples/emitc_modules/add_module.module"
