@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(TF_MLIR_HLO_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
+set(TF_MLIR_HLO_SOURCE_DIR
+  "${IREE_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
+)
+set(TF_MLIR_HLO_BINARY_DIR
+  "${IREE_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
 )
 
 external_cc_library(
@@ -22,7 +25,7 @@ external_cc_library(
   NAME
     mlir_hlo
   ROOT
-    ${TF_MLIR_HLO_SRC_ROOT}
+    ${TF_MLIR_HLO_SOURCE_DIR}
   DEPS
     MhloDialect
     MhloInferFusibilityOpInterface
@@ -32,5 +35,10 @@ external_cc_library(
     MhloPasses
     MhloLhloToLinalg
     MLIRMhloUtils
+  INCLUDES
+    "${TF_MLIR_HLO_SOURCE_DIR}/"
+    "${TF_MLIR_HLO_SOURCE_DIR}/include/"
+    "${TF_MLIR_HLO_BINARY_DIR}/"
+    "${TF_MLIR_HLO_BINARY_DIR}/include/"
   PUBLIC
 )
