@@ -33,7 +33,8 @@ namespace {
 // from this exclusion list eventually.
 bool isUnsupportedFusionOp(Operation *op) {
   return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
-             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp, mhlo::SliceOp,
+             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
+             mhlo::SliceOp,
              mhlo::TorchIndexSelectOp>(op);
 }
 
