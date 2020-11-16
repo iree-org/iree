@@ -41,8 +41,6 @@ def platform_trampoline_deps(basename, path = "base"):
 
 # A platform-sensitive list of dependencies for non-test targets using Vulkan.
 PLATFORM_VULKAN_DEPS = select({
-    "//iree/hal/vulkan:native_vk": [],
-    "//iree/hal/vulkan:swiftshader_vk": [],
     "//conditions:default": [],
 })
 
