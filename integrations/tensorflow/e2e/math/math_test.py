@@ -13,7 +13,7 @@ FLAGS = flags.FLAGS
 
 
 class Config:
-  """Specifies a unittests."""
+  """Specifies a unittest."""
 
   def __init__(self,
                signature: Sequence[tf.TensorSpec],
