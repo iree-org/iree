@@ -16,22 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    allocator
-  HDRS
-    "allocator.h"
-  SRCS
-    "allocator.cc"
-  DEPS
-    ::buffer
-    absl::span
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     api
   HDRS
     "api.h"
@@ -40,13 +24,9 @@ iree_cc_library(
     "api.cc"
   DEPS
     ::api_hdrs
-    ::buffer
-    ::command_buffer
-    ::device
-    ::driver
     ::driver_registry
+    ::hal
     ::heap_buffer
-    ::semaphore
     absl::inlined_vector
     absl::span
     absl::strings
@@ -85,179 +65,16 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    buffer
-  HDRS
-    "buffer.h"
-  SRCS
-    "buffer.cc"
-  DEPS
-    ::resource
-    absl::span
-    absl::strings
-    absl::variant
-    iree::base::bitfield
-    iree::base::logging
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    buffer_test
-  SRCS
-    "buffer_mapping_test.cc"
-    "buffer_test.cc"
-  DEPS
-    ::buffer
-    ::heap_buffer
-    absl::span
-    iree::base::status
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    command_buffer
-  HDRS
-    "command_buffer.h"
-  SRCS
-    "command_buffer.cc"
-  DEPS
-    ::buffer
-    ::descriptor_set
-    ::event
-    ::executable
-    ::executable_layout
-    ::resource
-    iree::base::bitfield
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     command_buffer_validation
   HDRS
     "command_buffer_validation.h"
   SRCS
     "command_buffer_validation.cc"
   DEPS
-    ::allocator
-    ::command_buffer
+    ::hal
     absl::strings
     iree::base::logging
     iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    command_queue
-  HDRS
-    "command_queue.h"
-  DEPS
-    ::command_buffer
-    ::semaphore
-    absl::span
-    iree::base::bitfield
-    iree::base::status
-    iree::base::time
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    debug_capture_manager
-  HDRS
-    "debug_capture_manager.h"
-  DEPS
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    deferred_buffer
-  HDRS
-    "deferred_buffer.h"
-  SRCS
-    "deferred_buffer.cc"
-  DEPS
-    ::allocator
-    ::buffer
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    deferred_buffer_test
-  SRCS
-    "deferred_buffer_test.cc"
-  DEPS
-    ::deferred_buffer
-    ::heap_buffer
-    absl::memory
-    iree::hal::testing::mock_allocator
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    descriptor_set
-  HDRS
-    "descriptor_set.h"
-  DEPS
-    ::buffer
-    ::resource
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    descriptor_set_layout
-  HDRS
-    "descriptor_set_layout.h"
-  DEPS
-    ::buffer
-    ::resource
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    device
-  HDRS
-    "device.h"
-  DEPS
-    ::allocator
-    ::buffer
-    ::command_queue
-    ::descriptor_set
-    ::descriptor_set_layout
-    ::device_info
-    ::event
-    ::executable_cache
-    ::executable_layout
-    ::semaphore
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::target_platform
-    iree::base::time
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    device_info
-  HDRS
-    "device_info.h"
-  DEPS
-    absl::strings
-    iree::base::bitfield
   PUBLIC
 )
 
@@ -269,41 +86,13 @@ iree_cc_library(
   SRCS
     "device_manager.cc"
   DEPS
-    ::allocator
-    ::buffer
-    ::command_queue
-    ::device
-    ::device_placement
-    ::executable_format
+    ::hal
     ::heap_buffer
-    ::semaphore
     absl::span
     absl::synchronization
     iree::base::status
     iree::base::time
     iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    device_placement
-  HDRS
-    "device_placement.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    driver
-  HDRS
-    "driver.h"
-  DEPS
-    ::debug_capture_manager
-    ::device
-    ::device_info
-    iree::base::ref_ptr
-    iree::base::status
   PUBLIC
 )
 
@@ -315,7 +104,7 @@ iree_cc_library(
   SRCS
     "driver_registry.cc"
   DEPS
-    ::driver
+    ::hal
     absl::core_headers
     absl::synchronization
     iree::base::initializer
@@ -326,69 +115,76 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    event
+    hal
   HDRS
+    "allocator.h"
+    "buffer.h"
+    "command_buffer.h"
+    "command_queue.h"
+    "debug_capture_manager.h"
+    "deferred_buffer.h"
+    "descriptor_set.h"
+    "descriptor_set_layout.h"
+    "device.h"
+    "device_info.h"
+    "device_placement.h"
+    "driver.h"
     "event.h"
-  DEPS
-    ::resource
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    executable
-  HDRS
     "executable.h"
-  DEPS
-    ::resource
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    executable_cache
-  HDRS
     "executable_cache.h"
+    "executable_format.h"
+    "executable_layout.h"
+    "executable_spec.h"
+    "resource.h"
+    "semaphore.h"
+    "stack_trace.h"
   SRCS
+    "allocator.cc"
+    "buffer.cc"
+    "command_buffer.cc"
+    "deferred_buffer.cc"
     "executable_cache.cc"
   DEPS
-    ::executable
-    ::executable_format
-    ::executable_layout
-    ::executable_spec
+    absl::span
+    absl::strings
+    absl::variant
     iree::base::bitfield
+    iree::base::logging
     iree::base::ref_ptr
     iree::base::status
+    iree::base::target_platform
+    iree::base::time
+    iree::base::tracing
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
-    executable_format
-  HDRS
-    "executable_format.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    executable_layout
-  HDRS
-    "executable_layout.h"
+    buffer_test
+  SRCS
+    "buffer_mapping_test.cc"
+    "buffer_test.cc"
   DEPS
-    ::resource
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    executable_spec
-  HDRS
-    "executable_spec.h"
-  DEPS
-    ::executable_format
+    ::hal
+    ::heap_buffer
     absl::span
-  PUBLIC
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    deferred_buffer_test
+  SRCS
+    "deferred_buffer_test.cc"
+  DEPS
+    ::hal
+    ::heap_buffer
+    absl::memory
+    iree::hal::testing::mock_allocator
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -399,40 +195,9 @@ iree_cc_library(
   SRCS
     "heap_buffer.cc"
   DEPS
-    ::allocator
-    ::buffer
+    ::hal
     iree::base::status
     iree::base::tracing
     iree::hal::host::host_buffer
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    resource
-  HDRS
-    "resource.h"
-  DEPS
-    iree::base::ref_ptr
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    semaphore
-  HDRS
-    "semaphore.h"
-  DEPS
-    ::resource
-    iree::base::status
-    iree::base::time
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    stack_trace
-  HDRS
-    "stack_trace.h"
   PUBLIC
 )
