@@ -17,11 +17,8 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/host_buffer.h"
-#include "iree/hal/vmla/vmla_module.h"
+#include "iree/hal/vmla/op_module.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/invocation.h"
-#include "iree/vm/list.h"
-#include "iree/vm/module.h"
 
 // flatcc schemas:
 #include "iree/base/flatcc.h"

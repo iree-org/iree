@@ -17,8 +17,7 @@
 
 #include "iree/base/memory.h"
 #include "iree/hal/host/host_local_device.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace hal {
