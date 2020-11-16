@@ -18,126 +18,61 @@ endif()
 
 iree_cc_library(
   NAME
-    metal_capture_manager
-  HDRS
-    "metal_capture_manager.h"
-  SRCS
-    "metal_capture_manager.mm"
-  DEPS
-    iree::base::file_io
-    iree::base::logging
-    iree::base::status
-    iree::base::tracing
-    iree::hal::debug_capture_manager
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_command_buffer
-  HDRS
-    "metal_command_buffer.h"
-  SRCS
-    "metal_command_buffer.mm"
-  DEPS
-    ::metal_kernel_library
-    ::metal_pipeline_argument_buffer
-    absl::flat_hash_map
-    absl::inlined_vector
-    iree::base::status
-    iree::base::tracing
-    iree::hal::command_buffer
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_command_queue
-  HDRS
-    "metal_command_queue.h"
-  SRCS
-    "metal_command_queue.mm"
-  DEPS
-    ::metal_command_buffer
-    ::metal_shared_event
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-    iree::hal::command_queue
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_device
-  HDRS
-    "metal_device.h"
-  SRCS
-    "metal_device.mm"
-  DEPS
-    ::metal_capture_manager
-    ::metal_command_buffer
-    ::metal_command_queue
-    ::metal_direct_allocator
-    ::metal_pipeline_argument_buffer
-    ::metal_pipeline_cache
-    ::metal_shared_event
-    absl::strings
-    absl::span
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-    iree::hal::allocator
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::driver
-    iree::hal::semaphore
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_direct_allocator
+    metal
   HDRS
     "metal_buffer.h"
+    "metal_capture_manager.h"
+    "metal_command_buffer.h"
+    "metal_command_queue.h"
+    "metal_device.h"
     "metal_direct_allocator.h"
+    "metal_driver.h"
+    "metal_kernel_library.h"
+    "metal_pipeline_argument_buffer.h"
+    "metal_pipeline_cache.h"
+    "metal_shared_event.h"
   SRCS
     "metal_buffer.mm"
+    "metal_capture_manager.mm"
+    "metal_command_buffer.mm"
+    "metal_command_queue.mm"
+    "metal_device.mm"
     "metal_direct_allocator.mm"
+    "metal_driver.mm"
+    "metal_kernel_library.mm"
+    "metal_pipeline_argument_buffer.cc"
+    "metal_pipeline_cache.mm"
+    "metal_shared_event.mm"
   DEPS
+    absl::flat_hash_map
+    absl::inlined_vector
     absl::memory
+    absl::span
+    absl::strings
+    iree::base::flatcc
+    iree::base::file_io
     iree::base::logging
+    iree::base::memory
     iree::base::status
+    iree::base::time
     iree::base::tracing
     iree::hal::allocator
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_driver
-  HDRS
-    "metal_driver.h"
-  SRCS
-    "metal_driver.mm"
-  DEPS
-    ::metal_capture_manager
-    ::metal_device
-    iree::base::status
-    iree::base::tracing
+    iree::hal::command_buffer
+    iree::hal::command_queue
+    iree::hal::debug_capture_manager
+    iree::hal::descriptor_set_layout
+    iree::hal::device
     iree::hal::device_info
     iree::hal::driver
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+    iree::hal::executable_layout
+    iree::hal::executable_spec
+    iree::hal::semaphore
+    iree::schemas::metal_executable_def_c_fbs
   LINKOPTS
+    "-framework Foundation"
     "-framework Metal"
   PUBLIC
 )
@@ -148,82 +83,11 @@ iree_cc_library(
   SRCS
     "metal_driver_module.cc"
   DEPS
-    ::metal_driver
+    ::metal
     absl::flags
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
   ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_kernel_library
-  HDRS
-    "metal_kernel_library.h"
-  SRCS
-    "metal_kernel_library.mm"
-  DEPS
-    absl::inlined_vector
-    iree::base::memory
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_spec
-    iree::schemas::metal_executable_def_c_fbs
-  LINKOPTS
-    "-framework Foundation"
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_pipeline_argument_buffer
-  HDRS
-    "metal_pipeline_argument_buffer.h"
-  SRCS
-    "metal_pipeline_argument_buffer.cc"
-  DEPS
-    absl::inlined_vector
-    absl::span
-    iree::hal::descriptor_set_layout
-    iree::hal::executable_layout
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_pipeline_cache
-  HDRS
-    "metal_pipeline_cache.h"
-  SRCS
-    "metal_pipeline_cache.mm"
-  DEPS
-    ::metal_kernel_library
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
-    iree::schemas::metal_executable_def_c_fbs
-  LINKOPTS
-    "-framework Metal"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    metal_shared_event
-  HDRS
-    "metal_shared_event.h"
-  SRCS
-    "metal_shared_event.mm"
-  DEPS
-    iree::base::tracing
-    iree::hal::semaphore
-  LINKOPTS
-    "-framework Metal"
   PUBLIC
 )
