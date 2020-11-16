@@ -36,7 +36,7 @@ iree_cc_library(
     LLVMX86AsmParser
     LLVMX86CodeGen
     MLIRTargetLLVMIR
-    flatccrt
+    iree::base::flatcc
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses

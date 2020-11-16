@@ -24,15 +24,8 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-extern "C" {
-// NOTE: order matters here (common_reader must preceed common_builder).
-// clang-format off
-#include "flatcc/flatcc_builder.h"
-#include "flatcc/reflection/flatbuffers_common_reader.h"
-#include "flatcc/reflection/flatbuffers_common_builder.h"
-#include "flatcc/flatcc_json_printer.h"
-// clang-format on
-}  // extern "C"
+// NOTE: order matters here as some of the LLVM includes conflict.
+#include "iree/base/flatcc.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -140,6 +140,7 @@ iree_cc_library(
     ::vmla_module
     absl::inlined_vector
     absl::span
+    iree::base::flatcc
     iree::base::status
     iree::base::tracing
     iree::hal::executable

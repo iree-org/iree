@@ -17,8 +17,8 @@
 #include "iree/base/file_io.h"
 #include "iree/base/file_path.h"
 
-// NOTE: include order matters:
-#include "flatcc/reflection/flatbuffers_common_reader.h"
+// flatcc schemas:
+#include "iree/base/flatcc.h"
 #include "iree/schemas/dylib_executable_def_reader.h"
 #include "iree/schemas/dylib_executable_def_verifier.h"
 

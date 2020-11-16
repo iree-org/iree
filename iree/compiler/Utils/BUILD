@@ -32,7 +32,9 @@ cc_library(
         "PatternUtils.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Dialect/IREE/IR",
+        "@com_github_dvidelabs_flatcc//:runtime",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
@@ -40,11 +42,6 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-        "@com_github_dvidelabs_flatcc//:runtime",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-
-        # HACK: work around copts being unsupported in bazel-to-cmake to get
-        # the flatcc deps.
-        "//iree/schemas:vmla_executable_def_c_fbs",  # build-cleaner: keep
     ],
 )

@@ -37,6 +37,7 @@ cc_library(
         "VMLATarget.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/VM/Conversion",
@@ -47,7 +48,6 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Utils",
         "//iree/schemas:vmla_executable_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
