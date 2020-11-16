@@ -90,8 +90,7 @@ class MaterializeConstantPoolBuffersPass
         storageOp.getLoc(), variableName, /*isMutable=*/false,
         IREE::HAL::BufferType::get(context));
     moduleSymbolTable.insert(variableOp, insertionPoint);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
 
     // Find all the spans in the pool that map into this storage buffer so that
     // we can update them with their runtime offsets. Note that since we are
@@ -123,8 +122,7 @@ class MaterializeConstantPoolBuffersPass
     auto initializerFunc = FuncOp::create(
         storageOp.getLoc(), initializerName,
         builder.getFunctionType({}, {IREE::HAL::BufferType::get(context)}));
-    SymbolTable::setSymbolVisibility(initializerFunc,
-                                     SymbolTable::Visibility::Private);
+    initializerFunc.setPrivate();
 
     auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
 
@@ -180,8 +178,7 @@ class MaterializeConstantPoolBuffersPass
         variableLoc, variableName, /*isMutable=*/false,
         IREE::HAL::BufferType::get(context));
     moduleSymbolTable.insert(variableOp, insertionPoint);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
 
     // Compute the ranges for all the splats at runtime and the required buffer
     // size based on the constraints provided.
@@ -232,8 +229,7 @@ class MaterializeConstantPoolBuffersPass
     auto initializerFunc = FuncOp::create(
         variableLoc, initializerName,
         builder.getFunctionType({}, {IREE::HAL::BufferType::get(context)}));
-    SymbolTable::setSymbolVisibility(initializerFunc,
-                                     SymbolTable::Visibility::Private);
+    initializerFunc.setPrivate();
 
     auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
 

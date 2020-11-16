@@ -40,8 +40,7 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
     if (!existingOp) {
       auto clonedOp = cast<IREE::VM::ImportOp>(targetBuilder.clone(*importOp));
       clonedOp.setName(fullName);
-      SymbolTable::setSymbolVisibility(clonedOp,
-                                       SymbolTable::Visibility::Private);
+      clonedOp.setPrivate();
     }
   });
   return success();
@@ -123,7 +122,7 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
   rewriter.setInsertionPoint(funcOp);
   auto rodataOp =
       rewriter.create<IREE::VM::RodataOp>(loc, safeIdentifier, utf8Bytes);
-  SymbolTable::setSymbolVisibility(rodataOp, SymbolTable::Visibility::Private);
+  rodataOp.setPrivate();
   rewriter.restoreInsertionPoint(insertPoint);
 
   // Load the UTF-8 bytes to pass as a value.

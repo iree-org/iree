@@ -34,8 +34,8 @@ namespace mhlo {
 namespace {
 
 template <typename HloOp>
-Value rewriteXlaBinaryElementwiseOpShape(RankedShapeType resultShape, HloOp op,
-                                         OpBuilder &builder) {
+Value rewriteXlaNaryElementwiseOpShape(RankedShapeType resultShape, HloOp op,
+                                       OpBuilder &builder) {
   if (!op) return nullptr;
   SmallVector<Value, 4> inputOperands(op.getOperands());
   return buildCastInputsToResultShape(op.getLoc(), resultShape, inputOperands,
@@ -448,7 +448,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   // NOTE: Most of these *should not* be "custom ops". They should be coming
   // from declarative shape information, but that doesn't exist yet.
 #define INSERT_EW_OP(OpTy) \
-  b.insertOpRankedShapeBuilder<OpTy>(rewriteXlaBinaryElementwiseOpShape<OpTy>);
+  b.insertOpRankedShapeBuilder<OpTy>(rewriteXlaNaryElementwiseOpShape<OpTy>);
   INSERT_EW_OP(AddOp);
   INSERT_EW_OP(Atan2Op);
   INSERT_EW_OP(DivOp);
@@ -462,6 +462,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   INSERT_EW_OP(ShiftRightLogicalOp);
   INSERT_EW_OP(SubOp);
   INSERT_EW_OP(CompareOp);
+  INSERT_EW_OP(ClampOp);
 
   b.insertOpRankedShapeBuilder<SelectOp>(rewriteSelectOp);
   b.insertOpRankedShapeBuilder<DotOp>(rewriteXlaDotOpShape);

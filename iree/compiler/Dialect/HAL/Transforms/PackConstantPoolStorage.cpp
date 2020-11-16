@@ -78,8 +78,7 @@ class PackConstantPoolStoragePass
       auto splatOp = builder.create<ConstantPoolSplatOp>(
           splatValueOp.getLoc(), splatValueOp.getName(), splatValueOp.value(),
           SymbolRefAttr{}, ByteRangeAttr{});
-      SymbolTable::setSymbolVisibility(splatOp,
-                                       SymbolTable::Visibility::Nested);
+      splatOp.setNested();
       splatValueOp.erase();
     }
 
@@ -100,8 +99,7 @@ class PackConstantPoolStoragePass
               .create<ConstantStorageOp>(storageBufferLoc, "_storage",
                                          storageBuffer.data);
       poolSymbolTable.insert(storageBufferOp);
-      SymbolTable::setSymbolVisibility(storageBufferOp,
-                                       SymbolTable::Visibility::Nested);
+      storageBufferOp.setNested();
 
       // TODO(benvanik): specify alignment attribute for file serialization
       // (minStorageBufferOffsetAlignment) and get vm.rodata handling it.
@@ -120,8 +118,7 @@ class PackConstantPoolStoragePass
                                APInt(64, constantSpan.length),
                                poolOp.getContext()),
             SymbolRefAttr{}, ByteRangeAttr{});
-        SymbolTable::setSymbolVisibility(spanOp,
-                                         SymbolTable::Visibility::Nested);
+        spanOp.setNested();
         valueOp.erase();
       }
     }

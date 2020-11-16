@@ -60,8 +60,7 @@ class HoistInlinedRodataPass
                                             (funcOp.getName() + "_const").str(),
                                             inlineOp.value());
         moduleSymbolTable.insert(rodataOp, moduleBuilder.getInsertionPoint());
-        SymbolTable::setSymbolVisibility(rodataOp,
-                                         SymbolTable::Visibility::Private);
+        rodataOp.setPrivate();
         replaceInlineOpWithRodataRef(inlineOp, rodataOp);
       }
     }

@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE with TensorFlow integrations using Bazel and
-# running Vulkan tests on an Nvidia GPU.
+FROM gcr.io/iree-oss/util AS base
 
-FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
+ARG VULKAN_SDK_VERSION=1.2.154.0
 
-RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-440=440.100-0ubuntu0.18.04.1
+RUN wget -q \
+  "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION?}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" \
+  -O "/tmp/vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.gz"
+
+RUN mkdir -p /opt/vulkan-sdk
+
+RUN tar -xf /tmp/vulkansdk-linux-x86_64-$VULKAN_SDK_VERSION.tar.gz -C /opt/vulkan-sdk

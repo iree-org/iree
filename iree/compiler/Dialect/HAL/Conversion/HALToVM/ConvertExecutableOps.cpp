@@ -79,8 +79,7 @@ class ExecutableCachePrepareOpConversion
            IREE::HAL::stringifyExecutableFormat(binaryOp.format()).lower())
               .str(),
           binaryOp.data());
-      SymbolTable::setSymbolVisibility(rodataOp,
-                                       SymbolTable::Visibility::Private);
+      rodataOp.setPrivate();
       rodataOps.push_back(rodataOp);
     }
     rewriter.restoreInsertionPoint(insertPoint);

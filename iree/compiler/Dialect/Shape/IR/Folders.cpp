@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Utils/PatternUtils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -306,10 +307,23 @@ LogicalResult fromExtentTensorOfToExtentTensorIsIdentity(
   return success();
 }
 
+LogicalResult fromExtentTensorOfCastIndexBypass(
+    FromExtentTensorOp op, FromExtentTensorOp::Adaptor operands,
+    PatternRewriter &rewriter) {
+  auto toOp = dyn_cast_or_null<IndexCastOp>(op.extent_tensor().getDefiningOp());
+  if (!toOp) {
+    return failure();
+  }
+
+  rewriter.replaceOpWithNewOp<FromExtentTensorOp>(op, op.getType(), toOp.in());
+  return success();
+}
+
 void FromExtentTensorOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
   insertGreedyPattern(patterns, context,
                       fromExtentTensorOfToExtentTensorIsIdentity);
+  insertGreedyPattern(patterns, context, fromExtentTensorOfCastIndexBypass);
 }
 
 //===----------------------------------------------------------------------===//
@@ -351,6 +365,7 @@ void populateFoldConversionPatterns(MLIRContext *context,
   insertConversionPattern(patterns, context, safeCastCompatibleShapePattern);
   insertConversionPattern(patterns, context,
                           fromExtentTensorOfToExtentTensorIsIdentity);
+  insertConversionPattern(patterns, context, fromExtentTensorOfCastIndexBypass);
 }
 
 }  // namespace Shape

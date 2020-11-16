@@ -127,8 +127,7 @@ class CreateBenchmarkFuncs
     auto variableOp =
         moduleBuilder.create<VariableOp>(loc, name,
                                          /*isMutable=*/false, inputType, attr);
-    SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+    variableOp.setPrivate();
     variableOp.setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
     auto lookupOp = blockBuilder.create<IREE::Flow::VariableLoadOp>(
         loc, inputType, variableOp.getName());
