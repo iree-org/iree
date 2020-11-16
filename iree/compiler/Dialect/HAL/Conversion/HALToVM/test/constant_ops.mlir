@@ -13,8 +13,8 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
 
 // CHECK: vm.global.ref @pool_storage0_buffer init(@pool_storage0_buffer_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_storage0_buffer init(@pool_storage0_buffer_initializer) : !hal.buffer attributes {sym_visibility = "private"}
-// CHECK: vm.func private @pool_storage0_buffer_initializer() -> !vm.ref<!hal.buffer>
-func private @pool_storage0_buffer_initializer() -> !hal.buffer {
+// CHECK: vm.func @pool_storage0_buffer_initializer() -> !vm.ref<!hal.buffer>
+func @pool_storage0_buffer_initializer() -> !hal.buffer attributes {sym_visibility = "private"} {
   %c0 = constant 0 : index
   %c16 = constant 16 : index
   %dev = hal.ex.shared_device : !hal.device
@@ -32,8 +32,8 @@ func @pool_storage1_buffer_initializer() -> !hal.buffer attributes {sym_visibili
 
 // CHECK: vm.global.ref @pool_splats init(@pool_splats_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_splats init(@pool_splats_initializer) : !hal.buffer attributes {sym_visibility = "private"}
-// CHECK: vm.func private @pool_splats_initializer() -> !vm.ref<!hal.buffer>
-func private @pool_splats_initializer() -> !hal.buffer {
+// CHECK: vm.func @pool_splats_initializer() -> !vm.ref<!hal.buffer>
+func @pool_splats_initializer() -> !hal.buffer attributes {sym_visibility = "private"} {
   %c64 = constant 64 : index
   %c0 = constant 0 : index
   %c4 = constant 4 : index

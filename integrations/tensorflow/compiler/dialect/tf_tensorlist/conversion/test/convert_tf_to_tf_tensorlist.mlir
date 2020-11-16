@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt %s -pass-pipeline='func(convert-tf-to-tf_tensorlist)' -split-input-file -allow-unregistered-dialect -verify-diagnostics | IreeFileCheck %s
+// RUN: iree-tf-opt %s -pass-pipeline=convert-tf-to-tf_tensorlist -split-input-file -allow-unregistered-dialect -verify-diagnostics | IreeFileCheck %s
 
 // TODO(silvasean): Handle interprocedural conversion.
 

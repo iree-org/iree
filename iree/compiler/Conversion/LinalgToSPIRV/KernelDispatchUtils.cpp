@@ -407,12 +407,14 @@ LogicalResult LaunchConfig::init(
   //   producer and consumer must match for the parallel loops.
   for (auto dependence :
        dependenceGraph.getDependentOperations(rootOperation.getValue())) {
-    unsigned viewIndex = dependence.indexingOpView.operandIndex;
-    AffineMap indexingMap = rootOperation->getIndexingMap(viewIndex);
+    Optional<unsigned> viewIndex =
+        rootOperation->getIndexOfShapedOperand(dependence.indexingView);
+    AffineMap indexingMap = rootOperation->getIndexingMap(*viewIndex);
     linalg::LinalgOp fusedOp =
         cast<linalg::LinalgOp>(dependence.dependentOpView.op);
-    unsigned fusedViewIndex = dependence.dependentOpView.operandIndex;
-    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(fusedViewIndex);
+    Optional<unsigned> fusedViewIndex =
+        fusedOp.getIndexOfShapedOperand(dependence.dependentOpView.view);
+    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(*fusedViewIndex);
     if (indexingMap.getNumResults() < numOuterParallel ||
         fusedIndexingMap.getNumResults() < numOuterParallel ||
         !llvm::all_of(

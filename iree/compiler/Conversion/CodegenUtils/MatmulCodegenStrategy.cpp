@@ -13,8 +13,10 @@
 // limitations under the License.
 
 // -----------------------------------------------------------------------------
-// This code will be removed once this gets upstreamed to common mlir.
-// Please try to limit changes in this code only minor changes.
+// This is a copy of the matmul strategy infrastructure existing in mlir_edge.
+// This version will be removed once this gets upstreamed to common mlir.
+// Please try to limit changes in this code only minor changes or make sure the
+// changes are applied in mlir_edge as well.
 
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 

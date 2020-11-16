@@ -119,7 +119,7 @@ LAYERS = [
     "Reshape",
     "SeparableConv1D",
     "SeparableConv2D",
-    # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
+    "SimpleRNN",
     "SimpleRNNCell",
     "Softmax",
     "SpatialDropout1D",
@@ -139,6 +139,7 @@ FAILING_STATIC = [
     {
         # Wrapping these in a tf.function appears to cause a keras bug.
         "layer": [
+            "ConvLSTM2D",
             "GRUCell",
             "LSTMCell",
             "SimpleRNNCell",
@@ -166,6 +167,7 @@ FAILING_STATIC = [
             "LocallyConnected2D",
             "Masking",
             "MultiHeadAttention",
+            "SimpleRNN",
             "UpSampling2D",
         ],
         "target_backends": [
@@ -266,7 +268,7 @@ LAYERS_WITH_FULL_API_TESTS = [
     "MaxPool3D",
     "SeparableConv1D",
     "SeparableConv2D",
-    # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
+    "SimpleRNN",
 ]
 
 FAILING_FULL_API = [
@@ -496,7 +498,7 @@ LAYERS_WITH_TRAINING_BEHAVIOR = [
     "LSTM",
     "LSTMCell",
     "MultiHeadAttention",
-    # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
+    "SimpleRNN",
     "SimpleRNNCell",
     "SpatialDropout1D",
     "SpatialDropout2D",
