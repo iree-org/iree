@@ -85,10 +85,13 @@ endif()
 
 set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
+# TODO(benvanik): fix these names (or remove entirely).
 set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(IREE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
+  ${IREE_SOURCE_DIR}
+  ${IREE_BINARY_DIR}
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
@@ -436,19 +439,6 @@ set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
 # tools in LLVM.
 iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
-
-#-------------------------------------------------------------------------------
-# Third party: tensorflow
-#-------------------------------------------------------------------------------
-
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
-)
 
 #-------------------------------------------------------------------------------
 # Third party: mlir-emitc
