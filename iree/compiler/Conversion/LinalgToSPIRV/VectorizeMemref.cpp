@@ -265,8 +265,8 @@ class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getType());
     if (!memrefType) return failure();
-    Value newAlloc = rewriter.create<AllocOp>(alloc.getLoc(), *memrefType,
-                                              alloc.dynamicSizes());
+    Value newAlloc =
+        rewriter.create<AllocOp>(alloc.getLoc(), *memrefType, alloc.value());
     rewriter.replaceOp(alloc, newAlloc);
     return success();
   }

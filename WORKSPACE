@@ -152,17 +152,6 @@ maybe(
     path = "third_party/tensorflow",
 )
 
-# TF depends on tf_toolchains.
-http_archive(
-    name = "tf_toolchains",
-    sha256 = "4c4231037088ad3b56520712a370db45860100304eea2c1a2dfc9944db10da4f",
-    strip_prefix = "toolchains-1.1.3",
-    urls = [
-        "http://mirror.tensorflow.org/github.com/tensorflow/toolchains/archive/v1.1.3.tar.gz",
-        "https://github.com/tensorflow/toolchains/archive/v1.1.3.tar.gz",
-    ],
-)
-
 # Import all of the tensorflow dependencies.
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 ###############################################################################

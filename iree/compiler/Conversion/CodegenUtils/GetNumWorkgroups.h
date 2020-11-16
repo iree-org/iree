@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_GETNUMWORKGROUPS_H_
-#define IREE_COMPILER_CONVERSION_CODEGENUTILS_GETNUMWORKGROUPS_H_
+#ifndef MLIR_EDGE_BENCHMARKS_STRATEGIES_WORKGROUPCALULCATION_H_
+#define MLIR_EDGE_BENCHMARKS_STRATEGIES_WORKGROUPCALULCATION_H_
 
 #include <cstdint>
 
@@ -94,4 +94,4 @@ std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_CODEGENUTILS_GETNUMWORKGROUPS_H_
+#endif  // MLIR_EDGE_BENCHMARKS_STRATEGIES_WORKGROUPCALULCATION_H_
