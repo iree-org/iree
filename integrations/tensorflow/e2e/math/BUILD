@@ -533,9 +533,18 @@ iree_e2e_cartesian_product_test_suite(
 # we can run them on the CI with 5 additional targets instead of 640.
 
 # Failing on Kokoro.
+# TODO(#3854): Remove this once we can update TensorFlow on Kokoro.
 TFLITE_FAILING_KOKORO = TFLITE_FAILING + [
     "angle",
     "count_nonzero",
+    "divide_no_nan",
+    "is_inf",
+    "is_nan",
+    "l2_normalize",
+    "multiply_no_nan",
+    "reciprocal",
+    "reciprocal_no_nan",
+    "zero_fraction",
 ]
 
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
