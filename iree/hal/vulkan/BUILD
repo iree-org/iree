@@ -81,7 +81,6 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
-        "@com_google_absl//absl/utility",
         "@iree_vulkan_headers//:vulkan_headers",
         "@renderdoc_api//:renderdoc_app",
     ],
@@ -181,7 +180,6 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
-        "@com_google_absl//absl/utility",
     ],
 )
 
