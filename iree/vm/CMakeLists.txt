@@ -67,9 +67,9 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    flatcc::runtime
     iree::base::alignment
     iree::base::api
+    iree::base::flatcc
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC

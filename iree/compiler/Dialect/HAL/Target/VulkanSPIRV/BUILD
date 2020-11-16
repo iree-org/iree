@@ -37,6 +37,7 @@ cc_library(
         "VulkanSPIRVTarget.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Conversion/LinalgToSPIRV:CodeGenOptionUtils",
@@ -47,7 +48,6 @@ cc_library(
         "//iree/compiler/Dialect/Vulkan/Utils",
         "//iree/compiler/Utils",
         "//iree/schemas:spirv_executable_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUDialect",

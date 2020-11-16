@@ -60,7 +60,6 @@ iree_cc_binary(
     deps = [
         "//iree/base:file_mapping",
         "//iree/schemas:bytecode_module_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
     ],
 )
 

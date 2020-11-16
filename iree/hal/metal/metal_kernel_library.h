@@ -25,8 +25,8 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_spec.h"
 
-// NOTE: include order matters:
-#include "flatcc/reflection/flatbuffers_common_reader.h"
+// flatcc schemas:
+#include "iree/base/flatcc.h"
 #include "iree/schemas/metal_executable_def_reader.h"
 #include "iree/schemas/metal_executable_def_verifier.h"
 

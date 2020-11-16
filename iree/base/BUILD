@@ -14,6 +14,7 @@
 
 # Common types and utilities used in the IREE codebase.
 
+load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
@@ -223,6 +224,26 @@ cc_test(
         ":file_path",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "flatcc",
+    hdrs = ["flatcc.h"],
+    deps = [
+        ":flatcc_dummy",
+        "@com_github_dvidelabs_flatcc//:runtime",
+    ],
+)
+
+iree_flatbuffer_c_library(
+    name = "flatcc_dummy",
+    srcs = ["flatcc.fbs"],
+    flatcc_args = [
+        "--reader",
+        "--builder",
+        "--verifier",
+        "--json",
     ],
 )
 

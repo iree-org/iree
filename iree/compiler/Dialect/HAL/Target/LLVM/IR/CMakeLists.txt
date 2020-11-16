@@ -29,7 +29,7 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     MLIRTargetLLVMIR
-    flatccrt
+    iree::base::flatcc
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
