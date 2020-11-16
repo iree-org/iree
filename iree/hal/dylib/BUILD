@@ -47,8 +47,7 @@ cc_library(
     hdrs = ["dylib_driver.h"],
     deps = [
         ":dylib_device",
-        "//iree/hal:device_info",
-        "//iree/hal:driver",
+        "//iree/hal",
         "//iree/hal/host/serial:serial_scheduling_model",
     ],
 )
@@ -76,8 +75,7 @@ cc_library(
         "//iree/base:flatcc",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
+        "//iree/hal",
         "//iree/hal/host:host_executable",
         "//iree/schemas:dylib_executable_def_c_fbs",
         "@com_google_absl//absl/container:inlined_vector",
@@ -93,8 +91,6 @@ cc_library(
         ":dylib_executable",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
+        "//iree/hal",
     ],
 )

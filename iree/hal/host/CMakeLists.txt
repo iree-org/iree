@@ -28,7 +28,7 @@ iree_cc_library(
     absl::synchronization
     iree::base::status
     iree::base::tracing
-    iree::hal::semaphore
+    iree::hal
   PUBLIC
 )
 
@@ -56,7 +56,7 @@ iree_cc_library(
     iree::base::logging
     iree::base::status
     iree::base::tracing
-    iree::hal::buffer
+    iree::hal
   PUBLIC
 )
 
@@ -69,8 +69,7 @@ iree_cc_library(
     "host_descriptor_set.cc"
   DEPS
     absl::inlined_vector
-    iree::hal::descriptor_set
-    iree::hal::descriptor_set_layout
+    iree::hal
   PUBLIC
 )
 
@@ -81,8 +80,7 @@ iree_cc_library(
     "host_executable.h"
   DEPS
     iree::base::status
-    iree::hal::descriptor_set
-    iree::hal::executable
+    iree::hal
   PUBLIC
 )
 
@@ -96,8 +94,7 @@ iree_cc_library(
   DEPS
     absl::inlined_vector
     iree::base::memory
-    iree::hal::descriptor_set_layout
-    iree::hal::executable_layout
+    iree::hal
   PUBLIC
 )
 
@@ -112,8 +109,7 @@ iree_cc_library(
     ::host_buffer
     iree::base::status
     iree::base::tracing
-    iree::hal::allocator
-    iree::hal::buffer
+    iree::hal
   PUBLIC
 )
 
@@ -135,9 +131,8 @@ iree_cc_library(
     iree::base::memory
     iree::base::status
     iree::base::tracing
-    iree::hal::allocator
+    iree::hal
     iree::hal::command_buffer_validation
-    iree::hal::device
   PUBLIC
 )
 
@@ -153,7 +148,7 @@ iree_cc_library(
     iree::base::intrusive_list
     iree::base::status
     iree::base::tracing
-    iree::hal::command_buffer
+    iree::hal
   PUBLIC
 )
 
@@ -165,7 +160,7 @@ iree_cc_library(
   SRCS
     "nop_event.cc"
   DEPS
-    iree::hal::event
+    iree::hal
   PUBLIC
 )
 
@@ -175,6 +170,6 @@ iree_cc_library(
   HDRS
     "scheduling_model.h"
   DEPS
-    iree::hal::command_queue
+    iree::hal
   PUBLIC
 )

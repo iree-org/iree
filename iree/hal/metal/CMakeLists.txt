@@ -56,20 +56,7 @@ iree_cc_library(
     iree::base::status
     iree::base::time
     iree::base::tracing
-    iree::hal::allocator
-    iree::hal::command_buffer
-    iree::hal::command_queue
-    iree::hal::debug_capture_manager
-    iree::hal::descriptor_set_layout
-    iree::hal::device
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
-    iree::hal::executable_layout
-    iree::hal::executable_spec
-    iree::hal::semaphore
+    iree::hal
     iree::schemas::metal_executable_def_c_fbs
   LINKOPTS
     "-framework Foundation"

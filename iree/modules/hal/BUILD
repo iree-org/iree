@@ -25,8 +25,8 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:tracing",
+        "//iree/hal",
         "//iree/hal:api",
-        "//iree/hal:device",
         "//iree/vm",
         "//iree/vm:native_module_cc",
         "@com_google_absl//absl/base:core_headers",

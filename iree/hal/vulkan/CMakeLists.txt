@@ -71,7 +71,7 @@ iree_cc_library(
     iree::base::target_platform
     iree::base::time
     iree::base::tracing
-    iree::hal::debug_capture_manager
+    iree::hal
     renderdoc_api::renderdoc_app
   PUBLIC
 )
@@ -109,8 +109,7 @@ iree_cc_library(
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
-    iree::hal::allocator
-    iree::hal::buffer
+    iree::hal
     vulkan_memory_allocator
   PUBLIC
 )
@@ -169,23 +168,8 @@ iree_cc_library(
     iree::base::target_platform
     iree::base::time
     iree::base::tracing
-    iree::hal::allocator
-    iree::hal::command_buffer
+    iree::hal
     iree::hal::command_buffer_validation
-    iree::hal::command_queue
-    iree::hal::debug_capture_manager
-    iree::hal::descriptor_set
-    iree::hal::descriptor_set_layout
-    iree::hal::device
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::event
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
-    iree::hal::executable_layout
-    iree::hal::executable_spec
-    iree::hal::semaphore
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )
