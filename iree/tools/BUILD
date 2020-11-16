@@ -18,7 +18,6 @@
 load(
     "//iree:build_defs.oss.bzl",
     "IREE_DRIVER_MODULES",
-    "PLATFORM_VULKAN_DEPS",
     iree_cc_binary = "cc_binary",
 )
 
@@ -51,7 +50,7 @@ iree_cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 iree_cc_binary(
@@ -247,7 +246,7 @@ iree_cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/compiler/Translation:IREEVM",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 iree_cc_binary(
@@ -264,7 +263,7 @@ iree_cc_binary(
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 iree_cc_binary(

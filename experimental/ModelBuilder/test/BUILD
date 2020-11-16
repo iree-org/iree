@@ -15,7 +15,7 @@
 # Tests for end-to-end IREE support starting from the XLA HLO dialect.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
-load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
+load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -115,7 +115,7 @@ cc_binary(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:mlir_runner_utils",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
@@ -149,7 +149,7 @@ cc_binary(
         "@llvm-project//mlir:VectorToLLVM",
         # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
@@ -182,7 +182,7 @@ cc_binary(
         "@llvm-project//mlir:mlir_c_runner_utils",
         # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
@@ -215,7 +215,7 @@ cc_binary(
         "@llvm-project//mlir:mlir_c_runner_utils",
         # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_DRIVER_MODULES,
 )
 
 cc_binary(

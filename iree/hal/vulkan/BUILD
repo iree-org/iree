@@ -14,11 +14,7 @@
 
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "iree_cmake_extra_content",
-    "PLATFORM_VULKAN_TEST_DEPS",
-)
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -99,7 +95,7 @@ cc_test(
         ":utils",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-    ] + PLATFORM_VULKAN_TEST_DEPS,
+    ],
 )
 
 cc_library(

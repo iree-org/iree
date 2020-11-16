@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "PLATFORM_VULKAN_DEPS",
-)
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -70,5 +65,5 @@ cc_binary(
         "//iree/vm:ref_cc",
         "@com_google_absl//absl/flags:flag",
         "@sdl2//:SDL2",
-    ] + PLATFORM_VULKAN_DEPS,
+    ],
 )

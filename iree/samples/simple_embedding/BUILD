@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS", "iree_cmake_extra_content")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
@@ -68,5 +68,5 @@ cc_test(
         # executables for from the source MLIR.
         "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ] + PLATFORM_VULKAN_TEST_DEPS,
+    ],
 )

@@ -39,14 +39,6 @@ def platform_trampoline_deps(basename, path = "base"):
         "//iree/%s/internal:%s_internal" % (path, basename),
     ]
 
-# A platform-sensitive list of dependencies for non-test targets using Vulkan.
-PLATFORM_VULKAN_DEPS = select({
-    "//conditions:default": [],
-})
-
-# A platform-sensitive list of dependencies for tests using Vulkan.
-PLATFORM_VULKAN_TEST_DEPS = []
-
 # Driver modules that register themselves at link time.
 IREE_DRIVER_MODULES = [
     "//iree/hal/dylib:dylib_driver_module",
