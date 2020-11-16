@@ -765,7 +765,7 @@ def tf_module_to_tflite_module_bytes(
     except Exception as e:
       logging.error("Failed to convert '%s' to tflite.", method_name)
       logging.error("TFLite excpetion: %s", e)
-      failed.append(failed_methods)
+      failed_methods.append(failed_methods)
 
   if failed_methods:
     raise RuntimeError(
