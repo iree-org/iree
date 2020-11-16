@@ -23,12 +23,8 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm/builtin_types.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/invocation.h"
-#include "iree/vm/module.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "iree/vm/test/all_bytecode_modules.h"

@@ -35,8 +35,7 @@ iree_cc_library(
     iree::modules::hal
     iree::modules::strings::strings_module
     iree::modules::tensorlist::native_module
+    iree::vm
+    iree::vm::cc
     iree::vm::bytecode_module
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::ref_cc
 )

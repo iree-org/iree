@@ -23,7 +23,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm/context.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace java {

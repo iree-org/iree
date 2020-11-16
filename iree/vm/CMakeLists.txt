@@ -16,36 +16,144 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    builtin_types
+    vm
+  HDRS
+    "api.h"
+  DEPS
+    ::impl
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    cc
+  HDRS
+    "module_abi_packing.h"
+    "native_module_cc.h"
+    "ref_cc.h"
+  DEPS
+    ::vm
+    absl::core_headers
+    absl::inlined_vector
+    absl::optional
+    absl::span
+    absl::strings
+    iree::base::api
+    iree::base::ref_ptr
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    impl
   HDRS
     "builtin_types.h"
+    "context.h"
+    "instance.h"
+    "invocation.h"
+    "list.h"
+    "module.h"
+    "native_module.h"
+    "ref.h"
+    "stack.h"
+    "type_def.h"
+    "value.h"
   SRCS
     "builtin_types.c"
+    "context.c"
+    "instance.c"
+    "invocation.c"
+    "list.c"
+    "module.c"
+    "native_module.c"
+    "ref.c"
+    "stack.c"
   DEPS
-    ::list
-    ::ref
+    iree::base::api
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    list_test
+  SRCS
+    "list_test.cc"
+  DEPS
+    ::impl
+    iree::base::api
+    iree::base::ref_ptr
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    native_module_test
+  SRCS
+    "native_module_test.cc"
+  DEPS
+    ::cc
+    ::impl
+    ::native_module_test_hdrs
+    iree::base::api
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    native_module_test_hdrs
+  HDRS
+    "native_module_test.h"
+  DEPS
+    ::impl
     iree::base::api
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    bytecode_dispatch_test
+    native_module_benchmark
   SRCS
-    "bytecode_dispatch_test.cc"
+    "native_module_benchmark.cc"
   DEPS
-    ::builtin_types
-    ::bytecode_module
-    ::context
-    ::instance
-    ::invocation
-    ::module
-    absl::strings
+    ::impl
+    ::native_module_test_hdrs
+    benchmark
+    iree::base::api
     iree::base::logging
-    iree::base::status
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    ref_test
+  SRCS
+    "ref_test.cc"
+  DEPS
+    ::impl
+    iree::base::api
+    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::vm::test::all_bytecode_modules_cc
+)
+
+iree_cc_test(
+  NAME
+    stack_test
+  SRCS
+    "stack_test.cc"
+  DEPS
+    ::impl
+    iree::base::api
+    iree::base::ref_ptr
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -60,19 +168,41 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "bytecode_op_table.h"
   DEPS
-    ::builtin_types
-    ::list
-    ::module
-    ::ref
-    ::stack
-    ::type_def
-    ::value
+    ::vm
     iree::base::api
     iree::base::core_headers
     iree::base::flatcc
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    bytecode_op_table_gen
+  TD_FILE
+    "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/IR/VMOps.td"
+  OUTS
+    -gen-iree-vm-op-table-defs bytecode_op_table.h
+  TBLGEN
+    IREE
+)
+
+iree_cc_test(
+  NAME
+    bytecode_module_test
+  SRCS
+    "bytecode_dispatch_test.cc"
+    "bytecode_module_test.cc"
+  DEPS
+    ::bytecode_module
+    ::vm
+    absl::strings
+    iree::base::logging
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm::test::all_bytecode_modules_cc
 )
 
 iree_cc_test(
@@ -83,11 +213,7 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::bytecode_module_benchmark_module_cc
-    ::context
-    ::instance
-    ::module
-    ::native_module
-    ::stack
+    ::vm
     absl::inlined_vector
     absl::strings
     benchmark
@@ -132,318 +258,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_cc_test(
-  NAME
-    bytecode_module_test
-  SRCS
-    "bytecode_module_test.cc"
-  DEPS
-    ::bytecode_module
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_tablegen_library(
-  NAME
-    bytecode_op_table_gen
-  TD_FILE
-    "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/IR/VMOps.td"
-  OUTS
-    -gen-iree-vm-op-table-defs bytecode_op_table.h
-  TBLGEN
-    IREE
-)
-
 iree_cc_library(
   NAME
     c_funcs
   HDRS
     "c_funcs.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    context
-  HDRS
-    "context.h"
-  SRCS
-    "context.c"
-  DEPS
-    ::instance
-    ::module
-    ::stack
-    iree::base::api
-    iree::base::core_headers
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    instance
-  HDRS
-    "instance.h"
-  SRCS
-    "instance.c"
-  DEPS
-    ::builtin_types
-    iree::base::api
-    iree::base::core_headers
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    invocation
-  HDRS
-    "invocation.h"
-  SRCS
-    "invocation.c"
-  DEPS
-    ::context
-    ::list
-    ::module
-    iree::base::api
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    list
-  HDRS
-    "list.h"
-  SRCS
-    "list.c"
-  DEPS
-    ::ref
-    ::type_def
-    ::value
-    iree::base::api
-    iree::base::core_headers
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    list_test
-  SRCS
-    "list_test.cc"
-  DEPS
-    ::builtin_types
-    ::list
-    iree::base::api
-    iree::base::ref_ptr
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    module
-  HDRS
-    "module.h"
-  SRCS
-    "module.c"
-  DEPS
-    ::ref
-    iree::base::api
-    iree::base::core_headers
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    native_module
-  HDRS
-    "native_module.h"
-  SRCS
-    "native_module.c"
-  DEPS
-    ::module
-    ::stack
-    iree::base::api
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    native_module_benchmark
-  SRCS
-    "native_module_benchmark.cc"
-  DEPS
-    ::module
-    ::native_module
-    ::native_module_test_hdrs
-    ::stack
-    benchmark
-    iree::base::api
-    iree::base::logging
-    iree::testing::benchmark_main
-)
-
-iree_cc_test(
-  NAME
-    native_module_test
-  SRCS
-    "native_module_test.cc"
-  DEPS
-    ::context
-    ::instance
-    ::invocation
-    ::list
-    ::native_module_test_hdrs
-    ::ref_cc
-    iree::base::api
-    iree::base::status
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    native_module_test_hdrs
-  HDRS
-    "native_module_test.h"
-  DEPS
-    ::context
-    ::instance
-    ::native_module
-    ::ref
-    ::stack
-    iree::base::api
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    native_module_cc
-  HDRS
-    "module_abi_packing.h"
-    "native_module_cc.h"
-  DEPS
-    ::builtin_types
-    ::module
-    ::ref
-    ::ref_cc
-    ::stack
-    absl::inlined_vector
-    absl::optional
-    absl::span
-    absl::strings
-    iree::base::api
-    iree::base::ref_ptr
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    ref
-  HDRS
-    "ref.h"
-  SRCS
-    "ref.c"
-  DEPS
-    iree::base::api
-    iree::base::core_headers
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    ref_test
-  SRCS
-    "ref_test.cc"
-  DEPS
-    ::ref
-    iree::base::api
-    iree::base::ref_ptr
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    ref_cc
-  HDRS
-    "ref_cc.h"
-  DEPS
-    ::ref
-    absl::core_headers
-    iree::base::api
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    stack
-  HDRS
-    "stack.h"
-  SRCS
-    "stack.c"
-  DEPS
-    ::module
-    ::ref
-    iree::base::api
-    iree::base::core_headers
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    stack_test
-  SRCS
-    "stack_test.cc"
-  DEPS
-    ::ref
-    ::stack
-    iree::base::api
-    iree::base::ref_ptr
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    type_def
-  HDRS
-    "type_def.h"
-  DEPS
-    ::ref
-    ::value
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    value
-  HDRS
-    "value.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vm
-  HDRS
-    "api.h"
-  DEPS
-    ::builtin_types
-    ::context
-    ::instance
-    ::invocation
-    ::list
-    ::module
-    ::native_module
-    ::ref
-    ::stack
-    ::type_def
-    ::value
-    iree::base::api
   PUBLIC
 )

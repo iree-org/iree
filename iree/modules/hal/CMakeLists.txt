@@ -31,6 +31,6 @@ iree_cc_library(
     iree::hal
     iree::hal::api
     iree::vm
-    iree::vm::native_module_cc
+    iree::vm::cc
   PUBLIC
 )

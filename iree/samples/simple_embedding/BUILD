@@ -59,7 +59,7 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
