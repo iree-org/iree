@@ -64,6 +64,9 @@ static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
 namespace {
 struct LaunchConfigInfo {
   std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+  // The corresponding indices of the loops that are distributed to workgroup
+  // dimensions.
+  std::array<int64_t, 3> workgroupLoopIndices = {0, 1, 2};
   std::array<int64_t, 3> numSubgroups = {1, 1, 1};
   bool vectorize = false;
 };
@@ -296,6 +299,41 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
+  if (targetEnv.getVendorID() == spirv::Vendor::ARM) {
+    auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
+    if (outputType.hasStaticShape()) {
+      const int tileWidth = 8;
+      const int tileChannel = 32;
+
+      auto shape = outputType.getShape();
+      if (shape[2] % tileWidth == 0 && shape[3] % tileChannel == 0) {
+        config.workgroupSize = {8, 2, 1};
+
+        SmallVector<int64_t, 4> workgroupLevel = {
+            /*batch=*/0, /*output_height=*/1,
+            /*output_width=*/tileWidth,
+            /*output_channel=*/tileChannel};
+        tileSizes.emplace_back(std::move(workgroupLevel));
+
+        // No tiling at the subgroup level given that we don't use subgroup
+        // level syncrhonization  or shared memory.
+        tileSizes.emplace_back();
+
+        SmallVector<int64_t, 4> invocationLevel = {
+            /*batch=*/0, /*output_height=*/1,
+            /*output_width=*/tileWidth / config.workgroupSize[1],
+            /*output_channel=*/tileChannel / config.workgroupSize[0]};
+        tileSizes.emplace_back(invocationLevel);
+
+        // We don't distribute along the batch dimension.
+        config.workgroupLoopIndices = {1, 2, 3};
+        config.vectorize = true;
+
+        return success();
+      }
+    }
+  }
+
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -407,6 +445,7 @@ LogicalResult LaunchConfig::init(
 #undef DISPATCH
   }
   workgroupSize = config.workgroupSize;
+  workgroupLoopIndices = config.workgroupLoopIndices;
   numSubgroups = config.numSubgroups;
   vectorize = config.vectorize;
   if (!rootOperation) {
@@ -508,10 +547,13 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     // the contract.
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
-  } else {
-    // Map to load4.
-    return SmallVector<int64_t, 4>({1, 4});
   }
+
+  // Map to load4.
+  auto rank = op.vector().getType().cast<VectorType>().getRank();
+  SmallVector<int64_t, 4> size(rank, 1);
+  size.back() = 4;
+  return size;
 }
 
 template <>
@@ -524,10 +566,13 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
     // the contract.
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
-  } else {
-    // Map to store4.
-    return SmallVector<int64_t, 4>({1, 4});
   }
+
+  // Map to store4.
+  auto rank = op.vector().getType().cast<VectorType>().getRank();
+  SmallVector<int64_t, 4> size(rank, 1);
+  size.back() = 4;
+  return size;
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {

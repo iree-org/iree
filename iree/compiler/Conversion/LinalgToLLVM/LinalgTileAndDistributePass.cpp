@@ -74,8 +74,8 @@ struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
          failed(createNumWorkgroupsFromResultShape(
              rewriter, cast<linalg::LinalgOp>(op), funcOp,
              getNumWorkgroupsFnAttrName(),
-             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(
-                 op))))) {
+             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op),
+             {0, 1, 2})))) {
       return failure();
     }
     rewriter.eraseOp(op);
@@ -112,7 +112,8 @@ struct TileAndFuseToCPUThreads
         failed(createNumWorkgroupsFromResultShape(
             rewriter, cast<linalg::LinalgOp>(op), funcOp,
             getNumWorkgroupsFnAttrName().str(),
-            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op)))) {
+            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op),
+            {0, 1, 2}))) {
       return failure();
     }
     return success();

@@ -39,7 +39,8 @@ namespace iree_compiler {
 /// distributed across workgroups.
 LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes);
+    llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> loopIndices);
 
 /// Generates a function that computes the number of workgroups as
 ///  ceil(`parallelLoopRange`[0] * `parallelLoopRange`[1] * ... *

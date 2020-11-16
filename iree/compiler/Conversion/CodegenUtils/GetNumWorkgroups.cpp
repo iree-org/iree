@@ -15,6 +15,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -101,7 +102,9 @@ static Value buildCeilDivConstDenominator(PatternRewriter &rewriter,
 
 LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
-    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes) {
+    llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> loopIndices) {
+  assert(loopIndices.size() == 3);
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
       linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
   if (!numWorkgroupsFn) return failure();
@@ -111,13 +114,15 @@ LogicalResult createNumWorkgroupsFromResultShape(
   Optional<SmallVector<Value, 2>> parallelLoopRange =
       getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
   if (!parallelLoopRange) return failure();
+
   Value one = rewriter.create<ConstantIndexOp>(loc, 1);
   SmallVector<Value, 3> returnValues(3, one);
   for (size_t i = 0, e = std::min<size_t>(parallelLoopRange->size(), 3); i != e;
        ++i) {
-    if (tileSizes[e - i - 1] != 0) {
+    int loopIndex = loopIndices[e - i - 1];
+    if (tileSizes[loopIndex] != 0) {
       returnValues[i] = buildCeilDivConstDenominator(
-          rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+          rewriter, loc, (*parallelLoopRange)[loopIndex], tileSizes[loopIndex]);
     }
   }
   rewriter.create<mlir::ReturnOp>(loc, returnValues);

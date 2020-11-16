@@ -28,6 +28,7 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
@@ -112,10 +113,8 @@ static linalg::LinalgLoopDistributionOptions getWorkgroupDistributionOptions() {
     return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
-  options.distributionMethod = {
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  options.distributionMethod.assign(
+      3, linalg::DistributionMethod::CyclicNumProcsEqNumIters);
 
   return options;
 }
@@ -151,7 +150,8 @@ class TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
              rewriter, linalgOp, funcOp, getNumWorkgroupsFnAttrName(),
-             launchConfig.getTileSizes(op, 0))))) {
+             launchConfig.getTileSizes(op, 0),
+             launchConfig.getWorkgroupLoopIndices())))) {
       return failure();
     }
     setMarker(op, getDeleteMarker());
@@ -194,7 +194,8 @@ class TileAndFuseToWorkgroupsPattern
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
              rewriter, linalgOp, funcOp, getNumWorkgroupsFnAttrName(),
-             launchConfig.getTileSizes(op, 0))))) {
+             launchConfig.getTileSizes(op, 0),
+             launchConfig.getWorkgroupLoopIndices())))) {
       return failure();
     }
     return success();
@@ -213,12 +214,11 @@ static void populateTilingToWorkgroupPatterns(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     const LaunchConfig &launchConfig, OwningRewritePatternList &patterns) {
   // Function to compute first level tiling values.
-  auto getOuterTileSizeFn = [&launchConfig](
-                                OpBuilder &builder,
-                                Operation *operation) -> SmallVector<Value, 4> {
+  auto getOuterTileSizeFn = [&launchConfig](OpBuilder &builder,
+                                            Operation *operation) {
     ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 0);
-    if (tileSizes.empty()) return {};
     SmallVector<Value, 4> tileSizesVal;
+    if (tileSizes.empty()) return tileSizesVal;
     tileSizesVal.reserve(tileSizes.size());
     for (auto val : tileSizes) {
       tileSizesVal.push_back(
@@ -407,32 +407,53 @@ static void populateTilingToInvocationPatterns(
   auto getThreadProcInfoFn = [&launchConfig](
                                  OpBuilder &builder, Location loc,
                                  ArrayRef<Range> parallelLoopRanges) {
+    int numLevels = parallelLoopRanges.size();
     Type indexType = builder.getIndexType();
-    SmallVector<linalg::ProcInfo, 2> procInfo(2);
-    procInfo[1] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("x")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[0])};
-    procInfo[0] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("y")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[1])};
+    SmallVector<linalg::ProcInfo, 4> procInfo(numLevels);
+    if (numLevels > 0) {
+      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
+                                   loc, indexType, builder.getStringAttr("x")),
+                               builder.create<ConstantIndexOp>(
+                                   loc, launchConfig.getWorkgroupSize()[0])};
+    }
+    if (numLevels > 0) {
+      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
+                                   loc, indexType, builder.getStringAttr("y")),
+                               builder.create<ConstantIndexOp>(
+                                   loc, launchConfig.getWorkgroupSize()[1])};
+    }
+    if (numLevels > 0) {
+      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
+                                   loc, indexType, builder.getStringAttr("z")),
+                               builder.create<ConstantIndexOp>(
+                                   loc, launchConfig.getWorkgroupSize()[2])};
+    }
     return procInfo;
   };
-  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
-      getThreadProcInfoFn,
-      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>>(
-      context,
+
+  linalg::LinalgLoopDistributionOptions distributionOptions;
+  distributionOptions.procInfo = getThreadProcInfoFn;
+  distributionOptions.distributionMethod.assign(
+      3, linalg::DistributionMethod::CyclicNumProcsEqNumIters);
+
+  auto tilingOptions =
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(subgroupDistributionOptions),
+          .setDistributionOptions(distributionOptions);
+
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>>(
+      context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
+
+  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+      context, tilingOptions,
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getConvFilterTileMarker(), context));
 }
 
 //====---------------------------------------------------------------------===//
@@ -504,6 +525,47 @@ static void applyVectorTransformation(FuncOp funcOp) {
       llvm::dbgs() << "\n\n";
     });
   }
+}
+
+//====---------------------------------------------------------------------===//
+// Patterns to tile convolution window dimensions
+//====---------------------------------------------------------------------===//
+
+/// Populates `patterns` with patterns that tiles a linalg.conv along filter's
+/// height, width, input channel dimensions with tile sizes 1, 1, 4.
+static void populateTilingConvFilterPatterns(MLIRContext *context,
+                                             OwningRewritePatternList &patterns,
+                                             linalg::LinalgMarker marker) {
+  auto getTileSizeFn = [](OpBuilder &builder, Operation *op) {
+    Location loc = op->getLoc();
+    auto zero = builder.create<ConstantIndexOp>(loc, 0);
+    auto one = builder.create<ConstantIndexOp>(loc, 1);
+    auto four = builder.create<ConstantIndexOp>(loc, 4);
+    // linalg.conv has 7 iterators.
+    SmallVector<Value, 4> tileSizes(7, zero);
+    // The last 3 are for the filter.
+    tileSizes[4] = four;                // input channel
+    tileSizes[5] = tileSizes[6] = one;  // filter height/width
+    return tileSizes;
+  };
+
+  SmallVector<unsigned, 8> loopOrder = {
+      /*batch=*/0,
+      /*output_height=*/1,
+      /*output_width=*/2,
+      /*output_channel=*/3,
+      /*filter_height=*/5,
+      /*filter_width=*/6,
+      /*input_channel=*/4,
+  };
+
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setInterchange(loopOrder)
+                           .setTileSizeComputationFunction(getTileSizeFn);
+
+  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+      context, tilingOptions, marker);
 }
 
 //====---------------------------------------------------------------------===//
@@ -630,9 +692,28 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
 
       {
+        OwningRewritePatternList tilingPatterns;
+        auto marker = getLinalgMatchAndReplaceMarker(
+            getConvFilterTileMarker(), getVectorizeMarker(), context);
+        populateTilingConvFilterPatterns(context, tilingPatterns, marker);
+        populateFoldGPUProcessorIDUsesPatterns(context, tilingPatterns);
+        tilingPatterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(
+            context);
+        applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns));
+        applyCanonicalizationPatterns(context, funcOp);
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After tiling linalg.conv  ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+
+      {
         OwningRewritePatternList vectorizationPatterns;
         populateVectorizationPatterns(context, launchConfig,
                                       vectorizationPatterns);
+        populateVectorizeLinalgConvPatterns(context, vectorizationPatterns);
         applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vectorization ---\n";

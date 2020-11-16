@@ -57,7 +57,10 @@ using TileSizesListType = SmallVector<SmallVector<int64_t, 4>, 1>;
 /// implementation from the rest of the pipeline.
 class LaunchConfig {
  public:
-  LaunchConfig() : workgroupSize({1, 1, 1}), numSubgroups({1, 1, 1}) {}
+  LaunchConfig()
+      : workgroupSize({1, 1, 1}),
+        workgroupLoopIndices({0, 1, 2}),
+        numSubgroups({1, 1, 1}) {}
 
   /// Given the sequence of `linalgOps` (and `options`), decide the launch
   /// configuration by deciding
@@ -94,6 +97,12 @@ class LaunchConfig {
   /// Returns the workgroup size to use based on the tile sizes.
   ArrayRef<int64_t> getWorkgroupSize() const { return workgroupSize; }
 
+  // Returns the corresponding indices of the loops that are distributed to
+  // workgroup dimensions.
+  ArrayRef<int64_t> getWorkgroupLoopIndices() const {
+    return workgroupLoopIndices;
+  }
+
   /// Returns the number of subgroups to use.
   ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
 
@@ -117,6 +126,10 @@ class LaunchConfig {
 
   /// Workgroup size to use.
   std::array<int64_t, 3> workgroupSize;
+
+  // The corresponding indices of the loops that are distributed to workgroup
+  // dimensions.
+  std::array<int64_t, 3> workgroupLoopIndices;
 
   /// Number of subgroups that are logically distributed along x, y & z.
   std::array<int64_t, 3> numSubgroups;

@@ -47,6 +47,8 @@ StringRef getCopyToWorkgroupMemoryMarker() {
   return "copy_to_workgroup_memory";
 }
 
+StringRef getConvFilterTileMarker() { return "tile_conv_filter"; }
+
 StringRef getVectorizeMarker() { return "vectorize"; }
 
 StringRef getDeleteMarker() { return "delete"; }
