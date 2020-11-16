@@ -33,9 +33,8 @@ jobs:
         run: ./scripts/git/submodule_versions.py init
       - name: Checking submodule state
         run: |
-          echo "::set-env name=has_diff::false"
-          git diff --cached --exit-code || echo "::set-env name=has_diff::true"
-      - name: Committing updates
+          echo "has_diff=false" >> $GITHUB_ENV
+          git diff --cached --exit-code || echo "has_diff=true" >> $GITHUB_ENV      - name: Committing updates
         if: env.has_diff == 'true'
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
