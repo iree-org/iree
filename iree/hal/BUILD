@@ -22,6 +22,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+#===------------------------------------------------------------------------===#
+# Public API
+#===------------------------------------------------------------------------===#
+# TODO(benvanik): rename to :hal
+
 cc_library(
     name = "api",
     srcs = ["api.cc"],
@@ -31,7 +36,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":api_hdrs",
         ":driver_registry",
         ":hal",
         ":heap_buffer",
@@ -43,14 +47,6 @@ cc_library(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "api_hdrs",
-    hdrs = ["api.h"],
-    deps = [
-        "//iree/base:api_hdrs",
     ],
 )
 
@@ -68,46 +64,10 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "command_buffer_validation",
-    srcs = ["command_buffer_validation.cc"],
-    hdrs = ["command_buffer_validation.h"],
-    deps = [
-        ":hal",
-        "//iree/base:logging",
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "device_manager",
-    srcs = ["device_manager.cc"],
-    hdrs = ["device_manager.h"],
-    deps = [
-        ":hal",
-        ":heap_buffer",
-        "//iree/base:status",
-        "//iree/base:time",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "driver_registry",
-    srcs = ["driver_registry.cc"],
-    hdrs = ["driver_registry.h"],
-    deps = [
-        ":hal",
-        "//iree/base:initializer",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
+#===------------------------------------------------------------------------===#
+# Implementation
+#===------------------------------------------------------------------------===#
+# TODO(benvanik): rename to :cc and expose via an api_cc.h.
 
 cc_library(
     name = "hal",
@@ -181,6 +141,60 @@ cc_test(
         "@com_google_absl//absl/memory",
     ],
 )
+
+#===------------------------------------------------------------------------===#
+# Debugging utilities and tools
+#===------------------------------------------------------------------------===#
+
+cc_library(
+    name = "command_buffer_validation",
+    srcs = ["command_buffer_validation.cc"],
+    hdrs = ["command_buffer_validation.h"],
+    deps = [
+        ":hal",
+        "//iree/base:logging",
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Internal device management and driver registry
+#===------------------------------------------------------------------------===#
+# TODO(benvanik): port these to C and merge into main API.
+
+cc_library(
+    name = "device_manager",
+    srcs = ["device_manager.cc"],
+    hdrs = ["device_manager.h"],
+    deps = [
+        ":hal",
+        ":heap_buffer",
+        "//iree/base:status",
+        "//iree/base:time",
+        "//iree/base:tracing",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "driver_registry",
+    srcs = ["driver_registry.cc"],
+    hdrs = ["driver_registry.h"],
+    deps = [
+        ":hal",
+        "//iree/base:initializer",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Internal implementation details
+#===------------------------------------------------------------------------===#
 
 cc_library(
     name = "heap_buffer",
