@@ -82,7 +82,8 @@ function(iree_cc_test)
   )
   target_include_directories(${_NAME} SYSTEM
     PUBLIC
-      ${IREE_COMMON_INCLUDE_DIRS}
+      "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+      "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
   )
   target_compile_definitions(${_NAME}
     PUBLIC

@@ -49,6 +49,7 @@ iree_cc_library(
     "SPIRVToMSL.cpp"
   DEPS
     LLVMSupport
+    MLIRSupport
     spirv-cross-msl
   PUBLIC
 )

@@ -336,11 +336,11 @@ if(${IREE_ENABLE_MLIR})
     message(STATUS "Adding bundled LLVM source dependency")
     add_iree_mlir_src_dep("third_party/llvm-project")
 
-    # Extend module path to allow submodules to use LLVM and MLIR CMake modules
+    # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
 
-    # Set include directories
+    # Add the bundled include directories for cmake files looking for them.
     list(APPEND LLVM_INCLUDE_DIRS
       ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
       ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
@@ -348,6 +348,17 @@ if(${IREE_ENABLE_MLIR})
     list(APPEND MLIR_INCLUDE_DIRS
       ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
       ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+    )
+
+    # Avoid globally modifying paths by instead adding the include paths to the
+    # rules that really should have them in the first place.
+    target_include_directories(LLVMSupport PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+    )
+    target_include_directories(MLIRSupport PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
     )
 
     # Set build option to use MHLO alongside with bundled MLIR
