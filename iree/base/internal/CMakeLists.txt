@@ -88,6 +88,7 @@ iree_cc_library(
     ::ostringstream
     absl::core_headers
     absl::strings
+    absl::utility
     iree::base::api
     iree::base::logging
     iree::base::target_platform
