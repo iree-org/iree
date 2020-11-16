@@ -18,16 +18,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "Tools",
+filegroup(
+    name = "GenSrcs",
     srcs = [
         "StructAttrGen.cpp",
     ],
-    deps = [
-        "@llvm-project//llvm:Support",
-        "@llvm-project//llvm:TableGen",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TableGen",
-    ],
-    alwayslink = 1,
 )

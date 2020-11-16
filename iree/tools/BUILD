@@ -264,10 +264,14 @@ cc_binary(
 
 cc_binary(
     name = "iree-tblgen",
+    srcs = [
+        "//iree/compiler/Dialect/IREE/Tools:GenSrcs",
+        "//iree/compiler/Dialect/VM/Tools:GenSrcs",
+    ],
     tags = ["hostonly"],
     deps = [
-        "//iree/compiler/Dialect/IREE/Tools",
-        "//iree/compiler/Dialect/VM/Tools",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
