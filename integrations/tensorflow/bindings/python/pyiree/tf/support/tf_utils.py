@@ -755,11 +755,22 @@ def tf_module_to_tflite_module_bytes(
   """
   tflite_modules = []
   methods, method_names = _get_concrete_functions(module_class, exported_names)
+  failed_methods = []
   for method, method_name in zip(methods, method_names):
     logging.info("Attempting to convert '%s' to tflite...", method_name)
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
-    logging.info("...converted '%s' to tflite.", method_name)
-    tflite_modules.append(converter.convert())
+    try:
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
+      logging.info("...converted '%s' to tflite.", method_name)
+      tflite_modules.append(converter.convert())
+    except Exception as e:
+      logging.error("Failed to convert '%s' to tflite.", method_name)
+      logging.error("TFLite excpetion: %s", e)
+      failed.append(failed_methods)
+
+  if failed_methods:
+    raise RuntimeError(
+        f"Failed to convert the following methods to tflite: {failed_methods}")
+
   return dict(zip(method_names, tflite_modules))
 
 
