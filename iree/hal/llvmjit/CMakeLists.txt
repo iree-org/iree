@@ -20,33 +20,38 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    llvmjit_device
+    llvmjit
   HDRS
     "llvmjit_device.h"
+    "llvmjit_driver.h"
+    "llvmjit_executable.h"
+    "llvmjit_executable_cache.h"
   SRCS
     "llvmjit_device.cc"
+    "llvmjit_driver.cc"
+    "llvmjit_executable.cc"
+    "llvmjit_executable_cache.cc"
   DEPS
-    ::llvmjit_executable_cache
+    LLVMAsmParser
+    LLVMCore
+    LLVMExecutionEngine
+    LLVMOrcJIT
+    LLVMSupport
+    absl::span
     iree::base::flatcc
     iree::base::status
     iree::base::tracing
-    iree::hal::host::host_local_device
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_driver
-  HDRS
-    "llvmjit_driver.h"
-  SRCS
-    "llvmjit_driver.cc"
-  DEPS
-    ::llvmjit_device
-    LLVMExecutionEngine
+    iree::hal::buffer
     iree::hal::device_info
     iree::hal::driver
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+    iree::hal::executable_spec
+    iree::hal::host::host_executable
+    iree::hal::host::host_local_device
     iree::hal::host::serial::serial_scheduling_model
+    iree::schemas::llvmir_executable_def_c_fbs
   PUBLIC
 )
 
@@ -56,52 +61,12 @@ iree_cc_library(
   SRCS
     "llvmjit_driver_module.cc"
   DEPS
-    ::llvmjit_driver
+    ::llvmjit
     LLVMSupport
     LLVMX86CodeGen
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
   ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_executable
-  HDRS
-    "llvmjit_executable.h"
-  SRCS
-    "llvmjit_executable.cc"
-  DEPS
-    LLVMAsmParser
-    LLVMCore
-    LLVMOrcJIT
-    LLVMSupport
-    absl::span
-    iree::base::status
-    iree::base::tracing
-    iree::hal::buffer
-    iree::hal::executable
-    iree::hal::executable_spec
-    iree::hal::host::host_executable
-    iree::schemas::llvmir_executable_def_c_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_executable_cache
-  HDRS
-    "llvmjit_executable_cache.h"
-  SRCS
-    "llvmjit_executable_cache.cc"
-  DEPS
-    ::llvmjit_executable
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
   PUBLIC
 )
