@@ -718,7 +718,7 @@ def _get_concrete_functions(module_class: Type[tf.Module],
   functions = []
   for name in exported_names:
     functions.append(getattr(instance, name).get_concrete_function())
-  return functions, exported_names
+  return functions, exported_names, instance
 
 
 def tf_module_to_tflite_module_bytes(
@@ -736,10 +736,14 @@ def tf_module_to_tflite_module_bytes(
     A dict mapping method names to compiled TFLite module bytes.
   """
   tflite_modules = []
-  methods, method_names = _get_concrete_functions(module_class, exported_names)
+  methods, method_names, instance = _get_concrete_functions(
+      module_class, exported_names)
   for method in methods:
     converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
     tflite_modules.append(converter.convert())
+  # Keep variables alive until TFLite has done the conversion; ConcreteFunctions
+  # themselves only keep weak references to variables.
+  del instance
   return dict(zip(method_names, tflite_modules))
 
 
