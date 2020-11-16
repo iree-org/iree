@@ -147,7 +147,6 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
-    absl::variant
     iree::base::bitfield
     iree::base::logging
     iree::base::ref_ptr
