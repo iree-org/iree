@@ -206,6 +206,7 @@ TFLITE_FAILING = [
     "betainc",
     "bincount",
     "confusion_matrix",
+    "conj",
     "cosh",
     "cumprod",
     "cumulative_logsumexp",

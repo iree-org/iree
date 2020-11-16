@@ -13,31 +13,17 @@ FLAGS = flags.FLAGS
 
 
 class Config:
-  """Specifies a set of unittests.
-
-  If dtypes is not specified, then only one unittest will be created. If
-  dtypes is specified then the other settings will be duplicated across it.
-  """
+  """Specifies a unittests."""
 
   def __init__(self,
                signature: Sequence[tf.TensorSpec],
                args: Sequence[Any] = None,
                kwargs: Dict[str, Any] = None,
-               generator: tf_utils.InputGeneratorType = None,
-               dtypes: Sequence[tf.DType] = None):
+               generator: tf_utils.InputGeneratorType = None):
     self.signature = signature
     self.args = args
     self.kwargs = kwargs if kwargs is not None else dict()
     self.generator = generator
-    self.dtypes = dtypes
-
-  def iterate_dtypes(self):
-    for dtype in self.dtypes:
-      if not isinstance(dtype, tf.DType):
-        raise TypeError(f"All dtypes must be tf.DTypes, but got '{dtype}'.")
-      signature = tf_utils.apply_function(
-          self.signature, lambda spec: tf.TensorSpec(spec.shape, dtype))
-      yield dtype.name, signature
 
 
 class ArgsConfig(Config):
@@ -50,6 +36,29 @@ class ArgsConfig(Config):
     signature = tf_utils.apply_function(
         args, lambda x: tf.TensorSpec.from_tensor(tf.convert_to_tensor(x)))
     super().__init__(signature, args, kwargs, generator)
+
+
+class DtypeConfig(Config):
+  """Specifies a unittest for each dtype in dtypes."""
+
+  def __init__(self,
+               signature: Sequence[tf.TensorSpec],
+               args: Sequence[Any] = None,
+               kwargs: Dict[str, Any] = None,
+               generator: tf_utils.InputGeneratorType = None,
+               dtypes: Sequence[tf.DType] = None):
+    super().__init__(signature, args, kwargs, generator)
+    for dtype in dtypes:
+      if not isinstance(dtype, tf.DType):
+        raise TypeError(f"All dtypes must be tf.DTypes, but got '{dtype}'.")
+    self.dtypes = dtypes
+
+  def __iter__(self):
+    for dtype in self.dtypes:
+      signature = tf_utils.apply_function(
+          self.signature, lambda spec: tf.TensorSpec(spec.shape, dtype))
+      dtype_config = Config(signature, self.args, self.kwargs, self.generator)
+      yield dtype.name, dtype_config
 
 
 # As high as tf goes without breaking.
@@ -102,33 +111,33 @@ UNSORTED_SEGMENT_CONFIG = ArgsConfig(args=[
 # with a default exported_name matching the name of the tf.math function.
 FUNCTION_TO_CONFIGS = {
     "abs":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "accumulate_n":
-        Config(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
     "acos":
         Config(signature=UNARY_FLOAT),
     "acosh":
         Config(signature=UNARY_FLOAT, generator=tf_utils.ndarange),
     "add":
-        Config(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
     "add_n":
-        Config(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
     "angle":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "argmax":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "argmin":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "asin":
         Config(signature=UNARY_FLOAT),
     "asinh":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "atan":
         Config(signature=UNARY_FLOAT),
     "atan2":
         Config(signature=BINARY_FLOAT),
     "atanh":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "bessel_i0":
         Config(signature=UNARY_FLOAT),
     "bessel_i0e":
@@ -147,29 +156,29 @@ FUNCTION_TO_CONFIGS = {
         ArgsConfig(args=[tf.constant([1, 2, 4]),
                          tf.constant([2, 2, 4])]),
     "conj":
-        Config(signature=UNARY_COMPLEX, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY_COMPLEX, dtypes=ALL_NUMBER_TYPES),
     "cos":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "cosh":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "count_nonzero":
-        Config(signature=UNARY,
-               generator=tf_utils.ndarange,
-               dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY,
+                    generator=tf_utils.ndarange,
+                    dtypes=ALL_NUMBER_TYPES),
     "cumprod":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "cumsum":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "cumulative_logsumexp":
         Config(signature=UNARY_FLOAT),
     "digamma":
         Config(signature=UNARY_FLOAT),
     "divide":
-        Config(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
     "divide_no_nan":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "equal":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "erf":
         Config(signature=UNARY_FLOAT),
     "erfc":
@@ -177,9 +186,9 @@ FUNCTION_TO_CONFIGS = {
     "erfinv":
         Config(signature=UNARY_FLOAT),
     "exp":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "expm1":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "floor":
         Config(signature=UNARY_FLOAT),
     "floordiv":
@@ -187,15 +196,15 @@ FUNCTION_TO_CONFIGS = {
     "floormod":
         Config(signature=BINARY),
     "greater":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "greater_equal":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "igamma":
         Config(signature=BINARY),
     "igammac":
         Config(signature=BINARY),
     "imag":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "in_top_k":
         Config(signature=[tf.TensorSpec([8], tf.int32),
                           tf.TensorSpec([8, 3])],
@@ -211,23 +220,23 @@ FUNCTION_TO_CONFIGS = {
     "is_nan":
         ArgsConfig(args=[tf.constant([[1., np.nan], [np.inf, 2.]])]),
     "is_non_decreasing":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "is_strictly_increasing":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "l2_normalize":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "lbeta":
         Config(signature=UNARY_FLOAT),
     "less":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "less_equal":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "lgamma":
         Config(signature=UNARY_FLOAT),
     "log":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "log1p":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "log_sigmoid":
         Config(signature=UNARY_FLOAT),
     "log_softmax":
@@ -241,25 +250,25 @@ FUNCTION_TO_CONFIGS = {
     "logical_xor":
         Config(signature=BINARY_BOOL),
     "maximum":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "minimum":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "mod":
-        Config(signature=BINARY,
-               generator=lambda *args: tf_utils.ndarange(*args) + 1,
-               dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY,
+                    generator=lambda *args: tf_utils.ndarange(*args) + 1,
+                    dtypes=REAL_NUMBER_TYPES),
     "multiply":
-        Config(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
     "multiply_no_nan":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "ndtri":
         Config(signature=UNARY_FLOAT),
     "negative":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "nextafter":
         Config(signature=BINARY),
     "not_equal":
-        Config(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
     "polygamma":
         ArgsConfig(args=[tf.ones(16), tf.linspace(0.5, 4, 16)]),
     "polyval":
@@ -271,39 +280,39 @@ FUNCTION_TO_CONFIGS = {
         "complex64": Config(signature=BINARY_COMPLEX),
     },
     "real":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "reciprocal":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "reciprocal_no_nan":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "reduce_all":
         Config(signature=UNARY_BOOL),
     "reduce_any":
         Config(signature=UNARY_BOOL),
     "reduce_euclidean_norm":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "reduce_logsumexp":
         Config(signature=UNARY_FLOAT),
     "reduce_max":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "reduce_mean":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "reduce_min":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "reduce_prod":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "reduce_std":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "reduce_sum":
-        Config(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
     "reduce_variance":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "rint":
         Config(signature=UNARY_FLOAT),
     "round":
         Config(signature=UNARY_FLOAT),
     "rsqrt":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "scalar_mul":
         Config(
             signature=[tf.TensorSpec([]), tf.TensorSpec([8])]),
@@ -318,13 +327,13 @@ FUNCTION_TO_CONFIGS = {
     "segment_sum":
         SEGMENT_CONFIG,
     "sigmoid":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "sign":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "sin":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "sinh":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "sobol_sample":
         ArgsConfig(args=[4, 3]),
     "softmax":
@@ -334,21 +343,21 @@ FUNCTION_TO_CONFIGS = {
     "softsign":
         Config(signature=UNARY_FLOAT),
     "sqrt":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "square":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "squared_difference":
-        Config(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
     "subtract":
-        Config(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
     "tan":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "tanh":
-        Config(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
     "top_k":
         Config(signature=UNARY_FLOAT, kwargs=dict(k=2)),
     "truediv":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "unsorted_segment_max":
         UNSORTED_SEGMENT_CONFIG,
     "unsorted_segment_mean":
@@ -362,13 +371,13 @@ FUNCTION_TO_CONFIGS = {
     "unsorted_segment_sum":
         UNSORTED_SEGMENT_CONFIG,
     "xdivy":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "xlog1py":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "xlogy":
-        Config(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
     "zero_fraction":
-        Config(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
     "zeta":
         Config(
             signature=BINARY_FLOAT,
@@ -463,17 +472,11 @@ def _make_dims_dynamic(spec: tf.TensorSpec) -> tf.TensorSpec:
   return tf.TensorSpec([None] * len(spec.shape), spec.dtype)
 
 
-def create_function_unittest(
-    function_name: str,
-    config: Config,
-    exported_name: str,
-    override_signature: Sequence[tf.TensorSpec] = None) -> tf.function:
+def create_function_unittest(function_name: str, config: Config,
+                             exported_name: str) -> tf.function:
   """Creates a tf_function_unittest from the provided Config."""
-  signature = config.signature
-  if override_signature is not None:
-    signature = override_signature
-
   function = getattr(tf.math, function_name)
+  signature = config.signature
   if is_complex(signature):
     function, signature = setup_complex_signature(function, signature)
   wrapped_function = lambda *args: function(*args, **config.kwargs)
@@ -495,13 +498,13 @@ class TfMathModule(tf_test_utils.TestModule):
     for function_name in FLAGS.functions:
       for config_name, config in FUNCTION_TO_CONFIGS[function_name].items():
         # Create a unittest for each dtype specified by 'config'.
-        if config.dtypes is not None:
-          for dtype_name, signature in config.iterate_dtypes():
-            if is_complex(signature) and not FLAGS.test_complex:
+        if isinstance(config, DtypeConfig):
+          for dtype_name, dtype_config in config:
+            if is_complex(dtype_config.signature) and not FLAGS.test_complex:
               continue
             exported_name = f"{config_name}_{dtype_name}"
             function_unittest = create_function_unittest(
-                function_name, config, exported_name, signature)
+                function_name, config, exported_name)
             setattr(self, exported_name, function_unittest)
         # Create a unittest for 'config'.
         else:
