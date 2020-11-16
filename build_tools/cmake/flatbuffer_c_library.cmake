@@ -21,10 +21,6 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: name of target (see Note)
 # SRCS: List of source files for the library
-# DEPS: List of other libraries to be linked in to the binary targets
-# COPTS: List of private compile options
-# DEFINES: List of public defines
-# LINKOPTS: List of link options
 # FLATCC_ARGS: List of flattbuffers arguments. Default:
 #             "--common"
 #             "--reader"
@@ -39,32 +35,28 @@ include(CMakeParseArguments)
 #
 # flatbuffer_c_library(
 #   NAME
-#     base_schema
+#     some_def
 #   SRCS
-#     "a.fbs"
-# )
-# flatbuffer_c_library(
-#   NAME
-#     other_schemas
-#   SRCS
-#     "b.fbs"
-#   DEPS
-#     iree::schemas::base_schema
+#     "some_def.fbs"
+#   FLATCC_ARGS
+#     "--reader"
+#     "--builder"
+#     "--verifier"
+#     "--json"
 #   PUBLIC
 # )
-#
 # iree_cc_binary(
 #   NAME
 #     main_lib
 #   ...
 #   DEPS
-#     iree::schemas::other_schemas
+#     iree::schemas::some_def
 # )
 function(flatbuffer_c_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS;FLATCC_ARGS"
+    "SRCS;FLATCC_ARGS"
     ${ARGN}
   )
 
@@ -128,7 +120,6 @@ function(flatbuffer_c_library)
     ${_GEN_TARGET}
     DEPENDS
       ${_OUTS}
-      ${_RULE_DEPS}
   )
 
   add_library(${_NAME} INTERFACE)
@@ -142,11 +133,6 @@ function(flatbuffer_c_library)
     INTERFACE
       flatcc::runtime
       ${IREE_DEFAULT_LINKOPTS}
-      ${_RULE_LINKOPTS}
-  )
-  target_compile_definitions(${_NAME}
-    INTERFACE
-      ${_RULE_DEFINES}
   )
   target_compile_options(${_NAME}
     INTERFACE
