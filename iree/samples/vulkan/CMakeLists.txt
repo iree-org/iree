@@ -39,12 +39,6 @@ if(NOT TARGET iree::testing::vulkan::vulkan_gui_util)
   return()
 endif()
 
-if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-else()
-  set(_GUI_LINKOPTS "")
-endif()
-
 iree_cc_binary(
   NAME
     vulkan_inference_gui
@@ -60,5 +54,5 @@ iree_cc_binary(
     iree::vm::bytecode_module
     iree::vm::ref_cc
   LINKOPTS
-    "${_GUI_LINKOPTS}"
+    "${IREE_TARGET_GUI_LINKOPTS}"
 )

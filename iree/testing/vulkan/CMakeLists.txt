@@ -45,12 +45,6 @@ iree_cc_library(
     Vulkan::Vulkan
 )
 
-if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-else()
-  set(_GUI_LINKOPTS "")
-endif()
-
 iree_cc_binary(
   NAME
     iree-run-module-vulkan-gui
@@ -70,5 +64,5 @@ iree_cc_binary(
     iree::vm
     iree::vm::bytecode_module
   LINKOPTS
-    "${_GUI_LINKOPTS}"
+    "${IREE_TARGET_GUI_LINKOPTS}"
 )
