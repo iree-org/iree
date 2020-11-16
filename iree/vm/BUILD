@@ -36,6 +36,7 @@ cc_library(
     ],
 )
 
+# TODO(benvanik): make these srcs and only expose an api_cc.h.
 cc_library(
     name = "cc",
     hdrs = [
