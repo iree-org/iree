@@ -89,10 +89,6 @@ set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${IREE_SOURCE_DIR}
-  ${IREE_BINARY_DIR}
-)
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG
@@ -432,16 +428,6 @@ if(IREE_USE_LINKER)
   set(LLVM_USE_LINKER ${IREE_USE_LINKER} CACHE STRING "" FORCE)
 endif()
 
-# TODO: This should go in add_iree_mlir_src_dep at the top level.
-if(IREE_MLIR_DEP_MODE STREQUAL "BUNDLED")
-  list(APPEND IREE_COMMON_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-  )
-endif()
-
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
 # tools in LLVM.
@@ -456,11 +442,6 @@ if(IREE_ENABLE_EMITC)
   set(EMITC_ENABLE_HLO OFF)
   set(EMITC_INCLUDE_TESTS OFF)
 
-  # TODO(marbre): add these only where required, not globally.
-  # list(APPEND IREE_COMMON_INCLUDE_DIRS
-  #   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-emitc/include
-  #   ${CMAKE_CURRENT_BINARY_DIR}/third_party/mlir-emitc/include
-  # )
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
 endif()
 
