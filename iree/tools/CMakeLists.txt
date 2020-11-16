@@ -120,11 +120,14 @@ if(${IREE_ENABLE_MLIR})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/IREE/Tools/StructAttrGen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
+      LLVMSupport
+      LLVMTableGen
       MLIRSupport
       MLIRTableGen
-      iree::compiler::Dialect::IREE::Tools
-      iree::compiler::Dialect::VM::Tools
     HOSTONLY
   )
 endif()
