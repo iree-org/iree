@@ -266,6 +266,15 @@ enum {
 // The C-string |name| will be copied and does not need to be a literal.
 #define IREE_TRACE_SET_THREAD_NAME(name) iree_tracing_set_thread_name_impl(name)
 
+// Evalutes the expression code only if tracing is enabled.
+//
+// Example:
+//  struct {
+//    IREE_TRACE(uint32_t trace_only_value);
+//  } my_object;
+//  IREE_TRACE(my_object.trace_only_value = 5);
+#define IREE_TRACE(expr) expr
+
 // Begins a new zone with the parent function name.
 #define IREE_TRACE_ZONE_BEGIN(zone_id) \
   IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, NULL)
@@ -377,6 +386,7 @@ enum {
 #else
 #define IREE_TRACE_SET_APP_INFO(value, value_length)
 #define IREE_TRACE_SET_THREAD_NAME(name)
+#define IREE_TRACE(expr)
 #define IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)
 #define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)

@@ -870,6 +870,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
   return handle->WriteData(target_offset, source_buffer, data_length);
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_copy_data(
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t data_length) {
+  IREE_TRACE_SCOPE0("iree_hal_buffer_copy_data");
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  auto* handle = reinterpret_cast<Buffer*>(target_buffer);
+  return handle->CopyData(target_offset,
+                          reinterpret_cast<Buffer*>(source_buffer),
+                          source_offset, data_length);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
     iree_device_size_t byte_offset, iree_device_size_t byte_length,

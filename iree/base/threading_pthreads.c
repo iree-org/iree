@@ -31,6 +31,12 @@
 #include <time.h>
 #include <unistd.h>
 
+// Older glibc doesn't have a gettid wrapper:
+// https://stackoverflow.com/a/63494768
+#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
+#define gettid() syscall(SYS_gettid)
+#endif
+
 struct iree_thread_s {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
@@ -156,6 +162,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   if (params.priority_class != IREE_THREAD_PRIORITY_CLASS_NORMAL) {
     iree_thread_set_priority_class(thread, params.priority_class);
   }
+  if (params.initial_affinity.specified) {
+    iree_thread_request_affinity(thread, params.initial_affinity);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   *out_thread = thread;
@@ -267,6 +276,23 @@ void iree_thread_override_end(iree_thread_override_t* override) {
   if (!override) return;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_thread_override_remove_self(override);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_thread_request_affinity(iree_thread_t* thread,
+                                  iree_thread_affinity_t affinity) {
+  if (!affinity.specified) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // NOTE: Android uses Linux lightweight processes (LWP) for threads, so the
+  // pid is really the tid. This is *not* anything related to pthreads_self.
+  pid_t tid = gettid();
+
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(affinity.id, &cpu_set);
+  sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
+
   IREE_TRACE_ZONE_END(z0);
 }
 

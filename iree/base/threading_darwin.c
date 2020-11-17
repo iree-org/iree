@@ -123,6 +123,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
 
   thread->mach_port = pthread_mach_thread_np(thread->handle);
+  if (params.initial_affinity.specified) {
+    iree_thread_request_affinity(thread, params.initial_affinity);
+  }
 
   // Retain the thread for the thread itself; this way if the caller immediately
   // releases the iree_thread_t handle the thread won't explode.
@@ -191,6 +194,23 @@ void iree_thread_override_end(iree_thread_override_t* override) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   pthread_override_qos_class_end_np((pthread_override_t)override);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_thread_request_affinity(iree_thread_t* thread,
+                                  iree_thread_affinity_t affinity) {
+  if (!affinity.specified) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // See:
+  // https://gist.github.com/Coneko/4234842
+  // https://fergofrog.com/code/cbowser/xnu/osfmk/mach/thread_policy.h.html
+  // http://www.hybridkernel.com/2015/01/18/binding_threads_to_cores_osx.html
+  thread_affinity_policy_data_t policy_data = {affinity.id};
+  thread_policy_set(thread->mach_port, THREAD_AFFINITY_POLICY,
+                    (thread_policy_t)(&policy_data),
+                    THREAD_AFFINITY_POLICY_COUNT);
 
   IREE_TRACE_ZONE_END(z0);
 }

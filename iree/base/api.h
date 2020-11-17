@@ -175,9 +175,9 @@ extern "C" {
 
 // `restrict` keyword, not supported by some older compilers.
 // We define our own macro in case dependencies use `restrict` differently.
-#if defined _MSC_VER && _MSC_VER >= 1900
+#if defined(_MSC_VER) && _MSC_VER >= 1900
 #define IREE_RESTRICT __restrict
-#elif defined _MSC_VER
+#elif defined(_MSC_VER)
 #define IREE_RESTRICT
 #else
 #define IREE_RESTRICT restrict
@@ -627,6 +627,18 @@ typedef void* iree_status_t;
   IREE_CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)
 
+// Returns the canonical status code for the given errno value.
+// https://en.cppreference.com/w/cpp/error/errno_macros
+IREE_API_EXPORT iree_status_code_t
+iree_status_code_from_errno(int error_number);
+
+#if defined(_WIN32) || defined(_WIN64)
+// Returns the canonical status code for the given Win32 GetLastError code.
+// https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
+IREE_API_EXPORT iree_status_code_t
+iree_status_code_from_win32_error(uint32_t error);
+#endif  // _WIN32 || _WIN64
+
 // Returns a NUL-terminated string constant for the given status code, such as
 // IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
 // result as the exact text may change.
@@ -775,6 +787,12 @@ IREE_API_EXPORT iree_time_t iree_time_now();
 // IREE_DURATION_INFINITE to avoid extraneous time queries.
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
+
+// Converts an absolute deadline time to a relative timeout duration.
+// This handles the special cases of IREE_TIME_INFINITE_PAST and
+// IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
+IREE_API_EXPORT iree_duration_t
+iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
 
 //===----------------------------------------------------------------------===//
 // iree_allocator_t (std::allocator-like interface)
