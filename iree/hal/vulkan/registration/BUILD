@@ -35,7 +35,7 @@ cc_library(
         "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:api",

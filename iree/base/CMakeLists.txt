@@ -192,6 +192,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    flags
+  HDRS
+    "flags.h"
+  SRCS
+    "flags.cc"
+  DEPS
+    ::api
+    absl::flags_parse
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     flatcc
   HDRS
     "flatcc.h"
@@ -211,18 +224,6 @@ flatbuffer_c_library(
     "--builder"
     "--verifier"
     "--json"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init
-  HDRS
-    "init.h"
-  SRCS
-    "init.cc"
-  DEPS
-    absl::flags_parse
   PUBLIC
 )
 

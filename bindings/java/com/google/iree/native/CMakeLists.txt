@@ -27,7 +27,7 @@ iree_cc_library(
     "module_wrapper.h"
   DEPS
     iree::base::api
-    iree::base::init
+    iree::base::flags
     iree::base::logging
     iree::base::status
     iree::hal::api

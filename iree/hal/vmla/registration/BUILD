@@ -35,7 +35,7 @@ cc_library(
         "IREE_HAL_HAVE_VMLA_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:status",
         "//iree/hal:api",
         "//iree/hal:driver_registry",

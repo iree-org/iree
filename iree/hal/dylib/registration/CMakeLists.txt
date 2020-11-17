@@ -26,7 +26,7 @@ iree_cc_library(
   SRCS
     "driver_module.cc"
   DEPS
-    iree::base::init
+    iree::base::flags
     iree::base::status
     iree::hal::api
     iree::hal::driver_registry

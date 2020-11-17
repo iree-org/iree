@@ -25,7 +25,7 @@ iree_cc_library(
     "driver_module.cc"
   DEPS
     absl::flags
-    iree::base::init
+    iree::base::flags
     iree::base::status
     iree::base::tracing
     iree::hal::api

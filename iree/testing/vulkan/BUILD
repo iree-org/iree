@@ -53,7 +53,7 @@ cc_binary(
     ],
     deps = [
         ":vulkan_gui_util",
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:main",
         "//iree/base:status",
         "//iree/base:tracing",

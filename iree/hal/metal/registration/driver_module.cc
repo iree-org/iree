@@ -15,7 +15,7 @@
 #include "iree/hal/metal/registration/driver_module.h"
 
 #include "absl/flags/flag.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/hal/metal/metal_driver.h"

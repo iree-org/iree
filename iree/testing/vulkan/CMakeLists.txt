@@ -54,7 +54,7 @@ iree_cc_binary(
     ::vulkan_gui_util
     absl::flags
     iree::base::file_io
-    iree::base::init
+    iree::base::flags
     iree::base::main
     iree::base::status
     iree::base::tracing

@@ -193,6 +193,16 @@ cc_test(
 )
 
 cc_library(
+    name = "flags",
+    srcs = ["flags.cc"],
+    hdrs = ["flags.h"],
+    deps = [
+        ":api",
+        "@com_google_absl//absl/flags:parse",
+    ],
+)
+
+cc_library(
     name = "flatcc",
     hdrs = ["flatcc.h"],
     deps = [
@@ -209,15 +219,6 @@ iree_flatbuffer_c_library(
         "--builder",
         "--verifier",
         "--json",
-    ],
-)
-
-cc_library(
-    name = "init",
-    srcs = ["init.cc"],
-    hdrs = ["init.h"],
-    deps = [
-        "@com_google_absl//absl/flags:parse",
     ],
 )
 

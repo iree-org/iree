@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 
 extern "C" int main(int argc, char** argv) {
-  ::iree::InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
 
   return RUN_ALL_TESTS();
