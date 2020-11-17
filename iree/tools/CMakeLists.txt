@@ -68,7 +68,7 @@ iree_cc_binary(
     absl::flags_usage
     absl::strings
     benchmark
-    iree::base::init
+    iree::base::flags
     iree::base::file_io
     iree::base::status
     iree::base::tracing
@@ -104,7 +104,7 @@ iree_cc_binary(
     absl::flags
     absl::strings
     iree::base::file_io
-    iree::base::init
+    iree::base::flags
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -327,7 +327,7 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       absl::strings
       iree::base::api
-      iree::base::init
+      iree::base::flags
       iree::base::status
       iree::base::tracing
       iree::compiler::Dialect::Flow::Transforms

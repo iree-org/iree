@@ -44,7 +44,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -523,7 +523,7 @@ extern "C" int main(int argc, char** argv) {
   }
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
-  iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
+  iree_flags_parse_checked(&argc_absl, &argv_absl_ptr);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   auto status = RunFile(input_file_flag, registry);

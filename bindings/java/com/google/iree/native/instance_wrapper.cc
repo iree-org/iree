@@ -16,7 +16,7 @@
 
 #include <mutex>
 
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
@@ -28,12 +28,13 @@ namespace java {
 namespace {
 
 void SetupVm() {
-  // TODO(jennik): Pass flags through from java.
+  // TODO(jennik): Pass flags through from java and us iree_flags_parse.
+  // This checked version will abort()/exit() and that's... not great.
   char binname[] = "libiree.so";
   char* argv[] = {binname};
   char** aargv = argv;
   int argc = 1;
-  InitializeEnvironment(&argc, &aargv);
+  iree_flags_parse_checked(&argc, &aargv);
 
   IREE_CHECK_OK(iree_hal_register_all_available_drivers());
   IREE_CHECK_OK(iree_vm_register_builtin_types());

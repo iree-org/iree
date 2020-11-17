@@ -46,12 +46,10 @@ cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         ":native_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:file_io",
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/drivers",

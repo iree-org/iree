@@ -53,7 +53,7 @@ iree_cc_binary(
     iree::base::api
     iree::base::core_headers
     iree::base::file_io
-    iree::base::init
+    iree::base::flags
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
