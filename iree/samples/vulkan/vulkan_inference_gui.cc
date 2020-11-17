@@ -176,9 +176,6 @@ int iree::IreeMain(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Setup IREE.
-  // This call to |iree_api_init| is not technically required, but it is
-  // included for completeness.
-  IREE_CHECK_OK(iree_api_init(&argc, &argv));
 
   // Check API version.
   iree_api_version_t actual_version;

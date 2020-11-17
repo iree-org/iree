@@ -949,11 +949,6 @@ iree_api_version_check(iree_api_version_t expected_version,
                                 expected_version, actual_version);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
-                                                          char*** argv) {
-  return iree_ok_status();
-}
-
 //===----------------------------------------------------------------------===//
 // iree_time_t and iree_duration_t
 //===----------------------------------------------------------------------===//
