@@ -69,38 +69,97 @@ python3 build_tools/docker/manage_images.py --images all --tag latest --update_r
 This requires that the tagged image have a repository digest, which means it was
 pushed to or pulled from GCR.
 
-## Deploying New Images
+## Adding or Updating an Image
 
-1.  Modify the Dockerfiles as desired.
-2.  Update `manage_images.py` to include the new image and its dependencies.
-3.  Build and push the new image to GCR and update references to it:
+If you have worked with the `docker` images before, it is prudent to follow the
+steps in the "Debugging" section below before continuing.
 
-    ```shell
-    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --build --push --update_references
+### Part 1. Local Changes
+
+1. Update the `Dockerfile` for the image that you want to modify or add. If
+   you're adding a new image, or updating the dependencies between images, be
+   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well.
+2. Build the image, push the image to GCR and update all references to the image
+   with the new GCR digest:
+
+   ```shell
+    python3 build_tools/docker/manage_images.py \
+      --image "${IMAGE?}" --build \
+      --tag latest \
+      --push \
+      --update_references
     ```
 
-4.  Commit changes and send a PR for review.
+3. Test that the changes behave as expected locally and iterate on the steps
+   above.
 
-5.  Merge your PR after is approved and all builds pass.
+### Part 2. Submitting to GitHub
 
-6.  Kokoro builds preload images tagged with `prod` on VM creation, so after
-    changing the images used, you should also update the images tagged as `prod`
-    in GCR. Update your local reference to the `prod` tag to point at the new
-    image:
+4. Commit the changes and send a PR for review. The CI will use the updated
+   digest references to test the new images.
 
-    ```shell
-    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --build --update_references
+5. Merge your PR after is approved and all CI tests pass. **Please remember to
+   complete the rest of the steps below**.
+
+### Part 3. Updating the `:prod` tag
+
+Kokoro builds preload images tagged with `prod` on VM creation, so after
+changing the images used, you should also update the images tagged as `prod`
+in GCR. This also makes development significantly easier for others who need to
+modify the `docker` images.
+
+6. On the `main` branch, build (but don't push) the images and locally tag them
+   with the `:prod` tag:
+
+   ```shell
+    python3 build_tools/docker/manage_images.py \
+      --image "${IMAGE?}" --build \
+      --tag prod \
+      --update_references
     ```
 
-    The build steps here should all be cache hits and no references should
-    actually be changed. If they are, that indicates the images you've just
-    built are different from the ones that are being referenced. Stop and fix
-    this before proceeding. This relies on you keeping your local copy of the
-    Docker images. If you didn't, you'll have to manually pull the missing
-    images by their digest.
+    This build should be entirely cache hits.
+7. We include `--update_references` in the command above so that we can check
+   that none of the images or references to them have been changed. Check that
+   the following command produces no output before continuing:
 
-7.  Push the new images with the `prod` tag to GCR.
+   ```shell
+   git status --porcelain
+   ```
+
+   If the output is not empty then you'll need to find the source of the
+   discrepancy (e.g. a locally modified `Dockerfile`) and remove it, and repeat
+   steps 5 and 6 before continuing. (This relies on you keeping your local copy
+   of the Docker images. If you didn't, you'll have to manually pull the missing
+   images by their digest).
+8. Now that we've confirmed that none of the images were changed, we can push
+   them to GCR with the `:prod` tag.
 
     ```shell
-    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --push
+    python3 build_tools/docker/manage_images.py \
+      --image "${IMAGE?}" \
+      --tag prod \
+      --push
     ```
+
+## Debugging
+
+Sometimes old versions of the `:latest` images can be stored locally and produce
+unexpected behaviors. The following commands will download all of the prod
+images and then update the images tagged with `:latest` on your machine (and on
+GCR).
+
+```shell
+# Pull all :prod images
+python3 build_tools/docker/manage_images.py --images all --pull --tag prod
+# Update the :latest images to match the :prod images.
+# If you have a clean workspace this _shouldn't_ require building anything as
+# everything should be cache hits from the :prod images downloaded above, but if
+# the :prod images are behind then that will not be the case and this may take
+# several hours (depending on your machine).
+python3 build_tools/docker/manage_images.py \
+  --images all --build \
+  --tag latest \
+  --push \
+  --update_references
+```
