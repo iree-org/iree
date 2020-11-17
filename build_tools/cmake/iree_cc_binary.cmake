@@ -14,10 +14,6 @@
 
 include(CMakeParseArguments)
 
-if(NOT DEFINED _IREE_CC_BINARY_NAMES)
-  set(_IREE_CC_BINARY_NAMES "")
-endif()
-
 # iree_cc_binary()
 #
 # CMake function to imitate Bazel's cc_binary rule.
@@ -129,12 +125,16 @@ function(iree_cc_binary)
       ${IREE_DEFAULT_LINKOPTS}
       ${_RULE_LINKOPTS}
   )
-  iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
+  # Replace dependencies passed by ::name with iree::package::name
   iree_package_ns(_PACKAGE_NS)
-  # Replace dependencies passed by ::name with ::iree::package::name
-  list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
+  target_link_libraries(${_NAME}
+    PUBLIC
+      ${_RULE_DEPS}
+  )
+  iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/binaries)
@@ -142,25 +142,8 @@ function(iree_cc_binary)
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-  # Defer computing transitive dependencies and calling target_link_libraries()
-  # until all libraries have been declared.
-  # Track target and deps, use in iree_complete_binary_link_options() later.
-  set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
-  set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
-
   install(TARGETS ${_NAME}
           RENAME ${_RULE_NAME}
           COMPONENT ${_RULE_NAME}
           RUNTIME DESTINATION bin)
-endfunction()
-
-# Sets target_link_libraries() on all registered binaries.
-# This must be called after all libraries have been declared.
-function(iree_complete_binary_link_options)
-  get_property(_NAMES GLOBAL PROPERTY _IREE_CC_BINARY_NAMES)
-
-  foreach(_NAME ${_NAMES})
-    get_target_property(_DIRECT_DEPS ${_NAME} DIRECT_DEPS)
-    iree_whole_archive_link(${_NAME} ${_DIRECT_DEPS})
-  endforeach(_NAME)
 endfunction()

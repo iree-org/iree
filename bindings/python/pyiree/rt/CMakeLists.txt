@@ -35,8 +35,6 @@ iree_pyext_library(
     iree::modules::tensorlist::native_module
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::invocation
-    iree::vm::ref
     absl::inlined_vector
     absl::memory
     absl::strings
