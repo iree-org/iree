@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -200,10 +201,9 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   // that substituting library calls is easier.
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
-      // TODO(b/144530470): replace with tablegen attributes/interfaces.
-      if (isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp,
-              mhlo::DotOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-              mhlo::TorchIndexSelectOp>(op)) {
+      // A root only op is mergable.
+      if (OpDispatchPolicy::isUnsupportedFusionOp(&op) &&
+          !OpDispatchPolicy::canOnlyBeRootOp(&op)) {
         return false;
       }
     }
@@ -220,12 +220,9 @@ bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
   for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
     for (int lhsResultIdx = 0; lhsResultIdx < lhs.getNumResults();
          ++lhsResultIdx) {
-      if (rhsArgs[rhsOpIdx] == lhs.getResult(lhsResultIdx)) {
-        for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
-          if (isa<mhlo::SliceOp>(user)) {
-            return true;
-          }
-        }
+      if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
+      for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
+        if (OpDispatchPolicy::canOnlyBeRootOp(user)) return true;
       }
     }
   }

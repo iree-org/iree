@@ -20,6 +20,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+
 // Queries dispatch options for an operation.
 // This is presently mostly a hard-coded set of heuristics but should expand
 // to be based on both queries of new op interfaces and a cost model.
@@ -40,6 +41,12 @@ class OpDispatchPolicy {
 
   OpDispatchPolicy(Dispatchability &dispatchability)
       : dispatchability(dispatchability) {}
+
+  // Returns true if |op| is not able to fuse with either producer or consumer.
+  static bool isUnsupportedFusionOp(Operation *op);
+
+  // Returns true if |op| can only be a root op.
+  static bool canOnlyBeRootOp(Operation *op);
 
   // Returns true if the given |op| can be dispatched in all cases.
   // Other passes may handle special cases of these ops but this initial
