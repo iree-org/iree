@@ -19,15 +19,25 @@ iree_cc_library(
     Common
   HDRS
     "Attributes.h"
+    "LaunchConfig.h"
     "Passes.h"
+    "Transforms.h"
   SRCS
     "DeclareNumWorkgroupsFnPass.cpp"
+    "LaunchConfig.cpp"
     "LegalizeNumWorkgroupsFnPass.cpp"
     "VectorTransferOptimization.cpp"
+    "Transforms.cpp"
   DEPS
+    LLVMSupport
+    MLIRGPU
     MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
+    MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRStandard
     MLIRTransforms
     MLIRVector
