@@ -63,18 +63,3 @@ iree_cc_library(
     "-framework Metal"
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    metal_driver_module
-  SRCS
-    "metal_driver_module.cc"
-  DEPS
-    ::metal
-    absl::flags
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)

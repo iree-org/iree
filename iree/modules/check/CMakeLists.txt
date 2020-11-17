@@ -29,7 +29,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       iree::base::logging
       iree::base::status
       iree::hal::api
-      iree::hal::vmla::vmla_driver_module
+      iree::hal::vmla::registration
       iree::modules::hal
       iree::testing::gtest
       iree::testing::gtest_main
@@ -56,11 +56,11 @@ iree_cc_binary(
     iree::base::init
     iree::base::status
     iree::base::tracing
+    iree::hal::drivers
     iree::modules::hal
     iree::testing::gtest
     iree::tools::utils::vm_util
     iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 

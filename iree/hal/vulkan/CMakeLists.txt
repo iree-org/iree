@@ -168,20 +168,3 @@ iree_cc_library(
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    vulkan_driver_module
-  SRCS
-    "vulkan_driver_module.cc"
-  DEPS
-    ::utils
-    ::vulkan
-    absl::flags
-    iree::base::init
-    iree::base::status
-    iree::base::tracing
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)

@@ -23,6 +23,7 @@
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -174,6 +175,7 @@ StatusOr<int> Run(std::string module_file_path) {
 
 extern "C" int main(int argc, char** argv) {
   InitializeEnvironment(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
   ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
 

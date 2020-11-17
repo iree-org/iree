@@ -23,6 +23,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -189,7 +190,8 @@ int iree::IreeMain(int argc, char** argv) {
     IREE_LOG(FATAL) << "Unsupported runtime API version " << actual_version;
   }
 
-  // Register HAL module types.
+  // Register HAL drivers and VM module types.
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
   IREE_CHECK_OK(iree_hal_module_register_types());
 
   // Create a runtime Instance.

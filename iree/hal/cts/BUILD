@@ -31,13 +31,8 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/hal:driver_registry",
+        "//iree/hal/drivers",
         "//iree/testing:gtest",
-
-        # HAL driver modules.
-        "//iree/hal/dylib:dylib_driver_module",  # build-cleaner: keep
-        "//iree/hal/llvmjit:llvmjit_driver_module",  # build-cleaner: keep
-        "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
-        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
     ],
 )
 

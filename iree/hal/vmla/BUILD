@@ -117,15 +117,3 @@ cc_library(
         "@com_google_absl//absl/types:span",
     ],
 )
-
-cc_library(
-    name = "vmla_driver_module",
-    srcs = ["vmla_driver_module.cc"],
-    deps = [
-        ":vmla",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-    ],
-    alwayslink = 1,
-)

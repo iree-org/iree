@@ -56,10 +56,8 @@ iree_pyext_module(
     ::PyExtRtLib
     bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    iree::hal::vulkan::vulkan_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
     iree::base::initializer
+    iree::hal::drivers
 )
 
 iree_py_library(

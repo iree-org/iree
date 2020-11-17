@@ -47,6 +47,7 @@ iree_cc_binary(
   DEPS
     absl::base
     iree::base::main
+    iree::hal::vulkan::registration
     iree::modules::hal
     iree::samples::vulkan::simple_mul_bytecode_module_cc
     iree::testing::vulkan::vulkan_gui_util

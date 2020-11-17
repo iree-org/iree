@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include "iree/hal/llvmjit/registration/driver_module.h"
 
 #include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
-#include "iree/hal/vmla/vmla_driver.h"
+#include "iree/hal/llvmjit/llvmjit_driver.h"
+#include "llvm/Support/TargetSelect.h"
 
 namespace iree {
 namespace hal {
-namespace vmla {
-namespace {
+namespace llvmjit {
 
-StatusOr<ref_ptr<Driver>> CreateVMLADriver() { return VMLADriver::Create(); }
+static StatusOr<ref_ptr<Driver>> CreateLLVMJITDriver() {
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  return make_ref<LLVMJITDriver>();
+}
 
-}  // namespace
-}  // namespace vmla
+}  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree
 
-IREE_REGISTER_MODULE_INITIALIZER(iree_hal_vmla_driver, {
-  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
-      "vmla", ::iree::hal::vmla::CreateVMLADriver));
-});
-IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_vmla_driver);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_llvmjit_driver_module_register() {
+  return ::iree::hal::DriverRegistry::shared_registry()->Register(
+      "llvm", ::iree::hal::llvmjit::CreateLLVMJITDriver);
+}

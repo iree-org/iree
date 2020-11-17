@@ -15,8 +15,6 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
 
-load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -42,11 +40,17 @@ cc_binary(
         "//iree/base:file_io",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-    ] + IREE_DRIVER_MODULES,
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/flags:usage",
+        "@com_google_absl//absl/strings",
+        "@com_google_benchmark//:benchmark",
+    ],
 )
 
 cc_binary(
@@ -230,6 +234,7 @@ cc_binary(
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/hal:api",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
@@ -242,7 +247,7 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/compiler/Translation:IREEVM",
-    ] + IREE_DRIVER_MODULES,
+    ],
 )
 
 cc_binary(
@@ -255,11 +260,14 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-    ] + IREE_DRIVER_MODULES,
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 cc_binary(
