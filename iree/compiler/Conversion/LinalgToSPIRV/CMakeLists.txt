@@ -39,6 +39,7 @@ iree_cc_library(
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"
+    "FoldGPUProcessorIDUses.cpp"
     "KernelDispatchUtils.cpp"
     "LinalgTileAndFusePass.cpp"
     "MatMulVectorizationTest.cpp"

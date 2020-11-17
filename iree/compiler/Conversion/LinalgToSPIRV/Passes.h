@@ -24,6 +24,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Passes
+//===----------------------------------------------------------------------===//
+
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the
 /// tile-sizes are the reverse of the workgroup size. So workgroup size along
@@ -59,10 +63,14 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 /// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
 std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 
-/// Convert memref of scalar to memref of vector of efficent size. This will
+/// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
+
+//===----------------------------------------------------------------------===//
+// Passes
+//===----------------------------------------------------------------------===//
 
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
@@ -73,9 +81,19 @@ std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options);
 
-/// Populate patterns to tile and distribute linalg operations.
+//===----------------------------------------------------------------------===//
+// Patterns
+//===----------------------------------------------------------------------===//
+
+/// Populates patterns to tile and distribute linalg operations.
 void populateLinalgTileAndDistributePatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
+
+/// Populates patterns to fold processor ID uses by using processor counts
+/// information where possible.
+void populateFoldGPUProcessorIDUsesPatterns(MLIRContext *context,
+                                            OwningRewritePatternList &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
