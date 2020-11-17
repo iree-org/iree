@@ -76,7 +76,9 @@ steps in the "Debugging" section below before continuing.
 
 ### Part 1. Local Changes
 
-1. Update the `Dockerfile` for the image that you want to modify or add.
+1. Update the `Dockerfile` for the image that you want to modify or add. If
+   you're adding a new image, or updating the dependencies between images, be
+   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well.
 2. Build the image, push the image to GCR and update all references to the image
    with the new GCR digest:
 
