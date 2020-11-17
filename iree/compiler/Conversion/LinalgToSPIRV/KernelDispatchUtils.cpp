@@ -72,7 +72,8 @@ static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
                                        const SPIRVCodegenOptions &options,
                                        TileSizesListType &tileSizes,
                                        std::array<int64_t, 3> &workgroupSize,
-                                       std::array<int64_t, 3> &numSubgroups) {
+                                       std::array<int64_t, 3> &numSubgroups,
+                                       bool &vectorize) {
   return op.emitError("undefined launch config for tiled operation");
 }
 
@@ -83,7 +84,8 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                std::array<int64_t, 3> &numSubgroups,
+                                bool &vectorize) {
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -209,10 +211,28 @@ static LogicalResult getTargetSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
+  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
+  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  assert(lhsType.getElementType() == rhsType.getElementType());
+  // Pick ideal tile size based on the type.
+  SmallVector<int64_t, 4> ts;
+  if (lhsType.getElementType().isF16()) {
+    ts.append({16, 64, 8});
+  } else {
+    ts.append({8, 64, 4});
+  }
+
+  // Fall back to the none vectorize path for cases we don't handle.
+  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
+      lhsType.getDimSize(0) % ts[0] != 0 ||
+      rhsType.getDimSize(0) % ts[1] != 0 ||
+      lhsType.getDimSize(1) % ts[2] != 0) {
+    return failure();
+  }
+
   workgroupSize[0] = targetEnv.getResourceLimits().subgroup_size().getInt();
   workgroupSize[1] = 1;
   workgroupSize[2] = 1;
-  SmallVector<int64_t, 4> ts = {8, 64, 4};
   tileSizes.emplace_back(ts);
   // No tiling at the subgroup level since this target doesn't use subgroup op
   // or shared memory.
@@ -228,15 +248,18 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                std::array<int64_t, 3> &numSubgroups,
+                                bool &vectorize) {
   if (options.enableVectorization &&
       succeeded(getConfigForCooperativeMatmul(op, targetEnv, options, tileSizes,
                                               workgroupSize, numSubgroups))) {
+    vectorize = true;
     return success();
   } else if (options.enableVectorization &&
              succeeded(getTargetSpecificConfig(op, targetEnv, options,
                                                tileSizes, workgroupSize,
                                                numSubgroups))) {
+    vectorize = true;
     return success();
   }
 
@@ -267,7 +290,8 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                std::array<int64_t, 3> &numSubgroups,
+                                bool &vectorize) {
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -309,7 +333,7 @@ static LogicalResult getPoolingOpLaunchConfig(
       opName op, const spirv::TargetEnv &targetEnv,                     \
       const SPIRVCodegenOptions &options, TileSizesListType &tileSizes, \
       std::array<int64_t, 3> &workgroupSize,                            \
-      std::array<int64_t, 3> &numSubgroups) {                           \
+      std::array<int64_t, 3> &numSubgroups, bool &vectorize) {          \
     return getPoolingOpLaunchConfig(op, targetEnv, options, tileSizes,  \
                                     workgroupSize, numSubgroups);       \
   }
@@ -365,7 +389,7 @@ LogicalResult LaunchConfig::init(
     rootOperation = cast<linalg::LinalgOp>(linalgOp.getOperation());          \
     TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)];     \
     if (failed(getOpLaunchConfig(linalgOp, targetEnv, options, tileSizesInfo, \
-                                 workgroupSize, numSubgroups))) {             \
+                                 workgroupSize, numSubgroups, vectorize))) {  \
       return failure();                                                       \
     }                                                                         \
     continue;                                                                 \

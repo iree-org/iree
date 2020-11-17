@@ -110,6 +110,9 @@ class LaunchConfig {
     return !getTileSizes(op, level).empty();
   }
 
+  /// Use vectorize transformations.
+  bool useVectorize() const { return vectorize; }
+
  protected:
   /// Current tile size configuration per operation. They key used here to
   /// retrieve the tile size information per operation is the value of a StrAttr
@@ -124,6 +127,9 @@ class LaunchConfig {
 
   /// Number of subgroups that are logically distributed along x, y & z.
   std::array<int64_t, 3> numSubgroups;
+
+  /// Use vectorization.
+  bool vectorize = false;
 
  private:
   /// Retrieves the key to use to get the `tileSizes` for a given
