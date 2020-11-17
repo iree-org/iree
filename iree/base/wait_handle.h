@@ -32,7 +32,8 @@
 #endif  // IREE_PLATFORM_*
 
 // TODO(benvanik): see if we can get sync file on linux too:
-#if defined(IREE_PLATFORM_ANDROID)
+// TODO(scotttodd): fix include on Android (missing linkopts?)
+#if 0 && defined(IREE_PLATFORM_ANDROID)
 #define IREE_HAVE_WAIT_TYPE_SYNC_FILE 1
 #endif  // IREE_PLATFORM_ANDROID
 
