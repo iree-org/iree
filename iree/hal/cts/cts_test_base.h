@@ -20,6 +20,7 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -35,6 +36,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   // to work around issues with driver lifetimes (specifically SwiftShader for
   // Vulkan).
   static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+
     auto driver_or = DriverRegistry::shared_registry()->Create("vulkan");
     if (driver_or.ok()) {
       shared_drivers_["vulkan"] = std::move(driver_or.value());

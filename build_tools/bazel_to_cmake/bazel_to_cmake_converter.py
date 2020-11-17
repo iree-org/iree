@@ -37,11 +37,6 @@ class BuildFileFunctions(object):
 
   def __init__(self, converter):
     self.converter = converter
-    self.IREE_DRIVER_MODULES = [
-        "//iree/hal/vmla:vmla_driver_module",
-        "//iree/hal/vulkan:vulkan_driver_module",
-        "//iree/hal/llvmjit:llvmjit_driver_module",
-    ]
 
   # ------------------------------------------------------------------------- #
   # Conversion utilities, written to reduce boilerplate and allow for reuse   #
@@ -343,6 +338,7 @@ class BuildFileFunctions(object):
                  srcs=None,
                  data=None,
                  deps=None,
+                 defines=None,
                  alwayslink=False,
                  testonly=False,
                  linkopts=None,
@@ -355,7 +351,7 @@ class BuildFileFunctions(object):
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
-    alwayslink_block = self._convert_alwayslink_block(alwayslink)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
     testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += (f"iree_cc_library(\n"
@@ -365,6 +361,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{data_block}"
                             f"{deps_block}"
+                            f"{defines_block}"
                             f"{alwayslink_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")

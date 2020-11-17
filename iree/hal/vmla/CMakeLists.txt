@@ -107,17 +107,3 @@ iree_cc_library(
     iree::vm::bytecode_module
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    vmla_driver_module
-  SRCS
-    "vmla_driver_module.cc"
-  DEPS
-    ::vmla
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)

@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# HAL implementation for executing functions provided by dynamic libraries.
-
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
@@ -59,16 +57,4 @@ cc_library(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
     ],
-)
-
-cc_library(
-    name = "dylib_driver_module",
-    srcs = ["dylib_driver_module.cc"],
-    deps = [
-        ":dylib",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-    ],
-    alwayslink = 1,
 )

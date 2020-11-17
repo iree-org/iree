@@ -179,18 +179,3 @@ cc_library(
         "@com_google_absl//absl/types:span",
     ],
 )
-
-cc_library(
-    name = "vulkan_driver_module",
-    srcs = ["vulkan_driver_module.cc"],
-    deps = [
-        ":utils",
-        ":vulkan",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:driver_registry",
-        "@com_google_absl//absl/flags:flag",
-    ],
-    alwayslink = 1,
-)

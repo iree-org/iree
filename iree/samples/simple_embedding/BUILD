@@ -12,22 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-""",
 )
 
 iree_bytecode_module(
@@ -48,12 +38,12 @@ cc_test(
         # For AddressSanitizer when using Vulkan + a local Nvidia GPU
         "//iree/tools:sanitizer_suppressions.txt",
     ],
-    tags = ["driver=vulkan"],
     deps = [
         ":simple_embedding_test_bytecode_module_cc",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/hal:api",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -63,10 +53,5 @@ cc_test(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-
-        # These are the drivers we support running with and can produce
-        # executables for from the source MLIR.
-        "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
-        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
     ],
 )

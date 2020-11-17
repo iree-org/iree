@@ -21,6 +21,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -35,6 +36,7 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 

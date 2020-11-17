@@ -56,6 +56,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_targets.h"
@@ -523,6 +524,7 @@ extern "C" int main(int argc, char** argv) {
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
   iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {
