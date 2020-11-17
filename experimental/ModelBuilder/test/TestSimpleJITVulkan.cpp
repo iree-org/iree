@@ -33,7 +33,6 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Parser.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
-#include "iree/base/initializer.h"
 
 static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),

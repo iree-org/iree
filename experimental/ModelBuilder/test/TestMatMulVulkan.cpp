@@ -34,7 +34,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Parser.h"
-#include "iree/base/initializer.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Pass/PassManager.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"

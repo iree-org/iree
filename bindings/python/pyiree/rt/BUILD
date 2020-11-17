@@ -55,7 +55,6 @@ iree_py_extension(
     deps = [
         ":rt_library",
         "//bindings/python/pyiree/common",
-        "//iree/base:initializer",
         "//iree/hal/drivers",
     ],
 )
