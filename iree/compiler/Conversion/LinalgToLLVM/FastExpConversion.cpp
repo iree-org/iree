@@ -31,10 +31,13 @@ struct FastExpConversionPattern : public OpRewritePattern<LLVM::ExpOp> {
 
   LogicalResult matchAndRewrite(LLVM::ExpOp op,
                                 PatternRewriter &rewriter) const override {
-    constexpr float ln2Const = 0.69314718055994529;
-    constexpr float ln2InvConst = 1.4426950408889634;
-    constexpr float cVaues[5] = {0.05924867, 0.15514645, 0.50308552, 0.99968939,
-                                 1.0000072153251447};
+    constexpr float ln2Const = 0.693147181;
+    constexpr float ln2InvConst = 1.44269504;
+
+    // Least squares polynomial fit computed :
+    // cValues = np.polyfit(np.linspace(0, math.log(2), 10000), np.exp(x), 4)
+    constexpr float cValues[5] = {0.05924867, 0.15514645, 0.50308552,
+                                  0.99968939, 1.00000721531};
     auto loc = op.getLoc();
     Value x = op.getOperand();
 
@@ -55,7 +58,7 @@ struct FastExpConversionPattern : public OpRewritePattern<LLVM::ExpOp> {
     SmallVector<Value, 4> PConst(5);
     for (int i = 0; i < 5; ++i) {
       PConst[i] = rewriter.create<LLVM::ConstantOp>(
-          loc, floatType, rewriter.getF32FloatAttr(cVaues[i]));
+          loc, floatType, rewriter.getF32FloatAttr(cValues[i]));
     }
     // Evaluate exp(y) = sum(c[i] * y**i, i)
     Value expY = rewriter.create<LLVM::FMulOp>(loc, floatType, y, PConst[0]);
@@ -67,7 +70,8 @@ struct FastExpConversionPattern : public OpRewritePattern<LLVM::ExpOp> {
     expY = rewriter.create<LLVM::FMulOp>(loc, floatType, expY, y);
     expY = rewriter.create<LLVM::FAddOp>(loc, floatType, expY, PConst[4]);
 
-    // Compute 2^k with integer bitshift, 2^k = (127 + k) << 23
+    // Compute exp2(k) with integer bitshift:
+    // exp2(k) = f32_bitcast((127 + k) << 23)
     Value fPBias = rewriter.create<LLVM::ConstantOp>(
         loc, i32Type, rewriter.getI32IntegerAttr(127));
     Value k = rewriter.create<LLVM::FPToSIOp>(loc, i32Type, kF32);
