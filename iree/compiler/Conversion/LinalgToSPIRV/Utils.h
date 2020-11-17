@@ -56,10 +56,6 @@ template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
                                                              Location loc,
                                                              unsigned numDims);
-
-/// Function to get number of outer parallel loops of a linalgOp
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
-
 /// Updates the workgroup size used for the dispatch region.
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
                                   ArrayRef<int64_t> workGroupSize);

@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace mlir {
@@ -30,7 +31,8 @@ enum class TilingLevel {
   // Tile linalg operation on workgroup thread into L1 block tiles.
   Level1Tiles = 1,
   // Tile linalg operations on L1 block tiles into vector tiles.
-  Level2Tiles = 2
+  Level2Tiles = 2,
+  NumTileLevels = 3
 };
 
 class CPUKernelDispatch {
@@ -45,6 +47,10 @@ struct TileSizeFn {
                                          OpBuilder &builder,
                                          Operation *operation);
 };
+
+Optional<LaunchConfig> initCPULaunchConfig(
+    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+    ArrayRef<linalg::LinalgOp> linalgOps);
 
 }  // namespace iree_compiler
 }  // namespace mlir
