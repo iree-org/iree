@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include "iree/hal/vulkan/registration/driver_module.h"
 
 #include "absl/flags/flag.h"
 #include "iree/base/init.h"
@@ -132,8 +132,8 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 }  // namespace hal
 }  // namespace iree
 
-IREE_REGISTER_MODULE_INITIALIZER(iree_hal_vulkan_driver, {
-  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
-      "vulkan", ::iree::hal::vulkan::CreateVulkanDriver));
-});
-IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_vulkan_driver);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_vulkan_driver_module_register() {
+  return ::iree::hal::DriverRegistry::shared_registry()->Register(
+      "vulkan", ::iree::hal::vulkan::CreateVulkanDriver);
+}

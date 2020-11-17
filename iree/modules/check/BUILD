@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -29,7 +27,7 @@ cc_test(
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/hal:api",
-        "//iree/hal/vmla:vmla_driver_module",
+        "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -56,11 +54,14 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
         "//iree/vm:bytecode_module",
-    ] + IREE_DRIVER_MODULES,
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 cc_library(

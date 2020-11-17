@@ -30,12 +30,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-DRIVER_DEPS =  [
-    "//iree/hal/vulkan:vulkan_driver_module",
-    "//iree/hal/llvmjit:llvmjit_driver_module",
-    "//iree/hal/vmla:vmla_driver_module",
-]
-
 iree_py_library(
     name = "rt",
     srcs = [
@@ -58,10 +52,11 @@ iree_py_extension(
     features = PYBIND_FEATURES,
     linkstatic = 1,
     win_def_file = "export.def",
-    deps = DRIVER_DEPS + [
+    deps = [
         ":rt_library",
         "//bindings/python/pyiree/common",
         "//iree/base:initializer",
+        "//iree/hal/drivers",
     ],
 )
 

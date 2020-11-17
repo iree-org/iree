@@ -42,10 +42,10 @@ iree_cc_library(
     absl::strings
     iree::base::initializer
     iree::base::status
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
-    ${IREE_HAL_DRIVER_MODULES}
   LINKOPTS
     "-landroid"
     "-llog"

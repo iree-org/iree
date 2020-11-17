@@ -47,17 +47,3 @@ iree_cc_library(
     iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    dylib_driver_module
-  SRCS
-    "dylib_driver_module.cc"
-  DEPS
-    ::dylib
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)

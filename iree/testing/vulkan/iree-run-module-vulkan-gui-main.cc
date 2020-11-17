@@ -23,6 +23,7 @@
 #include "iree/base/init.h"
 #include "iree/base/main.h"
 #include "iree/base/status.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
@@ -147,6 +148,7 @@ Status RunModuleAndUpdateImGuiWindow(
 
 int iree::IreeMain(int argc, char** argv) {
   iree::InitializeEnvironment(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
 
   // --------------------------------------------------------------------------
   // Create a window.

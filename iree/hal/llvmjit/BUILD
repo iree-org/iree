@@ -61,18 +61,3 @@ cc_library(
         "@llvm-project//llvm:Support",
     ],
 )
-
-cc_library(
-    name = "llvmjit_driver_module",
-    srcs = ["llvmjit_driver_module.cc"],
-    deps = [
-        ":llvmjit",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-        "@llvm-project//llvm:Support",
-        #TODO(ataei): Link with native target dep.
-        "@llvm-project//llvm:X86CodeGen",
-    ],
-    alwayslink = 1,
-)

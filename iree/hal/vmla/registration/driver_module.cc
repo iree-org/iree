@@ -12,27 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include "iree/hal/vmla/registration/driver_module.h"
 
-#include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
-#include "iree/hal/dylib/dylib_driver.h"
+#include "iree/hal/vmla/vmla_driver.h"
 
 namespace iree {
 namespace hal {
-namespace dylib {
+namespace vmla {
 
-static StatusOr<ref_ptr<Driver>> CreateDyLibDriver() {
-  return make_ref<DyLibDriver>();
+static StatusOr<ref_ptr<Driver>> CreateVMLADriver() {
+  return VMLADriver::Create();
 }
 
-}  // namespace dylib
+}  // namespace vmla
 }  // namespace hal
 }  // namespace iree
 
-IREE_REGISTER_MODULE_INITIALIZER(iree_hal_dylib_driver, {
-  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
-      "dylib", ::iree::hal::dylib::CreateDyLibDriver));
-});
-IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_dylib_driver);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_vmla_driver_module_register() {
+  return ::iree::hal::DriverRegistry::shared_registry()->Register(
+      "vmla", ::iree::hal::vmla::CreateVMLADriver);
+}

@@ -37,14 +37,6 @@ def platform_trampoline_deps(basename, path = "base"):
         "//iree/%s/internal:%s_internal" % (path, basename),
     ]
 
-# Driver modules that register themselves at link time.
-IREE_DRIVER_MODULES = [
-    "//iree/hal/dylib:dylib_driver_module",
-    "//iree/hal/vmla:vmla_driver_module",
-    "//iree/hal/vulkan:vulkan_driver_module",
-    "//iree/hal/llvmjit:llvmjit_driver_module",
-]
-
 def iree_build_test(name, targets):
     """Dummy rule to ensure that targets build.
 

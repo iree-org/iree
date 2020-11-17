@@ -1,0 +1,38 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+iree_add_all_subdirs()
+
+if(${IREE_HAL_DRIVER_METAL})
+
+iree_cc_library(
+  NAME
+    registration
+  HDRS
+    "driver_module.h"
+  SRCS
+    "driver_module.cc"
+  DEPS
+    absl::flags
+    iree::base::init
+    iree::base::status
+    iree::hal::api
+    iree::hal::driver_registry
+    iree::hal::metal
+  DEFINES
+    "IREE_HAL_HAVE_METAL_DRIVER_MODULE=1"
+  PUBLIC
+)
+
+endif()

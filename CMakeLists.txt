@@ -94,7 +94,7 @@ set(IREE_ALL_HAL_DRIVERS
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-  # For cross compilation towords Android, we don't want LLVM JIT HAL driver.
+  # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
   if(ANDROID)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
   endif()
@@ -120,24 +120,6 @@ foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
-
-# Enable HAL driver modules based on options.
-set (IREE_HAL_DRIVER_MODULES "")
-if(${IREE_HAL_DRIVER_DYLIB})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::dylib_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_LLVM})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::llvmjit::llvmjit_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_METAL})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::metal::metal_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VMLA})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vmla::vmla_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VULKAN})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::vulkan_driver_module)
-endif()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS

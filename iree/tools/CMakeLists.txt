@@ -72,11 +72,11 @@ iree_cc_binary(
     iree::base::file_io
     iree::base::status
     iree::base::tracing
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 
@@ -107,11 +107,11 @@ iree_cc_binary(
     iree::base::init
     iree::base::status
     iree::base::tracing
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
 )
 
 if(${IREE_ENABLE_MLIR})
@@ -339,11 +339,11 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::IREEVM
       iree::hal::api
+      iree::hal::drivers
       iree::modules::hal
       iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
-      ${IREE_HAL_DRIVER_MODULES}
     HOSTONLY
   )
 endif(${IREE_BUILD_COMPILER})

@@ -48,19 +48,3 @@ iree_cc_library(
     iree::schemas::llvmir_executable_def_c_fbs
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    llvmjit_driver_module
-  SRCS
-    "llvmjit_driver_module.cc"
-  DEPS
-    ::llvmjit
-    LLVMSupport
-    LLVMX86CodeGen
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)

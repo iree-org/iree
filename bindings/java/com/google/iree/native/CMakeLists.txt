@@ -16,10 +16,10 @@ iree_cc_library(
   NAME
     cc_wrappers
   SRCS
-     "context_wrapper.cc"
-     "function_wrapper.cc"
-     "instance_wrapper.cc"
-     "module_wrapper.cc"
+    "context_wrapper.cc"
+    "function_wrapper.cc"
+    "instance_wrapper.cc"
+    "module_wrapper.cc"
   HDRS
     "context_wrapper.h"
     "function_wrapper.h"
@@ -31,7 +31,7 @@ iree_cc_library(
     iree::base::logging
     iree::base::status
     iree::hal::api
-    iree::hal::vmla::vmla_driver_module
+    iree::hal::drivers
     iree::modules::hal
     iree::modules::strings::strings_module
     iree::modules::tensorlist::native_module

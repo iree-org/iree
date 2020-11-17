@@ -37,11 +37,6 @@ class BuildFileFunctions(object):
 
   def __init__(self, converter):
     self.converter = converter
-    self.IREE_DRIVER_MODULES = [
-        "//iree/hal/vmla:vmla_driver_module",
-        "//iree/hal/vulkan:vulkan_driver_module",
-        "//iree/hal/llvmjit:llvmjit_driver_module",
-    ]
 
   # ------------------------------------------------------------------------- #
   # Conversion utilities, written to reduce boilerplate and allow for reuse   #
@@ -223,6 +218,12 @@ class BuildFileFunctions(object):
   def _convert_deps_block(self, deps):
     return self._convert_target_list_block("DEPS", deps)
 
+  def _convert_defines_block(self, defines):
+    if not defines:
+      return ""
+    defines = "\n".join([f'    "{define}"' for define in defines])
+    return f"  DEFINES\n{defines}\n"
+
   def _convert_flatc_args_block(self, flatc_args):
     if not flatc_args:
       return ""
@@ -343,6 +344,7 @@ class BuildFileFunctions(object):
                  srcs=None,
                  data=None,
                  deps=None,
+                 defines=None,
                  alwayslink=False,
                  testonly=False,
                  linkopts=None,
@@ -355,6 +357,7 @@ class BuildFileFunctions(object):
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
+    defines_block = self._convert_defines_block(defines)
     alwayslink_block = self._convert_alwayslink_block(alwayslink)
     testonly_block = self._convert_testonly_block(testonly)
 
@@ -365,6 +368,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{data_block}"
                             f"{deps_block}"
+                            f"{defines_block}"
                             f"{alwayslink_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")

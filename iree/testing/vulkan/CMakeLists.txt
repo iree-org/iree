@@ -58,7 +58,7 @@ iree_cc_binary(
     iree::base::main
     iree::base::status
     iree::base::tracing
-    iree::hal::vulkan::vulkan_driver_module
+    iree::hal::vulkan::registration
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm

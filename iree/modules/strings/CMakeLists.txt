@@ -52,7 +52,7 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::hal::api
-    iree::hal::vmla::vmla_driver_module
+    iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

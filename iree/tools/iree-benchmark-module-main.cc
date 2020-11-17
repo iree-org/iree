@@ -21,6 +21,7 @@
 #include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
@@ -296,6 +297,7 @@ int main(int argc, char** argv) {
       absl::flags_internal::OnUndefinedFlag::kIgnoreUndefined);
   ::benchmark::Initialize(&argc, argv);
   iree::InitializeEnvironment(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   iree::IREEBenchmark iree_benchmark;
   auto status = iree_benchmark.Register();

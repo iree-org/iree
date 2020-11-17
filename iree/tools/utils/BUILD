@@ -44,7 +44,7 @@ cc_test(
         ":vm_util",
         "//iree/base:api",
         "//iree/hal:api",
-        "//iree/hal/vmla:vmla_driver_module",
+        "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

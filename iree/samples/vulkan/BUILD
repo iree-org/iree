@@ -48,6 +48,7 @@ cc_binary(
     deps = [
         ":simple_mul_bytecode_module_cc",
         "//iree/base:main",
+        "//iree/hal/vulkan/registration",
         "//iree/modules/hal",
         "//iree/testing/vulkan:vulkan_gui_util",
         "//iree/vm",
