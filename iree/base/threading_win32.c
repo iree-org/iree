@@ -19,6 +19,9 @@
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
+// Great documentation:
+// https://www.microsoftpressstore.com/articles/article.aspx?p=2233328
+
 struct iree_thread_s {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
@@ -167,6 +170,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   if (params.priority_class != IREE_THREAD_PRIORITY_CLASS_NORMAL) {
     iree_thread_set_priority_class(thread, params.priority_class);
   }
+  if (params.initial_affinity.specified) {
+    iree_thread_request_affinity(thread, params.initial_affinity);
+  }
 
   // Retain the thread for the thread itself; this way if the caller immediately
   // releases the iree_thread_t handle the thread won't explode.
@@ -252,6 +258,20 @@ void iree_thread_override_end(iree_thread_override_t* override) {
   if (!override) return;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_thread_override_remove_self(override);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_thread_request_affinity(iree_thread_t* thread,
+                                  iree_thread_affinity_t affinity) {
+  if (!affinity.specified) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  PROCESSOR_NUMBER ideal_processor;
+  memset(&ideal_processor, 0, sizeof(ideal_processor));
+  ideal_processor.Group = affinity.group;
+  ideal_processor.Number = affinity.id;
+  SetThreadIdealProcessorEx(thread->handle, &ideal_processor, NULL);
+
   IREE_TRACE_ZONE_END(z0);
 }
 
