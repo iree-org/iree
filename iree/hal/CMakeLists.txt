@@ -168,7 +168,6 @@ iree_cc_library(
     ::hal
     absl::core_headers
     absl::synchronization
-    iree::base::initializer
     iree::base::ref_ptr
     iree::base::status
   PUBLIC

@@ -19,7 +19,6 @@
 #include <set>
 
 #include "absl/flags/parse.h"
-#include "iree/base/initializer.h"
 
 namespace iree {
 
@@ -35,8 +34,6 @@ void InitializeEnvironment(int* argc, char*** argv) {
       (*argv)[*argc + 1] = nullptr;
     }
   }
-
-  IREE_RUN_MODULE_INITIALIZERS();
 }
 
 }  // namespace iree

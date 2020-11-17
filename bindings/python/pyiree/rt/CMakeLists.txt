@@ -56,7 +56,6 @@ iree_pyext_module(
     ::PyExtRtLib
     bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    iree::base::initializer
     iree::hal::drivers
 )
 

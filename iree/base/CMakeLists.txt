@@ -222,20 +222,7 @@ iree_cc_library(
   SRCS
     "init.cc"
   DEPS
-    ::initializer
     absl::flags_parse
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    initializer
-  HDRS
-    "initializer.h"
-  SRCS
-    "initializer.cc"
-  DEPS
-    ::core_headers
   PUBLIC
 )
 
