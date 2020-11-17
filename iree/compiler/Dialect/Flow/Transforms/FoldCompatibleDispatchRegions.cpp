@@ -164,13 +164,17 @@ bool doesValueDependOnOperation(Value value, Operation *op) {
              value.getDefiningOp()->isBeforeInBlock(op)) {
     // Can't depend on |op| as it is defined prior to it.
     return false;
+  } else if (value.getDefiningOp()->getBlock() == op->getBlock() &&
+             !value.getDefiningOp()->isBeforeInBlock(op)) {
+    // |op| is defined before one of |value| operands.
+    return true;
   }
   for (auto operand : value.getDefiningOp()->getOperands()) {
     if (doesValueDependOnOperation(operand, op)) {
       return true;
     }
   }
-  return true;
+  return false;
 }
 
 // Returns true if |rhs| transitively depends on any out of |lhs|.
