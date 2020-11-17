@@ -19,7 +19,7 @@
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/file_io.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -174,7 +174,7 @@ StatusOr<int> Run(std::string module_file_path) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
   IREE_CHECK_OK(iree_hal_register_all_available_drivers());
   ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
