@@ -84,3 +84,27 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
 // CHECK-NEXT: }
 // CHECK-NEXT: return %[[R2]] : tensor<4x4xf32>
+
+// -----
+
+module {
+  flow.variable @var1 dense<1.000000e+00> : tensor<4xf32>
+  flow.variable @var2 dense<2.000000e+00> : tensor<4xf32>
+  func @notDominate() -> tensor<4xf32> {
+    %c4 = constant 4 : index
+    %0 = flow.variable.load @var1 : tensor<4xf32>
+    %1 = flow.dispatch.region[%c4 : index](%arg0 = %0 : tensor<4xf32>) -> tensor<4xf32> {
+      %4 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      flow.return %4 : tensor<4xf32>
+    }
+    %2 = flow.variable.load @var2 : tensor<4xf32>
+    %3 = flow.dispatch.region[%c4 : index](%arg0 = %0 : tensor<4xf32>, %arg1 = %2 : tensor<4xf32>) -> tensor<4xf32> {
+      %4 = mhlo.subtract %arg1, %arg0 : tensor<4xf32>
+      flow.return %4 : tensor<4xf32>
+    }
+    return %3 : tensor<4xf32>
+  }
+}
+// CHECK-LABEL: func @notDominate
+// CHECK: flow.dispatch.region
+// CHECK: flow.dispatch.region
