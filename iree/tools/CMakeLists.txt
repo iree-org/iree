@@ -328,7 +328,6 @@ if(${IREE_BUILD_COMPILER})
       absl::strings
       iree::base::api
       iree::base::init
-      iree::base::source_location
       iree::base::status
       iree::base::tracing
       iree::compiler::Dialect::Flow::Transforms

@@ -99,9 +99,6 @@ class BuildFileFunctions(object):
     else:
       return ""
 
-  def _convert_alwayslink_block(self, alwayslink):
-    return self._convert_option_block("ALWAYSLINK", alwayslink)
-
   def _convert_testonly_block(self, testonly):
     return self._convert_option_block("TESTONLY", testonly)
 
@@ -339,7 +336,6 @@ class BuildFileFunctions(object):
                  data=None,
                  deps=None,
                  defines=None,
-                 alwayslink=False,
                  testonly=False,
                  linkopts=None,
                  **kwargs):
@@ -362,7 +358,6 @@ class BuildFileFunctions(object):
                             f"{data_block}"
                             f"{deps_block}"
                             f"{defines_block}"
-                            f"{alwayslink_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
