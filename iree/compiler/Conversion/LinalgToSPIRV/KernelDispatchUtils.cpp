@@ -25,6 +25,7 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -48,10 +49,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-/// Name of the StrAttr that can be used to get the key to access the tile size
-/// information.
-static const char kLaunchInfoKey[] = "launch_info_key";
 
 /// Given `nprocs` try to distribute it evenly across 2 logical x and y.
 static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
@@ -394,55 +391,43 @@ DEFINE_POOLING_OP_CONFIG(linalg::PoolingSumOp)
 
 #undef DEFINE_POOLINGOP_CONFIG
 
-Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
-  StringAttr attr = op->getAttrOfType<StringAttr>(kLaunchInfoKey);
-  if (!attr) return {};
-  return attr.getValue();
-}
-
-LogicalResult LaunchConfig::init(
+Optional<LaunchConfig> initGPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
-  unsigned numTiledOps = 0;
-  auto setKey = [&](Operation *op) -> std::string {
-    std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
-    op->setAttr(Identifier::get(kLaunchInfoKey, context),
-                StringAttr::get(key, context));
-    return key;
-  };
-
+  LaunchConfig launchConfig;
   if (!options.workgroupSize.empty()) {
-    for (linalg::LinalgOp linalgOp : linalgOps)
-      tileSizes[setKey(linalgOp)].emplace_back(options.tileSizes.begin(),
-                                               options.tileSizes.end());
-    workgroupSize = {1, 1, 1};
-    for (unsigned i = 0,
-                  e = std::min<unsigned>(3, options.workgroupSize.size());
-         i != e; ++i)
-      workgroupSize[i] = options.workgroupSize[i];
-    return success();
+    SmallVector<int64_t, 3> tileSizes(options.tileSizes.begin(),
+                                      options.tileSizes.end());
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      launchConfig.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
+    }
+    SmallVector<int64_t, 3> workgroupSize(options.workgroupSize.begin(),
+                                          options.workgroupSize.end());
+    launchConfig.setWorkgroupSize(workgroupSize);
+    return launchConfig;
   }
 
-  if (linalgOps.empty()) return success();
+  if (linalgOps.empty()) return launchConfig;
 
   spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(*linalgOps.begin()));
 
   Optional<linalg::LinalgOp> rootOperation = {};
   LaunchConfigInfo config;
   for (linalg::LinalgOp linalgOp : linalgOps) {
-#define DISPATCH(opName)                                                  \
-  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {              \
-    if (rootOperation) {                                                  \
-      return op.emitError(                                                \
-          "unhandled multiple root operations in dispatch region");       \
-    }                                                                     \
-    rootOperation = linalgOp;                                             \
-    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)]; \
-    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,   \
-                                 config))) {                              \
-      return failure();                                                   \
-    }                                                                     \
-    continue;                                                             \
+#define DISPATCH(opName)                                                     \
+  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {                 \
+    if (rootOperation) {                                                     \
+      op.emitError("unhandled multiple root operations in dispatch region"); \
+      return llvm::None;                                                     \
+    }                                                                        \
+    rootOperation = linalgOp;                                                \
+    TileSizesListType tileSizesInfo;                                         \
+    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,      \
+                                 config))) {                                 \
+      return llvm::None;                                                     \
+    }                                                                        \
+    launchConfig.setTileSizes(op, tileSizesInfo);                            \
+    continue;                                                                \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
@@ -454,73 +439,21 @@ LogicalResult LaunchConfig::init(
 
 #undef DISPATCH
   }
-  workgroupSize = config.workgroupSize;
-  numSubgroups = config.numSubgroups;
-  vectorize = config.vectorize;
+  launchConfig.setWorkgroupSize(config.workgroupSize);
+  launchConfig.setNumSubgroups(config.numSubgroups);
+  launchConfig.setVectorize(config.vectorize);
   if (!rootOperation) {
     // No root operations found. Dont need to do anything.
-    return success();
+    return launchConfig;
   }
 
-  // Check the dependencies going into and out of the root operation. For now
-  // only the following dependencies are supported
-  // - WAW dependencies going into the root operation.
-  // - RAW dependencies going out of the root operation.
-  // - WAW dependencies going out of the root operation.
-  // i.e. there are no RAW dependences going into the root operation.
-  auto inRAWDependencies = dependenceGraph.getDependencesInto(
-      *rootOperation, linalg::LinalgDependenceGraph::RAW);
-  if (!inRAWDependencies.empty()) {
-    return rootOperation->getOperation()->emitError(
-        "unhandled fusion of root operation with producer");
-  }
-  auto dependences =
-      dependenceGraph.getDependentOperations(rootOperation.getValue());
-  unsigned numOuterParallel = getNumOuterParallelLoops(*rootOperation);
-
-  // Check that for all dependences into and out of the root operation,
-  // - The result expressions of the indexing maps of the fused view in the
-  //   producer and consumer must match for the parallel loops.
-  for (auto dependence :
-       dependenceGraph.getDependentOperations(rootOperation.getValue())) {
-    unsigned viewIndex = dependence.indexingOpView.operandIndex;
-    AffineMap indexingMap = rootOperation->getIndexingMap(viewIndex);
-    linalg::LinalgOp fusedOp =
-        cast<linalg::LinalgOp>(dependence.dependentOpView.op);
-    unsigned fusedViewIndex = dependence.dependentOpView.operandIndex;
-    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(fusedViewIndex);
-    if (indexingMap.getNumResults() < numOuterParallel ||
-        fusedIndexingMap.getNumResults() < numOuterParallel ||
-        !llvm::all_of(
-            llvm::seq<unsigned>(0, numOuterParallel),
-            [&indexingMap, fusedIndexingMap](unsigned i) {
-              return indexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     fusedIndexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     indexingMap.getResult(i) == fusedIndexingMap.getResult(i);
-            })) {
-      return rootOperation->getOperation()->emitError(
-          "unhandled fusion of root operation with all operations in the "
-          "dispatch region");
-    }
-  }
-  // The dependent operations get the same tile size information as the root
-  // operation. To propogate that information, just use the same key as the root
-  // operation.
-  for (auto dependence : dependences) {
-    dependence.dependentOpView.op->setAttr(
-        Identifier::get(kLaunchInfoKey, context),
-        StringAttr::get(getKey(*rootOperation).getValue(), context));
-  }
+  if (failed(propogateRootOperationLaunchConfig(launchConfig, *rootOperation,
+                                                dependenceGraph)))
+    return llvm::None;
 
   // TODO(ravishankarm): Verify that the set configurations is within the device
   // limits.
-  return success();
-}
-
-void LaunchConfig::finalize(FuncOp funcOp) {
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    linalgOp.removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
-  });
+  return launchConfig;
 }
 
 template <typename OpTy>
