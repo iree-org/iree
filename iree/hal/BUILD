@@ -184,7 +184,6 @@ cc_library(
     hdrs = ["driver_registry.h"],
     deps = [
         ":hal",
-        "//iree/base:initializer",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/base:core_headers",

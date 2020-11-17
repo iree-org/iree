@@ -20,7 +20,6 @@
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/initializer.h"
 #include "iree/base/status.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
@@ -167,7 +166,6 @@ void RunModuleAppMain(android_app* app) {
   // trigger the workload.
   std::this_thread::sleep_for(std::chrono::seconds(2));
 
-  IREE_RUN_MODULE_INITIALIZERS();
   IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   ModuleLoader loader(app);

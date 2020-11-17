@@ -40,7 +40,6 @@ iree_cc_library(
   DEPS
     ::android_native_app_glue
     absl::strings
-    iree::base::initializer
     iree::base::status
     iree::hal::drivers
     iree::modules::hal

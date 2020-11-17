@@ -217,17 +217,7 @@ cc_library(
     srcs = ["init.cc"],
     hdrs = ["init.h"],
     deps = [
-        ":initializer",
         "@com_google_absl//absl/flags:parse",
-    ],
-)
-
-cc_library(
-    name = "initializer",
-    srcs = ["initializer.cc"],
-    hdrs = ["initializer.h"],
-    deps = [
-        ":core_headers",
     ],
 )
 

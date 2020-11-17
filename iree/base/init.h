@@ -22,9 +22,6 @@ namespace iree {
 
 // Initializes the system environment in a binary.
 //
-// This first parses command line flags, then resolves module initializers
-// by calling IREE_RUN_MODULE_INITIALIZERS().
-//
 // 'argc' and 'argv' are the command line flags to parse.
 //
 // This should typically be called early in main(), before other code runs.
