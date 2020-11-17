@@ -164,6 +164,11 @@ bool doesValueDependOnOperation(Value value, Operation *op) {
              value.getDefiningOp()->isBeforeInBlock(op)) {
     // Can't depend on |op| as it is defined prior to it.
     return false;
+  } else if (value.getDefiningOp()->getBlock() == op->getBlock() &&
+             !value.getDefiningOp()->isBeforeInBlock(op)) {
+    // Somehow depends because |op| does not dominate |value|.
+    // TODO(hanchung): we can probably reorder operations to avoid this check.
+    return true;
   }
   for (auto operand : value.getDefiningOp()->getOperands()) {
     if (doesValueDependOnOperation(operand, op)) {
