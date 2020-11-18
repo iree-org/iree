@@ -42,6 +42,11 @@ UNSORTED_SEGMENT_UNIT_TEST_SPECS = tf_test_utils.unit_test_specs_from_args(
         ]
     })
 
+REDUCE_KWARGS_TO_VALUES = {
+    "axis": [None, 1],
+    "keepdims": [False, True],
+}
+
 # A dictionary mapping tf.math function names to lists of UnitTestSpecs.
 # Each unit_test_name will have the tf.math function name prepended to it.
 FUNCTIONS_TO_UNIT_TEST_SPECS = {
@@ -410,49 +415,78 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
             signature_shapes=UNARY_SIGNATURE_SHAPES,
             signature_dtypes=[tf.float32, tf.complex64]),
     "reduce_all":
-        tf_test_utils.unit_test_specs_from_signatures(
-            signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.bool]),
+        [
+            # Explicitly test all True inputs to be absolutely sure that some
+            # reduction axes return True.
+            *tf_test_utils.unit_test_specs_from_args(
+                names_to_input_args={
+                    "all_true": [np.ones(RANK_7_SHAPE, np.bool)],
+                },
+                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+            *tf_test_utils.unit_test_specs_from_signatures(
+                signature_shapes=UNARY_SIGNATURE_SHAPES,
+                signature_dtypes=[tf.bool],
+                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+        ],
     "reduce_any":
-        tf_test_utils.unit_test_specs_from_signatures(
-            signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.bool]),
+        [
+            # Explicitly test all False inputs to be absolutely sure that some
+            # reduction axes return False.
+            *tf_test_utils.unit_test_specs_from_args(
+                names_to_input_args={
+                    "all_false": [np.zeros(RANK_7_SHAPE, np.bool)],
+                },
+                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+            *tf_test_utils.unit_test_specs_from_signatures(
+                signature_shapes=UNARY_SIGNATURE_SHAPES,
+                signature_dtypes=[tf.bool],
+                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+        ],
     "reduce_euclidean_norm":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.complex64]),
+            signature_dtypes=[tf.float32, tf.complex64],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_logsumexp":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32]),
+            signature_dtypes=[tf.float32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_max":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.int32]),
+            signature_dtypes=[tf.float32, tf.int32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_mean":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.int32]),
+            signature_dtypes=[tf.float32, tf.int32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_min":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.int32]),
+            signature_dtypes=[tf.float32, tf.int32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_prod":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.int32]),
+            signature_dtypes=[tf.float32, tf.int32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_std":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.complex64]),
+            signature_dtypes=[tf.float32, tf.complex64],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_sum":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.int32]),
+            signature_dtypes=[tf.float32, tf.int32],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "reduce_variance":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32, tf.complex64]),
+            signature_dtypes=[tf.float32, tf.complex64],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
     "rint":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
