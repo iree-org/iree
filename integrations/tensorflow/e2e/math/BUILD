@@ -81,7 +81,6 @@ TF_MATH_FUNCTIONS = [
     "bincount",
     "ceil",
     "confusion_matrix",
-    "conj",
     "cos",
     "cosh",
     "count_nonzero",
@@ -112,7 +111,6 @@ TF_MATH_FUNCTIONS = [
     "is_nan",
     "is_non_decreasing",
     "is_strictly_increasing",
-    "l2_normalize",
     "lbeta",
     "less",
     "less_equal",
@@ -580,7 +578,6 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
 # keep sorted
 VMLA_FAILING_DYNAMIC = VMLA_FAILING + [
     "angle",
-    "ceil",
     "cumsum",
     "divide_no_nan",
     "equal",
@@ -625,7 +622,6 @@ LLVM_FAILING_DYNAMIC = LLVM_FAILING + [
     "floormod",
     "greater",
     "greater_equal",
-    "imag",
     "is_finite",
     "is_inf",
     "lbeta",

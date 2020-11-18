@@ -414,34 +414,32 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
             signature_dtypes=[tf.float32, tf.complex64]),
-    "reduce_all":
-        [
-            # Explicitly test all True inputs to be absolutely sure that some
-            # reduction axes return True.
-            *tf_test_utils.unit_test_specs_from_args(
-                names_to_input_args={
-                    "all_true": [np.ones(RANK_7_SHAPE, np.bool)],
-                },
-                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
-            *tf_test_utils.unit_test_specs_from_signatures(
-                signature_shapes=UNARY_SIGNATURE_SHAPES,
-                signature_dtypes=[tf.bool],
-                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
-        ],
-    "reduce_any":
-        [
-            # Explicitly test all False inputs to be absolutely sure that some
-            # reduction axes return False.
-            *tf_test_utils.unit_test_specs_from_args(
-                names_to_input_args={
-                    "all_false": [np.zeros(RANK_7_SHAPE, np.bool)],
-                },
-                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
-            *tf_test_utils.unit_test_specs_from_signatures(
-                signature_shapes=UNARY_SIGNATURE_SHAPES,
-                signature_dtypes=[tf.bool],
-                kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
-        ],
+    "reduce_all": [
+        # Explicitly test all True inputs to be absolutely sure that some
+        # reduction axes return True.
+        *tf_test_utils.unit_test_specs_from_args(
+            names_to_input_args={
+                "all_true": [np.ones(RANK_7_SHAPE, np.bool)],
+            },
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+        *tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+    ],
+    "reduce_any": [
+        # Explicitly test all False inputs to be absolutely sure that some
+        # reduction axes return False.
+        *tf_test_utils.unit_test_specs_from_args(
+            names_to_input_args={
+                "all_false": [np.zeros(RANK_7_SHAPE, np.bool)],
+            },
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+        *tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool],
+            kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
+    ],
     "reduce_euclidean_norm":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
