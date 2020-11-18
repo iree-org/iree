@@ -17,6 +17,8 @@
 
 Includes information on their dependency graph and GCR URL.
 
+See the README for information on how to add and update images.
+
 Example usage:
 
 Rebuild the cmake image and all images that transitively on depend on it,
@@ -54,16 +56,17 @@ IMAGES_TO_DEPENDENCIES = {
     'bazel-tensorflow': ['bazel-python'],
     'bazel-tensorflow-nvidia': ['bazel-tensorflow-vulkan'],
     'bazel-tensorflow-swiftshader': ['bazel-tensorflow-vulkan', 'swiftshader'],
-    'bazel-tensorflow-vulkan': ['bazel-tensorflow'],
+    'bazel-tensorflow-vulkan': ['bazel-tensorflow', 'vulkan'],
     'cmake': ['base', 'util'],
     'cmake-android': ['cmake', 'util'],
     'cmake-python': ['cmake'],
     'cmake-python-nvidia': ['cmake-python-vulkan'],
     'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
-    'cmake-python-vulkan': ['cmake-python'],
-    'rbe-toolchain': [],
+    'cmake-python-vulkan': ['cmake-python', 'vulkan'],
+    'rbe-toolchain': ['vulkan'],
     'swiftshader': ['cmake'],
     'util': [],
+    'vulkan': ['util'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}

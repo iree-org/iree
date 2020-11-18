@@ -67,7 +67,9 @@ TFLITE_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",
     "gather_test.py",
+    "image_resize_test.py",
     "mandelbrot_test.py",
+    "quantization_dyn_test.py",
     "matrix_ops_dynamic_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
@@ -102,6 +104,7 @@ LLVM_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
+    "quantization_dyn_test.py",
     "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
@@ -123,6 +126,7 @@ VULKAN_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
+    "quantization_dyn_test.py",
     "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)

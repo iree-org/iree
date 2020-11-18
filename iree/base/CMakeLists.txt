@@ -636,36 +636,35 @@ else()
   )
 endif()
 
-# TODO(benvanik): get wait_handle ported to win32.
-# iree_cc_library(
-#   NAME
-#     wait_handle
-#   HDRS
-#     "wait_handle.h"
-#   SRCS
-#     "wait_handle.cc"
-#   DEPS
-#     absl::base
-#     absl::fixed_array
-#     absl::span
-#     absl::strings
-#     absl::time
-#     iree::base::logging
-#     iree::base::ref_ptr
-#     iree::base::status
-#     iree::base::time
-#   PUBLIC
-# )
-#
-# iree_cc_test(
-#   NAME
-#     wait_handle_test
-#   SRCS
-#     "wait_handle_test.cc"
-#   DEPS
-#     absl::time
-#     iree::base::status
-#     iree::base::wait_handle
-#     iree::testing::gtest
-#     iree::testing::gtest_main
-# )
+iree_cc_library(
+  NAME
+    wait_handle
+  HDRS
+    "wait_handle.h"
+  SRCS
+    "wait_handle.c"
+    "wait_handle_epoll.c"
+    "wait_handle_kqueue.c"
+    "wait_handle_poll.c"
+    "wait_handle_posix.c"
+    "wait_handle_posix.h"
+    "wait_handle_win32.c"
+  COPTS
+    "-D_GNU_SOURCE=1"
+  DEPS
+    ::api
+    ::target_platform
+    ::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    wait_handle_test
+  SRCS
+    "wait_handle_test.cc"
+  DEPS
+    ::wait_handle
+    iree::testing::gtest
+    iree::testing::gtest_main
+)

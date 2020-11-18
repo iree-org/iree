@@ -32,7 +32,7 @@ namespace hal {
 // A bitfield specifying the mode of operation for a command buffer.
 enum class CommandBufferMode : uint32_t {
   // Command buffer will be submitted once and never used again.
-  // This may enable in-place patching of command buffers that reduce overhead
+  // This may enable in-place patching of command buffers that reduces overhead
   // when it's known that command buffers will not be reused.
   kOneShot = 1 << 0,
 };

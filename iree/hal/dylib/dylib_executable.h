@@ -52,9 +52,7 @@ class DyLibExecutable final : public HostExecutable {
   std::unique_ptr<DynamicLibrary> executable_library_;
   std::vector<void*> entry_functions_;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  std::vector<const char*> entry_names_;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  IREE_TRACE(std::vector<const char*> entry_names_);
 };
 
 }  // namespace dylib

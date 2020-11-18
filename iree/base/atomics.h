@@ -266,6 +266,34 @@ typedef int64_t iree_atomic_int64_t;
 #endif  // iree_atomic_load_auto
 
 //==============================================================================
+// Pointer-width atomics
+//==============================================================================
+
+#if defined(IREE_PTR_SIZE_32)
+typedef iree_atomic_int32_t iree_atomic_ptr_t;
+#define iree_atomic_load_ptr iree_atomic_load_int32
+#define iree_atomic_store_ptr iree_atomic_store_int32
+#define iree_atomic_fetch_add_ptr iree_atomic_fetch_add_int32
+#define iree_atomic_fetch_sub_ptr iree_atomic_fetch_sub_int32
+#define iree_atomic_exchange_ptr iree_atomic_exchange_int32
+#define iree_atomic_compare_exchange_strong_ptr \
+  iree_atomic_compare_exchange_strong_int32
+#define iree_atomic_compare_exchange_weak_ptr \
+  iree_atomic_compare_exchange_weak_int32
+#else
+typedef iree_atomic_int64_t iree_atomic_ptr_t;
+#define iree_atomic_load_ptr iree_atomic_load_int64
+#define iree_atomic_store_ptr iree_atomic_store_int64
+#define iree_atomic_fetch_add_ptr iree_atomic_fetch_add_int64
+#define iree_atomic_fetch_sub_ptr iree_atomic_fetch_sub_int64
+#define iree_atomic_exchange_ptr iree_atomic_exchange_int64
+#define iree_atomic_compare_exchange_strong_ptr \
+  iree_atomic_compare_exchange_strong_int64
+#define iree_atomic_compare_exchange_weak_ptr \
+  iree_atomic_compare_exchange_weak_int64
+#endif  // IREE_PTR_SIZE_32
+
+//==============================================================================
 // Reference count atomics
 //==============================================================================
 // These are just aliases that allow use to have nicely readable ref counting

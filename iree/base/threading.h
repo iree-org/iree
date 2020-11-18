@@ -55,6 +55,37 @@ enum iree_thread_priority_class_e {
 };
 typedef int32_t iree_thread_priority_class_t;
 
+// Specifies the processor affinity for a particular thread.
+// Each platform handles this differently (if at all).
+//
+// macOS/iOS:
+//   Only affinity tags are supported; the ID will be used by the kernel to
+//   group threads that having matching values together and (hopefully) schedule
+//   them on cores that may share some level of the cache hierarchy. The API is
+//   effectively just asking nicely and hoping the kernel is on the same
+//   wavelength.
+//
+// Linux/Android:
+//   sched_setaffinity is used to pin the thread to the core with the given ID.
+//   There are, naturally, issues on Android where if the governer has turned
+//   off some cores (such as powering down big cores in an ARM big.LITTLE
+//   configuration) the affinity request will be dropped on the floor even if
+//   the cores are later enabled. This is one of the reasons why we note in
+//   iree_thread_request_affinity that requests may need to be made at
+//   ¯\_(ツ)_/¯ intervals. In the future we can try to hook into power
+//   management infra to see if we can tell when we need to do this.
+//
+// Windows:
+//   Stuff just works. Love it.
+typedef struct {
+  uint32_t specified : 1;
+  uint32_t group : 7;
+  uint32_t id : 24;
+} iree_thread_affinity_t;
+
+// Sets |thread_affinity| to match with any processor in the system.
+void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity);
+
 // Thread creation parameters.
 // All are optional and the entire struct can safely be zero-initialized.
 typedef struct {
@@ -73,9 +104,14 @@ typedef struct {
   bool create_suspended;
 
   // Initial priority class.
-  // This may be changed later via iree_thread_set_priority_class; see that for
-  // more information.
+  // This may be changed later via iree_thread_priority_class_override_begin;
+  // see that for more information.
   iree_thread_priority_class_t priority_class;
+
+  // Initial thread affinity.
+  // This may be changed later via iree_thread_request_affinity; see that for
+  // more information.
+  iree_thread_affinity_t initial_affinity;
 } iree_thread_create_params_t;
 
 typedef int (*iree_thread_entry_t)(void* entry_arg);
@@ -118,6 +154,26 @@ iree_thread_override_t* iree_thread_priority_class_override_begin(
 // Ends a priority class override that was began for a thread with
 // iree_thread_priority_class_override_begin.
 void iree_thread_override_end(iree_thread_override_t* override_token);
+
+// Updates the thread affinity of the given |thread|.
+// Affinities are not sticky and may need to be refreshed over time as CPUs are
+// enabled/disabled by the OS (such as power mode changes, governer adjustments,
+// etc). Users wanting to ensure threads have specific affinities may want to
+// request updates whenever new large amounts of work are about to be performed.
+//
+// NOTE: thread affinities are just a hint. The OS scheduler is free to do
+// whatever it wants up to and including entirely ignoring the specified
+// affinity. In many cases where cores are oversubscribed setting an affinity
+// mask can pessimize battery/thermals/performance as the OS will sometimes try
+// to shuffle around threads to disable physical cores/etc.
+//
+// Compatibility warning: Apple/darwin only support affinity groups, with each
+// unique affinity sharing time with all others of the same value. This means
+// that trying to get clever with several thread sets with overlapping
+// affinities will likely not work as expected. Try to stick with threads that
+// run only on a single processor.
+void iree_thread_request_affinity(iree_thread_t* thread,
+                                  iree_thread_affinity_t affinity);
 
 // Resumes |thread| if it was created suspended.
 // This has no effect if the thread is not suspended.

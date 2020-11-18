@@ -14,10 +14,6 @@
 
 # An image for building IREE and its Python bindings using CMake.
 
-ARG CMAKE_MAJOR_VERSION=3
-ARG CMAKE_MINOR_VERSION=13
-ARG CMAKE_PATCH_VERSION=5
-
 FROM gcr.io/iree-oss/cmake AS final
 # Dependencies for the python bindings tests.
 RUN apt-get update \
@@ -26,6 +22,6 @@ RUN apt-get update \
     python3-pip \
     python3-setuptools \
   && python3 -m pip install --upgrade pip \
-  && python3 -m pip install numpy absl-py
+  && python3 -m pip install numpy==1.19.4 absl-py
 
 ENV PYTHON_BIN /usr/bin/python3

@@ -36,7 +36,7 @@ docker_setup
 # TODO(#3550): Allow this to follow the checked-in Docker hierarchy.
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/bazel-tensorflow-nvidia@sha256:754dc09c558157f82e9d53451486951fc096e8d2a2b9a1306a29ebfe9e0772df \
+  gcr.io/iree-oss/bazel-tensorflow-nvidia@sha256:e5e96ec1709e83355ee2264c97c26fa5c3d40f749a62734f4787b17a83f2c3b8 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-turing/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

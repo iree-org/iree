@@ -38,9 +38,9 @@ jobs:
         run: ./scripts/git/update_to_llvm_syncpoint.py
       - name: Calculating SHAs
         run: |
-          echo "::set-env name=LLVM_SHA::$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
-          echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
-          echo "::set-env name=LLVM_BAZEL_SHA::$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)"
+          echo "LLVM_SHA=$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
+          echo "TF_SHA=$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
+          echo "LLVM_BAZEL_SHA=$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:

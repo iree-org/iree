@@ -15,7 +15,9 @@
 #ifndef IREE_BASE_TARGET_PLATFORM_H_
 #define IREE_BASE_TARGET_PLATFORM_H_
 
-// The Bazel rule defines one of the following top-level platforms and then
+#include <stdint.h>
+
+// The build system defines one of the following top-level platforms and then
 // one platform+architecture pair for that platform.
 //
 // IREE_ARCH_ARM_32
@@ -24,6 +26,10 @@
 // IREE_ARCH_WASM_64
 // IREE_ARCH_X86_32
 // IREE_ARCH_X86_64
+//
+// IREE_PTR_SIZE
+// IREE_PTR_SIZE_32
+// IREE_PTR_SIZE_64
 //
 // IREE_ENDIANNESS_LITTLE
 // IREE_ENDIANNESS_BIG
@@ -79,6 +85,18 @@
     !defined(IREE_ARCH_X86_32) && !defined(IREE_ARCH_X86_64)
 #error Unknown architecture.
 #endif  // all archs
+
+//==============================================================================
+// IREE_PTR_SIZE_*
+//==============================================================================
+
+#if UINTPTR_MAX > UINT_MAX
+#define IREE_PTR_SIZE_64
+#define IREE_PTR_SIZE 8
+#else
+#define IREE_PTR_SIZE_32
+#define IREE_PTR_SIZE 4
+#endif
 
 //==============================================================================
 // IREE_ENDIANNESS_*

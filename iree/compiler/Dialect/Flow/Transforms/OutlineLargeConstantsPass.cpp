@@ -94,8 +94,7 @@ class OutlineLargeConstantsPass
       auto variableOp = moduleBuilder.create<IREE::Flow::VariableOp>(
           largeConstantOp.getLoc(), name, /*isMutable=*/false,
           largeConstantOp.getType(), largeConstantOp.getValue());
-      SymbolTable::setSymbolVisibility(variableOp,
-                                       SymbolTable::Visibility::Private);
+      variableOp.setPrivate();
       replacements.emplace_back(largeConstantOp, variableOp);
 
       // Prevent the variable from being re-inlined if the canonicalizer runs.

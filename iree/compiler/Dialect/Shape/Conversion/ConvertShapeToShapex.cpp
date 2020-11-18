@@ -127,6 +127,45 @@ class ConvertShapeOfOp : public OpConversionPattern<shape::ShapeOfOp> {
   }
 };
 
+class ConvertGetExtent : public OpConversionPattern<shape::GetExtentOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      shape::GetExtentOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(
+        op, rewriter.getIndexType(), operands[0],
+        op.getConstantDim().getValue());
+    return success();
+  }
+};
+
+class ConvertFromExtents : public OpConversionPattern<shape::FromExtentsOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      shape::FromExtentsOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value, 4> dynOperands;
+    SmallVector<int64_t, 4> extents;
+    for (auto operand : operands) {
+      IntegerAttr indexAttr;
+      if (matchPattern(operand, m_Constant(&indexAttr))) {
+        extents.push_back(indexAttr.getValue().getSExtValue());
+        continue;
+      }
+      dynOperands.push_back(operand);
+      extents.push_back(-1);
+    }
+
+    auto resultType = RankedShapeType::get(extents, rewriter.getContext());
+    auto make = rewriter.create<Shape::MakeRankedShapeOp>(
+        op.getLoc(), resultType, dynOperands);
+
+    rewriter.replaceOp(op, make.getResult());
+
+    return success();
+  }
+};
+
 class ConvertSplitAtOp : public OpConversionPattern<shape::SplitAtOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -244,6 +283,8 @@ class ConvertShapeToShapex
     OwningRewritePatternList patterns;
     patterns.insert<ConvertConstShapeOp>(context);
     patterns.insert<ConvertShapeOfOp>(context);
+    patterns.insert<ConvertGetExtent>(context);
+    patterns.insert<ConvertFromExtents>(context);
     patterns.insert<ConvertSplitAtOp>(context);
     patterns.insert<ConvertBroadcastOp>(context);
     patterns.insert<ConvertConcatOp>(context);

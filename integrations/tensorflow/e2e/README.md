@@ -52,17 +52,17 @@ For locally running tests and iterating on backend development, `bazel run` is
 preferred.
 
 ```shell
-# Run math_test on all backends.
-bazel run //integrations/tensorflow/e2e:math_test_manual
+# Run conv_test on all backends.
+bazel run //integrations/tensorflow/e2e:conv_test_manual
 
-# Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
+# Run conv_test comparing TensorFlow to itself (e.g. to debug randomization).
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=tf
 
-# Run math_test comparing the VMLA backend and TensorFlow.
-bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
+# Run conv_test comparing the VMLA backend and TensorFlow.
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=iree_vmla
 
-# Run math_test comparing the VMLA backend to itself multiple times.
-bazel run //integrations/tensorflow/e2e:math_test_manual -- \
+# Run conv_test comparing the VMLA backend to itself multiple times.
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- \
   --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
 ```
 

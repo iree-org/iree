@@ -43,6 +43,16 @@ int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
 }
 
 //==============================================================================
+// iree_thread_affinity_t
+//==============================================================================
+
+// TODO(benvanik): add more helpers and possibly move cpuinfo usage into here.
+
+void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity) {
+  memset(out_thread_affinity, 0x00, sizeof(*out_thread_affinity));
+}
+
+//==============================================================================
 // iree_thread_override_list_t
 //==============================================================================
 // This is shared by multiple platform implementations and gets stripped in LTO
