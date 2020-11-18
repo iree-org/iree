@@ -71,6 +71,7 @@ TFLITE_FAILING = [
     "mandelbrot_test.py",
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
+    "reduce_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
     "scatter_update_test.py",

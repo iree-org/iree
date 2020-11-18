@@ -1042,7 +1042,6 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
-
 template <typename T>
 Status ReduceAnd::Execute(absl::Span<const T> src_buffer,
                           absl::Span<const T> init_buffer,
