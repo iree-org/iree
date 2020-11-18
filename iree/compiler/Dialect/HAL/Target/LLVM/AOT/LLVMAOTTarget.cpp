@@ -141,9 +141,9 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     }
     auto &linkArtifacts = linkArtifactsOr.getValue();
     if (options_.keepLinkerArtifacts) {
-      return mlir::emitRemark(targetOp.getLoc())
-             << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
-             << "    " << linkArtifacts.libraryFile.path;
+      mlir::emitRemark(targetOp.getLoc())
+          << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
+          << "    " << linkArtifacts.libraryFile.path;
       linkArtifacts.keepAllFiles();
     }
 
