@@ -14,28 +14,18 @@
 
 iree_add_all_subdirs()
 
-iree_check_single_backend_test_suite(
+iree_cc_library(
   NAME
-    check_llvm-ir-conv_img2col
+    LLVMToLLVM
+  HDRS
+    "Passes.h"
   SRCS
-    "conv.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-exponential_fast
-  SRCS
-    "exponential.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+    "FastExpConversion.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRLLVMIR
+    MLIRPass
+    MLIRTransforms
+  PUBLIC
 )

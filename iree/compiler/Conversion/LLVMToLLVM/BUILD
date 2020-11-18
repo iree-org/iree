@@ -12,30 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-conv_img2col
-  SRCS
-    "conv.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-exponential_fast
-  SRCS
-    "exponential.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+cc_library(
+    name = "LLVMToLLVM",
+    srcs = [
+        "FastExpConversion.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
 )
