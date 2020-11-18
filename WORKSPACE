@@ -293,6 +293,13 @@ maybe(
     path = "third_party/pffft",
 )
 
+maybe(
+    new_local_repository,
+    name = "half",
+    build_file = "build_tools/third_party/half/BUILD.overlay",
+    path = "third_party/half",
+)
+
 GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"
 
 http_archive(
