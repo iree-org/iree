@@ -64,7 +64,8 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
     "acosh":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            signature_dtypes=[tf.float32]),
+            signature_dtypes=[tf.float32],
+            input_generators=[tf_utils.ndarange]),
     "add":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=BINARY_SIGNATURE_SHAPES,
