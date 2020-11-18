@@ -328,7 +328,7 @@ Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
 
 LogicalResult LaunchConfig::init(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    const SPIRVCodegenOptions &options, ArrayRef<Operation *> linalgOps) {
+    const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
   unsigned numTiledOps = 0;
   auto setKey = [&](Operation *op) -> std::string {
     std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
@@ -338,7 +338,7 @@ LogicalResult LaunchConfig::init(
   };
 
   if (!options.workgroupSize.empty()) {
-    for (Operation *linalgOp : linalgOps)
+    for (linalg::LinalgOp linalgOp : linalgOps)
       tileSizes[setKey(linalgOp)].emplace_back(options.tileSizes.begin(),
                                                options.tileSizes.end());
     workgroupSize = {1, 1, 1};
@@ -355,20 +355,20 @@ LogicalResult LaunchConfig::init(
 
   Optional<linalg::LinalgOp> rootOperation = {};
 
-  for (Operation *op : linalgOps) {
-#define DISPATCH(opName)                                                      \
-  if (auto linalgOp = dyn_cast<opName>(op)) {                                 \
-    if (rootOperation) {                                                      \
-      return linalgOp.emitError(                                              \
-          "unhandled multiple root operations in dispatch region");           \
-    }                                                                         \
-    rootOperation = cast<linalg::LinalgOp>(linalgOp.getOperation());          \
-    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)];     \
-    if (failed(getOpLaunchConfig(linalgOp, targetEnv, options, tileSizesInfo, \
-                                 workgroupSize, numSubgroups))) {             \
-      return failure();                                                       \
-    }                                                                         \
-    continue;                                                                 \
+  for (linalg::LinalgOp linalgOp : linalgOps) {
+#define DISPATCH(opName)                                                  \
+  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {              \
+    if (rootOperation) {                                                  \
+      return op.emitError(                                                \
+          "unhandled multiple root operations in dispatch region");       \
+    }                                                                     \
+    rootOperation = linalgOp;                                             \
+    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)]; \
+    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,   \
+                                 workgroupSize, numSubgroups))) {         \
+      return failure();                                                   \
+    }                                                                     \
+    continue;                                                             \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
