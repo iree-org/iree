@@ -65,8 +65,8 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule =
-        mlir::translateModuleToLLVMIR(targetOp.getInnerModule(), context);
+    auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule(),
+                                                    context, libraryName);
     if (!llvmModule) {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
