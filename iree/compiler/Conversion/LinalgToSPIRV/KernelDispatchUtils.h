@@ -75,7 +75,7 @@ class LaunchConfig {
   LogicalResult init(MLIRContext *context,
                      const linalg::LinalgDependenceGraph &dependenceGraph,
                      const SPIRVCodegenOptions &options,
-                     ArrayRef<Operation *> linalgOps);
+                     ArrayRef<linalg::LinalgOp> linalgOps);
 
   /// Remove attributed added to operations for retrieving tile size
   /// information.
