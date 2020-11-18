@@ -710,8 +710,8 @@ class UnitTestSpec:
   def __init__(self,
                unit_test_name: str,
                input_signature: Sequence[tf.TensorSpec],
-               input_generator=None,
-               input_args: Sequence[Any] = None,
+               input_generator: tf_utils.InputGeneratorType = None,
+               input_args: Union[Sequence[Any], None] = None,
                kwargs: Dict[str, Any] = None):
     self.unit_test_name = tf_utils.remove_special_characters(unit_test_name)
     self.input_signature = input_signature
@@ -762,8 +762,10 @@ def _named_kwargs_product(
 def unit_test_specs_from_signatures(
     signature_shapes: Sequence[Sequence[Sequence[int]]],
     signature_dtypes: Sequence[tf.DType] = [tf.float32],
-    input_generators: Union[Sequence[Any],
-                            Dict[str, Any]] = [DEFAULT_INPUT_GENERATOR],
+    input_generators: Union[Sequence[tf_utils.InputGeneratorType],
+                            Dict[str, tf_utils.InputGeneratorType]] = [
+                                DEFAULT_INPUT_GENERATOR
+                            ],
     kwargs_to_values: Dict[str, Sequence[Any]] = None) -> List[UnitTestSpec]:
   """Generates a Cartesian product of UnitTestSpecs from the given arguments.
 
@@ -847,8 +849,10 @@ def unit_test_specs_from_signatures(
   specs = [
       names_to_shapes, names_to_dtypes, names_to_generators, names_to_kwargs
   ]
+  # pytype: disable=attribute-error
   key_product = itertools.product(*[list(spec.keys()) for spec in specs])
   value_product = itertools.product(*[list(spec.values()) for spec in specs])
+  # pytype: enable=attribute-error
 
   # Generate a UnitTestSpec for each element in the above product.
   unit_tests = []

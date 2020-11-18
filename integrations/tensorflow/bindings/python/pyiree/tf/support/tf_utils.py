@@ -145,6 +145,7 @@ def remove_special_characters(value: str) -> str:
     normalized_parts.append(part)
   return "__".join(normalized_parts)
 
+
 def is_complex(tensors: Union[Sequence[tf.TensorSpec], tf.TensorSpec]) -> bool:
   if isinstance(tensors, Sequence):
     for tensor in tensors:

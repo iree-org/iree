@@ -568,7 +568,7 @@ def create_wrapped_keras_layer(config: Config) -> tf.keras.Model:
 
 
 def create_tf_function_unit_test(config: Config, exported_name: str,
-                                model: tf.keras.Model) -> tf.function:
+                                 model: tf.keras.Model) -> tf.function:
   """Wrap the model's __call__ function in a tf.function for testing."""
   input_shapes = config.shapes
   if FLAGS.dynamic_batch:
@@ -580,7 +580,7 @@ def create_tf_function_unit_test(config: Config, exported_name: str,
 
   call = lambda *args: model(keras_arg_wrapper(*args), training=FLAGS.training)
   return tf_test_utils.tf_function_unit_test(input_signature=input_signature,
-                                            name=exported_name)(call)
+                                             name=exported_name)(call)
 
 
 class KerasLayersModule(tf_test_utils.TestModule):
