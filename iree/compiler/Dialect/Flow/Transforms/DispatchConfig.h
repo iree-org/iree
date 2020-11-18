@@ -20,7 +20,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-
 // Queries dispatch options for an operation.
 // This is presently mostly a hard-coded set of heuristics but should expand
 // to be based on both queries of new op interfaces and a cost model.
