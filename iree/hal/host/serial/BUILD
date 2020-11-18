@@ -75,7 +75,7 @@ cc_library(
         ":async_command_queue",
         ":serial_command_processor",
         ":serial_submission_queue",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:condvar_semaphore",

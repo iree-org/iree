@@ -61,13 +61,12 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::synchronization
+    iree::base::core_headers
     iree::base::dynamic_library
     iree::base::intrusive_list
     iree::base::logging
-    iree::base::memory
     iree::base::ref_ptr
     iree::base::status
-    iree::base::target_platform
     iree::base::time
     iree::base::tracing
     iree::hal
@@ -104,9 +103,9 @@ iree_cc_library(
     absl::flat_hash_map
     absl::memory
     absl::synchronization
+    iree::base::core_headers
     iree::base::logging
     iree::base::status
-    iree::base::target_platform
     iree::base::tracing
     iree::hal
     vulkan_memory_allocator
@@ -155,15 +154,13 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::synchronization
-    iree::base::alignment
     iree::base::api
     iree::base::arena
+    iree::base::core_headers
+    iree::base::flatcc
     iree::base::intrusive_list
-    iree::base::math
-    iree::base::memory
     iree::base::ref_ptr
     iree::base::status
-    iree::base::target_platform
     iree::base::time
     iree::base::tracing
     iree::hal

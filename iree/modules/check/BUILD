@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "IREE_DRIVER_MODULES",
-    iree_cc_binary = "cc_binary",
-)
+load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -46,7 +42,7 @@ cc_test(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-check-module",
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
@@ -55,10 +51,10 @@ iree_cc_binary(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:file_io",
         "//iree/base:init",
         "//iree/base:status",
-        "//iree/base:target_platform",
         "//iree/base:tracing",
         "//iree/modules/hal",
         "//iree/testing:gtest",

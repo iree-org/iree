@@ -16,6 +16,9 @@
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
 EXPLICIT_TARGET_MAPPING = {
+    # Internal utilities to emulate various binary/library options.
+    "//build_tools:default_linkopts": [],
+
     # absl
     "@com_google_absl//absl/flags:flag": ["absl::flags"],
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],

@@ -93,7 +93,7 @@ iree_cc_library(
     "host_executable_layout.cc"
   DEPS
     absl::inlined_vector
-    iree::base::memory
+    iree::base::core_headers
     iree::hal
   PUBLIC
 )
@@ -128,7 +128,7 @@ iree_cc_library(
     absl::core_headers
     absl::memory
     absl::span
-    iree::base::memory
+    iree::base::core_headers
     iree::base::status
     iree::base::tracing
     iree::hal

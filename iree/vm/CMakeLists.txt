@@ -67,8 +67,8 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    iree::base::alignment
     iree::base::api
+    iree::base::core_headers
     iree::base::flatcc
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
@@ -174,7 +174,7 @@ iree_cc_library(
     ::module
     ::stack
     iree::base::api
-    iree::base::atomics
+    iree::base::core_headers
     iree::base::tracing
   PUBLIC
 )
@@ -189,7 +189,7 @@ iree_cc_library(
   DEPS
     ::builtin_types
     iree::base::api
-    iree::base::atomics
+    iree::base::core_headers
     iree::base::tracing
   PUBLIC
 )
@@ -221,8 +221,8 @@ iree_cc_library(
     ::ref
     ::type_def
     ::value
-    iree::base::alignment
     iree::base::api
+    iree::base::core_headers
   PUBLIC
 )
 
@@ -249,9 +249,8 @@ iree_cc_library(
     "module.c"
   DEPS
     ::ref
-    iree::base::alignment
     iree::base::api
-    iree::base::atomics
+    iree::base::core_headers
     iree::base::tracing
   PUBLIC
 )
@@ -350,7 +349,7 @@ iree_cc_library(
     "ref.c"
   DEPS
     iree::base::api
-    iree::base::atomics
+    iree::base::core_headers
   PUBLIC
 )
 
@@ -389,8 +388,8 @@ iree_cc_library(
   DEPS
     ::module
     ::ref
-    iree::base::alignment
     iree::base::api
+    iree::base::core_headers
     iree::base::tracing
   PUBLIC
 )

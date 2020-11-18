@@ -79,7 +79,7 @@ iree_cc_library(
     ::serial_command_processor
     ::serial_submission_queue
     absl::inlined_vector
-    iree::base::memory
+    iree::base::core_headers
     iree::base::status
     iree::base::tracing
     iree::hal::host::condvar_semaphore

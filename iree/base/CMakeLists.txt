@@ -12,19 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (some scotttodd todos remain)
-
 iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    alignment
-  HDRS
-    "alignment.h"
-  DEPS
-    ::target_platform
-  PUBLIC
-)
 
 iree_cc_library(
   NAME
@@ -34,18 +22,36 @@ iree_cc_library(
   SRCS
     "api.c"
   DEPS
-    ::api_hdrs
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    api_hdrs
+    core_headers
   HDRS
-    "api.h"
+    "alignment.h"
+    "atomics.h"
+    "bitfield.h"
+    "math.h"
+    "memory.h"
+    "target_platform.h"
+  DEPS
+    absl::core_headers
+    absl::span
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    bitfield_test
+  SRCS
+    "bitfield_test.cc"
+  DEPS
+    ::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -75,37 +81,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    atomics
-  HDRS
-    "atomics.h"
-  DEPS
-    ::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    bitfield
-  HDRS
-    "bitfield.h"
-  DEPS
-    absl::span
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    bitfield_test
-  SRCS
-    "bitfield_test.cc"
-  DEPS
-    ::bitfield
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     dynamic_library
   HDRS
     "dynamic_library.h"
@@ -113,60 +88,15 @@ iree_cc_library(
     "dynamic_library_posix.cc"
     "dynamic_library_win32.cc"
   DEPS
+    ::core_headers
     ::file_path
     ::logging
     ::status
-    ::target_platform
     ::tracing
     absl::memory
     absl::span
     absl::strings
   PUBLIC
-)
-
-# TODO(scotttodd): clean up bazel_to_cmake handling here
-#   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
-#   * the output file name is platform-specific, get it with $<TARGET_FILE:>
-iree_cc_library(
-  NAME
-    dynamic_library_test_library.so
-  OUT
-    dynamic_library_test_library.so
-  SRCS
-    "dynamic_library_test_library.cc"
-  TESTONLY
-  SHARED
-)
-
-iree_cc_embed_data(
-  NAME
-    dynamic_library_test_library
-  GENERATED_SRCS
-    "$<TARGET_FILE:iree::base::dynamic_library_test_library.so>"
-  CC_FILE_OUTPUT
-    "dynamic_library_test_library_embed.cc"
-  H_FILE_OUTPUT
-    "dynamic_library_test_library_embed.h"
-  TESTONLY
-  CPP_NAMESPACE
-    "iree"
-  FLATTEN
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    dynamic_library_test
-  SRCS
-    "dynamic_library_test.cc"
-  DEPS
-    ::dynamic_library
-    ::dynamic_library_test_library
-    ::file_io
-    ::status
-    ::target_platform
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -175,8 +105,8 @@ iree_cc_library(
   HDRS
     "file_io.h"
   DEPS
+    ::core_headers
     ::status
-    ::target_platform
     absl::memory
     absl::span
     absl::strings
@@ -305,7 +235,7 @@ iree_cc_library(
   SRCS
     "initializer.cc"
   DEPS
-    ::target_platform
+    ::core_headers
   PUBLIC
 )
 
@@ -360,28 +290,8 @@ iree_cc_library(
     "main_posix.cc"
     "main_win32.cc"
   DEPS
+    ::core_headers
     ::logging
-    ::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    math
-  HDRS
-    "math.h"
-  DEPS
-    absl::core_headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    memory
-  HDRS
-    "memory.h"
-  DEPS
-    absl::span
   PUBLIC
 )
 
@@ -465,8 +375,7 @@ iree_cc_library(
     "synchronization.c"
   DEPS
     ::api
-    ::atomics
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )
@@ -480,6 +389,8 @@ iree_cc_test(
     ::synchronization
     benchmark
     iree::testing::benchmark_main
+  LABELS
+    "nowindows"
 )
 
 iree_cc_test(
@@ -491,14 +402,8 @@ iree_cc_test(
     ::synchronization
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    target_platform
-  HDRS
-    "target_platform.h"
-  PUBLIC
+  LABELS
+    "nowindows"
 )
 
 iree_cc_library(
@@ -535,9 +440,8 @@ iree_cc_library(
     "threading_win32.c"
   DEPS
     ::api
-    ::atomics
+    ::core_headers
     ::synchronization
-    ::target_platform
     ::tracing
   PUBLIC
 )
@@ -551,6 +455,8 @@ iree_cc_test(
     ::threading
     benchmark
     iree::testing::benchmark_main
+  LABELS
+    "nowindows"
 )
 
 iree_cc_test(
@@ -564,6 +470,8 @@ iree_cc_test(
     ::threading
     iree::testing::gtest
     iree::testing::gtest_main
+  LABELS
+    "nowindows"
 )
 
 if(${IREE_ENABLE_RUNTIME_TRACING})
@@ -577,7 +485,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     SRCS
       "tracing.cc"
     DEPS
-      ::target_platform
+      ::core_headers
       absl::core_headers
     DEFINES
       # TODO(#2114): Change the mode to 2.
@@ -613,7 +521,7 @@ iree_cc_library(
     "-D_GNU_SOURCE=1"
   DEPS
     ::api
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )

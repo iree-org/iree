@@ -57,7 +57,7 @@ cc_test(
     srcs = ["op_kernels_test.cc"],
     deps = [
         ":op_kernels",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/container:inlined_vector",
@@ -71,7 +71,7 @@ cc_library(
     deps = [
         ":op_kernels",
         "//iree/base:api",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
@@ -98,8 +98,8 @@ cc_library(
     deps = [
         ":op_module",
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:flatcc",
-        "//iree/base:memory",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
