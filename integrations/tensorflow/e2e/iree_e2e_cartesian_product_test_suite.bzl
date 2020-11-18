@@ -169,7 +169,7 @@ def iree_e2e_cartesian_product_test_suite(
                  "got `{}`".format(flags["target_backends"]))
         driver = get_driver(flags["target_backends"])
         if not driver:
-          continue
+            continue
 
         # Check if this is a failing configuration.
         failing = flags in failing_flag_configurations

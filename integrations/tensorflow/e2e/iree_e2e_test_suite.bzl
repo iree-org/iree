@@ -19,6 +19,7 @@ load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 def get_driver(backend):
     # TODO(#2175): Simplify this after backend names are standardized.
     driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
+
     # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
     if driver == "llvmjit":
         driver = ""
@@ -72,7 +73,7 @@ def iree_e2e_test_suite(
 
             driver = get_driver(backend)
             if not driver:
-              continue
+                continue
             py_test_tags = ["driver={}".format(driver)]
             if tags != None:  # `is` is not supported.
                 py_test_tags += tags
