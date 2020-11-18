@@ -567,8 +567,8 @@ def create_wrapped_keras_layer(config: Config) -> tf.keras.Model:
   return tf.keras.Model(inputs, outputs)
 
 
-def create_tf_function_unittest(config: Config, exported_name: str,
-                                model: tf.keras.Model) -> tf.function:
+def create_tf_function_unit_test(config: Config, exported_name: str,
+                                 model: tf.keras.Model) -> tf.function:
   """Wrap the model's __call__ function in a tf.function for testing."""
   input_shapes = config.shapes
   if FLAGS.dynamic_batch:
@@ -579,19 +579,19 @@ def create_tf_function_unittest(config: Config, exported_name: str,
     input_signature = [input_signature]
 
   call = lambda *args: model(keras_arg_wrapper(*args), training=FLAGS.training)
-  return tf_test_utils.tf_function_unittest(input_signature=input_signature,
-                                            name=exported_name)(call)
+  return tf_test_utils.tf_function_unit_test(input_signature=input_signature,
+                                             name=exported_name)(call)
 
 
 class KerasLayersModule(tf_test_utils.TestModule):
 
   @classmethod
   def configure_class(cls):
-    """Configure each tf_function_unittest and define it on the cls."""
+    """Configure each tf_function_unit_test and define it on the cls."""
     for i, (exported_name, config) in enumerate(get_configs().items()):
       model = create_wrapped_keras_layer(config)
       setattr(cls, exported_name,
-              create_tf_function_unittest(config, exported_name, model))
+              create_tf_function_unit_test(config, exported_name, model))
 
   def __init__(self):
     super().__init__()
@@ -600,7 +600,7 @@ class KerasLayersModule(tf_test_utils.TestModule):
       model = create_wrapped_keras_layer(config)
       self.models.append(model)
       setattr(self, exported_name,
-              create_tf_function_unittest(config, exported_name, model))
+              create_tf_function_unit_test(config, exported_name, model))
 
 
 class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
@@ -609,7 +609,7 @@ class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         KerasLayersModule,
-        exported_names=KerasLayersModule.get_exported_names())
+        exported_names=KerasLayersModule.get_tf_function_unit_tests())
 
 
 def main(argv):
@@ -638,7 +638,7 @@ def main(argv):
   # to test to the KerasLayersModule, and then generate unittests for each of
   # them.
   KerasLayersModule.configure_class()
-  KerasLayersTest.generate_unittests(KerasLayersModule)
+  KerasLayersTest.generate_unit_tests(KerasLayersModule)
   tf.test.main()
 
 
