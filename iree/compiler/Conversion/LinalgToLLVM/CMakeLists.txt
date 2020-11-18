@@ -23,7 +23,6 @@ iree_cc_library(
   SRCS
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
-    "FastExpConversion.cpp"
     "KernelDispatch.cpp"
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
@@ -50,6 +49,7 @@ iree_cc_library(
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::LLVMToLLVM
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
