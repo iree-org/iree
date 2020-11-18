@@ -719,7 +719,7 @@ class UnitTestSpec:
     self.kwargs = dict() if kwargs is None else kwargs
     self.input_generator = input_generator
 
-  def update_unit_test_name(self, new_name: str) -> "UnitTestSpec":
+  def with_name(self, new_name: str) -> "UnitTestSpec":
     return UnitTestSpec(new_name, self.input_signature, self.input_generator,
                         self.input_args, self.kwargs)
 

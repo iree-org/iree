@@ -615,10 +615,9 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
 }
 
 for function, specs in FUNCTIONS_TO_UNIT_TEST_SPECS.items():
-  # Update using 'update_unit_test_name' to avoid updating shared UnitTestSpecs.
+  # Update using 'with_name' to avoid updating shared UnitTestSpecs.
   specs = [
-      spec.update_unit_test_name(f"{function}__{spec.unit_test_name}")
-      for spec in specs
+      spec.with_name(f"{function}__{spec.unit_test_name}") for spec in specs
   ]
   FUNCTIONS_TO_UNIT_TEST_SPECS[function] = specs
 
