@@ -14,6 +14,12 @@
 
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
 cc_binary(
     name = "dynamic_library_test_library.so",
     testonly = True,
