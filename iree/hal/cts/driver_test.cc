@@ -36,10 +36,10 @@ TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, DriverTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, DriverTest,
+    ::testing::ValuesIn(CtsTestBase::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal
