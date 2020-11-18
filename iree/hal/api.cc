@@ -1891,6 +1891,11 @@ iree_hal_driver_registry_query_available_drivers(
   }
 
   *out_driver_count = available_drivers.size();
+  *out_driver_names = NULL;
+  if (available_drivers.empty()) {
+    return iree_ok_status();
+  }
+
   iree_string_view_t* driver_name_storage = nullptr;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator,
