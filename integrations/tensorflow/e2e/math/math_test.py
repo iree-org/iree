@@ -11,410 +11,596 @@ import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
 
-
-class Config:
-  """Specifies a unittest."""
-
-  def __init__(self,
-               signature: Sequence[tf.TensorSpec],
-               args: Sequence[Any] = None,
-               kwargs: Dict[str, Any] = None,
-               generator: tf_utils.InputGeneratorType = None):
-    self.signature = signature
-    self.args = args
-    self.kwargs = kwargs if kwargs is not None else dict()
-    self.generator = generator
-
-
-class ArgsConfig(Config):
-  """Uses input arguments to generate an input signature."""
-
-  def __init__(self,
-               args: Sequence[Any],
-               kwargs: Dict[str, Any] = None,
-               generator: tf_utils.InputGeneratorType = None):
-    signature = tf_utils.apply_function(
-        args, lambda x: tf.TensorSpec.from_tensor(tf.convert_to_tensor(x)))
-    super().__init__(signature, args, kwargs, generator)
-
-
-class DtypeConfig(Config):
-  """Specifies a unittest for each dtype in dtypes."""
-
-  def __init__(self,
-               signature: Sequence[tf.TensorSpec],
-               args: Sequence[Any] = None,
-               kwargs: Dict[str, Any] = None,
-               generator: tf_utils.InputGeneratorType = None,
-               dtypes: Sequence[tf.DType] = None):
-    super().__init__(signature, args, kwargs, generator)
-    for dtype in dtypes:
-      if not isinstance(dtype, tf.DType):
-        raise TypeError(f"All dtypes must be tf.DTypes, but got '{dtype}'.")
-    self.dtypes = dtypes
-
-  def __iter__(self):
-    for dtype in self.dtypes:
-      signature = tf_utils.apply_function(
-          self.signature, lambda spec: tf.TensorSpec(spec.shape, dtype))
-      dtype_config = Config(signature, self.args, self.kwargs, self.generator)
-      yield dtype.name, dtype_config
-
-
 # As high as tf goes without breaking.
-RANK_7_INPUT = [1, 1, 1, 2, 2, 2, 2]
-
-# "Untyped" signatures – for use with the 'dtypes' kwarg.
-UNARY = [tf.TensorSpec(RANK_7_INPUT)]
-BINARY = [tf.TensorSpec(RANK_7_INPUT)] * 2
-TERNARY = [tf.TensorSpec(RANK_7_INPUT)] * 2
-
-# Typed signatures with default precision.
-UNARY_FLOAT = [tf.TensorSpec(RANK_7_INPUT, tf.float32)]
-BINARY_FLOAT = [tf.TensorSpec(RANK_7_INPUT, tf.float32)] * 2
-TERNARY_FLOAT = [tf.TensorSpec(RANK_7_INPUT, tf.float32)] * 3
-UNARY_INT = [tf.TensorSpec(RANK_7_INPUT, tf.int32)]
-BINARY_INT = [tf.TensorSpec(RANK_7_INPUT, tf.int32)] * 2
-UNARY_BOOL = [tf.TensorSpec(RANK_7_INPUT, tf.bool)]
-BINARY_BOOL = [tf.TensorSpec(RANK_7_INPUT, tf.bool)] * 2
-UNARY_COMPLEX = [tf.TensorSpec(RANK_7_INPUT, tf.complex64)]
-BINARY_COMPLEX = [tf.TensorSpec(RANK_7_INPUT, tf.complex64)] * 2
-
-ALL_NUMBER_TYPES = [tf.int32, tf.float32, tf.complex64]
-REAL_NUMBER_TYPES = [tf.int32, tf.float32]
-FLOATING_NUMBER_TYPES = [tf.float32, tf.complex64]
+RANK_7_SHAPE = [2] * 7
+UNARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE]]
+BINARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE] * 2]
+TERNARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE] * 3]
 
 # Reused Configs.
-SEGMENT_CONFIG = ArgsConfig(args=[
-    tf.constant([
-        [1, 2, 3, 4],
-        [4, 3, 2, 1],
-        [5, 6, 7, 8],
-    ], np.float32),
-    np.array([0, 0, 1], np.int32)
-])
-UNSORTED_SEGMENT_CONFIG = ArgsConfig(args=[
-    tf.constant([
-        [1, 2, 3, 4],
-        [4, 3, 2, 1],
-        [5, 6, 7, 8],
-    ], np.float32),
-    np.array([0, 0, 1], np.int32),
-    2,
-])
+SEGMENT_UNIT_TEST_SPECS = tf_test_utils.unit_test_specs_from_args(
+    names_to_input_args={
+        "tf_doc_example": [
+            tf.constant([
+                [1, 2, 3, 4],
+                [4, 3, 2, 1],
+                [5, 6, 7, 8],
+            ], np.float32),
+            np.array([0, 0, 1], np.int32),
+        ]
+    })
+UNSORTED_SEGMENT_UNIT_TEST_SPECS = tf_test_utils.unit_test_specs_from_args(
+    names_to_input_args={
+        "tf_doc_example": [
+            tf.constant([
+                [1, 2, 3, 4],
+                [4, 3, 2, 1],
+                [5, 6, 7, 8],
+            ], np.float32),
+            np.array([0, 0, 1], np.int32),
+            2,
+        ]
+    })
 
-# A dict mapping tf.math function names to either a single Config (representing
-# the signature and other metadata to use to test that function) or a dict
-# mapping exported_names to Configs.
-#
-# Each entry will be normalized to be a dict mapping exported_names to Configs,
-# with a default exported_name matching the name of the tf.math function.
-FUNCTION_TO_CONFIGS = {
+# A dictionary mapping tf.math function names to lists of UnitTestSpecs.
+# Each unit_test_name will have the tf.math function name prepended to it.
+FUNCTIONS_TO_UNIT_TEST_SPECS = {
     "abs":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
-    "accumulate_n":
-        DtypeConfig(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
+    "accumulate_n": [
+        tf_test_utils.UnitTestSpec(
+            unit_test_name='f32',
+            input_signature=[[tf.TensorSpec(RANK_7_SHAPE, tf.float32)] * 5]),
+        tf_test_utils.UnitTestSpec(
+            unit_test_name='i32',
+            input_signature=[[tf.TensorSpec(RANK_7_SHAPE, tf.int32)] * 5]),
+    ],
     "acos":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "acosh":
-        Config(signature=UNARY_FLOAT, generator=tf_utils.ndarange),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "add":
-        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
-    "add_n":
-        DtypeConfig(signature=[TERNARY], dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
+    "add_n": [
+        tf_test_utils.UnitTestSpec(
+            unit_test_name='f32',
+            input_signature=[[tf.TensorSpec(RANK_7_SHAPE, tf.float32)] * 5]),
+        tf_test_utils.UnitTestSpec(
+            unit_test_name='i32',
+            input_signature=[[tf.TensorSpec(RANK_7_SHAPE, tf.int32)] * 5]),
+    ],
     "angle":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "argmax":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "argmin":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "asin":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "asinh":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "atan":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "atan2":
-        Config(signature=BINARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "atanh":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "bessel_i0":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "bessel_i0e":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "bessel_i1":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "bessel_i1e":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "betainc":
-        Config(signature=TERNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=TERNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "bincount":
-        Config(signature=UNARY_INT, generator=tf_utils.ndarange),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.int32],
+            input_generators=[tf_utils.ndarange]),
     "ceil":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "confusion_matrix":
-        ArgsConfig(args=[tf.constant([1, 2, 4]),
-                         tf.constant([2, 2, 4])]),
+        tf_test_utils.unit_test_specs_from_args(names_to_input_args={
+            "four_classes": [tf.constant([1, 2, 4]),
+                             tf.constant([2, 2, 4])]
+        }),
     "conj":
-        DtypeConfig(signature=UNARY_COMPLEX, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "cos":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "cosh":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "count_nonzero":
-        DtypeConfig(signature=UNARY,
-                    generator=tf_utils.ndarange,
-                    dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64],
+            input_generators=[tf_utils.ndarange]),
     "cumprod":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "cumsum":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "cumulative_logsumexp":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "digamma":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "divide":
-        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "divide_no_nan":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "equal":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "erf":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "erfc":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "erfinv":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "exp":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "expm1":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "floor":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "floordiv":
-        Config(signature=BINARY),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32],
+            # Avoid integer division by 0.
+            input_generators={
+                "uniform_1_3":
+                    lambda *args: tf_utils.uniform(*args, low=1.0, high=3.0)
+            }),
     "floormod":
-        Config(signature=BINARY),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32],
+            # Avoid integer division by 0.
+            input_generators={
+                "uniform_1_3":
+                    lambda *args: tf_utils.uniform(*args, low=1.0, high=3.0)
+            }),
     "greater":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "greater_equal":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "igamma":
-        Config(signature=BINARY),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "igammac":
-        Config(signature=BINARY),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "imag":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
-    "in_top_k":
-        Config(signature=[tf.TensorSpec([8], tf.int32),
-                          tf.TensorSpec([8, 3])],
-               kwargs=dict(k=3),
-               generator=tf_utils.ndarange),
-    "invert_permutation":
-        Config(signature=[tf.TensorSpec([8], tf.int32)],
-               generator=tf_utils.random_permutation),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
+    "in_top_k": [
+        tf_test_utils.UnitTestSpec(
+            unit_test_name="k_3",
+            input_signature=[
+                tf.TensorSpec([8], tf.int32),
+                tf.TensorSpec([8, 3])
+            ],
+            input_generator=tf_utils.ndarange,
+            kwargs=dict(k=3),
+        )
+    ],
+    "invert_permutation": [
+        tf_test_utils.UnitTestSpec(
+            unit_test_name="random",
+            input_signature=[tf.TensorSpec([8], tf.int32)],
+            input_generator=tf_utils.random_permutation,
+        )
+    ],
     "is_finite":
-        ArgsConfig(args=[tf.constant([[1., np.nan], [np.inf, 2.]])]),
+        tf_test_utils.unit_test_specs_from_args(names_to_input_args={
+            "nan_and_inf": [tf.constant([[1., np.nan], [np.inf, 2.]])]
+        }),
     "is_inf":
-        ArgsConfig(args=[tf.constant([[1., np.nan], [np.inf, 2.]])]),
+        tf_test_utils.unit_test_specs_from_args(names_to_input_args={
+            "nan_and_inf": [tf.constant([[1., np.nan], [np.inf, 2.]])]
+        }),
     "is_nan":
-        ArgsConfig(args=[tf.constant([[1., np.nan], [np.inf, 2.]])]),
+        tf_test_utils.unit_test_specs_from_args(names_to_input_args={
+            "nan_and_inf": [tf.constant([[1., np.nan], [np.inf, 2.]])]
+        }),
     "is_non_decreasing":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "is_strictly_increasing":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "l2_normalize":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "lbeta":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "less":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "less_equal":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "lgamma":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "log":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "log1p":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "log_sigmoid":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "log_softmax":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "logical_and":
-        Config(signature=BINARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "logical_not":
-        Config(signature=UNARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "logical_or":
-        Config(signature=BINARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "logical_xor":
-        Config(signature=BINARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "maximum":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "minimum":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "mod":
-        DtypeConfig(signature=BINARY,
-                    generator=lambda *args: tf_utils.ndarange(*args) + 1,
-                    dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32],
+            input_generators={
+                "positive_ndarange": lambda *args: tf_utils.ndarange(*args) + 1
+            }),
     "multiply":
-        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "multiply_no_nan":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "ndtri":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "negative":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "nextafter":
-        Config(signature=BINARY),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES),
     "not_equal":
-        DtypeConfig(signature=BINARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "polygamma":
-        ArgsConfig(args=[tf.ones(16), tf.linspace(0.5, 4, 16)]),
-    "polyval":
-        Config(signature=[TERNARY_FLOAT, tf.TensorSpec([])]),
-    "pow": {
-        # Use ndarange to avoid negative integer powers.
-        "int32": Config(signature=BINARY_INT, generator=tf_utils.ndarange),
-        "float32": Config(signature=BINARY_FLOAT),
-        "complex64": Config(signature=BINARY_COMPLEX),
-    },
+        tf_test_utils.unit_test_specs_from_args(names_to_input_args={
+            "nan_and_inf": [tf.ones(16), tf.linspace(0.5, 4, 16)]
+        }),
+    "polyval": [
+        tf_test_utils.UnitTestSpec(
+            unit_test_name="three_coeffs",
+            input_signature=[[tf.TensorSpec(RANK_7_SHAPE)] * 3,
+                             tf.TensorSpec([])],
+        )
+    ],
+    "pow":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64],
+            input_generators={
+                "positive_ndarange": lambda *args: tf_utils.ndarange(*args) + 1
+            }),
     "real":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "reciprocal":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "reciprocal_no_nan":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "reduce_all":
-        Config(signature=UNARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "reduce_any":
-        Config(signature=UNARY_BOOL),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.bool]),
     "reduce_euclidean_norm":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "reduce_logsumexp":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "reduce_max":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "reduce_mean":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "reduce_min":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "reduce_prod":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "reduce_std":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "reduce_sum":
-        DtypeConfig(signature=UNARY, dtypes=REAL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32]),
     "reduce_variance":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "rint":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "round":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "rsqrt":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "scalar_mul":
-        Config(
-            signature=[tf.TensorSpec([]), tf.TensorSpec([8])]),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[[[], [8]]]),
     "segment_max":
-        SEGMENT_CONFIG,
+        SEGMENT_UNIT_TEST_SPECS,
     "segment_mean":
-        SEGMENT_CONFIG,
+        SEGMENT_UNIT_TEST_SPECS,
     "segment_min":
-        SEGMENT_CONFIG,
+        SEGMENT_UNIT_TEST_SPECS,
     "segment_prod":
-        SEGMENT_CONFIG,
+        SEGMENT_UNIT_TEST_SPECS,
     "segment_sum":
-        SEGMENT_CONFIG,
+        SEGMENT_UNIT_TEST_SPECS,
     "sigmoid":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "sign":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "sin":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "sinh":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "sobol_sample":
-        ArgsConfig(args=[4, 3]),
+        tf_test_utils.unit_test_specs_from_args(
+            names_to_input_args={"simple": [4, 3]}),
     "softmax":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "softplus":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "softsign":
-        Config(signature=UNARY_FLOAT),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32]),
     "sqrt":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "square":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "squared_difference":
-        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "subtract":
-        DtypeConfig(signature=BINARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "tan":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "tanh":
-        DtypeConfig(signature=UNARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "top_k":
-        Config(signature=UNARY_FLOAT, kwargs=dict(k=2)),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32],
+            kwargs_to_values={"k": [1, 2]}),
     "truediv":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "unsorted_segment_max":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "unsorted_segment_mean":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "unsorted_segment_min":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "unsorted_segment_prod":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "unsorted_segment_sqrt_n":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "unsorted_segment_sum":
-        UNSORTED_SEGMENT_CONFIG,
+        UNSORTED_SEGMENT_UNIT_TEST_SPECS,
     "xdivy":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "xlog1py":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "xlogy":
-        DtypeConfig(signature=BINARY, dtypes=FLOATING_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.complex64]),
     "zero_fraction":
-        DtypeConfig(signature=UNARY, dtypes=ALL_NUMBER_TYPES),
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            signature_dtypes=[tf.float32, tf.int32, tf.complex64]),
     "zeta":
-        Config(
-            signature=BINARY_FLOAT,
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
             # The function is poorly behaved near zero, so we test this range
             # to avoid outputing all nans.
-            generator=lambda *args: tf_utils.uniform(*args, low=3.0, high=4.0)),
+            input_generators={
+                "uniform_3_4":
+                    lambda *args: tf_utils.uniform(*args, low=3.0, high=4.0)
+            },
+        )
 }
 
+for function, specs in FUNCTIONS_TO_UNIT_TEST_SPECS.items():
+  # Update using 'update_unit_test_name' to avoid updating shared UnitTestSpecs.
+  specs = [
+      spec.update_unit_test_name(f"{function}__{spec.unit_test_name}")
+      for spec in specs
+  ]
+  FUNCTIONS_TO_UNIT_TEST_SPECS[function] = specs
 
-def normalize_functions_to_configs(
-    functions_to_configs: Dict[str, Union[Config, Dict[str, Config]]]
-) -> Dict[str, Dict[str, Config]]:
-  # Normalize FUNCTION_TO_CONFIGS as described above.
-  normalized = dict()
-  for function_name, configs in functions_to_configs.items():
-    normalized[function_name] = dict()
-    if isinstance(configs, Config):
-      normalized[function_name] = {function_name: configs}
-    elif isinstance(configs, dict):
-      # Prepend the function names to existing exported names to make the logs
-      # readable. Split into two expressions so pytype can understand it.
-      normalized[function_name] = {
-          f"{function_name}_{config_name}": config
-          for config_name, config in configs.items()
-      }
-    else:
-      raise TypeError(
-          f"Unexpected type for value of FUNCTION_TO_CONFIGS {type(configs)}")
-  return normalized
-
-
-FUNCTION_TO_CONFIGS = normalize_functions_to_configs(FUNCTION_TO_CONFIGS)
+  # Validate that there are not multiple UnitTestSpecs with the same name.
+  seen_unit_test_names = set()
+  for spec in specs:
+    if spec.unit_test_name in seen_unit_test_names:
+      raise ValueError(
+          f"Found multiple UnitTestSpecs with the name '{spec.unit_test_name}'")
+    seen_unit_test_names.add(spec.unit_test_name)
 
 flags.DEFINE_list(
     "functions", None,
-    f"Any of {list(FUNCTION_TO_CONFIGS.keys())}. If more than one function is "
-    "provided then len(--target_backends) must be one.")
+    f"Any of {list(FUNCTIONS_TO_UNIT_TEST_SPECS.keys())}. If more than one "
+    "function is provided then len(--target_backends) must be one.")
 flags.DEFINE_bool(
     "dynamic_dims", False,
     "Whether or not to compile the layer with dynamic dimensions.")
@@ -427,92 +613,41 @@ flags.DEFINE_bool(
     '(and skip running the tests).')
 
 
-def is_complex(tensors: Union[Sequence[tf.TensorSpec], tf.TensorSpec]) -> bool:
-  if isinstance(tensors, Sequence):
-    for tensor in tensors:
-      if is_complex(tensor):
-        return True
-    return False
-  else:
-    return tensors.dtype.is_complex  # pytype: disable=attribute-error
-
-
-def _complex_wrapper(function):
-  """Wraps a tf.function to allow compiling functions of complex numbers."""
-
-  def decorator(*args, **kwargs):
-    inputs = []
-    for real, imag in zip(args[::2], args[1::2]):
-      inputs.append(tf.complex(real, imag))
-    result = function(*inputs, **kwargs)
-    # Directly returning a complex number causes an error.
-    return tf.math.real(result) + tf.math.imag(result)
-
-  return decorator
-
-
-def setup_complex_signature(function, signature: Sequence[tf.TensorSpec]):
-  """Compatibility layer for testing complex numbers."""
-  if not all([spec.dtype.is_complex for spec in signature]):
-    raise NotImplementedError("Signatures with mixed complex and non-complex "
-                              "tensor specs are not supported.")
-
-  # Rewrite the signature, replacing all complex tensors with pairs of real
-  # and imaginary tensors.
-  real_imag_signature = []
-  for spec in signature:
-    new_dtype = tf.float32 if spec.dtype.size == 8 else tf.float64
-    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
-    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
-
-  return _complex_wrapper(function), real_imag_signature
-
-
-def _make_dims_dynamic(spec: tf.TensorSpec) -> tf.TensorSpec:
-  return tf.TensorSpec([None] * len(spec.shape), spec.dtype)
-
-
-def create_function_unittest(function_name: str, config: Config,
-                             exported_name: str) -> tf.function:
-  """Creates a tf_function_unittest from the provided Config."""
+def create_function_unit_test(
+    function_name: str,
+    unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.function:
+  """Creates a tf_function_unit_test from the provided UnitTestSpec."""
   function = getattr(tf.math, function_name)
-  signature = config.signature
-  if is_complex(signature):
-    function, signature = setup_complex_signature(function, signature)
-  wrapped_function = lambda *args: function(*args, **config.kwargs)
+  signature = unit_test_spec.input_signature
+
+  if tf_utils.is_complex(signature):
+    function, signature = tf_utils.rewrite_complex_signature(
+        function, signature)
+  wrapped_function = lambda *args: function(*args, **unit_test_spec.kwargs)
 
   if FLAGS.dynamic_dims:
-    signature = tf_utils.apply_function(signature, _make_dims_dynamic)
+    signature = tf_utils.apply_function(signature, tf_utils.make_dims_dynamic)
 
-  return tf_test_utils.tf_function_unittest(
+  return tf_test_utils.tf_function_unit_test(
       input_signature=signature,
-      input_generator=config.generator,
-      input_args=config.args,
-      name=exported_name)(wrapped_function)
+      input_generator=unit_test_spec.input_generator,
+      input_args=unit_test_spec.input_args,
+      name=unit_test_spec.unit_test_name,
+      rtol=1e-5,
+      atol=1e-5)(wrapped_function)
 
 
 class TfMathModule(tf_test_utils.TestModule):
 
   def __init__(self):
     super().__init__()
-    for function_name in FLAGS.functions:
-      for config_name, config in FUNCTION_TO_CONFIGS[function_name].items():
-        # Create a unittest for each dtype specified by 'config'.
-        if isinstance(config, DtypeConfig):
-          for dtype_name, dtype_config in config:
-            if is_complex(dtype_config.signature) and not FLAGS.test_complex:
-              continue
-            exported_name = f"{config_name}_{dtype_name}"
-            function_unittest = create_function_unittest(
-                function_name, config, exported_name)
-            setattr(self, exported_name, function_unittest)
-        # Create a unittest for 'config'.
-        else:
-          if is_complex(config.signature) and not FLAGS.test_complex:
-            continue
-          function_unittest = create_function_unittest(
-              function_name, config, exported_name=config_name)
-          setattr(self, config_name, function_unittest)
+    for function in FLAGS.functions:
+      for unit_test_spec in FUNCTIONS_TO_UNIT_TEST_SPECS[function]:
+        if not FLAGS.test_complex and tf_utils.is_complex(
+            unit_test_spec.input_signature):
+          continue
+        function_unit_test = create_function_unit_test(function, unit_test_spec)
+        setattr(self, unit_test_spec.unit_test_name, function_unit_test)
 
 
 class TfMathTest(tf_test_utils.TracedModuleTestCase):
@@ -520,7 +655,7 @@ class TfMathTest(tf_test_utils.TracedModuleTestCase):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
-        TfMathModule, exported_names=TfMathModule.get_tf_function_unittests())
+        TfMathModule, exported_names=TfMathModule.get_tf_function_unit_tests())
 
 
 def main(argv):
@@ -529,11 +664,9 @@ def main(argv):
     tf.enable_v2_behavior()
 
   if FLAGS.list_functions_with_complex_tests:
-    for function_name, configs in FUNCTION_TO_CONFIGS.items():
-      for exported_name, config in configs.items():
-        if ((config.dtypes is not None and
-             any(dtype.is_complex for dtype in config.dtypes)) or
-            is_complex(config.signature)):
+    for function_name, unit_test_specs in FUNCTIONS_TO_UNIT_TEST_SPECS.items():
+      for spec in unit_test_specs:
+        if tf_utils.is_complex(spec.input_signature):
           print(f'    "{function_name}",')
     return
 
@@ -562,7 +695,7 @@ def main(argv):
   # TODO(meadowlark): provide a better way of overridding this default.
   TfMathModule.__name__ = os.path.join("tf", "math", settings_str)
 
-  TfMathTest.generate_unittests(TfMathModule)
+  TfMathTest.generate_unit_tests(TfMathModule)
   tf.test.main()
 
 

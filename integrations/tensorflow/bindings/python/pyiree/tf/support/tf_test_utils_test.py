@@ -54,18 +54,18 @@ class StatefulCountingModule(tf.Module):
 
 class TfFunctionUnittestModule(tf_test_utils.TestModule):
 
-  @tf_test_utils.tf_function_unittest(input_signature=[])
+  @tf_test_utils.tf_function_unit_test(input_signature=[])
   def no_args(self):
     return np.array([True], dtype=np.bool)
 
-  @tf_test_utils.tf_function_unittest(input_signature=[
+  @tf_test_utils.tf_function_unit_test(input_signature=[
       tf.TensorSpec([4]),
       tf.TensorSpec([4]),
   ])
   def default_uniform_inputs(self, a, b):
     return a + b
 
-  @tf_test_utils.tf_function_unittest(
+  @tf_test_utils.tf_function_unit_test(
       input_signature=[
           tf.TensorSpec([4]),
           tf.TensorSpec([4]),
@@ -75,7 +75,7 @@ class TfFunctionUnittestModule(tf_test_utils.TestModule):
   def custom_input_generator(self, a, b):
     return a + b
 
-  @tf_test_utils.tf_function_unittest(
+  @tf_test_utils.tf_function_unit_test(
       input_signature=[
           tf.TensorSpec([4]),
           tf.TensorSpec([4]),
@@ -89,7 +89,7 @@ class TfFunctionUnittestModule(tf_test_utils.TestModule):
     return a + b
 
   # This test will fail if atol is not successfully set.
-  @tf_test_utils.tf_function_unittest(
+  @tf_test_utils.tf_function_unit_test(
       input_signature=[
           tf.TensorSpec([128, 3072], tf.float32),
           tf.TensorSpec([3072, 256], tf.float32),
@@ -262,7 +262,7 @@ class TestUtilsTests(tf.test.TestCase, parameterized.TestCase):
         self._modules = tf_test_utils.compile_tf_module(
             TfFunctionUnittestModule)
 
-    TfFunctionUnittestTest.generate_unittests(TfFunctionUnittestModule)
+    TfFunctionUnittestTest.generate_unit_tests(TfFunctionUnittestModule)
     test_case = TfFunctionUnittestTest()
     self.assertTrue(hasattr(test_case, 'test_no_args'))
     self.assertTrue(hasattr(test_case, 'test_default_uniform_inputs'))

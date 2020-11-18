@@ -135,6 +135,62 @@ def save_input_values(inputs: Sequence[np.ndarray],
   return result
 
 
+def remove_special_characters(value: str) -> str:
+  """Replaces special characters with '_' while keeping instances of '__'."""
+  normalized_parts = []
+  for part in value.split("__"):
+    part = re.sub(r"[^a-zA-Z0-9_]", "_", part)  # Remove special characters.
+    part = re.sub(r"_+", "_", part)  # Remove duplicate "_".
+    part = part.strip("_")  # Don't end or start in "_".
+    normalized_parts.append(part)
+  return "__".join(normalized_parts)
+
+def is_complex(tensors: Union[Sequence[tf.TensorSpec], tf.TensorSpec]) -> bool:
+  if isinstance(tensors, Sequence):
+    for tensor in tensors:
+      if is_complex(tensor):
+        return True
+    return False
+  else:
+    return tensors.dtype.is_complex  # pytype: disable=attribute-error
+
+
+def _complex_wrapper(function):
+  """Wraps a tf.function to allow compiling functions of complex numbers."""
+
+  def decorator(*args, **kwargs):
+    inputs = []
+    for real, imag in zip(args[::2], args[1::2]):
+      inputs.append(tf.complex(real, imag))
+    result = function(*inputs, **kwargs)
+    # TODO(meadowlark): Support returning complex numbers.
+    return tf.math.real(result) + tf.math.imag(result)
+
+  return decorator
+
+
+def rewrite_complex_signature(function, signature: Sequence[tf.TensorSpec]):
+  """Compatibility layer for testing complex numbers."""
+  if not all([spec.dtype.is_complex for spec in signature]):
+    raise NotImplementedError("Signatures with mixed complex and non-complex "
+                              "tensor specs are not supported.")
+
+  # Rewrite the signature, replacing all complex tensors with pairs of real
+  # and imaginary tensors.
+  real_imag_signature = []
+  for spec in signature:
+    new_dtype = tf.float32 if spec.dtype.size == 8 else tf.float64
+    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
+    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
+
+  return _complex_wrapper(function), real_imag_signature
+
+
+def make_dims_dynamic(spec: tf.TensorSpec) -> tf.TensorSpec:
+  """Gives a tf.TensorSpec dynamic dims."""
+  return tf.TensorSpec([None] * len(spec.shape), spec.dtype)
+
+
 def _setup_mlir_crash_reproducer(
     function: Any,  # pytype doesn't support arbitrary Callable[*args, **kwargs]
     artifacts_dir: str,
