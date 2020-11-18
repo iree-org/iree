@@ -18,7 +18,12 @@
 FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
 COPY --from=gcr.io/iree-oss/swiftshader swiftshader/ swiftshader/
 
-RUN apt-get update && apt-get install -y vulkan-utils
-
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
+
+COPY --from=gcr.io/iree-oss/vulkan /opt/vulkan-sdk/ /opt/vulkan-sdk/
+ARG VULKAN_SDK_VERSION=1.2.154.0
+ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
+ENV PATH="${VULKAN_SDK}/bin:$PATH"
+RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
+  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
