@@ -95,7 +95,7 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 #elif defined(IREE_PLATFORM_WINDOWS)
 
-#pragma comment(lib, "synchronization")
+#pragma comment(lib, "Synchronization.lib")
 
 static inline iree_status_t iree_futex_wait(void* address,
                                             uint32_t expected_value,
