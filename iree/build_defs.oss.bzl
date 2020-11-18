@@ -14,8 +14,6 @@
 
 """Common Bazel definitions for IREE."""
 
-load("@rules_cc//cc:defs.bzl", _cc_binary = "cc_binary", _cc_library = "cc_library")
-
 # Target to the FileCheck binary.
 INTREE_FILECHECK_TARGET = "@llvm-project//llvm:FileCheck"
 
@@ -47,29 +45,12 @@ IREE_DRIVER_MODULES = [
     "//iree/hal/llvmjit:llvmjit_driver_module",
 ]
 
-# Aliases to the Starlark cc rules.
-cc_library = _cc_library
-
 def iree_build_test(name, targets):
     """Dummy rule to ensure that targets build.
 
     This is currently undefined in bazel and is preserved for compatibility.
     """
     pass
-
-def cc_binary(linkopts = [], **kwargs):
-    """Wrapper around low-level cc_binary that adds flags."""
-    _cc_binary(
-        linkopts = linkopts + select({
-            "//iree:iree_is_msvc": [],
-            "//conditions:default": [
-                # Just include libraries that should be presumed in 2020.
-                "-ldl",
-                "-lpthread",
-            ],
-        }),
-        **kwargs
-    )
 
 def iree_cmake_extra_content(content = "", inline = False):
     """Tool for inserting arbitrary content during Bazel->CMake conversion.

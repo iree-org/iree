@@ -15,11 +15,7 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "IREE_DRIVER_MODULES",
-    iree_cc_binary = "cc_binary",
-)
+load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -32,7 +28,7 @@ exports_files([
     "sanitizer_suppressions.txt",
 ])
 
-iree_cc_binary(
+cc_binary(
     name = "iree-benchmark-module",
     testonly = True,
     srcs = ["iree-benchmark-module-main.cc"],
@@ -53,7 +49,7 @@ iree_cc_binary(
     ] + IREE_DRIVER_MODULES,
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
@@ -207,7 +203,7 @@ cc_library(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-opt",
     tags = ["hostonly"],
     deps = [
@@ -215,7 +211,7 @@ iree_cc_binary(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
@@ -249,7 +245,7 @@ iree_cc_binary(
     ] + IREE_DRIVER_MODULES,
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-run-module",
     srcs = ["iree-run-module-main.cc"],
     deps = [
@@ -266,7 +262,7 @@ iree_cc_binary(
     ] + IREE_DRIVER_MODULES,
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-tblgen",
     tags = ["hostonly"],
     deps = [
@@ -301,7 +297,7 @@ cc_library(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-translate",
     tags = ["hostonly"],
     deps = [
