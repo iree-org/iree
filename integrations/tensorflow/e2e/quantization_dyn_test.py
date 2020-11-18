@@ -42,6 +42,7 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
   def test_fake_quant(self):
     def abs(module):
       module.fake_quant(tf_utils.uniform([32], low=-6, high=6))
+
     self.compare_backends(abs, self._modules)
 
 
