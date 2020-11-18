@@ -68,8 +68,11 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
 
+/// Creates a pass to fold processor ID uses where possible.
+std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass();
+
 //===----------------------------------------------------------------------===//
-// Passes
+// Pipelines
 //===----------------------------------------------------------------------===//
 
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the

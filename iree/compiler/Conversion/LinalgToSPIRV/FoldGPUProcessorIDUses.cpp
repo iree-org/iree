@@ -255,6 +255,10 @@ void populateFoldGPUProcessorIDUsesPatterns(
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 
+std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass() {
+  return std::make_unique<FoldGPUProcessIDUsesPass>();
+}
+
 static PassRegistration<FoldGPUProcessIDUsesPass> pass(
     "iree-codegen-fold-gpu-procid-uses",
     "Fold GPU processor ID uses where possible",
