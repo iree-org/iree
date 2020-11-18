@@ -40,6 +40,7 @@ class QuantizationDynTest(tf_test_utils.TracedModuleTestCase):
     self._modules = tf_test_utils.compile_tf_module(QuantizationDynModule)
 
   def test_fake_quant(self):
+
     def abs(module):
       module.fake_quant(tf_utils.uniform([32], low=-6, high=6))
 
