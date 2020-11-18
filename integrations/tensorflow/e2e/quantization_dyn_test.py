@@ -21,7 +21,7 @@ from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
-class MathModule(tf.Module):
+class QuantizationDynModule(tf.Module):
 
   @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
   def fake_quant(self, x):
@@ -33,11 +33,11 @@ class MathModule(tf.Module):
                                                         name=None)
 
 
-class MathTest(tf_test_utils.TracedModuleTestCase):
+class QuantizationDynTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(MathModule)
+    self._modules = tf_test_utils.compile_tf_module(QuantizationDynModule)
 
   def test_fake_quant(self):
     def abs(module):
