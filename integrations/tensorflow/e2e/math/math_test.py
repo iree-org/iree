@@ -17,7 +17,7 @@ UNARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE]]
 BINARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE] * 2]
 TERNARY_SIGNATURE_SHAPES = [[RANK_7_SHAPE] * 3]
 
-# Reused Configs.
+# Reused UnitTestSpecs.
 SEGMENT_UNIT_TEST_SPECS = tf_test_utils.unit_test_specs_from_args(
     names_to_input_args={
         "tf_doc_example": [
