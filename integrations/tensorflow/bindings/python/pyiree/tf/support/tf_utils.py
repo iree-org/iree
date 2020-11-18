@@ -718,7 +718,7 @@ def _get_concrete_functions(module_class: Type[tf.Module],
   functions = []
   for name in exported_names:
     functions.append(getattr(instance, name).get_concrete_function())
-  return functions, exported_names
+  return functions, exported_names, instance
 
 
 def tf_module_to_tflite_module_bytes(
@@ -736,10 +736,14 @@ def tf_module_to_tflite_module_bytes(
     A dict mapping method names to compiled TFLite module bytes.
   """
   tflite_modules = []
-  methods, method_names = _get_concrete_functions(module_class, exported_names)
+  methods, method_names, instance = _get_concrete_functions(
+      module_class, exported_names)
   for method in methods:
     converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
     tflite_modules.append(converter.convert())
+  # Keep variables alive until TFLite has done the conversion; ConcreteFunctions
+  # themselves only keep weak references to variables.
+  del instance
   return dict(zip(method_names, tflite_modules))
 
 
@@ -988,11 +992,6 @@ class BackendInfo:
           "driver": "vmla",
           "compiler_targets": ["vmla"]
       },
-      "iree_llvmjit": {
-          "compiled_module_class": IreeCompiledModule,
-          "driver": "llvm",
-          "compiler_targets": ["llvm-ir"]
-      },
       "iree_vulkan": {
           "compiled_module_class": IreeCompiledModule,
           "driver": "vulkan",
@@ -1005,13 +1004,13 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'iree_vmla', 'iree_llvmjit', 'iree_vulkan'.
+        'tf', 'iree_vmla', 'iree_vulkan'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
-      KeyError: if backend_name is not one of ['tf', 'iree_vmla',
-      'iree_llvmjit', 'iree_vulkan'].
+      KeyError: if backend_name is not one of
+        ['tf', 'iree_vmla', 'iree_vulkan'].
       ValueError: if backend_id doesn't start with backend_name.
     """
     if backend_name not in self._name_to_info:

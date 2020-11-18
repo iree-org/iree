@@ -665,43 +665,54 @@ LogicalResult PadOpConversion::apply(
 
 namespace {
 /// Converts mhlo.slice operation to linalg.subview + linalg.copy
-struct SliceOpConversion
-    : public ConvertToLinalgBufferOp<SliceOpConversion, mhlo::SliceOp> {
-  using ConvertToLinalgBufferOp<SliceOpConversion,
-                                mhlo::SliceOp>::ConvertToLinalgBufferOp;
+struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
+  SliceOpConversion(MLIRContext *context,
+                    TensorToBufferMap const &resultTensorToBufferMap,
+                    PatternBenefit benefit = 1)
+      : OpConversionPattern<mhlo::SliceOp>(context, benefit),
+        resultTensorToBufferMap(resultTensorToBufferMap) {}
 
-  LogicalResult apply(mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
+  LogicalResult matchAndRewrite(
+      mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
+    if (!argType || !argType.hasStaticShape()) {
+      return op.emitError("expected static shape");
+    }
+
+    auto resultShape = op.getResult().getType().cast<ShapedType>().getShape();
+    SmallVector<Value, 3> offsets, sizes, strides;
+    for (int i = 0, e = argType.getRank(); i < e; ++i) {
+      Value startIndex = rewriter.create<ConstantIndexOp>(
+          loc, op.start_indices().getValue<int64_t>(i));
+      offsets.push_back(startIndex);
+      Value size = rewriter.create<ConstantIndexOp>(loc, resultShape[i]);
+      sizes.push_back(size);
+      Value stride = rewriter.create<ConstantIndexOp>(
+          loc, op.strides().getValue<int64_t>(i));
+      strides.push_back(stride);
+    }
+    auto subViewOp = rewriter.create<SubViewOp>(loc, inputBuffers[0], offsets,
+                                                sizes, strides);
+
+    // If the result of the subview is already mapped to a buffer, a copy is
+    // required from the buffer above into the mapped buffer.
+    if (Value bufferForResult =
+            resultTensorToBufferMap.lookup(op.getResult())) {
+      rewriter.create<linalg::CopyOp>(loc, subViewOp, bufferForResult);
+      rewriter.replaceOp(op, bufferForResult);
+    } else {
+      rewriter.replaceOp(op, subViewOp.getResult());
+    }
+
+    return success();
+  }
+
+ private:
+  TensorToBufferMap const &resultTensorToBufferMap;
 };
 }  // namespace
-
-LogicalResult SliceOpConversion::apply(
-    mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  auto loc = op.getLoc();
-  auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
-  if (!argType || !argType.hasRank()) {
-    return op.emitError("expected known-rank args");
-  }
-
-  SmallVector<Value, 3> offsets, sizes, strides;
-  for (int i = 0, e = argType.getRank(); i < e; ++i) {
-    Value startIndex = rewriter.create<ConstantIndexOp>(
-        loc, op.start_indices().getValue<int64_t>(i));
-    offsets.push_back(startIndex);
-    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], i);
-    sizes.push_back(size);
-    Value stride = rewriter.create<ConstantIndexOp>(
-        loc, op.strides().getValue<int64_t>(i));
-    strides.push_back(stride);
-  }
-  auto subViewOp =
-      rewriter.create<SubViewOp>(loc, inputBuffers[0], offsets, sizes, strides);
-  rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
-
-  return success();
-}
 
 //===----------------------------------------------------------------------===//
 // mhlo.reduce_window conversion patterns and utility functions.

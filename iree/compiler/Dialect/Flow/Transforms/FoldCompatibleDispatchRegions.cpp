@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -200,15 +201,32 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   // that substituting library calls is easier.
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
-      // TODO(b/144530470): replace with tablegen attributes/interfaces.
-      if (isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp,
-              mhlo::DotOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-              mhlo::SliceOp, mhlo::TorchIndexSelectOp>(op)) {
+      // A root only op is mergable.
+      if (OpDispatchPolicy::isUnsupportedFusionOp(&op) &&
+          !OpDispatchPolicy::isRootOnlyOp(&op)) {
         return false;
       }
     }
   }
   return regionOp.body().getBlocks().size() == 1;
+}
+
+// Returns true if rhs has ops that can only be root op and will lose the
+// characteristic if merge two dispatch regions.
+bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
+  auto &rhsBlock = rhs.body().front();
+  auto lhsArgs = llvm::to_vector<8>(lhs.args());
+  auto rhsArgs = llvm::to_vector<8>(rhs.args());
+  for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
+    for (int lhsResultIdx = 0; lhsResultIdx < lhs.getNumResults();
+         ++lhsResultIdx) {
+      if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
+      for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
+        if (OpDispatchPolicy::isRootOnlyOp(user)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Merges |rhs| into |lhs| and returns the new |lhs| op.
@@ -344,6 +362,10 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
         // TODO(b/134675461): support non-trivial control flow.
         LLVM_DEBUG(llvm::dbgs()
                    << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
+      }
+      if (rhsHasRootOnlyOp(lhs, rhs)) {
+        LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS ROOT OP-\n");
+        continue;
       }
       mergableRegions[i] = mergeDispatchRegions(lhs, rhs);
       if (!mergableRegions[i]) {
