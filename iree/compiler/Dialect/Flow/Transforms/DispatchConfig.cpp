@@ -31,12 +31,6 @@ namespace Flow {
 namespace {
 // TODO(laurenzo): Every one of these should have better support and removed
 // from this exclusion list eventually.
-bool isUnsupportedFusionOp(Operation *op) {
-  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
-             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp, mhlo::SliceOp,
-             mhlo::TorchIndexSelectOp>(op);
-}
-
 // Allowlist of ops that materialize to a an index-permuted copy of some kind
 // if they exist standalone. Generally we try to avoid anchoring on these,
 // letting them fuse into more meaningful ops as possible.
@@ -180,6 +174,18 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   // such, we do as little as possible here and instead rely on optimization
   // passes to merge compatible regions.
   return FusionType::DISABLED;
+}
+
+// TODO(b/144530470): replace with tablegen attributes/interfaces.
+bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
+  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
+             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
+             mhlo::TorchIndexSelectOp>(op) ||
+         isRootOnlyOp(op);
+}
+
+bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
+  return isa<mhlo::SliceOp>(op);
 }
 
 }  // namespace Flow

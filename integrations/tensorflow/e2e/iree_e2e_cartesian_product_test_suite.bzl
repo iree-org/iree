@@ -164,6 +164,13 @@ def iree_e2e_cartesian_product_test_suite(
 
     tests = []
     for flags in all_flag_configurations:
+        if len(flags["target_backends"].split(",")) > 1:
+            fail("Multiple target backends cannot be specified at once, but " +
+                 "got `{}`".format(flags["target_backends"]))
+        driver = get_driver(flags["target_backends"])
+        if not driver:
+            continue
+
         # Check if this is a failing configuration.
         failing = flags in failing_flag_configurations
 
@@ -180,12 +187,6 @@ def iree_e2e_cartesian_product_test_suite(
         tests.append(test_name)
 
         args = ["--{}={}".format(k, v) for k, v in flags.items()]
-
-        if len(flags["target_backends"].split(",")) > 1:
-            fail("Multiple target backends cannot be specified at once, but " +
-                 "got `{}`".format(flags["target_backends"]))
-
-        driver = get_driver(flags["target_backends"])
         py_test_tags = ["driver={}".format(driver)]
         if tags != None:  # `is` is not supported.
             py_test_tags += tags
