@@ -110,6 +110,7 @@ LLVM_FAILING = [
     "math_dyn_test.py",
     "matrix_ops_dynamic_test.py",
     "range_test.py",
+    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
@@ -134,6 +135,7 @@ VULKAN_FAILING = [
     "math_dyn_test.py",
     "matrix_ops_dynamic_test.py",
     "range_test.py",
+    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",

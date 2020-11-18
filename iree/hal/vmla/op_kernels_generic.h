@@ -904,6 +904,20 @@ struct MaxKernel {
   }
 };
 
+struct AndKernel {
+  template <typename T>
+  inline void operator()(T* value0, const T value1) {
+    *value0 = *value0 && value1;
+  }
+};
+
+struct OrKernel {
+  template <typename T>
+  inline void operator()(T* value0, const T value1) {
+    *value0 = *value0 || value1;
+  }
+};
+
 template <typename T, typename KernelImpl>
 inline void ReduceDimension(absl::Span<const T> src_buffer,
                             absl::Span<T> dst_buffer, ShapeSpan src_shape,
@@ -1025,6 +1039,25 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
                           absl::Span<T> dst_buffer, int32_t dimension,
                           ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::MaxKernel>(
+      src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
+}
+
+
+template <typename T>
+Status ReduceAnd::Execute(absl::Span<const T> src_buffer,
+                          absl::Span<const T> init_buffer,
+                          absl::Span<T> dst_buffer, int32_t dimension,
+                          ShapeSpan src_shape, ShapeSpan dst_shape) {
+  return impl::GenericReduce<T, impl::AndKernel>(
+      src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
+}
+
+template <typename T>
+Status ReduceOr::Execute(absl::Span<const T> src_buffer,
+                         absl::Span<const T> init_buffer,
+                         absl::Span<T> dst_buffer, int32_t dimension,
+                         ShapeSpan src_shape, ShapeSpan dst_shape) {
+  return impl::GenericReduce<T, impl::OrKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
