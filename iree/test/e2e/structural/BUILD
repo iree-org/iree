@@ -20,12 +20,39 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(#2395): This fails on conversion to buffers for both LLVM-ir and SPIR-V.
+# TODO(#2395): Enable all the tests for both LLVM-ir and SPIR-V.
 iree_check_single_backend_test_suite(
-    name = "check_vmla-reference",
-    srcs = [
-        "fused_dispatch_region.mlir",
-    ],
+    name = "check_vmla",
+    srcs = glob(["*.mlir"]),
     driver = "vmla",
     target_backend = "vmla",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = [
+        "slice_add.mlir",
+    ],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+# TODO(ataei): Enable dylib-llvm-aot tests.
+# See: https://github.com/google/iree/issues/2645
+iree_check_single_backend_test_suite(
+    name = "check_llvm-ir_llvm",
+    srcs = [
+        "slice_add.mlir",
+    ],
+    driver = "llvm",
+    target_backend = "llvm-ir",
+)
+
+test_suite(
+    name = "check",
+    tests = [
+        ":check_llvm-ir_llvm",
+        ":check_vmla_vmla",
+        ":check_vulkan-spirv_vulkan",
+    ],
 )
