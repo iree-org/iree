@@ -117,7 +117,6 @@ void testVectorAdd1d() {
 }
 
 int main(int argc, char **argv) {
-  iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);
