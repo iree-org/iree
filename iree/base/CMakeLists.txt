@@ -379,8 +379,6 @@ iree_cc_test(
     ::synchronization
     benchmark
     iree::testing::benchmark_main
-  LABELS
-    "nowindows"
 )
 
 iree_cc_test(
@@ -392,8 +390,6 @@ iree_cc_test(
     ::synchronization
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "nowindows"
 )
 
 iree_cc_library(
@@ -445,8 +441,6 @@ iree_cc_test(
     ::threading
     benchmark
     iree::testing::benchmark_main
-  LABELS
-    "nowindows"
 )
 
 iree_cc_test(
@@ -460,8 +454,6 @@ iree_cc_test(
     ::threading
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "nowindows"
 )
 
 # TODO(benvanik): redirect to internal/tracing/ or something.
