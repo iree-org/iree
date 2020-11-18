@@ -44,13 +44,13 @@ DOC = """
 vision_model_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
 bazel run -c opt integrations/tensorflow/e2e/keras:vision_model_test_manual -- \
---target_backends=tf,iree_vmla,iree_llvmjit \
+--target_backends=tf,iree_vmla \
 --data=imagenet \
 --url=https://storage.googleapis.com/iree_models/ \
 --model=ResNet50
 
 Command arguments description:
---target_backends: can be combination of these: tf,iree_vmla,iree_llvmjit
+--target_backends: can be combination of these: tf,iree_vmla
 --data: can be 'imagenet' or 'cifar10'.
     imagenet - input image size (1, 224, 224, 3)
     cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests

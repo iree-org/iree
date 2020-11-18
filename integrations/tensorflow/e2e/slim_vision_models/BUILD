@@ -76,7 +76,6 @@ iree_e2e_cartesian_product_test_suite(
                 "resnet_v2_152",
             ],
             "target_backends": [
-                "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
@@ -159,7 +158,6 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
             "iree_vulkan",
         ],
     },

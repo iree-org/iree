@@ -992,11 +992,6 @@ class BackendInfo:
           "driver": "vmla",
           "compiler_targets": ["vmla"]
       },
-      "iree_llvmjit": {
-          "compiled_module_class": IreeCompiledModule,
-          "driver": "llvm",
-          "compiler_targets": ["llvm-ir"]
-      },
       "iree_vulkan": {
           "compiled_module_class": IreeCompiledModule,
           "driver": "vulkan",
@@ -1009,13 +1004,13 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'iree_vmla', 'iree_llvmjit', 'iree_vulkan'.
+        'tf', 'iree_vmla', 'iree_vulkan'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
-      KeyError: if backend_name is not one of ['tf', 'iree_vmla',
-      'iree_llvmjit', 'iree_vulkan'].
+      KeyError: if backend_name is not one of
+        ['tf', 'iree_vmla', 'iree_vulkan'].
       ValueError: if backend_id doesn't start with backend_name.
     """
     if backend_name not in self._name_to_info:
