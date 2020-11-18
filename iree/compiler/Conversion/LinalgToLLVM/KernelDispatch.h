@@ -15,13 +15,11 @@
 #include <cstdint>
 
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Value.h"
 
 namespace mlir {
-class Operation;
-class Value;
-class OpBuilder;
-class Operation;
-
 namespace iree_compiler {
 
 enum class TilingLevel {
