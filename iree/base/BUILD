@@ -447,9 +447,6 @@ cc_library(
         "threading_win32.c",
     ],
     hdrs = ["threading.h"],
-    copts = [
-        "-D_GNU_SOURCE=1",
-    ],
     deps = [
         ":api",
         ":atomics",
