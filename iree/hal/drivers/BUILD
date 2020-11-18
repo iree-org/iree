@@ -14,7 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
-    features = ["layering_check"],
+    features = ["-layering_check"],  # buildozer: disable=no-layering-check, allow indirect headers
     licenses = ["notice"],  # Apache 2.0
 )
 
