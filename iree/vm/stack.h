@@ -87,7 +87,7 @@ typedef struct iree_vm_stack_frame {
   // code), etc.
   iree_vm_source_offset_t pc;
 
-  IREE_TRACE(iree_zone_id_t trace_zone)
+  IREE_TRACE(iree_zone_id_t trace_zone);
 } iree_vm_stack_frame_t;
 
 // Returns the implementation-defined frame storage associated with |frame|.
