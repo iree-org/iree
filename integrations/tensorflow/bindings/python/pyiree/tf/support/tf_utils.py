@@ -811,8 +811,8 @@ def tf_module_to_tflite_module_bytes(
     A dict mapping method names to compiled TFLite module bytes.
   """
   tflite_modules = []
-  methods, method_names, instance = _get_concrete_functions(module_class,
-                                                            exported_names)
+  methods, method_names, instance = _get_concrete_functions(
+      module_class, exported_names)
   failed_methods = []
   for method, method_name in zip(methods, method_names):
     logging.info("Attempting to convert '%s' to tflite...", method_name)

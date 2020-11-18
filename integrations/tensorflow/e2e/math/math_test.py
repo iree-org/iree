@@ -140,7 +140,7 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
             signature_dtypes=[tf.float32]),
     "confusion_matrix":
         tf_test_utils.unit_test_specs_from_args(names_to_input_args={
-            "four_classes": [tf.constant([1, 2, 4]),
+            "five_classes": [tf.constant([1, 2, 4]),
                              tf.constant([2, 2, 4])]
         }),
     "conj":
