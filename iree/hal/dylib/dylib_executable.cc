@@ -37,6 +37,9 @@ DyLibExecutable::~DyLibExecutable() {
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   // Leak the library when tracing, since the profiler may still be reading it.
   // TODO(benvanik): move to an atexit handler instead, verify with ASAN/MSAN
+  // TODO(scotttodd): Make this compatible with testing:
+  //     two test cases, one for each function in the same executable
+  //     first test case passes, second fails to open the file (already open)
   executable_library_.release();
 #else
   executable_library_.reset();

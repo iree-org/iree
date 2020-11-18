@@ -25,9 +25,9 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Respect the user setting, but default to turning off the vulkan tests
-# and turning on the llvmjit ones.
+# and turning on the llvmaot ones.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
-export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-0}
+export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is
@@ -54,8 +54,8 @@ declare -a label_exclude_args=(
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=vulkan$")
 fi
-if [[ "${IREE_LLVMJIT_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=llvm$")
+if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
+  label_exclude_args+=("^driver=dylib$")
 fi
 
 # Join on "|"

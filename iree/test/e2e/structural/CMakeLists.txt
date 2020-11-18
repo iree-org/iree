@@ -39,11 +39,11 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-ir_llvm
+    check_dylib-llvm-aot_dylib
   SRCS
     "slice_add.mlir"
   TARGET_BACKEND
-    llvm-ir
+    dylib-llvm-aot
   DRIVER
-    llvm
+    dylib
 )

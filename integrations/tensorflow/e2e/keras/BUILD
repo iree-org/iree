@@ -44,13 +44,13 @@ DOC = """
 vision_model_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
 bazel run -c opt integrations/tensorflow/e2e/keras:vision_model_test_manual -- \
---target_backends=tf,iree_vmla \
+--target_backends=tf,iree_vmla,iree_llvmaot \
 --data=imagenet \
 --url=https://storage.googleapis.com/iree_models/ \
 --model=ResNet50
 
 Command arguments description:
---target_backends: can be combination of these: tf,iree_vmla
+--target_backends: can be combination of these: tf,iree_vmla,iree_llvmaot
 --data: can be 'imagenet' or 'cifar10'.
     imagenet - input image size (1, 224, 224, 3)
     cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests
@@ -126,7 +126,7 @@ iree_e2e_test_suite(
         "tf": TF_PASSING,
         "tflite": TFLITE_PASSING,
         "iree_vmla": VMLA_PASSING,
-        "iree_llvmjit": LLVM_PASSING,
+        "iree_llvmaot": LLVM_PASSING,
         "iree_vulkan": VULKAN_PASSING,
     },
     reference_backend = "tf",
@@ -140,7 +140,7 @@ iree_e2e_test_suite(
     backends_to_srcs = {
         "tflite": TFLITE_FAILING,
         "iree_vmla": VMLA_FAILING,
-        "iree_llvmjit": LLVM_FAILING,
+        "iree_llvmaot": LLVM_FAILING,
         "iree_vulkan": VULKAN_FAILING,
     },
     reference_backend = "tf",
@@ -174,7 +174,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -208,7 +208,7 @@ iree_e2e_cartesian_product_test_suite(
                 "ResNet152V2",
             ],
             "target_backends": [
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -232,7 +232,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -267,7 +267,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -320,7 +320,7 @@ iree_e2e_cartesian_product_test_suite(
                 "Xception",
             ],
             "target_backends": [
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -353,7 +353,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -435,7 +435,7 @@ iree_e2e_cartesian_product_test_suite(
             ],
             "target_backends": [
                 "iree_vmla",
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -448,7 +448,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -477,7 +477,7 @@ iree_e2e_cartesian_product_test_suite(
             "model": "ds_tc_resnet",
             "target_backends": [
                 "iree_vmla",
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -490,7 +490,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -513,7 +513,7 @@ iree_e2e_cartesian_product_test_suite(
                 "tf",
                 "tflite",
                 "iree_vmla",
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -530,7 +530,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },

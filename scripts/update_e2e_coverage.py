@@ -28,12 +28,13 @@ import utils
 
 TENSORFLOW_COVERAGE_DIR = 'tensorflow_coverage'
 REFERENCE_BACKEND = 'tf'
-# Assumes that tests are expanded for the tf, iree_vmla, and
+# Assumes that tests are expanded for the tf, iree_vmla, iree_llvmaot, and
 # iree_vulkan backends.
 BACKENDS_TO_TITLES = collections.OrderedDict([
     ('tf', 'tensorflow'),
     ('tflite', 'tflite'),
     ('iree_vmla', 'vmla'),
+    ('iree_llvmaot', 'llvm-aot'),
     ('iree_vulkan', 'vulkan-spirv'),
 ])
 

@@ -16,26 +16,26 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-ir-conv_img2col
+    check_llvm-aot-conv_img2col
   SRCS
     "conv.mlir"
   TARGET_BACKEND
-    llvm-ir
+    dylib-llvm-aot
   DRIVER
-    llvm
+    dylib
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-ir-exponential_fast
+    check_llvm-aot-exponential_fast
   SRCS
     "exponential.mlir"
   TARGET_BACKEND
-    llvm-ir
+    dylib-llvm-aot
   DRIVER
-    llvm
+    dylib
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-fast-exp=true"
 )

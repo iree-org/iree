@@ -66,7 +66,7 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "iree_vmla",
         },
         {
-            # Failing llvmjit and vulkan:
+            # Failing llvmaot and vulkan:
             "model": [
                 "nasnet_mobile",
                 "nasnet_large",
@@ -76,6 +76,7 @@ iree_e2e_cartesian_product_test_suite(
                 "resnet_v2_152",
             ],
             "target_backends": [
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -158,6 +159,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },

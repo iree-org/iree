@@ -54,7 +54,7 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": [
                 "tflite",
                 "iree_vmla",  # TODO(b/157581521)
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -75,7 +75,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -96,7 +96,7 @@ iree_e2e_cartesian_product_test_suite(
         {
             "target_backends": [
                 "iree_vmla",  # TODO(b/157581521)
-                "iree_llvmjit",
+                "iree_llvmaot",
                 "iree_vulkan",
             ],
         },
@@ -117,7 +117,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
