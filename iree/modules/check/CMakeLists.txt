@@ -51,10 +51,10 @@ iree_cc_binary(
     absl::flags
     absl::strings
     iree::base::api
+    iree::base::core_headers
     iree::base::file_io
     iree::base::init
     iree::base::status
-    iree::base::target_platform
     iree::base::tracing
     iree::modules::hal
     iree::testing::gtest

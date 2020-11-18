@@ -31,7 +31,7 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
-    iree::base::memory
+    iree::base::core_headers
     iree::base::ref_ptr
     iree::base::tracing
     iree::hal::host::host_local_allocator
@@ -57,7 +57,7 @@ iree_cc_test(
     ::api
     absl::inlined_vector
     absl::strings
-    iree::base::memory
+    iree::base::core_headers
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
@@ -147,11 +147,10 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
-    iree::base::bitfield
+    iree::base::core_headers
     iree::base::logging
     iree::base::ref_ptr
     iree::base::status
-    iree::base::target_platform
     iree::base::time
     iree::base::tracing
   PUBLIC

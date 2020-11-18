@@ -47,7 +47,7 @@ iree_cc_test(
   DEPS
     ::op_kernels
     absl::inlined_vector
-    iree::base::memory
+    iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -63,7 +63,7 @@ iree_cc_library(
     ::op_kernels
     absl::span
     iree::base::api
-    iree::base::memory
+    iree::base::core_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
@@ -92,8 +92,8 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
+    iree::base::core_headers
     iree::base::flatcc
-    iree::base::memory
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing

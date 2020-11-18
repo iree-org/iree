@@ -84,7 +84,7 @@ cc_library(
     srcs = ["host_executable_layout.cc"],
     hdrs = ["host_executable_layout.h"],
     deps = [
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/hal",
         "@com_google_absl//absl/container:inlined_vector",
     ],
@@ -111,7 +111,7 @@ cc_library(
         ":host_executable_layout",
         ":host_local_allocator",
         ":scheduling_model",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal",

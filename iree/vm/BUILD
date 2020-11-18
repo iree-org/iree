@@ -60,7 +60,7 @@ cc_library(
         ":stack",
         ":type_def",
         ":value",
-        "//iree/base:alignment",
+        "//iree/base:core_headers",
         "//iree/base:api",
         "//iree/base:flatcc",
         "//iree/base:tracing",
@@ -157,7 +157,7 @@ cc_library(
         ":module",
         ":stack",
         "//iree/base:api",
-        "//iree/base:atomics",
+        "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
 )
@@ -169,7 +169,7 @@ cc_library(
     deps = [
         ":builtin_types",
         "//iree/base:api",
-        "//iree/base:atomics",
+        "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
 )
@@ -195,8 +195,8 @@ cc_library(
         ":ref",
         ":type_def",
         ":value",
-        "//iree/base:alignment",
         "//iree/base:api",
+        "//iree/base:core_headers",
     ],
 )
 
@@ -219,9 +219,8 @@ cc_library(
     hdrs = ["module.h"],
     deps = [
         ":ref",
-        "//iree/base:alignment",
         "//iree/base:api",
-        "//iree/base:atomics",
+        "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
 )
@@ -312,7 +311,7 @@ cc_library(
     hdrs = ["ref.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:atomics",
+        "//iree/base:core_headers",
     ],
 )
 
@@ -345,8 +344,8 @@ cc_library(
     deps = [
         ":module",
         ":ref",
-        "//iree/base:alignment",
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:tracing",
     ],
 )
