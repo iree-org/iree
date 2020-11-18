@@ -22,7 +22,7 @@ package(
 
 # TODO(#2395): Enable all the tests for both LLVM-ir and SPIR-V.
 iree_check_single_backend_test_suite(
-    name = "check_vmla",
+    name = "check_vmla_vmla",
     srcs = glob(["*.mlir"]),
     driver = "vmla",
     target_backend = "vmla",
