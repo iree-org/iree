@@ -44,14 +44,26 @@ namespace iree_compiler {
 
 namespace {
 
-/// Returns true if the given `expr` does not contain mod/div operations.
-bool doesNotContainDivMod(AffineExpr expr) {
+/// Returns true if the given `expr` is a linear expression over one
+/// symbol/dimension.
+///
+/// Note that this function is not meant to check for all linear expression
+/// cases. It only checks that:
+/// 1) No mod/div operations,
+/// 2) For mul operations, one of the operand is a constant.
+/// Also this function assumes `expr` only contains one symbol/dimension.
+bool isLinearExpr(AffineExpr expr) {
   switch (expr.getKind()) {
-    case mlir::AffineExprKind::Add:
+    case mlir::AffineExprKind::Add: {
+      auto binExpr = expr.cast<AffineBinaryOpExpr>();
+      return isLinearExpr(binExpr.getLHS()) && isLinearExpr(binExpr.getRHS());
+    }
     case mlir::AffineExprKind::Mul: {
       auto binExpr = expr.cast<AffineBinaryOpExpr>();
-      return doesNotContainDivMod(binExpr.getLHS()) &&
-             doesNotContainDivMod(binExpr.getRHS());
+      AffineExpr lhs = binExpr.getLHS();
+      AffineExpr rhs = binExpr.getRHS();
+      return (lhs.isa<AffineConstantExpr>() && isLinearExpr(rhs)) ||
+             (rhs.isa<AffineConstantExpr>() && isLinearExpr(lhs));
     };
     case mlir::AffineExprKind::Mod:
     case mlir::AffineExprKind::FloorDiv:
@@ -159,10 +171,15 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
     // symbol with its lower and upper bound. This requires the result
     // expression to be a linear function of the input symbol.
     SmallVector<AffineExpr, 4> results;
+    // The indices into `results` where the corresponding AffineExpr is a
+    // constant from the original map. We need to keep track of this so later we
+    // can probe whether the constant is the min.
+    SmallVector<unsigned, 4> cstIndices;
     for (auto result : minOp.getAffineMap().getResults()) {
       if (auto cstResult = result.dyn_cast<AffineConstantExpr>()) {
         results.push_back(cstResult);
-      } else if (doesNotContainDivMod(result)) {
+        cstIndices.push_back(results.size() - 1);
+      } else if (isLinearExpr(result)) {
         results.push_back(simplifyAffineExpr(
             replaceSymbolWithValue(result, symbol0, 0), 0, 1));
         results.push_back(simplifyAffineExpr(
@@ -185,12 +202,16 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
       return true;
     };
 
-    // Check whether any of the expressions, when subtracted from all other
-    // expressions, produces only >= 0 constants. If so, it is the min.
-    for (auto result : results) {
+    // Check whether any of the original constant expressions, when subtracted
+    // from all other expressions, produces only >= 0 constants. If so, it is
+    // the min.
+    for (auto cstIndex : cstIndices) {
+      AffineExpr result = results[cstIndex];
+
       SmallVector<AffineExpr, 4> subExprs;
       subExprs.reserve(results.size());
       for (auto r : results) subExprs.push_back(r - result);
+
       AffineMap subMap =
           simplifyAffineMap(AffineMap::get(0, 1, subExprs, context));
       LLVM_DEBUG(llvm::dbgs() << "map by subtracting expr '" << result
