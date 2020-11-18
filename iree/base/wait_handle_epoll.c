@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/tracing.h"
-#include "iree/base/wait_handle.h"
-#include "iree/base/wait_handle_posix.h"
+// NOTE: must be first to ensure that we can define settings for all includes.
+#include "iree/base/wait_handle_impl.h"
 
 #if IREE_WAIT_API == IREE_WAIT_API_EPOLL
+
+#include "iree/base/tracing.h"
+#include "iree/base/wait_handle_posix.h"
 
 //===----------------------------------------------------------------------===//
 // iree_wait_set_t

@@ -454,6 +454,7 @@ cc_library(
     srcs = [
         "wait_handle.c",
         "wait_handle_epoll.c",
+        "wait_handle_impl.h",
         "wait_handle_kqueue.c",
         "wait_handle_poll.c",
         "wait_handle_posix.c",
@@ -461,12 +462,9 @@ cc_library(
         "wait_handle_win32.c",
     ],
     hdrs = ["wait_handle.h"],
-    copts = [
-        "-D_GNU_SOURCE=1",
-    ],
     deps = [
         ":api",
-        ":target_platform",
+        ":core_headers",
         ":tracing",
     ],
 )

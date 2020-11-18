@@ -12,29 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/wait_handle.h"
+// NOTE: must be first to ensure that we can define settings for all includes.
+#include "iree/base/wait_handle_impl.h"
 
 #ifndef IREE_BASE_WAIT_HANDLE_POSIX_H_
 #define IREE_BASE_WAIT_HANDLE_POSIX_H_
 
-// Priorities are (kqueue|epoll) > ppoll > poll
-#define IREE_WAIT_API_POLL 1
-#define IREE_WAIT_API_PPOLL 2
-#define IREE_WAIT_API_EPOLL 3
-#define IREE_WAIT_API_KQUEUE 4
-
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if defined(IREE_PLATFORM_WINDOWS)
-#define IREE_WAIT_API 0  // WFMO used in wait_handle_win32.c
-#else
-
-// TODO(benvanik): EPOLL on android/linux/bsd/etc.
-// TODO(benvanik): KQUEUE on mac/ios.
-#if !defined(OS_IOS) && !defined(__EMSCRIPTEN__)
-#define IREE_WAIT_API IREE_WAIT_API_PPOLL
-#else
-#define IREE_WAIT_API IREE_WAIT_API_POLL
-#endif  // insanity
+#if !defined(IREE_PLATFORM_WINDOWS)
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,6 +81,6 @@ iree_status_t iree_wait_primitive_clear(iree_wait_handle_t* handle);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_PLATFORM_WINDOWS
+#endif  // !IREE_PLATFORM_WINDOWS
 
 #endif  // IREE_BASE_WAIT_HANDLE_POSIX_H_
