@@ -509,8 +509,6 @@ iree_cc_library(
     "threading_impl.h"
     "threading_pthreads.c"
     "threading_win32.c"
-  COPTS
-    "-D_GNU_SOURCE=1"
   DEPS
     ::api
     ::atomics
