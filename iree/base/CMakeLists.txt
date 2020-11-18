@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT (tracing rule move)
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -462,6 +464,7 @@ iree_cc_test(
     "nowindows"
 )
 
+# TODO(benvanik): redirect to internal/tracing/ or something.
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
@@ -500,13 +503,12 @@ iree_cc_library(
   SRCS
     "wait_handle.c"
     "wait_handle_epoll.c"
+    "wait_handle_impl.h"
     "wait_handle_kqueue.c"
     "wait_handle_poll.c"
     "wait_handle_posix.c"
     "wait_handle_posix.h"
     "wait_handle_win32.c"
-  COPTS
-    "-D_GNU_SOURCE=1"
   DEPS
     ::api
     ::core_headers
