@@ -667,8 +667,8 @@ namespace {
 /// Converts mhlo.slice operation to linalg.subview + linalg.copy
 struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
   SliceOpConversion(MLIRContext *context,
-                            TensorToBufferMap const &resultTensorToBufferMap,
-                            PatternBenefit benefit = 1)
+                    TensorToBufferMap const &resultTensorToBufferMap,
+                    PatternBenefit benefit = 1)
       : OpConversionPattern<mhlo::SliceOp>(context, benefit),
         resultTensorToBufferMap(resultTensorToBufferMap) {}
 
