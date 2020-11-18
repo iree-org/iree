@@ -677,20 +677,17 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
-    if (!argType || !argType.hasRank()) {
-      return op.emitError("expected known-rank args");
+    if (!argType || !argType.hasStaticShape()) {
+      return op.emitError("expected static shape");
     }
 
-    auto resultType = op.getResult().getType().cast<ShapedType>();
-    auto memrefType =
-        MemRefType::get(resultType.getShape(), resultType.getElementType());
-    Value fakeBuffer = rewriter.create<AllocOp>(loc, memrefType);
+    auto resultShape = op.getResult().getType().cast<ShapedType>().getShape();
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0, e = argType.getRank(); i < e; ++i) {
       Value startIndex = rewriter.create<ConstantIndexOp>(
           loc, op.start_indices().getValue<int64_t>(i));
       offsets.push_back(startIndex);
-      Value size = rewriter.create<DimOp>(loc, fakeBuffer, i);
+      Value size = rewriter.create<ConstantIndexOp>(loc, resultShape[i]);
       sizes.push_back(size);
       Value stride = rewriter.create<ConstantIndexOp>(
           loc, op.strides().getValue<int64_t>(i));
@@ -699,8 +696,10 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
     auto subViewOp = rewriter.create<SubViewOp>(loc, inputBuffers[0], offsets,
                                                 sizes, strides);
 
-    Value bufferForResult = resultTensorToBufferMap.lookup(op.getResult());
-    if (bufferForResult) {
+    // If the result of the subview is already mapped to a buffer, a copy is
+    // required from the buffer above into the mapped buffer.
+    if (Value bufferForResult =
+            resultTensorToBufferMap.lookup(op.getResult())) {
       rewriter.create<linalg::CopyOp>(loc, subViewOp, bufferForResult);
       rewriter.replaceOp(op, bufferForResult);
     } else {
@@ -1248,8 +1247,7 @@ struct HALInterfaceLoadTensorOpEraser final
     // in the original computation the loaded tensor value goes through a chain
     // of view-like operations and is used as an operand to a store tensor
     // operation.
-    Value outputBuffer = resultTensorToBufferMap.lookup(loadOp.result());
-    if (outputBuffer && outputBuffer.getType() == buffer.getType()) {
+    if (Value outputBuffer = resultTensorToBufferMap.lookup(loadOp.result())) {
       rewriter.create<linalg::CopyOp>(loadOp.getLoc(), buffer, outputBuffer);
       rewriter.replaceOp(loadOp, outputBuffer);
     } else {
@@ -1385,11 +1383,6 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
       buffer = newReshapeOp.result();
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
-    }
-    if (auto sliceOp = tensor.getDefiningOp<mhlo::SliceOp>()) {
-      tensor = sliceOp.operand();
-      if (resultTensorToBufferMap.count(tensor)) break;
-      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
     }
     break;
   }

@@ -180,10 +180,10 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
 bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
   return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
              mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-             mhlo::TorchIndexSelectOp>(op) || canOnlyBeRootOp(op);
+             mhlo::TorchIndexSelectOp>(op) || isRootOnlyOp(op);
 }
 
-bool OpDispatchPolicy::canOnlyBeRootOp(Operation *op) {
+bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
   return isa<mhlo::SliceOp>(op);
 }
 

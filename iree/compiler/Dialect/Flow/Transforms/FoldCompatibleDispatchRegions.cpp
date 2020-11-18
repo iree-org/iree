@@ -203,7 +203,7 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
     for (auto &op : block) {
       // A root only op is mergable.
       if (OpDispatchPolicy::isUnsupportedFusionOp(&op) &&
-          !OpDispatchPolicy::canOnlyBeRootOp(&op)) {
+          !OpDispatchPolicy::isRootOnlyOp(&op)) {
         return false;
       }
     }
@@ -222,7 +222,7 @@ bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
          ++lhsResultIdx) {
       if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
       for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
-        if (OpDispatchPolicy::canOnlyBeRootOp(user)) return true;
+        if (OpDispatchPolicy::isRootOnlyOp(user)) return true;
       }
     }
   }
@@ -364,8 +364,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
                    << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
       }
       if (rhsHasRootOnlyOp(lhs, rhs)) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "   -RHS REGION HAS ROOT OP-\n");
+        LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS ROOT OP-\n");
         continue;
       }
       mergableRegions[i] = mergeDispatchRegions(lhs, rhs);
