@@ -37,6 +37,7 @@ cc_library(
         # TODO(benvanik): SIMD variants.
         "op_kernels_generic.h",
         "op_kernels_ruy.h",
+        "op_kernels_fft.h",
     ],
     deps = [
         "//iree/base:status",
@@ -49,6 +50,7 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_ruy//ruy",
         "@com_google_ruy//ruy:context",
+        "@pffft",
     ],
 )
 
