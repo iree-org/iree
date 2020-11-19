@@ -31,13 +31,22 @@ namespace iree_compiler {
 
 /// Apply canonicalizations related to tiling to make promotion/vectorization
 /// easier.
-void applyCanonicalizationPatterns(MLIRContext *context, Operation *op);
+void applyCanonicalizationPatternsForTiling(MLIRContext *context,
+                                            Operation *op);
 
-/// Method to tile and fuse sequence of Linalg operations in `linalgOps`.
 struct TileAndFuseOptions {
   linalg::LinalgLoopDistributionOptions distributionOptions;
   linalg::AllocBufferCallbackFn allocationFn = nullptr;
 };
+/// Method to tile and fuse sequence of Linalg operations in `linalgOps`. Uses
+/// the tile sizes for the first level of tiling specified in
+/// `launchConfig`. Proceeds by
+/// 1) Find the common loops around `linalgOps` that can be fused.
+/// 2) Tile the fusable loops in the last operation in the sequence.
+/// 3) Creates tiled version of the other ops within the inter-tile loops
+///    generated in step 2.
+/// 4) For all the tiled+fused ops, tile the unfused loops as specified by
+///    launchconfig.
 LogicalResult tileAndFuseLinalgBufferOps(
     FuncOp funcOp, ArrayRef<linalg::LinalgOp> linalgOps,
     const linalg::LinalgDependenceGraph &dependenceGraph,

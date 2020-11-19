@@ -58,6 +58,13 @@ static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
   return std::make_tuple(nprocs_x, nprocs / nprocs_x);
 }
 
+/// Returns the minimum of `shape` and `tileSize` if shape is static. If `shape`
+/// is dynamic returns `tileSize`.
+static int64_t getMinIfShapeStatic(int64_t shape, int64_t tileSize) {
+  if (shape == ShapedType::kDynamicSize) return tileSize;
+  return std::min(shape, tileSize);
+}
+
 namespace {
 struct LaunchConfigInfo {
   std::array<int64_t, 3> workgroupSize = {1, 1, 1};
@@ -280,9 +287,13 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     tileSizeK = 32;
   }
   assert(tileSizes.empty());
-  SmallVector<int64_t, 4> ts = {nRowsPerWorkitem * config.workgroupSize[1],
-                                nColsPerWorkitem * config.workgroupSize[0],
-                                tileSizeK};
+  int64_t M = op.inputs()[0].getType().cast<ShapedType>().getShape()[0];
+  int64_t N = op.inputs()[1].getType().cast<ShapedType>().getShape()[1];
+  int64_t K = op.inputs()[0].getType().cast<ShapedType>().getShape()[1];
+  SmallVector<int64_t, 4> ts = {
+      getMinIfShapeStatic(M, nRowsPerWorkitem * config.workgroupSize[1]),
+      getMinIfShapeStatic(N, nColsPerWorkitem * config.workgroupSize[0]),
+      getMinIfShapeStatic(K, tileSizeK)};
   tileSizes.emplace_back(std::move(ts));
   return success();
 }

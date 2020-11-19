@@ -75,9 +75,10 @@ static bool isFusableWithCurrentOpsList(
   Optional<SmallVector<int64_t, 4>> dstLoopBounds =
       linalg::getStaticLoopRanges(dstOp);
   if (!srcLoopBounds || !dstLoopBounds) return false;
-  for (unsigned i : llvm::seq<unsigned>(
-           0, std::min(3u, std::min(getNumOuterParallelLoops(srcOp),
-                                    getNumOuterParallelLoops(dstOp)))))
+  unsigned minNumParallelLoops =
+      std::min(3u, std::min(getNumOuterParallelLoops(srcOp),
+                            getNumOuterParallelLoops(dstOp)));
+  for (unsigned i : llvm::seq<unsigned>(0, minNumParallelLoops))
     if ((*srcLoopBounds)[i] != (*dstLoopBounds)[i]) return false;
   return true;
 }

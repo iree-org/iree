@@ -64,10 +64,9 @@ void eraseOp(OpBuilder &builder, Operation *op) {
 
 /// Computes the bounds of the loops of the `linalgOp`.
 template <typename BuilderTy>
-static Optional<SmallVector<Value, 4>> getLoopRange(BuilderTy &builder,
-                                                    Location loc,
-                                                    FuncOp numWorkgroupsFn,
-                                                    linalg::LinalgOp linalgOp) {
+static Optional<SmallVector<Value, 4>> getLoopUpperBounds(
+    BuilderTy &builder, Location loc, FuncOp numWorkgroupsFn,
+    linalg::LinalgOp linalgOp) {
   if (!numWorkgroupsFn.empty()) {
     numWorkgroupsFn.emitError("num workgroups fn expected to be empty");
     return {};
@@ -77,7 +76,7 @@ static Optional<SmallVector<Value, 4>> getLoopRange(BuilderTy &builder,
                  << numWorkgroupsFn.getName();
   });
 
-  builder.createBlock(&numWorkgroupsFn.getBody(), {},
+  builder.createBlock(&numWorkgroupsFn.getBody(), /*insertPt=*/{},
                       numWorkgroupsFn.getType().getInputs());
   llvm::SetVector<Operation *> slice;
   getBackwardSlice(linalgOp, &slice);
@@ -113,11 +112,11 @@ static Value buildCeilDiv(OpBuilder &builder, Location loc, Value numerator,
 
 /// Utility method to build IR that computes ceil(`numerator` / `denominator`)
 /// when denominator is a constant.
-static Value buildCeilDivConstDenominator(OpBuilder &builder, Location loc,
-                                          Value numerator,
-                                          int64_t denominator) {
-  return buildCeilDiv(builder, loc, numerator,
-                      builder.create<ConstantIndexOp>(loc, denominator));
+static Value buildCeilDiv(OpBuilder &builder, Location loc, Value numerator,
+                          int64_t denominator) {
+  return buildCeilDiv(
+      builder, loc, numerator,
+      builder.create<ConstantIndexOp>(loc, denominator).getResult());
 }
 
 template <class BuilderTy>
@@ -131,7 +130,7 @@ static LogicalResult createNumWorkgroupsFromResultShapeImpl(
 
   Location loc = linalgOp.getLoc();
   OpBuilder::InsertionGuard guard(builder);
-  auto loopRange = getLoopRange(builder, loc, numWorkgroupsFn, linalgOp);
+  auto loopRange = getLoopUpperBounds(builder, loc, numWorkgroupsFn, linalgOp);
   if (!loopRange) return failure();
 
   SmallVector<Value, 4> numWorkgroups;
@@ -139,8 +138,8 @@ static LogicalResult createNumWorkgroupsFromResultShapeImpl(
                                          distributedLoops.end());
   for (auto size : enumerate(tileSizes)) {
     if (size.value() && distributedLoopsSet.count(size.index())) {
-      Value num = buildCeilDivConstDenominator(
-          builder, loc, (*loopRange)[size.index()], size.value());
+      Value num =
+          buildCeilDiv(builder, loc, (*loopRange)[size.index()], size.value());
       numWorkgroups.push_back(num);
     }
   }
@@ -192,7 +191,7 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
   Location loc = linalgOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
   Optional<SmallVector<Value, 4>> loopRange =
-      getLoopRange(rewriter, loc, numWorkgroupsFn, linalgOp);
+      getLoopUpperBounds(rewriter, loc, numWorkgroupsFn, linalgOp);
   if (!loopRange) return failure();
   unsigned numParallelLoops = getNumOuterParallelLoops(linalgOp);
   Value one = rewriter.create<ConstantIndexOp>(loc, 1);
@@ -200,8 +199,8 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
   for (auto range : ArrayRef<Value>(*loopRange).take_front(numParallelLoops)) {
     returnValues[0] = rewriter.create<MulIOp>(loc, range, returnValues[0]);
   }
-  returnValues[0] = buildCeilDivConstDenominator(rewriter, loc, returnValues[0],
-                                                 workgroupSizeX);
+  returnValues[0] =
+      buildCeilDiv(rewriter, loc, returnValues[0], workgroupSizeX);
   rewriter.create<mlir::ReturnOp>(loc, returnValues);
   return success();
 }

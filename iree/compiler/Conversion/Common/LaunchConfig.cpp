@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- KernelDispatchUtils.cpp - Utilities for generating dispatch info ---===//
+//===- LaunchConfig.cpp - Specifies configuration used to drive the nfo ---===//
 //
-// This file defines utility functions that can be used to get the information
-// about tile sizes to use to partition work across workgroups, the workgroup
-// sizes and to create information the dispatch on the host side needs to
-// execute an entry point function (e.g. total number of workgroups).
+// This file defines the data structure that is used by the codegeneration to
+// lower to target specific IR. The values of the parameters are archtecture
+// specific. Once set the same transformations can be used to generate the
+// desired code. This allows sharing codegen infra between different backends.
 //
 //===----------------------------------------------------------------------===//
 
@@ -39,6 +39,7 @@ namespace iree_compiler {
 /// Name of the StrAttr that can be used to get the key to access the tile size
 /// information.
 static const char kLaunchInfoKey[] = "launch_info_key";
+
 static Optional<StringRef> getKey(Operation *op) {
   StringAttr attr = op->getAttrOfType<StringAttr>(kLaunchInfoKey);
   if (!attr) return {};
