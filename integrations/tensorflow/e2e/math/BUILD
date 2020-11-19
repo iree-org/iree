@@ -445,6 +445,7 @@ VULKAN_FAILING = [
     "logical_not",
     "logical_or",
     "logical_xor",
+    "mod",  # Passes with swiftshader, but fails on Turing GPU
     "ndtri",
     "nextafter",
     "polygamma",
