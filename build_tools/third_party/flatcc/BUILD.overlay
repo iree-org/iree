@@ -51,10 +51,14 @@ cc_library(
         "include/flatcc/flatcc_json_printer.h",
     ],
     copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
-      "-Wno-implicit-fallthrough",
-    ],
+        "-Iexternal/com_github_dvidelabs_flatcc/config/",
+        "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "-Wno-implicit-fallthrough",
+        ],
+    }),
     includes = [
       "include/",
     ],
