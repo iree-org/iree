@@ -17,6 +17,7 @@
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
+#include "iree/compiler/Conversion/LLVMToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -32,6 +33,12 @@ static llvm::cl::opt<bool> convImg2ColConversion(
     llvm::cl::desc("Enable rewriting linalg.conv linalg.generic that does "
                    "img2col buffer packing + "
                    "linag.matmul"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> fastExpConversion(
+    "iree-codegen-linalg-to-llvm-fast-exp",
+    llvm::cl::desc("If true convert llvm.intr.exp into its range reduced "
+                   "polynomial approximation."),
     llvm::cl::init(false));
 
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
@@ -66,6 +73,11 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+
+  // Approximate llvm.intr.exp with a 4-th order ploynmial in range[0, ln2].
+  if (fastExpConversion) {
+    passManager.addPass(createFastExpApproximationConversionPass());
+  }
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {

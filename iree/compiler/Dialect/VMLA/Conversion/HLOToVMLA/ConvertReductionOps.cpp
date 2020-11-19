@@ -186,6 +186,16 @@ struct BuiltinReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
           rewriter.getI32IntegerAttr(dimension), dst, dstShape,
           TypeAttr::get(elementType));
+    } else if (isa<mhlo::AndOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::ReduceAndOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
+          rewriter.getI32IntegerAttr(dimension), dst, dstShape,
+          TypeAttr::get(elementType));
+    } else if (isa<mhlo::OrOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::ReduceOrOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
+          rewriter.getI32IntegerAttr(dimension), dst, dstShape,
+          TypeAttr::get(elementType));
     } else {
       computeOp.emitRemark() << "unsupported builtin reduction operation";
       return failure();

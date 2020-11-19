@@ -814,6 +814,8 @@ class VMLAModuleState final {
   IREE_VMLA_REDUCTION_OP(ReduceMaxI16, kernels::ReduceMax, int16_t);
   IREE_VMLA_REDUCTION_OP(ReduceMaxI32, kernels::ReduceMax, int32_t);
   IREE_VMLA_REDUCTION_OP(ReduceMaxF32, kernels::ReduceMax, float);
+  IREE_VMLA_REDUCTION_OP(ReduceAndI8, kernels::ReduceAnd, int8_t);
+  IREE_VMLA_REDUCTION_OP(ReduceOrI8, kernels::ReduceOr, int8_t);
 
 #define IREE_VMLA_POOLING_OP(name, kernel, type)                              \
   Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,        \
@@ -1028,6 +1030,8 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("reduce.max.i16", &VMLAModuleState::ReduceMaxI16),
     vm::MakeNativeFunction("reduce.max.i32", &VMLAModuleState::ReduceMaxI32),
     vm::MakeNativeFunction("reduce.max.f32", &VMLAModuleState::ReduceMaxF32),
+    vm::MakeNativeFunction("reduce.and.i8", &VMLAModuleState::ReduceAndI8),
+    vm::MakeNativeFunction("reduce.or.i8", &VMLAModuleState::ReduceOrI8),
 
     vm::MakeNativeFunction("pooling.sum.i8", &VMLAModuleState::PoolingSumI8),
     vm::MakeNativeFunction("pooling.sum.i16", &VMLAModuleState::PoolingSumI16),

@@ -35,6 +35,7 @@ iree_cc_library(
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen
+    MLIRLLVMIR
     MLIRTargetLLVMIR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget

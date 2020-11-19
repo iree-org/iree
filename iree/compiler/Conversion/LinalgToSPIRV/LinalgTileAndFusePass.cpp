@@ -596,7 +596,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
     }
 
-    if (options.enableVectorization) {
+    if (launchConfig.useVectorize()) {
       {
         OwningRewritePatternList secondLevelTilingPatterns;
         populateTilingToSubgroupPatterns(context, launchConfig,

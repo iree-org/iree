@@ -25,6 +25,13 @@ def get_driver(backend):
         driver = ""
     return driver
 
+def set_difference(include, exclude):
+    return [
+        value
+        for value in include
+        if value not in exclude
+    ]
+
 def iree_e2e_test_suite(
         name,
         backends_to_srcs,

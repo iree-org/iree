@@ -12,30 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+set(HALF_API_ROOT "${IREE_ROOT_DIR}/third_party/half/")
 
-iree_check_single_backend_test_suite(
+external_cc_library(
+  PACKAGE
+    half
   NAME
-    check_llvm-ir-conv_img2col
-  SRCS
-    "conv.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-exponential_fast
-  SRCS
-    "exponential.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+    half
+  ROOT
+    ${HALF_API_ROOT}
+  HDRS
+    "half.hpp"
 )

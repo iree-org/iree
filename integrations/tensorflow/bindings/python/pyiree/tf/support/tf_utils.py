@@ -45,9 +45,15 @@ def uniform(shape: Sequence[int],
             dtype: Union[tf.DType, np.dtype] = np.float32,
             low: float = -1.0,
             high: float = 1.0) -> np.ndarray:
-  """np.random.uniform with simplified API and dtype control."""
+  """np.random.uniform with simplified API and dtype and bool support."""
   dtype = dtype.as_numpy_dtype if isinstance(dtype, tf.DType) else dtype
-  return np.random.uniform(size=shape, low=low, high=high).astype(dtype)
+  if dtype == np.bool:
+    return np.random.choice(2, shape).astype(np.bool)
+  else:
+    values = np.random.uniform(size=shape, low=low, high=high)
+    if np.issubdtype(dtype, np.integer):
+      values = np.round(values)
+    return values.astype(dtype)
 
 
 def ndarange(shape: Sequence[int],
@@ -57,22 +63,35 @@ def ndarange(shape: Sequence[int],
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
+def random_permutation(
+    shape: Sequence[int],
+    dtype: Union[tf.DType, np.dtype] = np.float32) -> np.ndarray:
+  """Returns a random permutation of [0, np.prod(shape))."""
+  values = ndarange(shape, dtype)
+  np.random.shuffle(values)
+  return values
+
+
+def apply_function(values, function):
+  """Applies 'function' recursively to the inputted values."""
+  if isinstance(values, list):
+    return [apply_function(v, function) for v in values]
+  elif isinstance(values, tuple):
+    return tuple(apply_function(v, function) for v in values)
+  elif isinstance(values, dict):
+    return {k: apply_function(v, function) for k, v in values.items()}
+  else:
+    return function(values)
+
+
 def generate_inputs(
     spec,  # Union[Sequence[tf.TensorSpec], tf.TensorSpec]
     input_generator: InputGeneratorType,
 ) -> Sequence[np.ndarray]:
   """Generates inputs for a given input signature using 'input_generator'."""
-  if isinstance(spec, Sequence):
-    # 'spec' is a sequence of 'tf.TensorSpec'.
-    # Recursively generate inputs.
-    return [generate_inputs(s, input_generator) for s in spec]
-  elif isinstance(spec, tf.TensorSpec):
-    # Handle dynamic shapes (e.g. batches) by substituting an int for None.
-    shape = [size if size is not None else 2 for size in spec.shape]
-    return input_generator(shape, spec.dtype)
-  else:
-    raise TypeError("Expected 'spec' to be a sequence of 'tf.TensorSpec' or "
-                    f"'tf.TensorSpec', but got '{type(spec)}'")
+  make_static = lambda shape: [dim if dim is not None else 2 for dim in shape]
+  generate = lambda spec: input_generator(make_static(spec.shape), spec.dtype)
+  return apply_function(spec, generate)
 
 
 def to_mlir_type(dtype: np.dtype) -> str:
@@ -114,6 +133,63 @@ def save_input_values(inputs: Sequence[np.ndarray],
       f.write(result)
       f.write("\n")
   return result
+
+
+def remove_special_characters(value: str) -> str:
+  """Replaces special characters with '_' while keeping instances of '__'."""
+  normalized_parts = []
+  for part in value.split("__"):
+    part = re.sub(r"[^a-zA-Z0-9_]", "_", part)  # Remove special characters.
+    part = re.sub(r"_+", "_", part)  # Remove duplicate "_".
+    part = part.strip("_")  # Don't end or start in "_".
+    normalized_parts.append(part)
+  return "__".join(normalized_parts)
+
+
+def is_complex(tensors: Union[Sequence[tf.TensorSpec], tf.TensorSpec]) -> bool:
+  if isinstance(tensors, Sequence):
+    for tensor in tensors:
+      if is_complex(tensor):
+        return True
+    return False
+  else:
+    return tensors.dtype.is_complex  # pytype: disable=attribute-error
+
+
+def _complex_wrapper(function):
+  """Wraps a tf.function to allow compiling functions of complex numbers."""
+
+  def decorator(*args, **kwargs):
+    inputs = []
+    for real, imag in zip(args[::2], args[1::2]):
+      inputs.append(tf.complex(real, imag))
+    result = function(*inputs, **kwargs)
+    # TODO(meadowlark): Support returning complex numbers.
+    return tf.math.real(result) + tf.math.imag(result)
+
+  return decorator
+
+
+def rewrite_complex_signature(function, signature: Sequence[tf.TensorSpec]):
+  """Compatibility layer for testing complex numbers."""
+  if not all([spec.dtype.is_complex for spec in signature]):
+    raise NotImplementedError("Signatures with mixed complex and non-complex "
+                              "tensor specs are not supported.")
+
+  # Rewrite the signature, replacing all complex tensors with pairs of real
+  # and imaginary tensors.
+  real_imag_signature = []
+  for spec in signature:
+    new_dtype = tf.float32 if spec.dtype.size == 8 else tf.float64
+    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
+    real_imag_signature.append(tf.TensorSpec(spec.shape, new_dtype))
+
+  return _complex_wrapper(function), real_imag_signature
+
+
+def make_dims_dynamic(spec: tf.TensorSpec) -> tf.TensorSpec:
+  """Gives a tf.TensorSpec dynamic dims."""
+  return tf.TensorSpec([None] * len(spec.shape), spec.dtype)
 
 
 def _setup_mlir_crash_reproducer(
@@ -557,28 +633,27 @@ def _normalize_numpy(result: np.ndarray):
   return result
 
 
+def _convert_to_numpy(tensor: Any) -> Any:
+  if not isinstance(tensor, tf.Tensor):
+    return tensor
+  return _normalize_numpy(tensor.numpy())
+
+
+def convert_to_numpy(values: Any) -> Any:
+  """Converts any tf.Tensor in values to numpy."""
+  return apply_function(values, _convert_to_numpy)
+
+
 class _TfFunctionWrapper(_FunctionWrapper):
   """Wraps a TF function, normalizing it to numpy."""
 
   def __init__(self, f: Callable[..., Any]):
     self._f = f
 
-  def _convert_to_numpy(self, tensor: Any) -> Any:
-    if not isinstance(tensor, tf.Tensor):
-      return tensor
-    return _normalize_numpy(tensor.numpy())
-
   def __call__(self, *args, **kwargs):
     # TensorFlow will auto-convert all inbound args.
     results = self._f(*args, **kwargs)
-    # Then unmarshal them to numpy in the same way that the other backends do.
-    # Handle single result (technically ambiguous with return of a tuple,
-    # which is sad).
-    if not isinstance(results, tuple):
-      results = (results,)
-    return tf.nest.map_structure(self._convert_to_numpy,
-                                 *results,
-                                 check_types=False)
+    return convert_to_numpy(results)
 
 
 def _convert_inputs_to_tensors(function):
@@ -738,9 +813,22 @@ def tf_module_to_tflite_module_bytes(
   tflite_modules = []
   methods, method_names, instance = _get_concrete_functions(
       module_class, exported_names)
-  for method in methods:
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
-    tflite_modules.append(converter.convert())
+  failed_methods = []
+  for method, method_name in zip(methods, method_names):
+    logging.info("Attempting to convert '%s' to tflite...", method_name)
+    try:
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
+      logging.info("...converted '%s' to tflite.", method_name)
+      tflite_modules.append(converter.convert())
+    except Exception as e:
+      logging.error("Failed to convert '%s' to tflite.", method_name)
+      logging.error("TFLite excpetion: %s", e)
+      failed_methods.append(method_name)
+
+  if failed_methods:
+    raise RuntimeError(
+        f"Failed to convert the following methods to tflite: {failed_methods}")
+
   # Keep variables alive until TFLite has done the conversion; ConcreteFunctions
   # themselves only keep weak references to variables.
   del instance

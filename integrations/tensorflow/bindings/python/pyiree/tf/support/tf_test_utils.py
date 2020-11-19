@@ -26,11 +26,13 @@ import collections
 import copy
 import glob
 import inspect
+import itertools
 import os
 import pickle
+import re
 import sys
 import tempfile
-from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -40,8 +42,8 @@ import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string("reference_backend", "tf",
                     "The backend to treat as a source of truth.")
-flags.DEFINE_string("target_backends", None,
-                    "Explicit comma-delimited list of target backends.")
+flags.DEFINE_list("target_backends", None,
+                  "Explicit comma-delimited list of target backends.")
 flags.DEFINE_string(
     "artifacts_dir", None,
     "Specifies a directory to dump compilation artifacts and traces to. "
@@ -56,6 +58,7 @@ flags.DEFINE_bool(
     "Creates and stores a SavedModel for the tf.Module class to be tested.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
+DEFAULT_INPUT_GENERATOR = tf_utils.uniform
 
 
 def _setup_artifacts_dir(module_name: str) -> str:
@@ -76,7 +79,7 @@ def _setup_artifacts_dir(module_name: str) -> str:
 
 def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
   """Decodes --target_backends and creates unique ids for them."""
-  backend_names = FLAGS.target_backends.split(",")
+  backend_names = FLAGS.target_backends
   backend_to_index = {k: 0 for k in backend_names if backend_names.count(k) > 1}
   backend_ids = []
 
@@ -140,11 +143,6 @@ class ModuleCall:
                atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
     self.method = method
-
-    for value in inputs:
-      if isinstance(value, tf.Tensor):
-        raise TypeError("Expected inputs to be native python types or numpy "
-                        f"arrays, but got {type(value)}")
 
     # Deepcopy to safegard against mutation.
     self.inputs = copy.deepcopy(inputs)
@@ -574,6 +572,10 @@ class TracedModule:
       # Only pass these to ModuleCall if they were specified by the user.
       tolerances = {k: v for k, v in tolerances.items() if v is not None}
 
+      # Ensure the inputs are numpy inputs.
+      args = tf_utils.convert_to_numpy(args)
+      kwargs = tf_utils.convert_to_numpy(kwargs)
+
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
       serialized_inputs, serialized_outputs = method.get_serialized_values()
@@ -602,7 +604,7 @@ Modules = collections.namedtuple("Modules",
 
 # We have to use a global variable to store the compiled modules so that we can
 # avoid recompilation. This is because the TestCase class resets it's entire
-# state and calls __init__ before each unittest. It also calls __init__ one
+# state and calls __init__ before each unit_test. It also calls __init__ one
 # additional time before that for good measure, which means without storing the
 # modules somewhere else we would have to compile each of them at least twice.
 # We can't store the modules on the class itself via setUpClass because of #2900
@@ -693,13 +695,229 @@ def compile_tf_signature_def_saved_model(
   return _global_modules
 
 
-def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
-                         input_args: Sequence[Any] = None,
-                         atol: float = None,
-                         rtol: float = None,
-                         name: str = None,
-                         **tf_function_kwargs):
-  """Creates a tf.function that can be used to generate unittests.
+# We use global variables to store the configuration information for
+# tf_function_unit_tests because tensorflow.python.eager.def_function.Function
+# is not an API that we can subclass, and storing the information directly
+# that class results in it being deleted at tf.Module initialization.
+# _global_unit_test_configs is a dict mapping exported_names to dicts containing
+# a get-function for input args and the tolerance kwargs for the trace.
+global _global_unit_test_configs
+_global_unit_test_configs = dict()
+
+
+class UnitTestSpec:
+
+  def __init__(self,
+               unit_test_name: str,
+               input_signature: Sequence[tf.TensorSpec],
+               input_generator: tf_utils.InputGeneratorType = None,
+               input_args: Union[Sequence[Any], None] = None,
+               kwargs: Dict[str, Any] = None):
+    self.unit_test_name = tf_utils.remove_special_characters(unit_test_name)
+    self.input_signature = input_signature
+    self.input_args = input_args
+    self.kwargs = dict() if kwargs is None else kwargs
+    self.input_generator = input_generator
+
+  def with_name(self, new_name: str) -> "UnitTestSpec":
+    return UnitTestSpec(new_name, self.input_signature, self.input_generator,
+                        self.input_args, self.kwargs)
+
+  def __str__(self):
+    return self.unit_test_name
+
+
+def _dictionary_product(dictionary: Dict[Any, Any]) -> List[Dict[Any, Any]]:
+  """Returns a named cartesian product of dictionary's values.
+
+  Converts {'a': [1, 2], 'b': [3, 4]} into
+  [{'a': 1, 'b': 3}, {'a': 1, 'b': 4}, {'a': 2, 'b': 3}, {'a': 2, 'b': 4}]
+  """
+  product = [[]]
+  for values in dictionary.values():
+    # Iteratively grow the elements of the product.
+    product = [element + [value] for element in product for value in values]
+  dicts = [{k: v for k, v in zip(dictionary, element)} for element in product]
+  return dicts
+
+
+def _named_kwargs_product(
+    kwargs_to_values: Dict[str, Sequence[Any]]) -> Dict[str, Dict[str, Any]]:
+  """Splits kwargs_to_values into a Cartesian product of its elements."""
+  # Validate 'kwargs_to_values'
+  if kwargs_to_values is None:
+    kwargs_to_values = dict()  # Use only default kwargs.
+  for kwarg_key, kwarg_values in kwargs_to_values.items():
+    if not isinstance(kwarg_values, Sequence):
+      raise TypeError(f"Expected kwargs_to_values[{repr(kwarg_key)}] to be a "
+                      f"sequence, but got '{type(kwarg_values)}'")
+
+  # Expand across a Cartesian product.
+  kwargs_product = _dictionary_product(kwargs_to_values)
+  # {'a': 1, 'b': 3} -> "a_1__b_3"
+  dict_to_str = lambda d: "__".join([f"{k}_{v}" for k, v in d.items()])
+  return {dict_to_str(kwargs): kwargs for kwargs in kwargs_product}
+
+
+def unit_test_specs_from_signatures(
+    signature_shapes: Sequence[Sequence[Sequence[int]]],
+    signature_dtypes: Sequence[tf.DType] = [tf.float32],
+    input_generators: Union[Sequence[tf_utils.InputGeneratorType],
+                            Dict[str, tf_utils.InputGeneratorType]] = [
+                                DEFAULT_INPUT_GENERATOR
+                            ],
+    kwargs_to_values: Dict[str, Sequence[Any]] = None) -> List[UnitTestSpec]:
+  """Generates a Cartesian product of UnitTestSpecs from the given arguments.
+
+  Args:
+    signature_shapes:
+      A sequence (representing multiple signatures to test) of sequences
+      (representing the shapes of the args in those signatures) of ints
+      (representing the individual sizes of those shapes).
+    signature_dtypes:
+      A sequence of dtypes to test each signature with.
+    input_generators:
+      Either:
+        1. a sequence of input generators to test each of the signature-dtype
+           pairs with
+        2. a dictionary mapping input generator names to input generators to
+           test each of the signature-dtype pairs with. This format must be used
+           if any of the generators are lambda functions.
+    kwargs_to_values:
+      A dict mapping kwarg names to sequences of values that they can take.
+
+  Returns:
+    A list of 'UnitTestSpec's generated from the provided arguments.
+  """
+  # Validate 'signature_shapes'
+  for i, shapes in enumerate(signature_shapes):
+    if not isinstance(shapes, Sequence):
+      raise TypeError(f"Expected signature_shapes[{i}] to be a sequence, but "
+                      f"got '{type(shapes)}'")
+    for j, shape in enumerate(shapes):
+      if not isinstance(shape, Sequence):
+        raise TypeError(f"Expected signature_shapes[{i}][{j}] to be a "
+                        f"sequence, but got '{type(shape)}'")
+      for k, size in enumerate(shape):
+        if not isinstance(size, int):
+          raise TypeError(f"Expected signature_shapes[{i}][{j}][{k}] to be an "
+                          f"int but got '{type(size)}")
+
+  # Parse 'signature_shapes'
+  names_to_shapes = dict()
+  for signature in signature_shapes:
+    # Converts [[1, 2, 3], [4, 5]] into 1x2x3_4x5.
+    signature_key = "_".join(
+        ["x".join(str(size) for size in shape) for shape in signature])
+    names_to_shapes[signature_key] = signature
+
+  # Validate 'signature_dtypes'
+  for i, dtype in enumerate(signature_dtypes):
+    if not isinstance(dtype, tf.DType):
+      raise TypeError(
+          f"Expected dtypes[{i}] to be a tf.DType, but got '{type(dtype)}'")
+
+  # Parse 'signature_dtypes'
+  # 'complex64' -> 'c64'
+  abbreviate = lambda dtype: re.sub(r"([a-z])[a-z]*([0-9]+)", r"\1\2", dtype)
+  names_to_dtypes = {
+      abbreviate(dtype.name): dtype for dtype in signature_dtypes
+  }
+
+  # Validate 'input_generators'
+  if not isinstance(input_generators, (Sequence, Dict)):
+    raise TypeError("Expected 'input_generators' to be a sequence or "
+                    f"dictionary, but got '{type(input_generators)}'")
+  if isinstance(input_generators, Sequence):
+    for i, generator in enumerate(input_generators):
+      if generator.__name__ == "<lambda>":
+        raise TypeError(
+            f"'input_generators' was a sequence but input_generators[{i}] was "
+            "lambda function. 'input_generators' must be a dictionary if "
+            "lambda functions are used.")
+
+  # Parse 'input_generators'
+  if isinstance(input_generators, Sequence):
+    names_to_generators = {gen.__name__: gen for gen in input_generators}
+  else:
+    names_to_generators = input_generators
+
+  # Validate and parse 'kwargs_to_values'
+  names_to_kwargs = _named_kwargs_product(kwargs_to_values)
+
+  # Create a Cartesian product through all specifications and their names.
+  specs = [
+      names_to_shapes, names_to_dtypes, names_to_generators, names_to_kwargs
+  ]
+  # pytype: disable=attribute-error
+  key_product = itertools.product(*[list(spec.keys()) for spec in specs])
+  value_product = itertools.product(*[list(spec.values()) for spec in specs])
+  # pytype: enable=attribute-error
+
+  # Generate a UnitTestSpec for each element in the above product.
+  unit_tests = []
+  for keys, (shapes, dtype, generator, kwargs) in zip(key_product,
+                                                      value_product):
+    unit_test_name = "__".join(key for key in keys if key)
+    input_signature = [tf.TensorSpec(shape, dtype) for shape in shapes]
+    unit_tests.append(
+        UnitTestSpec(
+            unit_test_name=unit_test_name,
+            input_signature=input_signature,
+            input_generator=generator,
+            input_args=None,
+            kwargs=kwargs,
+        ))
+  return unit_tests
+
+
+def unit_test_specs_from_args(
+    names_to_input_args: Dict[str, Sequence[Any]],
+    kwargs_to_values: Dict[str, Sequence[Any]] = None) -> List[UnitTestSpec]:
+  """Generates a Cartesian product of UnitTestSpecs from the given arguments.
+
+  Args:
+    signature_shapes:
+      A dict mapping names for input arguments to the arguments themselves.
+    kwargs_to_values:
+      A dict mapping kwarg names to sequences of values that they can take.
+
+  Returns:
+    A list of 'UnitTestSpec's generated from the provided arguments.
+  """
+  # Validate and parse 'kwargs_to_values'
+  names_to_kwargs = _named_kwargs_product(kwargs_to_values)
+
+  # Create a Cartesian product through all specifications and their names.
+  specs = [names_to_input_args, names_to_kwargs]
+  key_product = itertools.product(*[list(spec.keys()) for spec in specs])
+  value_product = itertools.product(*[list(spec.values()) for spec in specs])
+
+  # Generate a UnitTestSpec for each element in the above product.
+  unit_tests = []
+  for keys, (input_args, kwargs) in zip(key_product, value_product):
+    unit_test_name = "__".join(key for key in keys if key)
+    input_signature = tf_utils.apply_function(
+        input_args,
+        lambda x: tf.TensorSpec.from_tensor(tf.convert_to_tensor(x)))
+    unit_tests.append(
+        UnitTestSpec(
+            unit_test_name=unit_test_name,
+            input_signature=input_signature,
+            input_generator=None,
+            input_args=input_args,
+            kwargs=kwargs,
+        ))
+  return unit_tests
+
+
+def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
+                          input_args: Sequence[Any] = None,
+                          atol: float = None,
+                          rtol: float = None,
+                          name: str = None,
+                          **tf_function_kwargs):
+  """Creates a tf.function that can be used to generate unit_tests.
 
   If 'input_generator' and 'input_args' are unspecified then the function will
   be tested using random uniform data.
@@ -707,7 +925,7 @@ def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
   Args:
     input_generator:
       an optional callable taking a shape and dtype that returns input data for
-      the unittest.
+      the unit_test.
     input_args:
       an optional sequence of values to pass as positional args to the function.
     atol:
@@ -729,7 +947,7 @@ def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
     __name__ attribute if 'name' was specified.
   """
 
-  def _store_unittest_info(function):
+  def _store_unit_test_info(function):
     # Validate arguments.
     if input_generator is not None and input_args is not None:
       raise ValueError(
@@ -737,58 +955,54 @@ def tf_function_unittest(input_generator: tf_utils.InputGeneratorType = None,
 
     function = tf.function(**tf_function_kwargs)(function)
 
-    # Used to identify that the tf.function was created by this decorator.
-    function.is_tf_function_unittest = True
-
-    # Set function.get_trace_args.
-    if input_generator is not None:
-      # Use the user-specificed input_generator.
-      function.get_trace_args = lambda: tf_utils.generate_inputs(
-          function.input_signature, input_generator)
-    elif input_args is not None:
-      # Use the user-specified input_args.
-      function.get_trace_args = lambda: copy.deepcopy(input_args)
-    else:
-      # No user data specification – default to using random uniform data.
-      function.get_trace_args = lambda: tf_utils.generate_inputs(
-          function.input_signature, tf_utils.uniform)
-
-    # Set function.trace_kwargs.
-    function.trace_kwargs = dict(atol=atol, rtol=rtol)
-
-    # Set function.__name__.
+    # Set function.__name__
     if name is not None:
       function.__name__ = name
     elif function.__name__ == "<lambda>":
       raise ValueError("The 'name' kwarg must be provided when decorating a "
                        "lambda function.")
 
+    global _global_unit_test_configs
+    if function.__name__ not in _global_unit_test_configs:
+
+      if input_generator is not None:
+        # Use the user-specificed input_generator.
+        get_trace_args = lambda: tf_utils.generate_inputs(
+            function.input_signature, input_generator)
+      elif input_args is not None:
+        # Use the user-specified input_args.
+        get_trace_args = lambda: copy.deepcopy(input_args)
+      else:
+        # No user data specification – default to using random uniform data.
+        get_trace_args = lambda: tf_utils.generate_inputs(
+            function.input_signature, DEFAULT_INPUT_GENERATOR)
+
+      _global_unit_test_configs[function.__name__] = dict(
+          get_trace_args=get_trace_args,
+          trace_kwargs=dict(atol=atol, rtol=rtol))
+
     return function
 
-  return _store_unittest_info
+  return _store_unit_test_info
 
 
 class TestModule(tf.Module):
-  """Thin wrapper of tf.Module with helper methods for tf_function_unittests."""
+  """Thin tf.Module wrapper with helper methods for tf_function_unit_tests."""
 
   @classmethod
-  def get_tf_function_unittests(cls):
-    """Get all tf_function_unittest-created tf.functions on the class."""
-    tf_function_unittests = []
-    for name in dir(cls):
-      value = getattr(cls, name)
-      if hasattr(value, 'is_tf_function_unittest'):
-        tf_function_unittests.append(value)
+  def get_tf_function_unit_tests(cls):
+    """Get all tf_function_unit_test-created tf.functions on the class."""
+    # Initialize the module to ensure that _global_unit_test_configs has the
+    # info for all of the unit_tests. (Only doing this if
+    # _global_unit_test_configs is empty wouldn't address the case where some
+    # unit_tests are defined on the class and some are generated by __init__).
+    cls()
 
-    if not len(tf_function_unittests):
+    tf_function_unit_tests = list(_global_unit_test_configs.keys())
+    if not len(tf_function_unit_tests):
       raise ValueError(
-          "'get_tf_function_unittests' was called but no unittests were found.")
-    return tf_function_unittests
-
-  @classmethod
-  def get_exported_names(cls):
-    """Get the names of all tf_function_unittest-created tf.functions"""
-    return [function.__name__ for function in cls.get_tf_function_unittests()]
+          "'get_tf_function_unit_tests' was called but no tests were found.")
+    return tf_function_unit_tests
 
 
 class TracedModuleTestCase(tf.test.TestCase):
@@ -802,35 +1016,38 @@ class TracedModuleTestCase(tf.test.TestCase):
       module.reinitialize()
 
   @classmethod
-  def generate_unittests(cls, module_class: Type[TestModule]):
-    """Generates unittests for each 'tf_function_unittest' on 'module_class'."""
-    for function in module_class.get_tf_function_unittests():
-      # We have to pass the closure argument 'funcion' to 'trace' via a kwarg
-      # instead of using it directly in the body because 'function' is
-      # overwritten in each iteration of this loop, and python will only use
-      # the most recent version of 'function'. If we didn't do this, then we
-      # would only test the last function in this loop. The same is true for
-      # passing 'trace' to 'unittest'.
+  def generate_unit_tests(cls, module_class: Type[TestModule]):
+    """Generates tests for each 'tf_function_unit_test' on 'module_class'."""
+    for function_name in module_class.get_tf_function_unit_tests():
+      # We have to pass the closure arguments 'function_name', 'get_args' and
+      # 'kwargs' to 'trace' via a kwarg instead of using it directly in the body
+      # because 'function_name' and 'unit_test_config' are overwritten in each
+      # iteration of this loop, and python will only use the most recent version
+      # of each. If we didn't do this, then we would only test the last function
+      # in this loop. The same is true for passing 'trace' to 'unit_test'.
+      unit_test_config = _global_unit_test_configs[function_name]
 
       # Runs the inputs through a (traced) module.
-      def trace(module, function=function):
-        getattr(module, function.__name__)(*function.get_trace_args(),
-                                           **function.trace_kwargs)
+      def trace(module,
+                function_name=function_name,
+                get_args=unit_test_config["get_trace_args"],
+                kwargs=unit_test_config["trace_kwargs"]):
+        getattr(module, function_name)(*get_args(), **kwargs)
 
       # Give the trace the name of the tf.function that it is testing.
-      trace.__name__ = function.__name__
+      trace.__name__ = function_name
 
       # Runs 'trace' on modules compiled to each backend and compares them.
-      def unittest(self, trace=trace):
+      def unit_test(self, trace=trace):
         self.compare_backends(trace, self._modules)
 
-      # Make 'unittest' a function on the TracedModuleTestCase, which tells
+      # Make 'unit_test' a function on the TracedModuleTestCase, which tells
       # the test runner to run it.
-      unittest.__name__ = f"test_{function.__name__}"
-      if hasattr(cls, unittest.__name__):
-        raise ValueError("Tried to generate multiple instances of the unittest "
-                         f"'{unittest.__name__}'.")
-      setattr(cls, unittest.__name__, unittest)
+      unit_test.__name__ = f"test_{function_name}"
+      if hasattr(cls, unit_test.__name__):
+        raise ValueError("Tried to generate multiple instances of the "
+                         f"unit_test '{unit_test.__name__}'.")
+      setattr(cls, unit_test.__name__, unit_test)
 
   def compare_backends(self, trace_function: Callable[[TracedModule], None],
                        modules: Modules) -> None:

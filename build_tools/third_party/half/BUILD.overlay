@@ -1,3 +1,4 @@
+
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,30 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+package(default_visibility = ["//visibility:public"])
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-conv_img2col
-  SRCS
-    "conv.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-exponential_fast
-  SRCS
-    "exponential.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+cc_library(
+    name = "half",
+    hdrs = ["half.hpp"],
+    include_prefix = "third_party/half",
 )
