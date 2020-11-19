@@ -59,6 +59,9 @@ class OpDispatchPolicy {
   // Returns true if |op| can only be a root op.
   static bool isRootOnlyOp(Operation *op);
 
+  // Returns true if |op| can only be a root op.
+  static bool isLeafOnlyOp(Operation *op);
+
   // Returns true if the given |op| can be dispatched in all cases.
   // Other passes may handle special cases of these ops but this initial
   // identification is conservative.

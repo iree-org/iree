@@ -201,10 +201,11 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   // that substituting library calls is easier.
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
-      // A root only op is mergable.
+      // A root/leaf only op is mergable.
       if ((OpDispatchPolicy::isUnsupportedFusionOp(&op) ||
            OpDispatchPolicy::isFusableWithConsumersOnly(&op)) &&
-          !OpDispatchPolicy::isRootOnlyOp(&op)) {
+          !OpDispatchPolicy::isRootOnlyOp(&op) &&
+          !OpDispatchPolicy::isLeafOnlyOp(&op)) {
         return false;
       }
     }
@@ -224,6 +225,36 @@ bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
       if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
       for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
         if (OpDispatchPolicy::isRootOnlyOp(user)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Returns true if lhs has ops that can only be leaf op and will lose the
+// characteristic if merge two dispatch regions.
+bool lhsHasLeafOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
+  auto lhsArgs = llvm::to_vector<8>(lhs.args());
+  auto rhsArgs = llvm::to_vector<8>(rhs.args());
+  auto &lhsBlock = lhs.body().front();
+
+  // Find the values used as return values in the lhs.
+  // We'll need to replace the uses in rhs with these.
+  auto lhsReturnOp = cast<IREE::Flow::ReturnOp>(lhsBlock.getTerminator());
+  SmallVector<Value, 8> lhsReturnValues;
+  lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
+  lhsReturnValues.append(lhsReturnOp.operand_begin(),
+                         lhsReturnOp.operand_end());
+
+  for (int lhsResultIdx = 0; lhsResultIdx < lhs.getNumResults();
+       ++lhsResultIdx) {
+    if (!OpDispatchPolicy::isLeafOnlyOp(
+            lhsReturnValues[lhsResultIdx].getDefiningOp())) {
+      continue;
+    }
+    for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
+      if (rhsArgs[rhsOpIdx] == lhs.getResult(lhsResultIdx)) {
+        return true;
       }
     }
   }
@@ -364,7 +395,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
         LLVM_DEBUG(llvm::dbgs()
                    << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
       }
-      if (rhsHasRootOnlyOp(lhs, rhs)) {
+      if (rhsHasRootOnlyOp(lhs, rhs) || lhsHasLeafOnlyOp(lhs, rhs)) {
         LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS ROOT OP-\n");
         continue;
       }

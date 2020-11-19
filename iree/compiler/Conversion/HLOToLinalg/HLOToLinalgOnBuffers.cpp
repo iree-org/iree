@@ -615,57 +615,59 @@ LogicalResult ConcatenateOpConversion::apply(
 namespace {
 /// Converts mhlo.pad operation to linalg.indexed_generic op.
 // TODO(#1604): Lower the pad op to a Linalg named op.
-struct PadOpConversion
-    : public ConvertToLinalgBufferOp<PadOpConversion, mhlo::PadOp> {
-  using ConvertToLinalgBufferOp<PadOpConversion,
-                                mhlo::PadOp>::ConvertToLinalgBufferOp;
+struct PadOpConversion : public OpConversionPattern<mhlo::PadOp> {
+  PadOpConversion(MLIRContext *context,
+                  TensorToBufferMap const &resultTensorToBufferMap,
+                  PatternBenefit benefit = 1)
+      : OpConversionPattern<mhlo::PadOp>(context, benefit),
+        resultTensorToBufferMap(resultTensorToBufferMap) {}
 
-  LogicalResult apply(mhlo::PadOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
+  LogicalResult matchAndRewrite(
+      mhlo::PadOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    mhlo::PadOp::Adaptor adaptor(args);
+    auto loc = op.getLoc();
+
+    Value bufferForResult = resultTensorToBufferMap.lookup(op.getResult());
+    {
+      OpBuilder::InsertionGuard regionGuard(rewriter);
+      rewriter.setInsertionPointAfterValue(adaptor.padding_value());
+      Attribute paddingConstVal = getInitValueAsConst(op.padding_value());
+      Value paddingVal =
+          paddingConstVal
+              ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
+              : rewriter.create<LoadOp>(loc, adaptor.padding_value())
+                    .getResult();
+      // Since all the memory related ops (e.g., placeholder, subview) are put
+      // on the top, and the producers work on `subview`, we can fill the
+      // padding value at memory related ops stage.
+      if (paddingVal.getDefiningOp()->isBeforeInBlock(
+              bufferForResult.getDefiningOp())) {
+        rewriter.setInsertionPointAfterValue(bufferForResult);
+      }
+      rewriter.create<linalg::FillOp>(loc, bufferForResult, paddingVal);
+    }
+
+    // If the input is a constant, there is no convesion in this pass. So we can
+    // fill the value here.
+    bufferForResult = resultTensorToBufferMap.lookup(op.operand());
+    if (auto cstOp = dyn_cast<ConstantOp>(args[0].getDefiningOp())) {
+      auto inputConstAttr =
+          cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
+      Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
+      rewriter.create<linalg::FillOp>(loc, bufferForResult, cstVal);
+    } else if (args[0] != bufferForResult) {
+      rewriter.create<linalg::CopyOp>(loc, args[0], bufferForResult);
+    }
+    rewriter.replaceOp(op, bufferForResult);
+
+    return success();
+  }
+
+ private:
+  TensorToBufferMap const &resultTensorToBufferMap;
 };
 }  // namespace
-
-LogicalResult PadOpConversion::apply(
-    mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
-    ConversionPatternRewriter &rewriter) const {
-  mhlo::PadOp::Adaptor adaptor(inputBuffers);
-  auto loc = op.getLoc();
-
-  Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
-  Value paddingVal =
-      paddingConstVal
-          ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
-          : rewriter.create<LoadOp>(loc, adaptor.padding_value());
-
-  const auto &edgePaddingLow = op.edge_padding_low();
-  const auto &interiorPadding = op.interior_padding();
-  SmallVector<Value, 3> offsets, sizes, strides;
-  for (auto it : llvm::enumerate(llvm::zip(edgePaddingLow, interiorPadding))) {
-    Value startIndex = rewriter.create<ConstantIndexOp>(
-        loc, std::get<0>(it.value()).getZExtValue());
-    offsets.push_back(startIndex);
-    Value size = rewriter.create<DimOp>(loc, inputBuffers[0], it.index());
-    sizes.push_back(size);
-    Value stride = rewriter.create<ConstantIndexOp>(
-        loc, std::get<1>(it.value()).getZExtValue() + 1);
-    strides.push_back(stride);
-  }
-
-  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
-  auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
-                                              sizes, strides);
-  if (auto cstOp = dyn_cast<ConstantOp>(inputBuffers[0].getDefiningOp())) {
-    auto inputConstAttr =
-        cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
-    Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
-    rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
-  } else {
-    rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
-  }
-
-  return success();
-}
 
 //===----------------------------------------------------------------------===//
 // mhlo.slice conversion patterns.
@@ -1251,11 +1253,12 @@ struct HALInterfaceLoadTensorOpEraser final
     Value buffer = phOp.getResult();
 
     // If the result of the load is already mapped to a buffer, a copy is
-    // required from the buffer above into the mapped buffer. This happens when
-    // in the original computation the loaded tensor value goes through a chain
-    // of view-like operations and is used as an operand to a store tensor
-    // operation.
-    if (Value outputBuffer = resultTensorToBufferMap.lookup(loadOp.result())) {
+    // required from the buffer above into the mapped buffer. This happens
+    // when in the original computation the loaded tensor value goes through a
+    // chain of view-like operations and is used as an operand to a store
+    // tensor operation.
+    Value outputBuffer = resultTensorToBufferMap.lookup(loadOp.result());
+    if (outputBuffer && !outputBuffer.getDefiningOp<SubViewOp>()) {
       rewriter.create<linalg::CopyOp>(loadOp.getLoc(), buffer, outputBuffer);
       rewriter.replaceOp(loadOp, outputBuffer);
     } else {
@@ -1294,7 +1297,7 @@ struct HALInterfaceStoreTensorOpEraser final
     // If we are just storing the buffer back to itself again, we can trivially
     // remove this op. Otherwise, copy the content from the source buffer to the
     // destination buffer.
-    if (outputBuffer == operand) {
+    if (outputBuffer == operand || operand.getDefiningOp<SubViewOp>()) {
       rewriter.eraseOp(storeOp);
       return success();
     }
@@ -1389,6 +1392,29 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
           op.getLoc(), getMemrefTypeForTensor(tensorReshapeOp.getSrcType()),
           buffer, tensorReshapeOp.reassociation());
       buffer = newReshapeOp.result();
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
+      continue;
+    }
+    if (auto padOp = tensor.getDefiningOp<mhlo::PadOp>()) {
+      tensor = padOp.operand();
+      if (resultTensorToBufferMap.count(tensor)) break;
+      Location loc = padOp.getLoc();
+      const auto &edgePaddingLow = padOp.edge_padding_low();
+      const auto &interiorPadding = padOp.interior_padding();
+      SmallVector<Value, 3> offsets, sizes, strides;
+      for (auto it :
+           llvm::enumerate(llvm::zip(edgePaddingLow, interiorPadding))) {
+        Value startIndex = builder.create<ConstantIndexOp>(
+            loc, std::get<0>(it.value()).getZExtValue());
+        offsets.push_back(startIndex);
+        Value size = builder.create<ConstantIndexOp>(
+            loc, tensor.getType().cast<ShapedType>().getDimSize(it.index()));
+        sizes.push_back(size);
+        Value stride = builder.create<ConstantIndexOp>(
+            loc, std::get<1>(it.value()).getZExtValue() + 1);
+        strides.push_back(stride);
+      }
+      buffer = builder.create<SubViewOp>(loc, buffer, offsets, sizes, strides);
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }

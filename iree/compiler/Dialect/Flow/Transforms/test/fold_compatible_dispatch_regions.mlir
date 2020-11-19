@@ -162,3 +162,25 @@ module {
 //       CHECK: flow.dispatch.region
 //  CHECK-NEXT:   mhlo.slice
 //  CHECK-NEXT:   mhlo.multiply
+
+// -----
+
+module {
+  func @reshapeAndRootOnlyOp(%arg0: tensor<3x2x2xi32>, %arg1: tensor<1x2xi32>) -> tensor<1x2xi32> {
+    %c0 = constant 0 : index
+    %0 = flow.dispatch.region[%c0 : index](%arg2 = %arg0 : tensor<3x2x2xi32>) -> tensor<3x4xi32> {
+      %3 = "mhlo.reshape"(%arg2) : (tensor<3x2x2xi32>) -> tensor<3x4xi32>
+      flow.return %3 : tensor<3x4xi32>
+    }
+    %1 = flow.dispatch.region[%c0 : index](%arg2 = %0 : tensor<3x4xi32>) -> tensor<1x2xi32> {
+      %3 = "mhlo.slice"(%arg2) {limit_indices = dense<[2, 3]> : tensor<2xi64>, start_indices = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<3x4xi32>) -> tensor<1x2xi32>
+      flow.return %3 : tensor<1x2xi32>
+    }
+    return %1 : tensor<1x2xi32>
+  }
+}
+// CHECK-LABEL: func @reshapeAndRootOnlyOp
+//       CHECK: flow.dispatch.region
+//  CHECK-NEXT:   mhlo.reshape
+//       CHECK: flow.dispatch.region
+//  CHECK-NEXT:   mhlo.slice

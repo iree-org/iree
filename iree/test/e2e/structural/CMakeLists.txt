@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "matmul_add.mlir"
+    "pad.mlir"
     "slice_add.mlir"
   TARGET_BACKEND
     vulkan-spirv
@@ -43,6 +44,7 @@ iree_check_single_backend_test_suite(
     check_llvm-ir_llvm
   SRCS
     "matmul_add.mlir"
+    "pad.mlir"
     "slice_add.mlir"
   TARGET_BACKEND
     llvm-ir
