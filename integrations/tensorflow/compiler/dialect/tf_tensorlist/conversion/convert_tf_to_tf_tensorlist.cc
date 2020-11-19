@@ -19,9 +19,25 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
 namespace tf_tensorlist {
+
+namespace {
+TypeAttr GetVariantElementTypeAttr(Type type) {
+  if (auto variantTy = type.dyn_cast<TF::VariantType>()) {
+    return GetVariantElementTypeAttr(variantTy.getSubtypes().front());
+  }
+
+  if (auto shapedTy = type.dyn_cast<ShapedType>()) {
+    return GetVariantElementTypeAttr(shapedTy.getElementType());
+  }
+
+  return TypeAttr::get(type);
+}
+
+}  // namespace
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.inc"
 

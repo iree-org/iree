@@ -67,6 +67,12 @@ class TensorListModule(tf.Module):
     ta = ta.write(1, b)
     return ta.stack()
 
+  @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
+  def partially_empty_stack(self, x):
+    ta = tf.TensorArray(dtype=tf.float32, size=2, element_shape=[])
+    ta = ta.write(0, x)
+    return ta.stack()
+
 
 class TensorListTest(tf_test_utils.TracedModuleTestCase):
 
@@ -104,6 +110,11 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.concat_with_tensorlist_stack(np.array(42., dtype=np.float32),
                                           np.array(43., dtype=np.float32))
     self.compare_backends(concat_with_tensorlist_stack, self._modules)
+
+  def test_partially_empty_stack(self):
+    def partially_empty_stack(module):
+      module.partially_empty_stack(np.array(42., dtype=np.float32))
+    self.compare_backends(partially_empty_stack, self._modules)
   # yapf: enable
 
 

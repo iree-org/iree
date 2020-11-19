@@ -4,9 +4,9 @@
 
 // CHECK-LABEL: func @basic
 func @basic(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tensor<0xi32>, %index: tensor<i32>, %item: tensor<f32>) -> tensor<f32> {
-  // CHECK-NEXT: [[LIST0:%.+]] = "tf_tensorlist.Reserve"(%arg2, %arg1) : (tensor<0xi32>, tensor<i32>) -> !tf_tensorlist.list
+  // CHECK-NEXT: [[LIST0:%.+]] = "tf_tensorlist.Reserve"(%arg2, %arg1) {element_type = f32} : (tensor<0xi32>, tensor<i32>) -> !tf_tensorlist.list
   // CHECK-NEXT: [[LIST1:%.+]] = "tf_tensorlist.SetItem"([[LIST0]], %arg3, %arg4) : (!tf_tensorlist.list, tensor<i32>, tensor<f32>) -> !tf_tensorlist.list
-  // CHECK-NEXT: [[T:%.+]] = "tf_tensorlist.GetItem"([[LIST1]], %arg3, %arg2) : (!tf_tensorlist.list, tensor<i32>, tensor<0xi32>) -> tensor<f32>
+  // CHECK-NEXT: [[T:%.+]] = "tf_tensorlist.GetItem"([[LIST1]], %arg3) : (!tf_tensorlist.list, tensor<i32>) -> tensor<f32>
   // CHECK-NEXT: return [[T]] : tensor<f32>
   %list0 = "tf.TensorListReserve"(%element_shape, %num_elements) : (tensor<0xi32>, tensor<i32>) -> tensor<!tf.variant<tensor<f32>>>
   %list1 = "tf.TensorListSetItem"(%list0, %index, %item) : (tensor<!tf.variant<tensor<f32>>>, tensor<i32>, tensor<f32>) -> tensor<!tf.variant<tensor<f32>>>
@@ -16,9 +16,9 @@ func @basic(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tens
 
 // CHECK-LABEL: func @stack
 func @stack(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>) -> tensor<?xf32> {
-  // CHECK-NEXT: [[LIST0:%.+]] = "tf_tensorlist.FromTensor"(%arg0, %arg1) : (tensor<?xf32>, tensor<0xi32>) -> !tf_tensorlist.list
+  // CHECK-NEXT: [[LIST0:%.+]] = "tf_tensorlist.FromTensor"(%arg0) : (tensor<?xf32>) -> !tf_tensorlist.list
   // CHECK-NEXT: [[CONST:%.+]] = constant dense<-1> : tensor<i64>
-  // CHECK-NEXT: [[T:%.+]] = "tf_tensorlist.Stack"([[LIST0]], %arg1, [[CONST]]) : (!tf_tensorlist.list, tensor<0xi32>, tensor<i64>) -> tensor<?xf32>
+  // CHECK-NEXT: [[T:%.+]] = "tf_tensorlist.Stack"([[LIST0]], [[CONST]]) : (!tf_tensorlist.list, tensor<i64>) -> tensor<?xf32>
   // CHECK-NEXT: return [[T]]
 
   %list0 = "tf.TensorListFromTensor"(%arg0, %element_shape) : (tensor<?xf32>, tensor<0xi32>) -> tensor<!tf.variant<tensor<f32>>>
@@ -27,16 +27,17 @@ func @stack(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>) -> tensor<?xf32
 }
 
 // CHECK-LABEL: func @concat
-func @concat(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>, %lead: tensor<i64>) -> (tensor<?xf32>, tensor<0xi64>) {
-  // CHECK-DAG: [[LIST0:%.+]] = "tf_tensorlist.FromTensor"(%arg0, %arg1)
+func @concat(%arg0: tensor<5xf32>, %element_shape: tensor<0xi32>, %lead: tensor<i64>) -> (tensor<5xf32>, tensor<0xi64>) {
+  // CHECK-DAG: [[LIST0:%.+]] = "tf_tensorlist.FromTensor"(%arg0)
   // CHECK-DAG: [[T:%.+]] = "tf_tensorlist.Concat"([[LIST0]])
   // CHECK-DAG: [[L:%.+]] = "tf_tensorlist.GetDim0"([[LIST0]])
   // CHECK: return [[T]], [[L]]
 
-  %list0 = "tf.TensorListFromTensor"(%arg0, %element_shape) : (tensor<?xf32>, tensor<0xi32>) -> tensor<!tf.variant<tensor<f32>>>
-  %t:2 = "tf.TensorListConcatV2"(%list0, %element_shape, %lead) : (tensor<!tf.variant<tensor<f32>>>, tensor<0xi32>, tensor<i64>) -> (tensor<?xf32>, tensor<0xi64>)
-  return %t#0, %t#1 : tensor<?xf32>, tensor<0xi64>
+  %list0 = "tf.TensorListFromTensor"(%arg0, %element_shape) : (tensor<5xf32>, tensor<0xi32>) -> tensor<!tf.variant<tensor<f32>>>
+  %t:2 = "tf.TensorListConcatV2"(%list0, %element_shape, %lead) : (tensor<!tf.variant<tensor<f32>>>, tensor<0xi32>, tensor<i64>) -> (tensor<5xf32>, tensor<0xi64>)
+  return %t#0, %t#1 : tensor<5xf32>, tensor<0xi64>
 }
+
 
 // CHECK-LABEL: func @control_flow_simple
 func @control_flow_simple(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tensor<0xi32>, %index: tensor<i32>, %item: tensor<f32>) {

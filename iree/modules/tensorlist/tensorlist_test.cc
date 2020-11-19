@@ -91,6 +91,91 @@ class TensorListModulesTest : public ::testing::Test {
     return function;
   }
 
+  void Invoke(absl::string_view function_name,
+              absl::Span<const float> input_values,
+              absl::Span<const int32_t> input_shape,
+              absl::Span<const float> expected_values,
+              absl::Span<const int32_t> expected_shape) {
+    vm::ref<iree_hal_buffer_view_t> input_buffer_view;
+    CreateBufferView(input_values, input_shape, device_, &input_buffer_view);
+
+    // Pass in the tensor as a HAL buffer view.
+    vm::ref<iree_vm_list_t> inputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       iree_allocator_system(), &inputs));
+    iree_vm_ref_t input_buffer_view_ref =
+        iree_hal_buffer_view_move_ref(input_buffer_view.get());
+    IREE_ASSERT_OK(
+        iree_vm_list_push_ref_retain(inputs.get(), &input_buffer_view_ref));
+
+    // Prepare outputs list to accept the results from the invocation.
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       iree_allocator_system(), &outputs));
+
+    // Synchronously invoke the function.
+    IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction(function_name),
+                                  /*policy=*/nullptr, inputs.get(),
+                                  outputs.get(), iree_allocator_system()));
+
+    auto* returned_buffer_view =
+        reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
+            outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
+
+    absl::InlinedVector<int32_t, 5> returned_shape(
+        iree_hal_buffer_view_shape_rank(returned_buffer_view));
+    iree_hal_buffer_view_shape(returned_buffer_view, returned_shape.size(),
+                               returned_shape.data(), nullptr);
+
+    EXPECT_EQ(returned_shape, expected_shape);
+
+    iree_hal_buffer_t* returned_buffer =
+        iree_hal_buffer_view_buffer(returned_buffer_view);
+    ASSERT_NE(returned_buffer, nullptr);
+
+    iree_hal_mapped_memory_t mapped_memory;
+    IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
+                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                       IREE_WHOLE_BUFFER, &mapped_memory));
+    for (int i = 0; i < expected_values.size(); i++) {
+      EXPECT_EQ(reinterpret_cast<float*>(mapped_memory.contents.data)[i],
+                expected_values[i]);
+    }
+
+    IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+  }
+
+  void CreateBufferView(absl::Span<const float> contents,
+                        absl::Span<const int32_t> shape,
+                        iree_hal_device_t* device,
+                        iree_hal_buffer_view_t** out_buffer_view) {
+    size_t num_elements = 1;
+    for (int32_t dim : shape) {
+      num_elements *= dim;
+    }
+    ASSERT_EQ(contents.size(), num_elements);
+    vm::ref<iree_hal_buffer_t> buffer;
+    iree_hal_allocator_t* allocator = iree_hal_device_allocator(device);
+    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+        allocator,
+        static_cast<iree_hal_memory_type_t>(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
+    iree_hal_mapped_memory_t mapped_memory;
+    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
+                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
+                                       IREE_WHOLE_BUFFER, &mapped_memory));
+    memcpy(mapped_memory.contents.data,
+           static_cast<const void*>(contents.data()),
+           mapped_memory.contents.data_length);
+    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_view_create(
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
+        &*out_buffer_view));
+  }
+
   iree_hal_device_t* device_ = nullptr;
   iree_vm_instance_t* instance_ = nullptr;
   iree_vm_context_t* context_ = nullptr;
@@ -99,176 +184,53 @@ class TensorListModulesTest : public ::testing::Test {
   iree_vm_module_t* hal_module_ = nullptr;
 };
 
-void CreateBufferView(absl::Span<float> contents,
-                      absl::Span<const int32_t> shape,
-                      iree_hal_device_t* device,
-                      iree_hal_buffer_view_t** out_buffer_view) {
-  size_t num_elements = 1;
-  for (int32_t dim : shape) {
-    num_elements *= dim;
-  }
-  ASSERT_EQ(contents.size(), num_elements);
-  vm::ref<iree_hal_buffer_t> buffer;
-  iree_hal_allocator_t* allocator = iree_hal_device_allocator(device);
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      allocator,
-      static_cast<iree_hal_memory_type_t>(IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                                          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-      IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(), IREE_HAL_MEMORY_ACCESS_WRITE,
-                                     0, IREE_WHOLE_BUFFER, &mapped_memory));
-  memcpy(mapped_memory.contents.data, static_cast<void*>(contents.data()),
-         mapped_memory.contents.data_length);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
-  IREE_ASSERT_OK(iree_hal_buffer_view_create(
-      buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      iree_allocator_system(), &*out_buffer_view));
-}
-
 TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem) {
   // Allocate the buffer we'll be passing through.
-  static float kBufferContents[1] = {42.0f};
-  absl::InlinedVector<int32_t, 4> shape;
-  vm::ref<iree_hal_buffer_view_t> input_buffer_view;
-  CreateBufferView(kBufferContents, shape, device_, &input_buffer_view);
+  std::vector<float> input = {42.0f};
+  std::vector<int32_t> input_shape = {};
+  Invoke("identity_through_set_item_get_item", input, input_shape, input,
+         input_shape);
+}
 
-  // Pass in the tensor as a HAL buffer view.
-  vm::ref<iree_vm_list_t> inputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &inputs));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  IREE_ASSERT_OK(
-      iree_vm_list_push_ref_retain(inputs.get(), &input_buffer_view_ref));
-
-  // Prepare outputs list to accept the results from the invocation.
-  vm::ref<iree_vm_list_t> outputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &outputs));
-
-  // Synchronously invoke the function.
-  IREE_ASSERT_OK(iree_vm_invoke(
-      context_, LookupFunction("identity_through_set_item_get_item"),
-      /*policy=*/nullptr, inputs.get(), outputs.get(),
-      iree_allocator_system()));
-
-  auto* returned_buffer_view =
-      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
-          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
-  ASSERT_NE(nullptr, returned_buffer_view);
-  iree_hal_buffer_t* returned_buffer =
-      iree_hal_buffer_view_buffer(returned_buffer_view);
-  ASSERT_NE(nullptr, returned_buffer);
-
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
-                                     IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                     IREE_WHOLE_BUFFER, &mapped_memory));
-  EXPECT_EQ(reinterpret_cast<float*>(mapped_memory.contents.data)[0],
-            kBufferContents[0]);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem2D) {
+  // Allocate the buffer we'll be passing through.
+  std::vector<float> input = {42.0f};
+  std::vector<int32_t> input_shape = {1, 1};
+  Invoke("identity_through_set_item_get_item", input, input_shape, input,
+         input_shape);
 }
 
 TEST_F(TensorListModulesTest, IdentityThroughConcat) {
   // Allocate the buffer we'll be passing through.
-  static float kBufferContents[4] = {42.0f, 43.0f, 44.0f, 45.0f};
-  absl::InlinedVector<int32_t, 4> shape = {4, 1};
-  vm::ref<iree_hal_buffer_view_t> input_buffer_view;
-  CreateBufferView(kBufferContents, shape, device_, &input_buffer_view);
+  std::vector<float> input = {42.0f, 43.0f, 44.0f, 45.0f};
+  absl::InlinedVector<int32_t, 4> input_shape = {4, 1};
+  absl::InlinedVector<int32_t, 4> expected_shape = {4};
+  Invoke("identity_through_concat", input, input_shape, input, expected_shape);
+}
 
-  // Pass in the tensor as a HAL buffer view.
-  vm::ref<iree_vm_list_t> inputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &inputs));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  IREE_ASSERT_OK(
-      iree_vm_list_push_ref_retain(inputs.get(), &input_buffer_view_ref));
-
-  // Prepare outputs list to accept the results from the invocation.
-  vm::ref<iree_vm_list_t> outputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &outputs));
-
-  // Synchronously invoke the function.
-  IREE_ASSERT_OK(iree_vm_invoke(context_,
-                                LookupFunction("identity_through_concat"),
-                                /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                iree_allocator_system()));
-
-  auto* returned_buffer_view =
-      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
-          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
-  ASSERT_NE(nullptr, returned_buffer_view);
-  iree_hal_buffer_t* returned_buffer =
-      iree_hal_buffer_view_buffer(returned_buffer_view);
-  ASSERT_NE(nullptr, returned_buffer);
-
-  // Dimemsionality is reduced by 1.
-  auto returned_rank = iree_hal_buffer_view_shape_rank(returned_buffer_view);
-  ASSERT_EQ(returned_rank, shape.size() - 1);
-
-  iree_hal_dim_t returned_shape[1];
-  iree_hal_buffer_view_shape(returned_buffer_view, 1, returned_shape,
-                             &returned_rank);
-  EXPECT_EQ(returned_shape[0], shape[0] * shape[1]);
-
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
-                                     IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                     IREE_WHOLE_BUFFER, &mapped_memory));
-  EXPECT_EQ(std::memcmp(mapped_memory.contents.data,
-                        static_cast<void*>(&kBufferContents[0]),
-                        mapped_memory.contents.data_length),
-            0);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+TEST_F(TensorListModulesTest, ConcatAppendsEmpty) {
+  // Allocate the buffer we'll be passing through.
+  std::vector<float> input = {42.0f};
+  absl::InlinedVector<int32_t, 4> input_shape = {1};
+  std::vector<float> expected = {42.0f, 0.0f};
+  absl::InlinedVector<int32_t, 4> expected_shape = {2};
+  Invoke("concat_appends_empty", input, input_shape, expected, expected_shape);
 }
 
 TEST_F(TensorListModulesTest, IdentityThroughStack) {
   // Allocate the buffer we'll be passing through.
-  static float kBufferContents[2] = {42.0f, 43.0f};
-  absl::InlinedVector<int32_t, 4> shape = {2, 1};
-  vm::ref<iree_hal_buffer_view_t> input_buffer_view;
-  CreateBufferView(kBufferContents, shape, device_, &input_buffer_view);
+  std::vector<float> input = {42.0f, 43.0f};
+  absl::InlinedVector<int32_t, 4> input_shape = {2, 1};
+  Invoke("identity_through_stack", input, input_shape, input, input_shape);
+}
 
-  // Pass in the tensor as a HAL buffer view.
-  vm::ref<iree_vm_list_t> inputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &inputs));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  IREE_ASSERT_OK(
-      iree_vm_list_push_ref_retain(inputs.get(), &input_buffer_view_ref));
-
-  // Prepare outputs list to accept the results from the invocation.
-  vm::ref<iree_vm_list_t> outputs;
-  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     iree_allocator_system(), &outputs));
-
-  // Synchronously invoke the function.
-  IREE_ASSERT_OK(iree_vm_invoke(context_,
-                                LookupFunction("identity_through_stack"),
-                                /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                iree_allocator_system()));
-
-  auto* returned_buffer_view =
-      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
-          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
-  ASSERT_NE(nullptr, returned_buffer_view);
-  iree_hal_buffer_t* returned_buffer =
-      iree_hal_buffer_view_buffer(returned_buffer_view);
-  ASSERT_NE(nullptr, returned_buffer);
-
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
-                                     IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                     IREE_WHOLE_BUFFER, &mapped_memory));
-  EXPECT_EQ(std::memcmp(mapped_memory.contents.data,
-                        static_cast<void*>(&kBufferContents[0]),
-                        mapped_memory.contents.data_length),
-            0);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+TEST_F(TensorListModulesTest, StackAppendsEmpty) {
+  // Allocate the buffer we'll be passing through.
+  std::vector<float> input = {42.0f};
+  absl::InlinedVector<int32_t, 4> input_shape = {};
+  std::vector<float> expected = {42.0f, 0.0f};
+  absl::InlinedVector<int32_t, 4> expected_shape = {2};
+  Invoke("stack_appends_empty", input, input_shape, expected, expected_shape);
 }
 
 }  // namespace

@@ -36,6 +36,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
     alwayslink = 1,
 )
@@ -70,6 +71,8 @@ cc_library(
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir",
         "//iree/compiler/Dialect/HAL/Conversion",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/Modules/TensorList/IR",
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
         "@llvm-project//mlir:IR",
