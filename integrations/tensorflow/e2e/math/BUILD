@@ -544,6 +544,7 @@ iree_e2e_cartesian_product_test_suite(
 VMLA_FAILING_MULTIPLE = VMLA_FAILING + ["multiply"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
+# @unused
 LLVM_FAILING_MULTIPLE = LLVM_FAILING + ["square"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
@@ -944,6 +945,7 @@ iree_e2e_cartesian_product_test_suite(
 VMLA_FAILING_COMPLEX_MULTIPLE = VMLA_FAILING_COMPLEX + ["multiply"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
+# @unused
 LLVM_FAILING_COMPLEX_MULTIPLE = LLVM_FAILING_COMPLEX + ["square"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
