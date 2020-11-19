@@ -24,8 +24,8 @@
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/StandardTypes.h"
 
-constexpr int kVectorizationSizeInBits = 128;
-constexpr int kVecSize = kVectorizationSizeInBits / (sizeof(float) * 8);
+constexpr int kMaxVectorizationSizeInBits = 128;
+constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir {
 namespace iree_compiler {
@@ -47,22 +47,6 @@ static bool getUsesIfAllTransferOp(Value v,
   return true;
 }
 
-/// Returns true of the type is a memref that can be vectorized to
-/// vector<4xi32>. If it returns true also return the uses of memref.
-static bool isMemRefAndVectorizable(Value v,
-                                    SmallVectorImpl<Operation *> &uses) {
-  auto memrefType = v.getType().dyn_cast<MemRefType>();
-  // To be able to vectorize the memref it needs to be a scalar memref with a
-  // static most inner dimension aligned on the vectorization size.
-  return memrefType && !memrefType.getElementType().isa<VectorType>() &&
-         (kVectorizationSizeInBits % memrefType.getElementTypeBitWidth() ==
-          0) &&
-         !ShapedType::isDynamic(memrefType.getShape().back()) &&
-         ((memrefType.getElementTypeBitWidth() * memrefType.getShape().back()) %
-              kVectorizationSizeInBits ==
-          0) &&
-         getUsesIfAllTransferOp(v, uses);
-}
 
 /// Returns the bitwidth of a scalar or vector type.
 static Optional<unsigned> getBitWidth(Type type) {
@@ -76,6 +60,37 @@ static Optional<unsigned> getBitWidth(Type type) {
   return {};
 }
 
+// Calculate the vector size we want to use based on the memref uses.
+static unsigned calculateMemrefVecSize(SmallVectorImpl<Operation *> &uses) {
+  unsigned minSize = kMaxVectorizationSizeInBits;
+  for (Operation *op : uses) {
+    auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
+    if (!transferOp) return 0;
+    Optional<unsigned> transferSize = getBitWidth(transferOp.getVectorType());
+    if (!transferSize) return 0;
+    minSize = std::min(minSize, *transferSize);
+  }
+  return minSize;
+}
+
+/// If the memref is vectorizable return the vector size we want to use,
+/// otherwise return 0. If it returns a value greater than 0 it also returns the
+/// memref uses.
+static unsigned isMemRefAndVectorizable(Value v,
+                                        SmallVectorImpl<Operation *> &uses) {
+  auto memrefType = v.getType().dyn_cast<MemRefType>();
+  // To be able to vectorize the memref it needs to be a scalar memref with a
+  // static most inner dimension aligned on the vectorization size.
+  if (memrefType && !memrefType.getElementType().isa<VectorType>() &&
+      (kMaxVectorizationSizeInBits % memrefType.getElementTypeBitWidth() ==
+       0) &&
+      !ShapedType::isDynamic(memrefType.getShape().back()) &&
+      getUsesIfAllTransferOp(v, uses)) {
+    return calculateMemrefVecSize(uses);
+  }
+  return 0;
+}
+
 namespace {
 /// Analyze memref usages to decide if it should be vectorized. Right now the
 /// logic is to vectorize memref only if it is used by
@@ -85,7 +100,12 @@ class MemRefUsageAnalysis {
   explicit MemRefUsageAnalysis(mlir::Operation *);
 
   // Returns true if the memref should be converted to a vector of memref.
-  bool vectorizeMemRef(Value v) const { return vectorize.count(v); }
+  bool vectorizeMemRef(Value v) const { return vectorization_size.count(v); }
+
+  // Return the size of the vector we want to use for memref vectorization.
+  unsigned getMemRefVectorSizeInBits(Value v) const {
+    return vectorization_size.find(v)->second;
+  }
   // Returns true if the transfer operation needs to be updated during memref
   // vectorization.
   bool transferConvert(Operation *op) const { return transferOps.count(op); }
@@ -94,7 +114,7 @@ class MemRefUsageAnalysis {
   void analyzeFunc(FuncOp funcOp);
   void analyzeAlloc(AllocOp allocOp);
   void analyzePlaceholder(IREE::PlaceholderOp placeholderOp);
-  llvm::DenseSet<Value> vectorize;
+  llvm::DenseMap<Value, unsigned> vectorization_size;
   llvm::DenseSet<Operation *> transferOps;
 };
 
@@ -110,8 +130,8 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 void MemRefUsageAnalysis::analyzeFunc(FuncOp funcOp) {
   for (Value arg : funcOp.getArguments()) {
     SmallVector<Operation *, 4> vectorUses;
-    if (isMemRefAndVectorizable(arg, vectorUses)) {
-      vectorize.insert(arg);
+    if (unsigned vectorSize = isMemRefAndVectorizable(arg, vectorUses)) {
+      vectorization_size.insert(std::make_pair(arg, vectorSize));
       transferOps.insert(vectorUses.begin(), vectorUses.end());
     }
   }
@@ -120,16 +140,17 @@ void MemRefUsageAnalysis::analyzeFunc(FuncOp funcOp) {
 void MemRefUsageAnalysis::analyzePlaceholder(
     IREE::PlaceholderOp placeholderOp) {
   SmallVector<Operation *, 4> vectorUses;
-  if (isMemRefAndVectorizable(placeholderOp, vectorUses)) {
-    vectorize.insert(placeholderOp);
+  if (unsigned vectorSize =
+          isMemRefAndVectorizable(placeholderOp, vectorUses)) {
+    vectorization_size.insert(std::make_pair(placeholderOp, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
 }
 
 void MemRefUsageAnalysis::analyzeAlloc(AllocOp allocOp) {
   SmallVector<Operation *, 4> vectorUses;
-  if (isMemRefAndVectorizable(allocOp, vectorUses)) {
-    vectorize.insert(allocOp);
+  if (unsigned vectorSize = isMemRefAndVectorizable(allocOp, vectorUses)) {
+    vectorization_size.insert(std::make_pair(allocOp, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
 }
@@ -143,6 +164,8 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
         memrefUsageAnalysis(memrefUsageAnalysis) {}
 
  protected:
+  Optional<MemRefType> getVectorizedMemRefType(
+      ConversionPatternRewriter &rewriter, Value memRefValue) const;
   const MemRefUsageAnalysis &memrefUsageAnalysis;
 };
 
@@ -241,19 +264,37 @@ class ProcessTransferWrite final
   }
 };
 
-static Optional<MemRefType> getVectorizedMemRefType(
-    ConversionPatternRewriter &rewriter, MemRefType type) {
+/// Decide the new memref of vector type we want to use after vectorization
+/// based on the original type and the vectorization size we want. Since Vulkan
+/// only supports vector up to 4 elements we may re-interpret the memref using a
+/// larger type. For example:
+/// * memref<1024xf16> vectorized with a size of 64bits will return
+/// memref<256xvec<4xf16>>
+/// * memref<1024xf16> vectorized with a size of 128bits will return
+/// memref<128xvec<4xf32>>
+template <typename OpTy>
+Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
+    ConversionPatternRewriter &rewriter, Value memRefValue) const {
+  unsigned vecSizeInBits =
+      memrefUsageAnalysis.getMemRefVectorSizeInBits(memRefValue);
+  MemRefType type = memRefValue.getType().cast<MemRefType>();
   unsigned elemSize = type.getElementTypeBitWidth();
-  unsigned vecSize = kVectorizationSizeInBits / elemSize;
-  // Pick a new type of element size 32bits.
-  Type newElemType = type.getElementType().isa<IntegerType>()
-                         ? rewriter.getI32Type().cast<Type>()
-                         : rewriter.getF32Type().cast<Type>();
-  Type vecType = VectorType::get(kVecSize, newElemType);
+  unsigned numElements = vecSizeInBits / elemSize;
+  Type elemType = type.getElementType();
+  // If the vector we need to generate is bigger than the the max vector size
+  // allowed for loads use a larger element type.
+  if (numElements > kMaxVectorNumElements) {
+    elemType = elemType.isa<IntegerType>() ? rewriter.getI32Type().cast<Type>()
+                                           : rewriter.getF32Type().cast<Type>();
+    elemSize = elemType.getIntOrFloatBitWidth();
+    numElements = vecSizeInBits / elemSize;
+  }
+  Type vecType = VectorType::get(numElements, elemType);
   SmallVector<int64_t, 2> newShape(type.getShape().begin(),
                                    type.getShape().end());
-  if (newShape.back() % vecSize != 0) return {};
-  newShape.back() = newShape.back() / vecSize;
+  unsigned ratio = vecSizeInBits / type.getElementTypeBitWidth();
+  if (newShape.back() % ratio != 0) return {};
+  newShape.back() = newShape.back() / ratio;
   return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
 }
 
@@ -263,7 +304,7 @@ class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
   LogicalResult matchAndRewrite(
       AllocOp alloc, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = getVectorizedMemRefType(rewriter, alloc.getType());
+    auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
     Value newAlloc = rewriter.create<AllocOp>(alloc.getLoc(), *memrefType,
                                               alloc.dynamicSizes());
@@ -281,7 +322,7 @@ class ProcessIreeBinding final
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = placeholder.getType().dyn_cast<MemRefType>();
     if (!memrefType) return failure();
-    auto vecMemRef = getVectorizedMemRefType(rewriter, memrefType);
+    auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
     if (!vecMemRef) return failure();
     ValueRange dummyOperands;
     Value newPlaceholder = rewriter.create<IREE::PlaceholderOp>(
@@ -309,8 +350,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
   TypeConverter typeConverter;
   for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
     if (memrefUsageAnalysis.vectorizeMemRef(arg.value())) {
-      if (auto memrefType = getVectorizedMemRefType(
-              rewriter, arg.value().getType().cast<MemRefType>())) {
+      if (auto memrefType = getVectorizedMemRefType(rewriter, arg.value())) {
         signatureConverter.addInputs(arg.index(), *memrefType);
         continue;
       }
