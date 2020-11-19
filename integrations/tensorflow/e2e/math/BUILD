@@ -561,6 +561,7 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
             "--dynamic_dims=False",
         ],
         main = "math_test.py",
+        python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
@@ -790,6 +791,7 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
             "--dynamic_dims=False",
         ],
         main = "math_test.py",
+        python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
@@ -962,6 +964,7 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
             "--dynamic_dims=False",
         ],
         main = "math_test.py",
+        python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
