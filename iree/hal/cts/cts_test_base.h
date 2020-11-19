@@ -16,6 +16,7 @@
 #define IREE_HAL_CTS_CTS_TEST_BASE_H_
 
 #include <map>
+#include <mutex>
 #include <set>
 
 #include "iree/base/status.h"
@@ -30,14 +31,21 @@ namespace cts {
 
 // Common setup for tests parameterized across all registered drivers.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
+ public:
+  static std::vector<std::string> EnumerateAvailableDrivers() {
+    static std::once_flag register_once;
+    std::call_once(register_once, [] {
+      IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+    });
+    return DriverRegistry::shared_registry()->EnumerateAvailableDrivers();
+  }
+
  protected:
   // Per-test-suite set-up. This is called before the first test in this test
   // suite. We use it to set up drivers that must be reused between test cases
   // to work around issues with driver lifetimes (specifically SwiftShader for
   // Vulkan).
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_register_all_available_drivers());
-
     auto driver_or = DriverRegistry::shared_registry()->Create("vulkan");
     if (driver_or.ok()) {
       shared_drivers_["vulkan"] = std::move(driver_or.value());
