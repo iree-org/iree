@@ -107,6 +107,7 @@ iree_cc_library(
     "host_local_allocator.cc"
   DEPS
     ::host_buffer
+    ::pre_allocator
     iree::base::status
     iree::base::tracing
     iree::hal
@@ -171,5 +172,17 @@ iree_cc_library(
     "scheduling_model.h"
   DEPS
     iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pre_allocator
+  HDRS
+    "pre_allocator.h"
+  SRCS
+    "pre_allocator.cc"
+  DEPS
+    iree::hal::event
   PUBLIC
 )

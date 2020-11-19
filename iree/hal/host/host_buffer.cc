@@ -21,6 +21,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/host/pre_allocator.h"
 
 namespace iree {
 namespace hal {
@@ -34,12 +35,14 @@ HostBuffer::HostBuffer(Allocator* allocator, MemoryTypeBitfield memory_type,
     : Buffer(allocator, memory_type, allowed_access, usage, allocation_size, 0,
              allocation_size),
       data_(data),
-      owns_data_(owns_data) {}
+      owns_data_(owns_data),
+      allocation_size_(allocation_size) {}
 
 HostBuffer::~HostBuffer() {
   IREE_TRACE_SCOPE();
   if (owns_data_ && data_) {
-    std::free(data_);
+    PreAllocator::free_allocation(allocation_size_);
+    // free(data_);
     data_ = nullptr;
   }
 }

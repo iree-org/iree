@@ -21,6 +21,7 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/host_buffer.h"
+#include "iree/hal/host/pre_allocator.h"
 
 namespace iree {
 namespace hal {
@@ -28,7 +29,7 @@ namespace host {
 
 HostLocalAllocator::HostLocalAllocator() = default;
 
-HostLocalAllocator::~HostLocalAllocator() = default;
+HostLocalAllocator::~HostLocalAllocator() { PreAllocator::release_memory(); }
 
 bool HostLocalAllocator::CanUseBufferLike(
     Allocator* source_allocator, MemoryTypeBitfield memory_type,
@@ -95,7 +96,7 @@ StatusOr<ref_ptr<Buffer>> HostLocalAllocator::Allocate(
   // Make compatible with our requirements.
   IREE_RETURN_IF_ERROR(MakeCompatible(&memory_type, &buffer_usage));
 
-  void* malloced_data = std::calloc(1, allocation_size);
+  void* malloced_data = PreAllocator::malloc(allocation_size);
   if (!malloced_data) {
     return ResourceExhaustedErrorBuilder(IREE_LOC)
            << "Failed to malloc " << allocation_size << " bytes";

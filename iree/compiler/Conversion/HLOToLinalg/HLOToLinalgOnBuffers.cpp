@@ -276,10 +276,10 @@ struct DotOpConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (getDotOperationType(op) == opType) {
-      if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-        rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-        return failure();
-      }
+      // if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
+      //  rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
+      //  return failure();
+      // }
       rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers, resultBuffers);
       return success();
     }

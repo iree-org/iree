@@ -62,6 +62,7 @@ class HostBuffer : public Buffer {
  private:
   void* data_ = nullptr;
   bool owns_data_ = false;
+  device_size_t allocation_size_ = 0;
 };
 
 }  // namespace hal
