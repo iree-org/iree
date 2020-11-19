@@ -539,7 +539,10 @@ iree_e2e_cartesian_product_test_suite(
 # ---- MULTIPLE STATIC TESTS ------------------------------------------------ #
 
 # These tests compile all functions in tf.math at once for testing so that
-# we can run them on the CI with 5 additional targets instead of 640.
+# we can run them on the CI with 5 additional targets instead of 640. The tests
+# are run sharded such that about 5 functions run per shard. This is a
+# reasonable tradeoff between shard startup overhead and critical path test
+# latency.
 
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
 VMLA_FAILING_MULTIPLE = VMLA_FAILING + ["multiply"]
@@ -563,6 +566,7 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
         ],
         main = "math_test.py",
         python_version = "PY3",
+        shard_count = len(functions) // 5,
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
@@ -776,7 +780,10 @@ iree_e2e_cartesian_product_test_suite(
 # ---- MULTIPLE DYNAMIC TESTS ----------------------------------------------- #
 
 # These tests compile all functions in tf.math at once for testing so that
-# we can run them on the CI with 4 additional targets instead of 512.
+# we can run them on the CI with 4 additional targets instead of 512. The tests
+# are run sharded such that about 5 functions run per shard. This is a
+# reasonable tradeoff between shard startup overhead and critical path test
+# latency.
 
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
 VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
@@ -793,6 +800,7 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
         ],
         main = "math_test.py",
         python_version = "PY3",
+        shard_count = len(functions) // 5,
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
@@ -942,7 +950,10 @@ iree_e2e_cartesian_product_test_suite(
 # ---- MULTIPLE COMPLEX TESTS ----------------------------------------------- #
 
 # These tests compile all functions in tf.math at once for testing so that
-# we can run them on the CI with 4 additional targets instead of 512.
+# we can run them on the CI with 4 additional targets instead of 512. The tests
+# are run sharded such that about 5 functions run per shard. This is a
+# reasonable tradeoff between shard startup overhead and critical path test
+# latency.
 
 # TODO(#3810) 'multiply' outputs all zeros when compiled with other functions.
 VMLA_FAILING_COMPLEX_MULTIPLE = VMLA_FAILING_COMPLEX + ["multiply"]
@@ -966,6 +977,7 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
         ],
         main = "math_test.py",
         python_version = "PY3",
+        shard_count = len(functions) // 5,
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
