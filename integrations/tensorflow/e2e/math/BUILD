@@ -565,7 +565,8 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
@@ -793,7 +794,8 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_DYNAMIC_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_DYNAMIC),
         tf = TF_MATH_FUNCTIONS,
@@ -963,7 +965,8 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_COMPLEX_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_COMPLEX_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
