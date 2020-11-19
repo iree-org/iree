@@ -17,7 +17,7 @@
 #include <mutex>
 
 #include "iree/base/flags.h"
-#include "iree/hal/drivers/init.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
@@ -36,7 +36,8 @@ void SetupVm() {
   int argc = 1;
   iree_flags_parse_checked(&argc, &aargv);
 
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  // TODO(jennik): register all available drivers
+  IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
   IREE_CHECK_OK(iree_vm_register_builtin_types());
   IREE_CHECK_OK(iree_hal_module_register_types());
   IREE_CHECK_OK(iree_tensorlist_module_register_types());
