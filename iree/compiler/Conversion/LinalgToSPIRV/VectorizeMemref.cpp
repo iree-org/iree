@@ -264,6 +264,14 @@ class ProcessTransferWrite final
   }
 };
 
+/// Decide the new memref of vector type we want to use after vectorization
+/// based on the original type and the vectorization size we want. Since Vulkan
+/// only supports vector up to 4 elements we may re-interpret the memref using a
+/// larger type. For example:
+/// * memref<1024xf16> vectorized with a size of 64bits will return
+/// memref<256xvec<4xf16>>
+/// * memref<1024xf16> vectorized with a size of 128bits will return
+/// memref<128xvec<4xf32>>
 template <typename OpTy>
 Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, Value memRefValue) const {
