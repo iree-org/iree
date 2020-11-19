@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- KernelDispatchUtils.h - Utilities for generating dispatch info -----===//
+//===- LaunchConfig.h - Configuration used to drive arch specific codegen -===//
 //
-// This file declares utility functions that can be used to create information
-// the dispatch on the host side needs to execute an entry point function, like
-// the number of workgroups to use for launch, etc.
+// This file declares the data structure that is used by the codegeneration to
+// lower to target specific IR. The values of the parameters are archtecture
+// specific. Once set the same transformations can be used to generate the
+// desired code. This allows sharing codegen infra between different backends.
 //
 //===----------------------------------------------------------------------===//
 #ifndef IREE_COMPILER_CONVERSION_COMMON_LAUNCHCONFIG_H_
@@ -39,13 +40,16 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Store the tile sizes to use at different levels of tiling as a vector of
+/// Stores the tile sizes to use at different levels of tiling as a vector of
 /// vectors.
 /// - First level tiling maps to workgroups.
 /// - Second level tiling maps to subgroups.
+/// - Third level tiling maps to invocations.
 using TileSizesListType = SmallVector<SmallVector<int64_t, 4>, 1>;
 using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t, 4>>;
 
+/// Configurations for mapping Linalg ops to CPU/GPU parallel hiearchies.
+///
 /// Based on the linalg operations in a dispatch region, the number of levels of
 /// tiling, the tile sizes needed, the workgroup size, etc. need to be
 /// decided. These parameters are called `LaunchConfig`. This class implements
@@ -58,7 +62,7 @@ class LaunchConfig {
  public:
   LaunchConfig() : workgroupSize({1, 1, 1}), numSubgroups({1, 1, 1}) {}
 
-  /// Remove attributed added to operations for retrieving tile size
+  /// Removes attributes added to operations for retrieving tile size
   /// information.
   void finalize(FuncOp funcOp);
 

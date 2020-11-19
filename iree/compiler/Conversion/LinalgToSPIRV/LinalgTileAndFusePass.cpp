@@ -446,7 +446,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       OwningRewritePatternList promotionPatterns;
       populatePromotionPatterns(context, promotionPatterns);
       applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
-      applyCanonicalizationPatterns(context, funcOp);
+      applyCanonicalizationPatternsForTiling(context, funcOp);
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After Promotion  ---\n";
@@ -462,7 +462,7 @@ void LinalgTileAndFusePass::runOnOperation() {
                                          secondLevelTilingPatterns);
         applyPatternsAndFoldGreedily(funcOp,
                                      std::move(secondLevelTilingPatterns));
-        applyCanonicalizationPatterns(context, funcOp);
+        applyCanonicalizationPatternsForTiling(context, funcOp);
         promoteSingleIterationLoops(funcOp);
 
         LLVM_DEBUG({
@@ -478,7 +478,7 @@ void LinalgTileAndFusePass::runOnOperation() {
                                            thirdLevelTilingPatterns);
         applyPatternsAndFoldGreedily(funcOp,
                                      std::move(thirdLevelTilingPatterns));
-        applyCanonicalizationPatterns(context, funcOp);
+        applyCanonicalizationPatternsForTiling(context, funcOp);
         promoteSingleIterationLoops(funcOp);
 
         LLVM_DEBUG({

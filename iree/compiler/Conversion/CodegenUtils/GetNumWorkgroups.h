@@ -32,10 +32,10 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Generates a function that computes the number of workgroups as
-///  [ceil(`parallelLoopRange`[2] / `tileSizes`[2]),
-///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
-///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
+///  [ceil(`loopUpperBounds`[2] / `tileSizes`[2]),
+///   ceil(`loopUpperBounds`[1] / `tileSizes`[1]),
+///   ceil(`loopUpperBounds`[0] / `tileSizes`[0])]
+/// where `loopUpperBounds` is the ranges of the parallel loops of `linalgOp`
 ///  distributed across workgroups. `distributedLoops` are the loop dimensions
 ///  that are distributed.
 LogicalResult createNumWorkgroupsFromResultShape(
@@ -44,10 +44,10 @@ LogicalResult createNumWorkgroupsFromResultShape(
     llvm::ArrayRef<unsigned> distributedLoops);
 
 /// Generates a function that computes the number of workgroups as
-///  [ceil(`parallelLoopRange`[2] / `tileSizes`[2]),
-///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
-///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
+///  [ceil(`loopUpperBounds`[2] / `tileSizes`[2]),
+///   ceil(`loopUpperBounds`[1] / `tileSizes`[1]),
+///   ceil(`loopUpperBounds`[0] / `tileSizes`[0])]
+/// where `loopUpperBounds` is the ranges of the parallel loops of `linalgOp`
 /// distributed across workgroups. Assumes that upto 3 outer parallel loops of
 /// the `linalgOp` are distributed.
 LogicalResult createNumWorkgroupsFromResultShape(
@@ -55,9 +55,9 @@ LogicalResult createNumWorkgroupsFromResultShape(
     llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes);
 
 /// Generates a function that computes the number of workgroups as
-///  ceil(`parallelLoopRange`[0] * `parallelLoopRange`[1] * ... *
-///       `parallelLoopRange`[n-1]  /  `workgroupSizeX`)
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
+///  ceil(`loopUpperBounds`[0] * `loopUpperBounds`[1] * ... *
+///       `loopUpperBounds`[n-1]  /  `workgroupSizeX`)
+/// where `loopUpperBounds` is the ranges of the parallel loops of `linalgOp`
 /// distributed across workgroups.
 LogicalResult createNumWorkgroupsFromLinearizedResultShape(
     ConversionPatternRewriter &rewriter, linalg::LinalgOp linalgOp,

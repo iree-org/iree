@@ -26,8 +26,8 @@ iree_cc_library(
     "DeclareNumWorkgroupsFnPass.cpp"
     "LaunchConfig.cpp"
     "LegalizeNumWorkgroupsFnPass.cpp"
-    "VectorTransferOptimization.cpp"
     "Transforms.cpp"
+    "VectorTransferOptimization.cpp"
   DEPS
     LLVMSupport
     MLIRGPU

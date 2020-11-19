@@ -24,8 +24,8 @@ cc_library(
         "DeclareNumWorkgroupsFnPass.cpp",
         "LaunchConfig.cpp",
         "LegalizeNumWorkgroupsFnPass.cpp",
-        "VectorTransferOptimization.cpp",
         "Transforms.cpp",
+        "VectorTransferOptimization.cpp",
     ],
     hdrs = [
         "Attributes.h",

@@ -38,13 +38,10 @@
 namespace mlir {
 namespace iree_compiler {
 
-//===----------------------------------------------------------------------===//
-// Utility functions
-//===----------------------------------------------------------------------===//
-
 /// Apply canonicalizations related to tiling to make promotion/vectorization
 /// easier.
-void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
+void applyCanonicalizationPatternsForTiling(MLIRContext *context,
+                                            Operation *op) {
   OwningRewritePatternList canonicalizationPatterns;
   canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
@@ -53,6 +50,13 @@ void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
   applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
 }
 
+//===----------------------------------------------------------------------===//
+// Helper functions for tile and fuse.
+//===----------------------------------------------------------------------===//
+
+/// Promotes views used to chain Linalg ops in `fusedOps`
+/// into buffers using the allocation callback in `options`.
+///
 /// Once fused the fused views that are due to a RAW dependence can be promoted
 /// to workgroup memory. This will make the intermediate storage dead.
 static LogicalResult promoteFusedViews(OpBuilder &builder,
@@ -66,6 +70,10 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
   DenseSet<Value> promotedViews;
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(*fusedOps.begin());
+
+  // Scan the list of ops in reverse order. The fusion is performed by creating
+  // a tiled version of the ops within the tiled loops of the last operation in
+  // the sequence, and then proceeding up the sequence.
   for (linalg::LinalgOp op : llvm::reverse(fusedOps)) {
     auto dependences = fusableDependences.lookup(op);
     if (dependences.empty()) continue;
@@ -81,15 +89,19 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
     Value consumerView = consumer.getShapedOperand(consumerIdx);
     Value promotedView = nullptr;
 
+    // If the view is already promoted, reuse that. The assumption is that the
+    // view matches already.
     if (promotedViews.count(consumerView)) {
       promotedView = consumerView;
     } else if (dependence.dependenceType ==
                linalg::LinalgDependenceGraph::RAW) {
+      SubViewOp promotedViewProducer =
+          op.getShapedOperand(producerIdx).getDefiningOp<SubViewOp>();
+      assert(promotedViewProducer &&
+             "expected producer to be a subview op as well");
       Optional<linalg::PromotionInfo> promotionInfo =
           linalg::promoteSubviewAsNewBuffer(
-              builder, op.getLoc(),
-              op.getShapedOperand(producerIdx).getDefiningOp<SubViewOp>(),
-              options.allocationFn);
+              builder, op.getLoc(), promotedViewProducer, options.allocationFn);
       if (!promotionInfo) {
         return op.emitError("unable to promote RAW dependence");
       }
@@ -107,10 +119,11 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
 /// loops in the operation based on the configuration.
 static linalg::LinalgOp tileUnfusedLoops(
     OpBuilder &builder, linalg::LinalgOp linalgOp,
-    const std::set<unsigned> &fusedLoopDims, const LaunchConfig &launchConfig) {
-  SmallVector<int64_t, 4> tileSizes =
-      llvm::to_vector<4>(launchConfig.getTileSizes(linalgOp, 0));
+    const std::set<unsigned> &fusedLoopDims, ArrayRef<int64_t> tileSizesRef) {
+  SmallVector<int64_t, 4> tileSizes = llvm::to_vector<4>(tileSizesRef);
   tileSizes.resize(linalgOp.getNumLoops(), 0);
+  // Linalg uses tile size = 0 for a loop to indicate not tiling that loop. Set
+  // the fused loops to be untiled (since they are already tiled during fusion).
   for (unsigned loopNum : fusedLoopDims) {
     tileSizes[loopNum] = 0;
   }
@@ -124,15 +137,14 @@ static linalg::LinalgOp tileUnfusedLoops(
   return tiledOp->op;
 }
 
-/// Main utility function that implements the tile and fuse.
+/// Tiles the last operation in `fusableOps` and fuses all other operations with
+/// it by creating tiled versions of each within the generated inter-tile loops.
 static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
     OpBuilder &builder, FuncOp funcOp, ArrayRef<linalg::LinalgOp> fusableOps,
     const linalg::LinalgDependenceGraph &dependenceGraph,
-    const LaunchConfig &launchConfig, const TileAndFuseOptions &options) {
+    ArrayRef<int64_t> tileSizes, const TileAndFuseOptions &options) {
   // Get the tile sizes to use from the last fusable op and the tile+fuse all
   // ops.
-  SmallVector<int64_t, 4> tileSizes =
-      llvm::to_vector<4>(launchConfig.getTileSizes(fusableOps.back(), 0));
   linalg::LinalgTilingOptions tilingOptions;
   tilingOptions.setDistributionOptions(options.distributionOptions)
       .setTileSizes(tileSizes)
@@ -198,9 +210,10 @@ LogicalResult tileAndFuseLinalgBufferOps(
   if (fusableOps.empty()) return success();
 
   OpBuilder builder(context);
+  ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(fusableOps.back(), 0);
   Optional<linalg::TiledAndFusedLinalgOps> tiledAndFusedOps =
       tileAndFuseLinalgOps(builder, funcOp, fusableOps, dependenceGraph,
-                           launchConfig, options);
+                           tileSizes, options);
   if (!tiledAndFusedOps) {
     return funcOp.emitError("failed to tile and fuse operations");
   }
@@ -211,7 +224,7 @@ LogicalResult tileAndFuseLinalgBufferOps(
     llvm::dbgs() << "\n\n";
   });
 
-  applyCanonicalizationPatterns(context, funcOp);
+  applyCanonicalizationPatternsForTiling(context, funcOp);
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- After Canonicalization ---\n";
@@ -220,9 +233,8 @@ LogicalResult tileAndFuseLinalgBufferOps(
   });
 
   if (options.allocationFn) {
-    SmallVector<linalg::LinalgOp, 4> promoteFusedViewOps(
-        tiledAndFusedOps->fusedProducers.begin(),
-        tiledAndFusedOps->fusedProducers.end());
+    SmallVector<linalg::LinalgOp, 4> promoteFusedViewOps =
+        llvm::to_vector<4>(tiledAndFusedOps->fusedProducers);
     promoteFusedViewOps.push_back(tiledAndFusedOps->op);
 
     if (failed(promoteFusedViews(builder, promoteFusedViewOps, options))) {
@@ -239,20 +251,21 @@ LogicalResult tileAndFuseLinalgBufferOps(
   // Tile the unfused loops. Set the tile sizes for the fused loops to be zero
   // to avoid tiling them again.
   for (linalg::LinalgOp &fusedOp : tiledAndFusedOps->fusedProducers) {
+    ArrayRef<int64_t> fusedOpTileSizes = launchConfig.getTileSizes(fusedOp, 0);
     linalg::LinalgOp tiledOp = tileUnfusedLoops(
-        builder, fusedOp, tiledAndFusedOps->fusedLoopDims, launchConfig);
+        builder, fusedOp, tiledAndFusedOps->fusedLoopDims, fusedOpTileSizes);
     if (!tiledOp) {
       return fusedOp.emitError("unable to tile unfused loops");
     }
   }
   linalg::LinalgOp tiledOp =
       tileUnfusedLoops(builder, tiledAndFusedOps->op,
-                       tiledAndFusedOps->fusedLoopDims, launchConfig);
+                       tiledAndFusedOps->fusedLoopDims, tileSizes);
   if (!tiledOp) {
     return tiledAndFusedOps->op.emitError("unable to tile unfused loops");
   }
 
-  applyCanonicalizationPatterns(context, funcOp);
+  applyCanonicalizationPatternsForTiling(context, funcOp);
   return success();
 }
 
