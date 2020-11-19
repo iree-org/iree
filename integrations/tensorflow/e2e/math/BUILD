@@ -544,6 +544,7 @@ iree_e2e_cartesian_product_test_suite(
 VMLA_FAILING_MULTIPLE = VMLA_FAILING + ["multiply"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
+# @unused
 LLVM_FAILING_MULTIPLE = LLVM_FAILING + ["square"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
@@ -565,7 +566,8 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_MULTIPLE),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
@@ -793,7 +795,8 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_DYNAMIC),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_DYNAMIC_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_DYNAMIC),
         tf = TF_MATH_FUNCTIONS,
@@ -942,6 +945,7 @@ iree_e2e_cartesian_product_test_suite(
 VMLA_FAILING_COMPLEX_MULTIPLE = VMLA_FAILING_COMPLEX + ["multiply"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
+# @unused
 LLVM_FAILING_COMPLEX_MULTIPLE = LLVM_FAILING_COMPLEX + ["square"]
 
 # TODO(#3810) Including 'square' causes error: Recieved signal 11.
@@ -963,7 +967,8 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
         ],
     )
     for target_backend, functions in dict(
-        iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
+        # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
+        # iree_llvmjit = set_difference(TF_MATH_FUNCTIONS, LLVM_FAILING_COMPLEX_MULTIPLE),
         iree_vmla = set_difference(TF_MATH_FUNCTIONS, VMLA_FAILING_COMPLEX_MULTIPLE),
         iree_vulkan = set_difference(TF_MATH_FUNCTIONS, VULKAN_FAILING_COMPLEX_MULTIPLE),
         tf = TF_MATH_FUNCTIONS,
