@@ -601,6 +601,8 @@ class VMLA_ReduceOp<string mnemonic, list<OpTrait> traits = []> :
 def VMLA_ReduceSumOp : VMLA_ReduceOp<"reduce.sum">;
 def VMLA_ReduceMinOp : VMLA_ReduceOp<"reduce.min">;
 def VMLA_ReduceMaxOp : VMLA_ReduceOp<"reduce.max">;
+def VMLA_ReduceAndOp : VMLA_ReduceOp<"reduce.and">;
+def VMLA_ReduceOrOp  : VMLA_ReduceOp<"reduce.or">;
 
 class VMLA_PoolingOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, !listconcat(traits, [VMLA_IncludeShapes])> {
