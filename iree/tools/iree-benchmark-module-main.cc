@@ -53,6 +53,10 @@ ABSL_FLAG(std::string, function_inputs_file, "",
           "Provides a file for input shapes and optional values (see "
           "ParseToVariantListFromFile in vm_util.h for details)");
 
+ABSL_FLAG(
+    int32_t, warmup_iterations, 3,
+    "Number of warmup iterations to run before benchmarking iree_vm_invoke");
+
 namespace iree {
 namespace {
 
@@ -63,6 +67,17 @@ static void BenchmarkFunction(
     benchmark::State& state) {
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
   IREE_TRACE_FRAME_MARK();
+
+  // Warmup.
+  for (int i = 0; i < absl::GetFlag(FLAGS_warmup_iterations); ++i) {
+    IREE_TRACE_SCOPE0("WarmupIteration-" + i);
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
+                                      output_descs.size(),
+                                      iree_allocator_system(), &outputs));
+    IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr, inputs,
+                                 outputs.get(), iree_allocator_system()));
+  }
 
   // Benchmarking loop.
   for (auto _ : state) {
