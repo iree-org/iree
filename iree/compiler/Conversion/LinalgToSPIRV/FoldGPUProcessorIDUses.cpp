@@ -196,37 +196,35 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
       }
     }
 
-    auto isNegative = [](AffineExpr e) {
+    // Returns true if the given affine expression is a non-negative constant.
+    auto isNonNegativeCstExpr = [](AffineExpr e) {
       if (auto cst = e.dyn_cast<AffineConstantExpr>())
-        return cst.getValue() < 0;
-      return true;
+        return cst.getValue() >= 0;
+      return false;
     };
 
     // Check whether any of the original constant expressions, when subtracted
     // from all other expressions, produces only >= 0 constants. If so, it is
     // the min.
     for (auto cstIndex : cstIndices) {
-      AffineExpr result = results[cstIndex];
+      auto candidate = results[cstIndex].cast<AffineConstantExpr>();
 
       SmallVector<AffineExpr, 4> subExprs;
       subExprs.reserve(results.size());
-      for (auto r : results) subExprs.push_back(r - result);
+      for (auto r : results) subExprs.push_back(r - candidate);
 
       AffineMap subMap =
           simplifyAffineMap(AffineMap::get(0, 1, subExprs, context));
-      LLVM_DEBUG(llvm::dbgs() << "map by subtracting expr '" << result
+      LLVM_DEBUG(llvm::dbgs() << "map by subtracting expr '" << candidate
                               << "': " << subMap << "\n");
-      if (llvm::any_of(subMap.getResults(), isNegative)) continue;
-
-      if (auto cstExpr = result.dyn_cast<AffineConstantExpr>()) {
-        rewriter.replaceOpWithNewOp<ConstantIndexOp>(minOp, cstExpr.getValue());
-        break;
-      } else {
-        return failure();
+      if (llvm::all_of(subMap.getResults(), isNonNegativeCstExpr)) {
+        rewriter.replaceOpWithNewOp<ConstantIndexOp>(minOp,
+                                                     candidate.getValue());
+        return success();
       }
     }
 
-    return success();
+    return failure();
   }
 };
 
