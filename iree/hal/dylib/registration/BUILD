@@ -22,7 +22,9 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_DYLIB})
+if(NOT ${IREE_HAL_DRIVER_DYLIB})
+  return()
+endif()
 """,
     inline = True,
 )
@@ -41,11 +43,4 @@ cc_library(
         "//iree/hal:driver_registry",
         "//iree/hal/dylib",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )
