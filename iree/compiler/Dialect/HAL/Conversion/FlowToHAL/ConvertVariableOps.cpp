@@ -43,8 +43,8 @@ static FuncOp createInitializerFromImmediate(
   auto uniqueName = (Twine("__") + variableOp.getName() + "_initializer").str();
   auto initializerFuncOp =
       rewriter.create<FuncOp>(variableOp.getLoc(), uniqueName, initializerType);
-  auto *entryBlock = initializerFuncOp.addEntryBlock();
-  rewriter.setInsertionPointToEnd(entryBlock);
+  rewriter.createBlock(&initializerFuncOp.getBody(), initializerFuncOp.begin(),
+                       initializerType.getInputs());
 
   // Create const and return ops.
   auto constValue = rewriter.create<ConstantOp>(loc, immediateElements);
