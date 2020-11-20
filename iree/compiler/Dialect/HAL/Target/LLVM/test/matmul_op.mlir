@@ -11,7 +11,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @linked_llvm_ir
+// CHECK-LABEL: hal.executable @matmul_op_linked_llvm_ir
 // CHECK-DAG:   hal.executable.binary attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {

@@ -17,6 +17,8 @@
 
 Includes information on their dependency graph and GCR URL.
 
+See the README for information on how to add and update images.
+
 Example usage:
 
 Rebuild the cmake image and all images that transitively on depend on it,

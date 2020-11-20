@@ -19,11 +19,16 @@ package(
 )
 
 cc_library(
-    name = "LLVMAOTTargetLinker_internal",
-    srcs = ["LLVMAOTTargetLinker.cpp"],
+    name = "LinkerTools_internal",
+    srcs = [
+        "LinkerTools.cpp",
+        "UnixLinkerTool.cpp",
+        "WindowsLinkerTool.cpp",
+    ],
     deps = [
-        "//iree/base:status",
-        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOTTargetLinker_hdrs",
+        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LinkerTool_hdrs",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
     ],
 )

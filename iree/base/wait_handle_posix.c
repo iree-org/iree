@@ -27,7 +27,7 @@
 #include <sys/eventfd.h>
 #endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
 #if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
-#include <sync.h>
+#include <android/sync.h>
 #endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
 
 //===----------------------------------------------------------------------===//

@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,38 +12,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Tests for ops in the tf.math module."""
 
 from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
-class FiniteModule(tf.Module):
+class QuantizationModule(tf_test_utils.TestModule):
 
-  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
-  def finite(self, x):
-    return tf.math.is_finite(x)
+  @tf_test_utils.tf_function_unit_test(
+      input_signature=[tf.TensorSpec([32], tf.float32)],
+      input_generator=lambda *args: tf_utils.uniform(*args, low=-6, high=6))
+  def fake_quant(self, x):
+    return tf.quantization.fake_quant_with_min_max_args(x,
+                                                        min=-6,
+                                                        max=6,
+                                                        num_bits=8,
+                                                        narrow_range=False,
+                                                        name=None)
 
 
-class FiniteTest(tf_test_utils.TracedModuleTestCase):
+class QuantizationTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(FiniteModule)
-
-  def test_finite(self):
-
-    def finite(module):
-      module.finite(np.array([0.0, 1.2, -5.0, np.inf], dtype=np.float32))
-
-    self.compare_backends(finite, self._modules)
+    self._modules = tf_test_utils.compile_tf_module(QuantizationModule)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+
+  QuantizationTest.generate_unit_tests(QuantizationModule)
   tf.test.main()
 
 

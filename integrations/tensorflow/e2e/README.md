@@ -18,7 +18,7 @@ instructions.
 If you do not have your environment setup to use IREE with Vulkan (see
 [this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
 then you can run the manual test targets with
-`--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
+`--target_backends=tf,iree_vmla` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -52,17 +52,17 @@ For locally running tests and iterating on backend development, `bazel run` is
 preferred.
 
 ```shell
-# Run math_test on all backends.
-bazel run //integrations/tensorflow/e2e:math_test_manual
+# Run conv_test on all backends.
+bazel run //integrations/tensorflow/e2e:conv_test_manual
 
-# Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
+# Run conv_test comparing TensorFlow to itself (e.g. to debug randomization).
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=tf
 
-# Run math_test comparing the VMLA backend and TensorFlow.
-bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
+# Run conv_test comparing the VMLA backend and TensorFlow.
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=iree_vmla
 
-# Run math_test comparing the VMLA backend to itself multiple times.
-bazel run //integrations/tensorflow/e2e:math_test_manual -- \
+# Run conv_test comparing the VMLA backend to itself multiple times.
+bazel run //integrations/tensorflow/e2e:conv_test_manual -- \
   --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
 ```
 
@@ -72,10 +72,10 @@ model creation.
 
 ## Writing Tests
 
-There are two ways to write tests – via `tf_test_utils.tf_function_unittest` and
+There are two ways to write tests – via `tf_test_utils.tf_function_unit_test` and
 via test methods on a child of `tf_test_utils.TracedModuleTestCase`.
 
-### Via `tf_test_utils.tf_function_unittest`
+### Via `tf_test_utils.tf_function_unit_test`
 
 This is preferred in the cases where
 
@@ -86,7 +86,7 @@ This is preferred in the cases where
 
 Tests are specified by writing modules that inherit from
 `tf_test_utils.TestModule` (which is a thin wrapper around `tf.Module`) with
-methods decorated with `@tf_test_utils.tf_function_unittest` (with is a thin
+methods decorated with `@tf_test_utils.tf_function_unit_test` (with is a thin
 wrapper around `tf.function`).
 
 #### Basic example
@@ -101,14 +101,14 @@ class Conv2dModule(tf_test_utils.TestModule):
   # function. The 'input_signature' is required. If no other arguments are
   # specified then uniform random data is generated from the input signature
   # to numerically test the function.
-  @tf_test_utils.tf_function_unittest(input_signature=[
+  @tf_test_utils.tf_function_unit_test(input_signature=[
       tf.TensorSpec([1, 4, 5, 1], tf.float32),
       tf.TensorSpec([1, 1, 1, 1], tf.float32),
   ])
   def conv2d_1451x1111_valid(self, img, kernel):
     return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
 
-  @tf_test_utils.tf_function_unittest(input_signature=[
+  @tf_test_utils.tf_function_unit_test(input_signature=[
       tf.TensorSpec([2, 4, 5, 1], tf.float32),
       tf.TensorSpec([1, 1, 1, 1], tf.float32),
   ])
@@ -130,7 +130,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
 ```
 
 Finally, in the `main` function, you need to call
-`.generate_unittests(module_class)` on your `TestCase` to actually generate
+`.generate_unit_tests(module_class)` on your `TestCase` to actually generate
 the unittests that we specified:
 
 ```python
@@ -138,12 +138,12 @@ def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  # Generates unittests for all @tf_test_utils.tf_function_unittest decorated
+  # Generates unittests for all @tf_test_utils.tf_function_unit_test decorated
   # functions on the module class.
   # Note: if you are automatically generating functions to test they need to be
   # specified via a `classmethod` prior to this call _as well_ as via `__init__`
   # to properly handle stateful `tf.function`s.
-  ConvTest.generate_unittests(Conv2dModule)
+  ConvTest.generate_unit_tests(Conv2dModule)
   tf.test.main()
 
 
@@ -154,9 +154,9 @@ if __name__ == '__main__':
 This generates two unittests: `test_conv2d_1451x1111_valid` and
 `test_conv2d_2451x1111_valid`.
 
-#### Configuring `@tf_test_utils.tf_function_unittest`
+#### Configuring `@tf_test_utils.tf_function_unit_test`
 
-By default `@tf_test_utils.tf_function_unittest` uses uniform random input data
+By default `@tf_test_utils.tf_function_unit_test` uses uniform random input data
 to numerically test the function, but you can specify an `input_generator` or
 `input_args` to test data-specific behaviors:
 
@@ -234,8 +234,8 @@ Test targets are automatically generated for each test file and for each backend
 to check numerical correctness against TensorFlow. Tests targets that pass are
 placed into the `e2e_tests` test suite. Tests that fail on particular backends
 are recorded in lists in the `BUILD` files. For example, if
-`experimental_new_test.py` fails on the `iree_llvmjit` and `iree_vulkan`
-backends then the following lines should be added to the `BUILD` file:
+`experimental_new_test.py` fails on the `iree_vulkan` backend then the following
+lines should be added to the `BUILD` file:
 
 ```build
 LLVM_FAILING = [

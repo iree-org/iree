@@ -171,8 +171,6 @@ class DeviceSwitchRewriter {
         resultTypes_(resultTypes),
         device_(device),
         rewriter_(rewriter) {
-    // FIXME: Keep the same listener as the provided builder.
-    rewriter_.setListener(nullptr);
   }
 
   // Pushes a new condition onto the stack and returns a builder that must have
@@ -213,11 +211,18 @@ class DeviceSwitchRewriter {
         loc_, resultTypes_, device_, conditionAttrs, conditionArgs);
     for (int i = 0; i < caseOps_.size(); ++i) {
       Region &targetRegion = switchOp.getRegion(i);
-      Block *entryBlock = new Block;
-      targetRegion.push_back(entryBlock);
-      BlockAndValueMapping mapper;
+
+      SmallVector<Type, 4> entryTypes;
       for (auto arg : conditionArgs[i]) {
-        mapper.map(arg, entryBlock->addArgument(arg.getType()));
+        entryTypes.push_back(arg.getType());
+      }
+      Block *entryBlock =
+          rewriter_.createBlock(&targetRegion, targetRegion.end(), entryTypes);
+      rewriter_.setInsertionPointAfter(switchOp);
+
+      BlockAndValueMapping mapper;
+      for (auto arg : llvm::zip(conditionArgs[i], entryBlock->getArguments())) {
+        mapper.map(std::get<0>(arg), std::get<1>(arg));
       }
 
       Region &sourceRegion = caseOps_[i].getRegion(0);
@@ -229,7 +234,7 @@ class DeviceSwitchRewriter {
       rewriter_.mergeBlocks(secondBlock, entryBlock,
                             entryBlock->getArguments().take_front(
                                 secondBlock->getNumArguments()));
-      caseOps_[i].erase();
+      rewriter_.eraseOp(caseOps_[i]);
     }
     return switchOp;
   }

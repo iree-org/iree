@@ -29,7 +29,7 @@ class Value;
 class SubViewOp;
 class OperationFolder;
 class OpBuilder;
-class LogicalResult;
+struct LogicalResult;
 
 namespace iree_compiler {
 

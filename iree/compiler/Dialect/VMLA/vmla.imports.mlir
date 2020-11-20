@@ -475,6 +475,20 @@ vm.import @reduce.max.f32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
+vm.import @reduce.and.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dimension : i32,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+
+vm.import @reduce.or.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dimension : i32,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+
 vm.import @pooling.sum.i8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
   %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,

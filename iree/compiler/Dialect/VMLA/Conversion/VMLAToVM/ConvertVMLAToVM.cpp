@@ -359,6 +359,8 @@ void populateVMLAToVMPatterns(MLIRContext *context,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMaxOp, "vmla.reduce.max");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceAndOp, "vmla.reduce.and");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceOrOp, "vmla.reduce.or");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::PoolingSumOp, "vmla.pooling.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::PoolingMinOp, "vmla.pooling.min");

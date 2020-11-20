@@ -29,7 +29,7 @@ class Optional;
 namespace mlir {
 class Location;
 class FuncOp;
-class LogicalResult;
+struct LogicalResult;
 class PatternRewriter;
 class ConversionPatternRewriter;
 class Value;

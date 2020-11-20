@@ -529,8 +529,10 @@ void LinalgTileAndFusePass::runOnOperation() {
     if (linalgOps.empty()) continue;
 
     LaunchConfig launchConfig;
-    SmallVector<Operation *, 4> linalgOpsVec(linalgOps.begin(),
-                                             linalgOps.end());
+    SmallVector<linalg::LinalgOp, 4> linalgOpsVec =
+        llvm::to_vector<4>(llvm::map_range(linalgOps, [](Operation *op) {
+          return cast<linalg::LinalgOp>(op);
+        }));
     linalg::Aliases aliases;
     linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
     if (failed(launchConfig.init(context, dependenceGraph, options,
@@ -594,7 +596,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
     }
 
-    if (options.enableVectorization) {
+    if (launchConfig.useVectorize()) {
       {
         OwningRewritePatternList secondLevelTilingPatterns;
         populateTilingToSubgroupPatterns(context, launchConfig,

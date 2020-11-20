@@ -455,6 +455,22 @@ struct ReduceMax {
                         ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
+struct ReduceAnd {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const T> init_buffer,
+                        absl::Span<T> dst_buffer, int32_t dimension,
+                        ShapeSpan src_shape, ShapeSpan dst_shape);
+};
+
+struct ReduceOr {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const T> init_buffer,
+                        absl::Span<T> dst_buffer, int32_t dimension,
+                        ShapeSpan src_shape, ShapeSpan dst_shape);
+};
+
 struct PoolingSum {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,

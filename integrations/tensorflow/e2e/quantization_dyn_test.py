@@ -17,47 +17,40 @@
 from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
-class BooleanModule(tf_test_utils.TestModule):
+class QuantizationDynModule(tf.Module):
 
-  @tf_test_utils.tf_function_unittest(input_signature=[])
-  def constant(self):
-    return np.array([True, False, True], dtype=np.bool)
-
-  @tf_test_utils.tf_function_unittest(
-      input_signature=[tf.TensorSpec([4], tf.float32)],
-      input_args=[np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32)])
-  def greater_than(self, x):
-    return x > 1.0
-
-  @tf_test_utils.tf_function_unittest(
-      input_signature=[
-          tf.TensorSpec([4], tf.bool),
-          tf.TensorSpec([4], tf.bool)
-      ],
-      input_args=[
-          np.array([True, True, False, False], dtype=np.bool),
-          np.array([True, False, False, True], dtype=np.bool)
-      ],
-  )
-  def logical_and(self, x, y):
-    return tf.math.logical_and(x, y)
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
+  def fake_quant(self, x):
+    return tf.quantization.fake_quant_with_min_max_args(x,
+                                                        min=-6,
+                                                        max=6,
+                                                        num_bits=8,
+                                                        narrow_range=False,
+                                                        name=None)
 
 
-class BooleanTest(tf_test_utils.TracedModuleTestCase):
+class QuantizationDynTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(BooleanModule)
+    self._modules = tf_test_utils.compile_tf_module(QuantizationDynModule)
+
+  def test_fake_quant(self):
+
+    def abs(module):
+      module.fake_quant(tf_utils.uniform([32], low=-6, high=6))
+
+    self.compare_backends(abs, self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  BooleanTest.generate_unittests(BooleanModule)
   tf.test.main()
 
 

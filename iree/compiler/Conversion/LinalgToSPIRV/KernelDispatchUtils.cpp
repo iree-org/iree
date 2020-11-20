@@ -61,6 +61,14 @@ static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
   return std::make_tuple(nprocs_x, nprocs / nprocs_x);
 }
 
+namespace {
+struct LaunchConfigInfo {
+  std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+  std::array<int64_t, 3> numSubgroups = {1, 1, 1};
+  bool vectorize = false;
+};
+}  // namespace
+
 /// For a given operation `op`, compute the following configurations according
 /// to SPIR-V `targetEnv` and `options`:
 /// 1) number of tiling levels and tile sizes to use (updates `tileSizes`),
@@ -71,8 +79,7 @@ template <typename T>
 static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
                                        const SPIRVCodegenOptions &options,
                                        TileSizesListType &tileSizes,
-                                       std::array<int64_t, 3> &workgroupSize,
-                                       std::array<int64_t, 3> &numSubgroups) {
+                                       LaunchConfigInfo &config) {
   return op.emitError("undefined launch config for tiled operation");
 }
 
@@ -82,14 +89,13 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
-                                std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                LaunchConfigInfo &config) {
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
-  std::tie(workgroupSize[0], workgroupSize[1]) =
+  std::tie(config.workgroupSize[0], config.workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
-  workgroupSize[2] = 1;
+  config.workgroupSize[2] = 1;
   // This is just being hard-wired for now to be minimal viable, but this can be
   // decided better when we have better estimates of device charecteristics.
   const int64_t nRowsPerWorkitem = 1;
@@ -102,9 +108,9 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
     tileSizeK = 32;
   }
   assert(tileSizes.empty());
-  SmallVector<int64_t, 4> ts = {nBatchesPerWorkitem,
-                                nRowsPerWorkitem * workgroupSize[1],
-                                nColsPerWorkitem * workgroupSize[0], tileSizeK};
+  SmallVector<int64_t, 4> ts = {
+      nBatchesPerWorkitem, nRowsPerWorkitem * config.workgroupSize[1],
+      nColsPerWorkitem * config.workgroupSize[0], tileSizeK};
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
@@ -209,16 +215,36 @@ static LogicalResult getTargetSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
+  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
+  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  assert(lhsType.getElementType() == rhsType.getElementType());
+  // Pick ideal tile size based on the type.
+  SmallVector<int64_t, 4> workgroupLevelTs;
+  if (lhsType.getElementType().isF16()) {
+    workgroupLevelTs.append({16, 64, 8});
+  } else {
+    workgroupLevelTs.append({8, 64, 4});
+  }
+
+  // Fall back to the none vectorize path for cases we don't handle.
+  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
+      lhsType.getDimSize(0) % workgroupLevelTs[0] != 0 ||
+      rhsType.getDimSize(0) % workgroupLevelTs[1] != 0 ||
+      lhsType.getDimSize(1) % workgroupLevelTs[2] != 0) {
+    return failure();
+  }
+
   workgroupSize[0] = targetEnv.getResourceLimits().subgroup_size().getInt();
   workgroupSize[1] = 1;
   workgroupSize[2] = 1;
-  SmallVector<int64_t, 4> ts = {8, 64, 4};
-  tileSizes.emplace_back(ts);
+  tileSizes.emplace_back(workgroupLevelTs);
   // No tiling at the subgroup level since this target doesn't use subgroup op
   // or shared memory.
   tileSizes.emplace_back();
-  SmallVector<int64_t, 4> threadTs = {ts[0], ts[1] / workgroupSize[0], ts[2]};
-  tileSizes.emplace_back(threadTs);
+  SmallVector<int64_t, 4> invocationLevelTs = {
+      workgroupLevelTs[0], workgroupLevelTs[1] / workgroupSize[0],
+      workgroupLevelTs[2]};
+  tileSizes.emplace_back(invocationLevelTs);
   return success();
 }
 
@@ -227,25 +253,27 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
-                                std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                LaunchConfigInfo &config) {
   if (options.enableVectorization &&
       succeeded(getConfigForCooperativeMatmul(op, targetEnv, options, tileSizes,
-                                              workgroupSize, numSubgroups))) {
+                                              config.workgroupSize,
+                                              config.numSubgroups))) {
+    config.vectorize = true;
     return success();
   } else if (options.enableVectorization &&
              succeeded(getTargetSpecificConfig(op, targetEnv, options,
-                                               tileSizes, workgroupSize,
-                                               numSubgroups))) {
+                                               tileSizes, config.workgroupSize,
+                                               config.numSubgroups))) {
+    config.vectorize = true;
     return success();
   }
 
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
-  std::tie(workgroupSize[0], workgroupSize[1]) =
+  std::tie(config.workgroupSize[0], config.workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
-  workgroupSize[2] = 1;
+  config.workgroupSize[2] = 1;
   const int nRowsPerWorkitem = 1;
   const int nColsPerWorkitem = 1;
   int64_t tileSizeK = 0;
@@ -255,8 +283,9 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     tileSizeK = 32;
   }
   assert(tileSizes.empty());
-  SmallVector<int64_t, 4> ts = {nRowsPerWorkitem * workgroupSize[1],
-                                nColsPerWorkitem * workgroupSize[0], tileSizeK};
+  SmallVector<int64_t, 4> ts = {nRowsPerWorkitem * config.workgroupSize[1],
+                                nColsPerWorkitem * config.workgroupSize[0],
+                                tileSizeK};
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
@@ -266,8 +295,7 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
-                                std::array<int64_t, 3> &workgroupSize,
-                                std::array<int64_t, 3> &numSubgroups) {
+                                LaunchConfigInfo &config) {
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -275,7 +303,7 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   SmallVector<int64_t, 4> ts = {1, tileSizeY, tileSizeX};
   tileSizes.emplace_back(std::move(ts));
-  workgroupSize = {tileSizeX, tileSizeY, 1};
+  config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
 }
 
@@ -283,8 +311,7 @@ template <typename PoolingOpTy>
 static LogicalResult getPoolingOpLaunchConfig(
     PoolingOpTy op, const spirv::TargetEnv &targetEnv,
     const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
-    std::array<int64_t, 3> &workgroupSize,
-    std::array<int64_t, 3> &numSubgroups) {
+    LaunchConfigInfo &config) {
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -299,7 +326,7 @@ static LogicalResult getPoolingOpLaunchConfig(
   ts[ts.size() - 2] = tileSizeY;
   ts[ts.size() - 1] = tileSizeX;
   tileSizes.emplace_back(std::move(ts));
-  workgroupSize = {tileSizeX, tileSizeY, 1};
+  config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
 }
 
@@ -308,10 +335,9 @@ static LogicalResult getPoolingOpLaunchConfig(
   LogicalResult getOpLaunchConfig(                                      \
       opName op, const spirv::TargetEnv &targetEnv,                     \
       const SPIRVCodegenOptions &options, TileSizesListType &tileSizes, \
-      std::array<int64_t, 3> &workgroupSize,                            \
-      std::array<int64_t, 3> &numSubgroups) {                           \
+      LaunchConfigInfo &config) {                                       \
     return getPoolingOpLaunchConfig(op, targetEnv, options, tileSizes,  \
-                                    workgroupSize, numSubgroups);       \
+                                    config);                            \
   }
 
 DEFINE_POOLING_OP_CONFIG(linalg::PoolingMaxOp)
@@ -328,7 +354,7 @@ Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
 
 LogicalResult LaunchConfig::init(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    const SPIRVCodegenOptions &options, ArrayRef<Operation *> linalgOps) {
+    const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
   unsigned numTiledOps = 0;
   auto setKey = [&](Operation *op) -> std::string {
     std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
@@ -338,7 +364,7 @@ LogicalResult LaunchConfig::init(
   };
 
   if (!options.workgroupSize.empty()) {
-    for (Operation *linalgOp : linalgOps)
+    for (linalg::LinalgOp linalgOp : linalgOps)
       tileSizes[setKey(linalgOp)].emplace_back(options.tileSizes.begin(),
                                                options.tileSizes.end());
     workgroupSize = {1, 1, 1};
@@ -354,21 +380,21 @@ LogicalResult LaunchConfig::init(
   spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(*linalgOps.begin()));
 
   Optional<linalg::LinalgOp> rootOperation = {};
-
-  for (Operation *op : linalgOps) {
-#define DISPATCH(opName)                                                      \
-  if (auto linalgOp = dyn_cast<opName>(op)) {                                 \
-    if (rootOperation) {                                                      \
-      return linalgOp.emitError(                                              \
-          "unhandled multiple root operations in dispatch region");           \
-    }                                                                         \
-    rootOperation = cast<linalg::LinalgOp>(linalgOp.getOperation());          \
-    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)];     \
-    if (failed(getOpLaunchConfig(linalgOp, targetEnv, options, tileSizesInfo, \
-                                 workgroupSize, numSubgroups))) {             \
-      return failure();                                                       \
-    }                                                                         \
-    continue;                                                                 \
+  LaunchConfigInfo config;
+  for (linalg::LinalgOp linalgOp : linalgOps) {
+#define DISPATCH(opName)                                                  \
+  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {              \
+    if (rootOperation) {                                                  \
+      return op.emitError(                                                \
+          "unhandled multiple root operations in dispatch region");       \
+    }                                                                     \
+    rootOperation = linalgOp;                                             \
+    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)]; \
+    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,   \
+                                 config))) {                              \
+      return failure();                                                   \
+    }                                                                     \
+    continue;                                                             \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
@@ -380,7 +406,9 @@ LogicalResult LaunchConfig::init(
 
 #undef DISPATCH
   }
-
+  workgroupSize = config.workgroupSize;
+  numSubgroups = config.numSubgroups;
+  vectorize = config.vectorize;
   if (!rootOperation) {
     // No root operations found. Dont need to do anything.
     return success();

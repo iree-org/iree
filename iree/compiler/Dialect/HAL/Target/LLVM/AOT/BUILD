@@ -38,7 +38,7 @@ cc_library(
         "LLVMAOTTarget.h",
     ],
     deps = [
-        ":LLVMAOTTargetLinker",
+        ":LinkerTool",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMBaseTarget",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIRPasses",
@@ -52,21 +52,25 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
 
 cc_library(
-    name = "LLVMAOTTargetLinker",
-    hdrs = ["LLVMAOTTargetLinker.h"],
-    deps = platform_trampoline_deps("LLVMAOTTargetLinker", "compiler/Dialect/HAL/Target/LLVM/AOT"),
+    name = "LinkerTool",
+    srcs = ["LinkerTool.cpp"],
+    hdrs = ["LinkerTool.h"],
+    deps = platform_trampoline_deps("LinkerTools", "compiler/Dialect/HAL/Target/LLVM/AOT"),
 )
 
 cc_library(
-    name = "LLVMAOTTargetLinker_hdrs",
-    hdrs = ["LLVMAOTTargetLinker.h"],
+    name = "LinkerTool_hdrs",
+    hdrs = ["LinkerTool.h"],
     deps = [
-        "//iree/base:status",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMTargetOptions",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
     ],
 )
