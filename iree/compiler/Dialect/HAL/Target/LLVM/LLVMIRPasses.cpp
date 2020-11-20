@@ -21,6 +21,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -55,7 +56,7 @@ std::unique_ptr<llvm::TargetMachine> createTargetMachine(
   std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
       targetOptions.targetTriple, targetOptions.targetCPU /* cpu e.g k8*/,
       targetOptions.targetCPUFeatures /* cpu features e.g avx512fma*/,
-      targetOptions.options, {}, {},
+      targetOptions.options, llvm::Reloc::Model::PIC_, {},
       passBuilderOptLevelToCodeGenOptLevel(targetOptions.optLevel),
       /*JIT=*/false));
   return machine;
