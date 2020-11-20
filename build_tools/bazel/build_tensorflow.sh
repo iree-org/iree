@@ -94,6 +94,7 @@ bazel \
             --config=generic_clang \
             --build_tag_filters="${BUILD_TAG_FILTERS?}" \
             --test_tag_filters="${TEST_TAG_FILTERS?}" \
+            --test_arg=--use_crash_reproducer=False \
             --config=rs \
             --test_output=errors \
             --keep_going

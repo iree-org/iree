@@ -19,12 +19,20 @@ import os
 import tempfile
 from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
+from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
 from pyiree.tf import compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
+
+flags.DEFINE_bool(
+    "use_crash_reproducer", True,
+    "Uses the MLIR crash reproducer, generating reproducer files in the "
+    "artifacts directory for crashes and suppressing stack traces.")
+
+FLAGS = flags.FLAGS
 
 
 def _setup_mlir_crash_reproducer(
@@ -149,8 +157,10 @@ def _incrementally_compile_tf_module(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
-                                                 backend_info.backend_id)
+  if (FLAGS.use_crash_reproducer):
+    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
+                                                   artifacts_dir,
+                                                   backend_info.backend_id)
   return _compile_module(module, backend_info, exported_names, artifacts_dir)
 
 
@@ -188,8 +198,10 @@ def _incrementally_compile_tf_signature_def_saved_model(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
-                                                 backend_info.backend_id)
+  if (FLAGS.use_crash_reproducer):
+    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
+                                                   artifacts_dir,
+                                                   backend_info.backend_id)
   return _compile_module(saved_model_dir, saved_model_tags, backend_info,
                          exported_name, artifacts_dir)
 
