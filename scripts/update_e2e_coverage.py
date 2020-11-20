@@ -28,12 +28,13 @@ import utils
 
 TENSORFLOW_COVERAGE_DIR = 'tensorflow_coverage'
 REFERENCE_BACKEND = 'tf'
-# Assumes that tests are expanded for the tf, iree_vmla, and
+# Assumes that tests are expanded for the tf, iree_vmla, iree_llvmaot, and
 # iree_vulkan backends.
 BACKENDS_TO_TITLES = collections.OrderedDict([
     ('tf', 'tensorflow'),
     ('tflite', 'tflite'),
     ('iree_vmla', 'vmla'),
+    ('iree_llvmaot', 'llvm-aot'),
     ('iree_vulkan', 'vulkan-spirv'),
 ])
 
@@ -213,9 +214,9 @@ TARGETS_URL = os.path.join(MAIN_URL, 'iree/compiler/Dialect/HAL/Target')
 
 BACKEND_INFO = f"""IREE has three backend
 [targets]({TARGETS_URL}):
-`vmla`, `llvm-ir` and `vulkan-spirv`. We also test TFLite in our infrastructure
-for benchmarking purposes. The coverage tables below are automatically generated
-from IREE's test suites."""
+`vmla`, `dylib-llvm-aot` and `vulkan-spirv`. We also test TFLite in our
+infrastructure for benchmarking purposes. The coverage tables below are
+automatically generated from IREE's test suites."""
 
 
 def parse_arguments():

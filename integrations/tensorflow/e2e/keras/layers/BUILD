@@ -161,7 +161,7 @@ FAILING_STATIC = [
         ],
         "target_backends": [
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -176,6 +176,8 @@ FAILING_STATIC = [
     {
         # Failing on LLVM and Vulkan
         "layer": [
+            "Attention",
+            "AdditiveAttention",
             "Lambda",
             "Masking",
             "MaxPool1D",
@@ -183,15 +185,13 @@ FAILING_STATIC = [
             "MaxPool3D",
         ],
         "target_backends": [
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
     {
         # Failing on Vulkan
         "layer": [
-            "Attention",
-            "AdditiveAttention",
             "AveragePooling1D",
             "AveragePooling2D",
             "AveragePooling3D",
@@ -215,7 +215,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -297,7 +297,7 @@ FAILING_FULL_API = [
         ],
         "target_backends": [
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -319,7 +319,7 @@ FAILING_FULL_API = [
             "MaxPool3D",
         ],
         "target_backends": [
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -339,7 +339,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -404,7 +404,7 @@ FAILING_DYNAMIC = [
         ],
         "target_backends": [
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -428,7 +428,7 @@ FAILING_DYNAMIC = [
             "Subtract",
         ],
         "target_backends": [
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -453,7 +453,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -518,7 +518,7 @@ FAILING_TRAINING = [
         ],
         "target_backends": [
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },
@@ -538,7 +538,7 @@ iree_e2e_cartesian_product_test_suite(
             "tf",
             "tflite",
             "iree_vmla",
-            "iree_llvmjit",
+            "iree_llvmaot",
             "iree_vulkan",
         ],
     },

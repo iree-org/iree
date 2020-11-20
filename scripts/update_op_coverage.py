@@ -31,12 +31,11 @@ FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
-# TODO(scotttodd): LLVM AOT (dylib-llvm-aot) HAL target(s)
 OP_COVERAGE_DESCRIPTION = """# XLA HLO Op Coverage
 There are three backend [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
-- llvm-ir
+- dylib-llvm-aot
 - vulkan-spirv
 
 The table shows the supported XLA HLO ops on each backend. It is auto-generated
@@ -65,7 +64,7 @@ def get_backend_op_pair(test):
   """Returns the target backend and operation pair of the test."""
   test_suite_backends = {
       'check_vmla_vmla': 'vmla',
-      'check_llvm-ir_llvm': 'llvm-ir',
+      'check_dylib-llvm-aot_dylib': 'dylib-llvm-aot',
       'check_vulkan-spirv_vulkan': 'vulkan-spirv'
   }
   for (test_suite, backend) in test_suite_backends.items():

@@ -20,10 +20,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(scotttodd): also return if IREE_TARGET_BACKEND_DYLIB-LLVM-AOT is false
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} AND NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
   return()
 endif()
 """,

@@ -123,7 +123,7 @@ endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
-  # TODO(#2645): Add DYLIB-LLVM-AOT when it doesn't require an env var
+  DYLIB-LLVM-AOT
   LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
