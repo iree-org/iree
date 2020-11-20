@@ -161,6 +161,9 @@ def _incrementally_compile_tf_module(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
+  # Avoid the crash reproducer under tests or if the flag is false.
+  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
+  # use the crash reproducer.
   if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
     _compile_module = _setup_mlir_crash_reproducer(_compile_module,
                                                    artifacts_dir,
@@ -202,6 +205,9 @@ def _incrementally_compile_tf_signature_def_saved_model(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
+  # Avoid the crash reproducer under tests or if the flag is false.
+  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
+  # use the crash reproducer.
   if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
     _compile_module = _setup_mlir_crash_reproducer(_compile_module,
                                                    artifacts_dir,
