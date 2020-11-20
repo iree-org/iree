@@ -47,6 +47,7 @@ inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
     createConvertToGPUPass();
+    createFoldProcessorIDUsesPass();
     createLinalgTileAndFusePass(SPIRVCodegenOptions());
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();
