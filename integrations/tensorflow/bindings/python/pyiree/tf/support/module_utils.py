@@ -28,11 +28,15 @@ from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_bool(
-    "use_crash_reproducer", True,
-    "Uses the MLIR crash reproducer, generating reproducer files in the "
-    "artifacts directory for crashes and suppressing stack traces.")
+    "capture_crash_reproducer", True,
+    "Captures MLIR crash reproducers in the artifacts directory for crashes "
+    "and suppresses C++ stack traces.")
 
 FLAGS = flags.FLAGS
+
+
+def _running_bazel_test() -> bool:
+  return "TEST_TMPDIR" in os.environ
 
 
 def _setup_mlir_crash_reproducer(
@@ -157,7 +161,7 @@ def _incrementally_compile_tf_module(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  if (FLAGS.use_crash_reproducer):
+  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
     _compile_module = _setup_mlir_crash_reproducer(_compile_module,
                                                    artifacts_dir,
                                                    backend_info.backend_id)
@@ -198,7 +202,7 @@ def _incrementally_compile_tf_signature_def_saved_model(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  if (FLAGS.use_crash_reproducer):
+  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
     _compile_module = _setup_mlir_crash_reproducer(_compile_module,
                                                    artifacts_dir,
                                                    backend_info.backend_id)
