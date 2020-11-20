@@ -23,8 +23,9 @@ iree_cc_library(
     iree::tools::sanitizer_suppressions.txt
   DEPS
     iree::base::status
-    iree::hal::driver_registry
-    iree::hal::drivers
+    iree::hal
+    iree::hal::api
+    iree::hal::testing::driver_registry
     iree::testing::gtest
   TESTONLY
   PUBLIC
@@ -38,7 +39,7 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -51,7 +52,7 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -64,7 +65,7 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -77,7 +78,7 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -89,7 +90,7 @@ iree_cc_test(
     "driver_test.cc"
   DEPS
     ::cts_test_base
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -101,7 +102,7 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::cts_test_base
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
 )

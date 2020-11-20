@@ -34,7 +34,8 @@ namespace {
 class CustomModulesTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+        iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {
@@ -44,8 +45,9 @@ class CustomModulesTest : public ::testing::Test {
     IREE_CHECK_OK(iree_hal_module_register_types());
     // TODO(benvanik): make a 'don't care' helper method.
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
+    IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_allocator_system(), &hal_driver));
     iree_hal_device_t* hal_device = nullptr;
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &hal_device));

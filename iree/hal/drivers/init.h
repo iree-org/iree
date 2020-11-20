@@ -20,6 +20,7 @@ extern "C" {
 #endif  // __cplusplus
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
 
 // Registers all drivers that were linked into the current binary based on the
 // build configuration. Note that there may be no drivers available.
@@ -29,7 +30,7 @@ extern "C" {
 // create their own user_register_all_available_drivers() that calls this as
 // well as registering their drivers.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_register_all_available_drivers();
+iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry);
 
 #ifdef __cplusplus
 }  // extern "C"

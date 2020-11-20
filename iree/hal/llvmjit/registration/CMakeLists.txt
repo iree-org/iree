@@ -29,7 +29,6 @@ iree_cc_library(
     iree::base::flags
     iree::base::status
     iree::hal::api
-    iree::hal::driver_registry
     iree::hal::llvmjit
   DEFINES
     "IREE_HAL_HAVE_LLVMJIT_DRIVER_MODULE=1"

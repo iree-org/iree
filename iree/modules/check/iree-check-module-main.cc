@@ -175,7 +175,8 @@ StatusOr<int> Run(std::string module_file_path) {
 
 extern "C" int main(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
   ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -38,7 +38,7 @@ TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
 
 INSTANTIATE_TEST_SUITE_P(
     AllDrivers, DriverTest,
-    ::testing::ValuesIn(CtsTestBase::EnumerateAvailableDrivers()),
+    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
     GenerateTestName());
 
 }  // namespace cts

@@ -73,6 +73,8 @@ typedef struct {
 // query, lookup exported functions, and call module-provided implementation
 // functions for state and call management.
 typedef struct {
+  IREE_API_UNSTABLE
+
   // Name of the module prefixed on all exported functions.
   iree_string_view_t module_name;
 
