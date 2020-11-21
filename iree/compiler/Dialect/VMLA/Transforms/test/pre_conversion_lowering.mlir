@@ -78,6 +78,40 @@ func private @f(%arg0: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> {
 
 // -----
 
+// CHECK-LABEL: func private @f
+func private @f(%arg0: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> {
+  // CHECK-DAG: [[REAL:%.+]] = "mhlo.real"(%arg0)
+  // CHECK-DAG: [[IMAG:%.+]] = "mhlo.imag"(%arg0)
+  // CHECK-DAG: [[REAL_OUT:%.+]], [[IMAG_OUT:%.+]] = vmla.ifft.pseudo [[REAL]], [[IMAG]]
+  // CHECK: "mhlo.complex"([[REAL_OUT]], [[IMAG_OUT]])
+  %0 = "mhlo.fft"(%arg0) {fft_length = dense<8> : tensor<1xi64>, fft_type = "IFFT"} : (tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>>
+  return %0 : tensor<8xcomplex<f32>>
+}
+
+// -----
+
+// CHECK-LABEL: func private @f
+func private @f(%arg0: tensor<8xf32>) -> tensor<5xcomplex<f32>> {
+  // CHECK-DAG: [[REAL_OUT:%.+]], [[IMAG_OUT:%.+]] = vmla.rfft.pseudo %arg0
+  // CHECK: "mhlo.complex"([[REAL_OUT]], [[IMAG_OUT]])
+  %0 = "mhlo.fft"(%arg0) {fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"} : (tensor<8xf32>) -> tensor<5xcomplex<f32>>
+  return %0 : tensor<5xcomplex<f32>>
+}
+
+
+// -----
+
+// CHECK-LABEL: func private @f
+func private @f(%arg0: tensor<5xcomplex<f32>>) -> tensor<8xf32> {
+  // CHECK-DAG: [[REAL:%.+]] = "mhlo.real"(%arg0)
+  // CHECK-DAG: [[IMAG:%.+]] = "mhlo.imag"(%arg0)
+  // CHECK-DAG: [[REAL_OUT:%.+]] = vmla.irfft.pseudo [[REAL]], [[IMAG]]
+  %0 = "mhlo.fft"(%arg0) {fft_length = dense<5> : tensor<1xi64>, fft_type = "IRFFT"} : (tensor<5xcomplex<f32>>) -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
   // CHECK-NOT: "mhlo.complex"

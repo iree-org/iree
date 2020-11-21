@@ -678,9 +678,31 @@ def VMLA_FftPseudoOp : VMLA_Op<"fft.pseudo"> {
     The op that takes two tensors as input and returns two tensors as output.
     These represent the [real, imag] components of a complex number.
 
-    This is a placeholder for the actual implementation of fft.
-    In addition, only the base version of FFT is currently implemented.
-    (TODO: natashaknk)
+  }];
+  let arguments = (ins
+    AnyTensor:$real_in,
+    AnyTensor:$imag_in
+  );
+  let results = (outs
+    AnyTensor:$real_out,
+    AnyTensor:$imag_out
+  );
+
+  let assemblyFormat = [{
+  $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+  `->` `(`type($real_out)`,` type($imag_out)`)`
+  }];
+
+}
+
+def VMLA_IfftPseudoOp : VMLA_Op<"ifft.pseudo"> {
+  let summary = "pseudo-op of VMLA::IfftOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::IfftOp, to facilitate
+    the lowering process.
+
+    The op that takes two tensors as input and returns two tensors as output.
+    These represent the [real, imag] components of a complex number.
   }];
   let arguments = (ins
     AnyTensor:$real_in,
@@ -697,6 +719,52 @@ def VMLA_FftPseudoOp : VMLA_Op<"fft.pseudo"> {
   }];
 }
 
+def VMLA_RfftPseudoOp : VMLA_Op<"rfft.pseudo"> {
+  let summary = "pseudo-op of VMLA::RfftOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::RfftOp, to facilitate
+    the lowering process.
+
+    The op that takes one tensor as input and returns two tensors as output.
+    These outputs represent the [real, imag] components of a complex number.
+  }];
+  let arguments = (ins
+    AnyTensor:$real_in
+  );
+  let results = (outs
+    AnyTensor:$real_out,
+    AnyTensor:$imag_out
+  );
+
+  let assemblyFormat = [{
+  $real_in attr-dict `:` `(`type($real_in)`)`
+  `->` `(`type($real_out)`,` type($imag_out)`)`
+  }];
+}
+
+def VMLA_IrfftPseudoOp : VMLA_Op<"irfft.pseudo"> {
+  let summary = "pseudo-op of VMLA::IrfftOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::IrfftOp, to facilitate
+    the lowering process.
+
+    The op that takes two tensors as input and returns a tensor as output.
+    These represent the [real, imag] components of a complex number.
+  }];
+  let arguments = (ins
+    AnyTensor:$real_in,
+    AnyTensor:$imag_in
+  );
+  let results = (outs
+    AnyTensor:$real_out
+  );
+
+  let assemblyFormat = [{
+  $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+  `->` `(`type($real_out)`)`
+  }];
+}
+
 def VMLA_FftOp : VMLA_ElementTypeOp<"fft", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_Buffer:$real_in,
@@ -705,14 +773,63 @@ def VMLA_FftOp : VMLA_ElementTypeOp<"fft", [VMLA_IncludeShapes]> {
     VMLA_Shape:$imag_in_shape,
     VMLA_Buffer:$real_out,
     VMLA_Buffer:$imag_out,
-    VMLA_AnyTypeAttr:$real_element_type,
-    VMLA_AnyTypeAttr:$imag_element_type
+    VMLA_AnyTypeAttr:$element_type
   );
 
   let assemblyFormat = [{
     $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
     $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
-    `out` $real_out `,` $imag_out attr-dict `:` $real_element_type `,` $imag_element_type
+    `out` $real_out `,` $imag_out attr-dict `:` $element_type
+  }];
+}
+
+def VMLA_IfftOp : VMLA_ElementTypeOp<"ifft", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$real_in,
+    VMLA_Shape:$real_in_shape,
+    VMLA_Buffer:$imag_in,
+    VMLA_Shape:$imag_in_shape,
+    VMLA_Buffer:$real_out,
+    VMLA_Buffer:$imag_out,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+    $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+    `out` $real_out `,` $imag_out attr-dict `:` $element_type
+  }];
+}
+
+def VMLA_RfftOp : VMLA_ElementTypeOp<"rfft", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$real_in,
+    VMLA_Shape:$real_in_shape,
+    VMLA_Buffer:$real_out,
+    VMLA_Buffer:$imag_out,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+    `out` $real_out `,` $imag_out attr-dict `:` $element_type
+  }];
+}
+
+def VMLA_IrfftOp : VMLA_ElementTypeOp<"irfft", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$real_in,
+    VMLA_Shape:$real_in_shape,
+    VMLA_Buffer:$imag_in,
+    VMLA_Shape:$imag_in_shape,
+    VMLA_Buffer:$real_out,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+    $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+    `out` $real_out attr-dict `:` $element_type
   }];
 }
 
