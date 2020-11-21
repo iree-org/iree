@@ -34,7 +34,6 @@ cc_library(
     deps = [
         "//iree/base:flatcc",
         "//iree/compiler/Dialect/IREE/IR",
-        "@com_github_dvidelabs_flatcc//:runtime",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

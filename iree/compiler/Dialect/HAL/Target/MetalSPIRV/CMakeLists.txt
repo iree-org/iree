@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRSupport
-    flatccrt
+    iree::base::flatcc
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Utils

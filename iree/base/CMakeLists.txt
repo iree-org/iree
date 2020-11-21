@@ -212,7 +212,7 @@ iree_cc_library(
     "flatcc.h"
   DEPS
     ::flatcc_dummy
-    flatccrt
+    flatcc::runtime
   PUBLIC
 )
 

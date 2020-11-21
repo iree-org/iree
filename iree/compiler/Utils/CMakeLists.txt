@@ -32,7 +32,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
-    flatccrt
     iree::base::flatcc
     iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_hlo
