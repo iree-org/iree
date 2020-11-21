@@ -87,7 +87,6 @@ LAYERS = [
     "Embedding",
     "Flatten",
     "GRU",
-    "GRUCell",
     "GaussianDropout",
     "GaussianNoise",
     "GlobalAveragePooling1D",
@@ -98,7 +97,6 @@ LAYERS = [
     "GlobalMaxPool3D",
     "InputLayer",
     "LSTM",
-    "LSTMCell",
     "Lambda",
     "LayerNormalization",
     "LeakyReLU",
@@ -120,7 +118,6 @@ LAYERS = [
     "SeparableConv1D",
     "SeparableConv2D",
     # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
-    "SimpleRNNCell",
     "Softmax",
     "SpatialDropout1D",
     "SpatialDropout2D",
@@ -137,14 +134,6 @@ LAYERS = [
 
 FAILING_STATIC = [
     {
-        # Wrapping these in a tf.function appears to cause a keras bug.
-        "layer": [
-            "GRUCell",
-            "LSTMCell",
-            "SimpleRNNCell",
-        ],
-    },
-    {
         # Failing on TFLite
         "layer": [
             "AveragePooling3D",
@@ -152,6 +141,7 @@ FAILING_STATIC = [
             "Conv3D",
             "ConvLSTM2D",
             "LayerNormalization",
+            "Softmax",
             "MaxPool3D",
             "ZeroPadding3D",
         ],
@@ -161,10 +151,11 @@ FAILING_STATIC = [
         # Failing on IREE
         "layer": [
             "ConvLSTM2D",
+            "GRU",
+            "LSTM",  # Failing unless 'return_sequences = True'
             "LayerNormalization",
             "LeakyReLU",
             "LocallyConnected2D",
-            "Masking",
             "MultiHeadAttention",
             "UpSampling2D",
         ],
@@ -186,6 +177,7 @@ FAILING_STATIC = [
         # Failing on LLVM and Vulkan
         "layer": [
             "Lambda",
+            "Masking",
             "MaxPool1D",
             "MaxPool2D",
             "MaxPool3D",
@@ -198,11 +190,11 @@ FAILING_STATIC = [
     {
         # Failing on Vulkan
         "layer": [
+            "Attention",
+            "AdditiveAttention",
             "AveragePooling1D",
             "AveragePooling2D",
             "AveragePooling3D",
-            "GRU",
-            "LSTM",  # TODO(silvasean): Get this test working on Vulkan.
             "ThresholdedReLU",
         ],
         "target_backends": "iree_vulkan",
@@ -216,9 +208,9 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "layer": LAYERS,
-        "dynamic_batch": False,
+        "dynamic_dims": False,
         "training": False,
-        "test_full_api": False,
+        "test_default_kwargs_only": True,
         "target_backends": [
             "tf",
             "tflite",
@@ -237,12 +229,14 @@ iree_e2e_cartesian_product_test_suite(
 #   bazel run integrations/tensorflow/e2e/keras/layers:layers_test_manual -- \
 #     --list_layers_with_full_api_tests
 LAYERS_WITH_FULL_API_TESTS = [
+    "ActivityRegularization",
     "AdditiveAttention",
     "Attention",
     "AveragePooling1D",
     "AveragePooling2D",
     "AveragePooling3D",
     "BatchNormalization",
+    "Concatenate",
     "Conv1D",
     "Conv1DTranspose",
     "Conv2D",
@@ -250,22 +244,20 @@ LAYERS_WITH_FULL_API_TESTS = [
     "Conv3D",
     "Conv3DTranspose",
     # "ConvLSTM2D",  # TODO(meadowlark): Debug flakiness.
+    "Cropping1D",
+    "Cropping2D",
+    "Cropping3D",
     "DepthwiseConv2D",
-    "GlobalAveragePooling1D",
-    "GlobalAveragePooling2D",
-    "GlobalAveragePooling3D",
-    "GlobalMaxPool1D",
-    "GlobalMaxPool2D",
-    "GlobalMaxPool3D",
     "GRU",
+    "LSTM",
     "LocallyConnected1D",
     "LocallyConnected2D",
-    "LSTM",
     "MaxPool1D",
     "MaxPool2D",
     "MaxPool3D",
     "SeparableConv1D",
     "SeparableConv2D",
+    "SimpleRNN",
     # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
 ]
 
@@ -274,8 +266,6 @@ FAILING_FULL_API = [
         # Failing on TFLite
         "layer": [
             "AveragePooling3D",
-            "Conv1D",
-            "Conv2D",
             "Conv2DTranspose",
             "Conv3D",
             "Conv3DTranspose",
@@ -288,6 +278,7 @@ FAILING_FULL_API = [
             "MaxPool1D",
             "MaxPool3D",
             "SeparableConv1D",  # Failing on Kokoro.
+            "SeparableConv2D",
             "SimpleRNN",
         ],
         "target_backends": "tflite",
@@ -295,19 +286,13 @@ FAILING_FULL_API = [
     {
         # Failing on IREE
         "layer": [
-            "Conv1D",
-            "Conv2D",
             "Conv2DTranspose",
             "Conv3DTranspose",
-            "Conv3D",
             "ConvLSTM2D",
-            "DepthwiseConv2D",
             "GRU",
             "LocallyConnected1D",
             "LocallyConnected2D",
             "LSTM",
-            "SeparableConv1D",
-            "SeparableConv2D",
             "SimpleRNN",
         ],
         "target_backends": [
@@ -315,6 +300,10 @@ FAILING_FULL_API = [
             "iree_llvmjit",
             "iree_vulkan",
         ],
+    },
+    {
+        "layer": "Conv3D",
+        "target_backends": "iree_vmla",
     },
     {
         # Failing on LLVM and Vulakn
@@ -343,9 +332,9 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "layer": LAYERS_WITH_FULL_API_TESTS,
-        "dynamic_batch": False,
+        "dynamic_dims": False,
         "training": False,
-        "test_full_api": True,
+        "test_default_kwargs_only": False,
         "target_backends": [
             "tf",
             "tflite",
@@ -362,14 +351,6 @@ iree_e2e_cartesian_product_test_suite(
 
 FAILING_DYNAMIC = [
     {
-        # Wrapping these in a tf.function appears to cause a keras bug.
-        "layer": [
-            "GRUCell",
-            "LSTMCell",
-            "SimpleRNNCell",
-        ],
-    },
-    {
         # TFLite does not support dynamic shapes.
         "target_backends": "tflite",
     },
@@ -380,6 +361,7 @@ FAILING_DYNAMIC = [
             "AveragePooling1D",
             "AveragePooling2D",
             "AveragePooling3D",
+            "BatchNormalization",
             "Concatenate",
             "Conv1D",
             "Conv1DTranspose",
@@ -391,7 +373,9 @@ FAILING_DYNAMIC = [
             "Cropping1D",
             "Cropping2D",
             "Cropping3D",
+            "Dense",
             "DepthwiseConv2D",
+            "Dot",
             "ELU",
             "Flatten",
             "GRU",
@@ -431,9 +415,6 @@ FAILING_DYNAMIC = [
             "Add",
             "Attention",
             "Average",
-            "BatchNormalization",
-            "Dense",
-            "Dot",
             "GlobalAveragePooling1D",
             "GlobalAveragePooling2D",
             "GlobalAveragePooling3D",
@@ -459,15 +440,15 @@ FAILING_DYNAMIC = [
 ]
 
 iree_e2e_cartesian_product_test_suite(
-    name = "layers_dynamic_batch_tests",
+    name = "layers_dynamic_dims_tests",
     srcs = ["layers_test.py"],
     failing_configurations = FAILING_DYNAMIC,
     flags_to_values = {
         "reference_backend": "tf",
         "layer": LAYERS,
-        "dynamic_batch": True,
+        "dynamic_dims": True,
         "training": False,
-        "test_full_api": False,
+        "test_default_kwargs_only": True,
         "target_backends": [
             "tf",
             "tflite",
@@ -491,28 +472,17 @@ LAYERS_WITH_TRAINING_BEHAVIOR = [
     # "ConvLSTM2D",  # TODO(meadowlark): Debug flakiness.
     "Dropout",
     "GRU",
-    "GRUCell",
     "GaussianDropout",
     "GaussianNoise",
     "LSTM",
-    "LSTMCell",
     "MultiHeadAttention",
     # "SimpleRNN",  # TODO(meadowlark): Debug flakiness.
-    "SimpleRNNCell",
     "SpatialDropout1D",
     "SpatialDropout2D",
     "SpatialDropout3D",
 ]
 
 FAILING_TRAINING = [
-    {
-        # Wrapping these in a tf.function appears to cause a keras bug.
-        "layer": [
-            "GRUCell",
-            "LSTMCell",
-            "SimpleRNNCell",
-        ],
-    },
     {
         # Failing on TFLite:
         "layer": [
@@ -533,6 +503,7 @@ FAILING_TRAINING = [
             "AdditiveAttention",
             "AlphaDropout",
             "Attention",
+            "BatchNormalization",
             "ConvLSTM2D",
             "Dropout",
             "GaussianDropout",
@@ -560,9 +531,9 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "layer": LAYERS_WITH_TRAINING_BEHAVIOR,
-        "dynamic_batch": False,
+        "dynamic_dims": False,
         "training": True,
-        "test_full_api": False,
+        "test_default_kwargs_only": True,
         "target_backends": [
             "tf",
             "tflite",
