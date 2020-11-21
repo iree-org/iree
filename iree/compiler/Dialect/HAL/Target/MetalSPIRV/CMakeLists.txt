@@ -51,5 +51,7 @@ iree_cc_library(
     LLVMSupport
     MLIRSupport
     spirv-cross-msl
+  INCLUDES
+    "${IREE_ROOT_DIR}/third_party"
   PUBLIC
 )

@@ -12,27 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
-    features = ["-layering_check"],  # buildozer: disable=no-layering-check, allow indirect headers
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_HAL_DRIVER_VULKAN})
+""",
+    inline = True,
+)
+
 cc_library(
-    name = "drivers",
-    srcs = ["init.c"],
-    hdrs = ["init.h"],
+    name = "registration",
+    srcs = ["driver_module.cc"],
+    hdrs = ["driver_module.h"],
+    defines = [
+        "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1",
+    ],
     deps = [
-        "//iree/base:api",
+        "//iree/base:flags",
+        "//iree/base:status",
         "//iree/base:tracing",
-    ] + [
-        # TODO(*): select() and only pull in based on build configuration.
-        "//iree/hal/dylib/registration",
-        "//iree/hal/llvmjit/registration",
-        "//iree/hal/vmla/registration",
-        "//iree/hal/vulkan/registration",
-    ] + select({
-        "//iree:macos_x86_64": ["//iree/hal/metal/registration"],
-        "//conditions:default": [],
-    })
+        "//iree/hal:api",
+        "//iree/hal:driver_registry",
+        "//iree/hal/metal",
+        "@com_google_absl//absl/flags:flag",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

@@ -155,12 +155,14 @@ cc_library(
     local_defines = [
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_LLVMIR_TARGET",
+        "IREE_HAVE_METAL_TARGET",
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
         "//iree/compiler/Dialect/HAL/Target/LLVM/IR:LLVMIR",
+        "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],

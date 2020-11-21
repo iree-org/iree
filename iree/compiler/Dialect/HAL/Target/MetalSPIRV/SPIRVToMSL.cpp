@@ -19,7 +19,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "third_party/spirv_cross/spirv_msl.hpp"
+#include "spirv_cross/spirv_msl.hpp"
 
 #define DEBUG_TYPE "spirv-to-msl"
 
