@@ -275,6 +275,7 @@ FAILING_FULL_API = [
             "LocallyConnected1D",
             "LocallyConnected2D",
             "LSTM",
+            "MaxPool1D",
             "MaxPool3D",
             "SeparableConv1D",  # Failing on Kokoro.
             "SeparableConv2D",

@@ -52,13 +52,23 @@ RNN_KWARGS_TO_VALUES = dict(units=[4],
                             return_sequences=[False, True],
                             stateful=[False, True])
 
-POOLING_KWARGS_TO_VALUES = dict(strides=[None, 2], padding=["valid", "same"])
+POOLING_KWARGS_TO_VALUES = dict(strides=[None, 2],
+                                padding=["valid", "same"],
+                                data_format=[None, "channels_first"])
 CONV_KWARGS_TO_VALUES = dict(filters=[CONV_FILTERS],
                              kernel_size=[CONV_KERNEL_SIZE],
                              strides=[1, 2],
                              padding=["valid", "same"],
-                             data_format=["channels_last", "channels_first"],
+                             data_format=[None, "channels_first"],
                              dilation_rate=[1, 2])
+# Address pooling and conv layers having different default values for
+# 'data_format' for 1D layers.
+POOLING_1D_KWARGS_TO_VALUES = copy.deepcopy(POOLING_KWARGS_TO_VALUES)
+POOLING_1D_KWARGS_TO_VALUES.update(
+    {"data_format": ["channels_last", "channels_first"]})
+CONV_1D_KWARGS_TO_VALUES = copy.deepcopy(CONV_KWARGS_TO_VALUES)
+CONV_1D_KWARGS_TO_VALUES.update(
+    {"data_format": ["channels_last", "channels_first"]})
 
 # Unsupported by TensorFlow (at least on CPU).
 LAYERS_TO_TF_UNSUPPORTED_NON_DEFAULT_KWARGS = {
@@ -70,6 +80,7 @@ LAYERS_TO_TF_UNSUPPORTED_NON_DEFAULT_KWARGS = {
     "Conv3DTranspose": ["data_format"],
     "LocallyConnected1D": ["padding"],
     "LocallyConnected2D": ["padding"],
+    "MaxPool2D": ["data_format"],
 }
 
 # Some layers have kwargs which cannot both have non-default values.
@@ -94,38 +105,26 @@ def get_default_kwargs_values(layer: str) -> Dict[str, Any]:
   return kwargs_to_default_values
 
 
-def _flatten_sequence(sequence: Union[List[Any], Tuple[Any]]) -> List[Any]:
-  elements = []
-  for element in sequence:
-    if isinstance(element, (list, tuple)):
-      elements += _flatten_sequence(element)
-    else:
-      elements.append(element)
-  return elements
-
-
-def keras_default_equal(value: Any, default: Any) -> bool:
-  """Return True if 'value' is equal to 'default' as Keras kwargs."""
-  # This allows us to reuse variables like CONV_KWARGS_TO_VALUES.
-  # Treat splats as equal (e.g. 1 == (1, 1, 1, (1, 1))).
-  if (isinstance(default, Sequence) and
-      all([value == d for d in _flatten_sequence(default)])):
+def _equal_or_splat_equal(value: Any, sequence: Any) -> bool:
+  """Returns True if value==sequence or value==(every element in sequence)."""
+  if value == sequence:
     return True
-  # Keras' 1D Convs layers use 'channels_last' as a default for data_format
-  # while the 2D and 3D variants use 'None' as the default.
-  if value in [None, "channels_last"] and default in [None, "channels_last"]:
+  elif isinstance(sequence, (list, tuple)):
+    for element in sequence:
+      if not _equal_or_splat_equal(value, element):
+        return False
     return True
-  return value == default
+  return False
 
 
 def get_non_default_kwargs(
     layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> List[str]:
-  """Returns all non-default unrequired kwargs in unit_test_spec."""
+  """Returns all non-default optional kwargs in unit_test_spec."""
   kwargs_to_defaults = get_default_kwargs_values(layer)
   non_default_kwargs = []
   for kwarg, value in unit_test_spec.kwargs.items():
     if (kwarg in kwargs_to_defaults and
-        not keras_default_equal(value, kwargs_to_defaults[kwarg])):
+        not _equal_or_splat_equal(value, kwargs_to_defaults[kwarg])):
       non_default_kwargs.append(kwarg)
   return non_default_kwargs
 
@@ -184,7 +183,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
     "AveragePooling1D":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_1D_SIGNATURE_SHAPES,
-            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+            kwargs_to_values=POOLING_1D_KWARGS_TO_VALUES),
     "AveragePooling2D":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_2D_SIGNATURE_SHAPES,
@@ -204,7 +203,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
     "Conv1D":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_1D_SIGNATURE_SHAPES,
-            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+            kwargs_to_values=CONV_1D_KWARGS_TO_VALUES),
     "Conv1DTranspose":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_1D_SIGNATURE_SHAPES,
@@ -333,7 +332,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
     "MaxPool1D":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_1D_SIGNATURE_SHAPES,
-            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+            kwargs_to_values=POOLING_1D_KWARGS_TO_VALUES),
     "MaxPool2D":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=CONV_2D_SIGNATURE_SHAPES,
