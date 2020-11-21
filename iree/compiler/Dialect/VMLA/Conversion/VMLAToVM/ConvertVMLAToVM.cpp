@@ -267,13 +267,13 @@ class VMLAConvImportOpConversion
   }
 };
 
-class VMLAFftImportOpConversion
-    : public VMLAImportOpConversion<IREE::VMLA::FftOp> {
+template <typename FftOp>
+class VMLAFftImportOpConversion : public VMLAImportOpConversion<FftOp> {
  public:
-  using VMLAImportOpConversion<IREE::VMLA::FftOp>::VMLAImportOpConversion;
+  using VMLAImportOpConversion<FftOp>::VMLAImportOpConversion;
 
-  std::string getImportSuffix(IREE::VMLA::FftOp op) const override {
-    return std::string(".") + getTypedTypeStr(op.real_element_type());
+  std::string getImportSuffix(FftOp op) const override {
+    return std::string(".") + this->getTypedTypeStr(op.element_type());
   }
 };
 }  // namespace
@@ -352,8 +352,14 @@ void populateVMLAToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "vmla.batch.matmul");
   patterns.insert<VMLAConvImportOpConversion>(context, importSymbols,
                                               typeConverter, "vmla.conv");
-  patterns.insert<VMLAFftImportOpConversion>(context, importSymbols,
-                                             typeConverter, "vmla.fft");
+  patterns.insert<VMLAFftImportOpConversion<IREE::VMLA::FftOp>>(
+      context, importSymbols, typeConverter, "vmla.fft");
+  patterns.insert<VMLAFftImportOpConversion<IREE::VMLA::IfftOp>>(
+      context, importSymbols, typeConverter, "vmla.ifft");
+  patterns.insert<VMLAFftImportOpConversion<IREE::VMLA::RfftOp>>(
+      context, importSymbols, typeConverter, "vmla.rfft");
+  patterns.insert<VMLAFftImportOpConversion<IREE::VMLA::IrfftOp>>(
+      context, importSymbols, typeConverter, "vmla.irfft");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");

@@ -655,16 +655,40 @@ class VMLAModuleState final {
   IREE_VMLA_SORT_OP(SortI32, int32_t);
   IREE_VMLA_SORT_OP(SortF32, float);
 
-  Status FftF32(const vm::ref<Buffer>& real_src,
-                iree_vmla_shape_t real_src_shape,
-                const vm::ref<Buffer>& imag_src,
-                iree_vmla_shape_t imag_src_shape,
-                const vm::ref<Buffer>& real_dst,
-                const vm::ref<Buffer>& imag_dst) {
-    IREE_TRACE_SCOPE0("VMLAModuleState::FftF32");
-    IREE_RETURN_IF_ERROR(kernels::Fft::Execute<float>(
+#define IREE_VMLA_COMPLEX_INPUT_FFT_OP(name, op)                            \
+  Status name(                                                              \
+      const vm::ref<Buffer>& real_src, iree_vmla_shape_t real_src_shape,    \
+      const vm::ref<Buffer>& imag_src, iree_vmla_shape_t imag_src_shape,    \
+      const vm::ref<Buffer>& real_dst, const vm::ref<Buffer>& imag_dst) {   \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                           \
+    return op::Execute<float>(real_src->As<float>(), imag_src->As<float>(), \
+                              real_dst->As<float>(), imag_dst->As<float>(), \
+                              real_src_shape, imag_src_shape);              \
+  }
+
+  IREE_VMLA_COMPLEX_INPUT_FFT_OP(FftF32, kernels::Fft);
+  IREE_VMLA_COMPLEX_INPUT_FFT_OP(IfftF32, kernels::Ifft);
+
+  Status RfftF32(const vm::ref<Buffer>& real_src,
+                 iree_vmla_shape_t real_src_shape,
+                 const vm::ref<Buffer>& real_dst,
+                 const vm::ref<Buffer>& imag_dst) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::RfftF32");
+    IREE_RETURN_IF_ERROR(kernels::Rfft::Execute<float>(
+        real_src->As<float>(), real_dst->As<float>(), imag_dst->As<float>(),
+        real_src_shape));
+    return OkStatus();
+  }
+
+  Status IrfftF32(const vm::ref<Buffer>& real_src,
+                  iree_vmla_shape_t real_src_shape,
+                  const vm::ref<Buffer>& imag_src,
+                  iree_vmla_shape_t imag_src_shape,
+                  const vm::ref<Buffer>& real_dst) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::IrfftF32");
+    IREE_RETURN_IF_ERROR(kernels::Irfft::Execute<float>(
         real_src->As<float>(), imag_src->As<float>(), real_dst->As<float>(),
-        imag_dst->As<float>(), real_src_shape, imag_src_shape));
+        real_src_shape, imag_src_shape));
     return OkStatus();
   }
 
@@ -1001,6 +1025,9 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("sort.i32", &VMLAModuleState::SortI32),
     vm::MakeNativeFunction("sort.f32", &VMLAModuleState::SortF32),
     vm::MakeNativeFunction("fft.f32", &VMLAModuleState::FftF32),
+    vm::MakeNativeFunction("ifft.f32", &VMLAModuleState::IfftF32),
+    vm::MakeNativeFunction("rfft.f32", &VMLAModuleState::RfftF32),
+    vm::MakeNativeFunction("irfft.f32", &VMLAModuleState::IrfftF32),
     vm::MakeNativeFunction("finite.f32", &VMLAModuleState::FiniteF32),
 
     vm::MakeNativeFunction("convert.i8.i16", &VMLAModuleState::ConvertI8I16),

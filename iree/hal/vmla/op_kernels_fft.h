@@ -81,6 +81,96 @@ struct Fft {
   }
 };
 
+struct Ifft {
+  template <typename T>
+  static Status Execute(absl::Span<const T> real_src_buffer,
+                        absl::Span<const T> imag_src_buffer,
+                        absl::Span<T> real_dst_buffer,
+                        absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
+                        ShapeSpan imag_src_shape) {
+    PFFFT_Setup* fft_state =
+        pffft_new_setup(real_src_shape.back(), PFFFT_COMPLEX);
+    int element_count = real_src_buffer.size();
+    std::vector<T> complex_input;
+    complex_input.reserve(element_count * 2);
+
+    // pffft requires the input to be an array of interleaved complex numbers
+    for (int i = 0; i < element_count; i++) {
+      complex_input[i * 2] = real_src_buffer[i];
+      complex_input[i * 2 + 1] = imag_src_buffer[i];
+    }
+
+    std::vector<T> complex_output;
+    complex_output.reserve(element_count * 2);
+
+    pffft_transform_ordered(fft_state, &complex_input[0], &complex_output[0],
+                            NULL, PFFFT_BACKWARD);
+
+    // Split the interleaved array back into a real and imag vectors and scale
+    // them.
+    for (int i = 0; i < element_count; i++) {
+      real_dst_buffer[i] = complex_output[i * 2] / element_count;
+      imag_dst_buffer[i] = complex_output[i * 2 + 1] / element_count;
+    }
+    pffft_destroy_setup(fft_state);
+    return OkStatus();
+  }
+};
+
+struct Rfft {
+  template <typename T>
+  static Status Execute(absl::Span<const T> real_src_buffer,
+                        absl::Span<T> real_dst_buffer,
+                        absl::Span<T> imag_dst_buffer,
+                        ShapeSpan real_src_shape) {
+    PFFFT_Setup* fft_state = pffft_new_setup(real_src_shape.back(), PFFFT_REAL);
+    int element_count = real_src_buffer.size() / 2 + 1;
+
+    std::vector<T> complex_output;
+    complex_output.reserve(element_count * 4);
+
+    pffft_transform_ordered(fft_state, &real_src_buffer[0], &complex_output[0],
+                            NULL, PFFFT_FORWARD);
+
+    // Split the interleaved array back into a real and imag vectors and scale
+    // them.
+    for (int i = 0; i < element_count; i++) {
+      real_dst_buffer[i] = complex_output[i * 2];
+      imag_dst_buffer[i] = complex_output[i * 2 + 1];
+    }
+    auto temp = real_dst_buffer[element_count - 1];
+    real_dst_buffer[element_count - 1] = imag_dst_buffer[0];
+    imag_dst_buffer[0] = temp;
+    pffft_destroy_setup(fft_state);
+    return OkStatus();
+  }
+};
+
+struct Irfft {
+  template <typename T>
+  static Status Execute(absl::Span<const T> real_src_buffer,
+                        absl::Span<const T> imag_src_buffer,
+                        absl::Span<T> real_dst_buffer, ShapeSpan real_src_shape,
+                        ShapeSpan imag_src_shape) {
+    PFFFT_Setup* fft_state = pffft_new_setup(real_src_shape.back(), PFFFT_REAL);
+    int element_count = real_src_buffer.size();
+    std::vector<T> complex_input;
+    complex_input.reserve(element_count * 2);
+
+    // pffft requires the input to be an array of interleaved complex numbers
+    for (int i = 0; i < element_count; i++) {
+      complex_input[i * 2] = real_src_buffer[i];
+      complex_input[i * 2 + 1] = imag_src_buffer[i];
+    }
+
+    pffft_transform_ordered(fft_state, &complex_input[0], &real_dst_buffer[0],
+                            NULL, PFFFT_BACKWARD);
+
+    pffft_destroy_setup(fft_state);
+    return OkStatus();
+  }
+};
+
 }  // namespace kernels
 }  // namespace vmla
 }  // namespace hal

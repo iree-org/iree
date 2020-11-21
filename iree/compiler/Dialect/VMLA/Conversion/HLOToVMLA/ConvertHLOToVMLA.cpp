@@ -729,10 +729,105 @@ struct FftOpConversion : public OpConversionPattern<IREE::VMLA::FftPseudoOp> {
     rewriter.createOrFold<IREE::VMLA::FftOp>(
         srcOp.getLoc(), rawOperands[0], input_shape, rawOperands[1],
         input_shape, real_out, imag_out,
-        TypeAttr::get(real_input_type.getElementType()),
-        TypeAttr::get(imag_input_type.getElementType()));
+        TypeAttr::get(real_input_type.getElementType()));
 
     rewriter.replaceOp(srcOp, {real_out, imag_out});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
+struct IfftOpConversion : public OpConversionPattern<IREE::VMLA::IfftPseudoOp> {
+  IfftOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::VMLA::IfftPseudoOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto input_shape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.real_in(), typeConverter, rewriter);
+
+    auto real_input_type = srcOp.getOperand(0).getType().cast<ShapedType>();
+    auto imag_input_type = srcOp.getOperand(1).getType().cast<ShapedType>();
+
+    // The input type/shape should match for the real and imag components.
+    if (real_input_type != imag_input_type) {
+      srcOp.emitWarning() << "real and imag should have matching types";
+      return failure();
+    }
+
+    auto real_out = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(0), typeConverter, rewriter);
+    auto imag_out = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(1), typeConverter, rewriter);
+
+    rewriter.createOrFold<IREE::VMLA::IfftOp>(
+        srcOp.getLoc(), rawOperands[0], input_shape, rawOperands[1],
+        input_shape, real_out, imag_out,
+        TypeAttr::get(real_input_type.getElementType()));
+
+    rewriter.replaceOp(srcOp, {real_out, imag_out});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
+struct RfftOpConversion : public OpConversionPattern<IREE::VMLA::RfftPseudoOp> {
+  RfftOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::VMLA::RfftPseudoOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto input_type = srcOp.getOperand().getType().cast<ShapedType>();
+    auto input_shape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.real_in(), typeConverter, rewriter);
+
+    auto real_out = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(0), typeConverter, rewriter);
+    auto imag_out = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(1), typeConverter, rewriter);
+
+    rewriter.createOrFold<IREE::VMLA::RfftOp>(
+        srcOp.getLoc(), rawOperands[0], input_shape, real_out, imag_out,
+        TypeAttr::get(input_type.getElementType()));
+
+    rewriter.replaceOp(srcOp, {real_out, imag_out});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
+struct IrfftOpConversion
+    : public OpConversionPattern<IREE::VMLA::IrfftPseudoOp> {
+  IrfftOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::VMLA::IrfftPseudoOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto real_input_type = srcOp.getOperand(0).getType().cast<ShapedType>();
+    auto imag_input_type = srcOp.getOperand(1).getType().cast<ShapedType>();
+
+    // The input type/shape should match for the real and imag components.
+    if (real_input_type != imag_input_type) {
+      srcOp.emitWarning() << "real and imag should have matching types";
+      return failure();
+    }
+
+    auto input_shape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.real_in(), typeConverter, rewriter);
+    auto real_out = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+
+    rewriter.createOrFold<IREE::VMLA::IrfftOp>(
+        srcOp.getLoc(), rawOperands[0], input_shape, rawOperands[1],
+        input_shape, real_out, TypeAttr::get(real_input_type.getElementType()));
+
+    rewriter.replaceOp(srcOp, {real_out});
     return success();
   }
 
@@ -805,9 +900,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // vmla.sort.pseudo
   patterns.insert<SortOpConversion>(context, typeConverter);
 
-  // vmla.fft.pseudo
-  patterns.insert<FftOpConversion>(context, typeConverter);
-
+  // vmla.fft.pseudo, vmla.ifft.pseudo, vmla.rfft.pseudo, vmla.irfft.pseudo
+  patterns.insert<FftOpConversion, IfftOpConversion, RfftOpConversion,
+                  IrfftOpConversion>(context, typeConverter);
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.
   patterns.insert<VMLAOpConversion<mhlo::AddOp, IREE::VMLA::AddOp>>(
