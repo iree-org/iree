@@ -83,6 +83,30 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    atomic_slist
+  HDRS
+    "atomic_slist.h"
+  SRCS
+    "atomic_slist.c"
+  DEPS
+    ::core_headers
+    ::synchronization
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    atomic_slist_test
+  SRCS
+    "atomic_slist_test.cc"
+  DEPS
+    ::atomic_slist
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     dynamic_library
   HDRS
     "dynamic_library.h"
