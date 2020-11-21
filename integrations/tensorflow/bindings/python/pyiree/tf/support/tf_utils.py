@@ -209,6 +209,11 @@ def make_dims_dynamic(spec: tf.TensorSpec) -> tf.TensorSpec:
   return tf.TensorSpec([None] * len(spec.shape), spec.dtype)
 
 
+def keras_arg_wrapper(*args):
+  """Wrapper to convert multiple positional args into a list of values."""
+  return list(args) if isinstance(args, tuple) else args
+
+
 def check_same(ref: Any, tar: Any, rtol: float,
                atol: float) -> Tuple[bool, Union[str, None]]:
   """Checks that ref and tar have identical datastructures and values."""

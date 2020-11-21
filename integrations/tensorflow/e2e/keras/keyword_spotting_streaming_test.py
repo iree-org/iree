@@ -49,42 +49,27 @@ MODE_ENUM_TO_MODE = {
 }
 
 
-class KeywordSpottingModule(tf.Module):
+class KeywordSpottingModule(tf_test_utils.TestModule):
 
   def __init__(self):
     super().__init__()
     self.m = utils.get_model_with_default_params(FLAGS.model,
                                                  MODE_ENUM_TO_MODE[FLAGS.mode])
-    self.write_input_shapes_to_cls(self.m)
-    self.m.predict = lambda x: self.m.call(x, training=False)
-    input_signature = [tf.TensorSpec(shape) for shape in self.input_shapes]
-    self.predict = tf.function(input_signature=input_signature)(self.m.predict)
 
-  @classmethod
-  def write_input_shapes_to_cls(cls, model):
-    # We store the input shapes on the cls because we need access to them to
-    # generate the random inputs. Lists are not valid exported names, so we
-    # cannot access them from the module instance itself, and instead we store
-    # the input shapes on the test case below.
-    cls.input_shapes = [tensor.shape for tensor in model.inputs]
+    call = lambda *args: self.m(tf_utils.keras_arg_wrapper(*args),
+                                training=False)
+    input_signature = [tf.TensorSpec(tensor.shape) for tensor in self.m.inputs]
+    self.call = tf_test_utils.tf_function_unit_test(
+        input_signature=input_signature, name="call", atol=1e-5)(call)
 
 
 class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(KeywordSpottingModule,
-                                                    exported_names=['predict'])
-    self._input_shapes = KeywordSpottingModule.input_shapes
-
-  def test_predict(self):
-
-    def predict(module):
-      inputs = [tf_utils.uniform(shape) for shape in self._input_shapes]
-      inputs = inputs[0] if len(inputs) == 1 else inputs
-      module.predict(inputs, atol=1e-5)
-
-    self.compare_backends(predict, self._modules)
+    self._modules = tf_test_utils.compile_tf_module(
+        KeywordSpottingModule,
+        exported_names=KeywordSpottingModule.get_tf_function_unit_tests())
 
 
 def main(argv):
@@ -98,6 +83,7 @@ def main(argv):
   KeywordSpottingModule.__name__ = os.path.join('keyword_spotting', FLAGS.model,
                                                 FLAGS.mode)
 
+  KeywordSpottingTest.generate_unit_tests(KeywordSpottingModule)
   tf.test.main()
 
 
