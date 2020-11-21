@@ -29,9 +29,6 @@ Print out output for rebuilding the cmake image and all images that
 transitively on depend on it, but don't take side-effecting actions:
   python3 build_tools/docker/manage_images.py --build --image cmake --dry-run
 
-Push all `prod` images to GCR:
-  python3 build_tools/docker/manage_images.py --push --tag prod --images all
-
 Rebuild and push all images and update references to them in the repository:
   python3 build_tools/docker/manage_images.py --push --images all
   --update-references
@@ -46,9 +43,11 @@ import subprocess
 import sys
 from typing import List, Sequence, Union
 
+import utils
+
 IREE_GCR_URL = 'gcr.io/iree-oss/'
-DOCKER_DIR = 'build_tools/docker/'
 DIGEST_REGEX = r'sha256:[a-zA-Z0-9]+'
+DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
@@ -95,8 +94,7 @@ def parse_arguments():
       type=str,
       default='latest',
       help='Tag for the images to build. Defaults to `latest` (which is good '
-      'for testing changes in a PR). Use `prod` to update the images that the '
-      'CI caches.')
+      'for testing changes in a PR). The `prod` tag will not work with --push.')
   parser.add_argument('--pull',
                       action='store_true',
                       help='Pull the specified image before building.')
@@ -182,7 +180,7 @@ def get_repo_digest(tagged_image_url: str) -> str:
       '{{index .RepoDigests 0}}',
   ]
   try:
-    completed_process = run_command(
+    completed_process = utils.run_command(
         inspect_command,
         dry_run=False,  # Run even if --dry_run is True.
         capture_output=True,
@@ -237,15 +235,9 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
 if __name__ == '__main__':
   args = parse_arguments()
 
-  # Ensure the user has the correct authorization if they try to push to GCR.
   if args.push:
-    try:
-      run_command(['which', 'gcloud'])
-    except subprocess.CalledProcessError as error:
-      raise RuntimeError(
-          'gcloud not found. See https://cloud.google.com/sdk/install for '
-          'installation.') from error
-    run_command(['gcloud', 'auth', 'configure-docker'], dry_run=args.dry_run)
+    # Ensure the user has the correct authorization if they try to push to GCR.
+    utils.check_gcloud_auth(dry_run=args.dry_run)
 
   images_to_process = get_ordered_images_to_process(args.images)
   print(f'Also processing dependent images. Will process: {images_to_process}')
@@ -257,17 +249,31 @@ if __name__ == '__main__':
     image_path = os.path.join(DOCKER_DIR, image)
 
     if args.pull:
-      run_command(['docker', 'pull', tagged_image_url], dry_run=args.dry_run)
+      utils.run_command(['docker', 'pull', tagged_image_url], args.dry_run)
 
     if args.build:
-      run_command(['docker', 'build', '--tag', tagged_image_url, image_path],
-                  dry_run=args.dry_run)
+      utils.run_command(
+          ['docker', 'build', '--tag', tagged_image_url, image_path],
+          args.dry_run)
 
     if args.push:
-      run_command(['docker', 'push', tagged_image_url], dry_run=args.dry_run)
+      if args.tag == 'prod':
+        raise ValueError('This script cannot be used to push to :prod. Use '
+                         'build_tools/docker/manage_prod.py instead.')
+      utils.run_command(['docker', 'push', tagged_image_url], args.dry_run)
 
     if args.update_references:
       digest = get_repo_digest(tagged_image_url)
+
+      # Check that the image is in 'prod_digests.txt' and append it to the list
+      # in the file if it isn't. We know that the GCR digest exists at this
+      # point because 'get_repo_digest' confirms that the image has been pushed.
+      with open(utils.PROD_DIGESTS, 'r') as f:
+        in_prod_digests = image_url in f.read()
+      if not in_prod_digests:
+        with open(utils.PROD_DIGESTS, 'a') as f:
+          f.write(f'{image_url}@{digest}\n')
+
       # Just hardcode this oddity
       if image == 'rbe-toolchain':
         update_rbe_reference(digest, dry_run=args.dry_run)

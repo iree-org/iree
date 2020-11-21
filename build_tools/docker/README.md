@@ -82,7 +82,7 @@ steps in the "Debugging" section below before continuing.
 2. Build the image, push the image to GCR and update all references to the image
    with the new GCR digest:
 
-   ```shell
+    ```shell
     python3 build_tools/docker/manage_images.py \
       --image "${IMAGE?}" --build \
       --tag latest \
@@ -99,7 +99,7 @@ steps in the "Debugging" section below before continuing.
    digest references to test the new images.
 
 5. Merge your PR after is approved and all CI tests pass. **Please remember to
-   complete the rest of the steps below**.
+   complete the step below**.
 
 ### Part 3. Updating the `:prod` tag
 
@@ -108,38 +108,13 @@ changing the images used, you should also update the images tagged as `prod`
 in GCR. This also makes development significantly easier for others who need to
 modify the `docker` images.
 
-6. On the `main` branch, build (but don't push) the images and locally tag them
-   with the `:prod` tag:
-
-   ```shell
-    python3 build_tools/docker/manage_images.py \
-      --image "${IMAGE?}" --build \
-      --tag prod \
-      --update_references
-    ```
-
-    This build should be entirely cache hits.
-7. We include `--update_references` in the command above so that we can check
-   that none of the images or references to them have been changed. Check that
-   the following command produces no output before continuing:
-
-   ```shell
-   git status --porcelain
-   ```
-
-   If the output is not empty then you'll need to find the source of the
-   discrepancy (e.g. a locally modified `Dockerfile`) and remove it, and repeat
-   steps 5 and 6 before continuing. (This relies on you keeping your local copy
-   of the Docker images. If you didn't, you'll have to manually pull the missing
-   images by their digest).
-8. Now that we've confirmed that none of the images were changed, we can push
-   them to GCR with the `:prod` tag.
+6. We use `build_tools/docker/prod_digests.txt` as a source of truth for which
+   versions of the images on GCR should have the `:prod` tag. The following
+   command will ensure that you are at upstream HEAD on the `main` branch before
+   it updates the tags.
 
     ```shell
-    python3 build_tools/docker/manage_images.py \
-      --image "${IMAGE?}" \
-      --tag prod \
-      --push
+    python3 build_tools/docker/manage_prod.py
     ```
 
 ## Debugging
@@ -150,13 +125,14 @@ images and then update the images tagged with `:latest` on your machine (and on
 GCR).
 
 ```shell
-# Pull all :prod images
-python3 build_tools/docker/manage_images.py --images all --pull --tag prod
+# Pull all images that should have :prod tags. (They won't if someone ignores
+# step 6 above, but they are the images that this command pulls are correct
+# regardless).
+python3 build_tools/docker/manage_prod.py --pull_only
+
 # Update the :latest images to match the :prod images.
-# If you have a clean workspace this _shouldn't_ require building anything as
-# everything should be cache hits from the :prod images downloaded above, but if
-# the :prod images are behind then that will not be the case and this may take
-# several hours (depending on your machine).
+# If you have a clean workspace this shouldn't require building anything as
+# everything should be cache hits from the :prod images downloaded above.
 python3 build_tools/docker/manage_images.py \
   --images all --build \
   --tag latest \
