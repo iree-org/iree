@@ -58,8 +58,7 @@ static iree_status_t iree_hal_metal_executable_flatbuffer_verify(
   iree_MetalThreadgroupSize_vec_t threadgroup_sizes_vec =
       iree_MetalExecutableDef_threadgroup_sizes(executable_def);
   size_t threadgroup_size_count = iree_MetalThreadgroupSize_vec_len(threadgroup_sizes_vec);
-  if (!metal_executable_def.threadgroup_sizes() ||
-      metal_executable_def.threadgroup_sizes()->size() == 0) {
+  if (!threadgroup_size_count) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "No threadgroup sizes present";
   }
 
@@ -150,16 +149,16 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(id<MTLDevice> d
       }
       libraries.push_back(library);
 
-      NSString* entry_point = [NSString stringWithCString:entry_point
-                                                 encoding:[NSString defaultCStringEncoding]];
-      id<MTLFunction> function = [library newFunctionWithName:entry_point];
+      id<MTLFunction> function = [library newFunctionWithName:[NSString stringWithCString:entry_point
+                                                     encoding:[NSString defaultCStringEncoding]]];
       if (!function) {
         NSLog(@"Failed to create MTLFunction");
 #ifndef NDEBUG
         NSLog(@"Original MSL source: %@", shader_source);
 #endif
         return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Cannot find entry point '" << entry_point << "' in shader source index " << i;
+               << "Cannot find entry point '" << entry_point << "' in shader source index "
+               << entry_ordinal;
       }
 
       id<MTLComputePipelineState> pso = [device newComputePipelineStateWithFunction:function
@@ -172,8 +171,8 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(id<MTLDevice> d
         return InvalidArgumentErrorBuilder(IREE_LOC) << "Invalid MSL source";
       }
 
-      kernel_objects.push_back(KernelObjects{
-          function, iree_MetalThreadgroupSize_vec_at(threadgroup_sizes_vec, entry_ordinal), pso});
+      kernel_objects.push_back(
+          KernelObjects{function, {static_cast<uint32_t>(iree_MetalThreadgroupSize__size())}, pso});
     }
   }
 

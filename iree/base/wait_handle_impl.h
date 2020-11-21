@@ -52,7 +52,13 @@
 // TODO(benvanik): EPOLL on android/linux/bsd/etc.
 // TODO(benvanik): KQUEUE on mac/ios.
 #if !defined(OS_IOS) && !defined(__EMSCRIPTEN__)
+
+#if defined(IREE_PLATFORM_MACOS)
+#define IREE_WAIT_API IREE_WAIT_API_KQUEUE
+#else
 #define IREE_WAIT_API IREE_WAIT_API_PPOLL
+#endif
+
 #else
 #define IREE_WAIT_API IREE_WAIT_API_POLL
 #endif  // insanity
