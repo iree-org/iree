@@ -87,21 +87,25 @@ Status DirectCommandQueue::TranslateBatchInfo(
 
   submit_info->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info->pNext = timeline_submit_info;
-  submit_info->waitSemaphoreCount = wait_semaphore_handles.size();
+  submit_info->waitSemaphoreCount =
+      static_cast<uint32_t>(wait_semaphore_handles.size());
   submit_info->pWaitSemaphores = wait_semaphore_handles.data();
   submit_info->pWaitDstStageMask = wait_dst_stage_masks.data();
-  submit_info->commandBufferCount = command_buffer_handles.size();
+  submit_info->commandBufferCount =
+      static_cast<uint32_t>(command_buffer_handles.size());
   submit_info->pCommandBuffers = command_buffer_handles.data();
-  submit_info->signalSemaphoreCount = signal_semaphore_handles.size();
+  submit_info->signalSemaphoreCount =
+      static_cast<uint32_t>(signal_semaphore_handles.size());
   submit_info->pSignalSemaphores = signal_semaphore_handles.data();
 
   timeline_submit_info->sType =
       VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
   timeline_submit_info->pNext = nullptr;
-  timeline_submit_info->waitSemaphoreValueCount = wait_semaphore_values.size();
+  timeline_submit_info->waitSemaphoreValueCount =
+      static_cast<uint32_t>(wait_semaphore_values.size());
   timeline_submit_info->pWaitSemaphoreValues = wait_semaphore_values.data();
   timeline_submit_info->signalSemaphoreValueCount =
-      signal_semaphore_values.size();
+      static_cast<uint32_t>(signal_semaphore_values.size());
   timeline_submit_info->pSignalSemaphoreValues = signal_semaphore_values.data();
 
   return OkStatus();
@@ -125,7 +129,8 @@ Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
   {
     absl::MutexLock lock(&queue_mutex_);
     VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
-        queue_, submit_infos.size(), submit_infos.data(), VK_NULL_HANDLE));
+        queue_, static_cast<uint32_t>(submit_infos.size()), submit_infos.data(),
+        VK_NULL_HANDLE));
   }
 
   return OkStatus();

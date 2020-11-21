@@ -31,7 +31,7 @@ iree_cc_library(
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
+    iree::vm::cc
   PUBLIC
 )
 
@@ -45,7 +45,7 @@ iree_cc_test(
     absl::strings
     iree::base::api
     iree::hal::api
-    iree::hal::vmla::vmla_driver_module
+    iree::hal::vmla::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

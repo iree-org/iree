@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_LAYOUT_H_
 #define IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_LAYOUT_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"

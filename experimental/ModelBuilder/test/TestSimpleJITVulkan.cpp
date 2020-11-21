@@ -33,7 +33,6 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Parser.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
-#include "iree/base/initializer.h"
 
 static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),
@@ -118,7 +117,6 @@ void testVectorAdd1d() {
 }
 
 int main(int argc, char **argv) {
-  iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);

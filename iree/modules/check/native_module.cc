@@ -61,7 +61,7 @@ StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
 
 template <typename T>
 Status ExpectAllTrue(iree_byte_span_t bytes) {
-  EXPECT_THAT(AbslSpan<T>(bytes), Each(Not(0)));
+  EXPECT_THAT(AbslSpan<T>(bytes), Each(Not(T(0))));
   return OkStatus();
 }
 

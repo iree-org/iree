@@ -24,28 +24,21 @@
 
 #include <array>
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/IR/Function.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
-class FuncOp;
-struct LogicalResult;
-class Operation;
-class PatternRewriter;
-class ShapedType;
-class Value;
-
-namespace linalg {
-class LinalgDependenceGraph;
-class LinalgOp;
-}  // namespace linalg
-namespace iree_compiler {
-struct SPIRVCodegenOptions;
-}
-
 namespace iree_compiler {
 
 /// Store the tile sizes to use at different levels of tiling as a vector of

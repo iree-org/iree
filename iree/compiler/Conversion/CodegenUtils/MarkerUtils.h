@@ -23,11 +23,10 @@
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_MARKERUTILS_H_
 
 #include "llvm/ADT/ArrayRef.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
-
-class Operation;
 namespace iree_compiler {
 
 /// Marker to denote that a linalg operation has been partitioned to

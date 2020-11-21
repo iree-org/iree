@@ -23,6 +23,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/api.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -93,10 +94,11 @@ int iree::IreeMain(int argc, char** argv) {
   std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
-  SetupVulkan(iree_vulkan_features, layers.data(), layers.size(),
-              extensions.data(), extensions.size(), g_Allocator, &g_Instance,
-              &g_QueueFamily, &g_PhysicalDevice, &g_Queue, &g_Device,
-              &g_DescriptorPool);
+  SetupVulkan(iree_vulkan_features, layers.data(),
+              static_cast<uint32_t>(layers.size()), extensions.data(),
+              static_cast<uint32_t>(extensions.size()), g_Allocator,
+              &g_Instance, &g_QueueFamily, &g_PhysicalDevice, &g_Queue,
+              &g_Device, &g_DescriptorPool);
 
   // Create Window Surface
   VkSurfaceKHR surface;
@@ -174,9 +176,6 @@ int iree::IreeMain(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Setup IREE.
-  // This call to |iree_api_init| is not technically required, but it is
-  // included for completeness.
-  IREE_CHECK_OK(iree_api_init(&argc, &argv));
 
   // Check API version.
   iree_api_version_t actual_version;
@@ -188,7 +187,8 @@ int iree::IreeMain(int argc, char** argv) {
     IREE_LOG(FATAL) << "Unsupported runtime API version " << actual_version;
   }
 
-  // Register HAL module types.
+  // Register HAL drivers and VM module types.
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
   IREE_CHECK_OK(iree_hal_module_register_types());
 
   // Create a runtime Instance.

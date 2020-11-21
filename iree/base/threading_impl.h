@@ -15,6 +15,18 @@
 #ifndef IREE_BASE_THREADING_IMPL_H_
 #define IREE_BASE_THREADING_IMPL_H_
 
+// Ensure that any posix header we include exposes GNU stuff. Ignored on
+// platforms where we either don't have the GNU stuff or don't have posix
+// headers at all.
+//
+// Note that this does not need to be the same for all compilation units, only
+// those we want to access the non-portable features in. It *must* be defined
+// prior to including any of the files, though, as otherwise header-guards will
+// cause the setting at the time of first inclusion to win.
+//
+// https://stackoverflow.com/a/5583764
+#define _GNU_SOURCE 1
+
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
@@ -22,6 +34,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/synchronization.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/threading.h"
 
 #ifdef __cplusplus

@@ -31,13 +31,13 @@ struct FastExpConversionPattern : public OpRewritePattern<LLVM::ExpOp> {
 
   LogicalResult matchAndRewrite(LLVM::ExpOp op,
                                 PatternRewriter &rewriter) const override {
-    constexpr float ln2Const = 0.693147181;
-    constexpr float ln2InvConst = 1.44269504;
+    constexpr float ln2Const = 0.693147181f;
+    constexpr float ln2InvConst = 1.44269504f;
 
     // Least squares polynomial fit computed :
     // cValues = np.polyfit(np.linspace(0, math.log(2), 10000), np.exp(x), 4)
-    constexpr float cValues[5] = {0.05924867, 0.15514645, 0.50308552,
-                                  0.99968939, 1.00000721531};
+    constexpr float cValues[5] = {0.05924867f, 0.15514645f, 0.50308552f,
+                                  0.99968939f, 1.00000721531f};
     auto loc = op.getLoc();
     Value x = op.getOperand();
 

@@ -14,7 +14,7 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,32 +22,54 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "alignment",
-    hdrs = ["alignment.h"],
-    deps = [
-        ":target_platform",
-    ],
-)
+#===------------------------------------------------------------------------===#
+# Public API
+#===------------------------------------------------------------------------===#
 
 cc_library(
     name = "api",
-    srcs = [
-        "api.c",
-    ],
+    srcs = ["api.c"],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":api_hdrs",
-        ":target_platform",
+        ":core_headers",
         ":tracing",
     ],
 )
 
+#===------------------------------------------------------------------------===#
+# Core headers (platform detection, compiler compat, etc)
+#===------------------------------------------------------------------------===#
+
 cc_library(
-    name = "api_hdrs",
-    hdrs = ["api.h"],
+    name = "core_headers",
+    hdrs = [
+        "alignment.h",
+        "atomics.h",
+        "bitfield.h",
+        "math.h",
+        "memory.h",
+        "target_platform.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",  # bitfield.h
+    ],
 )
+
+cc_test(
+    name = "bitfield_test",
+    srcs = ["bitfield_test.cc"],
+    deps = [
+        ":core_headers",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Internal IREE C++ wrappers and utilities
+#===------------------------------------------------------------------------===#
 
 cc_library(
     name = "arena",
@@ -71,84 +93,22 @@ cc_test(
 )
 
 cc_library(
-    name = "atomics",
-    hdrs = ["atomics.h"],
-    deps = [
-        ":target_platform",
-    ],
-)
-
-cc_library(
-    name = "bitfield",
-    hdrs = ["bitfield.h"],
-    deps = [
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "bitfield_test",
-    srcs = ["bitfield_test.cc"],
-    deps = [
-        ":bitfield",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.cc",
         "dynamic_library_win32.cc",
     ],
     hdrs = ["dynamic_library.h"],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-ldl",
-        ],
-    }),
     deps = [
+        ":core_headers",
         ":file_path",
         ":logging",
         ":status",
-        ":target_platform",
         ":tracing",
+        "//build_tools:default_linkopts",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_binary(
-    name = "dynamic_library_test_library.so",
-    testonly = True,
-    srcs = ["dynamic_library_test_library.cc"],
-    linkshared = True,
-)
-
-cc_embed_data(
-    name = "dynamic_library_test_library",
-    testonly = True,
-    srcs = [":dynamic_library_test_library.so"],
-    cc_file_output = "dynamic_library_test_library_embed.cc",
-    cpp_namespace = "iree",
-    flatten = True,
-    h_file_output = "dynamic_library_test_library_embed.h",
-)
-
-cc_test(
-    name = "dynamic_library_test",
-    srcs = ["dynamic_library_test.cc"],
-    deps = [
-        ":dynamic_library",
-        ":dynamic_library_test_library",
-        ":file_io",
-        ":status",
-        ":target_platform",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )
 
@@ -156,8 +116,8 @@ cc_library(
     name = "file_io",
     hdrs = ["file_io.h"],
     deps = [
+        ":core_headers",
         ":status",
-        ":target_platform",
         "//iree/base/internal:file_io_internal",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -233,39 +193,32 @@ cc_test(
 )
 
 cc_library(
-    name = "flatbuffer_util",
-    srcs = ["flatbuffer_util.cc"],
-    hdrs = ["flatbuffer_util.h"],
+    name = "flags",
+    srcs = ["flags.cc"],
+    hdrs = ["flags.h"],
     deps = [
-        ":file_mapping",
-        ":memory",
-        ":ref_ptr",
-        ":status",
-        ":tracing",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "init",
-    srcs = ["init.cc"],
-    hdrs = ["init.h"],
-    deps = [
-        ":initializer",
+        ":api",
         "@com_google_absl//absl/flags:parse",
     ],
 )
 
 cc_library(
-    name = "initializer",
-    srcs = ["initializer.cc"],
-    hdrs = ["initializer.h"],
+    name = "flatcc",
+    hdrs = ["flatcc.h"],
     deps = [
-        ":target_platform",
+        ":flatcc_dummy",
+        "@com_github_dvidelabs_flatcc//:runtime",
+    ],
+)
+
+iree_flatbuffer_c_library(
+    name = "flatcc_dummy",
+    srcs = ["flatcc.fbs"],
+    flatcc_args = [
+        "--reader",
+        "--builder",
+        "--verifier",
+        "--json",
     ],
 )
 
@@ -317,24 +270,8 @@ cc_library(
     ],
     hdrs = ["main.h"],
     deps = [
+        ":core_headers",
         ":logging",
-        ":target_platform",
-    ],
-)
-
-cc_library(
-    name = "math",
-    hdrs = ["math.h"],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_library(
-    name = "memory",
-    hdrs = ["memory.h"],
-    deps = [
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -404,16 +341,9 @@ cc_library(
     name = "synchronization",
     srcs = ["synchronization.c"],
     hdrs = ["synchronization.h"],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-lpthread",
-        ],
-    }),
     deps = [
         ":api",
-        ":atomics",
-        ":target_platform",
+        ":core_headers",
         ":tracing",
     ],
 )
@@ -421,9 +351,6 @@ cc_library(
 cc_test(
     name = "synchronization_benchmark",
     srcs = ["synchronization_benchmark.cc"],
-    tags = [
-        "nowindows",  # TODO(#3615) make this link on windows
-    ],
     deps = [
         ":synchronization",
         "//iree/testing:benchmark_main",
@@ -434,19 +361,11 @@ cc_test(
 cc_test(
     name = "synchronization_test",
     srcs = ["synchronization_test.cc"],
-    tags = [
-        "nowindows",  # TODO(#3615) make this link on windows
-    ],
     deps = [
         ":synchronization",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
-)
-
-cc_library(
-    name = "target_platform",
-    hdrs = ["target_platform.h"],
 )
 
 cc_library(
@@ -477,31 +396,18 @@ cc_library(
         "threading_win32.c",
     ],
     hdrs = ["threading.h"],
-    copts = [
-        "-D_GNU_SOURCE=1",
-    ],
-    linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//conditions:default": [
-            "-ldl",
-            "-lpthread",
-        ],
-    }),
     deps = [
         ":api",
-        ":atomics",
+        ":core_headers",
         ":synchronization",
-        ":target_platform",
         ":tracing",
+        "//build_tools:default_linkopts",
     ],
 )
 
 cc_test(
     name = "threading_benchmark",
     srcs = ["threading_benchmark.cc"],
-    tags = [
-        "nowindows",  # TODO(#3615) make this link on windows
-    ],
     deps = [
         ":threading",
         "//iree/testing:benchmark_main",
@@ -514,9 +420,6 @@ cc_test(
     srcs = [
         "threading_impl.h",
         "threading_test.cc",
-    ],
-    tags = [
-        "nowindows",  # TODO(#3615) make this link on windows
     ],
     deps = [
         ":synchronization",
@@ -539,6 +442,7 @@ cc_library(
     srcs = [
         "wait_handle.c",
         "wait_handle_epoll.c",
+        "wait_handle_impl.h",
         "wait_handle_kqueue.c",
         "wait_handle_poll.c",
         "wait_handle_posix.c",
@@ -546,12 +450,9 @@ cc_library(
         "wait_handle_win32.c",
     ],
     hdrs = ["wait_handle.h"],
-    copts = [
-        "-D_GNU_SOURCE=1",
-    ],
     deps = [
         ":api",
-        ":target_platform",
+        ":core_headers",
         ":tracing",
     ],
 )

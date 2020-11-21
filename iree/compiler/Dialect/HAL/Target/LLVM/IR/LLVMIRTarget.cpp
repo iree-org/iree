@@ -17,7 +17,8 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/schemas/llvmir_executable_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/llvmir_executable_def_builder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
@@ -63,15 +64,6 @@ class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
       return targetOp.emitError("Failed to translate executable to LLVM IR");
     }
 
-    // Create invocation function an populate entry_points.
-    iree::LLVMIRExecutableDefT llvmIrExecutableDef;
-    auto entryPointOps =
-        targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-    for (auto entryPointOp : entryPointOps) {
-      llvmIrExecutableDef.entry_points.push_back(
-          std::string(entryPointOp.sym_name()));
-    }
-
     // LLVMIR opt passes.
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
@@ -86,30 +78,27 @@ class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
           "Can't build LLVMIR opt passes for ExecutableOp module");
     }
 
-    // Serialize LLVM module.
-    std::string bufferString;
-    llvm::raw_string_ostream ostream(bufferString);
-    llvmModule->print(ostream, nullptr);
-    ostream.flush();
+    // Serialize LLVM module directly into flatbuffer.
+    FlatbufferBuilder builder;
+    auto bitcodeModuleRef = builder.streamUint8Vec([&](raw_ostream &stream) {
+      llvmModule->print(stream, nullptr);
+      return true;
+    });
 
-    // Creates executable bytes.
-    llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
-                                         bufferString.end()};
+    auto entryPointsRef = builder.createStringVec(llvm::map_range(
+        targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+        [&](ExecutableEntryPointOp op) { return op.sym_name(); }));
 
-    ::flatbuffers::FlatBufferBuilder fbb;
-    auto executableOffset =
-        iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);
-    iree::FinishLLVMIRExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    iree_LLVMIRExecutableDef_start_as_root(builder);
+    iree_LLVMIRExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_LLVMIRExecutableDef_bitcode_module_add(builder, bitcodeModuleRef);
+    iree_LLVMIRExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::LLVM),
-        std::move(bytes));
-
+        builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
 };

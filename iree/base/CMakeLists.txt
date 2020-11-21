@@ -12,17 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+# bazel_to_cmake: DO NOT EDIT (tracing rule move)
 
-iree_cc_library(
-  NAME
-    alignment
-  HDRS
-    "alignment.h"
-  DEPS
-    ::target_platform
-  PUBLIC
-)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
@@ -32,18 +24,36 @@ iree_cc_library(
   SRCS
     "api.c"
   DEPS
-    ::api_hdrs
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    api_hdrs
+    core_headers
   HDRS
-    "api.h"
+    "alignment.h"
+    "atomics.h"
+    "bitfield.h"
+    "math.h"
+    "memory.h"
+    "target_platform.h"
+  DEPS
+    absl::core_headers
+    absl::span
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    bitfield_test
+  SRCS
+    "bitfield_test.cc"
+  DEPS
+    ::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -73,106 +83,22 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    atomics
-  HDRS
-    "atomics.h"
-  DEPS
-    ::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    bitfield
-  HDRS
-    "bitfield.h"
-  DEPS
-    absl::span
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    bitfield_test
-  SRCS
-    "bitfield_test.cc"
-  DEPS
-    ::bitfield
-    absl::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-)
-
-iree_cc_library(
-  NAME
     dynamic_library
   HDRS
     "dynamic_library.h"
   SRCS
     "dynamic_library_posix.cc"
     "dynamic_library_win32.cc"
-  LINKOPTS
-    ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
+    ::core_headers
     ::file_path
     ::logging
     ::status
-    ::target_platform
     ::tracing
     absl::memory
     absl::span
     absl::strings
   PUBLIC
-)
-
-# TODO(scotttodd): clean up bazel_to_cmake handling here
-#   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
-#   * the output file name is platform-specific, get it with $<TARGET_FILE:>
-iree_cc_library(
-  NAME
-    dynamic_library_test_library.so
-  OUT
-    dynamic_library_test_library.so
-  SRCS
-    "dynamic_library_test_library.cc"
-  TESTONLY
-  SHARED
-)
-
-iree_cc_embed_data(
-  NAME
-    dynamic_library_test_library
-  GENERATED_SRCS
-    "$<TARGET_FILE:iree::base::dynamic_library_test_library.so>"
-  CC_FILE_OUTPUT
-    "dynamic_library_test_library_embed.cc"
-  H_FILE_OUTPUT
-    "dynamic_library_test_library_embed.h"
-  TESTONLY
-  CPP_NAMESPACE
-    "iree"
-  FLATTEN
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    dynamic_library_test
-  SRCS
-    "dynamic_library_test.cc"
-  DEPS
-    ::dynamic_library
-    ::dynamic_library_test_library
-    ::file_io
-    ::status
-    ::target_platform
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -181,8 +107,8 @@ iree_cc_library(
   HDRS
     "file_io.h"
   DEPS
+    ::core_headers
     ::status
-    ::target_platform
     absl::memory
     absl::span
     absl::strings
@@ -268,47 +194,38 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    flatbuffer_util
+    flags
   HDRS
-    "flatbuffer_util.h"
+    "flags.h"
   SRCS
-    "flatbuffer_util.cc"
+    "flags.cc"
   DEPS
-    ::file_mapping
-    ::memory
-    ::ref_ptr
-    ::status
-    ::tracing
-    absl::memory
-    absl::optional
-    absl::span
-    absl::strings
-    flatbuffers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init
-  HDRS
-    "init.h"
-  SRCS
-    "init.cc"
-  DEPS
+    ::api
     absl::flags_parse
-    ::initializer
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    initializer
+    flatcc
   HDRS
-    "initializer.h"
-  SRCS
-    "initializer.cc"
+    "flatcc.h"
   DEPS
-    ::target_platform
+    ::flatcc_dummy
+    flatcc::runtime
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
+    flatcc_dummy
+  SRCS
+    "flatcc.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
@@ -363,28 +280,8 @@ iree_cc_library(
     "main_posix.cc"
     "main_win32.cc"
   DEPS
+    ::core_headers
     ::logging
-    ::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    math
-  HDRS
-    "math.h"
-  DEPS
-    absl::core_headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    memory
-  HDRS
-    "memory.h"
-  DEPS
-    absl::span
   PUBLIC
 )
 
@@ -459,16 +356,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-if(NOT ANDROID)
-  iree_select_compiler_opts(_SYNCHRONIZATION_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
-else()
-  # Android provides its own pthreads support with no linking required.
-  set(_SYNCHRONIZATION_LINKOPTS "")
-endif()
-
 iree_cc_library(
   NAME
     synchronization
@@ -476,12 +363,9 @@ iree_cc_library(
     "synchronization.h"
   SRCS
     "synchronization.c"
-  LINKOPTS
-    ${_SYNCHRONIZATION_LINKOPTS}
   DEPS
     ::api
-    ::atomics
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )
@@ -510,14 +394,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    target_platform
-  HDRS
-    "target_platform.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     time
   HDRS
     "time.h"
@@ -537,20 +413,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-if(NOT ANDROID)
-  iree_select_compiler_opts(_THREADING_LINKOPTS
-    CLANG_OR_GCC
-      "-ldl"
-      "-lpthread"
-  )
-else()
-  iree_select_compiler_opts(_THREADING_LINKOPTS
-    CLANG_OR_GCC
-      "-ldl"
-      # Android provides its own pthreads support with no linking required.
-  )
-endif()
-
 iree_cc_library(
   NAME
     threading
@@ -562,15 +424,10 @@ iree_cc_library(
     "threading_impl.h"
     "threading_pthreads.c"
     "threading_win32.c"
-  COPTS
-    "-D_GNU_SOURCE=1"
-  LINKOPTS
-    ${_THREADING_LINKOPTS}
   DEPS
     ::api
-    ::atomics
+    ::core_headers
     ::synchronization
-    ::target_platform
     ::tracing
   PUBLIC
 )
@@ -599,11 +456,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_select_compiler_opts(IREE_LINKOPTS_TRACING
-  GCC_OR_CLANG
-    -ldl
-)
-
+# TODO(benvanik): redirect to internal/tracing/ or something.
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
@@ -614,10 +467,8 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
       "${IREE_ROOT_DIR}/third_party/tracy/TracyC.h"
     SRCS
       "tracing.cc"
-    LINKOPTS
-      ${IREE_LINKOPTS_TRACING}
     DEPS
-      ::target_platform
+      ::core_headers
       absl::core_headers
     DEFINES
       # TODO(#2114): Change the mode to 2.
@@ -644,16 +495,15 @@ iree_cc_library(
   SRCS
     "wait_handle.c"
     "wait_handle_epoll.c"
+    "wait_handle_impl.h"
     "wait_handle_kqueue.c"
     "wait_handle_poll.c"
     "wait_handle_posix.c"
     "wait_handle_posix.h"
     "wait_handle_win32.c"
-  COPTS
-    "-D_GNU_SOURCE=1"
   DEPS
     ::api
-    ::target_platform
+    ::core_headers
     ::tracing
   PUBLIC
 )

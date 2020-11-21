@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_DEBUG_REPORTER_H_
 #define IREE_HAL_VULKAN_DEBUG_REPORTER_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

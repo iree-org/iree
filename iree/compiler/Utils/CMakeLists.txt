@@ -18,9 +18,11 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "FlatbufferUtils.h"
     "GraphUtils.h"
     "PatternUtils.h"
   SRCS
+    "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
   DEPS
     LLVMSupport
@@ -30,6 +32,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::base::flatcc
     iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_hlo
   PUBLIC

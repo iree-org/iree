@@ -16,6 +16,9 @@
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
 EXPLICIT_TARGET_MAPPING = {
+    # Internal utilities to emulate various binary/library options.
+    "//build_tools:default_linkopts": [],
+
     # absl
     "@com_google_absl//absl/flags:flag": ["absl::flags"],
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
@@ -57,15 +60,11 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     # Vulkan
-    # TODO(scotttodd): Set -DVK_NO_PROTOTYPES to COPTS for _no_prototypes.
-    #   Maybe add a wrapper CMake lib within build_tools/third_party/?
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
-    "@iree_vulkan_headers//:vulkan_headers_no_prototypes": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
-    "@com_github_google_flatbuffers//:flatbuffers": ["flatbuffers"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
@@ -74,6 +73,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@sdl2//:SDL2": ["SDL2-static"],
     "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
     "@half//:half": ["half"],
+    "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 
 

@@ -14,13 +14,10 @@
 
 #include "iree/hal/vulkan/pipeline_cache.h"
 
-#include "absl/synchronization/mutex.h"
-#include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/vulkan/status_util.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
 
 namespace iree {
 namespace hal {
@@ -39,15 +36,6 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
     ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
     const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("PipelineCache::PrepareExecutable");
-  if (spec.executable_data.size() <= 4 ||
-      !SpirVExecutableDefBufferHasIdentifier(spec.executable_data.data())) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Supplied executable data does not contain a SpirVExecutableDef";
-  }
-
-  // Get the SPIR-V executable def flatbuffer.
-  const auto& spirv_executable_def =
-      *::flatbuffers::GetRoot<SpirVExecutableDef>(spec.executable_data.data());
 
   // Create the executable (which may itself own many pipelines).
   IREE_ASSIGN_OR_RETURN(
@@ -56,7 +44,7 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
           add_ref(logical_device_),
           /*pipeline_cache=*/VK_NULL_HANDLE,
           static_cast<PipelineExecutableLayout*>(executable_layout), mode,
-          spirv_executable_def));
+          spec));
   return executable;
 }
 

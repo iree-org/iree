@@ -19,9 +19,9 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/Optional.h"
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
-#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 using llvm::None;
 using llvm::Optional;

@@ -16,7 +16,6 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
 #include "experimental/ModelBuilder/VulkanWrapperPass.h"
-#include "iree/base/initializer.h"
 #include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
@@ -541,7 +540,6 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
 }
 
 int main(int argc, char **argv) {
-  iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);

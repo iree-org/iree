@@ -598,7 +598,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
 // with real device allocators and will likely incur a copy if used.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_allocator_create_host_local(iree_allocator_t allocator,
-                                     iree_hal_allocator** out_allocator);
+                                     iree_hal_allocator_t** out_allocator);
 
 // Retains the given |allocator| for the caller.
 IREE_API_EXPORT void IREE_API_CALL

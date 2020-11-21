@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -23,7 +22,8 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/spirv_executable_def_builder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -86,16 +86,6 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
   return {};
 }
 
-// Returns a list of entry point names matching the expected export ordinals.
-static std::vector<std::string> populateEntryPointNames(
-    spirv::ModuleOp spvModuleOp) {
-  std::vector<std::string> entryPointNames;
-  spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
-    entryPointNames.push_back(std::string(entryPointOp.fn()));
-  });
-  return entryPointNames;
-}
-
 class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
  public:
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
@@ -135,53 +125,47 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpBuilder &executableBuilder) override {
-    iree::SpirVExecutableDefT spirvExecutableDef;
-
     ModuleOp innerModuleOp = targetOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
+
+    // Serialize the spirv::ModuleOp into the binary that we will embed in the
+    // final flatbuffer.
+    FlatbufferBuilder builder;
+    SmallVector<uint32_t, 256> spvBinary;
+    if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
+      return targetOp.emitError() << "failed to serialize spv.module";
+    }
+    auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
+                                                    spvBinary.size());
 
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
+    SmallVector<StringRef, 8> entryPointNames;
     if (auto scheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
             iree_compiler::getEntryPointScheduleAttrName())) {
       // We have multiple entry points in this module. Make sure the order
       // specified in the schedule attribute is respected.
       for (Attribute entryPoint : scheduleAttr) {
-        spirvExecutableDef.entry_points.emplace_back(
-            entryPoint.cast<StringAttr>().getValue().str());
+        entryPointNames.push_back(entryPoint.cast<StringAttr>().getValue());
       }
     } else {
-      spirvExecutableDef.entry_points = populateEntryPointNames(spvModuleOp);
+      spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
+        entryPointNames.push_back(entryPointOp.fn());
+      });
     }
+    auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    // Serialize the spirv::ModuleOp into the binary that we will embed in the
-    // final flatbuffer.
-    SmallVector<uint32_t, 256> spvBinary;
-    if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
-      return targetOp.emitError() << "failed to serialize spv.module";
-    }
-    spirvExecutableDef.code = {spvBinary.begin(), spvBinary.end()};
-    if (spirvExecutableDef.code.empty()) {
-      return targetOp.emitError()
-             << "failed to translate and serialize SPIR-V executable";
-    }
-
-    // Pack the executable definition and get the bytes with the proper header.
-    // The header is used to verify the contents at runtime.
-    ::flatbuffers::FlatBufferBuilder fbb;
-    auto executableOffset =
-        iree::SpirVExecutableDef::Pack(fbb, &spirvExecutableDef);
-    iree::FinishSpirVExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    iree_SpirVExecutableDef_start_as_root(builder);
+    iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
+    iree_SpirVExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
-        std::move(bytes));
+        builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();
   }

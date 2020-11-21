@@ -1,0 +1,30 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+namespace iree;
+
+// HACK: flatcc public API headers are incomplete and some things only exist
+// when pulled in via generated headers. So here we give ourselves something to
+// include that's always available and cheap.
+//
+// Instead of directly including this file use iree/base/flatcc.h.
+//
+// Normally including any generated file will include the appropriate headers in
+// the required order (as they are non-hermetic), but that requires that we have
+// a generated file. Though most of the API is exposed through the main includes
+// there are various types that only get generated and included by way of the
+// common headers that are not easily included.
+struct __IncludeWorkaround {
+  reserved:int;
+}

@@ -16,8 +16,6 @@
 
 #include <algorithm>
 
-#include "flatbuffers/flatbuffers.h"
-#include "flatbuffers/minireflect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
@@ -28,7 +26,9 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/schemas/bytecode_module_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/bytecode_module_def_builder.h"
+#include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -47,10 +47,6 @@ namespace IREE {
 namespace VM {
 
 namespace {
-
-using flatbuffers::FlatBufferBuilder;
-using flatbuffers::Offset;
-using flatbuffers::Vector;
 
 struct ModuleCounts {
   int importFuncs = 0;
@@ -204,20 +200,6 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   return success();
 }
 
-// Returns a vector of tables of type T or None if |contents| is empty.
-template <typename T>
-static Optional<Offset<Vector<Offset<T>>>> createOptionalVector(
-    const std::vector<Offset<T>> &contents, FlatBufferBuilder &fbb) {
-  if (contents.empty()) return llvm::None;
-  return fbb.CreateVector(contents);
-}
-template <typename T>
-static Optional<Offset<Vector<T>>> createOptionalVector(
-    const std::vector<T> &contents, FlatBufferBuilder &fbb) {
-  if (contents.empty()) return llvm::None;
-  return fbb.CreateVector(contents);
-}
-
 // Encodes a type (or a tuple of nested types) to a calling convention string.
 //
 // Examples:
@@ -331,89 +313,103 @@ static Optional<std::string> makeCallingConventionString(
   return std::string(s.data(), s.size());
 }
 
-// Populates common fields for FunctionSignatureDefs of all function types.
-static void populateFunctionSignatureDef(FunctionType functionType,
-                                         llvm::DenseMap<Type, int> &typeTable,
-                                         iree::vm::FunctionSignatureDefT &fsd) {
-  for (auto type : functionType.getInputs()) {
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    fsd.argument_types.push_back(typeTable.lookup(type));
+// Creates a FunctionSignatureDef based on the given function metadata.
+// Some fields are not used on all signature defs and added only when present on
+// the argument objects/attrs.
+static iree_vm_FunctionSignatureDef_ref_t createFunctionSignatureDef(
+    FunctionType functionType, llvm::DenseMap<Type, int> &typeTable,
+    StringRef callingConvention,
+    iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef,
+    FlatbufferBuilder &fbb) {
+  auto resultTypesRef = fbb.createInt32Vec(
+      llvm::map_range(functionType.getResults(), [&](Type type) {
+        if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+          type = refPtrType.getObjectType();
+        }
+        return typeTable.lookup(type);
+      }));
+  auto argumentTypesRef = fbb.createInt32Vec(
+      llvm::map_range(functionType.getInputs(), [&](Type type) {
+        if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+          type = refPtrType.getObjectType();
+        }
+        return typeTable.lookup(type);
+      }));
+
+  auto callingConventionRef = fbb.createString(callingConvention);
+
+  // If the signature would be empty then let's avoid writing the empty table.
+  if (!argumentTypesRef && !resultTypesRef && !callingConventionRef &&
+      !reflectionAttrsRef) {
+    return 0;
   }
-  for (auto type : functionType.getResults()) {
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    fsd.result_types.push_back(typeTable.lookup(type));
-  }
+
+  iree_vm_FunctionSignatureDef_start(fbb);
+  iree_vm_FunctionSignatureDef_argument_types_add(fbb, argumentTypesRef);
+  iree_vm_FunctionSignatureDef_result_types_add(fbb, resultTypesRef);
+  iree_vm_FunctionSignatureDef_calling_convention_add(fbb,
+                                                      callingConventionRef);
+  iree_vm_FunctionSignatureDef_reflection_attrs_add(fbb, reflectionAttrsRef);
+  return iree_vm_FunctionSignatureDef_end(fbb);
 }
 
 // Returns a serialized function signature.
-static Offset<iree::vm::FunctionSignatureDef> makeImportFunctionSignatureDef(
+static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
     IREE::VM::ImportOp importOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatBufferBuilder &fbb) {
-  // Common attributes.
-  iree::vm::FunctionSignatureDefT fsd;
-  populateFunctionSignatureDef(importOp.getType(), typeTable, fsd);
-
+    FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
   if (!cconv.hasValue()) return {};
-  fsd.calling_convention = cconv.getValue();
-
-  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
+  return createFunctionSignatureDef(importOp.getType(), typeTable,
+                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
+                                    fbb);
 }
 
 // Returns a serialized function signature.
-static Offset<iree::vm::FunctionSignatureDef> makeExportFunctionSignatureDef(
+static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
     IREE::VM::ExportOp exportOp, IREE::VM::FuncOp funcOp,
-    llvm::DenseMap<Type, int> &typeTable, FlatBufferBuilder &fbb) {
-  // Common attributes.
-  iree::vm::FunctionSignatureDefT fsd;
-  populateFunctionSignatureDef(funcOp.getType(), typeTable, fsd);
-
+    llvm::DenseMap<Type, int> &typeTable, FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
-  fsd.calling_convention = cconv.getValue();
-
-  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
+  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
+                                    fbb);
 }
 
 // Returns a serialized function signature.
-static Offset<iree::vm::FunctionSignatureDef> makeInternalFunctionSignatureDef(
+static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatBufferBuilder &fbb) {
-  // Common attributes.
-  iree::vm::FunctionSignatureDefT fsd;
-  populateFunctionSignatureDef(funcOp.getType(), typeTable, fsd);
-
+    FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   // TODO(benvanik): only do this on exports. The runtime currently looks on
   // internal functions, though, so we have to have it here.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
-  fsd.calling_convention = cconv.getValue();
 
   // Reflection attributes.
   // TODO(benvanik): move these to exports (or remove entirely).
+  iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef = 0;
   if (auto reflectionAttrs =
           funcOp.getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    llvm::SmallVector<Offset<iree::vm::ReflectionAttrDef>, 4>
-        reflectionAttrItems;
+    SmallVector<iree_vm_ReflectionAttrDef_ref_t, 4> reflectionAttrRefs;
     for (auto reflectionAttr : reflectionAttrs) {
       auto key = reflectionAttr.first.strref();
       auto value = reflectionAttr.second.dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
-      auto rattr = std::make_unique<iree::vm::ReflectionAttrDefT>();
-      rattr->key = key.str();
-      rattr->value = value.getValue().str();
-      fsd.reflection_attrs.push_back(std::move(rattr));
+      // NOTE: if we actually want to keep these we should dedupe them (as the
+      // keys and likely several of the values are shared across all functions).
+      auto valueRef = fbb.createString(value.getValue());
+      auto keyRef = fbb.createString(key);
+      reflectionAttrRefs.push_back(
+          iree_vm_ReflectionAttrDef_create(fbb, keyRef, valueRef));
     }
+    reflectionAttrsRef = iree_vm_ReflectionAttrDef_vec_create(
+        fbb, reflectionAttrRefs.data(), reflectionAttrRefs.size());
   }
 
-  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
+  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+                                    cconv.getValue(), reflectionAttrsRef, fbb);
 }
 
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.
@@ -426,9 +422,9 @@ static Offset<iree::vm::FunctionSignatureDef> makeInternalFunctionSignatureDef(
 // has been packed into the top-level table. This results in a messier function
 // here during serialization but a much more trivial (and cache-friendly)
 // representation at runtime.
-static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
-    BytecodeTargetOptions targetOptions, IREE::VM::ModuleOp moduleOp,
-    FlatBufferBuilder &fbb) {
+static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
+                                           IREE::VM::ModuleOp moduleOp,
+                                           FlatbufferBuilder &fbb) {
   SymbolTable symbolTable(moduleOp);
   auto symbolCounts = computeModuleSymbolCounts(moduleOp);
 
@@ -456,17 +452,24 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   // Serialize read-only data first so that it ends up at the end of the file.
   // This is where large things like parameters live and we don't want that to
   // get paged in until it is needed.
-  std::vector<Offset<Vector<uint8_t>>> rodataContentOffsets;
-  rodataContentOffsets.reserve(rodataOps.size());
-  for (auto rodataOp : rodataOps) {
-    auto dataOffset =
+  //
+  // NOTE: flatbuffers are built bottom-up; after each rodata we serialize we
+  // move *backward* in the file and prepend the next, meaning that if we
+  // were to serialize all rodata we'd have it in the opposite order as we do
+  // in the IR. Though this it isn't required for correctness, enabling file
+  // layout planning by preserving the order in the IR is useful.
+  SmallVector<flatbuffers_uint8_vec_ref_t, 8> rodataContentRefs;
+  rodataContentRefs.reserve(rodataOps.size());
+  for (auto rodataOp : llvm::reverse(rodataOps)) {
+    auto rodataRef =
         serializeConstant(rodataOp.getLoc(), rodataOp.value(), fbb);
-    if (dataOffset.IsNull()) {
-      rodataOp.emitOpError() << "failed to encode";
-      return {};
+    if (!rodataRef) {
+      return rodataOp.emitOpError() << "failed to encode";
     }
-    rodataContentOffsets.push_back(dataOffset);
+    rodataContentRefs.push_back(rodataRef);
   }
+  // List of references needs to be swapped forward (we wrote backward).
+  std::reverse(rodataContentRefs.begin(), rodataContentRefs.end());
 
   // Find all types in the module to build the type table.
   // Note that we don't emit it yet as we want to keep it near the top of the
@@ -478,28 +481,32 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   }
 
   // Serialize function bytecode one at a time and then merge at the end.
-  std::vector<std::vector<uint8_t>> bytecodeDataParts;
-  std::vector<iree::vm::FunctionDescriptor> functionDescriptors;
-  bytecodeDataParts.reserve(internalFuncOps.size());
-  functionDescriptors.reserve(internalFuncOps.size());
+  SmallVector<std::vector<uint8_t>, 8> bytecodeDataParts;
+  SmallVector<iree_vm_FunctionDescriptor_t, 8> functionDescriptors;
+  bytecodeDataParts.resize(internalFuncOps.size());
+  functionDescriptors.resize(internalFuncOps.size());
   size_t totalBytecodeLength = 0;
-  for (auto funcOp : internalFuncOps) {
-    auto encodedFunction =
-        BytecodeEncoder::encodeFunction(funcOp, typeOrdinalMap, symbolTable);
+  for (auto funcOp : llvm::enumerate(internalFuncOps)) {
+    auto encodedFunction = BytecodeEncoder::encodeFunction(
+        funcOp.value(), typeOrdinalMap, symbolTable);
     if (!encodedFunction) {
-      funcOp.emitError() << "failed to encode function bytecode";
-      return {};
+      return funcOp.value().emitError() << "failed to encode function bytecode";
     }
-    functionDescriptors.push_back(iree::vm::FunctionDescriptor(
-        totalBytecodeLength, encodedFunction->bytecodeData.size(),
-        encodedFunction->i32RegisterCount, encodedFunction->refRegisterCount));
+    iree_vm_FunctionDescriptor_assign(
+        &functionDescriptors[funcOp.index()], totalBytecodeLength,
+        encodedFunction->bytecodeData.size(), encodedFunction->i32RegisterCount,
+        encodedFunction->refRegisterCount);
     totalBytecodeLength += encodedFunction->bytecodeData.size();
-    bytecodeDataParts.push_back(std::move(encodedFunction->bytecodeData));
+    bytecodeDataParts[funcOp.index()] =
+        std::move(encodedFunction->bytecodeData);
   }
-  // TODO(benvanik): compression? deduping?
-  uint8_t *bytecodeDataPtr = nullptr;
-  auto bytecodeDataOffset = fbb.CreateUninitializedVector<uint8_t>(
-      totalBytecodeLength, &bytecodeDataPtr);
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytecodeDataPtr =
+      flatbuffers_uint8_vec_extend(fbb, totalBytecodeLength);
+  // NOTE: we need to ensure we clear the output data in case we have gaps for
+  // alignment (where otherwise uninitialized memory might sneak in and be bad
+  // for both security and determinism).
+  memset(bytecodeDataPtr, 0, totalBytecodeLength);
   size_t currentBytecodeOffset = 0;
   for (const auto &it : llvm::enumerate(internalFuncOps)) {
     int ordinal = it.index();
@@ -508,102 +515,109 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
                 data.size());
     currentBytecodeOffset += data.size();
   }
+  auto bytecodeDataRef = flatbuffers_uint8_vec_end(fbb);
+
+  // Encode the function descriptors adjacent to the bytcode data; they are
+  // always accessed together. Descriptor 0 is likely within a few hundred bytes
+  // of the referenced bytecode data offset 0, and from there we are at least
+  // able to hope sequential readahead caching helps; if not, at least we
+  // hopefully don't fault on the first function call every time.
+  auto functionDescriptorsRef = iree_vm_FunctionDescriptor_vec_create(
+      fbb, functionDescriptors.data(), functionDescriptors.size());
 
   // Serialize metadata that should be near the front of the file.
-  std::vector<Offset<iree::vm::RodataSegmentDef>> rodataSegmentOffsets;
-  rodataSegmentOffsets.reserve(rodataOps.size());
-  for (auto rodataContentOffset : rodataContentOffsets) {
-    iree::vm::RodataSegmentDefBuilder rsd(fbb);
-    rsd.add_data(rodataContentOffset);
-    rodataSegmentOffsets.push_back(rsd.Finish());
-  }
-  std::vector<Offset<iree::vm::RwdataSegmentDef>> rwdataSegmentOffsets;
-  std::vector<Offset<iree::vm::TypeDef>> typeOffsets;
-  typeOffsets.reserve(typeTable.size());
-  for (auto &typeDef : typeTable) {
-    auto nameOffset = fbb.CreateString(typeDef.full_name);
-    iree::vm::TypeDefBuilder tdb(fbb);
-    tdb.add_full_name(nameOffset);
-    typeOffsets.push_back(tdb.Finish());
-  }
-  std::vector<Offset<iree::vm::ImportFunctionDef>> importFuncOffsets;
-  importFuncOffsets.reserve(importFuncOps.size());
-  for (auto importOp : importFuncOps) {
-    auto nameOffset = fbb.CreateString(importOp.getName().str());
-    auto signatureOffset =
-        makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
-    iree::vm::ImportFunctionDefBuilder ifd(fbb);
-    ifd.add_full_name(nameOffset);
-    ifd.add_signature(signatureOffset);
-    importFuncOffsets.push_back(ifd.Finish());
-  }
-  std::vector<Offset<iree::vm::ExportFunctionDef>> exportFuncOffsets;
-  exportFuncOffsets.reserve(exportFuncOps.size());
-  for (auto exportOp : exportFuncOps) {
-    auto nameOffset = fbb.CreateString(exportOp.export_name().str());
-    auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
-    auto signatureOffset =
-        makeExportFunctionSignatureDef(exportOp, funcOp, typeOrdinalMap, fbb);
-    iree::vm::ExportFunctionDefBuilder efd(fbb);
-    efd.add_local_name(nameOffset);
-    efd.add_signature(signatureOffset);
-    efd.add_internal_ordinal(funcOp.ordinal().getValue().getLimitedValue());
-    exportFuncOffsets.push_back(efd.Finish());
-  }
-  std::vector<Offset<iree::vm::InternalFunctionDef>> internalFuncOffsets;
+  auto rodataSegmentRefs = llvm::to_vector<8>(
+      llvm::map_range(rodataContentRefs, [&](auto rodataContentRef) {
+        iree_vm_RodataSegmentDef_start(fbb);
+        iree_vm_RodataSegmentDef_data_add(fbb, rodataContentRef);
+        return iree_vm_RodataSegmentDef_end(fbb);
+      }));
+  SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
+  // NOTE: rwdata current unused.
+  auto typeRefs =
+      llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
+        auto fullNameRef = fbb.createString(typeDef.full_name);
+        iree_vm_TypeDef_start(fbb);
+        iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
+        return iree_vm_TypeDef_end(fbb);
+      }));
+  auto importFuncRefs =
+      llvm::to_vector<8>(llvm::map_range(importFuncOps, [&](auto importOp) {
+        auto fullNameRef = fbb.createString(importOp.getName());
+        auto signatureRef =
+            makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
+        iree_vm_ImportFunctionDef_start(fbb);
+        iree_vm_ImportFunctionDef_full_name_add(fbb, fullNameRef);
+        iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
+        return iree_vm_ImportFunctionDef_end(fbb);
+      }));
+  auto exportFuncRefs =
+      llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
+        auto localNameRef = fbb.createString(exportOp.export_name());
+        auto funcOp =
+            symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+        auto signatureRef = makeExportFunctionSignatureDef(exportOp, funcOp,
+                                                           typeOrdinalMap, fbb);
+        iree_vm_ExportFunctionDef_start(fbb);
+        iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
+        iree_vm_ExportFunctionDef_signature_add(fbb, signatureRef);
+        iree_vm_ExportFunctionDef_internal_ordinal_add(
+            fbb, funcOp.ordinal().getValue().getLimitedValue());
+        return iree_vm_ExportFunctionDef_end(fbb);
+      }));
+  SmallVector<iree_vm_InternalFunctionDef_ref_t, 8> internalFuncRefs;
   if (!targetOptions.stripSymbols) {
-    internalFuncOffsets.reserve(internalFuncOps.size());
+    internalFuncRefs.reserve(internalFuncOps.size());
     for (auto funcOp : internalFuncOps) {
-      auto nameOffset = fbb.CreateString(funcOp.getName().str());
-      auto signatureOffset =
+      auto localNameRef = fbb.createString(funcOp.getName());
+      auto signatureRef =
           makeInternalFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
-      iree::vm::InternalFunctionDefBuilder ifd(fbb);
-      ifd.add_local_name(nameOffset);
-      ifd.add_signature(signatureOffset);
-      internalFuncOffsets.push_back(ifd.Finish());
+      iree_vm_InternalFunctionDef_start(fbb);
+      iree_vm_InternalFunctionDef_local_name_add(fbb, localNameRef);
+      iree_vm_InternalFunctionDef_signature_add(fbb, signatureRef);
+      internalFuncRefs.push_back(iree_vm_InternalFunctionDef_end(fbb));
     }
   }
 
-  auto functionDescriptorsOffset =
-      fbb.CreateVectorOfStructs(functionDescriptors);
-  auto rodataSegmentsOffset = createOptionalVector(rodataSegmentOffsets, fbb);
-  auto rwdataSegmentsOffset = createOptionalVector(rwdataSegmentOffsets, fbb);
-  auto internalFuncsOffset = fbb.CreateVector(internalFuncOffsets);
-  auto exportFuncsOffset = fbb.CreateVector(exportFuncOffsets);
-  auto importFuncsOffset = createOptionalVector(importFuncOffsets, fbb);
-  auto typesOffset = fbb.CreateVector(typeOffsets);
+  // NOTE: we keep the vectors clustered here so that we can hopefully keep the
+  // pages mapped at runtime; vector dereferences in flatbuffers require
+  // touching these structs to get length/etc and as such we don't want to be
+  // gathering from all over the file (with giant rodata chunks and such
+  // inbetween) just to perform a bounds check and deference into another part
+  // of the file.
+  auto rodataSegmentsRef = fbb.createOffsetVecDestructive(rodataSegmentRefs);
+  auto rwdataSegmentsRef = fbb.createOffsetVecDestructive(rwdataSegmentRefs);
+  auto internalFuncsRef = fbb.createOffsetVecDestructive(internalFuncRefs);
+  auto exportFuncsOffset = fbb.createOffsetVecDestructive(exportFuncRefs);
+  auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
+  auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
-  Optional<Offset<iree::vm::ModuleStateDef>> moduleStateDef;
+  iree_vm_ModuleStateDef_ref_t moduleStateDef = 0;
   if (symbolCounts.globalBytes || symbolCounts.globalRefs) {
-    iree::vm::ModuleStateDefBuilder msd(fbb);
-    msd.add_global_bytes_capacity(symbolCounts.globalBytes);
-    msd.add_global_ref_count(symbolCounts.globalRefs);
-    moduleStateDef = msd.Finish();
+    iree_vm_ModuleStateDef_start(fbb);
+    iree_vm_ModuleStateDef_global_bytes_capacity_add(fbb,
+                                                     symbolCounts.globalBytes);
+    iree_vm_ModuleStateDef_global_ref_count_add(fbb, symbolCounts.globalRefs);
+    moduleStateDef = iree_vm_ModuleStateDef_end(fbb);
   }
 
-  auto nameOffset = fbb.CreateString(
-      moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name().str());
+  auto moduleNameRef = fbb.createString(
+      moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
 
-  iree::vm::BytecodeModuleDefBuilder bmd(fbb);
-  bmd.add_name(nameOffset);
-  bmd.add_types(typesOffset);
-  if (importFuncsOffset) {
-    bmd.add_imported_functions(importFuncsOffset.getValue());
-  }
-  bmd.add_exported_functions(exportFuncsOffset);
-  bmd.add_internal_functions(internalFuncsOffset);
-  if (moduleStateDef) {
-    bmd.add_module_state(moduleStateDef.getValue());
-  }
-  if (rwdataSegmentsOffset) {
-    bmd.add_rwdata_segments(rwdataSegmentsOffset.getValue());
-  }
-  if (rodataSegmentsOffset) {
-    bmd.add_rodata_segments(rodataSegmentsOffset.getValue());
-  }
-  bmd.add_function_descriptors(functionDescriptorsOffset);
-  bmd.add_bytecode_data(bytecodeDataOffset);
-  return bmd.Finish();
+  iree_vm_BytecodeModuleDef_start_as_root(fbb);
+  iree_vm_BytecodeModuleDef_name_add(fbb, moduleNameRef);
+  iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
+  iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);
+  iree_vm_BytecodeModuleDef_exported_functions_add(fbb, exportFuncsOffset);
+  iree_vm_BytecodeModuleDef_internal_functions_add(fbb, internalFuncsRef);
+  iree_vm_BytecodeModuleDef_module_state_add(fbb, moduleStateDef);
+  iree_vm_BytecodeModuleDef_rodata_segments_add(fbb, rodataSegmentsRef);
+  iree_vm_BytecodeModuleDef_rwdata_segments_add(fbb, rwdataSegmentsRef);
+  iree_vm_BytecodeModuleDef_function_descriptors_add(fbb,
+                                                     functionDescriptorsRef);
+  iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
+  iree_vm_BytecodeModuleDef_end_as_root(fbb);
+  return success();
 }
 
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
@@ -639,28 +653,30 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // the module header in memory. This ensures that when we map the file only
   // the first few pages need to be accessed to get the metadata and the rest
   // can be large bulk data.
-  FlatBufferBuilder fbb;
-  auto moduleDef = buildFlatBufferModule(targetOptions, moduleOp, fbb);
-  if (moduleDef.IsNull()) {
+  FlatbufferBuilder fbb;
+  if (failed(buildFlatBufferModule(targetOptions, moduleOp, fbb))) {
     return moduleOp.emitError()
            << "failed to build FlatBuffer BytecodeModuleDef";
   }
 
-  iree::vm::FinishBytecodeModuleDefBuffer(fbb, moduleDef);
-  const uint8_t *flatbufferBytes = fbb.GetBufferPointer();
-  size_t flatbufferByteSize = fbb.GetSize();
-
   switch (targetOptions.outputFormat) {
     case BytecodeOutputFormat::kFlatBufferBinary:
-      output.write(reinterpret_cast<const char *>(flatbufferBytes),
-                   flatbufferByteSize);
+      if (failed(fbb.copyToStream(output))) {
+        return moduleOp.emitError()
+               << "failed to copy flatbuffer emitter contents to output stream "
+                  "- possibly out of memory";
+      }
       break;
     case BytecodeOutputFormat::kFlatBufferText: {
-      flatbuffers::ToStringVisitor toStringVisitor("\n", false, "  ", false);
-      flatbuffers::IterateFlatBuffer(flatbufferBytes,
-                                     iree::vm::BytecodeModuleDefTypeTable(),
-                                     &toStringVisitor);
-      output << toStringVisitor.s << "\n";
+      if (failed(fbb.printJsonToStream(/*pretty=*/true,
+                                       /*includeDefaults=*/false,
+                                       bytecode_module_def_print_json,
+                                       output))) {
+        return moduleOp.emitError()
+               << "failed to print flatbuffer emitter contents to output "
+                  "stream - possibly out of memory, possibly unprintable "
+                  "structure";
+      }
       break;
     }
     default:

@@ -46,10 +46,6 @@ table VkSpecializationInfoDef {
 // This information is used to create the VkShaderModule, VkPipelineLayout, and
 // any required VkDescriptorSetLayouts.
 table SpirVExecutableDef {
-  // Reserved implementation-specific value that can be passed from compiler to
-  // runtime.
-  tag:string;
-
   // A map of entry point ordinals to string names as used in the shader module.
   entry_points:[string];
 

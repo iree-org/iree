@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (NOT ANDROID)
+if(NOT ANDROID)
   return()
 endif()
 
@@ -40,15 +40,14 @@ iree_cc_library(
   DEPS
     ::android_native_app_glue
     absl::strings
-    iree::base::initializer
     iree::base::status
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
-    ${IREE_HAL_DRIVER_MODULES}
   LINKOPTS
-    android
-    log
+    "-landroid"
+    "-llog"
   SHARED
   WHOLEARCHIVE
 )

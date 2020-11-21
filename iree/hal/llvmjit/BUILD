@@ -31,75 +31,33 @@ endif()
 )
 
 cc_library(
-    name = "llvmjit_device",
-    srcs = ["llvmjit_device.cc"],
-    hdrs = ["llvmjit_device.h"],
-    deps = [
-        ":llvmjit_executable_cache",
-        "//iree/base:tracing",
-        "//iree/hal/host:host_local_device",
+    name = "llvmjit",
+    srcs = [
+        "llvmjit_device.cc",
+        "llvmjit_driver.cc",
+        "llvmjit_executable.cc",
+        "llvmjit_executable_cache.cc",
     ],
-)
-
-cc_library(
-    name = "llvmjit_driver",
-    srcs = ["llvmjit_driver.cc"],
-    hdrs = ["llvmjit_driver.h"],
-    deps = [
-        ":llvmjit_device",
-        "//iree/hal:device_info",
-        "//iree/hal:driver",
-        "//iree/hal/host/serial:serial_scheduling_model",
-        "@llvm-project//llvm:ExecutionEngine",
+    hdrs = [
+        "llvmjit_device.h",
+        "llvmjit_driver.h",
+        "llvmjit_executable.h",
+        "llvmjit_executable_cache.h",
     ],
-)
-
-cc_library(
-    name = "llvmjit_driver_module",
-    srcs = ["llvmjit_driver_module.cc"],
     deps = [
-        ":llvmjit_driver",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-        "@llvm-project//llvm:Support",
-        #TODO(ataei): Link with native target dep.
-        "@llvm-project//llvm:X86CodeGen",
-    ],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "llvmjit_executable",
-    srcs = ["llvmjit_executable.cc"],
-    hdrs = ["llvmjit_executable.h"],
-    deps = [
+        "//iree/base:flatcc",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:buffer",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
+        "//iree/hal",
         "//iree/hal/host:host_executable",
-        "//iree/schemas:llvmir_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/hal/host:host_local_device",
+        "//iree/hal/host/serial:serial_scheduling_model",
+        "//iree/schemas:llvmir_executable_def_c_fbs",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:AsmParser",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:ExecutionEngine",
         "@llvm-project//llvm:OrcJIT",
         "@llvm-project//llvm:Support",
-    ],
-)
-
-cc_library(
-    name = "llvmjit_executable_cache",
-    srcs = ["llvmjit_executable_cache.cc"],
-    hdrs = ["llvmjit_executable_cache.h"],
-    deps = [
-        ":llvmjit_executable",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
     ],
 )
