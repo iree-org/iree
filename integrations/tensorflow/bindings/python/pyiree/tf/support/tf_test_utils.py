@@ -50,9 +50,6 @@ flags.DEFINE_bool(
     "Summarize the inputs and outputs of each module trace logged to disk.")
 flags.DEFINE_bool("log_all_traces", False,
                   "Log all traces to logging.info, even if comparison passes.")
-flags.DEFINE_bool(
-    "get_saved_model", False,
-    "Creates and stores a SavedModel for the tf.Module class to be tested.")
 
 FLAGS = flags.FLAGS
 DEFAULT_INPUT_GENERATOR = tf_utils.uniform
