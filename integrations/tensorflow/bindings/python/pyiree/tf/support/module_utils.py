@@ -36,6 +36,7 @@ FLAGS = flags.FLAGS
 
 
 def _running_bazel_test() -> bool:
+  # Bazel guarantees that TEST_TMPDIR is set when `bazel test` is running.
   return "TEST_TMPDIR" in os.environ
 
 
