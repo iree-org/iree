@@ -149,8 +149,9 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(id<MTLDevice> d
       }
       libraries.push_back(library);
 
-      id<MTLFunction> function = [library newFunctionWithName:[NSString stringWithCString:entry_point
-                                                     encoding:[NSString defaultCStringEncoding]]];
+      id<MTLFunction> function = [library
+          newFunctionWithName:[NSString stringWithCString:entry_point
+                                                 encoding:[NSString defaultCStringEncoding]]];
       if (!function) {
         NSLog(@"Failed to create MTLFunction");
 #ifndef NDEBUG
