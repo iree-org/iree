@@ -34,5 +34,5 @@ cc_library(
     ] + select({
         "//iree:macos_x86_64": ["//iree/hal/metal/registration"],
         "//conditions:default": [],
-    })
+    }),
 )

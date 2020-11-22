@@ -22,7 +22,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_VULKAN})
+if(${IREE_HAL_DRIVER_METAL})
 """,
     inline = True,
 )
@@ -32,7 +32,7 @@ cc_library(
     srcs = ["driver_module.cc"],
     hdrs = ["driver_module.h"],
     defines = [
-        "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1",
+        "IREE_HAL_HAVE_METAL_DRIVER_MODULE=1",
     ],
     deps = [
         "//iree/base:flags",

@@ -27,6 +27,7 @@ iree_cc_library(
     absl::flags
     iree::base::flags
     iree::base::status
+    iree::base::tracing
     iree::hal::api
     iree::hal::driver_registry
     iree::hal::metal
