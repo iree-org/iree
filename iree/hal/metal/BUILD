@@ -46,6 +46,7 @@ objc_library(
         "metal_device.mm",
         "metal_direct_allocator.mm",
         "metal_driver.mm",
+        "metal_kernel_library.mm",
         "metal_pipeline_cache.mm",
         "metal_shared_event.mm",
     ],
