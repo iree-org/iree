@@ -43,3 +43,6 @@ compile_commands.json
 
 # Pyenv files
 .python-version
+
+# Prebuilt tools
+Prebuilt/
