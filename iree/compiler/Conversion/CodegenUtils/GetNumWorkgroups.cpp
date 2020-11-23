@@ -69,8 +69,10 @@ static Optional<SmallVector<Value, 2>> getParallelLoopRange(
   // Clone the linalg operation just to compute the loop bounds.
   linalg::LinalgOp clonedLinalgOp =
       rewriter.clone(*linalgOp.getOperation(), mapper);
-  Optional<SmallVector<Value, 4>> bounds =
-      getLoopRanges(rewriter, clonedLinalgOp);
+  SmallVector<Range, 4> ranges = clonedLinalgOp.createLoopRanges(rewriter, loc);
+  SmallVector<Value, 4> bounds;
+  bounds.reserve(ranges.size());
+  for (Range r : ranges) bounds.push_back(r.size);
   unsigned numParallelLoops = linalgOp.iterator_types()
                                   .getValue()
                                   .take_while([](Attribute attr) -> bool {
@@ -78,8 +80,8 @@ static Optional<SmallVector<Value, 2>> getParallelLoopRange(
                                            getParallelIteratorTypeName();
                                   })
                                   .size();
-  SmallVector<Value, 2> returnVals(
-      bounds->begin(), std::next(bounds->begin(), numParallelLoops));
+  SmallVector<Value, 2> returnVals(bounds.begin(),
+                                   std::next(bounds.begin(), numParallelLoops));
   rewriter.eraseOp(clonedLinalgOp);
   return returnVals;
 }
