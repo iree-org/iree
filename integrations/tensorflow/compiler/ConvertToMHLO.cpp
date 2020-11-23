@@ -20,28 +20,35 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_device.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_executor.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/lower_tf.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
-namespace mhlo {
-namespace {
+namespace iree_compiler {
+namespace TF {
 
-// This is a customizer version of the TF to XLA lowering in:
+// This is a customized version of the TF to XLA lowering in:
 //    tensorflow/compiler/mlir/xla/transforms/legalize_tf.cc
 // It does not require the same number of options as we can hardcode as the pass
 // the IREE requires.
-class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
+class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<chlo::HloClientDialect, mhlo::MhloDialect,
+    registry.insert<mlir::TF::TensorFlowDialect,
+                    mlir::tf_executor::TensorFlowExecutorDialect,
+                    mlir::tf_device::TensorFlowDeviceDialect,
+                    mlir::tf_saved_model::TensorFlowSavedModelDialect,
+                    chlo::HloClientDialect, mhlo::MhloDialect,
                     shape::ShapeDialect, StandardOpsDialect>();
   }
 
  public:
-  LegalizeTF() = default;
-  LegalizeTF(const LegalizeTF &) {}
+  ConvertToMHLOPass() = default;
+  ConvertToMHLOPass(const ConvertToMHLOPass &) {}
 
-  /// Performs the lowering to XLA dialect.
   void runOnFunction() override {
     auto op = getFunction();
     MLIRContext *context = op.getContext();
@@ -49,11 +56,12 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
     OwningRewritePatternList lowerTfPatterns;
-    TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
+    mlir::TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns;
-    for (auto *op : context->getRegisteredOperations())
+    for (auto *op : context->getRegisteredOperations()) {
       op->getCanonicalizationPatterns(canonicalizePatterns, context);
+    }
 
     OwningRewritePatternList patterns;
     // Note that the `OperationConverter` orders patterns lexicographically by:
@@ -63,7 +71,7 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     // 3) Order of patterns in `OwningRewritePatternList`.
 
     // Add TF->HLO legalization patterns.
-    PopulateLegalizeTfPatterns(context, &patterns);
+    mhlo::PopulateLegalizeTfPatterns(context, &patterns);
 
     // TF::PopulateLoweringTFPatterns(context, &patterns);
 
@@ -78,11 +86,11 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
 
     ConversionTarget target(*context);
     target.addIllegalDialect<chlo::HloClientDialect>();
-    target.addLegalDialect<MhloDialect>();
-    target.addLegalDialect<StandardOpsDialect>();
+    target.addLegalDialect<mhlo::MhloDialect>();
+    target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
-    target.addLegalOp<CallOp>();
-    target.addLegalOp<TensorCastOp>();
+    target.addLegalOp<mlir::CallOp>();
+    target.addLegalOp<mlir::TensorCastOp>();
 
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
@@ -134,9 +142,14 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
       llvm::cl::init("INVALID_DEVICE_TYPE")};
 };
 
-static PassRegistration<LegalizeTF> pass(
-    "iree-xla-legalize-tf", "Legalize from TensorFlow to the XLA dialect");
+std::unique_ptr<FunctionPass> createConvertToMHLOPass() {
+  return std::make_unique<ConvertToMHLOPass>();
+}
 
-}  // namespace
-}  // namespace mhlo
+static PassRegistration<ConvertToMHLOPass> pass(
+    "iree-tf-convert-to-mhlo",
+    "Converts from TensorFlow to the XLA MHLO dialect");
+
+}  // namespace TF
+}  // namespace iree_compiler
 }  // namespace mlir

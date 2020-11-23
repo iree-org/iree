@@ -37,7 +37,6 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -77,5 +76,4 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],
-    alwayslink = 1,
 )

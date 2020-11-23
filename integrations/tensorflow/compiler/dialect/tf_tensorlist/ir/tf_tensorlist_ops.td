@@ -20,11 +20,11 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "tensorflow/compiler/mlir/tensorflow/ir/tf_op_base.td"
 
-class TfTensorList_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<TfTensorList_Dialect, mnemonic, traits> {
+class TFTensorList_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<TFTensorList_Dialect, mnemonic, traits> {
 }
 
-def TfTensorList_Reserve : TfTensorList_Op<"Reserve"> {
+def TFTensorList_Reserve : TFTensorList_Op<"Reserve"> {
   let summary = "Return a TensorList of the given size with empty elements.";
 
   let description = [{
@@ -38,11 +38,11 @@ def TfTensorList_Reserve : TfTensorList_Op<"Reserve"> {
   );
 
   let results = (outs
-    TfTensorList_TensorList:$list
+    TFTensorList_TensorList:$list
   );
 }
 
-def TfTensorList_GetItem : TfTensorList_Op<"GetItem"> {
+def TFTensorList_GetItem : TFTensorList_Op<"GetItem"> {
   let summary = "Returns an item of the TensorList.";
 
   let description = [{
@@ -61,7 +61,7 @@ def TfTensorList_GetItem : TfTensorList_Op<"GetItem"> {
   }];
 
   let arguments = (ins
-    TfTensorList_TensorList:$list,
+    TFTensorList_TensorList:$list,
     I32Tensor:$index,
     I32Tensor:$element_shape
   );
@@ -71,7 +71,7 @@ def TfTensorList_GetItem : TfTensorList_Op<"GetItem"> {
   );
 }
 
-def TfTensorList_SetItem : TfTensorList_Op<"SetItem"> {
+def TFTensorList_SetItem : TFTensorList_Op<"SetItem"> {
   let summary = "Sets an item of the TensorList, returning an updated list.";
 
   let description = [{
@@ -80,17 +80,17 @@ def TfTensorList_SetItem : TfTensorList_Op<"SetItem"> {
   }];
 
   let arguments = (ins
-    TfTensorList_TensorList:$list,
+    TFTensorList_TensorList:$list,
     I32Tensor:$index,
     TF_Tensor:$item
   );
 
   let results = (outs
-    TfTensorList_TensorList:$new_list
+    TFTensorList_TensorList:$new_list
   );
 }
 
-def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor", [NoSideEffect]> {
+def TFTensorList_FromTensor : TFTensorList_Op<"FromTensor", [NoSideEffect]> {
   let summary = [{
     Creates a TensorList which, when stacked, has the value of `tensor`.
   }];
@@ -108,11 +108,11 @@ def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor", [NoSideEffect]> {
   );
 
   let results = (outs
-    TfTensorList_TensorList:$list
+    TFTensorList_TensorList:$list
   );
 }
 
-def TfTensorList_Stack : TfTensorList_Op<"Stack", [NoSideEffect]> {
+def TFTensorList_Stack : TFTensorList_Op<"Stack", [NoSideEffect]> {
   let summary = "Stacks all tensors in the list.";
 
   let description = [{
@@ -124,7 +124,7 @@ def TfTensorList_Stack : TfTensorList_Op<"Stack", [NoSideEffect]> {
   }];
 
   let arguments = (ins
-    TfTensorList_TensorList:$list,
+    TFTensorList_TensorList:$list,
     I32Tensor:$element_shape,
     // TODO(silvasean): Properly handle IREE's blind truncation to 32-bit.
     // This is logically `index` type, but coming from TensorFlow it
@@ -138,7 +138,7 @@ def TfTensorList_Stack : TfTensorList_Op<"Stack", [NoSideEffect]> {
   );
 }
 
-def TfTensorList_Concat : TfTensorList_Op<"Concat", [NoSideEffect]> {
+def TFTensorList_Concat : TFTensorList_Op<"Concat", [NoSideEffect]> {
   let summary = "Concatenates all tensors in the list along the first dimension.";
 
   let description = [{
@@ -149,7 +149,7 @@ def TfTensorList_Concat : TfTensorList_Op<"Concat", [NoSideEffect]> {
   }];
 
   let arguments = (ins
-    TfTensorList_TensorList:$list
+    TFTensorList_TensorList:$list
   );
 
   let results = (outs
@@ -159,7 +159,7 @@ def TfTensorList_Concat : TfTensorList_Op<"Concat", [NoSideEffect]> {
 
 // TODO(suderman): If gradients are not being calculated, the value will be
 // DCE'd.
-def TfTensorList_GetDim0 : TfTensorList_Op<"GetDim0", [NoSideEffect]> {
+def TFTensorList_GetDim0 : TFTensorList_Op<"GetDim0", [NoSideEffect]> {
   let summary = "Returns a tensor of the lengths of Dim0 for the tensorlists' tensors";
 
   let description = [{
@@ -170,7 +170,7 @@ def TfTensorList_GetDim0 : TfTensorList_Op<"GetDim0", [NoSideEffect]> {
   }];
 
   let arguments = (ins
-    TfTensorList_TensorList:$list
+    TFTensorList_TensorList:$list
   );
 
   let results = (outs

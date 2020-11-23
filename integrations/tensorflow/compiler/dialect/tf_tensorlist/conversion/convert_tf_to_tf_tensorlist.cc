@@ -21,15 +21,17 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 
 namespace mlir {
+namespace iree_compiler {
 namespace tf_tensorlist {
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.inc"
 
-class ConvertTfToTfTensorList
-    : public PassWrapper<ConvertTfToTfTensorList, OperationPass<FuncOp>> {
+class ConvertTFToTFTensorListPass
+    : public PassWrapper<ConvertTFToTFTensorListPass, OperationPass<FuncOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<TfTensorListDialect>();
+    registry.insert<mlir::TF::TensorFlowDialect, TFTensorListDialect,
+                    StandardOpsDialect>();
   }
   void runOnOperation() override;
 };
@@ -66,7 +68,7 @@ class ConvertTfTensorlistConcatV2
 };
 }  // namespace
 
-void ConvertTfToTfTensorList::runOnOperation() {
+void ConvertTFToTFTensorListPass::runOnOperation() {
   auto func = getOperation();
 
   // The conversion happens in 2 steps:
@@ -87,7 +89,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   patterns.insert<ConvertTfTensorlistConcatV2>(&getContext());
 
   ConversionTarget target(getContext());
-  target.addLegalDialect<TfTensorListDialect>();
+  target.addLegalDialect<TFTensorListDialect>();
   target.addLegalDialect<TF::TensorFlowDialect>();
   target.addLegalDialect<StandardOpsDialect>();
   target.addIllegalOp<TF::TensorListReserveOp>();
@@ -106,7 +108,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   // want to blindly update all variant types to tensorlist. So here we do a
   // targeted rewrite.
   auto *tfTensorListDialect =
-      func.getContext()->getLoadedDialect<TfTensorListDialect>();
+      func.getContext()->getLoadedDialect<TFTensorListDialect>();
   auto tensorListType = TensorListType::get(func.getContext());
   SmallVector<Value, 8> typeConversionWorklist;
   func.walk([&](Operation *op) {
@@ -124,8 +126,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
     Value v = typeConversionWorklist.pop_back_val();
     for (OpOperand &use : v.getUses()) {
       Operation *owner = use.getOwner();
-      // If the user is already in the tf_tensorlist dialect, then everything is
-      // ok.
+      // If the user is already in the tf_tensorlist dialect then skip.
       if (owner->getDialect() == tfTensorListDialect) {
         continue;
       }
@@ -159,12 +160,14 @@ void ConvertTfToTfTensorList::runOnOperation() {
   }
 }
 
-static PassRegistration<ConvertTfToTfTensorList> pass(
-    "convert-tf-to-tf_tensorlist", "Convert to more precise types");
+static PassRegistration<ConvertTFToTFTensorListPass> pass(
+    "iree-tf-convert-to-tf-tensorlist",
+    "Converts TF tensor list ops to the IREE tf_tensorlist dialect");
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertTfToTfTensorList() {
-  return std::make_unique<ConvertTfToTfTensorList>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertTFToTFTensorListPass() {
+  return std::make_unique<ConvertTFToTFTensorListPass>();
 }
 
 }  // namespace tf_tensorlist
+}  // namespace iree_compiler
 }  // namespace mlir
