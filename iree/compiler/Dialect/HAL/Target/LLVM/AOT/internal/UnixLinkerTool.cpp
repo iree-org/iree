@@ -43,8 +43,8 @@ class UnixLinkerTool : public LinkerTool {
     for (auto &func : *llvmModule) {
       auto attrs = func.getAttributes();
       attrs = attrs.addAttribute(llvmModule->getContext(),
-                                llvm::AttributeList::FunctionIndex,
-                                "frame-pointer", "all");
+                                 llvm::AttributeList::FunctionIndex,
+                                 "frame-pointer", "all");
       func.setAttributes(attrs);
     }
     return success();
