@@ -19,7 +19,6 @@
 # See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
