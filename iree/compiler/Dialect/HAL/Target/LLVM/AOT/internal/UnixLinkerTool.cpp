@@ -36,10 +36,11 @@ class UnixLinkerTool : public LinkerTool {
 
   LogicalResult configureModule(llvm::Module *llvmModule,
                                 ArrayRef<StringRef> entryPointNames) override {
-    // Enable frame pointers to ensure that stack unwinding works, e.g. in Tracy.
-    // In principle this could also be achieved by enabling unwind tables, but we tried
-    // that and that didn't work in Tracy (which uses libbacktrace), while enabling
-    // frame pointers worked. https://github.com/google/iree/issues/3957
+    // Enable frame pointers to ensure that stack unwinding works, e.g. in
+    // Tracy. In principle this could also be achieved by enabling unwind
+    // tables, but we tried that and that didn't work in Tracy (which uses
+    // libbacktrace), while enabling frame pointers worked.
+    // https://github.com/google/iree/issues/3957
     for (auto &func : *llvmModule) {
       auto attrs = func.getAttributes();
       attrs = attrs.addAttribute(llvmModule->getContext(),
