@@ -1,0 +1,87 @@
+# Getting Started on RISC-V with CMake
+
+<!--
+Notes to those updating this guide:
+
+    * This document should be __simple__ and cover essential items only.
+      Notes for optional components should go in separate files.
+-->
+
+This guide walks through cross-compiling IREE core runtime towards the RISC-V Linux platform. Cross-compiling IREE compilers towards RISC-V is not supported at the moment.
+
+Cross-compilation involves both a *host* platform and a *target* platform. One
+invokes compiler toolchains on the host platform to generate libraries and
+executables that can be run on the target platform.
+
+## Prerequisites
+
+### Set up host development environment
+
+The host platform should have been set up for developing IREE. Right now Linux
+and Windows are supported. Please make sure you have followed the steps for
+[Linux](./getting_started_linux_cmake.md) or
+[Windows](./getting_started_windows_cmake.md).
+
+### Install RISC-V Tools
+
+Execute the following script to download RISC-V toolchain and QEMU:
+```shell
+# In IREE source root
+$ ./scripts/riscv_bootstrap.sh
+```
+RISC-V toolchain is built from https://github.com/llvm/llvm-project
+RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.1.0-rvv-zfh-pmp
+
+## Configure and build
+
+### Configure on Linux
+
+```shell
+$ mkdir build-riscv ; cd build-riscv
+$ cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="../build_tools/cmake/riscv.toolchain.cmake" \
+  -DRISCV_CPU=rv64 \
+  -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++` ..
+```
+
+*   The above configures IREE to cross-compile towards `rv64` cpu platform.
+
+### Build all targets
+
+```shell
+$ cmake --build .
+```
+
+## Test on RISC-V QEMU
+
+
+### VMLA HAL backend
+
+Translate a source MLIR into IREE module:
+
+```shell
+# Still in "build-riscv" folder.
+$ ./host/iree/tools/iree-translate \
+  -iree-mlir-to-vm-bytecode-module \
+  -iree-hal-target-backends=vmla \
+  ../iree/tools/test/simple.mlir \
+  -o /tmp/simple-vmla.vmfb
+```
+
+Then run on the RISC-V QEMU:
+
+```shell
+$ ../Prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
+  -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+  -L ../Prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
+  ./iree/tools/iree-run-module -driver=vmla -module_file=/tmp/simple-vmla.vmfb -entry_function=abs -function_inputs="i32=-5"
+```
+
+Output:
+```
+I ../iree/tools/utils/vm_util.cc:227] Creating driver and device for 'vmla'...
+EXEC @abs
+I ../iree/tools/utils/vm_util.cc:172] result[0]: Buffer<sint32[]>
+i32=5
+```
