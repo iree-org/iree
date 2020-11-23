@@ -65,7 +65,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "-iree-spirv-enable-vectorization",
-        "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+        "-iree-vulkan-target-triple=valhall-g77-unknown-android10",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
