@@ -408,20 +408,38 @@ static void populateTilingToInvocationPatterns(
                                  OpBuilder &builder, Location loc,
                                  ArrayRef<Range> parallelLoopRanges) {
     Type indexType = builder.getIndexType();
-    SmallVector<linalg::ProcInfo, 2> procInfo(2);
-    procInfo[1] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("x")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[0])};
-    procInfo[0] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("y")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[1])};
+    size_t numParallelLoop = parallelLoopRanges.size();
+    assert(numParallelLoop <= 3);
+    SmallVector<linalg::ProcInfo, 3> procInfo(numParallelLoop);
+    procInfo[numParallelLoop - 1] = {
+        builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                        builder.getStringAttr("x")),
+        builder.create<ConstantIndexOp>(loc,
+                                        launchConfig.getWorkgroupSize()[0])};
+    if (numParallelLoop > 1) {
+      procInfo[numParallelLoop - 2] = {
+          builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                          builder.getStringAttr("y")),
+          builder.create<ConstantIndexOp>(loc,
+                                          launchConfig.getWorkgroupSize()[1])};
+    }
+    if (numParallelLoop > 2) {
+      procInfo[numParallelLoop - 3] = {
+          builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                          builder.getStringAttr("z")),
+          builder.create<ConstantIndexOp>(loc,
+                                          launchConfig.getWorkgroupSize()[2])};
+    }
     return procInfo;
   };
-  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions3D = {
+      getThreadProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
                   linalg::LinalgTilingPattern<linalg::FillOp>>(
@@ -429,7 +447,16 @@ static void populateTilingToInvocationPatterns(
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(subgroupDistributionOptions),
+          .setDistributionOptions(invocationDistributionOptions2D),
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getVectorizeMarker(), context));
+  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+      context,
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(invocationDistributionOptions3D),
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
@@ -443,6 +470,7 @@ static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                  linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgVectorizationPattern<linalg::FillOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
