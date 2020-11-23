@@ -24,6 +24,7 @@
 #  "@com_github_pytorch_cpuinfo//"
 #  "@com_github_google_flatbuffers//"
 #  "@com_github_dvidelabs_flatcc//"
+#  "@half//"
 #  "@com_google_googletest//"
 #  "@llvm-project//"
 #  "@pffft//"
