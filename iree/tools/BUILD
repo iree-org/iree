@@ -155,7 +155,7 @@ cc_library(
     local_defines = [
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_LLVMIR_TARGET",
-        "IREE_HAVE_METAL_TARGET",
+        "IREE_HAVE_METALSPIRV_TARGET",
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
