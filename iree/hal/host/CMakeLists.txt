@@ -47,6 +47,16 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    pre_allocator
+  HDRS
+    "pre_allocator.h"
+  SRCS
+    "pre_allocator.cc"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     host_buffer
   HDRS
     "host_buffer.h"
@@ -172,17 +182,5 @@ iree_cc_library(
     "scheduling_model.h"
   DEPS
     iree::hal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    pre_allocator
-  HDRS
-    "pre_allocator.h"
-  SRCS
-    "pre_allocator.cc"
-  DEPS
-    iree::hal::event
   PUBLIC
 )
