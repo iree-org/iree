@@ -107,12 +107,10 @@ class FloatTypeConverter : public TypeConverter {
 };
 
 // Generic pattern to convert FP32 values and attributes to FP16.
-template <typename SourceOp>
 class GenericTypeConvert : public ConversionPattern {
  public:
   GenericTypeConvert(MLIRContext *context, TypeConverter &converter)
-      : ConversionPattern(SourceOp::getOperationName(), 0, converter, context) {
-  }
+      : ConversionPattern(0, converter, MatchAnyOpTypeTag()) {}
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -175,33 +173,7 @@ void ConvertF32ToF16Pass::runOnOperation() {
 
   FloatTypeConverter converter;
   OwningRewritePatternList patterns;
-  patterns.insert<
-      GenericTypeConvert<IREE::Flow::VariableOp>,
-      GenericTypeConvert<IREE::Flow::VariableAddressOp>,
-      GenericTypeConvert<IREE::Flow::VariableLoadIndirectOp>,
-      GenericTypeConvert<mhlo::AbsOp>, GenericTypeConvert<mhlo::CbrtOp>,
-      GenericTypeConvert<mhlo::CeilOp>, GenericTypeConvert<mhlo::ConvertOp>,
-      GenericTypeConvert<mhlo::CosOp>, GenericTypeConvert<mhlo::ExpOp>,
-      GenericTypeConvert<mhlo::Expm1Op>, GenericTypeConvert<mhlo::FloorOp>,
-      GenericTypeConvert<mhlo::IsFiniteOp>, GenericTypeConvert<mhlo::LogOp>,
-      GenericTypeConvert<mhlo::Log1pOp>, GenericTypeConvert<mhlo::LogisticOp>,
-      GenericTypeConvert<mhlo::NegOp>, GenericTypeConvert<mhlo::RoundOp>,
-      GenericTypeConvert<mhlo::RsqrtOp>, GenericTypeConvert<mhlo::SignOp>,
-      GenericTypeConvert<mhlo::SqrtOp>, GenericTypeConvert<mhlo::TanhOp>,
-      GenericTypeConvert<mhlo::AddOp>, GenericTypeConvert<mhlo::DivOp>,
-      GenericTypeConvert<mhlo::MaxOp>, GenericTypeConvert<mhlo::MinOp>,
-      GenericTypeConvert<mhlo::MulOp>, GenericTypeConvert<mhlo::PowOp>,
-      GenericTypeConvert<mhlo::SubOp>, GenericTypeConvert<mhlo::AllReduceOp>,
-      GenericTypeConvert<mhlo::ReduceOp>, GenericTypeConvert<mhlo::CompareOp>,
-      GenericTypeConvert<mhlo::SliceOp>, GenericTypeConvert<mhlo::ConstOp>,
-      GenericTypeConvert<mhlo::DotOp>, GenericTypeConvert<mhlo::DotGeneralOp>,
-      GenericTypeConvert<mhlo::TransposeOp>,
-      GenericTypeConvert<mhlo::ReshapeOp>, GenericTypeConvert<mhlo::ConvertOp>,
-      GenericTypeConvert<mhlo::MaxOp>, GenericTypeConvert<mhlo::ReturnOp>,
-      GenericTypeConvert<mhlo::BroadcastInDimOp>,
-      GenericTypeConvert<mhlo::TorchIndexSelectOp>,
-      GenericTypeConvert<mhlo::PadOp>, GenericTypeConvert<mhlo::ConcatenateOp>,
-      GenericTypeConvert<ReturnOp>>(context, converter);
+  patterns.insert<GenericTypeConvert>(context, converter);
   populateFuncOpTypeConversionPattern(patterns, context, converter);
   F32ToF16ConversionTarget target(*context);
   target.markUnknownOpDynamicallyLegal();

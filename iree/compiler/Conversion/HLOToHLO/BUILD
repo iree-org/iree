@@ -28,8 +28,8 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "iree/compiler/Dialect/Flow/IR",
-        "iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
