@@ -24,13 +24,15 @@ iree_cc_library(
     "TypeUtils.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    MhloDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

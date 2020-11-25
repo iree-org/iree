@@ -26,11 +26,16 @@ iree_cc_library(
     "UnrollReductions.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
+    LmhloPasses
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    MhloDialect
+    MhloPasses
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::Shape::IR
@@ -41,6 +46,5 @@ iree_cc_library(
     iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_hlo
   PUBLIC
 )

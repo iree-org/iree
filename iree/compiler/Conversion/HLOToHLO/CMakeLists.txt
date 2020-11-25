@@ -22,9 +22,11 @@ iree_cc_library(
   SRCS
     "DecomposeHLOClamp.cpp"
   DEPS
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRTransformUtils
-    tensorflow::mlir_hlo
+    MhloDialect
   PUBLIC
 )

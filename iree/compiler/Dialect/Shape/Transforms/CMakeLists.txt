@@ -31,17 +31,19 @@ iree_cc_library(
     "TieDynamicShapesPass.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRAnalysis
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    MhloDialect
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Plugins::VMLA::VMLAShapeBuilder
     iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
-    tensorflow::mlir_hlo
   PUBLIC
 )

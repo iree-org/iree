@@ -25,13 +25,15 @@ iree_cc_library(
     "DispatchabilityTest.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRSupport
+    MhloDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

@@ -59,6 +59,31 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
+    # MLIR-HLO
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo": ["MhloDialect",
+        "LmhloDialect", "MLIRMhloUtils"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:chlo_legalize_to_hlo":
+        ["ChloPasses"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_control_flow":
+        ["MhloToStandard"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_gather_to_torch_index_select":
+        ["MhloPasses"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg":
+        ["MhloLhloToLinalg"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_standard":
+        ["MhloToStandard"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo": ["LmhloDialect"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo_fuse_linalg":
+        ["LmhloPasses"],
+    # TODO: Create header only library. This is a include file only and not a
+    # CMake target in upstream.
+    #"@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op":
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:materialize_broadcasts":
+        ["MhloPasses"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns":
+        ["MhloPasses"],
+    "@org_tensorflow//tensorflow/compiler/mlir/hlo:unfuse_batch_norm":
+        ["MhloPasses"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
@@ -131,8 +156,7 @@ def convert_external_target(target):
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
-    # All Bazel targets map to a single CMake target.
-    return ["tensorflow::mlir_hlo"]
+    return _convert_mlir_target(target)
   if target.startswith("@com_google_ruy//ruy"):
     # All Bazel targets map to a single CMake target.
     return ["ruy"]

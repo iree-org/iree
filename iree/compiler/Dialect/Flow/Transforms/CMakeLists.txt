@@ -42,8 +42,11 @@ iree_cc_library(
     "RematerializeDispatchConstants.cpp"
     "StripAndSplatConstantVariables.cpp"
   DEPS
+    ChloPasses
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRShape
     MLIRShapeOpsTransforms
@@ -51,6 +54,9 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    MhloDialect
+    MhloPasses
+    MhloToStandard
     iree::base::signature_mangle
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion
@@ -63,6 +69,5 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
-    tensorflow::mlir_hlo
   PUBLIC
 )

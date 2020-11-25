@@ -25,11 +25,13 @@ iree_cc_library(
     "WorkloadUtils.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRStandard
     MLIRSupport
+    MhloDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

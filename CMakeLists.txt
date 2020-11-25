@@ -427,10 +427,6 @@ else()
   add_executable(iree_host_flatcc_cli ALIAS flatcc_cli)
 endif()
 
-if(${IREE_BUILD_COMPILER})
-  add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
-endif()
-
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
   # sdl2 logs are spammy - change log level while adding
   function(include_sdl2)

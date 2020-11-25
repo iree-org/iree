@@ -25,15 +25,19 @@ iree_cc_library(
     "ConvertReductionOps.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRTransforms
+    MhloDialect
+    MhloLhloToLinalg
+    MhloToStandard
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VMLA::Conversion
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_hlo
   PUBLIC
 )

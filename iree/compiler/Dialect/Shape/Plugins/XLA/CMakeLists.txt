@@ -23,8 +23,10 @@ iree_cc_library(
     "XlaHloShapeBuilder.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
+    MhloDialect
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

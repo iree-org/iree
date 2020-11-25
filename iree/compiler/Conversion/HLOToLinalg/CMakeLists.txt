@@ -27,20 +27,24 @@ iree_cc_library(
     "ResolveShapeOps.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMhloUtils
     MLIRPass
     MLIRSPIRV
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    MLIRmap_lmhlo_to_scalar_op
+    MhloDialect
+    MhloLhloToLinalg
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

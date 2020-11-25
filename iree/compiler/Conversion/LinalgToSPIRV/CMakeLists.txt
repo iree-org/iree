@@ -51,6 +51,7 @@ iree_cc_library(
   DEPS
     ::CodeGenOptionUtils
     LLVMSupport
+    LmhloDialect
     MLIRAffine
     MLIRAffineToStandard
     MLIRAnalysis
@@ -59,6 +60,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMhloUtils
     MLIRPass
     MLIRSCF
     MLIRSCFToGPU
@@ -72,6 +74,8 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSPIRV
+    MhloDialect
+    MhloLhloToLinalg
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
@@ -81,6 +85,5 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
-    tensorflow::mlir_hlo
   PUBLIC
 )

@@ -26,14 +26,16 @@ iree_cc_library(
     "GraphUtils.cpp"
   DEPS
     LLVMSupport
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    MhloDialect
     iree::base::flatcc
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )

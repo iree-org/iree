@@ -22,12 +22,14 @@ iree_cc_library(
   SRCS
     "ConvertHLOToFlow.cpp"
   DEPS
+    LmhloDialect
     MLIRIR
+    MLIRMhloUtils
     MLIRPass
     MLIRStandard
     MLIRTransforms
+    MhloDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
