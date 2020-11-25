@@ -42,13 +42,13 @@ struct ConvertF32ToF16Pass
 };
 
 /// Any fp32 derived type is illegal.
-static bool illegalType(Type type) {
+static bool isIllegalType(Type type) {
   if (type.isF32()) return true;
   if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
-    return illegalType(ptrType.getTargetType());
+    return isIllegalType(ptrType.getTargetType());
   }
   if (auto shapedType = type.dyn_cast<ShapedType>()) {
-    return illegalType(shapedType.getElementType());
+    return isIllegalType(shapedType.getElementType());
   }
   return false;
 }
@@ -61,27 +61,27 @@ class F32ToF16ConversionTarget : public ConversionTarget {
   // Operations are legal if they don't contain any illegal type.
   bool isDynamicallyLegal(Operation *op) const override {
     if (auto varOp = dyn_cast<IREE::Flow::VariableOp>(op)) {
-      return !illegalType(varOp.type());
+      return !isIllegalType(varOp.type());
     }
     if (auto funcOp = dyn_cast<FuncOp>(op)) {
       for (Type type : funcOp.getType().getInputs()) {
-        if (illegalType(type)) return false;
+        if (isIllegalType(type)) return false;
       }
       for (Type type : funcOp.getType().getResults()) {
-        if (illegalType(type)) return false;
+        if (isIllegalType(type)) return false;
       }
     }
     for (Type type : op->getResultTypes()) {
-      if (illegalType(type)) return false;
+      if (isIllegalType(type)) return false;
     }
     for (Type type : op->getOperandTypes()) {
-      if (illegalType(type)) return false;
+      if (isIllegalType(type)) return false;
     }
     return true;
   }
 };
 
-class floatTypeConverter : public TypeConverter {
+class FloatTypeConverter : public TypeConverter {
  public:
   static Type convertTensor(RankedTensorType type) {
     if (!type.getElementType().isF32()) return type;
@@ -89,7 +89,7 @@ class floatTypeConverter : public TypeConverter {
                                          Float16Type::get(type.getContext()));
     return newType;
   }
-  explicit floatTypeConverter() {
+  explicit FloatTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](FloatType type) {
       if (type.isF32()) return FloatType::getF16(type.getContext());
@@ -153,7 +153,7 @@ class GenericTypeConvert : public ConversionPattern {
         newAttrs.push_back(std::make_pair(
             attr.first, DenseElementsAttr::get(tensorType, args)));
       } else if (auto typeAttr = attr.second.dyn_cast<TypeAttr>()) {
-        if (illegalType(typeAttr.getValue())) {
+        if (isIllegalType(typeAttr.getValue())) {
           if (auto tensorType =
                   typeAttr.getValue().dyn_cast<RankedTensorType>()) {
             Type newType = RankedTensorType::get(tensorType.getShape(),
@@ -173,7 +173,7 @@ void ConvertF32ToF16Pass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
 
-  floatTypeConverter converter;
+  FloatTypeConverter converter;
   OwningRewritePatternList patterns;
   patterns.insert<
       GenericTypeConvert<IREE::Flow::VariableOp>,
