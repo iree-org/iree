@@ -22,11 +22,15 @@ cc_library(
     name = "HLOToHLO",
     srcs = [
         "DecomposeHLOClamp.cpp",
+        "DemoteF32ToF16.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
+        "iree/compiler/Dialect/Flow/IR",
+        "iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",

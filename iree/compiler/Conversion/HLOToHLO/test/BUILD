@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+# Tests for common transforms.
 
-iree_cc_library(
-  NAME
-    HLOToHLO
-  HDRS
-    "Passes.h"
-  SRCS
-    "DecomposeHLOClamp.cpp"
-    "DemoteF32ToF16.cpp"
-  DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransformUtils
-    tensorflow::mlir_hlo
-  PUBLIC
+load("iree:lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    default_visibility = ["//iree:friends"],
+    features = [
+        "-parse_headers",  # buildozer: disable=no-parse-headers, TODO(b/153880171): Enable when Bazel supports parse_headers
+        "layering_check",
+    ],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "iree/tools:IreeFileCheck",
+        "iree/tools:iree-opt",
+    ],
 )

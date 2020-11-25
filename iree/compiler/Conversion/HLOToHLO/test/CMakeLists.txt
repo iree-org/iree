@@ -14,22 +14,14 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    HLOToHLO
-  HDRS
-    "Passes.h"
+    lit
   SRCS
-    "DecomposeHLOClamp.cpp"
-    "DemoteF32ToF16.cpp"
-  DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransformUtils
-    tensorflow::mlir_hlo
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )
+
