@@ -404,33 +404,10 @@ static void populateTilingToInvocationPatterns(
         return tileSizesVal;
       };
 
-  auto getThreadProcInfoFn = [&launchConfig](
-                                 OpBuilder &builder, Location loc,
-                                 ArrayRef<Range> parallelLoopRanges) {
-    Type indexType = builder.getIndexType();
-    size_t numParallelLoop = parallelLoopRanges.size();
-    assert(numParallelLoop <= 3);
-    SmallVector<linalg::ProcInfo, 3> procInfo(numParallelLoop);
-    procInfo[numParallelLoop - 1] = {
-        builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                        builder.getStringAttr("x")),
-        builder.create<ConstantIndexOp>(loc,
-                                        launchConfig.getWorkgroupSize()[0])};
-    if (numParallelLoop > 1) {
-      procInfo[numParallelLoop - 2] = {
-          builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                          builder.getStringAttr("y")),
-          builder.create<ConstantIndexOp>(loc,
-                                          launchConfig.getWorkgroupSize()[1])};
-    }
-    if (numParallelLoop > 2) {
-      procInfo[numParallelLoop - 3] = {
-          builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                          builder.getStringAttr("z")),
-          builder.create<ConstantIndexOp>(loc,
-                                          launchConfig.getWorkgroupSize()[2])};
-    }
-    return procInfo;
+  auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
+                                ArrayRef<Range> parallelLoopRanges) {
+    return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
+        builder, loc, parallelLoopRanges.size());
   };
   linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
       getThreadProcInfoFn,

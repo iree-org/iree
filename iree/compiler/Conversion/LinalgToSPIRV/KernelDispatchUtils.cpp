@@ -92,8 +92,8 @@ static void getMaliBestMatMulTileSizes(Type elementType,
   }
 }
 
-/// Launch configuration for different known GPU configuration.
-static LogicalResult getTargetSpecificConfig(
+/// Launch configuration for Mali GPU configuration.
+static LogicalResult getMaliSpecificConfig(
     linalg::BatchMatmulOp op, const spirv::TargetEnv &targetEnv,
     const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
@@ -136,9 +136,9 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
   if (options.enableVectorization &&
-      succeeded(getTargetSpecificConfig(op, targetEnv, options, tileSizes,
-                                        config.workgroupSize,
-                                        config.numSubgroups))) {
+      succeeded(getMaliSpecificConfig(op, targetEnv, options, tileSizes,
+                                      config.workgroupSize,
+                                      config.numSubgroups))) {
     config.vectorize = true;
     return success();
   }
