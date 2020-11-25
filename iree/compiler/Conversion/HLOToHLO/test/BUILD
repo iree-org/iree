@@ -14,14 +14,11 @@
 
 # Tests for common transforms.
 
-load("iree:lit_test.bzl", "iree_lit_test_suite")
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
-    default_visibility = ["//iree:friends"],
-    features = [
-        "-parse_headers",  # buildozer: disable=no-parse-headers, TODO(b/153880171): Enable when Bazel supports parse_headers
-        "layering_check",
-    ],
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -29,7 +26,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
     data = [
-        "iree/tools:IreeFileCheck",
-        "iree/tools:iree-opt",
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
     ],
 )
