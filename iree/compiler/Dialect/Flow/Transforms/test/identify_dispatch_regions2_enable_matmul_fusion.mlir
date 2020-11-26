@@ -107,3 +107,41 @@ func @moveDispatchOp
 //  CHECK-NEXT:       flow.return %[[T5]]
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   return %[[RESULT2]]
+
+// -----
+
+func @dot_fusion_with_different_shape
+  (%arg0: tensor<384x512xf32>, %arg1: tensor<512x128xf32>,
+   %arg2: tensor<384x128xf32>) -> tensor<4x384x32xf32> {
+  %0 = "mhlo.dot"(%arg0, %arg1)
+    : (tensor<384x512xf32>, tensor<512x128xf32>) -> tensor<384x128xf32>
+  %1 = mhlo.add %0, %arg2 : tensor<384x128xf32>
+  %2 = "mhlo.reshape"(%1) : (tensor<384x128xf32>) -> tensor<1x384x4x32xf32>
+  %3 = "mhlo.transpose"(%2) {permutation = dense<[0, 2, 1, 3]> : tensor<4xi64>}
+    : (tensor<1x384x4x32xf32>) -> tensor<1x4x384x32xf32>
+  %4 = "mhlo.reshape"(%3) : (tensor<1x4x384x32xf32>) -> tensor<4x384x32xf32>
+  return %4 : tensor<4x384x32xf32>
+}
+
+// CHECK-LABEL: func @dot_fusion_with_different_shape
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<384x512xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<512x128xf32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<384x128xf32>
+//       CHECK:   %[[RESULT1:.+]] = flow.dispatch.region
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]] = %[[ARG0]]
+//  CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG1]]
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]] = %[[ARG2]]
+//  CHECK-SAME:     {
+//  CHECK-NEXT:       %[[T2:.+]] = "mhlo.dot"(%[[ARG3]], %[[ARG4]])
+//  CHECK-NEXT:       %[[T3:.+]] = mhlo.add %[[T2]], %[[ARG5]]
+//  CHECK-NEXT:       %[[T4:.+]] = "mhlo.reshape"(%[[T3]])
+//  CHECK-NEXT:       flow.return %[[T4]]
+//  CHECK-NEXT:     }
+//  CHECK-NEXT:   %[[RESULT2:.+]] = flow.dispatch.region
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]] = %[[RESULT1]]
+//  CHECK-SAME:     {
+//  CHECK-NEXT:       %[[T2:.+]] = "mhlo.transpose"(%[[ARG3]])
+//  CHECK-NEXT:       %[[T3:.+]] = "mhlo.reshape"(%[[T2]])
+//  CHECK-NEXT:       flow.return %[[T3]]
+//  CHECK-NEXT:     }
+//  CHECK-NEXT:   return %[[RESULT2]]

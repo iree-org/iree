@@ -44,6 +44,10 @@ class OpDispatchPolicy {
   // Returns true if |op| is only fusable with its consumers.
   static bool isFusableWithConsumersOnly(Operation *op);
 
+  // Returns true if |op| is only fusable with its consumers where consumer has
+  // the same shape for the output.
+  static bool isFusableWithConsumerOfSameOutputShapeOnly(Operation *op);
+
   // Returns true if |op| is not able to fuse with either producer or consumer.
   static bool isUnsupportedFusionOp(Operation *op);
 

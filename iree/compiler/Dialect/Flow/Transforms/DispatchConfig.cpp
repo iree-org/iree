@@ -51,6 +51,25 @@ bool isIndexOp(Operation *op) {
          isa<mhlo::ReshapeOp>(op) || isa<mhlo::SliceOp>(op) ||
          isa<mhlo::TransposeOp>(op);
 }
+
+/// Returns true if |lhs| and |rhs| return a single value with the same shape.
+bool checkSameOutputShape(Operation *lhs, Operation *rhs) {
+  if (lhs->getNumResults() != 1 || rhs->getNumResults() != 1) {
+    return false;
+  }
+  ShapedType lhsType = lhs->getResults()[0].getType().dyn_cast<ShapedType>();
+  ShapedType rhsType = rhs->getResults()[0].getType().dyn_cast<ShapedType>();
+  if (!lhsType || !rhsType || lhsType != rhsType) {
+    return false;
+  }
+  // The shapes match, but if one of the ops is a transpose the transpose shape
+  // might match, especially in dynamic case where the shapes might be different
+  // at runtime.
+  if (isa<mhlo::TransposeOp>(lhs) || isa<mhlo::TransposeOp>(rhs)) {
+    return false;
+  }
+  return true;
+}
 }  // namespace
 
 //------------------------------------------------------------------------------
@@ -142,14 +161,14 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
     // original position. This should apply to any such "metadata" ops.
     return FusionType::CLONE_INTO;
   }
-  if (isUnsupportedFusionOp(anchorOp) && isa<mhlo::ReshapeOp>(inputOp)) {
+  if (isa<mhlo::ReshapeOp>(inputOp)) {
     // Clones reshape op to the same region as its consumer.
     return FusionType::CLONE_INTO;
   }
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
     return FusionType::DISABLED;
   }
-  if (isFusableWithConsumersOnly(anchorOp) && !isa<mhlo::ReshapeOp>(inputOp)) {
+  if (isFusableWithConsumersOnly(anchorOp)) {
     return FusionType::DISABLED;
   }
 
@@ -169,16 +188,20 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   if (isIdentityMetadata(outputOp)) {
     return FusionType::MOVE_INTO;
   }
-
-  if (isUnsupportedFusionOp(anchorOp) && isa<mhlo::ReshapeOp>(outputOp)) {
+  if (isa<mhlo::ReshapeOp>(outputOp)) {
     // Moves reshape op to the same region as its producer.
     return FusionType::MOVE_INTO;
   }
+
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(outputOp)) {
     return FusionType::DISABLED;
   }
   if (isFusableWithConsumersOnly(anchorOp) &&
       !isFusableWithConsumersOnly(outputOp)) {
+    if (isFusableWithConsumerOfSameOutputShapeOnly(anchorOp) &&
+        !checkSameOutputShape(anchorOp, outputOp)) {
+      return FusionType::DISABLED;
+    }
     return FusionType::MOVE_INTO;
   }
 
@@ -190,8 +213,13 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   return FusionType::DISABLED;
 }
 
-bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
+bool OpDispatchPolicy::isFusableWithConsumerOfSameOutputShapeOnly(
+    Operation *op) {
   return clEnableMatmulFusion && isa<mhlo::DotOp>(op);
+}
+
+bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
+  return isFusableWithConsumerOfSameOutputShapeOnly(op);
 }
 
 // TODO(b/144530470): replace with tablegen attributes/interfaces.
