@@ -404,53 +404,47 @@ static void populateTilingToInvocationPatterns(
         return tileSizesVal;
       };
 
-  auto getThreadProcInfoFn = [&launchConfig](
-                                 OpBuilder &builder, Location loc,
-                                 ArrayRef<Range> parallelLoopRanges) {
-    int numLevels = parallelLoopRanges.size();
-    Type indexType = builder.getIndexType();
-    SmallVector<linalg::ProcInfo, 4> procInfo(numLevels);
-    if (numLevels > 0) {
-      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
-                                   loc, indexType, builder.getStringAttr("x")),
-                               builder.create<ConstantIndexOp>(
-                                   loc, launchConfig.getWorkgroupSize()[0])};
-    }
-    if (numLevels > 0) {
-      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
-                                   loc, indexType, builder.getStringAttr("y")),
-                               builder.create<ConstantIndexOp>(
-                                   loc, launchConfig.getWorkgroupSize()[1])};
-    }
-    if (numLevels > 0) {
-      procInfo[--numLevels] = {builder.create<gpu::ThreadIdOp>(
-                                   loc, indexType, builder.getStringAttr("z")),
-                               builder.create<ConstantIndexOp>(
-                                   loc, launchConfig.getWorkgroupSize()[2])};
-    }
-    return procInfo;
+  auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
+                                ArrayRef<Range> parallelLoopRanges) {
+    return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
+        builder, loc, parallelLoopRanges.size());
   };
 
-  linalg::LinalgLoopDistributionOptions distributionOptions;
-  distributionOptions.procInfo = getThreadProcInfoFn;
-  distributionOptions.distributionMethod.assign(
-      3, linalg::DistributionMethod::CyclicNumProcsEqNumIters);
-
-  auto tilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(distributionOptions);
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
+      getThreadProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions3D = {
+      getThreadProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
                   linalg::LinalgTilingPattern<linalg::FillOp>>(
-      context, tilingOptions,
+      context,
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(invocationDistributionOptions2D),
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getVectorizeMarker(), context));
+
+  auto threeDTilingOptions =
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(invocationDistributionOptions3D);
+
+  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+      context, threeDTilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
-      context, tilingOptions,
+      context, threeDTilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getConvFilterTileMarker(), context));
@@ -464,6 +458,7 @@ static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                  linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgVectorizationPattern<linalg::FillOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
