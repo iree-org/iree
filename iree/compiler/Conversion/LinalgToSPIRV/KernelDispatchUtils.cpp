@@ -348,13 +348,19 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
   if (targetEnv.getVendorID() == spirv::Vendor::ARM) {
+    auto inputType = op.getInput(1).getType().cast<MemRefType>();
     auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
-    if (outputType.hasStaticShape()) {
+    if (inputType.hasStaticShape() && outputType.hasStaticShape()) {
       const int tileWidth = 8;
       const int tileChannel = 32;
 
-      auto shape = outputType.getShape();
-      if (shape[2] % tileWidth == 0 && shape[3] % tileChannel == 0) {
+      auto outputShape = outputType.getShape();
+      bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
+      bool isOutputTilable = outputShape[0] == 1 &&
+                             outputShape[2] % tileWidth == 0 &&
+                             outputShape[3] % tileChannel == 0;
+
+      if (isInputTilable && isOutputTilable) {
         config.workgroupSize = {8, 2, 1};
 
         SmallVector<int64_t, 4> workgroupLevel = {
