@@ -237,10 +237,10 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
 
 // TODO(scotttodd): UpdateBuffer, Dispatch, Sync, etc.
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, CommandBufferTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, CommandBufferTest,
+    ::testing::ValuesIn(CtsTestBase::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

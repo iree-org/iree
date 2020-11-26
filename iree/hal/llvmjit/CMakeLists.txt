@@ -20,87 +20,31 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    llvmjit_device
+    llvmjit
   HDRS
     "llvmjit_device.h"
+    "llvmjit_driver.h"
+    "llvmjit_executable.h"
+    "llvmjit_executable_cache.h"
   SRCS
     "llvmjit_device.cc"
-  DEPS
-    ::llvmjit_executable_cache
-    iree::base::tracing
-    iree::hal::host::host_local_device
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_driver
-  HDRS
-    "llvmjit_driver.h"
-  SRCS
     "llvmjit_driver.cc"
-  DEPS
-    ::llvmjit_device
-    LLVMExecutionEngine
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::host::serial::serial_scheduling_model
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_driver_module
-  SRCS
-    "llvmjit_driver_module.cc"
-  DEPS
-    ::llvmjit_driver
-    LLVMSupport
-    LLVMX86CodeGen
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_executable
-  HDRS
-    "llvmjit_executable.h"
-  SRCS
     "llvmjit_executable.cc"
+    "llvmjit_executable_cache.cc"
   DEPS
     LLVMAsmParser
     LLVMCore
+    LLVMExecutionEngine
     LLVMOrcJIT
     LLVMSupport
     absl::span
-    flatbuffers
+    iree::base::flatcc
     iree::base::status
     iree::base::tracing
-    iree::hal::buffer
-    iree::hal::executable
-    iree::hal::executable_spec
+    iree::hal
     iree::hal::host::host_executable
-    iree::schemas::llvmir_executable_def_cc_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_executable_cache
-  HDRS
-    "llvmjit_executable_cache.h"
-  SRCS
-    "llvmjit_executable_cache.cc"
-  DEPS
-    ::llvmjit_executable
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
+    iree::hal::host::host_local_device
+    iree::hal::host::serial::serial_scheduling_model
+    iree::schemas::llvmir_executable_def_c_fbs
   PUBLIC
 )

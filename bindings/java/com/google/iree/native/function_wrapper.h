@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "iree/vm/module.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace java {

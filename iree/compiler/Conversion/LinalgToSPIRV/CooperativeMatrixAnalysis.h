@@ -23,13 +23,14 @@
 // or not.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_COOPERATIVEMATRIXANALYSIS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_COOPERATIVEMATRIXANALYSIS_H_
+
 #include "llvm/ADT/DenseSet.h"
+#include "mlir/IR/Operation.h"
 
 namespace mlir {
-class Operation;
-
 namespace iree_compiler {
 
 class CooperativeMatrixAnalysis {
@@ -45,6 +46,8 @@ class CooperativeMatrixAnalysis {
  private:
   llvm::DenseSet<mlir::Operation *> usesCooperativeMatrix;
 };
+
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_COOPERATIVEMATRIXANALYSIS_H_

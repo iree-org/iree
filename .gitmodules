@@ -10,9 +10,6 @@
 [submodule "third_party/tensorflow"]
 	path = third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
-[submodule "third_party/flatbuffers"]
-	path = third_party/flatbuffers
-	url = https://github.com/google/flatbuffers.git
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git

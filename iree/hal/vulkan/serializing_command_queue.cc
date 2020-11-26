@@ -134,20 +134,20 @@ void PrepareSubmitInfo(
       arena->AllocateSpan<VkSemaphore>(wait_semaphores.size());
   auto wait_dst_stage_masks =
       arena->AllocateSpan<VkPipelineStageFlags>(wait_semaphores.size());
-  for (int i = 0, e = wait_semaphores.size(); i < e; ++i) {
+  for (size_t i = 0, e = wait_semaphores.size(); i < e; ++i) {
     wait_semaphore_handles[i] = wait_semaphores[i];
     wait_dst_stage_masks[i] = dst_stage_mask;
   }
 
   auto signal_semaphore_handles =
       arena->AllocateSpan<VkSemaphore>(signal_semaphores.size());
-  for (int i = 0, e = signal_semaphores.size(); i < e; ++i) {
+  for (size_t i = 0, e = signal_semaphores.size(); i < e; ++i) {
     signal_semaphore_handles[i] = signal_semaphores[i];
   }
 
   auto command_buffer_handles =
       arena->AllocateSpan<VkCommandBuffer>(command_buffers.size());
-  for (int i = 0, e = command_buffers.size(); i < e; ++i) {
+  for (size_t i = 0, e = command_buffers.size(); i < e; ++i) {
     const auto& command_buffer = command_buffers[i];
     auto* direct_command_buffer =
         static_cast<DirectCommandBuffer*>(command_buffer->impl());
@@ -156,12 +156,15 @@ void PrepareSubmitInfo(
 
   submit_info->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info->pNext = nullptr;
-  submit_info->waitSemaphoreCount = wait_semaphore_handles.size();
+  submit_info->waitSemaphoreCount =
+      static_cast<uint32_t>(wait_semaphore_handles.size());
   submit_info->pWaitSemaphores = wait_semaphore_handles.data();
   submit_info->pWaitDstStageMask = wait_dst_stage_masks.data();
-  submit_info->commandBufferCount = command_buffer_handles.size();
+  submit_info->commandBufferCount =
+      static_cast<uint32_t>(command_buffer_handles.size());
   submit_info->pCommandBuffers = command_buffer_handles.data();
-  submit_info->signalSemaphoreCount = signal_semaphore_handles.size();
+  submit_info->signalSemaphoreCount =
+      static_cast<uint32_t>(signal_semaphore_handles.size());
   submit_info->pSignalSemaphores = signal_semaphore_handles.data();
 }
 
@@ -188,7 +191,7 @@ Status SerializingCommandQueue::Submit(
   IREE_DVLOG(2) << "SerializingCommandQueue::Submit";
 
   absl::MutexLock lock(&mutex_);
-  for (int i = 0; i < batches.size(); ++i) {
+  for (size_t i = 0; i < batches.size(); ++i) {
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
     IREE_ASSIGN_OR_RETURN(auto fence, fence_pool_->Acquire());
@@ -282,13 +285,13 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   if (submit_infos.empty()) return false;
 
   auto infos = arena.AllocateSpan<VkSubmitInfo>(submit_infos.size());
-  for (int i = 0, e = submit_infos.size(); i < e; ++i) {
+  for (size_t i = 0, e = submit_infos.size(); i < e; ++i) {
     infos[i] = submit_infos[i];
   }
 
   // Note: We might be able to batch the submission but it involves non-trivial
   // fence handling. We can handle that if really needed.
-  for (int i = 0, e = submit_infos.size(); i < e; ++i) {
+  for (size_t i = 0, e = submit_infos.size(); i < e; ++i) {
     VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
         queue_, /*submitCount=*/1, &submit_infos[i], submit_fences[i]));
   }
@@ -353,9 +356,9 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
     fences.reserve(pending_fences_.size());
     for (const auto& fence : pending_fences_) fences.push_back(fence->value());
 
-    VkResult result =
-        syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
-                                /*waitAll=*/VK_TRUE, timeout_ns);
+    VkResult result = syms()->vkWaitForFences(
+        *logical_device_, static_cast<uint32_t>(fences.size()), fences.data(),
+        /*waitAll=*/VK_TRUE, timeout_ns);
 
     switch (result) {
       case VK_SUCCESS:
@@ -394,7 +397,8 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   fences.reserve(pending_fences_.size());
   for (const auto& fence : pending_fences_) fences.push_back(fence->value());
 
-  syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
+  syms()->vkWaitForFences(*logical_device_,
+                          static_cast<uint32_t>(fences.size()), fences.data(),
                           /*waitAll=*/VK_TRUE, /*timeout=*/UINT64_MAX);
   // Clear the list. Fences will be automatically returned back to the queue
   // after refcount reaches 0.

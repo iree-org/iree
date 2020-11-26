@@ -32,7 +32,6 @@ include(CMakeParseArguments)
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
-# ALWAYSLINK: Always link the library into any binary with a direct dep.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 # Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
 # in ${PACKAGE}/internal.
@@ -79,7 +78,7 @@ include(CMakeParseArguments)
 # )
 function(external_cc_library)
   cmake_parse_arguments(_RULE
-    "PUBLIC;ALWAYSLINK;TESTONLY"
+    "PUBLIC;TESTONLY"
     "PACKAGE;NAME;ROOT"
     "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -122,7 +121,8 @@ function(external_cc_library)
     )
     target_include_directories(${_NAME} SYSTEM
       PUBLIC
-        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
     )
     target_compile_options(${_NAME}
@@ -134,18 +134,14 @@ function(external_cc_library)
       PUBLIC
         ${_RULE_DEPS}
       PRIVATE
-        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
     )
     target_compile_definitions(${_NAME}
       PUBLIC
         ${_RULE_DEFINES}
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
-
-    if(DEFINED _RULE_ALWAYSLINK)
-      set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
-    endif()
 
     # Add all external targets to a a folder in the IDE for organization.
     if(_RULE_PUBLIC)
@@ -164,19 +160,20 @@ function(external_cc_library)
     add_library(${_NAME} INTERFACE)
     target_include_directories(${_NAME} SYSTEM
       INTERFACE
-        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
     )
     target_compile_options(${_NAME}
       INTERFACE
-        ${_RULE_COPTS}
         ${IREE_DEFAULT_COPTS}
+        ${_RULE_COPTS}
     )
     target_link_libraries(${_NAME}
       INTERFACE
-        ${_RULE_DEPS}
-        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
+        ${_RULE_DEPS}
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
     target_compile_definitions(${_NAME}

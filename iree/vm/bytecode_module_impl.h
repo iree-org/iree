@@ -24,15 +24,10 @@
 #endif  // _MSC_VER
 
 #include "iree/base/api.h"
-#include "iree/vm/builtin_types.h"
-#include "iree/vm/module.h"
-#include "iree/vm/ref.h"
-#include "iree/vm/stack.h"
-#include "iree/vm/type_def.h"
-#include "iree/vm/value.h"
+#include "iree/vm/api.h"
 
 // NOTE: include order matters:
-#include "flatcc/reflection/flatbuffers_common_reader.h"
+#include "iree/base/flatcc.h"
 #include "iree/schemas/bytecode_module_def_reader.h"
 #include "iree/schemas/bytecode_module_def_verifier.h"
 

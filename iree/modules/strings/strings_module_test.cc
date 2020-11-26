@@ -21,6 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
@@ -40,6 +41,10 @@ namespace {
 
 class StringsModuleTest : public ::testing::Test {
  protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+  }
+
   virtual void SetUp() {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
@@ -301,7 +306,7 @@ class StringsModuleTest : public ::testing::Test {
     std::vector<iree_string_view_t> out_strings(expected.size());
     IREE_ASSERT_OK(strings_string_tensor_get_elements(
         output_tensor, out_strings.data(), out_strings.size(), 0));
-    for (int i = 0; i < expected.size(); i++) {
+    for (iree_host_size_t i = 0; i < expected.size(); i++) {
       EXPECT_EQ(iree_string_view_compare(out_strings[i], expected[i]), 0)
           << "Expected: " << expected[i].data << " found "
           << out_strings[i].data;

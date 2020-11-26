@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "mlir/Support/LLVM.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -37,7 +38,7 @@ struct MetalShader {
 // Cross compiles SPIR-V into Metal Shading Language source code for the
 // compute shader with |entryPoint|. Returns llvm::None on failure.
 llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
-    llvm::ArrayRef<uint32_t> spvBinary, const std::string& entryPoint);
+    llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint);
 
 }  // namespace iree_compiler
 }  // namespace mlir

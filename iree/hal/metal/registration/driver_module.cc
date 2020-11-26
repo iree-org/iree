@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include "iree/hal/metal/registration/driver_module.h"
 
 #include "absl/flags/flag.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/hal/metal/metal_driver.h"
@@ -28,7 +28,6 @@ ABSL_FLAG(
 namespace iree {
 namespace hal {
 namespace metal {
-namespace {
 
 StatusOr<ref_ptr<Driver>> CreateMetalDriver() {
   MetalDriverOptions options;
@@ -37,13 +36,12 @@ StatusOr<ref_ptr<Driver>> CreateMetalDriver() {
   return MetalDriver::Create(options);
 }
 
-}  // namespace
 }  // namespace metal
 }  // namespace hal
 }  // namespace iree
 
-IREE_REGISTER_MODULE_INITIALIZER(iree_hal_metal_driver, {
-  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
-      "metal", ::iree::hal::metal::CreateMetalDriver));
-});
-IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_metal_driver);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_metal_driver_module_register() {
+  return ::iree::hal::DriverRegistry::shared_registry()->Register(
+      "metal", ::iree::hal::metal::CreateMetalDriver);
+}

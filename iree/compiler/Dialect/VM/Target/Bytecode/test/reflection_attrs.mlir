@@ -3,12 +3,12 @@
 // CHECK-LABEL: simple_module
 vm.module @simple_module {
   vm.export @func
-  // CHECK: internal_functions:
-  // CHECK: reflection_attrs:
-  // CHECK:   key: "f"
-  // CHECK:   value: "FOOBAR"
-  // CHECK:   key: "fv"
-  // CHECK:   value: "INFINITY"
+  // CHECK: "internal_functions":
+  // CHECK: "reflection_attrs":
+  // CHECK:   "key": "f"
+  // CHECK:   "value": "FOOBAR"
+  // CHECK:   "key": "fv"
+  // CHECK:   "value": "INFINITY"
   vm.func @func(%arg0 : i32) -> i32
     attributes { iree.reflection = { f = "FOOBAR", fv = "INFINITY" } }
   {

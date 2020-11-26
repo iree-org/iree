@@ -25,10 +25,8 @@
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module.h"
-#include "iree/vm/module.h"
+#include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
-#include "iree/vm/ref.h"
-#include "iree/vm/stack.h"
 
 extern "C" iree_status_t strings_string_create(iree_string_view_t value,
                                                iree_allocator_t allocator,
@@ -141,7 +139,7 @@ iree_status_t strings_string_tensor_get_rank(
   if (!tensor || !rank) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
-  *rank = tensor->rank;
+  *rank = static_cast<int32_t>(tensor->rank);
   return iree_ok_status();
 }
 

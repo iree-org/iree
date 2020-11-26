@@ -17,10 +17,7 @@
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/invocation.h"
-#include "iree/vm/list.h"
+#include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 
 namespace iree {

@@ -18,9 +18,10 @@
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/file_io.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
@@ -223,7 +224,7 @@ class IREEBenchmark {
     iree_vm_function_t function;
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
-    for (int i = 0; i < signature.export_function_count; ++i) {
+    for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
       iree_string_view_t name;
       IREE_CHECK_OK(input_module_->get_function(input_module_->self,
                                                 IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -295,7 +296,8 @@ int main(int argc, char** argv) {
       absl::flags_internal::UsageFlagsAction::kHandleUsage,
       absl::flags_internal::OnUndefinedFlag::kIgnoreUndefined);
   ::benchmark::Initialize(&argc, argv);
-  iree::InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   iree::IREEBenchmark iree_benchmark;
   auto status = iree_benchmark.Register();

@@ -14,13 +14,14 @@
 
 package(default_visibility = ["//visibility:public"])
 
-# NOTE: we exclude JSON parsing/printing to avoid additional dependencies.
 cc_library(
     name = "runtime",
     srcs = [
         "config/config.h",
         "src/runtime/builder.c",
         "src/runtime/emitter.c",
+        "src/runtime/json_parser.c",
+        "src/runtime/json_printer.c",
         "src/runtime/refmap.c",
         "src/runtime/verifier.c",
     ],
@@ -45,10 +46,19 @@ cc_library(
         "include/flatcc/reflection/flatbuffers_common_builder.h",
         "include/flatcc/reflection/flatbuffers_common_reader.h",
     ] + glob(["include/flatcc/portable/**/*.h"]),
-    copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    textual_hdrs = [
+        "include/flatcc/flatcc_json_parser.h",
+        "include/flatcc/flatcc_json_printer.h",
     ],
+    copts = [
+        "-Iexternal/com_github_dvidelabs_flatcc/config/",
+        "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "-Wno-implicit-fallthrough",
+        ],
+    }),
     includes = [
       "include/",
     ],

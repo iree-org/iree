@@ -48,11 +48,12 @@ cc_binary(
     deps = [
         ":simple_mul_bytecode_module_cc",
         "//iree/base:main",
+        "//iree/hal/vulkan/registration",
         "//iree/modules/hal",
         "//iree/testing/vulkan:vulkan_gui_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
     ],

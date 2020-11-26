@@ -27,6 +27,8 @@ external_cc_library(
   SRCS
     "src/runtime/builder.c"
     "src/runtime/emitter.c"
+    "src/runtime/json_parser.c"
+    "src/runtime/json_printer.c"
     "src/runtime/refmap.c"
     "src/runtime/verifier.c"
   HDRS
@@ -40,6 +42,8 @@ external_cc_library(
     "include/flatcc/flatcc_flatbuffers.h"
     "include/flatcc/flatcc_identifier.h"
     "include/flatcc/flatcc_iov.h"
+    "include/flatcc/flatcc_json_parser.h"
+    "include/flatcc/flatcc_json_printer.h"
     "include/flatcc/flatcc_portable.h"
     "include/flatcc/flatcc_prologue.h"
     "include/flatcc/flatcc_refmap.h"

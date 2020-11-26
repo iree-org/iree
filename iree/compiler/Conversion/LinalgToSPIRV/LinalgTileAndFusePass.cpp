@@ -404,24 +404,19 @@ static void populateTilingToInvocationPatterns(
         return tileSizesVal;
       };
 
-  auto getThreadProcInfoFn = [&launchConfig](
-                                 OpBuilder &builder, Location loc,
-                                 ArrayRef<Range> parallelLoopRanges) {
-    Type indexType = builder.getIndexType();
-    SmallVector<linalg::ProcInfo, 2> procInfo(2);
-    procInfo[1] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("x")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[0])};
-    procInfo[0] = {builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr("y")),
-                   builder.create<ConstantIndexOp>(
-                       loc, launchConfig.getWorkgroupSize()[1])};
-    return procInfo;
+  auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
+                                ArrayRef<Range> parallelLoopRanges) {
+    return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
+        builder, loc, parallelLoopRanges.size());
   };
-  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions3D = {
+      getThreadProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
                   linalg::LinalgTilingPattern<linalg::FillOp>>(
@@ -429,7 +424,16 @@ static void populateTilingToInvocationPatterns(
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(subgroupDistributionOptions),
+          .setDistributionOptions(invocationDistributionOptions2D),
+      getLinalgMatchAndReplaceMarker(
+          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
+          getVectorizeMarker(), context));
+  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+      context,
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(invocationDistributionOptions3D),
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
@@ -443,6 +447,7 @@ static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
+                  linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgVectorizationPattern<linalg::FillOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
