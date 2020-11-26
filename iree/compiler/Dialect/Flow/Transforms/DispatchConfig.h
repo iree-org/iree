@@ -48,6 +48,11 @@ class OpDispatchPolicy {
   // the same shape for the output.
   static bool isFusableWithConsumerOfSameOutputShapeOnly(Operation *op);
 
+  // Returns true if |op| can be treated as a view modification, i.e. eventually
+  // the op is lowered to just change the way the underlying buffer holding the
+  // values is viewed w.r.t shape, etc.
+  static bool isViewModificationOp(Operation *op);
+
   // Returns true if |op| is not able to fuse with either producer or consumer.
   static bool isUnsupportedFusionOp(Operation *op);
 

@@ -24,9 +24,9 @@
 
 #define DEBUG_TYPE "iree-detail"
 
-static llvm::cl::opt<bool> clEnableMatmulFusion(
-    "iree-enable-matmul-fusion",
-    llvm::cl::desc("Flag to enable fusion of matmul with its consumers, "
+static llvm::cl::opt<bool> clEnableConsumerOnlyFusion(
+    "iree-enable-consumer-only-fusion",
+    llvm::cl::desc("Flag to enable fusion of matmul, etc. with its consumers, "
                    "experimental flag to evaluate fusion"),
     llvm::cl::init(false));
 
@@ -48,8 +48,7 @@ bool isIndexOp(Operation *op) {
          isa<mhlo::BroadcastInDimOp>(op) || isa<mhlo::BroadcastOp>(op) ||
          isa<mhlo::DynamicBroadcastInDimOp>(op) ||
          isa<mhlo::DynamicReshapeOp>(op) || isa<mhlo::DynamicSliceOp>(op) ||
-         isa<mhlo::ReshapeOp>(op) || isa<mhlo::SliceOp>(op) ||
-         isa<mhlo::TransposeOp>(op);
+         isa<mhlo::SliceOp>(op) || isa<mhlo::TransposeOp>(op);
 }
 
 /// Returns true if |lhs| and |rhs| return a single value with the same shape.
@@ -126,7 +125,11 @@ bool OpDispatchPolicy::isDispatchable(Operation *op) {
 }
 
 bool OpDispatchPolicy::isIdentityMetadata(Operation *op) {
-  return isa<Shape::TieShapeOp>(op);
+  return isa<Shape::TieShapeOp, Shape::MakeRankedShapeOp>(op);
+}
+
+bool OpDispatchPolicy::isViewModificationOp(Operation *op) {
+  return isa<mhlo::ReshapeOp>(op);
 }
 
 int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
@@ -134,13 +137,15 @@ int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
     return 100;
   }
 
-  if (isa<Shape::TieShapeOp>(op) || isa<Shape::MakeRankedShapeOp>(op)) {
+  if (isIdentityMetadata(op)) {
     // Cannot anchor.
     return 0;
+  } else if (isViewModificationOp(op)) {
+    return 1;
   } else if (isIndexOp(op)) {
     // We generally do not want to form anchors around ops that just do a copy
     // (perhaps with an affine map) except as a last resort.
-    return 1;
+    return 5;
   } else if (isa<mhlo::SelectOp>(op)) {
     // TODO(#2050): In a number of cases, this makes it less likely to split
     // a DR across a compare/select boundary. Remove this once i1 is legalized
@@ -156,13 +161,9 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
                                                          Operation *inputOp) {
   if (inputOp->isKnownTerminator()) return FusionType::DISABLED;
 
-  if (isIdentityMetadata(inputOp)) {
+  if (isIdentityMetadata(inputOp) || isViewModificationOp(inputOp)) {
     // Shape ties must always be duplicated into the region and remain in their
     // original position. This should apply to any such "metadata" ops.
-    return FusionType::CLONE_INTO;
-  }
-  if (isa<mhlo::ReshapeOp>(inputOp)) {
-    // Clones reshape op to the same region as its consumer.
     return FusionType::CLONE_INTO;
   }
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
@@ -185,11 +186,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   if (outputOp->isKnownTerminator() || outputOp->getNumResults() == 0) {
     return FusionType::DISABLED;
   }
-  if (isIdentityMetadata(outputOp)) {
-    return FusionType::MOVE_INTO;
-  }
-  if (isa<mhlo::ReshapeOp>(outputOp)) {
-    // Moves reshape op to the same region as its producer.
+  if (isIdentityMetadata(outputOp) || isViewModificationOp(outputOp)) {
     return FusionType::MOVE_INTO;
   }
 
@@ -215,7 +212,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
 
 bool OpDispatchPolicy::isFusableWithConsumerOfSameOutputShapeOnly(
     Operation *op) {
-  return clEnableMatmulFusion && isa<mhlo::DotOp>(op);
+  return clEnableConsumerOnlyFusion && isa<mhlo::DotOp, mhlo::DotGeneralOp>(op);
 }
 
 bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
@@ -224,10 +221,11 @@ bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
 
 // TODO(b/144530470): replace with tablegen attributes/interfaces.
 bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
-  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::PadOp,
-             mhlo::ReduceOp, mhlo::ReduceWindowOp, mhlo::TorchIndexSelectOp>(
-             op) ||
-         (!clEnableMatmulFusion && isa<mhlo::DotOp>(op)) || isRootOnlyOp(op);
+  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::PadOp, mhlo::ReduceOp,
+             mhlo::ReduceWindowOp, mhlo::TorchIndexSelectOp>(op) ||
+         (!clEnableConsumerOnlyFusion &&
+          isa<mhlo::DotOp, mhlo::DotGeneralOp>(op)) ||
+         isRootOnlyOp(op);
 }
 
 bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
