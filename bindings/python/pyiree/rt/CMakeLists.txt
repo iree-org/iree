@@ -35,8 +35,6 @@ iree_pyext_library(
     iree::modules::tensorlist::native_module
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::invocation
-    iree::vm::ref
     absl::inlined_vector
     absl::memory
     absl::strings
@@ -56,10 +54,7 @@ iree_pyext_module(
     ::PyExtRtLib
     bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    iree::hal::vulkan::vulkan_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::base::initializer
+    iree::hal::drivers
 )
 
 iree_py_library(

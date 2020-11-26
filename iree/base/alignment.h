@@ -18,11 +18,21 @@
 #ifndef IREE_BASE_ALIGNMENT_H_
 #define IREE_BASE_ALIGNMENT_H_
 
+#include <stddef.h>
+
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// https://en.cppreference.com/w/c/types/max_align_t
+#if defined(IREE_PLATFORM_WINDOWS)
+// NOTE: 16 is a specified Microsoft API requirement for some functions.
+#define iree_max_align_t 16
+#else
+#define iree_max_align_t sizeof(long double)
+#endif  // IREE_PLATFORM_*
 
 // https://en.cppreference.com/w/c/language/_Alignas
 // https://en.cppreference.com/w/c/language/_Alignof

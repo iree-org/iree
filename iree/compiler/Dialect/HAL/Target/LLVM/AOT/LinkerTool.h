@@ -50,6 +50,9 @@ struct Artifact {
   // Reads the artifact file contents as bytes.
   Optional<std::vector<int8_t>> read() const;
 
+  // Reads the artifact file and writes it into the given |stream|.
+  bool readInto(raw_ostream& targetStream) const;
+
   // Closes the ostream of the file while preserving the temporary entry on
   // disk. Use this if files need to be modified by external tools that may
   // require exclusive access.

@@ -1,4 +1,16 @@
-# Bytecode VM.
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
@@ -9,35 +21,156 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+#===------------------------------------------------------------------------===#
+# Public API
+#===------------------------------------------------------------------------===#
+
 cc_library(
-    name = "builtin_types",
-    srcs = ["builtin_types.c"],
-    hdrs = ["builtin_types.h"],
+    name = "vm",
+    hdrs = [
+        "api.h",
+    ],
     deps = [
-        ":list",
-        ":ref",
+        ":impl",
+        "//iree/base:api",
+    ],
+)
+
+# TODO(benvanik): make these srcs and only expose an api_cc.h.
+cc_library(
+    name = "cc",
+    hdrs = [
+        "module_abi_packing.h",
+        "native_module_cc.h",
+        "ref_cc.h",
+    ],
+    deps = [
+        ":vm",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Implementation
+#===------------------------------------------------------------------------===#
+
+cc_library(
+    name = "impl",
+    srcs = [
+        "builtin_types.c",
+        "context.c",
+        "instance.c",
+        "invocation.c",
+        "list.c",
+        "module.c",
+        "native_module.c",
+        "ref.c",
+        "stack.c",
+    ],
+    hdrs = [
+        "builtin_types.h",
+        "context.h",
+        "instance.h",
+        "invocation.h",
+        "list.h",
+        "module.h",
+        "native_module.h",
+        "ref.h",
+        "stack.h",
+        "type_def.h",
+        "value.h",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_test(
+    name = "list_test",
+    srcs = ["list_test.cc"],
+    deps = [
+        ":impl",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "native_module_test",
+    srcs = ["native_module_test.cc"],
+    deps = [
+        ":cc",
+        ":impl",
+        ":native_module_test_hdrs",
+        "//iree/base:api",
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "native_module_test_hdrs",
+    hdrs = [
+        "native_module_test.h",
+    ],
+    deps = [
+        ":impl",
         "//iree/base:api",
     ],
 )
 
 cc_test(
-    name = "bytecode_dispatch_test",
-    srcs = ["bytecode_dispatch_test.cc"],
+    name = "native_module_benchmark",
+    srcs = ["native_module_benchmark.cc"],
     deps = [
-        ":builtin_types",
-        ":bytecode_module",
-        ":context",
-        ":instance",
-        ":invocation",
-        ":module",
+        ":impl",
+        ":native_module_test_hdrs",
+        "//iree/base:api",
         "//iree/base:logging",
-        "//iree/base:status",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "//iree/vm/test:all_bytecode_modules_cc",
-        "@com_google_absl//absl/strings",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
     ],
 )
+
+cc_test(
+    name = "ref_test",
+    srcs = ["ref_test.cc"],
+    deps = [
+        ":impl",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "stack_test",
+    srcs = ["stack_test.cc"],
+    deps = [
+        ":impl",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Bytecode interpreter module
+#===------------------------------------------------------------------------===#
 
 cc_library(
     name = "bytecode_module",
@@ -52,19 +185,50 @@ cc_library(
         "bytecode_module.h",
     ],
     deps = [
-        ":builtin_types",
         ":bytecode_op_table_gen",
-        ":list",
-        ":module",
-        ":ref",
-        ":stack",
-        ":type_def",
-        ":value",
-        "//iree/base:alignment",
+        ":vm",
         "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:flatcc",
         "//iree/base:tracing",
         "//iree/schemas:bytecode_module_def_c_fbs",
-        "@com_github_dvidelabs_flatcc//:runtime",
+    ],
+)
+
+# TODO(benvanik): see if we can remove this; not good to have this dep.
+gentbl(
+    name = "bytecode_op_table_gen",
+    tbl_outs = [
+        ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
+    ],
+    tblgen = "//iree/tools:iree-tblgen",
+    td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
+    td_srcs = [
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/VM/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+        "@llvm-project//mlir:SideEffectTdFiles",
+    ],
+)
+
+cc_test(
+    name = "bytecode_module_test",
+    srcs = [
+        "bytecode_dispatch_test.cc",
+        "bytecode_module_test.cc",
+    ],
+    deps = [
+        ":bytecode_module",
+        ":vm",
+        "//iree/base:logging",
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+        "//iree/vm/test:all_bytecode_modules_cc",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -74,11 +238,7 @@ cc_test(
     deps = [
         ":bytecode_module",
         ":bytecode_module_benchmark_module_cc",
-        ":context",
-        ":instance",
-        ":module",
-        ":native_module",
-        ":stack",
+        ":vm",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
@@ -113,288 +273,13 @@ iree_bytecode_module(
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
-cc_test(
-    name = "bytecode_module_test",
-    srcs = ["bytecode_module_test.cc"],
-    deps = [
-        ":bytecode_module",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-gentbl(
-    name = "bytecode_op_table_gen",
-    tbl_outs = [
-        ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
-    ],
-    tblgen = "//iree/tools:iree-tblgen",
-    td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
-    td_srcs = [
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "//iree/compiler/Dialect/VM/IR:td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
-        "@llvm-project//mlir:SideEffectTdFiles",
-    ],
-)
+#===------------------------------------------------------------------------===#
+# Emit-C modules
+#===------------------------------------------------------------------------===#
 
 cc_library(
     name = "c_funcs",
     hdrs = [
         "c_funcs.h",
-    ],
-)
-
-cc_library(
-    name = "context",
-    srcs = ["context.c"],
-    hdrs = ["context.h"],
-    deps = [
-        ":instance",
-        ":module",
-        ":stack",
-        "//iree/base:api",
-        "//iree/base:atomics",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_library(
-    name = "instance",
-    srcs = ["instance.c"],
-    hdrs = ["instance.h"],
-    deps = [
-        ":builtin_types",
-        "//iree/base:api",
-        "//iree/base:atomics",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_library(
-    name = "invocation",
-    srcs = ["invocation.c"],
-    hdrs = ["invocation.h"],
-    deps = [
-        ":context",
-        ":list",
-        ":module",
-        "//iree/base:api",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_library(
-    name = "list",
-    srcs = ["list.c"],
-    hdrs = ["list.h"],
-    deps = [
-        ":ref",
-        ":type_def",
-        ":value",
-        "//iree/base:alignment",
-        "//iree/base:api",
-    ],
-)
-
-cc_test(
-    name = "list_test",
-    srcs = ["list_test.cc"],
-    deps = [
-        ":builtin_types",
-        ":list",
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "module",
-    srcs = ["module.c"],
-    hdrs = ["module.h"],
-    deps = [
-        ":ref",
-        "//iree/base:alignment",
-        "//iree/base:api",
-        "//iree/base:atomics",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_library(
-    name = "native_module",
-    srcs = ["native_module.c"],
-    hdrs = ["native_module.h"],
-    deps = [
-        ":module",
-        ":stack",
-        "//iree/base:api",
-    ],
-)
-
-cc_test(
-    name = "native_module_benchmark",
-    srcs = ["native_module_benchmark.cc"],
-    deps = [
-        ":module",
-        ":native_module",
-        ":native_module_test_hdrs",
-        ":stack",
-        "//iree/base:api",
-        "//iree/base:logging",
-        "//iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-cc_test(
-    name = "native_module_test",
-    srcs = ["native_module_test.cc"],
-    deps = [
-        ":context",
-        ":instance",
-        ":invocation",
-        ":list",
-        ":native_module_test_hdrs",
-        ":ref_cc",
-        "//iree/base:api",
-        "//iree/base:status",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "native_module_test_hdrs",
-    hdrs = [
-        "native_module_test.h",
-    ],
-    deps = [
-        ":context",
-        ":instance",
-        ":native_module",
-        ":ref",
-        ":stack",
-        "//iree/base:api",
-    ],
-)
-
-cc_library(
-    name = "native_module_cc",
-    hdrs = [
-        "module_abi_packing.h",
-        "native_module_cc.h",
-    ],
-    deps = [
-        ":builtin_types",
-        ":module",
-        ":ref",
-        ":ref_cc",
-        ":stack",
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "ref",
-    srcs = ["ref.c"],
-    hdrs = ["ref.h"],
-    deps = [
-        "//iree/base:api",
-        "//iree/base:atomics",
-    ],
-)
-
-cc_test(
-    name = "ref_test",
-    srcs = ["ref_test.cc"],
-    deps = [
-        ":ref",
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "ref_cc",
-    hdrs = ["ref_cc.h"],
-    deps = [
-        ":ref",
-        "//iree/base:api",
-        "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_library(
-    name = "stack",
-    srcs = ["stack.c"],
-    hdrs = ["stack.h"],
-    deps = [
-        ":module",
-        ":ref",
-        "//iree/base:alignment",
-        "//iree/base:api",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_test(
-    name = "stack_test",
-    srcs = ["stack_test.cc"],
-    deps = [
-        ":ref",
-        ":stack",
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "type_def",
-    hdrs = ["type_def.h"],
-    deps = [
-        ":ref",
-        ":value",
-    ],
-)
-
-cc_library(
-    name = "value",
-    hdrs = ["value.h"],
-)
-
-cc_library(
-    name = "vm",
-    hdrs = [
-        "api.h",
-    ],
-    deps = [
-        ":builtin_types",
-        ":context",
-        ":instance",
-        ":invocation",
-        ":list",
-        ":module",
-        ":native_module",
-        ":ref",
-        ":stack",
-        ":type_def",
-        ":value",
-        "//iree/base:api",
     ],
 )

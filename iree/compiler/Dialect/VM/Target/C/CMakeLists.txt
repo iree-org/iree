@@ -32,6 +32,8 @@ if(${IREE_ENABLE_EMITC})
       MLIRSupport
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
+    INCLUDES
+      "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
     PUBLIC
   )
 endif()

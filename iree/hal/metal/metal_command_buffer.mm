@@ -368,11 +368,11 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   }
 
   IREE_DVLOG(2) << "Dispatch workgroup count: (" << workgroups[0] << ", " << workgroups[1] << ", "
-                << workgroups[2] << "), workgroup size: (" << workgroup_size.x() << ", "
-                << workgroup_size.y() << ", " << workgroup_size.z() << ")";
-  [compute_encoder dispatchThreadgroups:MTLSizeMake(workgroups[0], workgroups[1], workgroups[2])
-                  threadsPerThreadgroup:MTLSizeMake(workgroup_size.x(), workgroup_size.y(),
-                                                    workgroup_size.z())];
+                << workgroups[2] << "), workgroup size: (" << workgroup_size.x << ", "
+                << workgroup_size.y << ", " << workgroup_size.z << ")";
+  [compute_encoder
+       dispatchThreadgroups:MTLSizeMake(workgroups[0], workgroups[1], workgroups[2])
+      threadsPerThreadgroup:MTLSizeMake(workgroup_size.x, workgroup_size.y, workgroup_size.z)];
 
   return OkStatus();
 }

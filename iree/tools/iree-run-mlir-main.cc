@@ -44,7 +44,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -56,6 +56,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_targets.h"
@@ -165,7 +166,7 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
     iree_host_size_t driver_count = 0;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
         iree_allocator_system(), &driver_names, &driver_count));
-    for (int i = 0; i < driver_count; ++i) {
+    for (iree_host_size_t i = 0; i < driver_count; ++i) {
       target_backends.push_back(
           std::string(driver_names[i].data, driver_names[i].size));
     }
@@ -378,7 +379,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 
   Status evaluate_status = OkStatus();
   auto module_signature = iree_vm_module_signature(bytecode_module);
-  for (int i = 0; i < module_signature.export_function_count; ++i) {
+  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
+       ++i) {
     evaluate_status = run_function(i);
     if (!evaluate_status.ok()) {
       break;
@@ -521,7 +523,8 @@ extern "C" int main(int argc, char** argv) {
   }
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
-  iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
+  iree_flags_parse_checked(&argc_absl, &argv_absl_ptr);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {

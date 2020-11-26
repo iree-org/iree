@@ -17,3 +17,9 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
+
+#===------------------------------------------------------------------------===#
+# Public API
+#===------------------------------------------------------------------------===#
+# TODO(#3817): expose :compiler as the public C API.
+# TODO(#3817): expose :cc as the public C++ wrapper API.

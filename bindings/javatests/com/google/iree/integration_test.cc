@@ -19,7 +19,7 @@
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 #include "bindings/java/com/google/iree/native/module_wrapper.h"
 #include "bindings/javatests/com/google/iree/simple_mul_bytecode_module.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 
 namespace iree {
 namespace java {

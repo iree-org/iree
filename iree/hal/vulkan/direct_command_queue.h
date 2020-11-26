@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include <cstdint>
 #include <string>

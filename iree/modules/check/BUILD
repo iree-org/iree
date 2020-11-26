@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "IREE_DRIVER_MODULES",
-    "PLATFORM_VULKAN_DEPS",
-    iree_cc_binary = "cc_binary",
-)
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -34,38 +27,39 @@ cc_test(
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/hal:api",
-        "//iree/hal/vmla:vmla_driver_module",
+        "//iree/hal/vmla/registration",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-check-module",
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
     deps = [
         ":native_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:file_io",
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:status",
-        "//iree/base:target_platform",
         "//iree/base:tracing",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 cc_library(
@@ -80,7 +74,7 @@ cc_library(
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/vm",
-        "//iree/vm:native_module_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
     ],

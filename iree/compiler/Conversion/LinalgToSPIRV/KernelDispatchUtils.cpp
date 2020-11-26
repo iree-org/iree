@@ -83,6 +83,51 @@ static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
   return op.emitError("undefined launch config for tiled operation");
 }
 
+static void getMaliBestMatMulTileSizes(Type elementType,
+                                       SmallVectorImpl<int64_t> &tileSizes) {
+  if (elementType.isF16()) {
+    tileSizes.append({16, 64, 8});
+  } else {
+    tileSizes.append({8, 64, 4});
+  }
+}
+
+/// Launch configuration for Mali GPU configuration.
+static LogicalResult getMaliSpecificConfig(
+    linalg::BatchMatmulOp op, const spirv::TargetEnv &targetEnv,
+    const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
+    std::array<int64_t, 3> &workgroupSize,
+    std::array<int64_t, 3> &numSubgroups) {
+  if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
+
+  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
+  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  assert(lhsType.getElementType() == rhsType.getElementType());
+  // Pick ideal tile size based on the type.
+  SmallVector<int64_t, 4> workgroupLevelTs(1, 1);
+  getMaliBestMatMulTileSizes(lhsType.getElementType(), workgroupLevelTs);
+  // Fall back to the none vectorize path for cases we don't handle.
+  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
+      lhsType.getDimSize(1) % workgroupLevelTs[1] != 0 ||
+      rhsType.getDimSize(2) % workgroupLevelTs[2] != 0 ||
+      lhsType.getDimSize(2) % workgroupLevelTs[3] != 0) {
+    return failure();
+  }
+
+  workgroupSize[0] = targetEnv.getResourceLimits().subgroup_size().getInt();
+  workgroupSize[1] = 1;
+  workgroupSize[2] = 1;
+  tileSizes.emplace_back(workgroupLevelTs);
+  // No tiling at the subgroup level since this target doesn't use subgroup op
+  // or shared memory.
+  tileSizes.emplace_back();
+  SmallVector<int64_t, 4> invocationLevelTs = {
+      workgroupLevelTs[0], workgroupLevelTs[1],
+      workgroupLevelTs[2] / workgroupSize[0], workgroupLevelTs[3]};
+  tileSizes.emplace_back(invocationLevelTs);
+  return success();
+}
+
 /// Launch config for `linalg.batchmatmul`.
 template <>
 LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
@@ -90,6 +135,13 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
+  if (options.enableVectorization &&
+      succeeded(getMaliSpecificConfig(op, targetEnv, options, tileSizes,
+                                      config.workgroupSize,
+                                      config.numSubgroups))) {
+    config.vectorize = true;
+    return success();
+  }
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -220,16 +272,12 @@ static LogicalResult getTargetSpecificConfig(
   assert(lhsType.getElementType() == rhsType.getElementType());
   // Pick ideal tile size based on the type.
   SmallVector<int64_t, 4> workgroupLevelTs;
-  if (lhsType.getElementType().isF16()) {
-    workgroupLevelTs.append({16, 64, 8});
-  } else {
-    workgroupLevelTs.append({8, 64, 4});
-  }
+  getMaliBestMatMulTileSizes(lhsType.getElementType(), workgroupLevelTs);
 
   // Fall back to the none vectorize path for cases we don't handle.
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
       lhsType.getDimSize(0) % workgroupLevelTs[0] != 0 ||
-      rhsType.getDimSize(0) % workgroupLevelTs[1] != 0 ||
+      rhsType.getDimSize(1) % workgroupLevelTs[1] != 0 ||
       lhsType.getDimSize(1) % workgroupLevelTs[2] != 0) {
     return failure();
   }
@@ -493,8 +541,14 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
         op.getAccType().cast<VectorType>().getElementType(),
         op.getResultType().cast<VectorType>().getElementType());
   } else {
+    unsigned lastParalleldim = 0;
+    for (auto it : llvm::enumerate(op.iterator_types())) {
+      if (isParallelIterator(it.value())) lastParalleldim = it.index();
+    }
+    SmallVector<int64_t, 4> nativeSize(op.iterator_types().size(), 1);
+    nativeSize[lastParalleldim] = 4;
     // Map to vec4 fma operations.
-    return SmallVector<int64_t, 4>({1, 4, 1});
+    return nativeSize;
   }
 }
 
@@ -509,8 +563,10 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
   } else {
+    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
     // Map to load4.
-    return SmallVector<int64_t, 4>({1, 4});
+    nativeSize.push_back(4);
+    return nativeSize;
   }
 }
 
@@ -525,8 +581,10 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
   } else {
+    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
     // Map to store4.
-    return SmallVector<int64_t, 4>({1, 4});
+    nativeSize.push_back(4);
+    return nativeSize;
   }
 }
 

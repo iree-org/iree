@@ -20,7 +20,6 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
-#include "iree/base/initializer.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver.h"
@@ -77,8 +76,5 @@ class DriverRegistry final {
 
 }  // namespace hal
 }  // namespace iree
-
-IREE_DECLARE_MODULE_INITIALIZER(iree_hal);
-IREE_REQUIRE_MODULE_LINKED(iree_hal);
 
 #endif  // IREE_HAL_DRIVER_REGISTRY_H_

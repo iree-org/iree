@@ -16,11 +16,13 @@
 
 import collections
 import copy
+import inspect
 import os
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 from absl import app
 from absl import flags
+from absl import logging
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -28,516 +30,448 @@ import tensorflow.compat.v2 as tf
 FLAGS = flags.FLAGS
 
 DROPOUT = 0.5
-DIM = 4
-RANK_2_INPUT = [DIM] * 2
-RANK_3_INPUT = [DIM] * 3
-RANK_4_INPUT = [DIM] * 4
+CONV_FILTERS = 2
+CONV_KERNEL_SIZE = 2
+DIM = 3
 
-CONV_1D_INPUT = [2, 8, 3]
-CONV_2D_INPUT = [2, 8, 8, 3]
-CONV_3D_INPUT = [2, 8, 8, 8, 3]
+# Used for attention layers and recurrent layers.
+RANK_3_SHAPE = [DIM] * 3
+# Highest rank that tf.keras will allow for all layers.
+RANK_5_SHAPE = [DIM] * 5
 
-# Configs are namedtuples storing keyword arguments and shapes to test a
-# tf.keras.layers.Layer with. They are used in two ways:
-#   1. To directly specify the kwargs and shapes for a layers test.
-#   2. In 'generate_configs', to specify how to change a default config to
-#      specify a non-default test. In this case, the overriding Config will
-#      exclusively specify the shape of the test if its shape is not None, and
-#      the overriding Config will extend/update the kwargs of the default
-#      Config.
-Config = collections.namedtuple('Config', ['kwargs', 'shapes'])
-# Use old default API for compatibility with Python 3.6.
-Config.__new__.__defaults__ = (dict(), None)
+UNARY_SIGNATURE_SHAPES = [[RANK_5_SHAPE]]
+BINARY_SIGNATURE_SHAPES = [[RANK_5_SHAPE] * 2]
+TERNARY_SIGNATURE_SHAPES = [[RANK_5_SHAPE] * 3]
 
+CONV_1D_SIGNATURE_SHAPES = [[[2, 8, 3]]]
+CONV_2D_SIGNATURE_SHAPES = [[[2, 8, 8, 3]]]
+CONV_3D_SIGNATURE_SHAPES = [[[2, 8, 8, 8, 3]]]
 
-def generate_configs(default_config: Config,
-                     override_configs: Dict[str, Config]) -> Dict[str, Config]:
-  """Generates a dict of 'Config's based off changes to a default Config."""
-  configs = {'default': default_config}
-  for exported_name, config in override_configs.items():
-    shapes = default_config.shapes if config.shapes is None else config.shapes
+RNN_SIGNATURE_SHAPES = [[RANK_3_SHAPE]]
+RNN_KWARGS_TO_VALUES = dict(units=[4],
+                            return_sequences=[False, True],
+                            stateful=[False, True])
 
-    # Deep copy to avoid inplace mutation of the default.
-    kwargs = copy.deepcopy(default_config.kwargs)
-    kwargs.update(config.kwargs)  # Adds new and overwrites old kwargs.
+POOLING_KWARGS_TO_VALUES = dict(strides=[None, 2],
+                                padding=["valid", "same"],
+                                data_format=[None, "channels_first"])
+CONV_KWARGS_TO_VALUES = dict(filters=[CONV_FILTERS],
+                             kernel_size=[CONV_KERNEL_SIZE],
+                             strides=[1, 2],
+                             padding=["valid", "same"],
+                             data_format=[None, "channels_first"],
+                             dilation_rate=[1, 2])
+# Address pooling and conv layers having different default values for
+# 'data_format' for 1D layers.
+POOLING_1D_KWARGS_TO_VALUES = copy.deepcopy(POOLING_KWARGS_TO_VALUES)
+POOLING_1D_KWARGS_TO_VALUES.update(
+    {"data_format": ["channels_last", "channels_first"]})
+CONV_1D_KWARGS_TO_VALUES = copy.deepcopy(CONV_KWARGS_TO_VALUES)
+CONV_1D_KWARGS_TO_VALUES.update(
+    {"data_format": ["channels_last", "channels_first"]})
 
-    configs[exported_name] = Config(kwargs, shapes)
-  return configs
-
-
-# A dict mapping tf.keras.layers names to either a single Config (representing
-# the kwargs and shapes to use to test a Layer) or a dict mapping exported_names
-# to Configs. The latter case is usually automatically generated via
-# 'generate_configs', with the 'Config's in 'override_configs' specifying how
-# to modify the 'default_config's kwargs and shapes.
-#
-# Each entry will be normalized to be a dict mapping exported_names to Configs,
-# with a default exported_name of 'default'.
-LAYER_TO_UNITTEST_CONFIGURATIONS = {
-    'Activation':
-        Config(dict(activation='relu'), [RANK_2_INPUT]),
-    'ActivityRegularization':
-        Config(dict(l1=0.1, l2=0.1), shapes=[RANK_2_INPUT]),
-    'Add':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'AdditiveAttention':
-        generate_configs(
-            default_config=Config(
-                shapes=[RANK_3_INPUT, RANK_3_INPUT, RANK_3_INPUT],),
-            override_configs={
-                'causal': Config(dict(causal=True)),
-            },
-        ),
-    'AlphaDropout':
-        Config(dict(rate=DROPOUT), [RANK_2_INPUT]),
-    'Attention':
-        generate_configs(
-            default_config=Config(
-                shapes=[RANK_3_INPUT, RANK_3_INPUT, RANK_3_INPUT],),
-            override_configs={
-                'causal': Config(dict(causal=True)),
-            },
-        ),
-    'Average':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'AveragePooling1D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_1D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'AveragePooling2D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_2D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Default AvgPoolingOp only supports NHWC on device type CPU
-                # 'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'AveragePooling3D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_3D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'BatchNormalization':
-        generate_configs(
-            default_config=Config(shapes=[RANK_2_INPUT]),
-            override_configs={'renorm': Config(dict(renorm=True))},
-        ),
-    'Concatenate':
-        Config(shapes=[RANK_4_INPUT, RANK_4_INPUT]),
-    'Conv1D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_1D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: The Conv2D op currently only supports the NHWC tensor
-                #     format on the CPU.
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'Conv1DTranspose':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_1D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Conv2DCustomBackpropInputOp only supports NHWC
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                # TF: Current libxsmm and customized CPU implementations do not
-                # yet support dilation rates larger than 1.
-                # 'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'Conv2D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_2D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: The Conv2D op currently only supports the NHWC tensor
-                #     format on the CPU.
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'Conv2DTranspose':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_2D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'Conv3D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_3D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: The Conv3D op currently only supports the NHWC tensor
-                #     format on the CPU.
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'Conv3DTranspose':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_3D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Conv3DBackpropInputOpV2 only supports NDHWC on the CPU.
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-            },
-        ),
-    'ConvLSTM2D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3, return_state=True),
-                shapes=[CONV_3D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-                'dilation_rate': Config(dict(dilation_rate=3)),
-                'go_backwards': Config(dict(go_backwards=True)),
-                'stateful': Config(dict(stateful=True)),
-            },
-        ),
-    'Cropping1D':
-        Config(dict(cropping=2), [CONV_1D_INPUT]),
-    'Cropping2D':
-        Config(dict(cropping=2), [CONV_2D_INPUT]),
-    'Cropping3D':
-        Config(dict(cropping=2), [CONV_3D_INPUT]),
-    'Dense':
-        Config(dict(units=4), [RANK_2_INPUT]),
-    'DepthwiseConv2D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(kernel_size=3),
-                shapes=[CONV_2D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-                'depth_multiplier': Config(dict(depth_multiplier=2)),
-                'dilation_rate': Config(dict(dilation_rate=2)),
-            },
-        ),
-    'Dot':
-        Config(dict(axes=(1, 2)), [RANK_3_INPUT, RANK_3_INPUT]),
-    'Dropout':
-        Config(dict(rate=DROPOUT), [RANK_3_INPUT]),
-    'ELU':
-        Config(shapes=[RANK_2_INPUT]),
-    'Embedding':
-        Config(dict(input_dim=4, output_dim=2), [RANK_2_INPUT]),
-    'Flatten':
-        Config(shapes=[RANK_2_INPUT]),
-    'GRU':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(units=4, return_sequences=True),
-                shapes=[RANK_3_INPUT],
-            ),
-            override_configs={
-                'implementation_1': Config(dict(implementation=1)),
-                'go_backwards': Config(dict(go_backwards=True)),
-                'time_major': Config(dict(time_major=True)),
-                'stateful': Config(dict(stateful=True)),
-            },
-        ),
-    'GRUCell':
-        Config(dict(units=4), [RANK_2_INPUT, RANK_2_INPUT]),
-    'GaussianDropout':
-        Config(dict(rate=DROPOUT), [RANK_2_INPUT]),
-    'GaussianNoise':
-        Config(dict(stddev=1.0), [RANK_2_INPUT]),
-    'GlobalAveragePooling1D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_1D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'GlobalAveragePooling2D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_2D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'GlobalAveragePooling3D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_3D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'GlobalMaxPool1D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_1D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'GlobalMaxPool2D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_2D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'GlobalMaxPool3D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_3D_INPUT]),
-            override_configs={
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'InputLayer':
-        Config(shapes=[RANK_2_INPUT]),
-    'LSTM':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(units=4, return_sequences=True),
-                shapes=[RANK_3_INPUT],
-            ),
-            override_configs={
-                'implementation_1': Config(dict(implementation=1)),
-                'go_backwards': Config(dict(go_backwards=True)),
-                'time_major': Config(dict(time_major=True)),
-                'stateful': Config(dict(stateful=True)),
-            },
-        ),
-    'LSTMCell':
-        Config(dict(units=4), [RANK_2_INPUT, RANK_2_INPUT]),
-    'Lambda':
-        Config(dict(function=lambda x: x**2), [RANK_2_INPUT]),
-    'LayerNormalization':
-        Config(shapes=[RANK_2_INPUT]),
-    'LeakyReLU':
-        Config(shapes=[RANK_2_INPUT]),
-    'LocallyConnected1D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_1D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same', implementation=2)),
-                'channels_first': Config(dict(data_format='channels_first')),
-                'sparse_implementation': Config(dict(implementation=3)),
-            },
-        ),
-    'LocallyConnected2D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_2D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same', implementation=2)),
-                'channels_first': Config(dict(data_format='channels_first')),
-                'sparse_implementation': Config(dict(implementation=3)),
-            },
-        ),
-    'Masking':
-        Config(shapes=[RANK_2_INPUT]),
-    'MaxPool1D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_1D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'MaxPool2D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_2D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Default MaxPoolingOp only supports NHWC on device type CPU
-                # 'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'MaxPool3D':
-        generate_configs(
-            default_config=Config(shapes=[CONV_3D_INPUT]),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                'channels_first': Config(dict(data_format='channels_first')),
-            },
-        ),
-    'Maximum':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'Minimum':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'MultiHeadAttention':
-        Config(dict(num_heads=2, key_dim=3), [RANK_3_INPUT, RANK_3_INPUT]),
-    'Multiply':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'PReLU':
-        Config(shapes=[RANK_2_INPUT]),
-    'Permute':
-        Config(dict(dims=(3, 1, 2)), [RANK_4_INPUT]),
-    'ReLU':
-        Config(shapes=[RANK_2_INPUT]),
-    'RepeatVector':
-        Config(dict(n=3), [RANK_2_INPUT]),
-    'Reshape':
-        Config(dict(target_shape=[1, 1, 1] + RANK_3_INPUT[1:]), [RANK_3_INPUT]),
-    'SeparableConv1D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_1D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Depthwise convolution on CPU is only supported for NHWC
-                #     format
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'depth_multiplier': Config(dict(depth_multiplier=2)),
-                'dilation_rate': Config(dict(dilation_rate=2)),
-            },
-        ),
-    'SeparableConv2D':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(filters=4, kernel_size=3),
-                shapes=[CONV_2D_INPUT],
-            ),
-            override_configs={
-                'strides': Config(dict(strides=3)),
-                'padding_same': Config(dict(padding='same')),
-                # TF: Depthwise convolution on CPU is only supported for NHWC
-                #     format
-                # 'channels_first': Config(dict(data_format='channels_first')),
-                'depth_multiplier': Config(dict(depth_multiplier=2)),
-                'dilation_rate': Config(dict(dilation_rate=2)),
-            },
-        ),
-    'SimpleRNN':
-        generate_configs(
-            default_config=Config(
-                kwargs=dict(units=4, return_sequences=True),
-                shapes=[RANK_3_INPUT],
-            ),
-            override_configs={
-                'go_backwards': Config(dict(go_backwards=True)),
-                'stateful': Config(dict(stateful=True)),
-            },
-        ),
-    'SimpleRNNCell':
-        Config(dict(units=4), [RANK_2_INPUT, RANK_2_INPUT]),
-    'Softmax':
-        Config(shapes=[RANK_2_INPUT]),
-    'SpatialDropout1D':
-        Config(dict(rate=DROPOUT), [CONV_1D_INPUT]),
-    'SpatialDropout2D':
-        Config(dict(rate=DROPOUT), [CONV_2D_INPUT]),
-    'SpatialDropout3D':
-        Config(dict(rate=DROPOUT), [CONV_3D_INPUT]),
-    'Subtract':
-        Config(shapes=[RANK_2_INPUT, RANK_2_INPUT]),
-    'ThresholdedReLU':
-        Config(shapes=[RANK_2_INPUT]),
-    'UpSampling1D':
-        Config(shapes=[CONV_1D_INPUT]),
-    'UpSampling2D':
-        Config(shapes=[CONV_2D_INPUT]),
-    'UpSampling3D':
-        Config(shapes=[CONV_3D_INPUT]),
-    'ZeroPadding1D':
-        Config(shapes=[CONV_1D_INPUT]),
-    'ZeroPadding2D':
-        Config(shapes=[CONV_2D_INPUT]),
-    'ZeroPadding3D':
-        Config(shapes=[CONV_3D_INPUT]),
+# Unsupported by TensorFlow (at least on CPU).
+LAYERS_TO_TF_UNSUPPORTED_NON_DEFAULT_KWARGS = {
+    "AveragePooling2D": ["data_format"],
+    "Conv1D": ["data_format"],
+    "Conv1DTranspose": ["data_format", "dilation_rate"],
+    "Conv2D": ["data_format"],
+    "Conv3D": ["data_format"],
+    "Conv3DTranspose": ["data_format"],
+    "LocallyConnected1D": ["padding"],
+    "LocallyConnected2D": ["padding"],
+    "MaxPool2D": ["data_format"],
 }
 
-# Normalize LAYER_TO_UNITTEST_CONFIGURATIONS
-for key, value in LAYER_TO_UNITTEST_CONFIGURATIONS.items():
-  if isinstance(value, Config):
-    LAYER_TO_UNITTEST_CONFIGURATIONS[key] = {'default': value}
+# Some layers have kwargs which cannot both have non-default values.
+LAYERS_TO_MUTUALLY_EXCLUSIVE_KWARGS = {
+    "Conv1D": ["strides", "dilation_rate"],
+    "Conv2D": ["strides", "dilation_rate"],
+    "Conv2DTranspose": ["strides", "dilation_rate"],
+    "Conv3D": ["strides", "dilation_rate"],
+    "ConvLSTM2D": ["strides", "dilation_rate"],
+}
+
+
+def get_default_kwargs_values(layer: str) -> Dict[str, Any]:
+  """Gets the default kwargs for a tf.keras.layers layer."""
+  layer_class = getattr(tf.keras.layers, layer)
+  layer_parameters = inspect.signature(layer_class.__init__).parameters
+  kwargs_to_default_values = {
+      kwarg: value.default
+      for kwarg, value in layer_parameters.items()
+      if value.default is not inspect.Parameter.empty
+  }
+  return kwargs_to_default_values
+
+
+def _equal_or_splat_equal(value: Any, sequence: Any) -> bool:
+  """Returns True if value==sequence or value==(every element in sequence)."""
+  if value == sequence:
+    return True
+  elif isinstance(sequence, (list, tuple)):
+    for element in sequence:
+      if not _equal_or_splat_equal(value, element):
+        return False
+    return True
+  return False
+
+
+def get_non_default_kwargs(
+    layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> List[str]:
+  """Returns all non-default optional kwargs in unit_test_spec."""
+  kwargs_to_defaults = get_default_kwargs_values(layer)
+  non_default_kwargs = []
+  for kwarg, value in unit_test_spec.kwargs.items():
+    if (kwarg in kwargs_to_defaults and
+        not _equal_or_splat_equal(value, kwargs_to_defaults[kwarg])):
+      non_default_kwargs.append(kwarg)
+  return non_default_kwargs
+
+
+def unsupported_by_tf(layer: str,
+                      unit_test_spec: tf_test_utils.UnitTestSpec) -> bool:
+  """True if unit_test_spec specifies tf-unsupported non-default kwargs."""
+  if layer in LAYERS_TO_TF_UNSUPPORTED_NON_DEFAULT_KWARGS:
+    unsupported_kwargs = LAYERS_TO_TF_UNSUPPORTED_NON_DEFAULT_KWARGS[layer]
+    non_default_kwargs = get_non_default_kwargs(layer, unit_test_spec)
+    return any(kwarg in unsupported_kwargs for kwarg in non_default_kwargs)
+  return False
+
+
+def has_mutually_exclusive_kwargs(
+    layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> bool:
+  """True if unit_test_spec specifies mutually exclusive non-default kwargs."""
+  if layer in LAYERS_TO_MUTUALLY_EXCLUSIVE_KWARGS:
+    mutually_exclusive_kwargs = LAYERS_TO_MUTUALLY_EXCLUSIVE_KWARGS[layer]
+    non_default_kwargs = get_non_default_kwargs(layer, unit_test_spec)
+    return set(mutually_exclusive_kwargs).issubset(set(non_default_kwargs))
+  return False
+
+
+# A dictionary mapping tf.keras.layers names to lists of UnitTestSpecs.
+# Each unit_test_name will have the tf.keras.layer name prepended to it.
+#
+# Each layer is required to have a UnitTestSpec with all-default values for
+# unrequired kwargs. This allows us to seperately test the basic api and the
+# full api.
+LAYERS_TO_UNIT_TEST_SPECS = {
+    "Activation":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(activation=["relu"])),
+    "ActivityRegularization":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(l1=[0.0, 0.1], l2=[0.0, 0.1])),
+    "Add":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "AdditiveAttention":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[(RANK_3_SHAPE, RANK_3_SHAPE, RANK_3_SHAPE)],
+            kwargs_to_values=dict(causal=[False, True])),
+    "AlphaDropout":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "Attention":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[(RANK_3_SHAPE, RANK_3_SHAPE, RANK_3_SHAPE)],
+            kwargs_to_values=dict(causal=[False, True])),
+    "Average":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "AveragePooling1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_1D_KWARGS_TO_VALUES),
+    "AveragePooling2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+    "AveragePooling3D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+    "BatchNormalization":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(renorm=[False, True])),
+    "Concatenate":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(axis=[-1, 0])),
+    "Conv1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_1D_KWARGS_TO_VALUES),
+    "Conv1DTranspose":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+    "Conv2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+    "Conv2DTranspose":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+    "Conv3D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+    "Conv3DTranspose":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=CONV_KWARGS_TO_VALUES),
+    "ConvLSTM2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(filters=[CONV_FILTERS],
+                                  kernel_size=[CONV_KERNEL_SIZE],
+                                  return_state=[False, True],
+                                  strides=[1, 2],
+                                  dilation_rate=[1, 2],
+                                  stateful=[False, True])),
+    "Cropping1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(cropping=[1, (1, 2)])),
+    "Cropping2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(cropping=[0, ((1, 2), (2, 1))])),
+    "Cropping3D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(cropping=[1, ((1, 2), (2, 1), (1, 0))])),
+    "Dense":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(units=[8])),
+    "DepthwiseConv2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(kernel_size=[CONV_KERNEL_SIZE],
+                                  strides=[1, 2],
+                                  padding=["valid", "same"],
+                                  dilation_rate=[1, 2],
+                                  depth_multiplier=[1, 2])),
+    "Dot":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(axes=[(1, 2)])),
+    "Dropout":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "ELU":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "Embedding":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(input_dim=[4], output_dim=[2])),
+    "Flatten":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "GRU":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=RNN_SIGNATURE_SHAPES,
+            kwargs_to_values=RNN_KWARGS_TO_VALUES),
+    "GaussianDropout":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=RNN_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "GaussianNoise":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=RNN_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(stddev=[1.0])),
+    "GlobalAveragePooling1D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_1D_SIGNATURE_SHAPES),
+    "GlobalAveragePooling2D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_2D_SIGNATURE_SHAPES),
+    "GlobalAveragePooling3D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_3D_SIGNATURE_SHAPES),
+    "GlobalMaxPool1D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_1D_SIGNATURE_SHAPES),
+    "GlobalMaxPool2D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_2D_SIGNATURE_SHAPES),
+    "GlobalMaxPool3D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_3D_SIGNATURE_SHAPES),
+    "InputLayer":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "LSTM":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=RNN_SIGNATURE_SHAPES,
+            kwargs_to_values=RNN_KWARGS_TO_VALUES),
+    "Lambda":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(function=[lambda x: x**2])),
+    "LayerNormalization":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "LeakyReLU":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "LocallyConnected1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(filters=[CONV_FILTERS],
+                                  kernel_size=[CONV_KERNEL_SIZE],
+                                  strides=[1, 3],
+                                  padding=["valid", "same"],
+                                  implementation=[1, 3])),
+    "LocallyConnected2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(filters=[CONV_FILTERS],
+                                  kernel_size=[CONV_KERNEL_SIZE],
+                                  strides=[1, 3],
+                                  padding=["valid", "same"],
+                                  implementation=[1, 3])),
+    "Masking":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "MaxPool1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_1D_KWARGS_TO_VALUES),
+    "MaxPool2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+    "MaxPool3D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=POOLING_KWARGS_TO_VALUES),
+    "Maximum":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "Minimum":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "MultiHeadAttention":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[(RANK_3_SHAPE, RANK_3_SHAPE)],
+            kwargs_to_values=dict(num_heads=[2], key_dim=[3])),
+    "Multiply":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "PReLU":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "Permute":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=UNARY_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(dims=[(3, 1, 4, 2)])),
+    "ReLU":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "RepeatVector":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[((2, 2),)], kwargs_to_values=dict(n=[3])),
+    "Reshape":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=[((3, 2, 2, 2),)],
+            kwargs_to_values=dict(target_shape=[(2, 1, 4, 1)])),
+    "SeparableConv1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(filters=[CONV_FILTERS],
+                                  kernel_size=[CONV_KERNEL_SIZE],
+                                  strides=[1, 2],
+                                  padding=["valid", "same"],
+                                  dilation_rate=[1, 2],
+                                  depth_multiplier=[1, 2])),
+    "SeparableConv2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(filters=[CONV_FILTERS],
+                                  kernel_size=[CONV_KERNEL_SIZE],
+                                  strides=[1, 2],
+                                  padding=["valid", "same"],
+                                  dilation_rate=[1, 2],
+                                  depth_multiplier=[1, 2])),
+    "SimpleRNN":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=RNN_SIGNATURE_SHAPES,
+            kwargs_to_values=RNN_KWARGS_TO_VALUES),
+    "Softmax":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "SpatialDropout1D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_1D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "SpatialDropout2D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_2D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "SpatialDropout3D":
+        tf_test_utils.unit_test_specs_from_signatures(
+            signature_shapes=CONV_3D_SIGNATURE_SHAPES,
+            kwargs_to_values=dict(rate=[DROPOUT])),
+    "Subtract":
+        tf_test_utils.unit_test_specs_from_signatures(BINARY_SIGNATURE_SHAPES),
+    "ThresholdedReLU":
+        tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
+    "UpSampling1D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_1D_SIGNATURE_SHAPES),
+    "UpSampling2D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_2D_SIGNATURE_SHAPES),
+    "UpSampling3D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_3D_SIGNATURE_SHAPES),
+    "ZeroPadding1D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_1D_SIGNATURE_SHAPES),
+    "ZeroPadding2D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_2D_SIGNATURE_SHAPES),
+    "ZeroPadding3D":
+        tf_test_utils.unit_test_specs_from_signatures(CONV_3D_SIGNATURE_SHAPES),
+}
+
+for layer, specs in LAYERS_TO_UNIT_TEST_SPECS.items():
+  # Update using 'with_name' to avoid updating shared UnitTestSpecs.
+  specs = [spec.with_name(f"{layer}__{spec.unit_test_name}") for spec in specs]
+  LAYERS_TO_UNIT_TEST_SPECS[layer] = specs
+
+  # Validate that there are not multiple UnitTestSpecs with the same name.
+  seen_unit_test_names = set()
+  for spec in specs:
+    if spec.unit_test_name in seen_unit_test_names:
+      raise ValueError(
+          f"Found multiple UnitTestSpecs with the name '{spec.unit_test_name}'")
+    seen_unit_test_names.add(spec.unit_test_name)
+
+  # Validate that there is one spec that has default values for all unrequired
+  # kwargs.
+  has_default_unrequired_kwargs = False
+  for spec in specs:
+    if not get_non_default_kwargs(layer, spec):
+      has_default_unrequired_kwargs = True
+
+  if not has_default_unrequired_kwargs:
+    raise ValueError(
+        f"The configuration for '{layer}' did not have a UnitTestSpec with all "
+        "default kwargs.")
 
 # Layers that allow specifying the 'dropout' kwarg.
 DROPOUT_LAYERS = [
-    'AdditiveAttention', 'Attention', 'ConvLSTM2D', 'GRU', 'GRUCell', 'LSTM',
-    'LSTMCell', 'MultiHeadAttention', 'SimpleRNN', 'SimpleRNNCell'
+    "AdditiveAttention", "Attention", "ConvLSTM2D", "GRU", "LSTM",
+    "MultiHeadAttention", "SimpleRNN"
 ]
 
-flags.DEFINE_string('layer', 'Dense',
-                    f'One of {list(LAYER_TO_UNITTEST_CONFIGURATIONS.keys())}.')
+flags.DEFINE_string("layer", None,
+                    f"One of {list(LAYERS_TO_UNIT_TEST_SPECS.keys())}.")
 flags.DEFINE_bool(
-    'dynamic_batch', False,
-    'Whether or not to compile the layer with a dynamic batch size.')
-flags.DEFINE_bool('training', False,
-                  'Whether or not to compile the layer in training mode.')
+    "dynamic_dims", False,
+    "Whether or not to compile the layer with a dynamic dimension sizes.")
+flags.DEFINE_bool("training", False,
+                  "Whether or not to compile the layer in training mode.")
 flags.DEFINE_bool(
-    'test_full_api', False,
-    'Whether or not to test multiple layer configurations using non-required '
-    'kwargs.')
+    "test_default_kwargs_only", True,
+    "Whether or not to test multiple layer configurations using non-required "
+    "kwargs.")
 flags.DEFINE_bool(
-    'list_layers_with_full_api_tests', False,
-    'Whether or not to print out all layers with non-default configurations '
-    '(and skip running the tests).')
-
-
-def get_configs() -> Dict[str, Config]:
-  """Gets the configs that we want to test for FLAGS.layer."""
-  configs = LAYER_TO_UNITTEST_CONFIGURATIONS[FLAGS.layer]
-  if not FLAGS.test_full_api:
-    return {'default': configs['default']}
-  return configs  # pytype: disable=bad-return-type
+    "list_layers_with_full_api_tests", False,
+    "Whether or not to print out all layers with non-default configurations "
+    "(and skip running the tests).")
 
 
 def get_input(shape: Sequence[int]) -> tf.keras.layers.Input:
-  """Gets the input shape(s) that we want to test."""
-  batch_size = None if FLAGS.dynamic_batch else shape[0]
+  """Converts a shape into a tf.keras.Input."""
+  # Most keras layers are only compatible with dynamic batch sizes.
+  batch_size = None if FLAGS.dynamic_dims else shape[0]
   return tf.keras.layers.Input(batch_size=batch_size, shape=shape[1:])
 
 
@@ -551,56 +485,76 @@ def keras_arg_wrapper(*args):
   return list(args) if isinstance(args, tuple) else args
 
 
-def create_wrapped_keras_layer(config: Config) -> tf.keras.Model:
+def create_wrapped_keras_layer(
+    layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.keras.Model:
   """Wraps a keras layer in a model for compilation."""
-  layer_class = getattr(tf.keras.layers, FLAGS.layer)
+  layer_class = getattr(tf.keras.layers, layer)
 
-  if FLAGS.training and FLAGS.layer in DROPOUT_LAYERS:
-    config.kwargs['dropout'] = DROPOUT
+  kwargs = copy.deepcopy(unit_test_spec.kwargs)
+  if FLAGS.training and layer in DROPOUT_LAYERS:
+    kwargs["dropout"] = DROPOUT
 
-  inputs = keras_input_normalizer([get_input(shape) for shape in config.shapes])
-  if FLAGS.layer == 'MultiHeadAttention':
+  if "dtype" not in unit_test_spec.kwargs:
+    kwargs["dtype"] = unit_test_spec.input_signature[0].dtype
+
+  inputs = keras_input_normalizer(
+      [get_input(spec.shape) for spec in unit_test_spec.input_signature])
+  if layer == "MultiHeadAttention":
     # TODO(meadowlark): Remove specialization if API changes.
-    outputs = layer_class(**config.kwargs)(*inputs)
+    outputs = layer_class(**kwargs)(*inputs)
   else:
-    outputs = layer_class(**config.kwargs)(inputs)
+    outputs = layer_class(**kwargs)(inputs)
   return tf.keras.Model(inputs, outputs)
 
 
-def create_tf_function_unit_test(config: Config, exported_name: str,
-                                 model: tf.keras.Model) -> tf.function:
+def create_layer_unit_test(
+    model: tf.keras.Model,
+    unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.function:
   """Wrap the model's __call__ function in a tf.function for testing."""
-  input_shapes = config.shapes
-  if FLAGS.dynamic_batch:
-    input_shapes = [[None] + shape[1:] for shape in input_shapes]
+  static_signature = unit_test_spec.input_signature
 
-  input_signature = [tf.TensorSpec(shape) for shape in input_shapes]
-  if len(input_signature) > 1:
-    input_signature = [input_signature]
+  dynamic_signature = static_signature
+  if FLAGS.dynamic_dims:
+    dynamic_signature = tf_utils.apply_function(dynamic_signature,
+                                                tf_utils.make_dims_dynamic)
+
+  if len(static_signature) > 1:
+    static_signature = [static_signature]
+    dynamic_signature = [dynamic_signature]
 
   call = lambda *args: model(keras_arg_wrapper(*args), training=FLAGS.training)
-  return tf_test_utils.tf_function_unit_test(input_signature=input_signature,
-                                             name=exported_name)(call)
+  return tf_test_utils.tf_function_unit_test(
+      input_signature=dynamic_signature,
+      static_signature=static_signature,
+      input_generator=unit_test_spec.input_generator,
+      input_args=unit_test_spec.input_args,
+      name=unit_test_spec.unit_test_name)(call)
 
 
 class KerasLayersModule(tf_test_utils.TestModule):
 
-  @classmethod
-  def configure_class(cls):
-    """Configure each tf_function_unit_test and define it on the cls."""
-    for i, (exported_name, config) in enumerate(get_configs().items()):
-      model = create_wrapped_keras_layer(config)
-      setattr(cls, exported_name,
-              create_tf_function_unit_test(config, exported_name, model))
-
   def __init__(self):
     super().__init__()
     self.models = []
-    for i, (exported_name, config) in enumerate(get_configs().items()):
-      model = create_wrapped_keras_layer(config)
+    for unit_test_spec in LAYERS_TO_UNIT_TEST_SPECS[FLAGS.layer]:
+      if (FLAGS.test_default_kwargs_only and
+          get_non_default_kwargs(FLAGS.layer, unit_test_spec)):
+        # Skip all UnitTestSpecs with non-default unrequired kwargs.
+        continue
+
+      if (unsupported_by_tf(FLAGS.layer, unit_test_spec) or
+          has_mutually_exclusive_kwargs(FLAGS.layer, unit_test_spec)):
+        # Filter out UnitTestSpecs with kwargs that TensorFlow can't run on
+        # CPU or that are mutually exclusive. This allows us to take a product
+        # like that in CONV_KWARGS_TO_VALUE and filter out the configurations
+        # lacking support for particular layers.
+        continue
+
+      model = create_wrapped_keras_layer(FLAGS.layer, unit_test_spec)
+      # IREE requires that the models are stored on the module instance.
       self.models.append(model)
-      setattr(self, exported_name,
-              create_tf_function_unit_test(config, exported_name, model))
+      layer_unit_test = create_layer_unit_test(model, unit_test_spec)
+      setattr(self, unit_test_spec.unit_test_name, layer_unit_test)
 
 
 class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
@@ -614,33 +568,36 @@ class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
 
 def main(argv):
   del argv  # Unused.
-  if hasattr(tf, 'enable_v2_behavior'):
+  if hasattr(tf, "enable_v2_behavior"):
     tf.enable_v2_behavior()
 
-  if FLAGS.layer not in LAYER_TO_UNITTEST_CONFIGURATIONS:
-    raise ValueError(f"Unrecognized layer: '{FLAGS.layer}'.")
-
   if FLAGS.list_layers_with_full_api_tests:
-    for layer, configs in sorted(LAYER_TO_UNITTEST_CONFIGURATIONS.items()):
-      if len(configs) > 1:
+    for layer, unit_test_specs in sorted(LAYERS_TO_UNIT_TEST_SPECS.items()):
+      if len(unit_test_specs) > 1:
         print(f'    "{layer}",')
     return
 
-  # Set up name for saving artifacts.
-  dynamic_batch_str = 'dynamic_batch' if FLAGS.dynamic_batch else 'static_batch'
-  training_str = 'training' if FLAGS.training else 'non_training'
-  full_api_str = 'full_api' if FLAGS.test_full_api else 'default_api'
-  settings_str = f'{full_api_str}_{dynamic_batch_str}_{training_str}'
-  KerasLayersModule.__name__ = os.path.join('keras_layers', FLAGS.layer,
-                                            settings_str)
+  if FLAGS.layer not in LAYERS_TO_UNIT_TEST_SPECS:
+    raise ValueError(f"Unrecognized layer: '{FLAGS.layer}'")
 
-  # Use the configurations for FLAGS.layer to add the tf.functions we wish
-  # to test to the KerasLayersModule, and then generate unittests for each of
-  # them.
-  KerasLayersModule.configure_class()
+  # Set up name for saving artifacts.
+  dynamic_str = "dynamic" if FLAGS.dynamic_dims else "static"
+  training_str = "training" if FLAGS.training else "non_training"
+  full_api_str = "default_api" if FLAGS.test_default_kwargs_only else "full_api"
+  settings_str = f"{full_api_str}_{dynamic_str}_{training_str}"
+  relative_artifacts_dir = os.path.join("tf", "keras", "layers", FLAGS.layer,
+                                        settings_str)
+  # The relative artifacts directory path is calculated from the module name
+  # TODO(meadowlark): provide a better way of overridding this default.
+  KerasLayersModule.__name__ = relative_artifacts_dir
+
+  unit_tests = KerasLayersModule.get_tf_function_unit_tests()
+  logging.info("Testing the following %s functions: %s", len(unit_tests),
+               unit_tests)
+
   KerasLayersTest.generate_unit_tests(KerasLayersModule)
   tf.test.main()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   app.run(main)

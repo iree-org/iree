@@ -35,12 +35,12 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRTranslation
-    flatbuffers
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::VM::Analysis
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
-    iree::schemas::bytecode_module_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::bytecode_module_def_c_fbs
   PUBLIC
 )

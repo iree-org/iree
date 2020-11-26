@@ -21,7 +21,7 @@ iree_cc_library(
     "benchmark_main.cc"
   DEPS
     benchmark
-    iree::base::init
+    iree::base::flags
   TESTONLY
   PUBLIC
 )
@@ -51,7 +51,7 @@ iree_cc_library(
     ::gtest
     gmock
     gtest
-    iree::base::init
+    iree::base::flags
   TESTONLY
   PUBLIC
 )

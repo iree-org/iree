@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/atomics.h"
-#include "iree/base/synchronization.h"
-#include "iree/base/threading.h"
+// NOTE: must be first to ensure that we can define settings for all includes.
 #include "iree/base/threading_impl.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
     defined(IREE_PLATFORM_LINUX)
@@ -30,6 +27,11 @@
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "iree/base/atomics.h"
+#include "iree/base/synchronization.h"
+#include "iree/base/threading.h"
+#include "iree/base/tracing.h"
 
 // Older glibc doesn't have a gettid wrapper:
 // https://stackoverflow.com/a/63494768
