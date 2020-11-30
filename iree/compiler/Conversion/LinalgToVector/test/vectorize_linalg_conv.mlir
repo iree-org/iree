@@ -22,11 +22,12 @@ func @vectorize_conv(%filter: memref<1x1x4x4xf32>, %input: memref<1x1x7x4xf32>, 
 // CHECK: %[[INPUT:.+]] = subview %[[INPUT_ARG]]
 // CHECK: %[[OUTPUT:.+]] = subview %[[OUTPUT_ARG]]
 
-// Read in the filter
-// CHECK: %[[FILTER_0:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x4x4xf32>, vector<1x4xf32>
-// CHECK: %[[FILTER_1:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c1, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x4x4xf32>, vector<1x4xf32>
-// CHECK: %[[FILTER_2:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c2, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x4x4xf32>, vector<1x4xf32>
-// CHECK: %[[FILTER_3:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c3, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x4x4xf32>, vector<1x4xf32>
+// Read in the filter and get slices
+// CHECK: %[[FILTER_VECTOR:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c0, %c0], %cst {masked = [false, false]} : memref<1x1x4x4xf32>, vector<4x4xf32>
+// CHECK: %[[FILTER_0:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [0, 0], sizes = [1, 4], strides = [1, 1]} : vector<4x4xf32> to vector<1x4xf32>
+// CHECK: %[[FILTER_1:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [1, 0], sizes = [1, 4], strides = [1, 1]} : vector<4x4xf32> to vector<1x4xf32>
+// CHECK: %[[FILTER_2:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [2, 0], sizes = [1, 4], strides = [1, 1]} : vector<4x4xf32> to vector<1x4xf32>
+// CHECK: %[[FILTER_3:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [3, 0], sizes = [1, 4], strides = [1, 1]} : vector<4x4xf32> to vector<1x4xf32>
 
 // Handle batch #0
 // CHECK: %[[INPUT_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x7x4xf32>, vector<1x4xf32>
@@ -72,11 +73,11 @@ func @vectorize_conv(%filter: memref<1x1x4x4xf32>, %input: memref<1x1x7x4xf32>, 
 // CHECK: %[[OUTPUT_3:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c3, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x1x4x4xf32>, vector<1x4xf32>
 // CHECK: %[[INPUT_3_0:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
 // CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_0]], %[[FILTER_0]], %[[OUTPUT_3]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
-// CHECK: %[[INPUT_3_1:.+]] = vector.extract_strided_slice %37 {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
+// CHECK: %[[INPUT_3_1:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
 // CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
-// CHECK: %[[INPUT_3_2:.+]] = vector.extract_strided_slice %37 {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
+// CHECK: %[[INPUT_3_2:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
 // CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
-// CHECK: %[[INPUT_3_3:.+]] = vector.extract_strided_slice %37 {offsets = [0, 3], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
+// CHECK: %[[INPUT_3_3:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 3], sizes = [1, 1], strides = [1, 1]} : vector<1x4xf32> to vector<1x1xf32>
 // CHECK: %[[DOT_3:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_3]], %[[FILTER_3]], %[[DOT_2]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: vector.transfer_write %[[DOT_3]], %[[OUTPUT]][%c0, %c0, %c3, %c0] {masked = [false, false]} : vector<1x4xf32>, memref<1x1x4x4xf32>
 

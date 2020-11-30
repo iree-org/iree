@@ -116,22 +116,30 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
     MLIRContext *context = convOp.getContext();
     Location loc = convOp.getLoc();
 
-    auto vector1x4Type =
-        VectorType::get({1, 4}, filterViewOp.getType().getElementType());
+    Type elementType = filterViewOp.getType().getElementType();
+    auto filterVectorType =
+        VectorType::get({numInputChannels, numOutputChannels}, elementType);
+    auto vector1x4Type = VectorType::get({1, 4}, elementType);
     Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
 
-    // Load the entire filter subview. Both the height and width dimensions are
-    // 1; so we just need to loop over input and output channel dimensions.
+    // Load the entire filter subview.
+    SmallVector<Value, 4> filterIndices(4, zero);
+    Value wholeFilter = rewriter.create<vector::TransferReadOp>(
+        loc, filterVectorType, filterViewOp, filterIndices);
+
+    // Get filter slices so that later we can use them for dot product with the
+    // input. Both the height and width dimensions are 1; so we just need to
+    // loop over input and output channel dimensions.
     SmallVector<SmallVector<Value, 1>, 4> filterVectors(numInputChannels);
     for (int ic = 0; ic < numInputChannels; ++ic) {
       auto &thisInputChannel = filterVectors[ic];
       thisInputChannel.reserve(numOutputChannels / 4);
       for (int oc = 0; oc < numOutputChannels / 4; ++oc) {
-        SmallVector<Value, 4> filterIndices(4, zero);
-        filterIndices[2] = rewriter.create<ConstantIndexOp>(loc, ic);
-        filterIndices[3] = rewriter.create<ConstantIndexOp>(loc, oc * 4);
-        thisInputChannel.push_back(rewriter.create<vector::TransferReadOp>(
-            loc, vector1x4Type, filterViewOp, filterIndices));
+        Value slice = rewriter.create<vector::ExtractStridedSliceOp>(
+            loc, wholeFilter, /*offsets=*/ArrayRef<int64_t>({ic, oc * 4}),
+            /*sizes=*/ArrayRef<int64_t>({1, 4}),
+            /*strides=*/ArrayRef<int64_t>({1, 1}));
+        thisInputChannel.push_back(slice);
       }
     }
 
