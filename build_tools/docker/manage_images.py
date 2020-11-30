@@ -48,6 +48,7 @@ from typing import List, Sequence, Union
 
 IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
+DIGEST_REGEX = r'sha256:[a-zA-Z0-9]+'
 
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
@@ -199,7 +200,7 @@ def update_rbe_reference(digest: str, dry_run: bool = False):
   for line in fileinput.input(files=['WORKSPACE'], inplace=(not dry_run)):
     if line.strip().startswith('digest ='):
       digest_updates += 1
-      print(re.sub('sha256:[a-zA-Z0-9]+', digest, line), end='')
+      print(re.sub(DIGEST_REGEX, digest, line), end='')
     else:
       print(line, end='')
 
@@ -215,25 +216,22 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
   print(f'Updating references to {image_url}')
 
   grep_command = ['git', 'grep', '-l', f'{image_url}@sha256']
-  completed_process = run_command(grep_command,
-                                  check=False,
-                                  capture_output=True,
-                                  timeout=5)
+  try:
+    completed_process = run_command(grep_command,
+                                    capture_output=True,
+                                    timeout=5)
+  except subprocess.CalledProcessError as error:
+    if error.returncode == 1:
+      print(f'Found no references to {image_url}')
+      return
+    raise error
 
-  if completed_process.returncode == 0:
-    # Update references in all grepped files.
-    files = completed_process.stdout.split()
-    print(f'Updating references in {len(files)} files: {files}')
-    for line in fileinput.input(files=files, inplace=(not dry_run)):
-      print(re.sub(f'{image_url}@sha256:[a-zA-Z0-9]+', f'{image_url}@{digest}',
-                   line),
-            end='')
-  elif completed_process.returncode == 1:
-    print(f'Found no references to {image_url}')
-  else:
-    print(f'{" ".join(grep_command)} '
-          f'failed with exit code {completed_process.returncode}')
-    sys.exit(completed_process.returncode)
+  # Update references in all grepped files.
+  files = completed_process.stdout.split()
+  print(f'Updating references in {len(files)} files: {files}')
+  for line in fileinput.input(files=files, inplace=(not dry_run)):
+    print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}', line),
+          end='')
 
 
 if __name__ == '__main__':
