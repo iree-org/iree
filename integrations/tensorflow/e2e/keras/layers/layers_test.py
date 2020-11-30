@@ -517,8 +517,7 @@ def create_layer_unit_test(
     static_signature = [static_signature]
     dynamic_signature = [dynamic_signature]
 
-  call = lambda *args: model(tf_utils.keras_arg_wrapper(*args),
-                             training=FLAGS.training)
+  call = lambda *args: model(*args, training=FLAGS.training)
   return tf_test_utils.tf_function_unit_test(
       input_signature=dynamic_signature,
       static_signature=static_signature,
