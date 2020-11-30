@@ -89,12 +89,6 @@ def parse_arguments():
                       required=True,
                       action='append',
                       help=f'Name of the image to build: {IMAGES_HELP}.')
-  parser.add_argument(
-      '--tag',
-      type=str,
-      default='latest',
-      help='Tag for the images to build. Defaults to `latest` (which is good '
-      'for testing changes in a PR). The `prod` tag will not work with --push.')
   parser.add_argument('--pull',
                       action='store_true',
                       help='Pull the specified image before building.')
@@ -245,7 +239,7 @@ if __name__ == '__main__':
   for image in images_to_process:
     print(f'Processing image {image}')
     image_url = posixpath.join(IREE_GCR_URL, image)
-    tagged_image_url = f'{image_url}:{args.tag}'
+    tagged_image_url = f'{image_url}:latest'
     image_path = os.path.join(DOCKER_DIR, image)
 
     if args.pull:
@@ -257,9 +251,6 @@ if __name__ == '__main__':
           args.dry_run)
 
     if args.push:
-      if args.tag == 'prod':
-        raise ValueError('This script cannot be used to push to :prod. Use '
-                         'build_tools/docker/manage_prod.py instead.')
       utils.run_command(['docker', 'push', tagged_image_url], args.dry_run)
 
     if args.update_references:
