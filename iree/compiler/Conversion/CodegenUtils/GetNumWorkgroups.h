@@ -35,8 +35,8 @@ namespace iree_compiler {
 ///  [ceil(`parallelLoopRange`[2] / `tileSizes`[2]),
 ///   ceil(`parallelLoopRange`[1] / `tileSizes`[1]),
 ///   ceil(`parallelLoopRange`[0] / `tileSizes`[0])]
-/// where `parallelLoopRange` is the ranges of the parallel loops of `linalgOp`
-/// distributed across workgroups.
+/// distributed across workgroups.`loopIndices` is used for selecting the three
+/// dimensions for distribution; it must contain three indices.
 LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
     llvm::StringRef numWorkgroupsFnAttr, llvm::ArrayRef<int64_t> tileSizes,

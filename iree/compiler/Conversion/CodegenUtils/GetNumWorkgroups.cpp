@@ -106,6 +106,12 @@ LogicalResult createNumWorkgroupsFromResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
     llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> loopIndices) {
+  // `loopIndices` is used for selecting the three dimensions for distribution.
+  // We will always have three dimensions for distribution. The default is
+  // `{0, 1, 2}` if the launch configuration did not specify it explicitly. That
+  // means distributing along the leading outer parallel dimensions. If
+  // an op is not really distributed along all three dimensions then the
+  // trailing numbers will just be ignored.
   assert(loopIndices.size() == 3);
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
       linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
