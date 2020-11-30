@@ -99,7 +99,7 @@ function run_and_log {
       tag='c'
       ;;
     *)
-      echo "Not supported target"
+      echo "Unrecognized target '${target}'"
       exit 1
       ;;
   esac
