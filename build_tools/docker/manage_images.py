@@ -157,19 +157,18 @@ def run_command(command: Sequence[str],
                 **run_kwargs) -> subprocess.CompletedProcess:
   """Thin wrapper around subprocess.run"""
   print(f'Running: `{" ".join(command)}`')
-  if not dry_run:
-    if capture_output:
-      # Hardcode support for python <= 3.6.
-      run_kwargs['stdout'] = subprocess.PIPE
-      run_kwargs['stderr'] = subprocess.PIPE
+  if dry_run:
+    # Dummy CompletedProess with successful returncode.
+    return subprocess.CompletedProcess(command, returncode=0)
+  if capture_output:
+    # Hardcode support for python <= 3.6.
+    run_kwargs['stdout'] = subprocess.PIPE
+    run_kwargs['stderr'] = subprocess.PIPE
 
-    completed_process = subprocess.run(command,
-                                       universal_newlines=universal_newlines,
-                                       check=check,
-                                       **run_kwargs)
-    return completed_process
-  # Dummy CompletedProess with successful returncode.
-  return subprocess.CompletedProcess(command, returncode=0)
+  return subprocess.run(command,
+                        universal_newlines=universal_newlines,
+                        check=check,
+                        **run_kwargs)
 
 
 def get_repo_digest(tagged_image_url: str) -> str:
