@@ -27,10 +27,10 @@ def TensorList_Reserve : Op<TensorList_Dialect, "Reserve"> {
   }];
 
   let arguments = (ins
-    // TODO(silvasean): Do we need element_shape?
     HAL_BufferView:$element_shape,
     // TODO(silvasean): Convert to `I32:$count` instead.
-    HAL_BufferView:$count
+    HAL_BufferView:$count,
+    HAL_ElementTypeAttr:$element_type
   );
 
   let results = (outs
@@ -47,9 +47,7 @@ def TensorList_GetItem : Op<TensorList_Dialect, "GetItem"> {
   let arguments = (ins
     TensorList_TensorList:$list,
     // TODO(silvasean): Convert to `I32:$index` instead.
-    HAL_BufferView:$index,
-    // TODO(silvasean): Do we need element_shape?
-    HAL_BufferView:$element_shape
+    HAL_BufferView:$index
   );
 
   let results = (outs
@@ -83,9 +81,7 @@ def TensorList_FromTensor : Op<TensorList_Dialect, "FromTensor"> {
     a tensorlist `list` of length equal to `tensor`'s leading dimension.
   }];
   let arguments = (ins
-    HAL_BufferView:$tensor,
-    // TODO(silvasean): Do we need element_shape?
-    HAL_BufferView:$element_shape
+    HAL_BufferView:$tensor
   );
   let results = (outs
     TensorList_TensorList:$list
@@ -102,8 +98,8 @@ def TensorList_Stack : Op<TensorList_Dialect, "Stack"> {
     Requires all tensors contained in `list` to be the same shape.
   }];
   let arguments = (ins
+    HAL_Allocator:$allocator,
     TensorList_TensorList:$list,
-    HAL_BufferView:$element_shape,
     HAL_BufferView:$num_elements
   );
   let results = (outs
@@ -122,6 +118,7 @@ def TensorList_Concat : Op<TensorList_Dialect, "Concat"> {
     the non-leading axes.
   }];
   let arguments = (ins
+    HAL_Allocator:$allocator,
     TensorList_TensorList:$list
   );
   let results = (outs

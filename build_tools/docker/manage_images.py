@@ -44,9 +44,11 @@ import posixpath
 import re
 import subprocess
 import sys
+from typing import List, Sequence, Union
 
 IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
+DIGEST_REGEX = r'sha256:[a-zA-Z0-9]+'
 
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
@@ -130,107 +132,105 @@ def parse_arguments():
   return args
 
 
-def get_ordered_images_to_process(images):
-  unmarked_images = list(images)
-  # Python doesn't have a builtin OrderedSet
-  marked_images = set()
-  order = []
+def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
+  # Python doesn't have a builtin OrderedSet, so we mimic one to the extent
+  # that we need by using 'in' before adding any elements.
+  processing_order = []
 
-  def visit(image):
-    if image in marked_images:
-      return
-    for dependent_images in IMAGES_TO_DEPENDENT_IMAGES[image]:
-      visit(dependent_images)
-    marked_images.add(image)
-    order.append(image)
+  def add_dependent_images(image: str):
+    if image not in processing_order:
+      for dependent_image in IMAGES_TO_DEPENDENT_IMAGES[image]:
+        add_dependent_images(dependent_image)
+      processing_order.append(image)
 
-  while unmarked_images:
-    visit(unmarked_images.pop())
+  for image in images:
+    add_dependent_images(image)
 
-  order.reverse()
-  return order
+  processing_order.reverse()
+  return processing_order
 
 
-def stream_command(command, dry_run=False):
+def run_command(command: Sequence[str],
+                dry_run: bool = False,
+                check: bool = True,
+                capture_output: bool = False,
+                universal_newlines: bool = True,
+                **run_kwargs) -> subprocess.CompletedProcess:
+  """Thin wrapper around subprocess.run"""
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
-    return 0
-  process = subprocess.Popen(command,
-                             bufsize=1,
-                             stderr=subprocess.STDOUT,
-                             stdout=subprocess.PIPE,
-                             universal_newlines=True)
-  for line in process.stdout:
-    print(line, end='')
+    # Dummy CompletedProess with successful returncode.
+    return subprocess.CompletedProcess(command, returncode=0)
 
-  if process.poll() is None:
-    raise RuntimeError('Unexpected end of output while process is not finished')
-  return process.poll()
-
-
-def check_stream_command(command, dry_run=False):
-  exit_code = stream_command(command, dry_run=dry_run)
-  if exit_code != 0:
-    print(f'Command failed with exit code {exit_code}: `{" ".join(command)}`')
-    sys.exit(exit_code)
+  if capture_output:
+    # Hardcode support for python <= 3.6.
+    run_kwargs['stdout'] = subprocess.PIPE
+    run_kwargs['stderr'] = subprocess.PIPE
+  return subprocess.run(command,
+                        universal_newlines=universal_newlines,
+                        check=check,
+                        **run_kwargs)
 
 
-def get_repo_digest(image):
+def get_repo_digest(tagged_image_url: str) -> str:
   inspect_command = [
       'docker',
       'image',
       'inspect',
-      f'{image}',
+      tagged_image_url,
       '-f',
       '{{index .RepoDigests 0}}',
   ]
-  inspect_process = subprocess.run(inspect_command,
-                                   universal_newlines=True,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   timeout=10)
-  if inspect_process.returncode != 0:
-    print(f'Computing the repository digest for {image} failed.'
-          ' Has it been pushed to GCR?')
-    print(f'Output from `{" ".join(inspect_command)}`:')
-    print(inspect_process.stdout, end='')
-    print(inspect_process.stderr, end='')
-    sys.exit(inspect_process.returncode)
-  _, repo_digest = inspect_process.stdout.strip().split('@')
+  try:
+    completed_process = run_command(
+        inspect_command,
+        dry_run=False,  # Run even if --dry_run is True.
+        capture_output=True,
+        timeout=10)
+  except subprocess.CalledProcessError as error:
+    raise RuntimeError(f'Computing the repository digest for {tagged_image_url}'
+                       ' failed. Has it been pushed to GCR?') from error
+  _, repo_digest = completed_process.stdout.strip().split('@')
   return repo_digest
 
 
-def update_rbe_reference(digest, dry_run=False):
+def update_rbe_reference(digest: str, dry_run: bool = False):
   print('Updating WORKSPACE file for rbe-toolchain')
+  digest_updates = 0
   for line in fileinput.input(files=['WORKSPACE'], inplace=(not dry_run)):
     if line.strip().startswith('digest ='):
-      print(re.sub('sha256:[a-zA-Z0-9]+', digest, line), end='')
+      digest_updates += 1
+      print(re.sub(DIGEST_REGEX, digest, line), end='')
     else:
       print(line, end='')
 
+  if digest_updates > 1:
+    raise RuntimeError(
+        "There is more than one instance of 'digest =' in the WORKSPACE file. "
+        "This means that more than just the 'rbe_toolchain' digest was "
+        "overwritten, and the file should be restored.")
 
-def update_references(image_name, digest, dry_run=False):
-  print(f'Updating references to {image_name}')
 
-  grep_command = ['git', 'grep', '-l', f'{image_name}@sha256']
-  grep_process = subprocess.run(grep_command,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                timeout=5,
-                                universal_newlines=True)
-  if grep_process.returncode > 1:
-    print(f'{" ".join(grep_command)} '
-          f'failed with exit code {grep_process.returncode}')
-    sys.exit(grep_process.returncode)
-  if grep_process.returncode == 1:
-    print(f'Found no references to {image_name}')
-    return
+def update_references(image_url: str, digest: str, dry_run: bool = False):
+  """Updates all references to 'image_url' with a sha256 digest."""
+  print(f'Updating references to {image_url}')
 
-  files = grep_process.stdout.split()
+  grep_command = ['git', 'grep', '-l', f'{image_url}@sha256']
+  try:
+    completed_process = run_command(grep_command,
+                                    capture_output=True,
+                                    timeout=5)
+  except subprocess.CalledProcessError as error:
+    if error.returncode == 1:
+      print(f'Found no references to {image_url}')
+      return
+    raise error
+
+  # Update references in all grepped files.
+  files = completed_process.stdout.split()
   print(f'Updating references in {len(files)} files: {files}')
   for line in fileinput.input(files=files, inplace=(not dry_run)):
-    print(re.sub(f'{image_name}@sha256:[a-zA-Z0-9]+', f'{image_name}@{digest}',
-                 line),
+    print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}', line),
           end='')
 
 
@@ -239,35 +239,36 @@ if __name__ == '__main__':
 
   # Ensure the user has the correct authorization if they try to push to GCR.
   if args.push:
-    if stream_command(['which', 'gcloud']) != 0:
-      print('gcloud not found.'
-            ' See https://cloud.google.com/sdk/install for installation.')
-      sys.exit(1)
-    check_stream_command(['gcloud', 'auth', 'configure-docker'],
-                         dry_run=args.dry_run)
+    try:
+      run_command(['which', 'gcloud'])
+    except subprocess.CalledProcessError as error:
+      raise RuntimeError(
+          'gcloud not found. See https://cloud.google.com/sdk/install for '
+          'installation.') from error
+    run_command(['gcloud', 'auth', 'configure-docker'], dry_run=args.dry_run)
 
   images_to_process = get_ordered_images_to_process(args.images)
   print(f'Also processing dependent images. Will process: {images_to_process}')
 
   for image in images_to_process:
     print(f'Processing image {image}')
-    image_name = posixpath.join(IREE_GCR_URL, image)
-    image_tag = f'{image_name}:{args.tag}'
+    image_url = posixpath.join(IREE_GCR_URL, image)
+    tagged_image_url = f'{image_url}:{args.tag}'
     image_path = os.path.join(DOCKER_DIR, image)
 
     if args.pull:
-      check_stream_command(['docker', 'pull', image_tag], dry_run=args.dry_run)
+      run_command(['docker', 'pull', tagged_image_url], dry_run=args.dry_run)
 
     if args.build:
-      check_stream_command(['docker', 'build', '--tag', image_tag, image_path],
-                           dry_run=args.dry_run)
+      run_command(['docker', 'build', '--tag', tagged_image_url, image_path],
+                  dry_run=args.dry_run)
 
     if args.push:
-      check_stream_command(['docker', 'push', image_tag], dry_run=args.dry_run)
+      run_command(['docker', 'push', tagged_image_url], dry_run=args.dry_run)
 
     if args.update_references:
-      digest = get_repo_digest(image_tag)
+      digest = get_repo_digest(tagged_image_url)
       # Just hardcode this oddity
       if image == 'rbe-toolchain':
         update_rbe_reference(digest, dry_run=args.dry_run)
-      update_references(image_name, digest, dry_run=args.dry_run)
+      update_references(image_url, digest, dry_run=args.dry_run)

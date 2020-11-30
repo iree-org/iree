@@ -68,7 +68,9 @@ class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         KeywordSpottingModule,
-        exported_names=KeywordSpottingModule.get_tf_function_unit_tests())
+        exported_names=['predict'],
+        relative_artifacts_dir=os.path.join('kws_streaming', FLAGS.model,
+                                            FLAGS.mode))
 
 
 def main(argv):
@@ -79,8 +81,6 @@ def main(argv):
   if FLAGS.model not in ALL_MODELS:
     raise ValueError(f'Unsupported model: {FLAGS.model}.\n'
                      f'Expected one of {MODELS_HELP}.')
-  KeywordSpottingModule.__name__ = os.path.join('keyword_spotting', FLAGS.model,
-                                                FLAGS.mode)
 
   KeywordSpottingTest.generate_unit_tests(KeywordSpottingModule)
   tf.test.main()

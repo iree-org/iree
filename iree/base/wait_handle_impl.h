@@ -51,7 +51,8 @@
 
 // TODO(benvanik): EPOLL on android/linux/bsd/etc.
 // TODO(benvanik): KQUEUE on mac/ios.
-#if !defined(OS_IOS) && !defined(__EMSCRIPTEN__)
+// KQUEUE is not implemented yet. Use POLL for mac/ios
+#if !defined(IREE_PLATFORM_APPLE) && !defined(__EMSCRIPTEN__)
 #define IREE_WAIT_API IREE_WAIT_API_PPOLL
 #else
 #define IREE_WAIT_API IREE_WAIT_API_POLL

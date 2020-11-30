@@ -16,7 +16,7 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "half",
+    name = "includes",
     hdrs = ["half.hpp"],
     include_prefix = "third_party/half",
 )

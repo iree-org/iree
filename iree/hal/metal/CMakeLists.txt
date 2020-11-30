@@ -16,6 +16,8 @@ if(NOT ${IREE_HAL_DRIVER_METAL})
   return()
 endif()
 
+iree_add_all_subdirs()
+
 iree_cc_library(
   NAME
     metal
@@ -52,7 +54,6 @@ iree_cc_library(
     iree::base::flatcc
     iree::base::file_io
     iree::base::logging
-    iree::base::memory
     iree::base::status
     iree::base::time
     iree::base::tracing
