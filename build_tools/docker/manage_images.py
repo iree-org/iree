@@ -160,11 +160,11 @@ def run_command(command: Sequence[str],
   if dry_run:
     # Dummy CompletedProess with successful returncode.
     return subprocess.CompletedProcess(command, returncode=0)
+
   if capture_output:
     # Hardcode support for python <= 3.6.
     run_kwargs['stdout'] = subprocess.PIPE
     run_kwargs['stderr'] = subprocess.PIPE
-
   return subprocess.run(command,
                         universal_newlines=universal_newlines,
                         check=check,
@@ -187,9 +187,8 @@ def get_repo_digest(tagged_image_url: str) -> str:
         capture_output=True,
         timeout=10)
   except subprocess.CalledProcessError as error:
-    print(f'Computing the repository digest for {tagged_image_url} failed.'
-          ' Has it been pushed to GCR?')
-    raise error
+    raise RuntimeError(f'Computing the repository digest for {tagged_image_url}'
+                       ' failed. Has it been pushed to GCR?') from error
   _, repo_digest = completed_process.stdout.strip().split('@')
   return repo_digest
 
@@ -245,9 +244,9 @@ if __name__ == '__main__':
     try:
       run_command(['which', 'gcloud'])
     except subprocess.CalledProcessError as error:
-      print('gcloud not found.'
-            ' See https://cloud.google.com/sdk/install for installation.')
-      raise error
+      raise RuntimeError(
+          'gcloud not found. See https://cloud.google.com/sdk/install for '
+          'installation.') from error
     run_command(['gcloud', 'auth', 'configure-docker'], dry_run=args.dry_run)
 
   images_to_process = get_ordered_images_to_process(args.images)
