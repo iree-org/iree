@@ -14,13 +14,9 @@
 
 # bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
 
-# This need to come first so targets in the android/ directory can depend on it.
-# TODO(#3317): this seems to indicate an issue somewhere regarding dynamic
-# library dependency management.
-add_subdirectory(utils)
-
 add_subdirectory(android)
 add_subdirectory(test)
+add_subdirectory(utils)
 
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
