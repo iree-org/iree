@@ -526,24 +526,23 @@ static void applyVectorTransformation(FuncOp funcOp) {
 // Patterns to tile convolution window dimensions
 //====---------------------------------------------------------------------===//
 
-/// Populates `patterns` with patterns that tiles a linalg.conv along filter's
-/// height, width, input channel dimensions with tile sizes 1, 1, 4.
 static void populateTilingConvFilterPatterns(MLIRContext *context,
                                              OwningRewritePatternList &patterns,
+                                             const LaunchConfig &launchConfig,
                                              linalg::LinalgMarker marker) {
-  auto getTileSizeFn = [](OpBuilder &builder, Operation *op) {
+  auto getTileSizeFn = [&launchConfig](OpBuilder &builder, Operation *op) {
+    SmallVector<Value, 4> tileSizes;
+    ArrayRef<int64_t> fourthLevel = launchConfig.getTileSizes(op, 3);
+    tileSizes.reserve(fourthLevel.size());
+
     Location loc = op->getLoc();
-    auto zero = builder.create<ConstantIndexOp>(loc, 0);
-    auto one = builder.create<ConstantIndexOp>(loc, 1);
-    auto four = builder.create<ConstantIndexOp>(loc, 4);
-    // linalg.conv has 7 iterators.
-    SmallVector<Value, 4> tileSizes(7, zero);
-    // The last 3 are for the filter.
-    tileSizes[4] = four;                // input channel
-    tileSizes[5] = tileSizes[6] = one;  // filter height/width
+    for (int64_t size : fourthLevel) {
+      tileSizes.push_back(builder.create<ConstantIndexOp>(loc, size));
+    }
     return tileSizes;
   };
 
+  // TODO(antiagainst): move this to launch configuration.
   SmallVector<unsigned, 8> loopOrder = {
       /*batch=*/0,
       /*output_height=*/1,
@@ -690,7 +689,8 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList tilingPatterns;
         auto marker = getLinalgMatchAndReplaceMarker(
             getConvFilterTileMarker(), getVectorizeMarker(), context);
-        populateTilingConvFilterPatterns(context, tilingPatterns, marker);
+        populateTilingConvFilterPatterns(context, tilingPatterns, launchConfig,
+                                         marker);
         populateFoldGPUProcessorIDUsesPatterns(context, tilingPatterns);
         tilingPatterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(
             context);

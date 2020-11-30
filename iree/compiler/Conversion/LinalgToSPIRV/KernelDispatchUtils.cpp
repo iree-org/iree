@@ -376,6 +376,12 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
       /*output_channel=*/tileChannel / config.workgroupSize[0]};
   tileSizes.emplace_back(invocationLevel);
 
+  // Finally, for each invocation, we use tiling to generate loops to loop over
+  // the filter's height (step 1), width (step 1), and input channel (step 4)
+  // dimensions.
+  SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 4, 1, 1};
+  tileSizes.emplace_back(fourthLevel);
+
   // We don't distribute along the batch dimension.
   config.workgroupLoopIndices = {1, 2, 3};
   config.vectorize = true;
