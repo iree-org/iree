@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/tracing.h"
-#include "iree/base/wait_handle.h"
+// NOTE: must be first to ensure that we can define settings for all includes.
+#include "iree/base/wait_handle_impl.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
+
+#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Platform utilities

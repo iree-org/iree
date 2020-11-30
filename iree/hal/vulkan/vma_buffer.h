@@ -15,10 +15,10 @@
 #ifndef IREE_HAL_VULKAN_VMA_BUFFER_H_
 #define IREE_HAL_VULKAN_VMA_BUFFER_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include "iree/hal/buffer.h"
-#include "vk_mem_alloc.h"
+#include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
 namespace iree {
 namespace hal {

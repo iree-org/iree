@@ -26,10 +26,10 @@ table DyLibExecutableDef {
   // An embedded (as opposed to external) dynamic library file.
   // TODO(scotttodd): List of embedded files?
   // TODO(scotttodd): Format of files, platform information (x86/arm/etc.)
-  library_embedded:[byte];
+  library_embedded:[ubyte];
 
   debug_database_filename:string;
-  debug_database_embedded:[byte];
+  debug_database_embedded:[ubyte];
 
   // TODO(scotttodd): Relative file path from this flatbuffer file
 }

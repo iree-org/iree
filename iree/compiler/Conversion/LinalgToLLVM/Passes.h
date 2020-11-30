@@ -34,6 +34,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
 /// Vectorizes linalg ops executed in the same iree.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 
+std::unique_ptr<OperationPass<ModuleOp>>
+createFastExpApproximationConversionPass();
+
 /// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
 /// followed by linalg::MatmulOp.
 void populateConvImg2ColMatmulConversionPatterns(

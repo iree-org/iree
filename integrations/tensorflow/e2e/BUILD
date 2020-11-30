@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # Test coverage across backends for e2e tests is defined directly in the BUILD
-# files. A coverage table generated from this file can be viewed here:
-#   https://google.github.io/iree/tf-e2e-coverage
+# files. Coverage tables generated from this file can be viewed here:
+#   https://google.github.io/iree/tensorflow-coverage
 # Updates made to test suite names should also be reflected here:
 #   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
 
@@ -59,7 +59,6 @@ SPECIAL_CASES = [
 # keep sorted
 TFLITE_FAILING = [
     "broadcasting_test.py",
-    "complex_test.py",
     "concat_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
@@ -67,12 +66,12 @@ TFLITE_FAILING = [
     "einsum_static_test.py",
     "einsum_vector_test.py",
     "fft_test.py",
-    "finite_test.py",
     "gather_test.py",
     "image_resize_test.py",
     "mandelbrot_test.py",
-    "math_dyn_test.py",
     "matrix_ops_dynamic_test.py",
+    "quantization_dyn_test.py",
+    "reduce_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
     "scatter_update_test.py",
@@ -105,11 +104,11 @@ LLVM_FAILING = [
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
-    "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "math_dyn_test.py",
     "matrix_ops_dynamic_test.py",
+    "quantization_dyn_test.py",
     "range_test.py",
+    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
@@ -117,7 +116,6 @@ LLVM_FAILING = [
 
 # keep sorted
 VULKAN_FAILING = [
-    "bool_test.py",
     "broadcast_to_test.py",
     "broadcasting_test.py",
     "conv_transpose_test.py",
@@ -129,11 +127,11 @@ VULKAN_FAILING = [
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
-    "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "math_dyn_test.py",
     "matrix_ops_dynamic_test.py",
+    "quantization_dyn_test.py",
     "range_test.py",
+    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",

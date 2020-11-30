@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/StandardTypes.h"
@@ -24,24 +23,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-namespace {
-
-using flatbuffers::FlatBufferBuilder;
-using flatbuffers::Offset;
-using flatbuffers::Vector;
-
-}  // namespace
-
 // TODO(benvanik): switch to LLVM's BinaryStreamWriter to handle endianness.
 
-static Offset<Vector<uint8_t>> serializeConstantI8Array(
-    DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
+static flatbuffers_uint8_vec_ref_t serializeConstantI8Array(
+    DenseIntElementsAttr attr, FlatbufferBuilder &fbb) {
   // vm.rodata and other very large constants end up as this; since i8 is i8
   // everywhere (endianness doesn't matter when you have one byte :) we can
   // directly access the data and memcpy.
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 1, &bytePtr);
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr =
+      flatbuffers_uint8_vec_extend(fbb, attr.getNumElements() * sizeof(int8_t));
   if (attr.isSplat()) {
     // NOTE: this is a slow path and we should have eliminated it earlier on
     // during constant op conversion.
@@ -52,72 +43,72 @@ static Offset<Vector<uint8_t>> serializeConstantI8Array(
     auto rawData = attr.getRawData();
     std::memcpy(bytePtr, rawData.data(), rawData.size());
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-static Offset<Vector<uint8_t>> serializeConstantI16Array(
-    DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 2, &bytePtr);
+static flatbuffers_uint8_vec_ref_t serializeConstantI16Array(
+    DenseIntElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(
+      fbb, attr.getNumElements() * sizeof(int16_t));
   uint16_t *nativePtr = reinterpret_cast<uint16_t *>(bytePtr);
   for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(16, 0) & UINT16_MAX;
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-static Offset<Vector<uint8_t>> serializeConstantI32Array(
-    DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 4, &bytePtr);
+static flatbuffers_uint8_vec_ref_t serializeConstantI32Array(
+    DenseIntElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(
+      fbb, attr.getNumElements() * sizeof(int32_t));
   uint32_t *nativePtr = reinterpret_cast<uint32_t *>(bytePtr);
   for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(32, 0) & UINT32_MAX;
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-static Offset<Vector<uint8_t>> serializeConstantI64Array(
-    DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 8, &bytePtr);
+static flatbuffers_uint8_vec_ref_t serializeConstantI64Array(
+    DenseIntElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(
+      fbb, attr.getNumElements() * sizeof(int64_t));
   uint64_t *nativePtr = reinterpret_cast<uint64_t *>(bytePtr);
   for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(64, 0) & UINT64_MAX;
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-static Offset<Vector<uint8_t>> serializeConstantF32Array(
-    DenseFPElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 4, &bytePtr);
+static flatbuffers_uint8_vec_ref_t serializeConstantF32Array(
+    DenseFPElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr =
+      flatbuffers_uint8_vec_extend(fbb, attr.getNumElements() * sizeof(float));
   float *nativePtr = reinterpret_cast<float *>(bytePtr);
   for (const APFloat &value : attr.getFloatValues()) {
     *(nativePtr++) = value.convertToFloat();
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-static Offset<Vector<uint8_t>> serializeConstantF64Array(
-    DenseFPElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 8, &bytePtr);
+static flatbuffers_uint8_vec_ref_t serializeConstantF64Array(
+    DenseFPElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr =
+      flatbuffers_uint8_vec_extend(fbb, attr.getNumElements() * sizeof(double));
   double *nativePtr = reinterpret_cast<double *>(bytePtr);
   for (const APFloat &value : attr.getFloatValues()) {
     *(nativePtr++) = value.convertToDouble();
   }
-  return byteVector;
+  return flatbuffers_uint8_vec_end(fbb);
 }
 
-Offset<Vector<uint8_t>> serializeConstant(Location loc,
-                                          ElementsAttr elementsAttr,
-                                          FlatBufferBuilder &fbb) {
+flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
+                                              ElementsAttr elementsAttr,
+                                              FlatbufferBuilder &fbb) {
   if (auto attr = elementsAttr.dyn_cast<DenseIntElementsAttr>()) {
     switch (attr.getType().getElementTypeBitWidth()) {
       case 8:

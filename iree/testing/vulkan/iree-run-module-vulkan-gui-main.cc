@@ -20,9 +20,10 @@
 // Other dependencies (helpers, etc.)
 #include "absl/flags/flag.h"
 #include "iree/base/file_io.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/main.h"
 #include "iree/base/status.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
@@ -146,7 +147,8 @@ Status RunModuleAndUpdateImGuiWindow(
 }  // namespace iree
 
 int iree::IreeMain(int argc, char** argv) {
-  iree::InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
 
   // --------------------------------------------------------------------------
   // Create a window.
@@ -248,9 +250,6 @@ int iree::IreeMain(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Setup IREE.
-  // This call to |iree_api_init| is not technically required, but it is
-  // included for completeness.
-  IREE_CHECK_OK(iree_api_init(&argc, &argv));
 
   // Check API version.
   iree_api_version_t actual_version;

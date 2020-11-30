@@ -17,4 +17,4 @@
 FROM gcr.io/iree-oss/bazel-python AS final
 
 # Install tensorflow.
-RUN python3 -m pip install tf-nightly==2.4.0.dev20200902
+RUN python3 -m pip install tf-nightly==2.5.0.dev20201116

@@ -1392,6 +1392,14 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                          data));
 }
 
+void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
+                               uint32_t format, DenseIntElementsAttr data) {
+  ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(
+      "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
+  state.addAttribute("data", data);
+}
+
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();

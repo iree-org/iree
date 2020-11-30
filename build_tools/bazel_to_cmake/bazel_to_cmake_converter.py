@@ -37,16 +37,6 @@ class BuildFileFunctions(object):
 
   def __init__(self, converter):
     self.converter = converter
-    # TODO(gcmn): Do this in a less hard-coded way
-    self.PLATFORM_VULKAN_DEPS = []
-    self.PLATFORM_VULKAN_TEST_DEPS = ["//iree/testing:gtest_main"]
-    self.FLATBUFFER_SUPPORTS_REFLECTIONS = False
-    self.PLATFORM_VULKAN_LOADER_COPTS = []
-    self.IREE_DRIVER_MODULES = [
-        "//iree/hal/vmla:vmla_driver_module",
-        "//iree/hal/vulkan:vulkan_driver_module",
-        "//iree/hal/llvmjit:llvmjit_driver_module",
-    ]
 
   # ------------------------------------------------------------------------- #
   # Conversion utilities, written to reduce boilerplate and allow for reuse   #
@@ -108,9 +98,6 @@ class BuildFileFunctions(object):
       return f"  {option}\n"
     else:
       return ""
-
-  def _convert_alwayslink_block(self, alwayslink):
-    return self._convert_option_block("ALWAYSLINK", alwayslink)
 
   def _convert_testonly_block(self, testonly):
     return self._convert_option_block("TESTONLY", testonly)
@@ -348,7 +335,7 @@ class BuildFileFunctions(object):
                  srcs=None,
                  data=None,
                  deps=None,
-                 alwayslink=False,
+                 defines=None,
                  testonly=False,
                  linkopts=None,
                  **kwargs):
@@ -360,7 +347,7 @@ class BuildFileFunctions(object):
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
-    alwayslink_block = self._convert_alwayslink_block(alwayslink)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
     testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += (f"iree_cc_library(\n"
@@ -370,7 +357,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{data_block}"
                             f"{deps_block}"
-                            f"{alwayslink_block}"
+                            f"{defines_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
@@ -497,17 +484,6 @@ class BuildFileFunctions(object):
                             f"{name_block}"
                             f"{srcs_block}"
                             f"{flatcc_args_block}"
-                            f"  PUBLIC\n)\n\n")
-
-  def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):
-    name_block = self._convert_name_block(name)
-    srcs_block = self._convert_srcs_block(srcs)
-    flatc_args_block = self._convert_flatc_args_block(flatc_args)
-
-    self.converter.body += (f"flatbuffer_cc_library(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{flatc_args_block}"
                             f"  PUBLIC\n)\n\n")
 
   def gentbl(self,

@@ -29,14 +29,32 @@ iree_py_library(
     name = "support",
     srcs = [
         "__init__.py",
+        "module_utils.py",
         "tf_test_driver.py",
         "tf_test_utils.py",
         "tf_utils.py",
+        "trace_utils.py",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python:pathsetup",  # build_cleaner: keep
         "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
         "//bindings/python/pyiree/rt",
+    ],
+)
+
+iree_py_test(
+    name = "module_utils_test",
+    srcs = [
+        "module_utils.py",
+        "module_utils_test.py",
+    ],
+    python_version = "PY3",
+    tags = [
+        "driver=llvm",
+        "driver=vmla",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
 
@@ -59,8 +77,19 @@ iree_py_test(
         "tf_utils_test.py",
     ],
     python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_py_test(
+    name = "trace_utils_test",
+    srcs = [
+        "trace_utils.py",
+        "trace_utils_test.py",
+    ],
+    python_version = "PY3",
     tags = [
-        "driver=llvm",
         "driver=vmla",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [

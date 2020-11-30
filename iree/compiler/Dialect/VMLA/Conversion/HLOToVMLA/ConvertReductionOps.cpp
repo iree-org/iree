@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -29,7 +30,6 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -183,6 +183,16 @@ struct BuiltinReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
           TypeAttr::get(elementType));
     } else if (isa<mhlo::MaxOp>(computeOp)) {
       rewriter.create<IREE::VMLA::ReduceMaxOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
+          rewriter.getI32IntegerAttr(dimension), dst, dstShape,
+          TypeAttr::get(elementType));
+    } else if (isa<mhlo::AndOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::ReduceAndOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
+          rewriter.getI32IntegerAttr(dimension), dst, dstShape,
+          TypeAttr::get(elementType));
+    } else if (isa<mhlo::OrOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::ReduceOrOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
           rewriter.getI32IntegerAttr(dimension), dst, dstShape,
           TypeAttr::get(elementType));

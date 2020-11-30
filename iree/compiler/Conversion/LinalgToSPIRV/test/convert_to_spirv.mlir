@@ -6,7 +6,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
   func @push_constant() {
     // CHECK: %[[INDEX_0:.+]] = spv.constant 0 : i32
     // CHECK: %[[INDEX_1:.+]] = spv.constant 2 : i32
-    // CHECK: %[[ADDR:.+]] = spv._address_of @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
+    // CHECK: %[[ADDR:.+]] = spv.mlir.addressof @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
     // CHECK: %[[AC:.+]] = spv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
     // CHECK: spv.Load "PushConstant" %[[AC]] : i32
     %0 = hal.interface.load.constant offset = 2 : index
@@ -49,8 +49,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
   // CHECK: spv.func @resource_bindings_in_entry_func1()
   func @resource_bindings_in_entry_func1() {
-    // CHECK: spv._address_of @[[FUNC1_ARG:.+]]
-    // CHECK: spv._address_of @[[FUNC1_RET:.+]]
+    // CHECK: spv.mlir.addressof @[[FUNC1_ARG:.+]]
+    // CHECK: spv.mlir.addressof @[[FUNC1_RET:.+]]
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xvector<4xf32>>
     return
@@ -58,8 +58,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
   // CHECK: spv.func @resource_bindings_in_entry_func2()
   func @resource_bindings_in_entry_func2() {
-    // CHECK: spv._address_of @[[FUNC2_ARG]]
-    // CHECK: spv._address_of @[[FUNC2_RET]]
+    // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
+    // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
     return

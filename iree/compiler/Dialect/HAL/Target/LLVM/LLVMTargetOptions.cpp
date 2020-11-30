@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Target/TargetOptions.h"
@@ -26,17 +27,34 @@ namespace HAL {
 
 LLVMTargetOptions getDefaultLLVMTargetOptions() {
   LLVMTargetOptions targetOptions;
+
   // Host target triple.
   targetOptions.targetTriple = llvm::sys::getDefaultTargetTriple();
+  targetOptions.targetCPU = llvm::sys::getHostCPUName().str();
+  {
+    llvm::SubtargetFeatures features;
+    llvm::StringMap<bool> hostFeatures;
+    if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
+      for (auto &feature : hostFeatures) {
+        features.AddFeature(feature.first(), feature.second);
+      }
+    }
+    targetOptions.targetCPUFeatures = features.getString();
+  }
+
   // LLVM loop optimization options.
   targetOptions.pipelineTuningOptions.LoopInterleaving = true;
   targetOptions.pipelineTuningOptions.LoopVectorization = true;
   targetOptions.pipelineTuningOptions.LoopUnrolling = true;
+
   // LLVM SLP Auto vectorizer.
   targetOptions.pipelineTuningOptions.SLPVectorization = true;
+
   // LLVM -O3.
+  // TODO(benvanik): add an option for this.
   targetOptions.optLevel = llvm::PassBuilder::OptimizationLevel::O3;
   targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
+
   return targetOptions;
 }
 
@@ -46,16 +64,57 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   static llvm::cl::opt<std::string> clTargetTriple(
       "iree-llvm-target-triple", llvm::cl::desc("LLVM target machine triple"),
       llvm::cl::init(llvmTargetOptions.targetTriple));
-  static llvm::cl::opt<bool> clSoftFloat(
-      "iree-llvm-enable-msoft-float-abi",
+  static llvm::cl::opt<std::string> clTargetCPU(
+      "iree-llvm-target-cpu",
+      llvm::cl::desc(
+          "LLVM target machine CPU; use 'host' for your host native CPU"),
+      llvm::cl::init("generic"));
+  static llvm::cl::opt<std::string> clTargetCPUFeatures(
+      "iree-llvm-target-cpu-features",
+      llvm::cl::desc("LLVM target machine CPU features; use 'host' for your "
+                     "host native CPU"),
+      llvm::cl::init(""));
+  llvmTargetOptions.targetTriple = clTargetTriple;
+  if (clTargetCPU != "host") {
+    llvmTargetOptions.targetCPU = clTargetCPU;
+  }
+  if (clTargetCPUFeatures != "host") {
+    llvmTargetOptions.targetCPUFeatures = clTargetCPUFeatures;
+  }
+
+  static llvm::cl::opt<llvm::FloatABI::ABIType> clTargetFloatABI(
+      "iree-llvm-target-float-abi",
       llvm::cl::desc("LLVM target codegen enables soft float abi e.g "
                      "-mfloat-abi=softfp"),
-      llvm::cl::init(false));
+      llvm::cl::init(llvmTargetOptions.options.FloatABIType),
+      llvm::cl::values(
+          clEnumValN(llvm::FloatABI::Default, "default", "Default (softfp)"),
+          clEnumValN(llvm::FloatABI::Soft, "soft",
+                     "Software floating-point emulation"),
+          clEnumValN(llvm::FloatABI::Hard, "hard",
+                     "Hardware floating-point instructions")));
+  llvmTargetOptions.options.FloatABIType = clTargetFloatABI;
 
-  llvmTargetOptions.targetTriple = clTargetTriple;
-  if (clSoftFloat) {
-    llvmTargetOptions.options.FloatABIType = llvm::FloatABI::Soft;
-  }
+  static llvm::cl::opt<bool> clDebugSymbols(
+      "iree-llvm-debug-symbols",
+      llvm::cl::desc("Generate and embed debug information (DWARF, PDB, etc)"),
+      llvm::cl::init(llvmTargetOptions.debugSymbols));
+  llvmTargetOptions.debugSymbols = clDebugSymbols;
+
+  static llvm::cl::opt<bool> clLinkStatic(
+      "iree-llvm-link-static",
+      llvm::cl::desc(
+          "Links system libraries into binaries statically to isolate them "
+          "from platform dependencies needed at runtime"),
+      llvm::cl::init(llvmTargetOptions.linkStatic));
+  llvmTargetOptions.linkStatic = clLinkStatic;
+
+  static llvm::cl::opt<bool> clKeepLinkerArtifacts(
+      "iree-llvm-keep-linker-artifacts",
+      llvm::cl::desc("Keep LLVM linker target artifacts (.so/.dll/etc)"),
+      llvm::cl::init(llvmTargetOptions.keepLinkerArtifacts));
+  llvmTargetOptions.keepLinkerArtifacts = clKeepLinkerArtifacts;
+
   return llvmTargetOptions;
 }
 

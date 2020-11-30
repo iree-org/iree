@@ -14,8 +14,6 @@
 
 # Conformance Test Suite (CTS) for HAL implementations.
 
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -33,14 +31,9 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/hal:driver_registry",
+        "//iree/hal/drivers",
         "//iree/testing:gtest",
-
-        # HAL driver modules.
-        "//iree/hal/dylib:dylib_driver_module",  # build-cleaner: keep
-        "//iree/hal/llvmjit:llvmjit_driver_module",  # build-cleaner: keep
-        "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
-        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ] + PLATFORM_VULKAN_TEST_DEPS,
+    ],
 )
 
 cc_test(

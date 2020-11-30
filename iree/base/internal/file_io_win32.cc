@@ -48,7 +48,8 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   result.resize(file->size());
   DWORD bytes_read = 0;
   if (::ReadFile(file->handle(), const_cast<char*>(result.data()),
-                 result.size(), &bytes_read, nullptr) == FALSE) {
+                 static_cast<DWORD>(result.size()), &bytes_read,
+                 nullptr) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
            << "Unable to read file span of " << result.size() << " bytes from '"
            << path << "'";
@@ -63,8 +64,8 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
 Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_TRACE_SCOPE0("file_io::SetFileContents");
   IREE_ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
-  if (::WriteFile(file->handle(), content.data(), content.size(), NULL, NULL) ==
-      FALSE) {
+  if (::WriteFile(file->handle(), content.data(),
+                  static_cast<DWORD>(content.size()), NULL, NULL) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
            << "Unable to write file span of " << content.size() << " bytes to '"
            << path << "'";
@@ -103,7 +104,8 @@ std::string GetTempPath() {
 
   std::string temp_path(64, '\0');
   for (bool retry_query = true; retry_query;) {
-    DWORD required_length = ::GetTempPathA(temp_path.size(), &temp_path[0]);
+    DWORD required_length =
+        ::GetTempPathA(static_cast<DWORD>(temp_path.size()), &temp_path[0]);
     retry_query = required_length > temp_path.size();
     temp_path.resize(required_length);
   }

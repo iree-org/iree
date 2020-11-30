@@ -24,28 +24,21 @@
 
 #include <array>
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/IR/Function.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
-class FuncOp;
-class LogicalResult;
-class Operation;
-class PatternRewriter;
-class ShapedType;
-class Value;
-
-namespace linalg {
-class LinalgDependenceGraph;
-class LinalgOp;
-}  // namespace linalg
-namespace iree_compiler {
-struct SPIRVCodegenOptions;
-}
-
 namespace iree_compiler {
 
 /// Store the tile sizes to use at different levels of tiling as a vector of
@@ -75,7 +68,7 @@ class LaunchConfig {
   LogicalResult init(MLIRContext *context,
                      const linalg::LinalgDependenceGraph &dependenceGraph,
                      const SPIRVCodegenOptions &options,
-                     ArrayRef<Operation *> linalgOps);
+                     ArrayRef<linalg::LinalgOp> linalgOps);
 
   /// Remove attributed added to operations for retrieving tile size
   /// information.
@@ -110,6 +103,9 @@ class LaunchConfig {
     return !getTileSizes(op, level).empty();
   }
 
+  /// Use vectorize transformations.
+  bool useVectorize() const { return vectorize; }
+
  protected:
   /// Current tile size configuration per operation. They key used here to
   /// retrieve the tile size information per operation is the value of a StrAttr
@@ -124,6 +120,9 @@ class LaunchConfig {
 
   /// Number of subgroups that are logically distributed along x, y & z.
   std::array<int64_t, 3> numSubgroups;
+
+  /// Use vectorization.
+  bool vectorize = false;
 
  private:
   /// Retrieves the key to use to get the `tileSizes` for a given

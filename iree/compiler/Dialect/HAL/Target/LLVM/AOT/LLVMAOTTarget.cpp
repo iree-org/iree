@@ -16,14 +16,16 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTargetLinker.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/schemas/dylib_executable_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/dylib_executable_def_builder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Target/LLVMIR.h"
 
 namespace mlir {
@@ -46,95 +48,153 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     // multi-threading issues.
     llvm::LLVMContext context;
 
-    // Remove all private functions, e.g tile size calcuations.
-    SmallVector<FuncOp, 4> nonPublicFn;
-    for (auto func : targetOp.getInnerModule().getOps<FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(func) !=
-          SymbolTable::Visibility::Public) {
-        nonPublicFn.push_back(func);
-      }
+    // We name our files after the executable name so that they are easy to
+    // track both during compilation (logs/artifacts/etc), as outputs (final
+    // intermediate code/binary files), and at runtime (loaded
+    // libraries/symbols/etc).
+    auto libraryName =
+        targetOp.getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+
+    // TODO(#3737): don't add functions we don't want to serialize to the
+    // module. Right now workgroup count calculation functions end up in here
+    // as std.func ops and not just the llvm.func ops we expect.
+    auto illegalFuncOps =
+        llvm::to_vector<4>(targetOp.getInnerModule().getOps<FuncOp>());
+    for (auto funcOp : illegalFuncOps) {
+      funcOp.erase();
     }
-    for (auto func : nonPublicFn) {
-      func.erase();
-    }
+
+    llvm::Triple targetTriple(options_.targetTriple);
+    targetOp.getInnerModule().setAttr(
+        LLVM::LLVMDialect::getTargetTripleAttrName(),
+        executableBuilder.getStringAttr(targetTriple.str()));
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule =
-        mlir::translateModuleToLLVMIR(targetOp.getInnerModule(), context);
+    auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule(),
+                                                    context, libraryName);
     if (!llvmModule) {
-      return failure();
+      return targetOp.emitError() << "failed to translate the MLIR LLVM "
+                                     "dialect to the native llvm::Module";
     }
 
-    iree::DyLibExecutableDefT dyLibExecutableDef;
-    // Create invocation function an populate entry_points.
-    auto entryPointOps = targetOp.getBlock().getOps<ExecutableEntryPointOp>();
-
-    for (auto entryPointOp : entryPointOps) {
-      dyLibExecutableDef.entry_points.push_back(
-          std::string(entryPointOp.sym_name()));
+    // Try to grab a linker tool based on the options (and target environment).
+    auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
+    if (!linkerTool) {
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to find a target linker for the given target triple '"
+             << options_.targetTriple << "'";
     }
 
-    // LLVMIR opt passes.
+    // Configure the module with any code generation options required later by
+    // linking (such as initializer functions).
+    auto entryPointNames = llvm::to_vector<8>(
+        llvm::map_range(targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+                        [&](auto op) { return op.getName(); }));
+    if (failed(
+            linkerTool->configureModule(llvmModule.get(), entryPointNames))) {
+      return targetOp.emitError()
+             << "failed to configure LLVM module for target linker";
+    }
+
+    // LLVM opt passes that perform code generation optimizations/transformation
+    // similar to what a frontend would do before passing to linking.
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
-      targetOp.emitError("Can't create target machine for target triple: " +
-                         options_.targetTriple);
-      return failure();
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to create target machine for target triple '"
+             << options_.targetTriple << "'";
     }
-
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
-
     if (failed(
             runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
-      return targetOp.emitError(
-          "Can't build LLVMIR opt passes for ExecutableOp module");
+      return targetOp.emitError()
+             << "failed to run LLVM-IR opt passes for IREE::HAL::ExecutableOp "
+                "targeting '"
+             << options_.targetTriple << "'";
     }
 
-    std::string objData;
-    if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                    &objData))) {
-      return targetOp.emitError("Can't compile LLVMIR module to an obj");
-    }
-
-    std::string sharedLibData;
-    const char *linkerToolPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
-    if (linkerToolPath != nullptr) {
-      auto sharedLibDataStatus = linkLLVMAOTObjects(linkerToolPath, objData);
-      if (!sharedLibDataStatus.ok()) {
-        return targetOp.emitError(
-            "Can't link executable and generate target dylib, using linker "
-            "toolchain: '" +
-            std::string(linkerToolPath) + "'");
+    // Emit object files.
+    SmallVector<Artifact, 4> objectFiles;
+    {
+      // NOTE: today we just use a single object file, however if we wanted to
+      // scale code generation and linking we'd want to generate one per
+      // function (or something like that).
+      std::string objectData;
+      if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
+                                      &objectData))) {
+        return targetOp.emitError()
+               << "failed to compile LLVM-IR module to an object file";
       }
-      sharedLibData = sharedLibDataStatus.value();
-    } else {
-      auto sharedLibDataStatus = linkLLVMAOTObjectsWithLLDElf(objData);
-      if (!sharedLibDataStatus.ok()) {
-        return targetOp.emitError(
-            "Can't link executable and generate target dylib using "
-            "lld::elf::link");
-      }
-      sharedLibData = sharedLibDataStatus.value();
+      auto objectFile = Artifact::createTemporary(libraryName, "obj");
+      auto &os = objectFile.outputFile->os();
+      os << objectData;
+      os.flush();
+      os.close();
+      objectFiles.push_back(std::move(objectFile));
     }
-    dyLibExecutableDef.library_embedded = {sharedLibData.begin(),
-                                           sharedLibData.end()};
 
-    ::flatbuffers::FlatBufferBuilder fbb;
-    auto executableOffset =
-        iree::DyLibExecutableDef::Pack(fbb, &dyLibExecutableDef);
-    iree::FinishDyLibExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    // Link the generated object files into a dylib.
+    auto linkArtifactsOr =
+        linkerTool->linkDynamicLibrary(libraryName, objectFiles);
+    if (!linkArtifactsOr.hasValue()) {
+      return mlir::emitError(targetOp.getLoc())
+             << "failed to link executable and generate target dylib using "
+                "linker toolchain "
+             << linkerTool->getToolPath();
+    }
+    auto &linkArtifacts = linkArtifactsOr.getValue();
+    if (options_.keepLinkerArtifacts) {
+      mlir::emitRemark(targetOp.getLoc())
+          << "Linker artifacts for " << targetOp.getName() << " preserved:\n"
+          << "    " << linkArtifacts.libraryFile.path;
+      linkArtifacts.keepAllFiles();
+    }
+
+    // Embed debug symbols at the end of the flatbuffer by adding first in the
+    // bottoms-up builder.
+    FlatbufferBuilder builder;
+    flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
+    flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
+    if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
+      debugDatabaseRef = builder.streamUint8Vec([&](raw_ostream &stream) {
+        return linkArtifacts.debugFile.readInto(stream);
+      });
+      debugDatabaseFilenameRef = builder.createString(
+          llvm::sys::path::filename(linkArtifacts.debugFile.path));
+    }
+
+    // Embed entire dynamic library output.
+    flatbuffers_uint8_vec_ref_t libraryEmbeddedRef =
+        builder.streamUint8Vec([&](raw_ostream &stream) {
+          return linkArtifacts.libraryFile.readInto(stream);
+        });
+    if (!libraryEmbeddedRef) {
+      return targetOp.emitError() << "failed to read back dylib temp file at "
+                                  << linkArtifacts.libraryFile.path;
+    }
+
+    // Entry point names up from.
+    // TODO(#3580): these won't be needed in the executable_library world.
+    auto entryPointsRef = builder.createStringVec(llvm::map_range(
+        targetOp.getBlock().getOps<ExecutableEntryPointOp>(),
+        [&](ExecutableEntryPointOp op) { return op.getName(); }));
+
+    iree_DyLibExecutableDef_start_as_root(builder);
+    iree_DyLibExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
+    iree_DyLibExecutableDef_debug_database_filename_add(
+        builder, debugDatabaseFilenameRef);
+    iree_DyLibExecutableDef_debug_database_embedded_add(builder,
+                                                        debugDatabaseRef);
+    iree_DyLibExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::DyLib),
-        std::move(bytes));
-
+        builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
 };

@@ -13,13 +13,13 @@
 // limitations under the License.
 
 #include "benchmark/benchmark.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 
 namespace iree {
 
 extern "C" int main(int argc, char** argv) {
   ::benchmark::Initialize(&argc, argv);
-  iree::InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
   ::benchmark::RunSpecifiedBenchmarks();
   return 0;
 }

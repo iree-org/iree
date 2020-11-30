@@ -24,10 +24,28 @@ namespace IREE {
 namespace HAL {
 
 struct LLVMTargetOptions {
+  // Target machine configuration.
+  std::string targetTriple;
+  std::string targetCPU;
+  std::string targetCPUFeatures;
+
   llvm::PipelineTuningOptions pipelineTuningOptions;
   llvm::PassBuilder::OptimizationLevel optLevel;
   llvm::TargetOptions options;
-  std::string targetTriple;
+
+  // Include debug information in output files (PDB, DWARF, etc).
+  // Though this can be set independently from the optLevel (so -O3 with debug
+  // information is valid) it may significantly change the output program
+  // and benchmarking
+  bool debugSymbols = true;
+
+  // Link any required runtime libraries into the produced binaries statically.
+  // This increases resulting binary size but enables the binaries to be used on
+  // any machine without requiring matching system libraries to be installed.
+  bool linkStatic = false;
+
+  // True to keep linker artifacts for debugging.
+  bool keepLinkerArtifacts = false;
 };
 
 // Returns LLVMTargetOptions struct intialized with the

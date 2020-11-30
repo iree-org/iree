@@ -353,7 +353,7 @@ module attributes {
 //       CHECK:   %[[LBY_2:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX_2:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
 //       CHECK:   %[[VIEW2:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
-//       CHECK:   %[[VIEW3:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
+//       CHECK:   %[[VIEW3:.+]] = subview %[[RET0]][%[[LBY]], %[[LBX]]]
 //       CHECK:   linalg.fill(%[[VIEW3]], %{{.+}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.matmul

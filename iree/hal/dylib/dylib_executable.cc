@@ -14,10 +14,62 @@
 
 #include "iree/hal/dylib/dylib_executable.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
 #include "iree/base/file_path.h"
-#include "iree/schemas/dylib_executable_def_generated.h"
+
+// flatcc schemas:
+#include "iree/base/flatcc.h"
+#include "iree/schemas/dylib_executable_def_reader.h"
+#include "iree/schemas/dylib_executable_def_verifier.h"
+
+// NOTE: starting to port this to C.
+
+// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// runtime. There are still some conditions we must be aware of (such as omitted
+// names on functions with internal linkage), however we shouldn't need to
+// bounds check anything within the flatbuffer after this succeeds.
+static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        flatbuffer_data.data_length);
+  }
+
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret = iree_DyLibExecutableDef_verify_as_root(
+      flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_DyLibExecutableDef_table_t executable_def =
+      iree_DyLibExecutableDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_DyLibExecutableDef_entry_points_get(executable_def);
+  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  for (size_t i = 0; i < entry_point_count; ++i) {
+    if (!flatbuffers_string_len(
+            flatbuffers_string_vec_at(entry_points_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu has no name", i);
+    }
+  }
+
+  if (!flatbuffers_uint8_vec_len(
+          iree_DyLibExecutableDef_library_embedded_get(executable_def))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable library_embedded is missing/empty");
+  }
+
+  return iree_ok_status();
+}
 
 namespace iree {
 namespace hal {
@@ -34,9 +86,13 @@ DyLibExecutable::DyLibExecutable() = default;
 
 DyLibExecutable::~DyLibExecutable() {
   IREE_TRACE_SCOPE0("DyLibExecutable::dtor");
-  // TODO(benvanik): move to an atexit handler when tracing is enabled.
-  // executable_library_.release();
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  // Leak the library when tracing, since the profiler may still be reading it.
+  // TODO(benvanik): move to an atexit handler instead, verify with ASAN/MSAN
+  executable_library_.release();
+#else
   executable_library_.reset();
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   for (const auto& file_path : temp_file_paths_) {
     file_io::DeleteFile(file_path).IgnoreError();
   }
@@ -45,21 +101,22 @@ DyLibExecutable::~DyLibExecutable() {
 Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   IREE_TRACE_SCOPE0("DyLibExecutable::Initialize");
 
-  auto dylib_executable_def =
-      ::flatbuffers::GetRoot<DyLibExecutableDef>(spec.executable_data.data());
-
-  if (!dylib_executable_def->entry_points() ||
-      dylib_executable_def->entry_points()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No entry points defined";
-  }
-  if (!dylib_executable_def->library_embedded() ||
-      dylib_executable_def->library_embedded()->size() == 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "No embedded library";
-  }
+  // Verify and fetch the executable flatbuffer wrapper.
+  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
+      spec.executable_data.data(), spec.executable_data.size());
+  IREE_RETURN_IF_ERROR(
+      iree_hal_dylib_executable_flatbuffer_verify(executable_data));
+  iree_DyLibExecutableDef_table_t executable_def =
+      iree_DyLibExecutableDef_as_root(executable_data.data);
 
   // Write the embedded library out to a temp file, since all of the dynamic
   // library APIs work with files. We could instead use in-memory files on
   // platforms where that is convenient.
+  //
+  // TODO(#3845): use dlopen on an fd with either dlopen(/proc/self/fd/NN),
+  // fdlopen, or android_dlopen_ext to avoid needing to write the file to disk.
+  // Can fallback to memfd_create + dlopen where available, and fallback from
+  // that to disk (maybe just windows/mac).
   std::string base_name = "dylib_executable";
   IREE_ASSIGN_OR_RETURN(auto library_temp_path,
                         file_io::GetTempFile(base_name));
@@ -73,46 +130,51 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   library_temp_path += ".so";
 #endif
 
-  absl::string_view embedded_library_data(
-      reinterpret_cast<const char*>(
-          dylib_executable_def->library_embedded()->data()),
-      dylib_executable_def->library_embedded()->size());
-  IREE_RETURN_IF_ERROR(
-      file_io::SetFileContents(library_temp_path, embedded_library_data));
+  flatbuffers_uint8_vec_t embedded_library_vec =
+      iree_DyLibExecutableDef_library_embedded_get(executable_def);
+  IREE_RETURN_IF_ERROR(file_io::SetFileContents(
+      library_temp_path,
+      absl::string_view(reinterpret_cast<const char*>(embedded_library_vec),
+                        flatbuffers_uint8_vec_len(embedded_library_vec))));
 
   IREE_ASSIGN_OR_RETURN(executable_library_,
                         DynamicLibrary::Load(library_temp_path.c_str()));
 
-  if (dylib_executable_def->debug_database_filename() &&
-      dylib_executable_def->debug_database_embedded()) {
+  flatbuffers_string_t debug_database_filename =
+      iree_DyLibExecutableDef_debug_database_filename_get(executable_def);
+  flatbuffers_uint8_vec_t debug_database_embedded_vec =
+      iree_DyLibExecutableDef_debug_database_embedded_get(executable_def);
+  if (flatbuffers_string_len(debug_database_filename) &&
+      flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
     IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
-    absl::string_view debug_database_filename(
-        dylib_executable_def->debug_database_filename()->data(),
-        dylib_executable_def->debug_database_filename()->size());
-    absl::string_view debug_database_data(
-        reinterpret_cast<const char*>(
-            dylib_executable_def->debug_database_embedded()->data()),
-        dylib_executable_def->debug_database_embedded()->size());
     auto debug_database_path = file_path::JoinPaths(
-        file_path::DirectoryName(library_temp_path), debug_database_filename);
+        file_path::DirectoryName(library_temp_path),
+        absl::string_view(debug_database_filename,
+                          flatbuffers_string_len(debug_database_filename)));
     temp_file_paths_.push_back(debug_database_path);
-    IREE_IGNORE_ERROR(
-        file_io::SetFileContents(debug_database_path, debug_database_data));
+    IREE_IGNORE_ERROR(file_io::SetFileContents(
+        debug_database_path,
+        absl::string_view(
+            reinterpret_cast<const char*>(debug_database_embedded_vec),
+            flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
     executable_library_->AttachDebugDatabase(debug_database_path.c_str());
   }
 
-  const auto& entry_points = *dylib_executable_def->entry_points();
-  entry_functions_.resize(entry_points.size());
-  IREE_TRACE(entry_names_.resize(entry_points.size()));
-  for (int i = 0; i < entry_functions_.size(); ++i) {
-    void* symbol = executable_library_->GetSymbol(entry_points[i]->c_str());
+  flatbuffers_string_vec_t entry_points =
+      iree_DyLibExecutableDef_entry_points_get(executable_def);
+  entry_functions_.resize(flatbuffers_string_vec_len(entry_points));
+  IREE_TRACE(entry_names_.resize(flatbuffers_string_vec_len(entry_points)));
+  for (size_t i = 0; i < entry_functions_.size(); ++i) {
+    flatbuffers_string_t entry_point =
+        flatbuffers_string_vec_at(entry_points, i);
+    void* symbol = executable_library_->GetSymbol(entry_point);
     if (!symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
-             << "Could not find symbol: " << entry_points[i];
+             << "Could not find symbol: " << entry_point;
     }
     entry_functions_[i] = symbol;
 
-    IREE_TRACE(entry_names_[i] = entry_points[i]->c_str());
+    IREE_TRACE(entry_names_[i] = entry_point);
   }
 
   return OkStatus();

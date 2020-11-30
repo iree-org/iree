@@ -18,7 +18,7 @@
 workspace(name = "iree_core")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load(":repo_utils.bzl", "maybe")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ###############################################################################
 # Bazel rules.
@@ -63,7 +63,7 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 rbe_autoconfig(
     name = "rbe_default",
     base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:417ffe630a3a933b93e6b06aea7d4969fdbc1b120e26e674be108b8a849e0e8c",
+    digest = "sha256:d6d895294076b5289e81489f664656211c41656cffe7c448ecb5c6f54f045974",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
     use_checked_in_confs = "Force",
@@ -196,14 +196,6 @@ maybe(
     path = "third_party/googletest",
 )
 
-# Note that TensorFlow provides this as "flatbuffers" which is wrong.
-# It is only used for TFLite and may cause ODR issues if not fixed.
-maybe(
-    local_repository,
-    name = "com_github_google_flatbuffers",
-    path = "third_party/flatbuffers",
-)
-
 maybe(
     new_local_repository,
     name = "com_github_dvidelabs_flatcc",
@@ -291,6 +283,13 @@ maybe(
     name = "pffft",
     build_file = "build_tools/third_party/pffft/BUILD.overlay",
     path = "third_party/pffft",
+)
+
+maybe(
+    new_local_repository,
+    name = "half",
+    build_file = "build_tools/third_party/half/BUILD.overlay",
+    path = "third_party/half",
 )
 
 GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"

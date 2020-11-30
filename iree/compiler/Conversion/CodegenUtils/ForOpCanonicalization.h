@@ -17,8 +17,9 @@
 
 #include <memory>
 
+#include "mlir/Pass/Pass.h"
+
 namespace mlir {
-class FunctionPass;
 namespace iree_compiler {
 
 /// An ad-hoc pass to canonicalize selected loop carried dependencies on

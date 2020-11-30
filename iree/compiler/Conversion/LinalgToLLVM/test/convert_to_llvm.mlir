@@ -75,13 +75,9 @@ hal.interface @legacy_io2 attributes {push_constants = 1 : i32, sym_visibility =
 // CHECK: %[[STRIDE_DIM0:.+]] = llvm.mul %[[STRIDE_DIM1:.+]], %[[DIM1_0:.+]]: !llvm.i64
 // CHECK: %[[INSERT_DIM0:.+]] = llvm.insertvalue %[[STRIDE_DIM0:.+]], %[[MEMREF3:.+]][4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[EXTRACT1:.+]] = llvm.extractvalue %[[INSERT_DIM0:.+]][1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
-// CHECK: %[[CONST0_3:.+]] = llvm.mlir.constant(0 : index) : !llvm.i64
 // CHECK: %[[EXTRACT2:.+]] = llvm.extractvalue %[[INSERT_DIM0:.+]][4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
-// CHECK: %[[MUL1:.+]] = llvm.mul %[[CONST0_2:.+]], %[[EXTRACT2:.+]] : !llvm.i64
-// CHECK: %[[ADD1:.+]] = llvm.add %[[CONST0_3:.+]], %[[MUL1:.+]] : !llvm.i64
-// CHECK: %[[CONST1_2:.+]] = llvm.mlir.constant(1 : index) : !llvm.i64
-// CHECK: %[[MUL2:.+]] = llvm.mul %[[CONST0_2:.+]], %[[CONST1_2:.+]] : !llvm.i64
-// CHECK: %[[ADD2:.+]] = llvm.add %[[ADD1:.+]], %[[MUL2:.+]] : !llvm.i64
+// CHECK: %[[MUL1:.+]] = llvm.mul %[[CONST0_2]], %[[EXTRACT2]] : !llvm.i64
+// CHECK: %[[ADD1:.+]] = llvm.add %[[MUL1]], %[[CONST0_2]] : !llvm.i64
 // CHECK: %[[GET_PTR:.+]] = llvm.getelementptr %[[EXTRACT1:.+]][%[[ADD2:.+]]] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
 // CHECK: %[[LOAD:.+]] = llvm.load %[[GET_PTR:.+]] : !llvm.ptr<float>
 

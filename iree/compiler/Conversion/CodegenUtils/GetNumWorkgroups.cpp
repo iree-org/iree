@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
+
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
-#include "mlir/IR/PatternMatch.h"
 
 #define DEBUG_TYPE "workgroup-calculation"
 
@@ -69,8 +66,10 @@ static Optional<SmallVector<Value, 2>> getParallelLoopRange(
   // Clone the linalg operation just to compute the loop bounds.
   linalg::LinalgOp clonedLinalgOp =
       rewriter.clone(*linalgOp.getOperation(), mapper);
-  Optional<SmallVector<Value, 4>> bounds =
-      getLoopRanges(rewriter, clonedLinalgOp);
+  SmallVector<Range, 4> ranges = clonedLinalgOp.createLoopRanges(rewriter, loc);
+  SmallVector<Value, 4> bounds;
+  bounds.reserve(ranges.size());
+  for (Range r : ranges) bounds.push_back(r.size);
   unsigned numParallelLoops = linalgOp.iterator_types()
                                   .getValue()
                                   .take_while([](Attribute attr) -> bool {
@@ -78,8 +77,8 @@ static Optional<SmallVector<Value, 2>> getParallelLoopRange(
                                            getParallelIteratorTypeName();
                                   })
                                   .size();
-  SmallVector<Value, 2> returnVals(
-      bounds->begin(), std::next(bounds->begin(), numParallelLoops));
+  SmallVector<Value, 2> returnVals(bounds.begin(),
+                                   std::next(bounds.begin(), numParallelLoops));
   rewriter.eraseOp(clonedLinalgOp);
   return returnVals;
 }

@@ -20,7 +20,7 @@ iree_cc_library(
   HDRS
     "mock_allocator.h"
   DEPS
-    iree::hal::allocator
+    iree::hal
     iree::testing::gtest
   TESTONLY
   PUBLIC
@@ -32,7 +32,7 @@ iree_cc_library(
   HDRS
     "mock_command_buffer.h"
   DEPS
-    iree::hal::command_buffer
+    iree::hal
     iree::testing::gtest
   TESTONLY
   PUBLIC
@@ -44,7 +44,7 @@ iree_cc_library(
   HDRS
     "mock_command_queue.h"
   DEPS
-    iree::hal::command_queue
+    iree::hal
     iree::testing::gtest
   TESTONLY
   PUBLIC

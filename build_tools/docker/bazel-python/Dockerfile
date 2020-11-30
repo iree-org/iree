@@ -24,6 +24,6 @@ RUN apt-get update \
     python3-pip \
     python3-setuptools \
   && python3 -m pip install --upgrade pip \
-  && python3 -m pip install numpy
+  && python3 -m pip install numpy==1.19.4
 
 ENV PYTHON_BIN /usr/bin/python3

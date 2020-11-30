@@ -26,7 +26,7 @@ iree_cc_library(
   SRCS
     "LLVMAOTTarget.cpp"
   DEPS
-    ::LLVMAOTTargetLinker
+    ::LinkerTool
     LLVMAArch64AsmParser
     LLVMAArch64CodeGen
     LLVMARMAsmParser
@@ -35,32 +35,39 @@ iree_cc_library(
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen
+    MLIRLLVMIR
     MLIRTargetLLVMIR
+    iree::base::flatcc
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
-    iree::schemas::dylib_executable_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    LLVMAOTTargetLinker
+    LinkerTool
   HDRS
-    "LLVMAOTTargetLinker.h"
+    "LinkerTool.h"
+  SRCS
+    "LinkerTool.cpp"
   DEPS
-    iree::compiler::Dialect::HAL::Target::LLVM::AOT::internal::LLVMAOTTargetLinker_internal
+    iree::compiler::Dialect::HAL::Target::LLVM::AOT::internal::LinkerTools_internal
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    LLVMAOTTargetLinker_hdrs
+    LinkerTool_hdrs
   HDRS
-    "LLVMAOTTargetLinker.h"
+    "LinkerTool.h"
   DEPS
-    iree::base::status
+    LLVMCore
+    LLVMSupport
+    MLIRSupport
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
   PUBLIC
 )

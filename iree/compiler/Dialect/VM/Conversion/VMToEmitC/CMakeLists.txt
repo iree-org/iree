@@ -28,6 +28,9 @@ if(${IREE_ENABLE_EMITC})
       MLIREmitC
       MLIRTransforms
       iree::compiler::Dialect::VM::IR
+    INCLUDES
+      "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
+      "${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include"
     PUBLIC
   )
 endif()

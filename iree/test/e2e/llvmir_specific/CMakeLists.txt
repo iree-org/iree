@@ -26,3 +26,16 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
 )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-ir-exponential_fast
+  SRCS
+    "exponential.mlir"
+  TARGET_BACKEND
+    llvm-ir
+  DRIVER
+    llvm
+  COMPILER_FLAGS
+    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+)
