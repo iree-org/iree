@@ -28,9 +28,9 @@ iree_cc_library(
     absl::span
     iree::base::api
     iree::base::tracing
+    iree::hal
     iree::hal::api
-    iree::hal::device
     iree::vm
-    iree::vm::native_module_cc
+    iree::vm::cc
   PUBLIC
 )

@@ -82,6 +82,3 @@ StatusOr<ref_ptr<Driver>> DriverRegistry::Create(
 
 }  // namespace hal
 }  // namespace iree
-
-IREE_REGISTER_MODULE_INITIALIZER(
-    iree_hal, ::iree::hal::DriverRegistry::shared_registry());

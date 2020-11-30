@@ -16,8 +16,7 @@
 #define IREE_HAL_VMLA_VMLA_DRIVER_H_
 
 #include "iree/hal/driver.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace hal {

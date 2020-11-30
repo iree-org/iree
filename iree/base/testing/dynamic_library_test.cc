@@ -16,10 +16,10 @@
 
 #include <string>
 
-#include "iree/base/dynamic_library_test_library_embed.h"
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
+#include "iree/base/testing/dynamic_library_test_library_embed.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -64,7 +64,6 @@ std::string DynamicLibraryTest::library_temp_path_;
 TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
   IREE_ASSERT_OK_AND_ASSIGN(auto library,
                             DynamicLibrary::Load(library_temp_path_.c_str()));
-  EXPECT_EQ(library_temp_path_, library->file_name());
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryFailure) {

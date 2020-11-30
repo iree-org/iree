@@ -112,7 +112,7 @@ class StringsModuleState final {
     std::string str;
     str.reserve(string_length);
     StringTensorToStringHelper(str_tensor->values, str_tensor->shape,
-                               str_tensor->rank, &str);
+                               static_cast<int32_t>(str_tensor->rank), &str);
 
     IREE_RETURN_IF_ERROR(strings_string_create(
         iree_make_cstring_view(str.c_str()), allocator_, &new_string));

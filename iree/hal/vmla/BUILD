@@ -57,7 +57,7 @@ cc_test(
     srcs = ["op_kernels_test.cc"],
     deps = [
         ":op_kernels",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/container:inlined_vector",
@@ -65,108 +65,55 @@ cc_test(
 )
 
 cc_library(
-    name = "vmla_cache",
-    srcs = ["vmla_cache.cc"],
-    hdrs = ["vmla_cache.h"],
-    deps = [
-        ":vmla_executable",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:allocator",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
-        "//iree/vm:instance",
-        "//iree/vm:module",
-    ],
-)
-
-cc_library(
-    name = "vmla_device",
-    srcs = ["vmla_device.cc"],
-    hdrs = ["vmla_device.h"],
-    deps = [
-        ":vmla_cache",
-        "//iree/base:memory",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_queue",
-        "//iree/hal:device",
-        "//iree/hal/host:host_local_device",
-        "//iree/vm:instance",
-        "//iree/vm:module",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "vmla_driver",
-    srcs = ["vmla_driver.cc"],
-    hdrs = ["vmla_driver.h"],
-    deps = [
-        ":vmla_device",
-        ":vmla_module",
-        "//iree/base:tracing",
-        "//iree/hal:device_info",
-        "//iree/hal:driver",
-        "//iree/hal/host/serial:serial_scheduling_model",
-        "//iree/vm:instance",
-        "//iree/vm:module",
-    ],
-)
-
-cc_library(
-    name = "vmla_driver_module",
-    srcs = ["vmla_driver_module.cc"],
-    deps = [
-        ":vmla_driver",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-    ],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "vmla_executable",
-    srcs = ["vmla_executable.cc"],
-    hdrs = ["vmla_executable.h"],
-    deps = [
-        ":vmla_module",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
-        "//iree/hal/host:host_buffer",
-        "//iree/hal/host:host_executable",
-        "//iree/schemas:vmla_executable_def_cc_fbs",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:context",
-        "//iree/vm:instance",
-        "//iree/vm:invocation",
-        "//iree/vm:list",
-        "//iree/vm:module",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "vmla_module",
-    srcs = ["vmla_module.cc"],
-    hdrs = ["vmla_module.h"],
+    name = "op_module",
+    srcs = ["op_module.cc"],
+    hdrs = ["op_module.h"],
     deps = [
         ":op_kernels",
         "//iree/base:api",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/vm",
-        "//iree/vm:native_module_cc",
+        "//iree/vm:cc",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "vmla",
+    srcs = [
+        "vmla_cache.cc",
+        "vmla_device.cc",
+        "vmla_driver.cc",
+        "vmla_executable.cc",
+    ],
+    hdrs = [
+        "vmla_cache.h",
+        "vmla_device.h",
+        "vmla_driver.h",
+        "vmla_executable.h",
+    ],
+    deps = [
+        ":op_module",
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:flatcc",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal",
+        "//iree/hal/host:host_buffer",
+        "//iree/hal/host:host_executable",
+        "//iree/hal/host:host_local_device",
+        "//iree/hal/host/serial:serial_scheduling_model",
+        "//iree/schemas:vmla_executable_def_c_fbs",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )

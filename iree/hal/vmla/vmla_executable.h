@@ -22,9 +22,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace hal {

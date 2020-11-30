@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# HAL implementation for executing functions provided by dynamic libraries.
-
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
@@ -31,70 +29,32 @@ endif()
 )
 
 cc_library(
-    name = "dylib_device",
-    srcs = ["dylib_device.cc"],
-    hdrs = ["dylib_device.h"],
-    deps = [
-        ":dylib_executable_cache",
-        "//iree/base:tracing",
-        "//iree/hal/host:host_local_device",
+    name = "dylib",
+    srcs = [
+        "dylib_device.cc",
+        "dylib_driver.cc",
+        "dylib_executable.cc",
+        "dylib_executable_cache.cc",
     ],
-)
-
-cc_library(
-    name = "dylib_driver",
-    srcs = ["dylib_driver.cc"],
-    hdrs = ["dylib_driver.h"],
-    deps = [
-        ":dylib_device",
-        "//iree/hal:device_info",
-        "//iree/hal:driver",
-        "//iree/hal/host/serial:serial_scheduling_model",
+    hdrs = [
+        "dylib_device.h",
+        "dylib_driver.h",
+        "dylib_executable.h",
+        "dylib_executable_cache.h",
     ],
-)
-
-cc_library(
-    name = "dylib_driver_module",
-    srcs = ["dylib_driver_module.cc"],
-    deps = [
-        ":dylib_driver",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/hal:driver_registry",
-    ],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "dylib_executable",
-    srcs = ["dylib_executable.cc"],
-    hdrs = ["dylib_executable.h"],
     deps = [
         "//iree/base:dynamic_library",
         "//iree/base:file_io",
         "//iree/base:file_path",
+        "//iree/base:flatcc",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
+        "//iree/hal",
         "//iree/hal/host:host_executable",
-        "//iree/schemas:dylib_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/hal/host:host_local_device",
+        "//iree/hal/host/serial:serial_scheduling_model",
+        "//iree/schemas:dylib_executable_def_c_fbs",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "dylib_executable_cache",
-    srcs = ["dylib_executable_cache.cc"],
-    hdrs = ["dylib_executable_cache.h"],
-    deps = [
-        ":dylib_executable",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
     ],
 )

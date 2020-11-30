@@ -17,7 +17,7 @@
 #ifndef IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 #define IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include <vector>
 

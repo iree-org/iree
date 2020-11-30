@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mutex>
+
 #include "iree/base/status.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
@@ -142,6 +144,10 @@ TEST_P(CommandQueueTest, WaitMultiple) {
 }
 
 std::vector<std::string> GetSupportedDrivers() {
+  static std::once_flag register_once;
+  std::call_once(register_once, [] {
+    IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  });
   auto drivers = DriverRegistry::shared_registry()->EnumerateAvailableDrivers();
   auto it = drivers.begin();
   while (it != drivers.end()) {

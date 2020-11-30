@@ -18,7 +18,7 @@
 workspace(name = "iree_core")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load(":repo_utils.bzl", "maybe")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ###############################################################################
 # Bazel rules.
@@ -194,14 +194,6 @@ maybe(
     local_repository,
     name = "com_google_googletest",
     path = "third_party/googletest",
-)
-
-# Note that TensorFlow provides this as "flatbuffers" which is wrong.
-# It is only used for TFLite and may cause ODR issues if not fixed.
-maybe(
-    local_repository,
-    name = "com_github_google_flatbuffers",
-    path = "third_party/flatbuffers",
 )
 
 maybe(

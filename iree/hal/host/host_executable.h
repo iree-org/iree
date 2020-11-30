@@ -41,7 +41,7 @@ class HostExecutable : public Executable {
   // Grid parameters shared for all tiles within a dispatch.
   struct DispatchParams {
     // Entry point within the executable.
-    int32_t entry_point = 0;
+    size_t entry_point = 0;
 
     // Total workgroup XYZ count for the grid.
     std::array<uint32_t, 3> workgroup_count;

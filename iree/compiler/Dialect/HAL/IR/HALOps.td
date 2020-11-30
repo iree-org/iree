@@ -1931,6 +1931,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilderDAG<(ins "uint32_t":$format, "std::vector<uint8_t>":$data)>,
+    OpBuilderDAG<(ins "uint32_t":$format, "DenseIntElementsAttr":$data)>,
   ];
 
   let extraClassDeclaration = [{

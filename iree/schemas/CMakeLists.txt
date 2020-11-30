@@ -23,95 +23,71 @@ flatbuffer_c_library(
     "--reader"
     "--builder"
     "--verifier"
+    "--json"
   PUBLIC
 )
 
-flatbuffer_cc_library(
+flatbuffer_c_library(
   NAME
-    bytecode_module_def_cc_fbs
-  SRCS
-    "bytecode_module_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
-  PUBLIC
-)
-
-flatbuffer_cc_library(
-  NAME
-    dylib_executable_def_cc_fbs
+    dylib_executable_def_c_fbs
   SRCS
     "dylib_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
-flatbuffer_cc_library(
+flatbuffer_c_library(
   NAME
-    llvmir_executable_def_cc_fbs
+    llvmir_executable_def_c_fbs
   SRCS
     "llvmir_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
-flatbuffer_cc_library(
+flatbuffer_c_library(
   NAME
-    metal_executable_def_cc_fbs
+    metal_executable_def_c_fbs
   SRCS
     "metal_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
-flatbuffer_cc_library(
+flatbuffer_c_library(
   NAME
-    spirv_executable_def_cc_fbs
+    spirv_executable_def_c_fbs
   SRCS
     "spirv_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )
 
-flatbuffer_cc_library(
+flatbuffer_c_library(
   NAME
-    vmla_executable_def_cc_fbs
+    vmla_executable_def_c_fbs
   SRCS
     "vmla_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
-  PUBLIC
-)
-
-iree_cc_embed_data(
-  NAME
-    reflection_data
-  CC_FILE_OUTPUT
-    "reflection_data.cc"
-  H_FILE_OUTPUT
-    "reflection_data.h"
-  CPP_NAMESPACE
-    "iree::schemas"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
   PUBLIC
 )

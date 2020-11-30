@@ -36,12 +36,7 @@ if(${IREE_ENABLE_EMITC})
     DEPS
       ::add_module_cc
       iree::base::api
-      iree::vm::c_funcs
-      iree::vm::context
-      iree::vm::instance
-      iree::vm::native_module
-      iree::vm::ref
-      iree::vm::stack
+      iree::vm
     PUBLIC
   )
 
@@ -56,10 +51,7 @@ if(${IREE_ENABLE_EMITC})
       iree::base::status
       iree::testing::gtest
       iree::testing::gtest_main
-      iree::vm::context
-      iree::vm::instance
-      iree::vm::invocation
-      iree::vm::list
-      iree::vm::ref_cc
+      iree::vm
+      iree::vm::cc
   )
 endif()

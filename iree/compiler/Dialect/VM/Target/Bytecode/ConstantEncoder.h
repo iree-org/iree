@@ -15,7 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_CONSTANTENCODER_H_
 #define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_CONSTANTENCODER_H_
 
-#include "flatbuffers/flatbuffers.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/bytecode_module_def_builder.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
 
@@ -25,9 +26,9 @@ namespace IREE {
 namespace VM {
 
 // Serializes a constant attribute to the FlatBuffer as a binary blob.
-flatbuffers::Offset<flatbuffers::Vector<uint8_t>> serializeConstant(
-    Location loc, ElementsAttr elementsAttr,
-    flatbuffers::FlatBufferBuilder &fbb);
+flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
+                                              ElementsAttr elementsAttr,
+                                              FlatbufferBuilder &fbb);
 
 }  // namespace VM
 }  // namespace IREE

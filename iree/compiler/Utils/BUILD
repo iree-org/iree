@@ -23,13 +23,16 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
+        "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
     ],
     hdrs = [
+        "FlatbufferUtils.h",
         "GraphUtils.h",
         "PatternUtils.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
