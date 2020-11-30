@@ -341,51 +341,57 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
   return success();
 }
 
+static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
+                                           TileSizesListType &tileSizes,
+                                           LaunchConfigInfo &config) {
+  auto inputType = op.getInput(1).getType().cast<MemRefType>();
+  auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
+  if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
+    return failure();
+
+  const int tileWidth = 8;
+  const int tileChannel = 32;
+
+  auto outputShape = outputType.getShape();
+  bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
+  bool isOutputTilable = outputShape[0] == 1 &&
+                         outputShape[2] % tileWidth == 0 &&
+                         outputShape[3] % tileChannel == 0;
+  if (!isInputTilable || !isOutputTilable) return failure();
+
+  config.workgroupSize = {8, 2, 1};
+
+  SmallVector<int64_t, 4> workgroupLevel = {/*batch=*/0, /*output_height=*/1,
+                                            /*output_width=*/tileWidth,
+                                            /*output_channel=*/tileChannel};
+  tileSizes.emplace_back(std::move(workgroupLevel));
+
+  // No tiling at the subgroup level given that we don't use subgroup
+  // level syncrhonization  or shared memory.
+  tileSizes.emplace_back();
+
+  SmallVector<int64_t, 4> invocationLevel = {
+      /*batch=*/0, /*output_height=*/1,
+      /*output_width=*/tileWidth / config.workgroupSize[1],
+      /*output_channel=*/tileChannel / config.workgroupSize[0]};
+  tileSizes.emplace_back(invocationLevel);
+
+  // We don't distribute along the batch dimension.
+  config.workgroupLoopIndices = {1, 2, 3};
+  config.vectorize = true;
+
+  return success();
+}
+
 template <>
 LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
-  if (targetEnv.getVendorID() == spirv::Vendor::ARM) {
-    auto inputType = op.getInput(1).getType().cast<MemRefType>();
-    auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
-    if (inputType.hasStaticShape() && outputType.hasStaticShape()) {
-      const int tileWidth = 8;
-      const int tileChannel = 32;
-
-      auto outputShape = outputType.getShape();
-      bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
-      bool isOutputTilable = outputShape[0] == 1 &&
-                             outputShape[2] % tileWidth == 0 &&
-                             outputShape[3] % tileChannel == 0;
-
-      if (isInputTilable && isOutputTilable) {
-        config.workgroupSize = {8, 2, 1};
-
-        SmallVector<int64_t, 4> workgroupLevel = {
-            /*batch=*/0, /*output_height=*/1,
-            /*output_width=*/tileWidth,
-            /*output_channel=*/tileChannel};
-        tileSizes.emplace_back(std::move(workgroupLevel));
-
-        // No tiling at the subgroup level given that we don't use subgroup
-        // level syncrhonization  or shared memory.
-        tileSizes.emplace_back();
-
-        SmallVector<int64_t, 4> invocationLevel = {
-            /*batch=*/0, /*output_height=*/1,
-            /*output_width=*/tileWidth / config.workgroupSize[1],
-            /*output_channel=*/tileChannel / config.workgroupSize[0]};
-        tileSizes.emplace_back(invocationLevel);
-
-        // We don't distribute along the batch dimension.
-        config.workgroupLoopIndices = {1, 2, 3};
-        config.vectorize = true;
-
-        return success();
-      }
-    }
+  if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
+      succeeded(getMaliSpecificConfig(op, tileSizes, config))) {
+    return success();
   }
 
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
