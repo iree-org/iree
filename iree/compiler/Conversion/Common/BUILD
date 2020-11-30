@@ -23,6 +23,7 @@ cc_library(
     srcs = [
         "DeclareNumWorkgroupsFnPass.cpp",
         "LegalizeNumWorkgroupsFnPass.cpp",
+        "VectorTransferOptimization.cpp",
     ],
     hdrs = [
         "Attributes.h",
@@ -38,6 +39,7 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
     ],
 )

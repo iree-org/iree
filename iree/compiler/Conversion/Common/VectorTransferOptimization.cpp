@@ -12,19 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Pass/Pass.h"
+
 namespace mlir {
 namespace iree_compiler {
 
-/// Pass to legalize function that returns number of workgroups to use for
-/// launch to be runnable on the host.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
+namespace {
 
-/// Pass to initialize the function that computes the number of workgroups for
-/// each entry point function. The function is defined, but is populated later.
-std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
+struct VectorTransferOptimizationPass
+    : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
+  void runOnFunction() override { vector::transferOpflowOpt(getFunction()); }
+};
 
-/// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
+}  // namespace
+
+std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass() {
+  return std::make_unique<VectorTransferOptimizationPass>();
+}
+
+static PassRegistration<VectorTransferOptimizationPass> pass(
+    "iree-codegen-optimize-vector-transfer",
+    "Run optimization transformations on vector transfer operations",
+    [] { return std::make_unique<VectorTransferOptimizationPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir
