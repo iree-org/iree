@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # `prod_digests.txt` at upstream HEAD on the main branch.
     utils.run_command(["git", "sync"])
 
-  with open(utils.PROD_DIGESTS, "r") as f:
+  with open(utils.PROD_DIGESTS_PATH, "r") as f:
     images_with_digests = [line.strip() for line in f.readlines()]
 
   for image_with_digest in images_with_digests:

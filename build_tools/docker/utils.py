@@ -18,7 +18,7 @@ import os
 import subprocess
 from typing import Sequence
 
-PROD_DIGESTS = "build_tools/docker/prod_digests.txt".replace("/", os.sep)
+PROD_DIGESTS_PATH = "build_tools/docker/prod_digests.txt".replace("/", os.sep)
 
 
 def run_command(command: Sequence[str],
