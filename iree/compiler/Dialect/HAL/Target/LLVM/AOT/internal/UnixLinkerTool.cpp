@@ -31,7 +31,43 @@ class UnixLinkerTool : public LinkerTool {
 
   std::string getToolPath() const override {
     auto toolPath = LinkerTool::getToolPath();
-    return toolPath.empty() ? "ld.lld" : toolPath;
+    if (!toolPath.empty()) return toolPath;
+    if (targetTriple.isAndroid()) {
+// TODO(ataei, benvanik): Windows cross-linking android NDK support.
+#if defined(__unix__) && defined(__x86_64__)
+#if defined(__linux__)
+      return llvm::Twine(std::getenv("ANDROID_NDK"))
+          .concat("/toolchains/llvm/prebuilt/linux-x86_64/bin/")
+#elif defined(__APPLE__)
+      return llvm::Twine(std::getenv("ANDROID_NDK"))
+          .concat("/toolchains/llvm/prebuilt/darwin-x86_64/bin/")
+#else
+      return toolPath;
+#endif
+          // TODO(ataei): Set target archicture and ABI from targetTriple.
+          .concat("aarch64-linux-android30-clang++")
+          .str();
+#elif
+      return toolPath
+#endif
+    }
+// TODO(ataei, benvanik): Windows cross-linking discovery support.
+#ifdef __unix__
+#define UNIX_SYS_LINKER_PATH_LENGTH 255
+    auto sysLinkers = {"ld", "ld.gold", "lld.ld"};
+    for (auto syslinker : sysLinkers) {
+      FILE *pipe =
+          popen(llvm::Twine("which ").concat(syslinker).str().c_str(), "r");
+      char linkerPath[UNIX_SYS_LINKER_PATH_LENGTH];
+      if (fgets(linkerPath, sizeof(linkerPath), pipe) != NULL) {
+        return strtok(linkerPath, "\n");
+      }
+    }
+    return toolPath;
+#undef UNIX_SYS_LINKER_PATH_LENGTH
+#elif
+    return toolPath;
+#endif
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,
@@ -71,11 +107,12 @@ class UnixLinkerTool : public LinkerTool {
         "-o " + artifacts.libraryFile.path,
     };
 
-    // TODO(ataei): add flags based on targetTriple.isAndroid(), like
-    //   -static-libstdc++ (if this is needed, which it shouldn't be).
+    if (targetTriple.isAndroid()) {
+      flags.push_back("-static-libstdc++");
+    }
 
-    // Link all input objects. Note that we are not linking whole-archive as we
-    // want to allow dropping of unused codegen outputs.
+    // Link all input objects. Note that we are not linking whole-archive as
+    // we want to allow dropping of unused codegen outputs.
     for (auto &objectFile : objectFiles) {
       flags.push_back(objectFile.path);
     }
