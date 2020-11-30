@@ -126,8 +126,7 @@ GCR).
 
 ```shell
 # Pull all images that should have :prod tags. (They won't if someone ignores
-# step 6 above, but they are the images that this command pulls are correct
-# regardless).
+# step 6 above, but the images that this command pulls are correct regardless).
 python3 build_tools/docker/manage_prod.py --pull_only
 
 # Update the :latest images to match the :prod images.
