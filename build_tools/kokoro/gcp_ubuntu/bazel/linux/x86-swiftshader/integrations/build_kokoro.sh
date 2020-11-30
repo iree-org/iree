@@ -32,7 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/bazel-tensorflow-swiftshader@sha256:ce07901f5aa2e9d6ae0187a35cf02b8cdf6691d3ae444ea8ba9cc3eaa9a43e4a \
+  gcr.io/iree-oss/bazel-tensorflow-swiftshader@sha256:ea8c0be61b02a8ae614d903cada4e945dab0a63b86e97879a5d300ff4dbe3d1a \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

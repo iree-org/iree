@@ -64,7 +64,7 @@ IMAGES_TO_DEPENDENCIES = {
     'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
     'cmake-python-vulkan': ['cmake-python', 'vulkan'],
     'rbe-toolchain': ['vulkan'],
-    'swiftshader': ['cmake', 'vulkan'],
+    'swiftshader': ['cmake'],
     'util': [],
     'vulkan': ['util'],
 }
