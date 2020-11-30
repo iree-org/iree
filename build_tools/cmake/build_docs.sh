@@ -49,6 +49,7 @@ cd ${BUILD_DIR}
 ninja iree-doc iree_tools_iree-opt
 
 cd ${ROOT_DIR}
+mkdir -p ${BUILD_DIR}/doc/
 # Copy docs in source tree over
 cp README.md ${BUILD_DIR}/doc/index.md
 cp -rf docs/* ${BUILD_DIR}/doc/
