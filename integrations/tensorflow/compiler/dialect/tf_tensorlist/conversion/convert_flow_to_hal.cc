@@ -29,22 +29,21 @@ namespace iree_compiler {
 
 namespace {
 
-LogicalResult getBufferView(Operation *srcOp, Value srcOperand,
-                            Value dstOperand,
-                            ConversionPatternRewriter &rewriter,
-                            Value &retValue) {
+Value getBufferView(Operation *srcOp, Value srcOperand, Value dstOperand,
+                    ConversionPatternRewriter &rewriter) {
   auto operand = IREE::HAL::TensorRewriteAdaptor::getChecked(
       srcOp->getLoc(), srcOperand, dstOperand, rewriter);
   if (!operand.hasValue()) {
-    return srcOp->emitOpError() << "unable to create adaptor for operand";
+    srcOp->emitOpError() << "unable to create adaptor for operand";
+    return nullptr;
   }
   auto bufferView = operand->getBufferView();
   if (!bufferView) {
-    return srcOp->emitOpError() << "unable to get buffer view for operand";
+    srcOp->emitOpError() << "unable to get buffer view for operand";
+    return nullptr;
   }
 
-  retValue = bufferView;
-  return success();
+  return bufferView;
 }
 
 class ReserveOpConversion : public OpConversionPattern<tf_tensorlist::Reserve> {
@@ -58,11 +57,14 @@ class ReserveOpConversion : public OpConversionPattern<tf_tensorlist::Reserve> {
     auto elementTy = reserveOp.element_type();
     auto element_value = IREE::HAL::getElementTypeValue(elementTy).getValue();
 
-    Value operand0, operand1;
-    getBufferView(reserveOp, reserveOp.getOperand(0), newOperands[0], rewriter,
-                  operand0);
-    getBufferView(reserveOp, reserveOp.getOperand(1), newOperands[1], rewriter,
-                  operand1);
+    auto operand0 = getBufferView(reserveOp, reserveOp.getOperand(0),
+                                  newOperands[0], rewriter);
+    auto operand1 = getBufferView(reserveOp, reserveOp.getOperand(1),
+                                  newOperands[1], rewriter);
+
+    if (!operand0 || !operand1) {
+      return failure();
+    }
 
     rewriter.replaceOpWithNewOp<IREE::TensorList::Reserve>(
         reserveOp,
@@ -113,9 +115,9 @@ class StackOpConversion : public OpConversionPattern<tf_tensorlist::Stack> {
         rewriter.create<IREE::HAL::DeviceAllocatorOp>(stackOp.getLoc(), device)
             .getResult();
 
-    Value operand1;
-    getBufferView(stackOp, stackOp.getOperand(1), newOperands[1], rewriter,
-                  operand1);
+    auto operand1 =
+        getBufferView(stackOp, stackOp.getOperand(1), newOperands[1], rewriter);
+    if (!operand1) return failure();
 
     auto newStackOp = rewriter.createOrFold<IREE::TensorList::Stack>(
         stackOp.getLoc(), IREE::HAL::BufferViewType::get(rewriter.getContext()),
@@ -138,9 +140,6 @@ void populateTensorListToHALPatterns(MLIRContext *context,
   // as we just want the simple form. If we wanted to perform additional
   // verification or have a specific use case (such as a place where only the
   // buffer is required and the shape is not) we could add our own.
-  // patterns.insert<
-  //     HALOpConversion<tf_tensorlist::Reserve, IREE::TensorList::Reserve>>(
-  //     context, typeConverter);
   patterns.insert<
       HALOpConversion<tf_tensorlist::GetItem, IREE::TensorList::GetItem>>(
       context, typeConverter);
