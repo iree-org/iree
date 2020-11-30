@@ -27,6 +27,7 @@ iree_cc_library(
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "Passes.cpp"
+    "PlanConvLoopOrder.cpp"
   DEPS
     LLVMSupport
     MLIRAffineToStandard
