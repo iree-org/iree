@@ -146,8 +146,10 @@ class AppTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(VisionModule,
-                                                    exported_names=['predict'])
+    self._modules = tf_test_utils.compile_tf_module(
+        VisionModule,
+        exported_names=['predict'],
+        relative_artifacts_dir=os.path.join(FLAGS.model, FLAGS.data))
 
   def test_predict(self):
 
@@ -164,8 +166,6 @@ def main(argv):
 
   if FLAGS.model not in APP_MODELS:
     raise ValueError(f'Unsupported model: {FLAGS.model}')
-  # Override VisionModule's __name__ to be more specific.
-  VisionModule.__name__ = os.path.join(FLAGS.model, FLAGS.data)
 
   tf.test.main()
 
