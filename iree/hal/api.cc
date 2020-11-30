@@ -39,6 +39,7 @@
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
+#include "third_party/half/half.hpp"
 
 namespace iree {
 namespace hal {
@@ -294,9 +295,16 @@ static iree_status_t iree_hal_parse_element_unsafe(
                               reinterpret_cast<uint64_t*>(out_data))
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "float16 parsing not implemented");
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
+      float temp = 0;
+      if (!absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
+                            &temp)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *reinterpret_cast<uint16_t*>(out_data) =
+          half_float::detail::float2half<std::round_to_nearest>(temp);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       return absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<float*>(out_data))
@@ -407,8 +415,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                         *reinterpret_cast<const uint64_t*>(data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "parser for float16 not yet implemented");
+      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        half_float::detail::half2float<float>(
+                            *reinterpret_cast<const uint16_t*>(data.data)));
+      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const float*>(data.data));
