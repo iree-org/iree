@@ -269,7 +269,7 @@ if __name__ == '__main__':
       # in the file if it isn't. We know that the GCR digest exists at this
       # point because 'get_repo_digest' confirms that the image has been pushed.
       with open(utils.PROD_DIGESTS_PATH, 'r') as f:
-        in_prod_digests = image_url in f.read()
+        in_prod_digests = f'{image_url}@' in f.read()
       if not in_prod_digests:
         with open(utils.PROD_DIGESTS_PATH, 'a') as f:
           f.write(f'{image_url}@{digest}\n')
