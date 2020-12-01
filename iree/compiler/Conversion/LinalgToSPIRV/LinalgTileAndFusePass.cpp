@@ -279,42 +279,28 @@ static void populateTilingToInvocationPatterns(
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
-
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
-      getThreadProcInfoFn,
-      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions3D = {
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions = {
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
+  auto tilingOptions =
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(invocationDistributionOptions);
+
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(invocationDistributionOptions2D),
-      getLinalgMatchAndReplaceMarker(
-          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
-          getVectorizeMarker(), context));
-
-  auto threeDTilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(invocationDistributionOptions3D);
-
-  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
-      context, threeDTilingOptions,
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+      context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
-      context, threeDTilingOptions,
+      context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getConvFilterTileMarker(), context));
