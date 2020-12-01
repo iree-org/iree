@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_H_
 #define IREE_HAL_VULKAN_PIPELINE_EXECUTABLE_H_
 
-#include <vulkan/vulkan.h>
+#include "iree/hal/vulkan/vulkan_headers.h"
 
 #include <vector>
 
@@ -28,7 +28,6 @@
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/pipeline_executable_layout.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
 
 namespace iree {
 namespace hal {
@@ -39,8 +38,7 @@ class PipelineExecutable final : public Executable {
   static StatusOr<ref_ptr<PipelineExecutable>> Create(
       ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
       PipelineExecutableLayout* executable_layout,
-      ExecutableCachingModeBitfield mode,
-      const SpirVExecutableDef& spirv_executable_def);
+      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec);
 
   PipelineExecutable(ref_ptr<VkDeviceHandle> logical_device,
                      absl::InlinedVector<VkPipeline, 1> pipelines);
@@ -56,7 +54,6 @@ class PipelineExecutable final : public Executable {
 
  private:
   ref_ptr<VkDeviceHandle> logical_device_;
-  std::string tag_;
 
   // One pipeline per entry point.
   absl::InlinedVector<VkPipeline, 1> pipelines_;

@@ -25,7 +25,7 @@ cc_library(
     testonly = True,
     srcs = ["benchmark_main.cc"],
     deps = [
-        "//iree/base:init",
+        "//iree/base:flags",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -52,7 +52,7 @@ cc_library(
     tags = ["keep_dep"],
     deps = [
         ":gtest",
-        "//iree/base:init",
+        "//iree/base:flags",
         "@com_google_googletest//:gtest",
     ],
 )

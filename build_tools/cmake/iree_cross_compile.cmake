@@ -101,7 +101,8 @@ function(iree_create_configuration CONFIG_NAME)
   message(STATUS "C++ compiler for ${CONFIG_NAME} build: ${_CONFIG_CXX_COMPILER}")
 
   add_custom_command(OUTPUT ${IREE_${CONFIG_NAME}_BINARY_ROOT}/CMakeCache.txt
-    COMMAND "${CMAKE_COMMAND}" "${PROJECT_SOURCE_DIR}" -G "${CMAKE_GENERATOR}"
+    COMMAND "${CMAKE_COMMAND}" "${CMAKE_CURRENT_SOURCE_DIR}"
+        -G "${CMAKE_GENERATOR}"
         -DCMAKE_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
         -DCMAKE_C_COMPILER="${_CONFIG_C_COMPILER}"
@@ -150,7 +151,7 @@ function(iree_get_build_command EXECUTABLE_TARGET)
   if(NOT _RULE_CONFIG)
     set(_RULE_CONFIG "$<CONFIG>")
   endif()
-  if (CMAKE_GENERATOR MATCHES "Make")
+  if(CMAKE_GENERATOR MATCHES "Make")
     # Use special command for Makefiles to support parallelism.
     set(${_RULE_CMDVAR}
         "$(MAKE)" "-C" "${_RULE_BINDIR}" "${EXECUTABLE_TARGET}" PARENT_SCOPE)

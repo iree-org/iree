@@ -19,7 +19,7 @@ function(iree_append value)
 endfunction()
 
 if(IREE_ENABLE_LLD)
-  if (IREE_USE_LINKER)
+  if(IREE_USE_LINKER)
     message(FATAL_ERROR "IREE_ENABLE_LLD and IREE_USE_LINKER can't be set at the same time")
   endif()
   set(IREE_USE_LINKER "lld")

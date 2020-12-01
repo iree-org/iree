@@ -59,7 +59,6 @@
 #include <utility>
 
 #include "absl/types/span.h"
-#include "absl/types/variant.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"

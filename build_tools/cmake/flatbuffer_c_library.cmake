@@ -21,10 +21,6 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: name of target (see Note)
 # SRCS: List of source files for the library
-# DEPS: List of other libraries to be linked in to the binary targets
-# COPTS: List of private compile options
-# DEFINES: List of public defines
-# LINKOPTS: List of link options
 # FLATCC_ARGS: List of flattbuffers arguments. Default:
 #             "--common"
 #             "--reader"
@@ -39,32 +35,28 @@ include(CMakeParseArguments)
 #
 # flatbuffer_c_library(
 #   NAME
-#     base_schema
+#     some_def
 #   SRCS
-#     "a.fbs"
-# )
-# flatbuffer_c_library(
-#   NAME
-#     other_schemas
-#   SRCS
-#     "b.fbs"
-#   DEPS
-#     iree::schemas::base_schema
+#     "some_def.fbs"
+#   FLATCC_ARGS
+#     "--reader"
+#     "--builder"
+#     "--verifier"
+#     "--json"
 #   PUBLIC
 # )
-#
 # iree_cc_binary(
 #   NAME
 #     main_lib
 #   ...
 #   DEPS
-#     iree::schemas::other_schemas
+#     iree::schemas::some_def
 # )
 function(flatbuffer_c_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS;FLATCC_ARGS"
+    "SRCS;FLATCC_ARGS"
     ${ARGN}
   )
 
@@ -95,6 +87,9 @@ function(flatbuffer_c_library)
         list(APPEND _OUTS "${_SRC_FILENAME}_builder.h")
       elseif(_ARG STREQUAL "--verifier")
         list(APPEND _OUTS "${_SRC_FILENAME}_verifier.h")
+      elseif(_ARG STREQUAL "--json")
+        list(APPEND _OUTS "${_SRC_FILENAME}_json_printer.h")
+        list(APPEND _OUTS "${_SRC_FILENAME}_json_parser.h")
       endif()
     endforeach()
   endforeach()
@@ -125,28 +120,24 @@ function(flatbuffer_c_library)
     ${_GEN_TARGET}
     DEPENDS
       ${_OUTS}
-      ${_RULE_DEPS}
   )
 
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_GEN_TARGET})
   target_include_directories(${_NAME} SYSTEM
     INTERFACE
-      "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+      "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+      "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
       ${CMAKE_CURRENT_BINARY_DIR}
     )
   target_link_libraries(${_NAME}
     INTERFACE
       flatcc::runtime
-      ${_RULE_LINKOPTS}
       ${IREE_DEFAULT_LINKOPTS}
-  )
-  target_compile_definitions(${_NAME}
-    INTERFACE
-      ${_RULE_DEFINES}
   )
   target_compile_options(${_NAME}
     INTERFACE
+      "-I${IREE_ROOT_DIR}/third_party/flatcc/include/"
       "-I${IREE_ROOT_DIR}/third_party/flatcc/include/flatcc/reflection/"
   )
 

@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/atomics.h"
-#include "iree/base/threading.h"
+// NOTE: must be first to ensure that we can define settings for all includes.
 #include "iree/base/threading_impl.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_APPLE)
 
@@ -24,6 +22,10 @@
 #include <mach/thread_act.h>
 #include <pthread.h>
 #include <string.h>
+
+#include "iree/base/atomics.h"
+#include "iree/base/threading.h"
+#include "iree/base/tracing.h"
 
 // Useful to see how pthreads is implemented on (old) darwin:
 // https://opensource.apple.com/source/Libc/Libc-825.40.1/pthreads/pthread.c.auto.html

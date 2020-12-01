@@ -148,7 +148,7 @@ class NativeModule {
     if (out_function) {
       out_function->module = module->interface();
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT;
-      out_function->ordinal = ordinal;
+      out_function->ordinal = static_cast<uint16_t>(ordinal);
     }
     if (out_name) {
       *out_name = dispatch_function.name;

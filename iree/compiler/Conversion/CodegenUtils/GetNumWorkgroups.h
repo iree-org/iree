@@ -18,33 +18,17 @@
 #include <array>
 #include <cstdint>
 
-namespace llvm {
-class StringRef;
-template <typename T>
-class ArrayRef;
-template <typename T>
-class Optional;
-}  // namespace llvm
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
 
 namespace mlir {
-class Location;
-class FuncOp;
-struct LogicalResult;
-class PatternRewriter;
-class ConversionPatternRewriter;
-class Value;
-namespace linalg {
-class LinalgOp;
-}  // namespace linalg
-
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
-class InterfaceOp;
-class TensorRewriteAdaptor;
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
 namespace iree_compiler {
 
 /// Generates a function that computes the number of workgroups as

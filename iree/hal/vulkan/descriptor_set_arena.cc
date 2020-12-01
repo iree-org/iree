@@ -131,7 +131,7 @@ Status DescriptorSetArena::BindDescriptorSet(
 
   // Pick a bucket based on the number of descriptors required.
   // NOTE: right now we are 1:1 with bindings.
-  int required_descriptor_count = bindings.size() * 1;
+  int required_descriptor_count = static_cast<int>(bindings.size() * 1);
   int max_descriptor_count =
       std::max(8, RoundUpToNearestPow2(required_descriptor_count));
   int bucket = TrailingZeros(max_descriptor_count >> 3);
@@ -194,7 +194,8 @@ Status DescriptorSetArena::BindDescriptorSet(
   // descriptor sets we will need and what buffers they will point to (without
   // doing just as much work as actually recording the buffer to try to find
   // out).
-  syms().vkUpdateDescriptorSets(*logical_device_, write_infos.size(),
+  syms().vkUpdateDescriptorSets(*logical_device_,
+                                static_cast<uint32_t>(write_infos.size()),
                                 write_infos.data(), 0, nullptr);
 
   // Bind the descriptor set.
@@ -219,7 +220,8 @@ Status DescriptorSetArena::PushDescriptorSet(
   // command buffer and prevent the need for our own pooling mechanisms.
   syms().vkCmdPushDescriptorSetKHR(
       command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-      executable_layout->handle(), set, write_infos.size(), write_infos.data());
+      executable_layout->handle(), set,
+      static_cast<uint32_t>(write_infos.size()), write_infos.data());
 
   return OkStatus();
 }

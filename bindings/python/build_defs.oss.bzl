@@ -17,10 +17,8 @@
 load("@iree_native_python//:build_defs.bzl", "py_extension")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
-load("//iree:build_defs.oss.bzl", _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS")
 
 NUMPY_DEPS = []
-PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
 PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 PYTHON_CPP_EXTRA_DEPS = []
 

@@ -375,10 +375,10 @@ TEST_P(BufferTest, MapMemorySubspan) {
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 0xCC, 0xDD, 4, 5, 6));
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, BufferTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, BufferTest,
+    ::testing::ValuesIn(CtsTestBase::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

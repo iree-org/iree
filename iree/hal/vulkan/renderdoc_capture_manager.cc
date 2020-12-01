@@ -19,8 +19,7 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-#if defined(IREE_PLATFORM_WINDOWS)
-#else
+#if !defined(IREE_PLATFORM_WINDOWS)
 #include <dlfcn.h>
 #endif  // IREE_PLATFORM_WINDOWS
 

@@ -50,9 +50,6 @@ flags.DEFINE_bool(
     "Summarize the inputs and outputs of each module trace logged to disk.")
 flags.DEFINE_bool("log_all_traces", False,
                   "Log all traces to logging.info, even if comparison passes.")
-flags.DEFINE_bool(
-    "get_saved_model", False,
-    "Creates and stores a SavedModel for the tf.Module class to be tested.")
 
 FLAGS = flags.FLAGS
 DEFAULT_INPUT_GENERATOR = tf_utils.uniform
@@ -432,6 +429,7 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
                           atol: float = None,
                           rtol: float = None,
                           name: str = None,
+                          static_signature: Sequence[tf.TensorSpec] = None,
                           **tf_function_kwargs):
   """Creates a tf.function that can be used to generate unit_tests.
 
@@ -453,6 +451,10 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
     name:
       optional, the name to reference this function with. Must be used if
       decorating a lambda.
+    static_signature:
+      optional, a signature with the same structure as 'input_signature'. Used
+      to specify the correct shape for data generation when dynamic dims are
+      provided.
 
   Raises:
     ValueError: if 'input_generator' and 'input_args' are both specified.
@@ -481,17 +483,22 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
     global _global_unit_test_configs
     if function.__name__ not in _global_unit_test_configs:
 
+      if static_signature is not None:
+        signature = static_signature
+      else:
+        signature = function.input_signature
+
       if input_generator is not None:
         # Use the user-specificed input_generator.
         get_trace_args = lambda: tf_utils.generate_inputs(
-            function.input_signature, input_generator)
+            signature, input_generator)
       elif input_args is not None:
         # Use the user-specified input_args.
         get_trace_args = lambda: copy.deepcopy(input_args)
       else:
         # No user data specification – default to using random uniform data.
         get_trace_args = lambda: tf_utils.generate_inputs(
-            function.input_signature, DEFAULT_INPUT_GENERATOR)
+            signature, DEFAULT_INPUT_GENERATOR)
 
       _global_unit_test_configs[function.__name__] = dict(
           get_trace_args=get_trace_args,

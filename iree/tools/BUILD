@@ -15,13 +15,6 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
 
-load(
-    "//iree:build_defs.oss.bzl",
-    "IREE_DRIVER_MODULES",
-    "PLATFORM_VULKAN_DEPS",
-    iree_cc_binary = "cc_binary",
-)
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -33,36 +26,34 @@ exports_files([
     "sanitizer_suppressions.txt",
 ])
 
-iree_cc_binary(
+cc_binary(
     name = "iree-benchmark-module",
     testonly = True,
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
+        "//iree/base:file_io",
+        "//iree/base:flags",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/tools/utils:vm_util",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
-        "//iree/base:init",
-        "//iree/base:file_io",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/modules/hal",
-        "//iree/tools/utils:vm_util",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
-        "//iree/base:file_io",  # build-cleaner: keep
-        "//iree/base:flatbuffer_util",
-        "//iree/base:init",
-        "//iree/schemas:bytecode_module_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/base:file_mapping",
+        "//iree/schemas:bytecode_module_def_c_fbs",
     ],
 )
 
@@ -211,7 +202,7 @@ cc_library(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-opt",
     tags = ["hostonly"],
     deps = [
@@ -219,17 +210,16 @@ iree_cc_binary(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
     deps = [
         ":init_passes_and_dialects",
         ":init_targets",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
         "//iree/base:api",
+        "//iree/base:flags",
+        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Transforms",
@@ -237,45 +227,52 @@ iree_cc_binary(
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/compiler/Translation:IREEVM",
         "//iree/hal:api",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/compiler/Translation:IREEVM",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-run-module",
     srcs = ["iree-run-module-main.cc"],
     deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
         "//iree/base:file_io",
-        "//iree/base:init",
+        "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-tblgen",
+    srcs = [
+        "//iree/compiler/Dialect/IREE/Tools:GenSrcs",
+        "//iree/compiler/Dialect/VM/Tools:GenSrcs",
+    ],
     tags = ["hostonly"],
     deps = [
-        "//iree/compiler/Dialect/IREE/Tools",
-        "//iree/compiler/Dialect/VM/Tools",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
@@ -305,7 +302,7 @@ cc_library(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "iree-translate",
     tags = ["hostonly"],
     deps = [
