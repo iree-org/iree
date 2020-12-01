@@ -15,67 +15,54 @@
 # limitations under the License.
 
 # Compiles the given model to modules. The targets are expected to be a
-# comma-separated list, e.g., --targets=vmla,vulkan,dylib
+# comma-separated list, e.g., --targets=vmla,vulkan-spirv,dylib-llvm-aot
 #
-# If dylib target is set, the script assumes ANDROID_NDK env is also set.
+# If dylib-llvm-aot target is set, the script assumes ANDROID_NDK env is also
+# set.
 
-PREFIX="module"
+prefix="module"
 while [[ $# -gt 0 ]]; do
   token="$1"
   case $token in
     --model=*)
-      MODEL=${1#*=}
+      model=${1#*=}
       shift
       ;;
     --targets=*)
-      TARGETS=${1#*=}
+      targets=${1#*=}
       shift
       ;;
     --prefix=*)
-      PREFIX=${1#*=}
+      prefix=${1#*=}
       shift
       ;;
   esac
 done
 
-if [[ -z "${MODEL}" ]]; then
+if [[ -z "${model}" ]]; then
   echo "Must set --model flag.";
   exit 1
 fi
 
 export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
 
-IFS=',' read -ra targets_array <<< "$TARGETS"
+IFS=',' read -ra targets_array <<< "$targets"
 for target in "${targets_array[@]}"
 do
   echo "Compile the module for ${target}..."
-  module_name="${PREFIX}-${target}.vmfb"
+  module_name="${prefix}-${target}.vmfb"
+  extra_flags=()
   case "${target}" in
-    "vulkan")
-      build/host/iree/tools/iree-translate \
-        --iree-mlir-to-vm-bytecode-module \
-        --iree-hal-target-backends=vulkan-spirv \
-        ${MODEL} \
-        -o "${module_name}"
+    "dylib-llvm-aot")
+      extra_flags+=('--iree-llvm-target-triple=aarch64-linux-android')
       ;;
-    "vmla")
-      build/host/iree/tools/iree-translate \
-        --iree-mlir-to-vm-bytecode-module \
-        --iree-hal-target-backends=vmla \
-        ${MODEL} \
-        -o "${module_name}"
-      ;;
-    "dylib")
-      build/host/iree/tools/iree-translate \
-        --iree-mlir-to-vm-bytecode-module \
-        --iree-hal-target-backends=dylib-llvm-aot \
-        --iree-llvm-target-triple=aarch64-linux-android \
-        ${MODEL} \
-        -o "${module_name}"
-        ;;
     *)
-      echo "Not supported target"
-      exit 1
       ;;
   esac
+  build-android/host/iree/tools/iree-translate \
+    --iree-mlir-to-vm-bytecode-module \
+    --iree-hal-target-backends=vmla \
+    "${extra_flags[@]}" \
+    "${model}" \
+    -o "${module_name}"
 done
