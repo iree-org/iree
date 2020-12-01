@@ -33,7 +33,7 @@
 #endif  // IREE_HAL_HAVE_VMLA_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_VULKAN_DRIVER_MODULE)
-#include "iree/hal/vulkan/registration/google_internal/driver_module.h"
+#include "iree/hal/vulkan/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

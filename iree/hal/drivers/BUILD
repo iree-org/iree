@@ -14,7 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
-    features = ["-layering_check"],  # buildozer: disable=no-layering-check, allow indirect headers
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -30,6 +30,6 @@ cc_library(
         "//iree/hal/dylib/registration",
         "//iree/hal/llvmjit/registration",
         "//iree/hal/vmla/registration",
-        "//iree/hal/vulkan/registration/google_internal:registration",
+        "//iree/hal/vulkan/registration",
     ],
 )

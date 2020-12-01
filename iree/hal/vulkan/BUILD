@@ -85,17 +85,16 @@ cc_library(
     ],
 )
 
-# TODO(suderman): Re-enable once testing solution is found.
-# cc_test(
-#     name = "dynamic_symbols_test",
-#     srcs = ["dynamic_symbols_test.cc"],
-#     tags = ["driver=vulkan"],
-#     deps = [
-#         ":utils",
-#         "//iree/testing:gtest",
-#         "//iree/testing:gtest_main",
-#     ],
-# )
+cc_test(
+    name = "dynamic_symbols_test",
+    srcs = ["dynamic_symbols_test.cc"],
+    tags = ["driver=vulkan"],
+    deps = [
+        ":utils",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
 
 cc_library(
     name = "vma_allocator",
