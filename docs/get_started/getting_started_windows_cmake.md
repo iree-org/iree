@@ -102,6 +102,51 @@ Build all targets:
 > cmake --build ..\iree-build\
 ```
 
+## Target Configuration
+
+### LLVM AOT Backend
+
+`-iree-hal-target-backends=dylib-llvm-aot` can be used to generate modules with
+ahead-of-time compiled kernels stored in DLLs. Run the iree-opt/iree-translate
+tools from a command prompt with `lld-link.exe` or `link.exe` tools on the
+`PATH` and the MSVC/Windows SDK environment variables; the easiest way to get
+this configured is to use the `vsvarsall.bat` or `vcvars64.bat` files to set
+your environment. See
+[the Microsoft documentation](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019)
+for details on configuring the toolchain.
+
+If you want to manually specify the linker used, set the
+`IREE_LLVMAOT_LINKER_PATH` environment variable to the path of the linker:
+
+```powershell
+> set IREE_LLVMAOT_LINKER_PATH="C:\Tools\LLVM\bin\lld-link.exe"
+```
+
+Translate a source MLIR file into an IREE module:
+
+```powershell
+> ..\iree-build\iree\tools\iree-translate.exe \
+  -iree-mlir-to-vm-bytecode-module \
+  -iree-hal-target-backends=dylib-llvm-aot \
+  iree/tools/test/simple.mlir \
+  -o %TMP%/simple-llvm_aot.vmfb
+```
+
+Note that this will use the host machine as the target by default, and the
+exact target triple and architecture can be specified with flags when
+cross-compiling:
+
+```powershell
+> ..\iree-build\iree\tools\iree-translate.exe \
+  -iree-mlir-to-vm-bytecode-module \
+  -iree-hal-target-backends=dylib-llvm-aot \
+  -iree-llvm-target-triple=x86_64-pc-windows-msvc \
+  -iree-llvm-target-cpu=host \
+  -iree-llvm-target-cpu-features=host \
+  iree/tools/test/simple.mlir \
+  -o %TMP%/simple-llvm_aot.vmfb
+```
+
 ## What's next?
 
 ### Take a Look Around

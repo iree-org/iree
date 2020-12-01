@@ -119,6 +119,39 @@ $ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
   -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
+### LLVM Ahead-of-Time (AOT) backend
+
+To compile IREE LLVM AOT (vs JIT) module we need to set the AOT linker path environment variable:
+
+```shell
+$ export IREE_LLVMAOT_LINKER_PATH=ld.lld-10
+```
+
+Translate a source MLIR into an IREE module:
+
+```shell
+# Assuming in IREE source root
+$ ./build/iree/tools/iree-translate \
+    -iree-mlir-to-vm-bytecode-module \
+    -iree-llvm-target-triple=x86_64-linux-gnu \
+    -iree-hal-target-backends=dylib-llvm-aot \
+    iree/tools/test/simple.mlir \
+    -o /tmp/simple-llvm_aot.vmfb
+```
+
+Then run the compiled module using the `dylib` HAL driver:
+
+```shell
+$ ./build/iree/tools/iree-run-module -driver=dylib \
+          -input_file=/tmp/simple-llvm_aot.vmfb \
+          -entry_function=abs \
+          -inputs="i32=-5"
+
+EXEC @abs
+i32=5
+```
+
+
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see

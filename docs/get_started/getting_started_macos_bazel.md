@@ -104,8 +104,9 @@ build --disk_cache=/tmp/bazel-cache
 # and with assertions enabled.
 build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never
 
-# Use --config=asserts to enable assertions in IREE and LLVM.
-build:asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-UNDEBUG'
+# Use --config=asserts to enable assertions. This has to be done globally:
+# Code compiled with and without assertions can't be linked together (ODR violation).
+build:asserts --compilation_mode=opt '--copt=-UNDEBUG'
 ```
 
 ## What's next?

@@ -32,7 +32,7 @@ func @dot(%lhs: tensor<32x1024xf32>, %rhs: tensor<1024x64xf32>) -> tensor<32x64x
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -74,7 +74,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -84,7 +84,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -94,7 +94,7 @@ module {
 ```
 ### IR Dump After Inliner
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -120,7 +120,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::LegalizeInputTypesPass
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -186,7 +186,7 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::DispatchabilityAnalysisPass
 ```
-module {
+module  {
   func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x64xf32> {iree.reflection = {}}) -> (tensor<32x64xf32> {iree.reflection = {}}) attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
@@ -244,10 +244,10 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegionsPass
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -273,10 +273,10 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::DeduplicateExecutablesPass
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -374,10 +374,10 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineLargeConstantsPass
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -397,10 +397,10 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -420,10 +420,10 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -443,10 +443,10 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::IdentifyConstantPoolsPass
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -466,10 +466,10 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeConstantPoolBuffersPass
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -489,10 +489,10 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -512,10 +512,10 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     flow.dispatch.entry @dot_ex_dispatch_0
-    module {
+    module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
         return %0 : tensor<32x64xf32>
@@ -535,7 +535,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeInterfacesPass
 ```
-module {
+module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -544,7 +544,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         func @dot_ex_dispatch_0() {
           %c0 = constant 0 : index
           %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
@@ -578,7 +578,7 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   func @dot_ex_dispatch_0() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
@@ -621,7 +621,7 @@ func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1
 ```
 ### IR Dump After Inliner
 ```
-module {
+module  {
   func @dot_ex_dispatch_0() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
@@ -640,7 +640,7 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   func @dot_ex_dispatch_0() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
@@ -906,7 +906,7 @@ func @dot_ex_dispatch_0() {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::VMLA::ConversionPass
 ```
-module {
+module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
     %c1024 = constant 1024 : index
     %c64 = constant 64 : index
@@ -1061,7 +1061,7 @@ func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg
 ```
 ### IR Dump After mlir::iree_compiler::IREE::VM::MarkPublicSymbolsExportedPass
 ```
-module {
+module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
     %c1024 = constant 1024 : index
     %c64 = constant 64 : index
@@ -1101,7 +1101,7 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   func @dot_ex_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) attributes {iree.module.export} {
     %c1024 = constant 1024 : index
     %c64 = constant 64 : index
@@ -1141,7 +1141,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::VM::ConversionPass
 ```
-module {
+module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
       %c1024 = vm.const.i32 1024 : i32
@@ -1342,6 +1342,8 @@ module {
     vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
@@ -1560,6 +1562,8 @@ vm.module @module {
   vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
@@ -1777,6 +1781,8 @@ vm.module @module {
   vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
@@ -1794,7 +1800,7 @@ vm.module @module {
 ```
 ### IR Dump After Inliner
 ```
-module {
+module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
       %c1024 = vm.const.i32 1024 : i32
@@ -1995,6 +2001,8 @@ module {
     vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
@@ -2013,7 +2021,7 @@ module {
 ```
 ### IR Dump After CSE
 ```
-module {
+module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
       %c1024 = vm.const.i32 1024 : i32
@@ -2202,6 +2210,8 @@ module {
     vm.import @vmla.reduce.max.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.max.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.and.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.reduce.or.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.pooling.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_dimensions : i32 ..., %window_strides : i32 ..., %padding : i32 ...) attributes {sym_visibility = "private"}
@@ -2220,7 +2230,7 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
       %c1024 = vm.const.i32 1024 : i32
@@ -2298,7 +2308,7 @@ vm.module @module {
 ```
 hal.executable.target @vmla, filter="vmla" {
   hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-  module {
+  module  {
     vm.module @module {
       vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
         %zero = vm.const.i32.zero : i32
@@ -2338,7 +2348,7 @@ hal.executable.target @vmla, filter="vmla" {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::ConvertToHALPass
 ```
-module {
+module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -2347,7 +2357,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -2525,7 +2535,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::{anonymous}::PublicABIGenerationPass
 ```
-module {
+module  {
   hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -2534,7 +2544,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -2623,7 +2633,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::LinkExecutablesPass
 ```
-module {
+module  {
   hal.executable @linked_vmla attributes {sym_visibility = "private"} {
     hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -2632,7 +2642,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @linked_module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -2721,7 +2731,7 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::ResolveEntryPointOrdinalsPass
 ```
-module {
+module  {
   hal.executable @linked_vmla attributes {sym_visibility = "private"} {
     hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -2730,7 +2740,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @linked_module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -2943,7 +2953,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeResourceCachesPass
 ```
-module {
+module  {
   hal.variable @_executable_linked_vmla mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
@@ -2979,7 +2989,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @linked_module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -3172,7 +3182,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MemoizeDeviceQueriesPass
 ```
-module {
+module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
@@ -3217,7 +3227,7 @@ module {
     }
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-      module {
+      module  {
         vm.module @linked_module {
           vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
             %zero = vm.const.i32.zero : i32
@@ -3592,7 +3602,7 @@ hal.executable @linked_vmla attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1344xi8>, format = 1447906369 : i32} {
+  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1334xi8>, format = 1447906369 : i32} {
   }
 }
 
@@ -3719,7 +3729,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
@@ -3760,7 +3770,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1344xi8>, format = 1447906369 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1334xi8>, format = 1447906369 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw", noinline} {
@@ -3816,7 +3826,7 @@ module {
 ```
 ### IR Dump After Canonicalizer
 ```
-module {
+module  {
   hal.variable @_device_match_id_0 init(@_device_match_id_0_initializer) : i1 attributes {sym_visibility = "private"}
   func private @_device_match_id_0_initializer() -> i1 {
     %dev = hal.ex.shared_device : !hal.device
@@ -3857,7 +3867,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1344xi8>, format = 1447906369 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1334xi8>, format = 1447906369 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw", noinline} {
@@ -3913,11 +3923,11 @@ module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::VM::ConversionPass
 ```
-module {
+module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
     vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
-    vm.func @_device_match_id_0_initializer() -> i32 attributes {sym_visibility = "private"} {
+    vm.func private @_device_match_id_0_initializer() -> i32 {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -3925,7 +3935,7 @@ module {
     }
     vm.global.ref @_executable_linked_vmla mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
-    vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
+    vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %c1 = vm.const.i32 1 : i32
       %zero = vm.const.i32.zero : i32
@@ -3941,7 +3951,7 @@ module {
       vm.return %ref_5 : !vm.ref<!hal.descriptor_set_layout>
     }
     vm.global.ref @_executable_layout_0 init(@_executable_layout_0_initializer) : !vm.ref<!hal.executable_layout>
-    vm.func @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> attributes {sym_visibility = "private"} {
+    vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> {
       %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %zero = vm.const.i32.zero : i32
@@ -3950,8 +3960,8 @@ module {
     }
     vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
-    vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
+    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
+    vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
       %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
@@ -4095,7 +4105,7 @@ module {
 vm.module @module {
   vm.global.i32 @_device_match_id_0 init(@_device_match_id_0_initializer) : i32
   vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
-  vm.func @_device_match_id_0_initializer() -> i32 attributes {sym_visibility = "private"} {
+  vm.func private @_device_match_id_0_initializer() -> i32 {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -4103,7 +4113,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_linked_vmla mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
-  vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
+  vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %c1 = vm.const.i32 1 : i32
     %zero = vm.const.i32.zero : i32
@@ -4119,7 +4129,7 @@ vm.module @module {
     vm.return %ref_5 : !vm.ref<!hal.descriptor_set_layout>
   }
   vm.global.ref @_executable_layout_0 init(@_executable_layout_0_initializer) : !vm.ref<!hal.executable_layout>
-  vm.func @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> attributes {sym_visibility = "private"} {
+  vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> {
     %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %zero = vm.const.i32.zero : i32
@@ -4128,8 +4138,8 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
-  vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
+  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
+  vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
     %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
@@ -4272,7 +4282,7 @@ vm.module @module {
 vm.module @module {
   vm.global.i32 @_device_match_id_0 mutable : i32
   vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
-  vm.func @_device_match_id_0_initializer() -> i32 attributes {sym_visibility = "private"} {
+  vm.func private @_device_match_id_0_initializer() -> i32 {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -4280,7 +4290,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_linked_vmla mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
-  vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
+  vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %c1 = vm.const.i32 1 : i32
     %zero = vm.const.i32.zero : i32
@@ -4296,7 +4306,7 @@ vm.module @module {
     vm.return %ref_5 : !vm.ref<!hal.descriptor_set_layout>
   }
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-  vm.func @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> attributes {sym_visibility = "private"} {
+  vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> {
     %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %zero = vm.const.i32.zero : i32
@@ -4305,8 +4315,8 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
-  vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
+  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
+  vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
     %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
@@ -4458,7 +4468,7 @@ vm.module @module {
 ```
 ### IR Dump After Inliner
 ```
-module {
+module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
@@ -4467,7 +4477,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
+    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -4635,7 +4645,7 @@ module {
 ```
 ### IR Dump After CSE
 ```
-module {
+module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
@@ -4644,7 +4654,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
+    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -4812,7 +4822,7 @@ module {
 ```
 ### IR Dump After SymbolDCE
 ```
-module {
+module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
@@ -4821,7 +4831,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
+    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -4969,7 +4979,7 @@ vm.module @module {
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
+  vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -5108,7 +5118,7 @@ vm.module @module {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::DropCompilerHintsPass
 ```
-module {
+module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_vmla_EC74E8E47AC10E22 dense<[118, 109, 108, 97]> : vector<4xi8>
@@ -5117,7 +5127,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1344xi8>
+    vm.rodata @_linked_vmla_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1334xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
