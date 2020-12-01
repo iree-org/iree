@@ -409,31 +409,19 @@ static void populateTilingToInvocationPatterns(
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions2D = {
-      getThreadProcInfoFn,
-      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions3D = {
+  linalg::LinalgLoopDistributionOptions invocationDistributionOptions = {
       getThreadProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>>(
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
       context,
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(invocationDistributionOptions2D),
-      getLinalgMatchAndReplaceMarker(
-          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
-          getVectorizeMarker(), context));
-  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(invocationDistributionOptions3D),
+          .setDistributionOptions(invocationDistributionOptions),
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
