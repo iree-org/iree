@@ -17,11 +17,13 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -41,11 +43,6 @@ struct LinalgTileAndDistributePass
   LinalgTileAndDistributePass() = default;
   LinalgTileAndDistributePass(const LinalgTileAndDistributePass &pass) {}
   void runOnOperation() override;
-
- private:
-  ListOption<int64_t> tileSizes{
-      *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
 }  // namespace
 
@@ -74,8 +71,8 @@ struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
          failed(createNumWorkgroupsFromResultShape(
              rewriter, cast<linalg::LinalgOp>(op), funcOp,
              getNumWorkgroupsFnAttrName(),
-             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op),
-             {0, 1, 2})))) {
+             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(
+                 op))))) {
       return failure();
     }
     rewriter.eraseOp(op);
@@ -112,8 +109,7 @@ struct TileAndFuseToCPUThreads
         failed(createNumWorkgroupsFromResultShape(
             rewriter, cast<linalg::LinalgOp>(op), funcOp,
             getNumWorkgroupsFnAttrName().str(),
-            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op),
-            {0, 1, 2}))) {
+            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op)))) {
       return failure();
     }
     return success();
@@ -124,6 +120,34 @@ struct TileAndFuseToCPUThreads
 };
 
 }  // namespace
+
+Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
+                                          ArrayRef<Value> boundingSubViewSize,
+                                          OperationFolder *folder) {
+  // Allocate the memory into the entry block of the parent FuncOp. This better
+  // aligns with the semantics of this memory which is available at the entry of
+  // the function.
+  OpBuilder::InsertionGuard guard(b);
+  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  if (!funcOp) {
+    subview.emitError("expected op to be within std.func");
+    return llvm::None;
+  }
+  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
+  // The bounding subview size is expected to be constant. This specified the
+  // shape of the allocation.
+  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
+      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
+        APInt value;
+        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
+        return -1;
+      }));
+  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
+  MemRefType allocType =
+      MemRefType::get(shape, subview.getType().getElementType());
+  Value buffer = b.create<AllocaOp>(subview.getLoc(), allocType);
+  return buffer;
+}
 
 void LinalgTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -148,57 +172,57 @@ void LinalgTileAndDistributePass::runOnOperation() {
        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
-  CPUKernelDispatch cpuKernelDispatch;
-
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
-    // Compute the Linalg Dependence Graph.
+    Region &body = funcOp.getBody();
+    if (!llvm::hasSingleElement(body.getBlocks())) {
+      funcOp.emitError("unhandled dispatch function with multiple blocks");
+      return signalPassFailure();
+    }
+    Block &block = body.front();
+    auto linalgOps = block.getOps<linalg::LinalgOp>();
+    if (linalgOps.empty()) continue;
+
+    SmallVector<linalg::LinalgOp, 4> linalgOpsVec =
+        llvm::to_vector<4>(llvm::map_range(linalgOps, [](Operation *op) {
+          return cast<linalg::LinalgOp>(op);
+        }));
     linalg::Aliases aliases;
-    linalg::LinalgDependenceGraph dependenceGraph =
-        linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, funcOp);
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    Optional<LaunchConfig> launchConfigOpt =
+        initCPULaunchConfig(context, dependenceGraph, linalgOpsVec);
+    if (!launchConfigOpt) {
+      funcOp.emitError("unable to find launch configuration");
+      return signalPassFailure();
+    }
+    LaunchConfig &launchConfig = *launchConfigOpt;
 
-    OwningRewritePatternList patterns;
-
-    auto linalgTilingOptions =
-        linalg::LinalgTilingOptions()
-            .setDistributionOptions(workgroupDistributionOptions)
-            .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops);
-    tileSizes.empty()
-        ? linalgTilingOptions.setTileSizeComputationFunction(
-              [&cpuKernelDispatch](
-                  OpBuilder &builder,
-                  Operation *operation) -> SmallVector<Value, 4> {
-                return TileSizeFn::get<TilingLevel::WorkGroupTiles>(
-                    cpuKernelDispatch, builder, operation);
-              })
-        : linalgTilingOptions.setTileSizes(ArrayRef<int64_t>(tileSizes));
-    patterns.insert<TileAndFuseToCPUThreads<linalg::MatmulOp>,
-                    TileAndFuseToCPUThreads<linalg::BatchMatmulOp>,
-                    TileToCPUThreads<linalg::MatmulOp>,
-                    TileToCPUThreads<linalg::BatchMatmulOp>>(
-        context, dependenceGraph, cpuKernelDispatch, linalgTilingOptions,
-        linalg::LinalgMarker(ArrayRef<Identifier>(),
-                             Identifier::get(getWorkgroupMarker(), context)));
-
-    // Tile and distribute to CPU threads.
-    applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-
-    // Apply canonicalization patterns.
-    OwningRewritePatternList canonicalizationPatterns;
-    canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
-    AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                               context);
-    AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-    SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-
-    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
-
-    // Delete the ops that are marked for deletion.
-    funcOp.walk([](linalg::LinalgOp linalgOp) {
-      if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
-        linalgOp.getOperation()->erase();
+    LLVM_DEBUG({
+      llvm::dbgs() << "@func " << funcOp.getName() << "\n";
+      for (auto op : linalgOps) {
+        llvm::dbgs() << "\t" << op.getOperation()->getName() << " : ";
+        TileSizesListTypeRef configTileSizes = launchConfig.getTileSizes(op);
+        llvm::dbgs() << "{";
+        std::string sep = "";
+        for (auto &level : enumerate(configTileSizes)) {
+          llvm::dbgs() << sep << level.index() << " : [";
+          sep = ", ";
+          interleaveComma(level.value(), llvm::dbgs());
+          llvm::dbgs() << "]";
+        }
+        llvm::dbgs() << "}\n";
+      }
     });
+
+    TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
+                                             allocateThreadLocalMemory};
+    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOpsVec, dependenceGraph,
+                                          launchConfig, tileAndFuseOptions))) {
+      return signalPassFailure();
+    }
+
+    launchConfig.finalize(funcOp);
   }
 }
 

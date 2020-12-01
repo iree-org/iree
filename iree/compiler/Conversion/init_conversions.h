@@ -33,6 +33,7 @@ inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
+  createDemoteF32ToF16Pass();
 }
 
 inline void registerLinalgToVectorPasses() {

@@ -19,11 +19,13 @@
 // the number of workgroups to use for launch, etc.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 
 #include <array>
 
+#include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -41,107 +43,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Store the tile sizes to use at different levels of tiling as a vector of
-/// vectors.
-/// - First level tiling maps to workgroups.
-/// - Second level tiling maps to subgroups.
-using TileSizesListType = SmallVector<SmallVector<int64_t, 4>, 1>;
-
-/// Based on the linalg operations in a dispatch region, the number of levels of
-/// tiling, the tile sizes needed, the workgroup size, etc. need to be
-/// decided. These parameters are called `LaunchConfig`. This class implements
-/// one heuristic to compute these for the different linalg operations on
-/// buffers. This can be adapted later to support multiple configurations that
-/// can be picked based on device information/problem size information. It
-/// exposes the information needed by the codegenerators, and hides the
-/// implementation from the rest of the pipeline.
-class LaunchConfig {
- public:
-  LaunchConfig()
-      : workgroupSize({1, 1, 1}),
-        workgroupLoopIndices({0, 1, 2}),
-        numSubgroups({1, 1, 1}) {}
-
-  /// Given the sequence of `linalgOps` (and `options`), decide the launch
-  /// configuration by deciding
-  /// - the number of levels of tiling,
-  /// - tile sizes for each level,
-  /// - the workgroup size, and
-  /// - number of subgroups to use.
-  LogicalResult init(MLIRContext *context,
-                     const linalg::LinalgDependenceGraph &dependenceGraph,
-                     const SPIRVCodegenOptions &options,
-                     ArrayRef<linalg::LinalgOp> linalgOps);
-
-  /// Remove attributed added to operations for retrieving tile size
-  /// information.
-  void finalize(FuncOp funcOp);
-
-  /// Gets the tile size computed for an operation at all levels.
-  TileSizesListType getTileSizes(Operation *op) const {
-    auto key = getKey(op);
-    if (!key) return {};
-    auto it = tileSizes.find(*key);
-    return it->second;
-  }
-
-  /// Gets the tile size computed for an operation for an level.
-  ArrayRef<int64_t> getTileSizes(Operation *op, size_t level) const {
-    auto key = getKey(op);
-    if (!key) return {};
-    auto it = tileSizes.find(*key);
-    if (it == tileSizes.end() || level >= it->second.size()) return {};
-    return it->second[level];
-  }
-
-  /// Returns the workgroup size to use based on the tile sizes.
-  ArrayRef<int64_t> getWorkgroupSize() const { return workgroupSize; }
-
-  // Returns the corresponding indices of the loops that are distributed to
-  // workgroup dimensions.
-  ArrayRef<int64_t> getWorkgroupLoopIndices() const {
-    return workgroupLoopIndices;
-  }
-
-  /// Returns the number of subgroups to use.
-  ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
-
-  /// Returns true if tile sizes have been computed for the operation. If tile
-  /// sizes arent set, it implies operation is not to be tiled.
-  bool hasTileSizes(Operation *op, size_t level = 0) const {
-    return !getTileSizes(op, level).empty();
-  }
-
-  /// Use vectorize transformations.
-  bool useVectorize() const { return vectorize; }
-
- protected:
-  /// Current tile size configuration per operation. They key used here to
-  /// retrieve the tile size information per operation is the value of a StrAttr
-  /// added to operations during `init`. When tiled this attribute is copied
-  /// over to the tiled operation, thereby the same key can be used to retrieve
-  /// the tile sizes for the next level of tiling. The `finalize` method removes
-  /// these attributes.
-  llvm::StringMap<TileSizesListType> tileSizes;
-
-  /// Workgroup size to use.
-  std::array<int64_t, 3> workgroupSize;
-
-  // The corresponding indices of the loops that are distributed to workgroup
-  // dimensions.
-  std::array<int64_t, 3> workgroupLoopIndices;
-
-  /// Number of subgroups that are logically distributed along x, y & z.
-  std::array<int64_t, 3> numSubgroups;
-
-  /// Use vectorization.
-  bool vectorize = false;
-
- private:
-  /// Retrieves the key to use to get the `tileSizes` for a given
-  /// `operation`. Returns llvm::None on failure.
-  Optional<StringRef> getKey(Operation *op) const;
-};
+Optional<LaunchConfig> initGPULaunchConfig(
+    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+    const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps);
 
 /// Returns the size of instruction in `vector` dialect that maps directly to
 /// the hardware.
@@ -149,4 +53,5 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_DISPATCHUTILS_H_
