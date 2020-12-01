@@ -91,6 +91,17 @@ static linalg::LinalgLoopDistributionOptions getWorkgroupDistributionOptions() {
   return options;
 }
 
+/// Applies canonicalization over index calculation inside the given `funcOp`.
+static void applyIndexCalculationCanonicalization(FuncOp funcOp) {
+  MLIRContext *context = funcOp.getContext();
+  OwningRewritePatternList canonicalizationPatterns;
+  DimOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  AddIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  SubIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  SignedDivIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+}
+
 //===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
@@ -471,10 +482,28 @@ void LinalgTileAndFusePass::runOnOperation() {
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After First level of tile+distribute ---\n";
+      llvm::dbgs() << "--- After first level of tiling and distribution ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    // In the above we distributed ops to workgroup dimensions and populated a
+    // function for calculating the number of workgroups. In the folling steps,
+    // we will need to query the workgroup count function to simplify GPU
+    // processor ID uses. It relies on constant upper bounds. So we need to
+    // canonicalize the workgroup count function first.
+    if (funcOp.getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName())) {
+      FuncOp numWorkGroupFunc =
+          getNumWorkgroupsFn(funcOp, getNumWorkgroupsFnAttrName());
+      applyIndexCalculationCanonicalization(numWorkGroupFunc);
+
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "--- After canonicalizing workgroup count function  ---\n";
+        numWorkGroupFunc.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
 
     if (options.useWorkgroupMemory) {
       // The promotion patterns are put separate from the tiling patterns to
@@ -521,30 +550,6 @@ void LinalgTileAndFusePass::runOnOperation() {
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Third level Tiling  ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-          llvm::dbgs() << "\n\n";
-        });
-      }
-
-      // For the next step, we will need to query the workgroup count function
-      // to simplify GPU processor ID uses. It relies on constant upper bounds.
-      // So we need to canonicalize the workgroup count function first.
-      if (funcOp.getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName())) {
-        OwningRewritePatternList canonicalizationPatterns;
-        DimOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-        AddIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-        SignedDivIOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                  context);
-        FuncOp numWorkGroupFunc =
-            getNumWorkgroupsFn(funcOp, getNumWorkgroupsFnAttrName());
-        applyPatternsAndFoldGreedily(numWorkGroupFunc,
-                                     std::move(canonicalizationPatterns));
-        applyCanonicalizationPatternsForTiling(context, funcOp);
-
-        LLVM_DEBUG({
-          llvm::dbgs()
-              << "--- After canonicalizing workgroup count function  ---\n";
-          numWorkGroupFunc.print(llvm::dbgs(),
-                                 OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
       }
