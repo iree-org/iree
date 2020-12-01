@@ -212,6 +212,7 @@ void registerLLVMAOTTargetBackends(
     INIT_LLVM_TARGET(X86)
     INIT_LLVM_TARGET(ARM)
     INIT_LLVM_TARGET(AArch64)
+    INIT_LLVM_TARGET(RISCV)
     return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
   });
 }

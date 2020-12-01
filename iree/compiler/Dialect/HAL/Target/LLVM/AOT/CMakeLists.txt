@@ -32,6 +32,8 @@ iree_cc_library(
     LLVMARMAsmParser
     LLVMARMCodeGen
     LLVMCore
+    LLVMRISCVAsmParser
+    LLVMRISCVCodeGen
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen

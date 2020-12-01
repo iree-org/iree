@@ -82,6 +82,12 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
     llvmTargetOptions.targetCPUFeatures = clTargetCPUFeatures;
   }
 
+  static llvm::cl::opt<std::string> clTargetABI(
+      "iree-llvm-target-abi",
+      llvm::cl::desc("LLVM target machine ABI; specify for -mabi"),
+      llvm::cl::init(""));
+  llvmTargetOptions.options.MCOptions.ABIName = clTargetABI;
+
   static llvm::cl::opt<llvm::FloatABI::ABIType> clTargetFloatABI(
       "iree-llvm-target-float-abi",
       llvm::cl::desc("LLVM target codegen enables soft float abi e.g "
