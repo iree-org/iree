@@ -147,6 +147,9 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - Load/store on std.subview ops are converted into load/store on the
   //     original buffers.
   //===--------------------------------------------------------------------===//
+  if (options.enableVectorization) {
+    pm.addNestedPass<FuncOp>(createVectorTransferOptimizationPass());
+  }
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

@@ -23,12 +23,14 @@ iree_cc_library(
   SRCS
     "DeclareNumWorkgroupsFnPass.cpp"
     "LegalizeNumWorkgroupsFnPass.cpp"
+    "VectorTransferOptimization.cpp"
   DEPS
     MLIRIR
     MLIRPass
     MLIRSCFToStandard
     MLIRStandard
     MLIRTransforms
+    MLIRVector
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
