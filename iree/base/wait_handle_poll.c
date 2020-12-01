@@ -105,7 +105,7 @@ static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
     // One or more events set.
     *out_signaled_count = rv;
     return iree_ok_status();
-  } else {
+  } else if (rv < 0) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "ppoll failure %d", errno);
   }
