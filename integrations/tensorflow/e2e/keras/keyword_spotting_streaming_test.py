@@ -68,7 +68,7 @@ class KeywordSpottingTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         KeywordSpottingModule,
-        exported_names=['predict'],
+        exported_names=['call'],
         relative_artifacts_dir=os.path.join('kws_streaming', FLAGS.model,
                                             FLAGS.mode))
 
