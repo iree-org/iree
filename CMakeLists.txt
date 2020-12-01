@@ -64,7 +64,7 @@ if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
-if (${IREE_ENABLE_MLIR})
+if(${IREE_ENABLE_MLIR})
   set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
 endif()
 
@@ -92,9 +92,9 @@ set(IREE_ALL_HAL_DRIVERS
   Vulkan
 )
 
-if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
-  set( IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS} )
-  # For cross compilation towords Android, we don't want LLVM JIT HAL driver.
+if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
+  set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
+  # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
   if(ANDROID)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
   endif()
@@ -120,24 +120,6 @@ foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
-
-# Enable HAL driver modules based on options.
-set (IREE_HAL_DRIVER_MODULES "")
-if(${IREE_HAL_DRIVER_DYLIB})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::dylib_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_LLVM})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::llvmjit::llvmjit_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_METAL})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::metal::metal_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VMLA})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vmla::vmla_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VULKAN})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::vulkan_driver_module)
-endif()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
@@ -231,7 +213,7 @@ option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
-if (${IREE_ENABLE_CCACHE})
+if(${IREE_ENABLE_CCACHE})
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
@@ -245,7 +227,6 @@ endif()
 include(iree_macros)
 include(iree_copts)
 include(sanitizers)
-include(iree_whole_archive_link)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
@@ -259,7 +240,7 @@ include(iree_add_all_subdirs)
 include(iree_check_test)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
   set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
 endif()
@@ -336,18 +317,29 @@ if(${IREE_ENABLE_MLIR})
     message(STATUS "Adding bundled LLVM source dependency")
     add_iree_mlir_src_dep("third_party/llvm-project")
 
-    # Extend module path to allow submodules to use LLVM and MLIR CMake modules
-    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/lib/cmake/mlir")
-    list(APPEND CMAKE_MODULE_PATH "${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+    # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
 
-    # Set include directories
+    # Add the bundled include directories for cmake files looking for them.
     list(APPEND LLVM_INCLUDE_DIRS
-      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
     )
     list(APPEND MLIR_INCLUDE_DIRS
-      ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-      ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+    )
+
+    # Avoid globally modifying paths by instead adding the include paths to the
+    # rules that really should have them in the first place.
+    target_include_directories(LLVMSupport PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+    )
+    target_include_directories(MLIRSupport PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
     )
 
     # Set build option to use MHLO alongside with bundled MLIR
@@ -396,24 +388,19 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonLibs 3)
 endif()
 
-list(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/flatbuffers/CMake/
-)
-
 include(external_cc_library)
 include(flatbuffer_c_library)
-include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
@@ -428,18 +415,10 @@ if(CMAKE_CROSSCOMPILING)
   iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
 
   # Add a custom target to copy the flatc to the binary directory.
-  add_custom_target(iree_host_flatc
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy_if_different
-        "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin"
-    DEPENDS iree_host_build_flatc
-    COMMENT "Installing host flatc..."
-  )
   add_custom_target(iree_host_flatcc_cli
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different
-        "${PROJECT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
         "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli${IREE_HOST_EXECUTABLE_SUFFIX}"
     DEPENDS iree_host_build_flatcc_cli
     COMMENT "Installing host flatcc..."
@@ -538,8 +517,6 @@ if(${IREE_BUILD_EXPERIMENTAL})
   add_subdirectory(experimental)
 endif()
 
-# Note: this must be called after all libraries have been declared.
-iree_complete_binary_link_options()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   iree_complete_py_extension_link_options()
 endif()

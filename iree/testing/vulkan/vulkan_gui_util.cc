@@ -194,12 +194,13 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
     VkQueueFamilyProperties* queues = (VkQueueFamilyProperties*)malloc(
         sizeof(VkQueueFamilyProperties) * count);
     vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &count, queues);
-    for (uint32_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < count; i++) {
       if (queues[i].queueFlags &
           (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
         *queue_family_index = i;
         break;
       }
+    }
     free(queues);
     IM_ASSERT(*queue_family_index != (uint32_t)-1);
   }
@@ -218,7 +219,8 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     create_info.queueCreateInfoCount = 1;
     create_info.pQueueCreateInfos = &queue_info;
-    create_info.enabledExtensionCount = device_extensions.size();
+    create_info.enabledExtensionCount =
+        static_cast<uint32_t>(device_extensions.size());
     create_info.ppEnabledExtensionNames = device_extensions.data();
     err = vkCreateDevice(*physical_device, &create_info, allocator, device);
     check_vk_result(err);

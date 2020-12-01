@@ -17,11 +17,9 @@
 #include <iostream>
 #include <memory>
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/executable.h"
-#include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/AsmParser/Parser.h"
@@ -30,6 +28,60 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+
+// flatcc schemas:
+#include "iree/base/flatcc.h"
+#include "iree/schemas/llvmir_executable_def_reader.h"
+#include "iree/schemas/llvmir_executable_def_verifier.h"
+
+// NOTE: starting to port this to C.
+
+// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// runtime. There are still some conditions we must be aware of (such as omitted
+// names on functions with internal linkage), however we shouldn't need to
+// bounds check anything within the flatbuffer after this succeeds.
+static iree_status_t iree_hal_llvmir_executable_flatbuffer_verify(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        flatbuffer_data.data_length);
+  }
+
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret = iree_LLVMIRExecutableDef_verify_as_root(
+      flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_LLVMIRExecutableDef_table_t executable_def =
+      iree_LLVMIRExecutableDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_vec_t entry_points_vec =
+      iree_LLVMIRExecutableDef_entry_points_get(executable_def);
+  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  for (size_t i = 0; i < entry_point_count; ++i) {
+    if (!flatbuffers_string_len(
+            flatbuffers_string_vec_at(entry_points_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable entry point %zu has no name", i);
+    }
+  }
+
+  if (!flatbuffers_uint8_vec_len(
+          iree_LLVMIRExecutableDef_bitcode_module_get(executable_def))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable bitcode_module is missing/empty");
+  }
+
+  return iree_ok_status();
+}
 
 namespace iree {
 namespace hal {
@@ -40,13 +92,20 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     ExecutableSpec spec, bool allow_aliasing_data) {
   IREE_TRACE_SCOPE0("LLVMJITExecutable::Load");
 
-  auto module_def =
-      ::flatbuffers::GetRoot<LLVMIRExecutableDef>(spec.executable_data.data());
-  auto data =
-      reinterpret_cast<const char*>(module_def->llvmir_module()->data());
-  const int size = module_def->llvmir_module()->size();
+  // Verify and fetch the executable flatbuffer wrapper.
+  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
+      spec.executable_data.data(), spec.executable_data.size());
+  IREE_RETURN_IF_ERROR(
+      iree_hal_llvmir_executable_flatbuffer_verify(executable_data));
+  iree_LLVMIRExecutableDef_table_t executable_def =
+      iree_LLVMIRExecutableDef_as_root(executable_data.data);
+
+  flatbuffers_uint8_vec_t bitcode_module_vec =
+      iree_LLVMIRExecutableDef_bitcode_module_get(executable_def);
   auto mem_buffer = llvm::MemoryBuffer::getMemBufferCopy(
-      llvm::StringRef(data, size), "llvm-ir");
+      llvm::StringRef(reinterpret_cast<const char*>(bitcode_module_vec),
+                      flatbuffers_uint8_vec_len(bitcode_module_vec)),
+      "llvm-ir");
   auto llvm_context = std::make_unique<llvm::LLVMContext>();
   llvm::SMDiagnostic sm_diagnostic;
   auto module = llvm::parseAssembly(*mem_buffer, sm_diagnostic, *llvm_context);
@@ -55,7 +114,6 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
            << "Can't parse LLVMIR Module: " << sm_diagnostic.getMessage().str();
   }
   auto dataLayout = module->getDataLayout();
-  const auto entry_points = module_def->entry_points();
   llvm::orc::ThreadSafeModule thread_safe_module(std::move(module),
                                                  std::move(llvm_context));
   auto ll_jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
@@ -67,29 +125,35 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
            << llvm::toString(std::move(err));
   }
 
-  auto dylib_serarch_generator =
+  auto llvmjit_serarch_generator =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           dataLayout.getGlobalPrefix());
-  if (!dylib_serarch_generator) {
+  if (!llvmjit_serarch_generator) {
     return UnavailableErrorBuilder(IREE_LOC)
            << "Can't resolve symbols in current process: "
-           << llvm::toString(dylib_serarch_generator.takeError());
+           << llvm::toString(llvmjit_serarch_generator.takeError());
   }
 
-  auto& main_jitdylib = ll_jit->getMainJITDylib();
-  main_jitdylib.addGenerator(std::move(dylib_serarch_generator.get()));
+  auto& main_jitllvmjit = ll_jit->getMainJITDylib();
+  main_jitllvmjit.addGenerator(std::move(llvmjit_serarch_generator.get()));
 
   auto executable =
       make_ref<LLVMJITExecutable>(spec, std::move(ll_jit), allow_aliasing_data);
 
-  for (const auto func_name : *entry_points) {
-    auto func_symbol = executable->ll_jit_->lookup(func_name->str());
+  flatbuffers_string_vec_t entry_points =
+      iree_LLVMIRExecutableDef_entry_points_get(executable_def);
+  executable->symbols_.resize(flatbuffers_string_vec_len(entry_points));
+  for (size_t i = 0; i < flatbuffers_string_vec_len(entry_points); ++i) {
+    flatbuffers_string_t entry_point =
+        flatbuffers_string_vec_at(entry_points, i);
+    auto func_symbol = executable->ll_jit_->lookup(
+        llvm::StringRef(entry_point, flatbuffers_string_len(entry_point)));
     if (!func_symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
-             << "Can't JIT compile function '" << func_name
+             << "Can't JIT compile function '" << entry_point
              << "': " << llvm::toString(func_symbol.takeError());
     }
-    executable->symbols_.push_back(func_symbol.get());
+    executable->symbols_[i] = func_symbol.get();
   }
 
   return executable;

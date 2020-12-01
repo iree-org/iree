@@ -19,10 +19,11 @@
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/file_io.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -35,7 +36,7 @@
 #if defined(IREE_PLATFORM_WINDOWS)
 #include <fcntl.h>
 #include <io.h>
-#define IREE_FORCE_BINARY_STDIN() setmode(_fileno(stdin), O_BINARY)
+#define IREE_FORCE_BINARY_STDIN() _setmode(_fileno(stdin), O_BINARY)
 #else
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
@@ -111,8 +112,8 @@ StatusOr<int> Run(std::string module_file_path) {
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};
   auto module_signature = iree_vm_module_signature(input_module);
-  for (int ordinal = 0; ordinal < module_signature.export_function_count;
-       ++ordinal) {
+  for (iree_host_size_t ordinal = 0;
+       ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
     iree_string_view_t export_name_sv;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
@@ -173,7 +174,8 @@ StatusOr<int> Run(std::string module_file_path) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
   ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
 

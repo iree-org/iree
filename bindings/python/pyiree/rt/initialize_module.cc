@@ -18,13 +18,13 @@
 #include "bindings/python/pyiree/rt/hal.h"
 #include "bindings/python/pyiree/rt/host_types.h"
 #include "bindings/python/pyiree/rt/vm.h"
-#include "iree/base/initializer.h"
+#include "iree/hal/drivers/init.h"
 
 namespace iree {
 namespace python {
 
 PYBIND11_MODULE(binding, m) {
-  IREE_RUN_MODULE_INITIALIZERS();
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
 
   m.doc() = "IREE Binding Backend Helpers";
   SetupFunctionAbiBindings(m);

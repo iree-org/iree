@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: must be first to ensure that we can define settings for all includes.
+#include "iree/base/threading_impl.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+
 #include "iree/base/atomics.h"
 #include "iree/base/threading.h"
 #include "iree/base/threading_impl.h"
 #include "iree/base/tracing.h"
-
-#if defined(IREE_PLATFORM_WINDOWS)
 
 // Great documentation:
 // https://www.microsoftpressstore.com/articles/article.aspx?p=2233328

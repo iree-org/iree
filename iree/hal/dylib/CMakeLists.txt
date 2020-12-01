@@ -20,83 +20,30 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    dylib_device
+    dylib
   HDRS
     "dylib_device.h"
+    "dylib_driver.h"
+    "dylib_executable.h"
+    "dylib_executable_cache.h"
   SRCS
     "dylib_device.cc"
-  DEPS
-    ::dylib_executable_cache
-    iree::base::tracing
-    iree::hal::host::host_local_device
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    dylib_driver
-  HDRS
-    "dylib_driver.h"
-  SRCS
     "dylib_driver.cc"
-  DEPS
-    ::dylib_device
-    iree::hal::device_info
-    iree::hal::driver
-    iree::hal::host::serial::serial_scheduling_model
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    dylib_driver_module
-  SRCS
-    "dylib_driver_module.cc"
-  DEPS
-    ::dylib_driver
-    iree::base::init
-    iree::base::status
-    iree::hal::driver_registry
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    dylib_executable
-  HDRS
-    "dylib_executable.h"
-  SRCS
     "dylib_executable.cc"
+    "dylib_executable_cache.cc"
   DEPS
     absl::inlined_vector
     absl::span
-    flatbuffers
     iree::base::dynamic_library
     iree::base::file_io
     iree::base::file_path
+    iree::base::flatcc
     iree::base::status
     iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_spec
+    iree::hal
     iree::hal::host::host_executable
-    iree::schemas::dylib_executable_def_cc_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    dylib_executable_cache
-  HDRS
-    "dylib_executable_cache.h"
-  SRCS
-    "dylib_executable_cache.cc"
-  DEPS
-    ::dylib_executable
-    iree::base::status
-    iree::base::tracing
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
+    iree::hal::host::host_local_device
+    iree::hal::host::serial::serial_scheduling_model
+    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )

@@ -24,11 +24,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/IR/Function.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
-
-class FuncOp;
 
 /// Abstract Transformation class applied in a sequence that also handles state
 /// through markers.

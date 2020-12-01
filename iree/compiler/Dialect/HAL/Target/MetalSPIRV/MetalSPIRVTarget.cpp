@@ -14,12 +14,12 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/schemas/metal_executable_def_generated.h"
+#include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/schemas/metal_executable_def_builder.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
@@ -50,16 +50,6 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
                                    spirv::getDefaultResourceLimits(context));
 }
 
-// Returns a list of entry point names matching the expected export ordinals.
-static std::vector<std::string> populateEntryPointNames(
-    spirv::ModuleOp spvModuleOp) {
-  std::vector<std::string> entryPointNames;
-  spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
-    entryPointNames.push_back(std::string(entryPointOp.fn()));
-  });
-  return entryPointNames;
-}
-
 class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
  public:
   MetalSPIRVTargetBackend(MetalSPIRVTargetOptions options)
@@ -88,17 +78,18 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // The runtime use ordinals instead of names but Metal requires function
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
-    std::vector<std::string> entryPoints;
+    SmallVector<StringRef, 8> entryPointNames;
     if (auto scheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
             iree_compiler::getEntryPointScheduleAttrName())) {
       // We have multiple entry points in this module. Make sure the order
       // specified in the schedule attribute is respected.
       for (Attribute entryPoint : scheduleAttr) {
-        entryPoints.emplace_back(
-            entryPoint.cast<StringAttr>().getValue().str());
+        entryPointNames.push_back(entryPoint.cast<StringAttr>().getValue());
       }
     } else {
-      entryPoints = populateEntryPointNames(spvModuleOp);
+      spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
+        entryPointNames.push_back(entryPointOp.fn());
+      });
     }
 
     // 1. Serialize the spirv::ModuleOp into binary format.
@@ -109,7 +100,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
 
     // 2. Cross compile SPIR-V to MSL source code.
     llvm::SmallVector<MetalShader, 2> mslShaders;
-    for (const std::string &entryPoint : entryPoints) {
+    for (const auto &entryPoint : entryPointNames) {
       llvm::Optional<MetalShader> mslShader = crossCompileSPIRVToMSL(
           // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
           llvm::makeArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
@@ -129,30 +120,32 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // to invoke them in C++.
 
     // 4. Pack the MTLLibrary and metadata into a flatbuffer.
-    iree::MetalExecutableDefT metalExecutableDef;
-    metalExecutableDef.entry_points = entryPoints;
-    for (auto &shader : mslShaders) {
-      metalExecutableDef.shader_sources.push_back(std::move(shader.source));
-      const auto &sizes = shader.threadgroupSize;
-      metalExecutableDef.threadgroup_sizes.push_back(
-          {sizes.x, sizes.y, sizes.z});
-    }
+    FlatbufferBuilder builder;
 
-    // Pack the executable definition and get the bytes with the proper header.
-    // The header is used to verify the contents at runtime.
-    ::flatbuffers::FlatBufferBuilder fbb;
-    auto executableOffset =
-        iree::MetalExecutableDef::Pack(fbb, &metalExecutableDef);
-    iree::FinishMetalExecutableDefBuffer(fbb, executableOffset);
-    std::vector<uint8_t> bytes;
-    bytes.resize(fbb.GetSize());
-    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+    auto shaderSourcesRef = builder.createStringVec(llvm::map_range(
+        mslShaders, [&](const MetalShader &shader) { return shader.source; }));
+
+    iree_MetalThreadgroupSize_vec_start(builder);
+    for (auto &shader : mslShaders) {
+      iree_MetalThreadgroupSize_vec_push_create(
+          builder, shader.threadgroupSize.x, shader.threadgroupSize.y,
+          shader.threadgroupSize.z);
+    }
+    auto threadgroupSizesRef = iree_MetalThreadgroupSize_vec_end(builder);
+
+    auto entryPointNamesRef = builder.createStringVec(entryPointNames);
+
+    iree_MetalExecutableDef_start_as_root(builder);
+    iree_MetalExecutableDef_entry_points_add(builder, entryPointNamesRef);
+    iree_MetalExecutableDef_threadgroup_sizes_add(builder, threadgroupSizesRef);
+    iree_MetalExecutableDef_shader_sources_add(builder, shaderSourcesRef);
+    iree_MetalExecutableDef_end_as_root(builder);
 
     // 5. Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         targetOp.getLoc(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::Metal),
-        std::move(bytes));
+        builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();
   }

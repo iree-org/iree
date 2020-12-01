@@ -20,7 +20,6 @@
 #include "iree/base/status.h"
 #include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"
-#include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 

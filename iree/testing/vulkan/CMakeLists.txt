@@ -45,12 +45,6 @@ iree_cc_library(
     Vulkan::Vulkan
 )
 
-if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-else()
-  set(_GUI_LINKOPTS "")
-endif()
-
 iree_cc_binary(
   NAME
     iree-run-module-vulkan-gui
@@ -60,15 +54,15 @@ iree_cc_binary(
     ::vulkan_gui_util
     absl::flags
     iree::base::file_io
-    iree::base::init
+    iree::base::flags
     iree::base::main
     iree::base::status
     iree::base::tracing
-    iree::hal::vulkan::vulkan_driver_module
+    iree::hal::vulkan::registration
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
   LINKOPTS
-    "${_GUI_LINKOPTS}"
+    "${IREE_TARGET_GUI_LINKOPTS}"
 )

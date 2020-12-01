@@ -67,6 +67,22 @@ Optional<std::vector<int8_t>> Artifact::read() const {
   return resultBuffer;
 }
 
+bool Artifact::readInto(raw_ostream &targetStream) const {
+  // NOTE: we could make this much more efficient if we read in the file a
+  // chunk at a time and piped it along to targetStream. I couldn't find
+  // anything in LLVM that did this, for some crazy reason, but since we are
+  // dealing with binaries that can be 10+MB here it'd be nice if we could avoid
+  // reading them all into memory.
+  auto fileData = llvm::MemoryBuffer::getFile(path);
+  if (!fileData) {
+    llvm::errs() << "failed to load library output file '" << path << "'";
+    return false;
+  }
+  auto sourceBuffer = fileData.get()->getBuffer();
+  targetStream.write(sourceBuffer.data(), sourceBuffer.size());
+  return true;
+}
+
 void Artifact::close() { outputFile->os().close(); }
 
 void Artifacts::keepAllFiles() {

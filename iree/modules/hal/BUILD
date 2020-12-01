@@ -25,10 +25,10 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:tracing",
+        "//iree/hal",
         "//iree/hal:api",
-        "//iree/hal:device",
         "//iree/vm",
-        "//iree/vm:native_module_cc",
+        "//iree/vm:cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",

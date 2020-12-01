@@ -29,10 +29,6 @@ struct MetalThreadgroupSize {
 // This information is used to create MTLLibrary, MTLFunction and pipeline
 // state objects.
 table MetalExecutableDef {
-  // Reserved implementation-specific value that can be passed from compiler
-  // to runtime.
-  tag:string;
-
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];

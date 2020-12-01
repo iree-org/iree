@@ -25,8 +25,8 @@ cc_library(
     srcs = ["file_handle_win32.cc"],
     hdrs = ["file_handle_win32.h"],
     deps = [
+        "//iree/base:core_headers",
         "//iree/base:status",
-        "//iree/base:target_platform",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -40,10 +40,10 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
+        "//iree/base:core_headers",
         "//iree/base:file_io_hdrs",
         "//iree/base:file_path",
         "//iree/base:status",
-        "//iree/base:target_platform",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -58,8 +58,8 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
+        "//iree/base:core_headers",
         "//iree/base:file_mapping_hdrs",
-        "//iree/base:target_platform",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -88,9 +88,10 @@ cc_library(
     deps = [
         ":ostringstream",
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:logging",
-        "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/utility",
     ],
 )

@@ -429,7 +429,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
       break;
     default: {
       // Treat any unknown format as binary.
-      n = 2 * element_size;
+      n = 2 * (int)element_size;
       if (buffer && buffer_capacity > n) {
         iree_hal_bytes_to_hex_string(data.data, buffer, element_size);
         buffer[n] = 0;
@@ -1707,19 +1707,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   // We need to allocate storage to marshal in the semaphores. Ideally we'd
   // change the C++ API to make this 1:1 with a reinterpret_cast, however that
   // makes the C API more difficult. Bleh.
-  int total_semaphore_count = 0;
-  for (int i = 0; i < batch_count; ++i) {
+  iree_host_size_t total_semaphore_count = 0;
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
     total_semaphore_count += batches[i].wait_semaphores.count;
     total_semaphore_count += batches[i].signal_semaphores.count;
   }
   absl::InlinedVector<SemaphoreValue, 4> semaphore_values(
       total_semaphore_count);
   absl::InlinedVector<SubmissionBatch, 2> dst_batches(batch_count);
-  int base_semaphore_index = 0;
-  for (int i = 0; i < batch_count; ++i) {
+  iree_host_size_t base_semaphore_index = 0;
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
     const auto& src_batch = batches[i];
     auto& dst_batch = dst_batches[i];
-    for (int j = 0; j < src_batch.wait_semaphores.count; ++j) {
+    for (iree_host_size_t j = 0; j < src_batch.wait_semaphores.count; ++j) {
       semaphore_values[base_semaphore_index + j] = {
           reinterpret_cast<Semaphore*>(src_batch.wait_semaphores.semaphores[j]),
           src_batch.wait_semaphores.payload_values[j]};
@@ -1731,7 +1731,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     dst_batch.command_buffers =
         iree::ReinterpretSpan<CommandBuffer*>(absl::MakeConstSpan(
             src_batch.command_buffers, src_batch.command_buffer_count));
-    for (int j = 0; j < src_batch.signal_semaphores.count; ++j) {
+    for (iree_host_size_t j = 0; j < src_batch.signal_semaphores.count; ++j) {
       semaphore_values[base_semaphore_index + j] = {
           reinterpret_cast<Semaphore*>(
               src_batch.signal_semaphores.semaphores[j]),
@@ -1901,6 +1901,11 @@ iree_hal_driver_registry_query_available_drivers(
   }
 
   *out_driver_count = available_drivers.size();
+  *out_driver_names = NULL;
+  if (available_drivers.empty()) {
+    return iree_ok_status();
+  }
+
   iree_string_view_t* driver_name_storage = nullptr;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator,

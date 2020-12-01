@@ -19,6 +19,7 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/samples/custom_modules/custom_modules_test_module.h"
 #include "iree/samples/custom_modules/native_module.h"
@@ -32,6 +33,10 @@ namespace {
 
 class CustomModulesTest : public ::testing::Test {
  protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+  }
+
   virtual void SetUp() {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 

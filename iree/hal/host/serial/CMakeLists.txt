@@ -26,9 +26,8 @@ iree_cc_library(
     absl::synchronization
     iree::base::status
     iree::base::tracing
-    iree::hal::command_queue
+    iree::hal
     iree::hal::host::serial::serial_submission_queue
-    iree::hal::semaphore
   PUBLIC
 )
 
@@ -42,7 +41,7 @@ iree_cc_test(
     absl::memory
     iree::base::status
     iree::base::time
-    iree::hal::command_queue
+    iree::hal
     iree::hal::host::serial::serial_submission_queue
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
@@ -61,7 +60,7 @@ iree_cc_library(
     absl::inlined_vector
     iree::base::status
     iree::base::tracing
-    iree::hal::command_buffer
+    iree::hal
     iree::hal::host::host_descriptor_set
     iree::hal::host::host_executable
     iree::hal::host::host_executable_layout
@@ -80,7 +79,7 @@ iree_cc_library(
     ::serial_command_processor
     ::serial_submission_queue
     absl::inlined_vector
-    iree::base::memory
+    iree::base::core_headers
     iree::base::status
     iree::base::tracing
     iree::hal::host::condvar_semaphore
@@ -104,7 +103,7 @@ iree_cc_library(
     iree::base::intrusive_list
     iree::base::status
     iree::base::tracing
-    iree::hal::command_queue
+    iree::hal
     iree::hal::host::condvar_semaphore
   PUBLIC
 )

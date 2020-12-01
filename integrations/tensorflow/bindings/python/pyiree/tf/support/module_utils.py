@@ -19,12 +19,25 @@ import os
 import tempfile
 from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
+from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
 from pyiree.tf import compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
+
+flags.DEFINE_bool(
+    "capture_crash_reproducer", True,
+    "Captures MLIR crash reproducers in the artifacts directory for crashes "
+    "and suppresses C++ stack traces.")
+
+FLAGS = flags.FLAGS
+
+
+def _running_bazel_test() -> bool:
+  # Bazel guarantees that TEST_TMPDIR is set when `bazel test` is running.
+  return "TEST_TMPDIR" in os.environ
 
 
 def _setup_mlir_crash_reproducer(
@@ -149,8 +162,13 @@ def _incrementally_compile_tf_module(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
-                                                 backend_info.backend_id)
+  # Avoid the crash reproducer under tests or if the flag is false.
+  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
+  # use the crash reproducer.
+  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
+    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
+                                                   artifacts_dir,
+                                                   backend_info.backend_id)
   return _compile_module(module, backend_info, exported_names, artifacts_dir)
 
 
@@ -188,8 +206,13 @@ def _incrementally_compile_tf_signature_def_saved_model(
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
 
-  _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
-                                                 backend_info.backend_id)
+  # Avoid the crash reproducer under tests or if the flag is false.
+  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
+  # use the crash reproducer.
+  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
+    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
+                                                   artifacts_dir,
+                                                   backend_info.backend_id)
   return _compile_module(saved_model_dir, saved_model_tags, backend_info,
                          exported_name, artifacts_dir)
 

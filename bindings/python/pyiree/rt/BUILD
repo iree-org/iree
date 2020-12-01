@@ -15,7 +15,6 @@
 load(
     "//bindings/python:build_defs.oss.bzl",
     "NUMPY_DEPS",
-    "PLATFORM_VULKAN_DEPS",
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
@@ -30,12 +29,6 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
-    "//iree/hal/vulkan:vulkan_driver_module",
-    "//iree/hal/llvmjit:llvmjit_driver_module",
-    "//iree/hal/vmla:vmla_driver_module",
-]
 
 iree_py_library(
     name = "rt",
@@ -59,10 +52,10 @@ iree_py_extension(
     features = PYBIND_FEATURES,
     linkstatic = 1,
     win_def_file = "export.def",
-    deps = DRIVER_DEPS + [
+    deps = [
         ":rt_library",
         "//bindings/python/pyiree/common",
-        "//iree/base:initializer",
+        "//iree/hal/drivers",
     ],
 )
 
@@ -90,10 +83,6 @@ pybind_cc_library(
         "//iree/modules/tensorlist:native_module",
         "//iree/vm",
         "//iree/vm:bytecode_module",
-        "//iree/vm:invocation",
-        "//iree/vm:list",
-        "//iree/vm:module",
-        "//iree/vm:ref",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
