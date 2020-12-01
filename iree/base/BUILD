@@ -67,6 +67,16 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "math_test",
+    srcs = ["math_test.cc"],
+    deps = [
+        ":core_headers",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
@@ -87,6 +97,26 @@ cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "atomic_slist",
+    srcs = ["atomic_slist.c"],
+    hdrs = ["atomic_slist.h"],
+    deps = [
+        ":core_headers",
+        ":synchronization",
+    ],
+)
+
+cc_test(
+    name = "atomic_slist_test",
+    srcs = ["atomic_slist_test.cc"],
+    deps = [
+        ":atomic_slist",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

@@ -22,7 +22,7 @@ function(iree_multipy_configure)
   # Configure the defaults.
   # Note that this is using the pybind11 configuration vars, which creates
   # a fragile dependency. It would be better to derive these locally.
-  if(PYTHONLIBS_FOUND)
+  if(Python3_FOUND)
     set(IREE_MULTIPY_DEFAULT_EXECUTABLE "${PYTHON_EXECUTABLE}" CACHE INTERNAL "Python executable" )
     set(IREE_MULTIPY_DEFAULT_INCLUDE_DIRS "${PYTHON_INCLUDE_DIRS}" CACHE INTERNAL "Python include dirs" )
     set(IREE_MULTIPY_DEFAULT_LIBRARIES "${PYTHON_LIBRARIES}" CACHE INTERNAL "Python libraries")

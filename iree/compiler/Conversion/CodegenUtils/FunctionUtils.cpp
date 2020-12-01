@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
@@ -22,6 +23,15 @@ namespace iree_compiler {
 bool isEntryPoint(FuncOp func) {
   return SymbolTable::getSymbolVisibility(func) ==
          SymbolTable::Visibility::Public;
+}
+
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return linalg::isParallelIteratorType(attr);
+      })
+      .size();
 }
 
 }  // namespace iree_compiler

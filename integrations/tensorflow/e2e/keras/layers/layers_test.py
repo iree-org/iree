@@ -480,11 +480,6 @@ def keras_input_normalizer(inputs: Sequence[Any]) -> Union[Any, Sequence[Any]]:
   return inputs[0] if len(inputs) == 1 else inputs
 
 
-def keras_arg_wrapper(*args):
-  """Wrapper to convert multiple positional args into a list of values."""
-  return list(args) if isinstance(args, tuple) else args
-
-
 def create_wrapped_keras_layer(
     layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.keras.Model:
   """Wraps a keras layer in a model for compilation."""
@@ -522,7 +517,7 @@ def create_layer_unit_test(
     static_signature = [static_signature]
     dynamic_signature = [dynamic_signature]
 
-  call = lambda *args: model(keras_arg_wrapper(*args), training=FLAGS.training)
+  call = lambda *args: model(*args, training=FLAGS.training)
   return tf_test_utils.tf_function_unit_test(
       input_signature=dynamic_signature,
       static_signature=static_signature,
@@ -557,13 +552,22 @@ class KerasLayersModule(tf_test_utils.TestModule):
       setattr(self, unit_test_spec.unit_test_name, layer_unit_test)
 
 
+def get_relative_artifacts_dir() -> str:
+  dynamic_str = "dynamic" if FLAGS.dynamic_dims else "static"
+  training_str = "training" if FLAGS.training else "non_training"
+  full_api_str = "default_api" if FLAGS.test_default_kwargs_only else "full_api"
+  settings_str = f"{full_api_str}_{dynamic_str}_{training_str}"
+  return os.path.join("tf", "keras", "layers", FLAGS.layer, settings_str)
+
+
 class KerasLayersTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         KerasLayersModule,
-        exported_names=KerasLayersModule.get_tf_function_unit_tests())
+        exported_names=KerasLayersModule.get_tf_function_unit_tests(),
+        relative_artifacts_dir=get_relative_artifacts_dir())
 
 
 def main(argv):
@@ -579,17 +583,6 @@ def main(argv):
 
   if FLAGS.layer not in LAYERS_TO_UNIT_TEST_SPECS:
     raise ValueError(f"Unrecognized layer: '{FLAGS.layer}'")
-
-  # Set up name for saving artifacts.
-  dynamic_str = "dynamic" if FLAGS.dynamic_dims else "static"
-  training_str = "training" if FLAGS.training else "non_training"
-  full_api_str = "default_api" if FLAGS.test_default_kwargs_only else "full_api"
-  settings_str = f"{full_api_str}_{dynamic_str}_{training_str}"
-  relative_artifacts_dir = os.path.join("tf", "keras", "layers", FLAGS.layer,
-                                        settings_str)
-  # The relative artifacts directory path is calculated from the module name
-  # TODO(meadowlark): provide a better way of overridding this default.
-  KerasLayersModule.__name__ = relative_artifacts_dir
 
   unit_tests = KerasLayersModule.get_tf_function_unit_tests()
   logging.info("Testing the following %s functions: %s", len(unit_tests),

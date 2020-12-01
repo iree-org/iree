@@ -18,7 +18,7 @@ external_cc_library(
   PACKAGE
     half
   NAME
-    half
+    includes
   ROOT
     ${HALF_API_ROOT}
   HDRS

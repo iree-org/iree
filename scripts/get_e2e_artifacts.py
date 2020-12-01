@@ -160,10 +160,7 @@ def main(argv):
 
   if FLAGS.run_test_suites:
     # Use bazel test to execute all of the test suites in parallel.
-    command = [
-        'bazel', 'test', *test_suites, '--color=yes',
-        '--test_arg=--get_saved_model'
-    ]
+    command = ['bazel', 'test', *test_suites, '--color=yes']
     print(f'Running: `{" ".join(command)}`')
     if not FLAGS.dry_run:
       subprocess.check_call(command)

@@ -126,7 +126,13 @@ std::string GetTempPath() {
     return tmpdir;
   }
 
+#ifdef __ANDROID__
+  // Support running Android command-line programs both as regular shell user
+  // and as root. For the latter, TMPDIR is not defined by default.
+  return "/data/local/tmp";
+#else
   return "/tmp";
+#endif
 }
 
 StatusOr<std::string> GetTempFile(absl::string_view base_name) {

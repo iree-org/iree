@@ -101,7 +101,8 @@ class ApplicationsTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         ApplicationsModule,
-        exported_names=ApplicationsModule.get_tf_function_unit_tests())
+        exported_names=ApplicationsModule.get_tf_function_unit_tests(),
+        relative_artifacts_dir=os.path.join(FLAGS.model, FLAGS.data))
 
 
 def main(argv):
@@ -111,8 +112,6 @@ def main(argv):
 
   if not hasattr(tf.keras.applications, FLAGS.model):
     raise ValueError(f"Unsupported model: {FLAGS.model}")
-  # Override ApplicationsModule's __name__ to be more specific.
-  ApplicationsModule.__name__ = os.path.join(FLAGS.model, FLAGS.data)
 
   ApplicationsTest.generate_unit_tests(ApplicationsModule)
   tf.test.main()
