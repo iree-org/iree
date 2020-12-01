@@ -19,6 +19,7 @@
 // the number of workgroups to use for launch, etc.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 
@@ -52,4 +53,5 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_DISPATCHUTILS_H_

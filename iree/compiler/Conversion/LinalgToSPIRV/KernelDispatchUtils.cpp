@@ -346,12 +346,63 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
   return success();
 }
 
+static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
+                                           TileSizesListType &tileSizes,
+                                           LaunchConfigInfo &config) {
+  auto inputType = op.getInput(1).getType().cast<MemRefType>();
+  auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
+  if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
+    return failure();
+
+  const int tileWidth = 8;
+  const int tileChannel = 32;
+
+  auto outputShape = outputType.getShape();
+  bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
+  bool isOutputTilable = outputShape[0] == 1 &&
+                         outputShape[2] % tileWidth == 0 &&
+                         outputShape[3] % tileChannel == 0;
+  if (!isInputTilable || !isOutputTilable) return failure();
+
+  config.workgroupSize = {8, 2, 1};
+
+  SmallVector<int64_t, 4> workgroupLevel = {/*batch=*/0, /*output_height=*/1,
+                                            /*output_width=*/tileWidth,
+                                            /*output_channel=*/tileChannel};
+  tileSizes.emplace_back(std::move(workgroupLevel));
+
+  // No tiling at the subgroup level given that we don't use subgroup
+  // level syncrhonization  or shared memory.
+  tileSizes.emplace_back();
+
+  SmallVector<int64_t, 4> invocationLevel = {
+      /*batch=*/0, /*output_height=*/1,
+      /*output_width=*/tileWidth / config.workgroupSize[1],
+      /*output_channel=*/tileChannel / config.workgroupSize[0]};
+  tileSizes.emplace_back(invocationLevel);
+
+  // Finally, for each invocation, we use tiling to generate loops to loop over
+  // the filter's height (step 1), width (step 1), and input channel (step 4)
+  // dimensions.
+  SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 4, 1, 1};
+  tileSizes.emplace_back(fourthLevel);
+
+  config.vectorize = true;
+
+  return success();
+}
+
 template <>
 LogicalResult getOpLaunchConfig(linalg::ConvOp op,
                                 const spirv::TargetEnv &targetEnv,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
+  if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
+      succeeded(getMaliSpecificConfig(op, tileSizes, config))) {
+    return success();
+  }
+
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -450,9 +501,11 @@ Optional<LaunchConfig> initGPULaunchConfig(
 
 #undef DISPATCH
   }
+
   launchConfig.setWorkgroupSize(config.workgroupSize);
   launchConfig.setNumSubgroups(config.numSubgroups);
   launchConfig.setVectorize(config.vectorize);
+
   if (!rootOperation) {
     // No root operations found. Dont need to do anything.
     return launchConfig;
@@ -506,12 +559,13 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     // the contract.
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
-  } else {
-    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
-    // Map to load4.
-    nativeSize.push_back(4);
-    return nativeSize;
   }
+
+  // Map to load4.
+  auto rank = op.getVectorType().getRank();
+  SmallVector<int64_t, 4> nativeSize(rank, 1);
+  nativeSize.back() = 4;
+  return nativeSize;
 }
 
 template <>
@@ -524,12 +578,13 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
     // the contract.
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
-  } else {
-    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
-    // Map to store4.
-    nativeSize.push_back(4);
-    return nativeSize;
   }
+
+  // Map to store4.
+  auto rank = op.getVectorType().getRank();
+  SmallVector<int64_t, 4> nativeSize(rank, 1);
+  nativeSize.back() = 4;
+  return nativeSize;
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
