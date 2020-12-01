@@ -480,11 +480,6 @@ def keras_input_normalizer(inputs: Sequence[Any]) -> Union[Any, Sequence[Any]]:
   return inputs[0] if len(inputs) == 1 else inputs
 
 
-def keras_arg_wrapper(*args):
-  """Wrapper to convert multiple positional args into a list of values."""
-  return list(args) if isinstance(args, tuple) else args
-
-
 def create_wrapped_keras_layer(
     layer: str, unit_test_spec: tf_test_utils.UnitTestSpec) -> tf.keras.Model:
   """Wraps a keras layer in a model for compilation."""
@@ -522,7 +517,7 @@ def create_layer_unit_test(
     static_signature = [static_signature]
     dynamic_signature = [dynamic_signature]
 
-  call = lambda *args: model(keras_arg_wrapper(*args), training=FLAGS.training)
+  call = lambda *args: model(*args, training=FLAGS.training)
   return tf_test_utils.tf_function_unit_test(
       input_signature=dynamic_signature,
       static_signature=static_signature,
