@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/base/target_platform.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LinkerTool.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -34,25 +35,23 @@ class UnixLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
     if (targetTriple.isAndroid()) {
 // TODO(ataei, benvanik): Windows cross-linking android NDK support.
-#if defined(__unix__) && defined(__x86_64__)
-#if defined(__linux__)
+#if defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_LINUX)
       return llvm::Twine(std::getenv("ANDROID_NDK"))
           .concat("/toolchains/llvm/prebuilt/linux-x86_64/bin/")
-#elif defined(__APPLE__)
-      return llvm::Twine(std::getenv("ANDROID_NDK"))
-          .concat("/toolchains/llvm/prebuilt/darwin-x86_64/bin/")
-#else
-      return toolPath;
-#endif
           // TODO(ataei): Set target archicture and ABI from targetTriple.
           .concat("aarch64-linux-android30-clang++")
           .str();
-#elif
-      return toolPath
-#endif
+#elif defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_APPLE)
+      return llvm::Twine(std::getenv("ANDROID_NDK"))
+          .concat("/toolchains/llvm/prebuilt/darwin-x86_64/bin/")
+          .concat("aarch64-linux-android30-clang++")
+          .str();
+#else
+      return toolPath;
+#endif  // IREE_ARCH_X86_64 && IREE_PLATFORM_LINUX
     }
 // TODO(ataei, benvanik): Windows cross-linking discovery support.
-#ifdef __unix__
+#if defined(IREE_PLATFORM_LINUX)
 #define UNIX_SYS_LINKER_PATH_LENGTH 255
     auto sysLinkers = {"ld", "ld.gold", "lld.ld"};
     for (auto syslinker : sysLinkers) {
@@ -65,9 +64,9 @@ class UnixLinkerTool : public LinkerTool {
     }
     return toolPath;
 #undef UNIX_SYS_LINKER_PATH_LENGTH
-#elif
+#else
     return toolPath;
-#endif
+#endif  // IREE_PLATFORM_LINUX
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,
