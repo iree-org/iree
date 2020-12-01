@@ -69,14 +69,15 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - All Linalg ops have buffer semantics.
   //
   // Post-conditions:
+  //   - If there are multiple linalg operations in the dispatch region, they
+  //     are fused, using tile+fuse approach.
+  //     - The fused loops are distributed across workgroups.
   //   - The operations that cannot be fused at buffer levels are split into
   //     separate entry points.
-  //   - If the input Linalg ops are tilable:
-  //     - loop.parallel ops are generated for mapping to workgroups.
-  //     - Linalg ops are nested inside loop.parallel ops and ready for mapping
-  //       to workitems.
-  //     - If multiple linalg operations are present they get tiled and fused to
-  //       get outer loop.parallel ops which can be mapped to workitems.
+  //   - If there is a single linalg operation in the dispatch region, it is
+  //     tiled and the generated parallel loop distributed.
+  //     - The tiled linalg operation can be tiled again one or more times and
+  //       then vectorized.
   //   - Otherwise:
   //     - The Linalg op is kept untouched.
   //
