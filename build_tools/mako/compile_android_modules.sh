@@ -22,6 +22,10 @@
 #   2) IREE is built to Android in `build/` directory. E.g., build with
 #      build_tools/cmake/build_android.sh script.
 
+set -e
+set -o pipefail
+set -o xtrace
+
 prefix="module"
 while [[ $# -gt 0 ]]; do
   token="$1"
@@ -63,7 +67,7 @@ do
   esac
   build/host/iree/tools/iree-translate \
     --iree-mlir-to-vm-bytecode-module \
-    --iree-hal-target-backends=vmla \
+    --iree-hal-target-backends="${target}" \
     "${extra_flags[@]}" \
     "${model}" \
     -o "${module_name}"
