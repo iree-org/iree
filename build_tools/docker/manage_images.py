@@ -107,27 +107,10 @@ def parse_arguments():
   return args
 
 
-def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
-  # Python doesn't have a builtin OrderedSet, so we mimic one to the extent
-  # that we need by using 'in' before adding any elements.
-  processing_order = []
-
-  def add_dependent_images(image: str):
-    if image not in processing_order:
-      for dependent_image in IMAGES_TO_DEPENDENT_IMAGES[image]:
-        add_dependent_images(dependent_image)
-      processing_order.append(image)
-
-  for image in images:
-    add_dependent_images(image)
-
-  processing_order.reverse()
-def _topological_sort(
-    input_nodes: Sequence[str],
-    node_to_child_nodes: Dict[str, Sequence[str]]) -> List[str]:
-  # ^^^ Not entirely sure what to name this.
-  # Python doesn't have a builtin OrderedSet, so we mimic one to the extent
-  # that we need by using 'in' before adding any elements.
+def _dag_dfs(input_nodes: Sequence[str],
+             node_to_child_nodes: Dict[str, Sequence[str]]) -> List[str]:
+  # Python doesn't have a builtin OrderedSet, but we don't have many images, so
+  # we just use a list.
   ordered_nodes = []
 
   def add_children(parent_node: str):
@@ -138,38 +121,17 @@ def _topological_sort(
 
   for node in input_nodes:
     add_children(node)
-  ordered_nodes.reverse()
   return ordered_nodes
 
 
 def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
-  return _topological_sort(images, IMAGES_TO_DEPENDENT_IMAGES)
+  dependents = _dag_dfs(images, IMAGES_TO_DEPENDENT_IMAGES)
+  dependents.reverse()
+  return dependents
 
 
 def get_dependencies(images: Sequence[str]) -> List[str]:
-  return list(reversed(_topological_sort(images, IMAGES_TO_DEPENDENCIES)))
-
-
-def run_command(command: Sequence[str],
-                dry_run: bool = False,
-                check: bool = True,
-                capture_output: bool = False,
-                universal_newlines: bool = True,
-                **run_kwargs) -> subprocess.CompletedProcess:
-  """Thin wrapper around subprocess.run"""
-  print(f'Running: `{" ".join(command)}`')
-  if dry_run:
-    # Dummy CompletedProess with successful returncode.
-    return subprocess.CompletedProcess(command, returncode=0)
-
-  if capture_output:
-    # Hardcode support for python <= 3.6.
-    run_kwargs['stdout'] = subprocess.PIPE
-    run_kwargs['stderr'] = subprocess.PIPE
-  return subprocess.run(command,
-                        universal_newlines=universal_newlines,
-                        check=check,
-                        **run_kwargs)
+  return _dag_dfs(images, IMAGES_TO_DEPENDENCIES)
 
 
 def get_repo_digest(tagged_image_url: str) -> str:
@@ -220,9 +182,9 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
 
   grep_command = ['git', 'grep', '-l', f'{image_url}@sha256']
   try:
-    completed_process = run_command(grep_command,
-                                    capture_output=True,
-                                    timeout=5)
+    completed_process = utils.run_command(grep_command,
+                                          capture_output=True,
+                                          timeout=5)
   except subprocess.CalledProcessError as error:
     if error.returncode == 1:
       print(f'Found no references to {image_url}')
