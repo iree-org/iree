@@ -21,6 +21,16 @@ package(
 )
 
 cc_library(
+    name = "driver_registry",
+    testonly = True,
+    hdrs = ["driver_registry.h"],
+    deps = [
+        "//iree/hal:api",
+        "//iree/hal/drivers",
+    ],
+)
+
+cc_library(
     name = "mock_allocator",
     testonly = True,
     hdrs = ["mock_allocator.h"],

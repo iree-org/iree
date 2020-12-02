@@ -21,9 +21,9 @@ iree_cc_library(
     "api.h"
     "api_detail.h"
   SRCS
+    "api.c"
     "api.cc"
   DEPS
-    ::driver_registry
     ::hal
     ::heap_buffer
     absl::inlined_vector
@@ -32,6 +32,8 @@ iree_cc_library(
     iree::base::api
     iree::base::core_headers
     iree::base::ref_ptr
+    iree::base::synchronization
+    iree::base::threading
     iree::base::tracing
     iree::hal::host::host_local_allocator
   PUBLIC
@@ -154,22 +156,6 @@ iree_cc_library(
     iree::base::status
     iree::base::time
     iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    driver_registry
-  HDRS
-    "driver_registry.h"
-  SRCS
-    "driver_registry.cc"
-  DEPS
-    ::hal
-    absl::core_headers
-    absl::synchronization
-    iree::base::ref_ptr
-    iree::base::status
   PUBLIC
 )
 

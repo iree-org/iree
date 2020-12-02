@@ -94,7 +94,10 @@ class ClassificationTrainingTest(tf_test_utils.TracedModuleTestCase):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
-        ClassificationTrainingModule, exported_names=["train_on_batch"])
+        ClassificationTrainingModule,
+        exported_names=["train_on_batch"],
+        relative_artifacts_dir=os.path.join(
+            ClassificationTrainingModule.__name__, FLAGS.optimizer))
 
   def test_train_on_batch(self):
 
@@ -109,8 +112,6 @@ def main(argv):
   del argv  # Unused
   if hasattr(tf, "enable_v2_behavior"):
     tf.enable_v2_behavior()
-  ClassificationTrainingModule.__name__ = os.path.join(
-      ClassificationTrainingModule.__name__, FLAGS.optimizer)
   tf.test.main()
 
 

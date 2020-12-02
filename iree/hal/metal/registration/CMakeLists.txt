@@ -28,7 +28,6 @@ iree_cc_library(
     iree::base::flags
     iree::base::status
     iree::hal::api
-    iree::hal::driver_registry
     iree::hal::metal
   DEFINES
     "IREE_HAL_HAVE_METAL_DRIVER_MODULE=1"

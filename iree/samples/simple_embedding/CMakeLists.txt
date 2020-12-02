@@ -43,7 +43,7 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::hal::api
-    iree::hal::drivers
+    iree::hal::testing::driver_registry
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

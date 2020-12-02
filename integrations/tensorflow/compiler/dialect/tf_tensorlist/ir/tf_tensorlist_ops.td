@@ -34,7 +34,8 @@ def TFTensorList_Reserve : TFTensorList_Op<"Reserve"> {
 
   let arguments = (ins
     TF_I32OrI64Tensor:$element_shape,
-    I32Tensor:$num_elements
+    I32Tensor:$num_elements,
+    TypeAttr:$element_type
   );
 
   let results = (outs
@@ -62,8 +63,7 @@ def TFTensorList_GetItem : TFTensorList_Op<"GetItem"> {
 
   let arguments = (ins
     TFTensorList_TensorList:$list,
-    I32Tensor:$index,
-    I32Tensor:$element_shape
+    I32Tensor:$index
   );
 
   let results = (outs
@@ -103,8 +103,7 @@ def TFTensorList_FromTensor : TFTensorList_Op<"FromTensor", [NoSideEffect]> {
   }];
 
   let arguments = (ins
-    TF_Tensor:$tensor,
-    I32Tensor:$element_shape
+    TF_Tensor:$tensor
   );
 
   let results = (outs
@@ -125,7 +124,6 @@ def TFTensorList_Stack : TFTensorList_Op<"Stack", [NoSideEffect]> {
 
   let arguments = (ins
     TFTensorList_TensorList:$list,
-    I32Tensor:$element_shape,
     // TODO(silvasean): Properly handle IREE's blind truncation to 32-bit.
     // This is logically `index` type, but coming from TensorFlow it
     // comes in as i64. IREE then proceeds to blindly truncate it to I32

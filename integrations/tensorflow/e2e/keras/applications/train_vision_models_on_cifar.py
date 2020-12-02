@@ -28,50 +28,12 @@ flags.DEFINE_bool(
     'include_top', True,
     'Whether or not to include the final (top) layers of the model.')
 
-APP_MODELS = {
-    'ResNet50':
-        tf.keras.applications.resnet.ResNet50,
-    'ResNet101':
-        tf.keras.applications.resnet.ResNet101,
-    'ResNet152':
-        tf.keras.applications.resnet.ResNet152,
-    'ResNet50V2':
-        tf.keras.applications.resnet_v2.ResNet50V2,
-    'ResNet101V2':
-        tf.keras.applications.resnet_v2.ResNet101V2,
-    'ResNet152V2':
-        tf.keras.applications.resnet_v2.ResNet152V2,
-    'VGG16':
-        tf.keras.applications.vgg16.VGG16,
-    'VGG19':
-        tf.keras.applications.vgg19.VGG19,
-    'Xception':
-        tf.keras.applications.xception.Xception,
-    'InceptionV3':
-        tf.keras.applications.inception_v3.InceptionV3,
-    'InceptionResNetV2':
-        tf.keras.applications.inception_resnet_v2.InceptionResNetV2,
-    'MobileNet':
-        tf.keras.applications.mobilenet.MobileNet,
-    'MobileNetV2':
-        tf.keras.applications.mobilenet_v2.MobileNetV2,
-    'DenseNet121':
-        tf.keras.applications.densenet.DenseNet121,
-    'DenseNet169':
-        tf.keras.applications.densenet.DenseNet169,
-    'DenseNet201':
-        tf.keras.applications.densenet.DenseNet201,
-    'NASNetMobile':
-        tf.keras.applications.nasnet.NASNetMobile,
-    'NASNetLarge':
-        tf.keras.applications.nasnet.NASNetLarge,
-}
-
 # minimum size for keras vision models
 INPUT_SHAPE = [1, 32, 32, 3]
 
 
-def main(_):
+def main(argv):
+  del argv  # Unused.
 
   # prepare training and testing data
   (train_images,
@@ -89,10 +51,10 @@ def main(_):
   train_labels = train_labels[:4000]
 
   # It is a toy model for debugging (not optimized for accuracy or speed).
-
-  model = APP_MODELS[FLAGS.model](weights=None,
-                                  include_top=FLAGS.include_top,
-                                  input_shape=INPUT_SHAPE[1:])
+  model_class = getattr(tf.keras.applications, FLAGS.model)
+  model = model_class(weights=None,
+                      include_top=FLAGS.include_top,
+                      input_shape=INPUT_SHAPE[1:])
   model.summary()
   model.compile(optimizer='adam',
                 loss='sparse_categorical_crossentropy',

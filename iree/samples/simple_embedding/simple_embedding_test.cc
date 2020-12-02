@@ -19,7 +19,7 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -45,28 +45,17 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 
 // Builds a list of tests to run based on the linked in driver modules.
 std::vector<TestParams> GetAvailableDriverTestParams() {
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
-
   std::vector<TestParams> all_test_params;
-  iree_string_view_t* driver_names = nullptr;
-  iree_host_size_t driver_count = 0;
-  IREE_CHECK_OK(iree_hal_driver_registry_query_available_drivers(
-      iree_allocator_system(), &driver_names, &driver_count));
-  for (iree_host_size_t i = 0; i < driver_count; ++i) {
+  auto driver_names = iree::hal::testing::EnumerateAvailableDrivers();
+  // TODO(#3843): this whole file stopped being useful a long time ago as a
+  // "simple" embedded test. This is a hack to work around its bustedness.
+  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "dylib");
+  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "llvm");
+  for (const auto& driver_name : driver_names) {
     TestParams test_params;
-    test_params.driver_name =
-        std::string(driver_names[i].data, driver_names[i].size);
-
-    // TODO(#3843): this whole file stopped being useful a long time ago as a
-    // "simple" embedded test. This is a hack to work around its bustedness.
-    if (test_params.driver_name == "dylib" ||
-        test_params.driver_name == "llvm") {
-      continue;
-    }
-
+    test_params.driver_name = driver_name;
     all_test_params.push_back(std::move(test_params));
   }
-  iree_allocator_free(iree_allocator_system(), driver_names);
   return all_test_params;
 }
 
@@ -86,7 +75,8 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   const auto& driver_name = GetParam().driver_name;
   IREE_LOG(INFO) << "Creating driver '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
+  IREE_ASSERT_OK(iree_hal_driver_registry_try_create_by_name(
+      iree_hal_driver_registry_default(),
       iree_string_view_t{driver_name.data(), driver_name.size()},
       iree_allocator_system(), &driver));
   iree_hal_device_t* device = nullptr;

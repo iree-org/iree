@@ -202,7 +202,8 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
       // A root only op is mergable.
-      if (OpDispatchPolicy::isUnsupportedFusionOp(&op) &&
+      if ((OpDispatchPolicy::isUnsupportedFusionOp(&op) ||
+           OpDispatchPolicy::isFusableWithConsumersOnly(&op)) &&
           !OpDispatchPolicy::isRootOnlyOp(&op)) {
         return false;
       }

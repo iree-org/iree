@@ -158,7 +158,8 @@ Status Run() {
 
 extern "C" int main(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());
   return 0;
 }

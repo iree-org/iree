@@ -23,6 +23,16 @@ namespace iree_compiler {
 /// Creates a pass to vectorize Linalg operations.
 std::unique_ptr<Pass> createLoadStoreVectorizationPass();
 
+/// Creates a pass to vectorize a very specific form of linalg.conv ops.
+std::unique_ptr<Pass> createVectorizeLinalgConvPass();
+
+/// Populates `patterns` with a very specific pattern that vectorizes a
+/// linalg.conv op for a single thread. The linalg.conv should compute on
+/// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
+/// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
+void populateVectorizeLinalgConvPatterns(MLIRContext *context,
+                                         OwningRewritePatternList &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

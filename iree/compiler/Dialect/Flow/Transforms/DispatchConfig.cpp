@@ -17,11 +17,18 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 #define DEBUG_TYPE "iree-detail"
+
+static llvm::cl::opt<bool> clEnableMatmulFusion(
+    "iree-enable-matmul-fusion",
+    llvm::cl::desc("Flag to enable fusion of matmul with its consumers, "
+                   "experimental flag to evaluate fusion"),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -104,7 +111,7 @@ bool OpDispatchPolicy::isIdentityMetadata(Operation *op) {
 }
 
 int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
-  if (isUnsupportedFusionOp(op)) {
+  if (isUnsupportedFusionOp(op) || isFusableWithConsumersOnly(op)) {
     return 100;
   }
 
@@ -142,6 +149,9 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
     return FusionType::DISABLED;
   }
+  if (isFusableWithConsumersOnly(anchorOp) && !isa<mhlo::ReshapeOp>(inputOp)) {
+    return FusionType::DISABLED;
+  }
 
   // By default for operands, they are duplicated into the dispatch region.
   // Typically at the initial fusion stage, there is not a sufficient cost
@@ -167,6 +177,10 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(outputOp)) {
     return FusionType::DISABLED;
   }
+  if (isFusableWithConsumersOnly(anchorOp) &&
+      !isFusableWithConsumersOnly(outputOp)) {
+    return FusionType::MOVE_INTO;
+  }
 
   // Generally, it is hard to reason locally about the legality of fusing an
   // output, since additional analysis may need to be done to determine
@@ -176,12 +190,16 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   return FusionType::DISABLED;
 }
 
+bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
+  return clEnableMatmulFusion && isa<mhlo::DotOp>(op);
+}
+
 // TODO(b/144530470): replace with tablegen attributes/interfaces.
 bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
-  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
-             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-             mhlo::TorchIndexSelectOp>(op) ||
-         isRootOnlyOp(op);
+  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::PadOp,
+             mhlo::ReduceOp, mhlo::ReduceWindowOp, mhlo::TorchIndexSelectOp>(
+             op) ||
+         (!clEnableMatmulFusion && isa<mhlo::DotOp>(op)) || isRootOnlyOp(op);
 }
 
 bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {

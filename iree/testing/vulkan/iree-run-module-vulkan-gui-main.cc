@@ -148,7 +148,8 @@ Status RunModuleAndUpdateImGuiWindow(
 
 int iree::IreeMain(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
-  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
+      iree_hal_driver_registry_default()));
 
   // --------------------------------------------------------------------------
   // Create a window.
