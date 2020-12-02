@@ -20,17 +20,19 @@
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
+namespace iree_compiler {
 namespace tf_tensorlist {
 
-class TfTensorListDialect : public Dialect {
+class TFTensorListDialect : public Dialect {
  public:
   static StringRef getDialectNamespace() { return "tf_tensorlist"; }
-  explicit TfTensorListDialect(MLIRContext *context);
+  explicit TFTensorListDialect(MLIRContext *context);
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &printer) const override;
 };
 
 }  // namespace tf_tensorlist
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // TENSORFLOW_COMPILER_MLIR_TENSORFLOW_IR_tf_tensorlist_H_

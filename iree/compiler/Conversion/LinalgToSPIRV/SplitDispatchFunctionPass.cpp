@@ -81,6 +81,10 @@ static bool isFusableWithCurrentOpsList(
       dependenceGraph.hasDependenceFrom(srcOp, dstOp, DependenceTy)) \
     return true;
 
+    ADD_FUSABLE_PAIR(linalg::BatchMatmulOp, linalg::GenericOp,
+                     linalg::LinalgDependenceGraph::DependenceType::RAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::BatchMatmulOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,

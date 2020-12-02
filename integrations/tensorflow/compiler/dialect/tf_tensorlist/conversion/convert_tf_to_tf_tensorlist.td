@@ -22,22 +22,21 @@ def GetVariantElementTypeAttr : NativeCodeCall<
   "GetVariantElementTypeAttr($0.getType())">;
 
 def : Pat<(TF_TensorListReserveOp:$result $element_shape, $num_elements),
-          (TfTensorList_Reserve $element_shape, $num_elements,
+          (TFTensorList_Reserve $element_shape, $num_elements,
            (GetVariantElementTypeAttr $result))>;
 
 def : Pat<(TF_TensorListGetItemOp $input_handle, $index, $element_shape),
-          (TfTensorList_GetItem $input_handle, $index)>;
+          (TFTensorList_GetItem $input_handle, $index)>;
 
 def : Pat<(TF_TensorListSetItemOp $input_handle, $index, $item),
-          (TfTensorList_SetItem $input_handle, $index, $item)>;
+          (TFTensorList_SetItem $input_handle, $index, $item)>;
 
 def : Pat<(TF_TensorListFromTensorOp $tensor, $element_shape),
-          (TfTensorList_FromTensor $tensor)>;
+          (TFTensorList_FromTensor $tensor)>;
 
 def WrapScalarI64InTensor : NativeCodeCall<
     "DenseElementsAttr::get(RankedTensorType::get({}, $_builder.getIntegerType(64)), {$_self.getValue()})">;
 def : Pat<(TF_TensorListStackOp $input_handle, $element_shape, $num_elements),
-          (TfTensorList_Stack
+          (TFTensorList_Stack
             $input_handle,
             (ConstantOp WrapScalarI64InTensor:$num_elements))>;
-

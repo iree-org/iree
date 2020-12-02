@@ -14,11 +14,13 @@
 
 #include "integrations/tensorflow/bindings/python/pyiree/tf/compiler/register_tensorflow.h"
 
+#include <mutex>
 #include <string>
 #include <vector>
 
 #include "bindings/python/pyiree/common/status_utils.h"
 #include "bindings/python/pyiree/compiler/compiler.h"
+#include "integrations/tensorflow/compiler/Passes.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
@@ -41,10 +43,20 @@ namespace python {
 
 namespace {
 
+static void initializeContextForTFImport(MLIRContext* context) {
+  static std::once_flag flag;
+  std::call_once(flag, [&]() {
+    mlir::iree_compiler::TF::registerAllPasses();
+    mlir::iree_compiler::TF::registerAllDialects(context->getDialectRegistry());
+  });
+}
+
 CompilerModuleBundle LoadSavedModel(
     std::shared_ptr<CompilerContextBundle> context_bundle,
     const std::string& saved_model_dir,
     const std::vector<std::string>& exported_names) {
+  initializeContextForTFImport(context_bundle->mlir_context());
+
   SavedModelV2Bundle bundle;
   auto load_status = SavedModelV2Bundle::Load(
       std::string(saved_model_dir.data(), saved_model_dir.length()), &bundle);
@@ -76,6 +88,8 @@ CompilerModuleBundle LoadSignatureDefSavedModel(
     const std::string& saved_model_dir,
     const std::unordered_set<std::string>& tags,
     const std::vector<std::string>& exported_names) {
+  initializeContextForTFImport(context_bundle->mlir_context());
+
   SavedModelBundle bundle;
   auto load_status = LoadSavedModel(
       SessionOptions(), RunOptions(),

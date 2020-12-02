@@ -18,16 +18,17 @@
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
+namespace iree_compiler {
 namespace tf_tensorlist {
 
 //===----------------------------------------------------------------------===//
-// TfTensorListDialect Dialect
+// TFTensorListDialect Dialect
 //===----------------------------------------------------------------------===//
 
-TfTensorListDialect::TfTensorListDialect(MLIRContext *context)
+TFTensorListDialect::TFTensorListDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context,
-              TypeID::get<TfTensorListDialect>()) {
-  addInterfaces<iree_compiler::TfTensorListToHALConversionInterface>();
+              TypeID::get<TFTensorListDialect>()) {
+  addInterfaces<iree_compiler::TFTensorListToHALConversionInterface>();
   addOperations<
 #define GET_OP_LIST
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.cc.inc"
@@ -35,7 +36,7 @@ TfTensorListDialect::TfTensorListDialect(MLIRContext *context)
   addTypes<TensorListType>();
 }
 
-Type TfTensorListDialect::parseType(DialectAsmParser &parser) const {
+Type TFTensorListDialect::parseType(DialectAsmParser &parser) const {
   StringRef type_name;
   if (parser.parseKeyword(&type_name)) return nullptr;
   if (type_name == "list") {
@@ -46,10 +47,11 @@ Type TfTensorListDialect::parseType(DialectAsmParser &parser) const {
   return nullptr;
 }
 
-void TfTensorListDialect::printType(Type type,
+void TFTensorListDialect::printType(Type type,
                                     DialectAsmPrinter &printer) const {
   printer << "list";
 }
 
 }  // namespace tf_tensorlist
+}  // namespace iree_compiler
 }  // namespace mlir
