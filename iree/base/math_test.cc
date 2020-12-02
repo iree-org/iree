@@ -145,7 +145,6 @@ TEST(RoundingTest, UpToNextPow232) {
 
 TEST(RoundingTest, UpToNextPow264) {
   constexpr uint64_t kUint16Max = UINT16_MAX;
-  constexpr uint64_t kUint32Max = UINT32_MAX;
   constexpr uint64_t kUint64Max = UINT64_MAX;
   EXPECT_EQ(0ull, iree_math_round_up_to_pow2_u64(0ull));
   EXPECT_EQ(1ull, iree_math_round_up_to_pow2_u64(1ull));
