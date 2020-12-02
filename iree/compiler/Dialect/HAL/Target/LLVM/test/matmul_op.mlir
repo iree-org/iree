@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
     workload = 4 : index

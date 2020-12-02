@@ -120,7 +120,6 @@ iree_cc_binary(
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
     iree::base::initializer
-    iree::hal::llvmjit::llvmjit_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     vulkan-runtime-wrappers
@@ -159,7 +158,6 @@ iree_cc_binary(
     experimental::ModelBuilder::VulkanLaunchWrapper
     iree::base::initializer
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     vulkan-runtime-wrappers
@@ -196,7 +194,6 @@ iree_cc_binary(
     iree::base::initializer
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     vulkan-runtime-wrappers
@@ -233,7 +230,6 @@ iree_cc_binary(
     iree::base::initializer
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     vulkan-runtime-wrappers

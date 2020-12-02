@@ -86,7 +86,6 @@ endif()
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
   DyLib
-  LLVM
   Metal
   VMLA
   Vulkan
@@ -124,7 +123,6 @@ endforeach()
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
-  LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
