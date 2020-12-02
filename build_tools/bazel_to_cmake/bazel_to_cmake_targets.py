@@ -72,7 +72,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@pffft": ["pffft"],
     "@sdl2//:SDL2": ["SDL2-static"],
     "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
-    "@half": ["half"],
+    "@half//:half": ["half"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 
