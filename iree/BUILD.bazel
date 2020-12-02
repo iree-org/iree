@@ -44,11 +44,3 @@ config_setting(
         "iree_is_msvc": "true",
     },
 )
-
-config_setting(
-    name = "macos_x86_64",
-    values = {
-        "apple_platform_type": "macos",
-        "cpu": "darwin",
-    },
-)

@@ -40,13 +40,11 @@ cc_library(
     name = "SPIRVToMSL",
     srcs = [
         "SPIRVToMSL.cpp",
-        "@spirv_cross//:spirv_msl.hpp",
     ],
     hdrs = ["SPIRVToMSL.h"],
-    copts = ["-Iexternal"],
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
-        "@spirv_cross",
+        "@spirv_cross//:spirv_cross_lib",
     ],
 )

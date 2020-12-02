@@ -41,13 +41,20 @@ SPIRV_HEADERS = [
 CLI_SOURCES = ["main.cpp"]
 
 cc_library(
-    name = "spirv_cross",
+    name = "spirv_cross_lib_real",
     srcs = SPIRV_SOURCES,
     hdrs = SPIRV_HEADERS,
 )
 
+cc_library(
+    name = "spirv_cross_lib",
+    hdrs = SPIRV_HEADERS,
+    deps = [":spirv_cross_lib_real"],
+    include_prefix = "third_party/spirv_cross",
+)
+
 cc_binary(
-    name = "spriv_cross_cli",
+    name = "spriv_cross",
     srcs = CLI_SOURCES,
     deps = ["spirv_cross"],
 )
