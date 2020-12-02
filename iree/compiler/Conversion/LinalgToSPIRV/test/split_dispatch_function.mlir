@@ -1,9 +1,11 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-codegen-split-dispatch-function -verify-diagnostics %s | IreeFileCheck %s
 
 module {
-  // CHECK: func @kernel_fusable_fill_conv_ops
-  // CHECK:   linalg.fill
-  // CHECK:   linalg.conv
+  //     CHECK: func @kernel_fusable_fill_conv_ops
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.conv
+  //     CHECK:   return
 
   func @kernel_fusable_fill_conv_ops()
   attributes {hal.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
@@ -20,10 +22,9 @@ module {
     linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
     return
   }
-  func @kernel_fill_conv_ops_num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
-                                              !shapex.ranked_shape<[3,3,512,1]>,
-                                              !shapex.ranked_shape<[?,1,1,512]>)
-                                             -> (index, index, index)
+  func @kernel_fusable_fill_conv_ops_num_workgroups__
+    (!shapex.ranked_shape<[?,2,2,512]>, !shapex.ranked_shape<[3,3,512,1]>,
+     !shapex.ranked_shape<[?,1,1,512]>) -> (index, index, index)
   attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -35,9 +36,11 @@ module {
 // -----
 
 module {
-  // CHECK: func @kernel_fusable_fill_matmul_ops
-  // CHECK:   linalg.fill
-  // CHECK:   linalg.matmul
+  //     CHECK: func @kernel_fusable_fill_matmul_ops
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.matmul
+  //     CHECK:   return
 
   func @kernel_fusable_fill_matmul_ops()
   attributes {hal.num_workgroups_fn = @kernel_fusable_fill_matmul_ops_num_workgroups__} {
@@ -73,9 +76,11 @@ module {
 // -----
 
 module {
-  // CHECK: func @kernel_fusable_pooling()
-  // CHECK:   linalg.fill
-  // CHECK:   linalg.pooling
+  //     CHECK: func @kernel_fusable_pooling()
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.pooling
+  //     CHECK:   return
   func @kernel_fusable_pooling() attributes {hal.num_workgroups_fn = @kernel_fusable_pooling__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
@@ -221,7 +226,6 @@ module {
   }
 }
 
-
 // -----
 
 // Nothing to do if there is just one Linalg op.
@@ -245,6 +249,8 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
+
+
 
 // -----
 
@@ -270,7 +276,6 @@ module {
 }
 
 // -----
-
 #map0 = affine_map<(d0, d1) -> (d0 * 12 + d1 + 53)>
 
 module {
@@ -417,3 +422,62 @@ module {
 // CHECK-NEXT:   linalg.copy
 //  CHECK-NOT:   linalg
 //      CHECK:   return
+
+// -----
+
+module {
+  //     CHECK: func @kernel_fusable_fill_matmul_generic_ops
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.matmul
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.generic
+  //     CHECK:   return
+
+  func @kernel_fusable_fill_matmul_generic_ops()
+  attributes {hal.num_workgroups_fn = @kernel_fusable_fill_matmul_generic_ops_num_workgroups__} {
+    %cst = constant 0.000000e+00 : f32
+    %dimM = hal.interface.load.constant offset = 0 : index
+    %dimN = hal.interface.load.constant offset = 1 : index
+    %shape1 = shapex.make_ranked_shape %dimM : (index) -> !shapex.ranked_shape<[?,512]>
+    %shape2 = shapex.make_ranked_shape %dimN : (index) -> !shapex.ranked_shape<[512,?]>
+    %shape3 = shapex.make_ranked_shape %dimM, %dimN : (index, index) -> !shapex.ranked_shape<[?,?]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x512xf32>
+    %ts0 = shapex.tie_shape %0, %shape1 : memref<?x512xf32>, !shapex.ranked_shape<[?,512]>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<512x?xf32>
+    %ts1 = shapex.tie_shape %1, %shape2 : memref<512x?xf32>, !shapex.ranked_shape<[512, ?]>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2} : memref<?x?xf32>
+    %ts2 = shapex.tie_shape %2, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?, ?]>
+    %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
+    %ts3 = shapex.tie_shape %3, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?,?]>
+    %4 = alloc(%dimM, %dimN) : memref<?x?xf32>
+    %ts4 = shapex.tie_shape %4, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?,?]>
+    linalg.fill(%ts4, %cst) : memref<?x?xf32>, f32
+    linalg.matmul ins(%ts0, %ts1 : memref<?x512xf32>, memref<512x?xf32>)
+                  outs(%ts4 : memref<?x?xf32>)
+    linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%ts2, %ts4 : memref<?x?xf32>, memref<?x?xf32>)
+      outs(%ts3 : memref<?x?xf32>) {
+      ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):
+        %5 = addf %arg0, %arg1 : f32
+        linalg.yield %5 : f32
+    }
+    return
+  }
+  func @kernel_fusable_matmul_ops_num_workgroups__(!shapex.ranked_shape<[?,512]>,
+                                                   !shapex.ranked_shape<[512,?]>,
+                                                   !shapex.ranked_shape<[?,?]>,
+                                                   !shapex.ranked_shape<[?,?]>)
+                                                  -> (index, index, index)
+  attributes {sym_visibility = "private"}
+  hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}

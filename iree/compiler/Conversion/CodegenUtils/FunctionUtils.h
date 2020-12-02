@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/Function.h"
 
 namespace mlir {
@@ -32,6 +33,9 @@ inline const char* getBindingAttrName() { return "binding"; }
 inline const char* getOperandResultNumAttrName() {
   return "operand_result_index";
 }
+
+/// Returns the number of outer parallel loops of a linalgOp.
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
 
 }  // namespace iree_compiler
 }  // namespace mlir

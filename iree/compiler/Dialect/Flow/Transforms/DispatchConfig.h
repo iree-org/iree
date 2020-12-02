@@ -41,6 +41,9 @@ class OpDispatchPolicy {
   OpDispatchPolicy(Dispatchability &dispatchability)
       : dispatchability(dispatchability) {}
 
+  // Returns true if |op| is only fusable with its consumers.
+  static bool isFusableWithConsumersOnly(Operation *op);
+
   // Returns true if |op| is not able to fuse with either producer or consumer.
   static bool isUnsupportedFusionOp(Operation *op);
 

@@ -254,6 +254,44 @@ LogicalResult fuseInputs(DispatchRegion &dispatchRegion,
   return success();
 }
 
+// Inlining an op into a dispatch region makes the operands of the op the
+// operands of the dispatch region (if the operands arent already defined in the
+// dispatch region). The dispatch region has to be moved just after the last
+// defined operand for SSA value use to be valid.
+static LogicalResult moveDispatchOp(DispatchRegionOp dispatchRegionOp,
+                                    Operation *inlinedOp) {
+  // Check the operation that is the lexicographically first to produce an
+  // operand to the inlinedOp
+  Optional<Operation *> lastOperandDef = llvm::None;
+  for (Value operand : inlinedOp->getOperands()) {
+    if (Operation *definingOp = operand.getDefiningOp()) {
+      if (!lastOperandDef ||
+          lastOperandDef.getValue()->isBeforeInBlock(definingOp)) {
+        lastOperandDef = definingOp;
+      }
+    }
+  }
+  // If the last operand def is already before the dispatch region, there is
+  // nothing to do.
+  if (!lastOperandDef ||
+      lastOperandDef.getValue()->isBeforeInBlock(dispatchRegionOp)) {
+    return success();
+  }
+
+  // The dispatch region needs to be moved after the lastOperandDef, but before
+  // the first use.
+  Optional<Operation *> firstUse = llvm::None;
+  for (Operation *user : dispatchRegionOp.getOperation()->getUsers()) {
+    if (!firstUse || user->isBeforeInBlock(*firstUse)) {
+      firstUse = user;
+    }
+  }
+  if (firstUse && firstUse.getValue()->isBeforeInBlock(*lastOperandDef))
+    return failure();
+  dispatchRegionOp.getOperation()->moveAfter(lastOperandDef.getValue());
+  return success();
+}
+
 LogicalResult fuseOutputs(DispatchRegion &dispatchRegion,
                           OpDispatchPolicy &policy) {
   LLVM_DEBUG(llvm::dbgs() << "++ FUSING OUTPUT\n");
@@ -274,6 +312,11 @@ LogicalResult fuseOutputs(DispatchRegion &dispatchRegion,
     if (action != OpDispatchPolicy::FusionType::MOVE_INTO) {
       return nextOp->emitError()
              << "cannot fuse output except with MOVE_INTO action";
+    }
+    if (failed(moveDispatchOp(dispatchRegion.op, nextOp))) {
+      LLVM_DEBUG(llvm::dbgs() << "- SKIP Fusion due to SSA use-def violation "
+                              << *nextOp << "\n");
+      continue;
     }
     LLVM_DEBUG(llvm::dbgs() << "- FUSABLE OUTPUT(" << static_cast<int>(action)
                             << "): " << *nextOp << "\n");

@@ -77,8 +77,10 @@ class SlimVisionTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._modules = tf_test_utils.compile_tf_module(SlimVisionModule,
-                                                    exported_names=['predict'])
+    self._modules = tf_test_utils.compile_tf_module(
+        SlimVisionModule,
+        exported_names=['predict'],
+        relative_artifacts_dir=FLAGS.model)
 
   def test_predict(self):
 
@@ -94,8 +96,6 @@ def main(argv):
   del argv  # Unused.
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-
-  SlimVisionModule.__name__ = FLAGS.model
   tf.test.main()
 
 

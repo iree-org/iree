@@ -55,7 +55,7 @@ FLAGS = flags.FLAGS
 DEFAULT_INPUT_GENERATOR = tf_utils.uniform
 
 
-def _setup_artifacts_dir(module_name: str) -> str:
+def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
   parent_dirs = [
       FLAGS.artifacts_dir,
       os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'),
@@ -65,7 +65,7 @@ def _setup_artifacts_dir(module_name: str) -> str:
   # Use the most preferred path in parent_dirs that isn't None.
   parent_dir = next(parent for parent in parent_dirs if parent is not None)
 
-  artifacts_dir = os.path.join(parent_dir, module_name)
+  artifacts_dir = os.path.join(parent_dir, relative_artifacts_dir)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
   os.makedirs(artifacts_dir, exist_ok=True)
   return artifacts_dir
@@ -125,9 +125,9 @@ global _global_modules
 _global_modules = None
 
 
-def compile_tf_module(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = ()) -> Modules:
+def compile_tf_module(module_class: Type[tf.Module],
+                      exported_names: Sequence[str] = (),
+                      relative_artifacts_dir: str = None) -> Modules:
   """Compiles module_class to each backend that we test.
 
   Args:
@@ -135,6 +135,9 @@ def compile_tf_module(
     exported_names: optional iterable of strings representing which of
       module_class's functions to compile. If exported_names is empty all
       functions will be compiled.
+    relative_artifacts_dir: optional string specifying where to save compilation
+      artifacts within the artifacts_dir. If it is not specified then
+      module_class.__name__ will be used.
 
   Returns:
     A 'Modules' namedtuple containing the reference module, target modules and
@@ -145,7 +148,9 @@ def compile_tf_module(
     return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
-  artifacts_dir = _setup_artifacts_dir(module_class.__name__)
+  if relative_artifacts_dir is None:
+    relative_artifacts_dir = module_class.__name__
+  artifacts_dir = _setup_artifacts_dir(relative_artifacts_dir)
 
   # Get the backend information for this test.
   ref_backend_info = module_utils.BackendInfo(FLAGS.reference_backend,

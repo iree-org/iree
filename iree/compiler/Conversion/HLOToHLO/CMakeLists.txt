@@ -21,10 +21,15 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "DecomposeHLOClamp.cpp"
+    "DemoteF32ToF16.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRPass
+    MLIRSupport
     MLIRTransformUtils
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_hlo
   PUBLIC
 )
