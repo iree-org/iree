@@ -214,9 +214,9 @@ TARGETS_URL = os.path.join(MAIN_URL, 'iree/compiler/Dialect/HAL/Target')
 
 BACKEND_INFO = f"""IREE has three backend
 [targets]({TARGETS_URL}):
-`vmla`, `llvm-ir` and `vulkan-spirv`. We also test TFLite in our infrastructure
-for benchmarking purposes. The coverage tables below are automatically generated
-from IREE's test suites."""
+`vmla`, `dylib-llvm-aot` and `vulkan-spirv`. We also test TFLite in our
+infrastructure for benchmarking purposes. The coverage tables below are
+automatically generated from IREE's test suites."""
 
 
 def parse_arguments():
