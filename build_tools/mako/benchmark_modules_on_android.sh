@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 TS="$(date +%s)000"
-SED_EXPR='s/BM_[[:alnum:][:punct:]]+ [[:space:]]+ ([0-9]+) ms[[:print:]]+/\1/p'
+SED_EXPR='s/BM_[[:alnum:][:punct:]]+\/real_time[[:space:]]+ ([.0-9]+) ms[[:print:]]+/\1/p'
 OUTPUT_DIR=test_output_files
 DEVICE_ROOT=/data/local/tmp/benchmark_tmpdir
 
@@ -111,10 +111,11 @@ function run_and_log {
     "${DEVICE_ROOT}/iree-benchmark-module" \
     "--flagfile=${DEVICE_ROOT}/flagfile" \
     "--module_file=${DEVICE_ROOT}/${model}-${target}.vmfb" \
-    "--driver=${driver}" | tee "${test_out}"
-  for ms in "$(sed -En -e "${SED_EXPR}" "${test_out}")"; do
+    "--driver=${driver}" \
+    --benchmark_repetitions=10 | tee "${test_out}"
+  while read -r ms; do
     append_mako_sample "${mako_log}" "${ms}" "${TAG}"
-  done
+  done < <(sed -En -e "${SED_EXPR}" "${test_out}")
 }
 
 phone_serial_number="$(adb get-serialno)"
