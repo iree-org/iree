@@ -696,12 +696,34 @@ class TfMathModule(tf_test_utils.TestModule):
         setattr(self, unit_test_spec.unit_test_name, function_unit_test)
 
 
+def get_relative_artifacts_dir() -> str:
+  if len(FLAGS.functions) > 1:
+    # We only allow testing multiple functions with a single target backend
+    # so that we can store the artifacts under:
+    #   'artifacts_dir/multiple_functions__backend/...'
+    # We specialize the 'multiple_functions' dir by backend to avoid overwriting
+    # tf_input.mlir and iree_input.mlir. These are typically identical across
+    # backends, but are not when the functions to compile change per-backend.
+    if len(FLAGS.target_backends) != 1:
+      raise flags.IllegalFlagValueError(
+          "Expected len(target_backends) == 1 when len(functions) > 1, but got "
+          f"the following values for target_backends: {FLAGS.target_backends}.")
+    function_str = f"multiple_functions__{FLAGS.target_backends[0]}"
+  else:
+    function_str = FLAGS.functions[0]
+  dim_str = "dynamic_dims" if FLAGS.dynamic_dims else "static_dims"
+  complex_str = "complex" if FLAGS.test_complex else "non_complex"
+  return os.path.join("tf", "math", function_str, f"{dim_str}_{complex_str}")
+
+
 class TfMathTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
-        TfMathModule, exported_names=TfMathModule.get_tf_function_unit_tests())
+        TfMathModule,
+        exported_names=TfMathModule.get_tf_function_unit_tests(),
+        relative_artifacts_dir=get_relative_artifacts_dir())
 
 
 def main(argv):
@@ -720,26 +742,6 @@ def main(argv):
     raise flags.IllegalFlagValueError(
         "'--functions' must be specified if "
         "'--list_functions_with_complex_tests' isn't")
-
-  if len(FLAGS.functions) > 1:
-    # We only allow testing multiple functions with a single target backend
-    # so that we can store the artifacts under:
-    #   'artifacts_dir/multiple_functions__backend/...'
-    # We specialize the 'multiple_functions' dir by backend to avoid overwriting
-    # tf_input.mlir and iree_input.mlir. These are typically identical across
-    # backends, but are not when the functions to compile change per-backend.
-    if len(FLAGS.target_backends) != 1:
-      raise flags.IllegalFlagValueError(
-          "Expected len(target_backends) == 1 when len(functions) > 1, but got "
-          f"the following values for target_backends: {FLAGS.target_backends}.")
-    function_str = f"multiple_functions__{FLAGS.target_backends[0]}"
-  else:
-    function_str = FLAGS.functions[0]
-  dim_str = "dynamic_dims" if FLAGS.dynamic_dims else "static_dims"
-  settings_str = os.path.join(function_str, dim_str)
-  # The relative artifacts directory path is calculated from the module name
-  # TODO(meadowlark): provide a better way of overridding this default.
-  TfMathModule.__name__ = os.path.join("tf", "math", settings_str)
 
   TfMathTest.generate_unit_tests(TfMathModule)
   tf.test.main()

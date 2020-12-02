@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/IR/Builders.h"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.cpp.inc"

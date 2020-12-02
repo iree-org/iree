@@ -248,7 +248,7 @@ class VectorTransferWriteToStore
 };
 
 // Lower vector contract to a single scalar or vector mulf+addf. Insert casts to
-// convert from 2D vector to 1D vector or scalar.
+// convert from N-D vector to 1D vector or scalar.
 class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
  public:
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
@@ -256,19 +256,20 @@ class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
     auto iteratorTypes = op.iterator_types().getValue();
-    if (iteratorTypes.size() != 3 || !isParallelIterator(iteratorTypes[0]) ||
-        !isParallelIterator(iteratorTypes[1]) ||
-        !isReductionIterator(iteratorTypes[2]) ||
-        !isRowMajorMatmul(op.indexing_maps())) {
+    if (!isReductionIterator(iteratorTypes.back()) ||
+        op.getContractingDimMap().size() > 1)
       return failure();
-    }
     if (op.getLhsType().getNumElements() != 1) return failure();
-    unsigned vecSize = op.getAccType().cast<VectorType>().getNumElements();
-    if (!(vecSize >= 1 && vecSize <= 4)) return failure();
+    auto accType = op.getAccType().cast<VectorType>();
+    auto rhsType = op.getRhsType();
+    unsigned vecSize = accType.getNumElements();
+    if (accType != rhsType || !(vecSize >= 1 && vecSize <= 4) ||
+        accType.getShape().back() != vecSize)
+      return failure();
     auto loc = op.getLoc();
     VectorType vecType = VectorType::get(
         vecSize, op.getResultType().cast<VectorType>().getElementType());
-    std::array<int64_t, 2> zero = {0, 0};
+    llvm::SmallVector<int64_t, 4> zero(iteratorTypes.size() - 1, 0);
     Value lhs = rewriter.create<vector::ExtractOp>(loc, op.lhs(), zero);
     Value rhs, acc;
     if (vecSize == 1) {

@@ -27,5 +27,6 @@
 // to be omitted and not have VMA poking around where it shouldn't.
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 
-#include "vk_mem_alloc.h"
+#include <vk_mem_alloc.h>
+
 #endif  // IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_

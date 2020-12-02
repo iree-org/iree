@@ -374,18 +374,17 @@ endif()
 # Non-LLVM Dependencies
 #-------------------------------------------------------------------------------
 
-# Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
-# any of our dependencies do. See
+# Use the FindPython functions before any of our dependencies do. See
 # https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
 # If one dependency finds Python 2 (the default),
 # any others that try to find Python 3 will fail.
 # (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
 if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(PythonInterp 3 REQUIRED)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   # Note: Optional because python libs can be manually specified.
-  find_package(PythonLibs 3)
+  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
 
 include(external_cc_library)
