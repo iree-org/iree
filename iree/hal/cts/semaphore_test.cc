@@ -15,7 +15,7 @@
 #include <thread>
 
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -143,7 +143,7 @@ TEST_P(SemaphoreTest, PingPong) {
 
 INSTANTIATE_TEST_SUITE_P(
     AllDrivers, SemaphoreTest,
-    ::testing::ValuesIn(CtsTestBase::EnumerateAvailableDrivers()),
+    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
     GenerateTestName());
 
 }  // namespace cts

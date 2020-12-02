@@ -297,7 +297,8 @@ int main(int argc, char** argv) {
       absl::flags_internal::OnUndefinedFlag::kIgnoreUndefined);
   ::benchmark::Initialize(&argc, argv);
   iree_flags_parse_checked(&argc, &argv);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
 
   iree::IREEBenchmark iree_benchmark;
   auto status = iree_benchmark.Register();

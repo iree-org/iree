@@ -262,6 +262,8 @@ typedef struct {
 // occur in any order from any thread.
 // TODO(benvanik): version this interface.
 typedef struct iree_vm_module {
+  IREE_API_UNSTABLE
+
   void* self;
   iree_atomic_ref_count_t ref_count;
 

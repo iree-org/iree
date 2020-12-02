@@ -31,7 +31,8 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+        iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {

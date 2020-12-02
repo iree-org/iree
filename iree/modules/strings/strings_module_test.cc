@@ -42,7 +42,8 @@ namespace {
 class StringsModuleTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+        iree_hal_driver_registry_default()));
   }
 
   virtual void SetUp() {
@@ -57,8 +58,9 @@ class StringsModuleTest : public ::testing::Test {
     // Setup hal module:
     IREE_CHECK_OK(iree_hal_module_register_types());
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
+    IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_allocator_system(), &hal_driver));
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_CHECK_OK(

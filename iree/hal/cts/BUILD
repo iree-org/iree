@@ -30,8 +30,9 @@ cc_library(
     ],
     deps = [
         "//iree/base:status",
-        "//iree/hal:driver_registry",
-        "//iree/hal/drivers",
+        "//iree/hal",
+        "//iree/hal:api",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
     ],
 )
@@ -42,7 +43,7 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -54,7 +55,7 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -66,7 +67,7 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -78,7 +79,7 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -89,7 +90,7 @@ cc_test(
     srcs = ["driver_test.cc"],
     deps = [
         ":cts_test_base",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -100,7 +101,7 @@ cc_test(
     srcs = ["semaphore_test.cc"],
     deps = [
         ":cts_test_base",
-        "//iree/hal:driver_registry",
+        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
