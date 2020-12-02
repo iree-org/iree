@@ -23,6 +23,14 @@
 namespace mlir {
 namespace iree_compiler {
 
+// TODO(ravishankarm): This needs to be put in a common place for the CPU and
+// GPU backends to use.
+static llvm::cl::list<unsigned> clLLVMTileSizes(
+    "iree-llvm-tile-size",
+    llvm::cl::desc("Set tile sizes to use for tiling Linalg operations in "
+                   "LLVM code generation"),
+    llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
 static llvm::cl::opt<int> matmulWorkgroupTileSize(
     "iree-codegen-linalg-to-llvm-kernel-dispatch-matmul-workgroup-tile-size",
     llvm::cl::desc(
@@ -150,6 +158,49 @@ DEFINE_TILE_SIZE_FN(TilingLevel::Level1Tiles)
 DEFINE_TILE_SIZE_FN(TilingLevel::Level2Tiles)
 
 #undef DEFINE_TILE_SIZE_FN
+
+Optional<LaunchConfig> initCPULaunchConfig(
+    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+    ArrayRef<linalg::LinalgOp> linalgOps) {
+  LaunchConfig config;
+  if (!clLLVMTileSizes.empty()) {
+    SmallVector<int64_t, 3> tileSizes(clLLVMTileSizes.begin(),
+                                      clLLVMTileSizes.end());
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      config.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
+    }
+    return config;
+  }
+
+  Optional<linalg::LinalgOp> rootOperation = llvm::None;
+  for (auto linalgOp : linalgOps) {
+#define DISPATCH(opType)                                                     \
+  if (opType op = dyn_cast<opType>(linalgOp.getOperation())) {               \
+    if (rootOperation) {                                                     \
+      op.emitError("unhandled multiple root operations in dispatch region"); \
+      return llvm::None;                                                     \
+    }                                                                        \
+    rootOperation = linalgOp;                                                \
+    config.setTileSizes(                                                     \
+        op,                                                                  \
+        TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op), \
+        0);                                                                  \
+    continue;                                                                \
+  }
+
+    DISPATCH(linalg::MatmulOp)
+    DISPATCH(linalg::BatchMatmulOp)
+
+#undef DISPATCH
+  }
+  if (!rootOperation) {
+    return config;
+  }
+  if (failed(propogateRootOperationLaunchConfig(config, *rootOperation,
+                                                dependenceGraph)))
+    return llvm::None;
+  return config;
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir

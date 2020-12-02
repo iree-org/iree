@@ -171,7 +171,8 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     const ref_ptr<DynamicSymbols>& syms) {
   absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues;
 
-  uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
+  uint64_t compute_queue_count =
+      iree_math_count_ones_u64(compute_queue_set.queue_indices);
   for (uint32_t i = 0; i < compute_queue_count; ++i) {
     if (!(compute_queue_set.queue_indices & (1ull << i))) continue;
 
@@ -193,7 +194,8 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     }
   }
 
-  uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);
+  uint64_t transfer_queue_count =
+      iree_math_count_ones_u64(transfer_queue_set.queue_indices);
   for (uint32_t i = 0; i < transfer_queue_count; ++i) {
     if (!(transfer_queue_set.queue_indices & (1ull << i))) continue;
 
@@ -411,8 +413,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
     const ref_ptr<DynamicSymbols>& syms) {
   IREE_TRACE_SCOPE0("VulkanDevice::Wrap");
 
-  uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
-  uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);
+  uint64_t compute_queue_count =
+      iree_math_count_ones_u64(compute_queue_set.queue_indices);
+  uint64_t transfer_queue_count =
+      iree_math_count_ones_u64(transfer_queue_set.queue_indices);
 
   if (compute_queue_count == 0) {
     return InvalidArgumentErrorBuilder(IREE_LOC)

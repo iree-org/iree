@@ -27,6 +27,7 @@ cc_library(
         "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "Passes.cpp",
+        "PlanConvLoopOrder.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",

@@ -309,6 +309,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    math_test
+  SRCS
+    "math_test.cc"
+  DEPS
+    ::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     ref_ptr
