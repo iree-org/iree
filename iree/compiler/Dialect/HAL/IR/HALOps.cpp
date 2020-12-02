@@ -1591,6 +1591,177 @@ InterfaceBindingOp InterfaceStoreTensorOp::queryBindingOp() {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.load.tensor.tile
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceLoadTensorTileOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+/// Print a hal.interface.load.tensor.tile op of the form:
+/// ```
+///   `hal.interface.load.tensor.tile` $binding `,`
+///     `base_offset` `=` base_offset `,`
+///     `offsets` `=` `[` offset-list `]` `,`
+///     `sizes` `=` `[` size-list `]` `,`
+///     `strides` `=` `[` stride-list `]` attr-dict `:` type($result)
+/// ```
+static void printInterfaceLoadTensorTileOp(OpAsmPrinter &p,
+                                           InterfaceLoadTensorTileOp op) {
+  p << op.getOperation()->getName().getStringRef() << ' ';
+  p << op.binding() << ", base_offset = " << op.base_offset();
+  printOffsetsSizesAndStrides(
+      p, op, /*offsetPrefix=*/", offsets = ", /*sizePrefix=*/", sizes = ",
+      /*stridePrefix=*/", strides = ",
+      InterfaceLoadTensorTileOp::getSpecialAttrNames());
+  p << " : " << op.getType();
+}
+
+static ParseResult parseBindingAttrAndOffset(
+    OpAsmParser &parser, OperationState *result, SymbolRefAttr &bindingAttr,
+    OpAsmParser::OperandType &baseOffsetInfo) {
+  if (failed(parser.parseAttribute(
+          bindingAttr, InterfaceLoadTensorTileOp::getBindingAttrName(),
+          result->attributes)))
+    return failure();
+  if (parser.parseComma() || parser.parseKeyword("base_offset") ||
+      parser.parseEqual() || parser.parseOperand(baseOffsetInfo))
+    return failure();
+  return success();
+}
+
+/// Parse a hal.interface.load.tensor.tile op of the form:
+/// ```
+///   `hal.interface.load.tensor.tile` $binding `,`
+///     `base_offset` `=` base_offset `,`
+///     `offsets` `=` `[` offset-list `]` `,`
+///     `sizes` `=` `[` size-list `]` `,`
+///     `strides` `=` `[` stride-list `]` attr-dict `:` type($result)
+/// ```
+static ParseResult parseInterfaceLoadTensorTileOp(OpAsmParser &parser,
+                                                  OperationState *result) {
+  // Parse `binding` symbol attribute and `base_offset` operand.
+  SymbolRefAttr bindingAttr;
+  OpAsmParser::OperandType baseOffsetInfo;
+  if (failed(parseBindingAttrAndOffset(parser, result, bindingAttr,
+                                       baseOffsetInfo)))
+    return failure();
+
+  // Immediately resolve base_offset operand.
+  auto indexType = parser.getBuilder().getIndexType();
+  if (parser.resolveOperand(baseOffsetInfo, indexType, result->operands))
+    return failure();
+
+  // Parse and resolve offset, sizes and strides + set segment_sizes attribute.
+  auto parseOffsetPrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("offsets") ||
+                   parser.parseEqual());
+  };
+  auto parseSizePrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("sizes") ||
+                   parser.parseEqual());
+  };
+  auto parseStridePrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("strides") ||
+                   parser.parseEqual());
+  };
+  SmallVector<int, 4> segmentSizes{1};  // base offset
+  if (failed(parseOffsetsSizesAndStrides(parser, *result, segmentSizes,
+                                         parseOffsetPrefix, parseSizePrefix,
+                                         parseStridePrefix)))
+    return failure();
+
+  // Parse column type.
+  Type dstType;
+  return failure(parser.parseOptionalAttrDict(result->attributes) ||
+                 parser.parseColonType(dstType) ||
+                 parser.addTypeToList(dstType, result->types));
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface.store.tensor.tile
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceStoreTensorTileOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+/// Print a hal.interface.store.tensor.tile op of the form:
+/// ```
+///   `hal.interface.store.tensor.tile` $operand $binding `,`
+///     `base_offset` `=` base_offset `,`
+///     `offsets` `=` `[` offset-list `]` `,`
+///     `sizes` `=` `[` size-list `]` `,`
+///     `strides` `=` `[` stride-list `]` attr-dict `:` type($operand)
+/// ```
+static void printInterfaceStoreTensorTileOp(OpAsmPrinter &p,
+                                            InterfaceStoreTensorTileOp op) {
+  p << op.getOperation()->getName().getStringRef() << ' ';
+  p << op.operand() << ", " << op.binding()
+    << ", base_offset = " << op.base_offset();
+  printOffsetsSizesAndStrides(
+      p, op, /*offsetPrefix=*/", offsets = ", /*sizePrefix=*/", sizes = ",
+      /*stridePrefix=*/", strides = ",
+      InterfaceStoreTensorTileOp::getSpecialAttrNames());
+  p << " : " << op.operand().getType();
+}
+
+/// Parse a hal.interface.store.tensor.tile op of the form:
+/// ```
+///   `hal.interface.store.tensor.tile` $operand $binding `,`
+///     `base_offset` `=` base_offset `,`
+///     `offsets` `=` `[` offset-list `]` `,`
+///     `sizes` `=` `[` size-list `]` `,`
+///     `strides` `=` `[` stride-list `]` attr-dict `:` type($operand)
+/// ```
+static ParseResult parseInterfaceStoreTensorTileOp(OpAsmParser &parser,
+                                                   OperationState *result) {
+  // Parse `operand`
+  OpAsmParser::OperandType operandInfo;
+  if (parser.parseOperand(operandInfo) || parser.parseComma()) return failure();
+
+  // Parse `binding` symbol attribute and `base_offset` operand.
+  SymbolRefAttr bindingAttr;
+  OpAsmParser::OperandType baseOffsetInfo;
+  if (failed(parseBindingAttrAndOffset(parser, result, bindingAttr,
+                                       baseOffsetInfo)))
+    return failure();
+
+  auto indexType = parser.getBuilder().getIndexType();
+
+  // Set up resolution function that is called before resolving offsets, sizes
+  // and strides.
+  Type operandType;
+  auto preResolutionFn = [&](OpAsmParser &parser, OperationState &result) {
+    return failure(
+        parser.parseOptionalAttrDict(result.attributes) ||
+        parser.parseColonType(operandType) ||
+        parser.resolveOperand(operandInfo, operandType, result.operands) ||
+        parser.resolveOperand(baseOffsetInfo, indexType, result.operands));
+  };
+
+  // Parse and resolve offset, sizes and strides + set segment_sizes attribute.
+  auto parseOffsetPrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("offsets") ||
+                   parser.parseEqual());
+  };
+  auto parseSizePrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("sizes") ||
+                   parser.parseEqual());
+  };
+  auto parseStridePrefix = [](OpAsmParser &parser) {
+    return failure(parser.parseComma() || parser.parseKeyword("strides") ||
+                   parser.parseEqual());
+  };
+  SmallVector<int, 4> segmentSizes{1, 1};  // operand, base offset
+  return parseOffsetsSizesAndStrides(parser, *result, segmentSizes,
+                                     preResolutionFn, parseOffsetPrefix,
+                                     parseSizePrefix, parseStridePrefix);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable_cache.create
 //===----------------------------------------------------------------------===//
 
