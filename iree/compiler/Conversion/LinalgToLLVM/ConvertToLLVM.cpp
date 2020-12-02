@@ -428,8 +428,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
-    "LLVMIR "
-    "dialect",
+    "LLVMIR dialect",
     [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler

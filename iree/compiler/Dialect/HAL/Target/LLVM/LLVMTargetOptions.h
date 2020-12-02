@@ -48,8 +48,7 @@ struct LLVMTargetOptions {
   bool keepLinkerArtifacts = false;
 };
 
-// Returns LLVMTargetOptions struct intialized with the
-// iree-hal-llvm-ir-* flags.
+// Returns LLVMTargetOptions struct intialized with the iree-llvm-* flags.
 LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
 }  // namespace HAL

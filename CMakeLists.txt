@@ -87,7 +87,6 @@ endif()
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
   DyLib
-  LLVM
   Metal
   VMLA
   Vulkan
@@ -95,10 +94,6 @@ set(IREE_ALL_HAL_DRIVERS
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-  # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
-  if(ANDROID)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
-  endif()
 
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
@@ -125,7 +120,6 @@ endforeach()
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
-  LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
