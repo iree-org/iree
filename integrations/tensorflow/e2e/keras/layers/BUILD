@@ -176,6 +176,8 @@ FAILING_STATIC = [
     {
         # Failing on LLVM and Vulkan
         "layer": [
+            "Attention",
+            "AdditiveAttention",
             "Lambda",
             "Masking",
             "MaxPool1D",
@@ -190,8 +192,6 @@ FAILING_STATIC = [
     {
         # Failing on Vulkan
         "layer": [
-            "Attention",
-            "AdditiveAttention",
             "AveragePooling1D",
             "AveragePooling2D",
             "AveragePooling3D",
