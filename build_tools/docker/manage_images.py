@@ -122,22 +122,32 @@ def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
     add_dependent_images(image)
 
   processing_order.reverse()
-  return processing_order
+def _topological_sort(
+    input_nodes: Sequence[str],
+    node_to_child_nodes: Dict[str, Sequence[str]]) -> List[str]:
+  # ^^^ Not entirely sure what to name this.
+  # Python doesn't have a builtin OrderedSet, so we mimic one to the extent
+  # that we need by using 'in' before adding any elements.
+  ordered_nodes = []
+
+  def add_children(parent_node: str):
+    if parent_node not in ordered_nodes:
+      for child_node in node_to_child_nodes[parent_node]:
+        add_children(child_node)
+      ordered_nodes.append(parent_node)
+
+  for node in input_nodes:
+    add_children(node)
+  ordered_nodes.reverse()
+  return ordered_nodes
 
 
-def get_dependencies(images: Sequence[str]) -> Sequence[str]:
-  dependencies = []
+def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
+  return _topological_sort(images, IMAGES_TO_DEPENDENT_IMAGES)
 
-  def add_dependency(image: str):
-    if image not in dependencies:
-      for dependency in IMAGES_TO_DEPENDENCIES[image]:
-        add_dependency(dependency)
-      dependencies.append(image)
 
-  for image in images:
-    add_dependency(image)
-
-  return dependencies
+def get_dependencies(images: Sequence[str]) -> List[str]:
+  return list(reversed(_topological_sort(images, IMAGES_TO_DEPENDENCIES)))
 
 
 def run_command(command: Sequence[str],
@@ -229,14 +239,13 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
             end='')
 
 
-# TODO typing
-def get_prod_digests() -> Dict[str, str]:
+def parse_prod_digests() -> Dict[str, str]:
+  image_urls_to_prod_digests = {}
   with open(utils.PROD_DIGESTS_PATH, "r") as f:
-    images_with_digests = {}
     for line in f:
-      url, digest = line.strip().split("@")
-      images_with_digests[url] = digest
-  return images_with_digests
+      image_url, digest = line.strip().split("@")
+      image_urls_to_prod_digests[image_url] = digest
+  return image_urls_to_prod_digests
 
 
 if __name__ == '__main__':
@@ -249,12 +258,15 @@ if __name__ == '__main__':
   print(f'Also processing dependent images. Will process: {images_to_process}')
 
   dependencies = get_dependencies(images_to_process)
-  print(f'Pulling image dependencies: {list(dependencies)}')
-  prod_digests = get_prod_digests()
+  print(f'Pulling image dependencies: {dependencies}')
+  image_urls_to_prod_digests = parse_prod_digests()
   for dependency in dependencies:
-    if dependency in prod_digests:
-      image_with_digest = f'{dependency}@{prod_digests[dependency]}'
-      utils.run_command(["docker", "pull", image_with_digest],
+    dependency_url = posixpath.join(IREE_GCR_URL, dependency)
+    # If `dependency` is a new image then it may not have a prod digest yet.
+    if dependency_url in image_urls_to_prod_digests:
+      digest = image_urls_to_prod_digests[dependency_url]
+      dependency_with_digest = f'{dependency_url}@{digest}'
+      utils.run_command(["docker", "pull", dependency_with_digest],
                         dry_run=args.dry_run)
 
   for image in images_to_process:
@@ -274,7 +286,7 @@ if __name__ == '__main__':
 
     # Check that the image is in 'prod_digests.txt' and append it to the list
     # in the file if it isn't.
-    if image_url not in prod_digests:
+    if image_url not in image_urls_to_prod_digests:
       image_with_digest = f'{image_url}@{digest}'
       print(
           f'Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}')
