@@ -21,10 +21,11 @@ add_subdirectory(utils)
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
-# TODO(#2645): Move LLVMAOT target under DYLIB-LLVM-AOT flag
-if(${IREE_TARGET_BACKEND_LLVM-IR})
+if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOT)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
+endif()
+if(${IREE_TARGET_BACKEND_LLVM-IR})
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
 endif()
