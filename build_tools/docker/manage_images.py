@@ -126,13 +126,13 @@ def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
 
 
 def get_dependencies(images: Sequence[str]) -> Sequence[str]:
-  dependencies = set()
+  dependencies = []
 
   def add_dependency(image: str):
     if image not in dependencies:
       for dependency in IMAGES_TO_DEPENDENCIES[image]:
         add_dependency(dependency)
-      dependencies.add(image)
+      dependencies.append(image)
 
   for image in images:
     add_dependency(image)
