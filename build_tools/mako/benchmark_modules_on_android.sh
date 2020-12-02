@@ -90,13 +90,13 @@ function run_and_log {
   local target="$2"
   case "${target}" in
     "vulkan-spirv")
-      TAG='g'
+      TAG='vlk'
       ;;
     "vmla")
-      TAG='v'
+      TAG='vmla'
       ;;
     "dylib-llvm-aot")
-      TAG='c'
+      TAG='cpu'
       ;;
     *)
       echo "Unrecognized target '${target}'"

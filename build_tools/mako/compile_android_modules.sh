@@ -17,8 +17,10 @@
 # Compiles the given model to modules. The targets are expected to be a
 # comma-separated list, e.g., --targets=vmla,vulkan-spirv,dylib-llvm-aot
 #
-# If dylib-llvm-aot target is set, the script assumes ANDROID_NDK env is also
-# set.
+# The scripts is used for benchmarking automation, and it assumes:
+#   1) ANDROID_NDK env is set.
+#   2) IREE is built to Android in `build/` directory. E.g., build with
+#      build_tools/cmake/build_android.sh script.
 
 prefix="module"
 while [[ $# -gt 0 ]]; do
@@ -59,7 +61,7 @@ do
     *)
       ;;
   esac
-  build-android/host/iree/tools/iree-translate \
+  build/host/iree/tools/iree-translate \
     --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends=vmla \
     "${extra_flags[@]}" \
