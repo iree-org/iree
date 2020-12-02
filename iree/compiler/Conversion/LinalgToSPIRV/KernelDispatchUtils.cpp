@@ -25,6 +25,7 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -49,16 +50,19 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Name of the StrAttr that can be used to get the key to access the tile size
-/// information.
-static const char kLaunchInfoKey[] = "launch_info_key";
-
 /// Given `nprocs` try to distribute it evenly across 2 logical x and y.
 static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
   int64_t nprocs_x = std::max<int64_t>(
       1, static_cast<int64_t>(
              llvm::PowerOf2Ceil(static_cast<uint64_t>(std::sqrt(nprocs)))));
   return std::make_tuple(nprocs_x, nprocs / nprocs_x);
+}
+
+/// Returns the minimum of `shape` and `tileSize` if shape is static. If `shape`
+/// is dynamic returns `tileSize`.
+static int64_t getMinIfShapeStatic(int64_t shape, int64_t tileSize) {
+  if (shape == ShapedType::kDynamicSize) return tileSize;
+  return std::min(shape, tileSize);
 }
 
 namespace {
@@ -83,6 +87,51 @@ static LogicalResult getOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
   return op.emitError("undefined launch config for tiled operation");
 }
 
+static void getMaliBestMatMulTileSizes(Type elementType,
+                                       SmallVectorImpl<int64_t> &tileSizes) {
+  if (elementType.isF16()) {
+    tileSizes.append({16, 64, 8});
+  } else {
+    tileSizes.append({8, 64, 4});
+  }
+}
+
+/// Launch configuration for Mali GPU configuration.
+static LogicalResult getMaliSpecificConfig(
+    linalg::BatchMatmulOp op, const spirv::TargetEnv &targetEnv,
+    const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,
+    std::array<int64_t, 3> &workgroupSize,
+    std::array<int64_t, 3> &numSubgroups) {
+  if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
+
+  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
+  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  assert(lhsType.getElementType() == rhsType.getElementType());
+  // Pick ideal tile size based on the type.
+  SmallVector<int64_t, 4> workgroupLevelTs(1, 1);
+  getMaliBestMatMulTileSizes(lhsType.getElementType(), workgroupLevelTs);
+  // Fall back to the none vectorize path for cases we don't handle.
+  if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
+      lhsType.getDimSize(1) % workgroupLevelTs[1] != 0 ||
+      rhsType.getDimSize(2) % workgroupLevelTs[2] != 0 ||
+      lhsType.getDimSize(2) % workgroupLevelTs[3] != 0) {
+    return failure();
+  }
+
+  workgroupSize[0] = targetEnv.getResourceLimits().subgroup_size().getInt();
+  workgroupSize[1] = 1;
+  workgroupSize[2] = 1;
+  tileSizes.emplace_back(workgroupLevelTs);
+  // No tiling at the subgroup level since this target doesn't use subgroup op
+  // or shared memory.
+  tileSizes.emplace_back();
+  SmallVector<int64_t, 4> invocationLevelTs = {
+      workgroupLevelTs[0], workgroupLevelTs[1],
+      workgroupLevelTs[2] / workgroupSize[0], workgroupLevelTs[3]};
+  tileSizes.emplace_back(invocationLevelTs);
+  return success();
+}
+
 /// Launch config for `linalg.batchmatmul`.
 template <>
 LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
@@ -90,6 +139,13 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
                                 const SPIRVCodegenOptions &options,
                                 TileSizesListType &tileSizes,
                                 LaunchConfigInfo &config) {
+  if (options.enableVectorization &&
+      succeeded(getMaliSpecificConfig(op, targetEnv, options, tileSizes,
+                                      config.workgroupSize,
+                                      config.numSubgroups))) {
+    config.vectorize = true;
+    return success();
+  }
   unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
                                   .max_compute_workgroup_invocations()
                                   .getInt();
@@ -220,16 +276,12 @@ static LogicalResult getTargetSpecificConfig(
   assert(lhsType.getElementType() == rhsType.getElementType());
   // Pick ideal tile size based on the type.
   SmallVector<int64_t, 4> workgroupLevelTs;
-  if (lhsType.getElementType().isF16()) {
-    workgroupLevelTs.append({16, 64, 8});
-  } else {
-    workgroupLevelTs.append({8, 64, 4});
-  }
+  getMaliBestMatMulTileSizes(lhsType.getElementType(), workgroupLevelTs);
 
   // Fall back to the none vectorize path for cases we don't handle.
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape() ||
       lhsType.getDimSize(0) % workgroupLevelTs[0] != 0 ||
-      rhsType.getDimSize(0) % workgroupLevelTs[1] != 0 ||
+      rhsType.getDimSize(1) % workgroupLevelTs[1] != 0 ||
       lhsType.getDimSize(1) % workgroupLevelTs[2] != 0) {
     return failure();
   }
@@ -283,9 +335,13 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
     tileSizeK = 32;
   }
   assert(tileSizes.empty());
-  SmallVector<int64_t, 4> ts = {nRowsPerWorkitem * config.workgroupSize[1],
-                                nColsPerWorkitem * config.workgroupSize[0],
-                                tileSizeK};
+  int64_t M = op.inputs()[0].getType().cast<ShapedType>().getShape()[0];
+  int64_t N = op.inputs()[1].getType().cast<ShapedType>().getShape()[1];
+  int64_t K = op.inputs()[0].getType().cast<ShapedType>().getShape()[1];
+  SmallVector<int64_t, 4> ts = {
+      getMinIfShapeStatic(M, nRowsPerWorkitem * config.workgroupSize[1]),
+      getMinIfShapeStatic(N, nColsPerWorkitem * config.workgroupSize[0]),
+      getMinIfShapeStatic(K, tileSizeK)};
   tileSizes.emplace_back(std::move(ts));
   return success();
 }
@@ -346,55 +402,43 @@ DEFINE_POOLING_OP_CONFIG(linalg::PoolingSumOp)
 
 #undef DEFINE_POOLINGOP_CONFIG
 
-Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
-  StringAttr attr = op->getAttrOfType<StringAttr>(kLaunchInfoKey);
-  if (!attr) return {};
-  return attr.getValue();
-}
-
-LogicalResult LaunchConfig::init(
+Optional<LaunchConfig> initGPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps) {
-  unsigned numTiledOps = 0;
-  auto setKey = [&](Operation *op) -> std::string {
-    std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
-    op->setAttr(Identifier::get(kLaunchInfoKey, context),
-                StringAttr::get(key, context));
-    return key;
-  };
-
+  LaunchConfig launchConfig;
   if (!options.workgroupSize.empty()) {
-    for (linalg::LinalgOp linalgOp : linalgOps)
-      tileSizes[setKey(linalgOp)].emplace_back(options.tileSizes.begin(),
-                                               options.tileSizes.end());
-    workgroupSize = {1, 1, 1};
-    for (unsigned i = 0,
-                  e = std::min<unsigned>(3, options.workgroupSize.size());
-         i != e; ++i)
-      workgroupSize[i] = options.workgroupSize[i];
-    return success();
+    SmallVector<int64_t, 3> tileSizes(options.tileSizes.begin(),
+                                      options.tileSizes.end());
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      launchConfig.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
+    }
+    SmallVector<int64_t, 3> workgroupSize(options.workgroupSize.begin(),
+                                          options.workgroupSize.end());
+    launchConfig.setWorkgroupSize(workgroupSize);
+    return launchConfig;
   }
 
-  if (linalgOps.empty()) return success();
+  if (linalgOps.empty()) return launchConfig;
 
   spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(*linalgOps.begin()));
 
   Optional<linalg::LinalgOp> rootOperation = {};
   LaunchConfigInfo config;
   for (linalg::LinalgOp linalgOp : linalgOps) {
-#define DISPATCH(opName)                                                  \
-  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {              \
-    if (rootOperation) {                                                  \
-      return op.emitError(                                                \
-          "unhandled multiple root operations in dispatch region");       \
-    }                                                                     \
-    rootOperation = linalgOp;                                             \
-    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)]; \
-    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,   \
-                                 config))) {                              \
-      return failure();                                                   \
-    }                                                                     \
-    continue;                                                             \
+#define DISPATCH(opName)                                                     \
+  if (auto op = dyn_cast<opName>(linalgOp.getOperation())) {                 \
+    if (rootOperation) {                                                     \
+      op.emitError("unhandled multiple root operations in dispatch region"); \
+      return llvm::None;                                                     \
+    }                                                                        \
+    rootOperation = linalgOp;                                                \
+    TileSizesListType tileSizesInfo;                                         \
+    if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,      \
+                                 config))) {                                 \
+      return llvm::None;                                                     \
+    }                                                                        \
+    launchConfig.setTileSizes(op, tileSizesInfo);                            \
+    continue;                                                                \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
@@ -406,73 +450,21 @@ LogicalResult LaunchConfig::init(
 
 #undef DISPATCH
   }
-  workgroupSize = config.workgroupSize;
-  numSubgroups = config.numSubgroups;
-  vectorize = config.vectorize;
+  launchConfig.setWorkgroupSize(config.workgroupSize);
+  launchConfig.setNumSubgroups(config.numSubgroups);
+  launchConfig.setVectorize(config.vectorize);
   if (!rootOperation) {
     // No root operations found. Dont need to do anything.
-    return success();
+    return launchConfig;
   }
 
-  // Check the dependencies going into and out of the root operation. For now
-  // only the following dependencies are supported
-  // - WAW dependencies going into the root operation.
-  // - RAW dependencies going out of the root operation.
-  // - WAW dependencies going out of the root operation.
-  // i.e. there are no RAW dependences going into the root operation.
-  auto inRAWDependencies = dependenceGraph.getDependencesInto(
-      *rootOperation, linalg::LinalgDependenceGraph::RAW);
-  if (!inRAWDependencies.empty()) {
-    return rootOperation->getOperation()->emitError(
-        "unhandled fusion of root operation with producer");
-  }
-  auto dependences =
-      dependenceGraph.getDependentOperations(rootOperation.getValue());
-  unsigned numOuterParallel = getNumOuterParallelLoops(*rootOperation);
-
-  // Check that for all dependences into and out of the root operation,
-  // - The result expressions of the indexing maps of the fused view in the
-  //   producer and consumer must match for the parallel loops.
-  for (auto dependence :
-       dependenceGraph.getDependentOperations(rootOperation.getValue())) {
-    unsigned viewIndex = dependence.indexingOpView.operandIndex;
-    AffineMap indexingMap = rootOperation->getIndexingMap(viewIndex);
-    linalg::LinalgOp fusedOp =
-        cast<linalg::LinalgOp>(dependence.dependentOpView.op);
-    unsigned fusedViewIndex = dependence.dependentOpView.operandIndex;
-    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(fusedViewIndex);
-    if (indexingMap.getNumResults() < numOuterParallel ||
-        fusedIndexingMap.getNumResults() < numOuterParallel ||
-        !llvm::all_of(
-            llvm::seq<unsigned>(0, numOuterParallel),
-            [&indexingMap, fusedIndexingMap](unsigned i) {
-              return indexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     fusedIndexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     indexingMap.getResult(i) == fusedIndexingMap.getResult(i);
-            })) {
-      return rootOperation->getOperation()->emitError(
-          "unhandled fusion of root operation with all operations in the "
-          "dispatch region");
-    }
-  }
-  // The dependent operations get the same tile size information as the root
-  // operation. To propogate that information, just use the same key as the root
-  // operation.
-  for (auto dependence : dependences) {
-    dependence.dependentOpView.op->setAttr(
-        Identifier::get(kLaunchInfoKey, context),
-        StringAttr::get(getKey(*rootOperation).getValue(), context));
-  }
+  if (failed(propogateRootOperationLaunchConfig(launchConfig, *rootOperation,
+                                                dependenceGraph)))
+    return llvm::None;
 
   // TODO(ravishankarm): Verify that the set configurations is within the device
   // limits.
-  return success();
-}
-
-void LaunchConfig::finalize(FuncOp funcOp) {
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    linalgOp.removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
-  });
+  return launchConfig;
 }
 
 template <typename OpTy>
@@ -493,8 +485,14 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
         op.getAccType().cast<VectorType>().getElementType(),
         op.getResultType().cast<VectorType>().getElementType());
   } else {
+    unsigned lastParalleldim = 0;
+    for (auto it : llvm::enumerate(op.iterator_types())) {
+      if (isParallelIterator(it.value())) lastParalleldim = it.index();
+    }
+    SmallVector<int64_t, 4> nativeSize(op.iterator_types().size(), 1);
+    nativeSize[lastParalleldim] = 4;
     // Map to vec4 fma operations.
-    return SmallVector<int64_t, 4>({1, 4, 1});
+    return nativeSize;
   }
 }
 
@@ -509,8 +507,10 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
   } else {
+    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
     // Map to load4.
-    return SmallVector<int64_t, 4>({1, 4});
+    nativeSize.push_back(4);
+    return nativeSize;
   }
 }
 
@@ -525,8 +525,10 @@ getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
     return SmallVector<int64_t, 4>(op.getVectorType().getDimSize(0),
                                    op.getVectorType().getDimSize(1));
   } else {
+    SmallVector<int64_t, 4> nativeSize(op.getVectorType().getRank() - 1, 1);
     // Map to store4.
-    return SmallVector<int64_t, 4>({1, 4});
+    nativeSize.push_back(4);
+    return nativeSize;
   }
 }
 

@@ -14,13 +14,9 @@
 
 # bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
 
-# This need to come first so targets in the android/ directory can depend on it.
-# TODO(#3317): this seems to indicate an issue somewhere regarding dynamic
-# library dependency management.
-add_subdirectory(utils)
-
 add_subdirectory(android)
 add_subdirectory(test)
+add_subdirectory(utils)
 
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
@@ -52,6 +48,9 @@ if(IREE_ENABLE_EMITC)
   set(IREE_TRANSLATE_CONDITIONAL_DEPS
     MLIREmitC
     MLIRTargetCpp
+  )
+  set(IREE_EMITC_INCLUDES
+    "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
   )
 endif()
 
@@ -208,6 +207,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::HAL::Conversion::Passes
+    INCLUDES
+      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 
@@ -295,6 +296,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
       ${IREE_TRANSLATE_CONDITIONAL_DEPS}
+    INCLUDES
+      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 

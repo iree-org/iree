@@ -205,8 +205,7 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
         /*initTensors*/ ValueRange{}, genericOp.indexing_mapsAttr(),
         genericOp.iterator_types(),
         /*doc=*/nullptr,
-        /*library_call=*/nullptr, genericOp.sparseAttr(),
-        /*symbol_source=*/nullptr);
+        /*library_call=*/nullptr, genericOp.sparseAttr());
 
     Region &newRegion = newOp.region();
     rewriter.inlineRegionBefore(genericOp.getRegion(), newRegion,
