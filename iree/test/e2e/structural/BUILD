@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = [
+        "matmul_add.mlir",
         "slice_add.mlir",
     ],
     driver = "vulkan",
@@ -42,6 +43,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_llvm-ir_llvm",
     srcs = [
+        "matmul_add.mlir",
         "slice_add.mlir",
     ],
     driver = "llvm",
