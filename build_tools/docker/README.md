@@ -4,6 +4,8 @@ This directory contains the Dockerfiles that specify the container images used
 for IREE. Images are uploaded to
 [Google Container Registry (GCR)](https://cloud.google.com/container-registry).
 
+## Running Images Locally
+
 To build an image, use `docker build`, e.g.:
 
 ```shell
@@ -14,6 +16,12 @@ To explore an image interactively, use `docker run`, e.g.
 
 ```shell
 docker run --interactive --tty --rm cmake
+```
+
+Production versions of the images can be downloaded from GCR:
+
+```shell
+docker pull gcr.io/iree-oss/cmake:prod
 ```
 
 You can find more information in the
@@ -37,10 +45,12 @@ dependencies based on these image names.
 
 We use a helper python script to manage the Docker image deployment. It lists
 all images and their dependencies and manages their canonical registry location.
-When creating a new image, add it to this mapping. To build an image and all
-images it depends on as well as pushing them to GCR and updating all references
-to the image digest. Pushing images to GCR requires the `Storage Admin` role in
-the `iree-oss` GCP project.
+This script pushes images to GCR which requires the `Storage Admin` role in the
+`iree-oss` GCP project.
+
+When creating a new image, add it to the mapping in this script. To build an
+image and all images it depends on as well as pushing them to GCR and updating
+all references to the image digest.
 
 ```shell
 python3 build_tools/docker/manage_images.py --image cmake
