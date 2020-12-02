@@ -73,7 +73,6 @@ cc_library(
         "//iree/compiler/Dialect/Modules/TensorList/IR",
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],

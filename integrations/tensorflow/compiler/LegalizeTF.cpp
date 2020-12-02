@@ -15,8 +15,10 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "integrations/tensorflow/compiler/Passes.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -31,15 +33,15 @@ namespace {
 //    tensorflow/compiler/mlir/xla/transforms/legalize_tf.cc
 // It does not require the same number of options as we can hardcode as the pass
 // the IREE requires.
-class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
+class IREEXLALegalizeTF : public PassWrapper<IREEXLALegalizeTF, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<chlo::HloClientDialect, mhlo::MhloDialect,
                     shape::ShapeDialect, StandardOpsDialect>();
   }
 
  public:
-  LegalizeTF() = default;
-  LegalizeTF(const LegalizeTF &) {}
+  IREEXLALegalizeTF() = default;
+  IREEXLALegalizeTF(const IREEXLALegalizeTF &) {}
 
   /// Performs the lowering to XLA dialect.
   void runOnFunction() override {
@@ -134,9 +136,14 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
       llvm::cl::init("INVALID_DEVICE_TYPE")};
 };
 
-static PassRegistration<LegalizeTF> pass(
+static PassRegistration<IREEXLALegalizeTF> pass(
     "iree-xla-legalize-tf", "Legalize from TensorFlow to the XLA dialect");
 
 }  // namespace
 }  // namespace mhlo
 }  // namespace mlir
+
+std::unique_ptr<mlir::OperationPass<mlir::FuncOp>>
+mlir::iree_compiler::createIREEXLALegalizeTF() {
+  return std::make_unique<mlir::mhlo::IREEXLALegalizeTF>();
+}

@@ -22,6 +22,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,6 +31,53 @@ namespace iree_compiler {
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
 void createIreeTfImportPipeline(OpPassManager &pm) {
+  ////////////////////////////////////////////////////////////////////////////
+  // Clean up tf_executor and extraneous unused functions.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(createSymbolDCEPass());
+  pm.addPass(tf_executor::CreateTFExecutorGraphPruningPass());
+  pm.addPass(TF::CreateGuaranteeAllFuncsOneUsePass());
+  TF::CreateTFStandardPipeline(pm, TF::StandardPipelineOptions());
+  pm.addPass(TF::CreateDeviceIndexSelectorPass());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Try to get the IR in good condition.
+  // In particular, because IREE doesn't handle dynamic shapes, we need to
+  // guarantee here that all dynamic shapes are gone.
+  // TODO(silvasean): Add a verifier pass that enforces that.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(createInlinerPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(TFDevice::CreateDecomposeResourceOpsPass());
+  pm.addPass(createPropagateResourceCasts());
+  pm.addPass(TF::CreateTFShapeInferencePass());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Lower to CFG.
+  // After this point, most TF optimizations won't work properly besides
+  // simple canonicalizations.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(TF::CreateTFFunctionalControlFlowToCFG());
+  // Inline, as tf-functional-control-flow-to-cfg leaves in calls.
+  pm.addPass(createInlinerPass());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Some further cleanups now that control flow is in better shape.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(createSymbolDCEPass());
+  pm.addPass(createCanonicalizerPass());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Legalize to XLA
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(createIREEXLALegalizeTF());
+  pm.addPass(createCanonicalizerPass());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Now that the IR is starting to look nice, optimize global tensors.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(tf_saved_model::CreateOptimizeGlobalTensorsPass());
+
   ////////////////////////////////////////////////////////////////////////////
   // Lowering shape-related constructs.
   ////////////////////////////////////////////////////////////////////////////
@@ -69,6 +118,12 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // Validate that all Tensorflow has been legalized away.
   ////////////////////////////////////////////////////////////////////////////
   pm.addPass(createCheckNoTF());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Temporary: Does some special case fixups of HLO ops with dynamic
+  // shapes until these can be done properly upstream.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(Shape::createConvertHLOToShapePass());
 }
 
 static mlir::PassPipelineRegistration<> pipeline(

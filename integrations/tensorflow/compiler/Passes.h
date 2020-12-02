@@ -43,6 +43,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCasts();
 // Validates whether any Tensorflow operations remain.
 std::unique_ptr<OperationPass<FuncOp>> createCheckNoTF();
 
+// Creates an IREE-specific variant of the upstream XLA LegalizeTF pass.
+std::unique_ptr<OperationPass<FuncOp>> createIREEXLALegalizeTF();
+
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
 void createIreeTfImportPipeline(OpPassManager &pm);

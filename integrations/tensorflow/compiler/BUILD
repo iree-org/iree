@@ -56,6 +56,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:lower_tf_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
     alwayslink = 1,
@@ -86,5 +87,22 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//iree/tools:iree_translate_main",
+    ],
+)
+
+cc_binary(
+    name = "iree-tf-import",
+    srcs = ["iree-tf-import-main.cc"],
+    deps = [
+        ":tensorflow",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@org_tensorflow//tensorflow/cc/saved_model:loader",
+        "@org_tensorflow//tensorflow/compiler/mlir:init_mlir",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "@org_tensorflow//tensorflow/core/platform:errors",
     ],
 )
