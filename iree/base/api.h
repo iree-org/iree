@@ -718,13 +718,18 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
 // IREE Core API
 //===----------------------------------------------------------------------===//
 
+// Sprinkle this wherever to make it easier to find structs/functions that are
+// not yet stable.
+#define IREE_API_UNSTABLE
+
 // Known versions of the API that can be referenced in code.
 // Out-of-bounds values are possible in forward-versioned changes.
-typedef enum {
-  IREE_API_VERSION_0 = 0,
+enum iree_api_version_e {
+  IREE_API_VERSION_0 = 0u,
   // Always set to the latest version of the library from source.
   IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
-} iree_api_version_t;
+};
+typedef uint32_t iree_api_version_t;
 
 // Checks whether the |expected_version| of the caller matches the implemented
 // version of |out_actual_version|. Forward compatibility of the API is
@@ -736,24 +741,6 @@ typedef enum {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version);
-
-// Initializes IREE for use within a binary.
-//
-// Specifically, this parses any command line flags and performs module
-// initialization (such as for tracing and dynamic driver registration). If
-// your application is certain it does not need this functionality, this call
-// may be skipped.
-//
-// |argc| and |argv| should contain any command line flags to parse.
-// If there are no flags to parse, nullptr may be passed, but this should still
-// be called so other initialization happens.
-//
-// This should typically be called early in some sort of main() function once,
-// before calling most other API functions. Certain core API functions here
-// such as iree_api_version_check, iree_allocator_malloc, and
-// iree_allocator_free are safe to call before this.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
-                                                          char*** argv);
 
 //===----------------------------------------------------------------------===//
 // iree_time_t and iree_duration_t

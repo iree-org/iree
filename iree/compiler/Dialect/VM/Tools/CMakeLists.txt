@@ -13,18 +13,3 @@
 # limitations under the License.
 
 iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    Tools
-  SRCS
-    "VMOpEncoderGen.cpp"
-    "VMOpTableGen.cpp"
-  DEPS
-    LLVMSupport
-    LLVMTableGen
-    MLIRSupport
-    MLIRTableGen
-  ALWAYSLINK
-  PUBLIC
-)

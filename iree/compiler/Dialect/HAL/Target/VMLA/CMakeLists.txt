@@ -30,7 +30,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    flatbuffers
+    iree::base::flatcc
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Conversion
@@ -39,6 +39,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VMLA::IR::VMLADialect
     iree::compiler::Dialect::VMLA::Transforms
-    iree::schemas::vmla_executable_def_cc_fbs
+    iree::compiler::Utils
+    iree::schemas::vmla_executable_def_c_fbs
   PUBLIC
 )

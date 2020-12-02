@@ -28,7 +28,7 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:semaphore",
+        "//iree/hal",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
@@ -56,7 +56,7 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:buffer",
+        "//iree/hal",
     ],
 )
 
@@ -65,8 +65,7 @@ cc_library(
     srcs = ["host_descriptor_set.cc"],
     hdrs = ["host_descriptor_set.h"],
     deps = [
-        "//iree/hal:descriptor_set",
-        "//iree/hal:descriptor_set_layout",
+        "//iree/hal",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )
@@ -76,8 +75,7 @@ cc_library(
     hdrs = ["host_executable.h"],
     deps = [
         "//iree/base:status",
-        "//iree/hal:descriptor_set",
-        "//iree/hal:executable",
+        "//iree/hal",
     ],
 )
 
@@ -86,9 +84,8 @@ cc_library(
     srcs = ["host_executable_layout.cc"],
     hdrs = ["host_executable_layout.h"],
     deps = [
-        "//iree/base:memory",
-        "//iree/hal:descriptor_set_layout",
-        "//iree/hal:executable_layout",
+        "//iree/base:core_headers",
+        "//iree/hal",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )
@@ -101,8 +98,7 @@ cc_library(
         ":host_buffer",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:allocator",
-        "//iree/hal:buffer",
+        "//iree/hal",
     ],
 )
 
@@ -115,12 +111,11 @@ cc_library(
         ":host_executable_layout",
         ":host_local_allocator",
         ":scheduling_model",
-        "//iree/base:memory",
+        "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:allocator",
+        "//iree/hal",
         "//iree/hal:command_buffer_validation",
-        "//iree/hal:device",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -136,7 +131,7 @@ cc_library(
         "//iree/base:intrusive_list",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:command_buffer",
+        "//iree/hal",
     ],
 )
 
@@ -145,7 +140,7 @@ cc_library(
     srcs = ["nop_event.cc"],
     hdrs = ["nop_event.h"],
     deps = [
-        "//iree/hal:event",
+        "//iree/hal",
     ],
 )
 
@@ -153,6 +148,6 @@ cc_library(
     name = "scheduling_model",
     hdrs = ["scheduling_model.h"],
     deps = [
-        "//iree/hal:command_queue",
+        "//iree/hal",
     ],
 )

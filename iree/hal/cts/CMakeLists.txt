@@ -14,8 +14,6 @@
 
 iree_add_all_subdirs()
 
-# bazel_to_cmake: DO NOT EDIT, IREE_HAL_DRIVER_MODULES is custom logic
-
 iree_cc_library(
   NAME
     cts_test_base
@@ -25,10 +23,10 @@ iree_cc_library(
     iree::tools::sanitizer_suppressions.txt
   DEPS
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal
+    iree::hal::api
+    iree::hal::testing::driver_registry
     iree::testing::gtest
-    iree::testing::gtest_main
-    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
   PUBLIC
 )
@@ -41,8 +39,9 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -53,8 +52,9 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -65,8 +65,9 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -77,8 +78,9 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -88,8 +90,9 @@ iree_cc_test(
     "driver_test.cc"
   DEPS
     ::cts_test_base
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -99,6 +102,7 @@ iree_cc_test(
     "semaphore_test.cc"
   DEPS
     ::cts_test_base
-    iree::hal::driver_registry
+    iree::hal::testing::driver_registry
     iree::testing::gtest
+    iree::testing::gtest_main
 )

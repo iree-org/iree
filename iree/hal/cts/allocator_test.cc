@@ -14,7 +14,7 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -77,10 +77,10 @@ TEST_P(AllocatorTest, CanUseBufferLike) {
       allocator_->CanUseBufferLike(allocator_, memory_type, usage, usage));
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, AllocatorTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, AllocatorTest,
+    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

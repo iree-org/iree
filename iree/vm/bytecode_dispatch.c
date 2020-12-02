@@ -14,25 +14,10 @@
 
 #include <string.h>
 
+#include "iree/base/math.h"
 #include "iree/base/tracing.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
-#include "iree/vm/list.h"
-
-//===----------------------------------------------------------------------===//
-// Math utilities, kept here to limit dependencies
-//===----------------------------------------------------------------------===//
-
-// Rounds up the value to the nearest power of 2 (if not already a power of 2).
-static inline uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
-  n--;
-  n |= n >> 1;
-  n |= n >> 2;
-  n |= n >> 4;
-  n |= n >> 8;
-  n |= n >> 16;
-  n++;
-  return n;
-}
 
 //===----------------------------------------------------------------------===//
 // Register remapping utilities

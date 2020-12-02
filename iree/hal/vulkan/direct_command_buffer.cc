@@ -230,8 +230,10 @@ Status DirectCommandBuffer::ExecutionBarrier(
   syms()->vkCmdPipelineBarrier(
       command_buffer_, ConvertPipelineStageFlags(source_stage_mask),
       ConvertPipelineStageFlags(target_stage_mask), /*dependencyFlags=*/0,
-      memory_barrier_infos.size(), memory_barrier_infos.data(),
-      buffer_barrier_infos.size(), buffer_barrier_infos.data(), 0, nullptr);
+      static_cast<uint32_t>(memory_barrier_infos.size()),
+      memory_barrier_infos.data(),
+      static_cast<uint32_t>(buffer_barrier_infos.size()),
+      buffer_barrier_infos.data(), 0, nullptr);
 
   return OkStatus();
 }
@@ -296,12 +298,14 @@ Status DirectCommandBuffer::WaitEvents(
     info.size = buffer_barrier.length;
   }
 
-  syms()->vkCmdWaitEvents(
-      command_buffer_, event_handles.size(), event_handles.data(),
-      ConvertPipelineStageFlags(source_stage_mask),
-      ConvertPipelineStageFlags(target_stage_mask), memory_barrier_infos.size(),
-      memory_barrier_infos.data(), buffer_barrier_infos.size(),
-      buffer_barrier_infos.data(), 0, nullptr);
+  syms()->vkCmdWaitEvents(command_buffer_, event_handles.size(),
+                          event_handles.data(),
+                          ConvertPipelineStageFlags(source_stage_mask),
+                          ConvertPipelineStageFlags(target_stage_mask),
+                          static_cast<uint32_t>(memory_barrier_infos.size()),
+                          memory_barrier_infos.data(),
+                          static_cast<uint32_t>(buffer_barrier_infos.size()),
+                          buffer_barrier_infos.data(), 0, nullptr);
   return OkStatus();
 }
 
@@ -385,8 +389,9 @@ Status DirectCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
 
   syms()->vkCmdPushConstants(
       command_buffer_, device_executable_layout->handle(),
-      VK_SHADER_STAGE_COMPUTE_BIT, offset * sizeof(uint32_t),
-      values.size() * sizeof(uint32_t), values.data());
+      VK_SHADER_STAGE_COMPUTE_BIT,
+      static_cast<uint32_t>(offset * sizeof(uint32_t)),
+      static_cast<uint32_t>(values.size() * sizeof(uint32_t)), values.data());
 
   return OkStatus();
 }
@@ -424,8 +429,9 @@ Status DirectCommandBuffer::BindDescriptorSet(
       device_descriptor_set->handle()};
   syms()->vkCmdBindDescriptorSets(
       command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
-      device_executable_layout->handle(), set, descriptor_sets.size(),
-      descriptor_sets.data(), dynamic_offsets_i32.size(),
+      device_executable_layout->handle(), set,
+      static_cast<uint32_t>(descriptor_sets.size()), descriptor_sets.data(),
+      static_cast<uint32_t>(dynamic_offsets_i32.size()),
       dynamic_offsets_i32.data());
 
   return OkStatus();

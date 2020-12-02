@@ -14,13 +14,9 @@
 
 # bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
 
-# This need to come first so targets in the android/ directory can depend on it.
-# TODO(#3317): this seems to indicate an issue somewhere regarding dynamic
-# library dependency management.
-add_subdirectory(utils)
-
 add_subdirectory(android)
 add_subdirectory(test)
+add_subdirectory(utils)
 
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
@@ -53,6 +49,9 @@ if(IREE_ENABLE_EMITC)
     MLIREmitC
     MLIRTargetCpp
   )
+  set(IREE_EMITC_INCLUDES
+    "${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include"
+  )
 endif()
 
 iree_cc_binary(
@@ -68,15 +67,15 @@ iree_cc_binary(
     absl::flags_usage
     absl::strings
     benchmark
-    iree::base::init
+    iree::base::flags
     iree::base::file_io
     iree::base::status
     iree::base::tracing
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 
@@ -88,11 +87,9 @@ iree_cc_binary(
   SRCS
     "iree-dump-module-main.cc"
   DEPS
-    flatbuffers
-    iree::base::file_io
-    iree::base::flatbuffer_util
-    iree::base::init
-    iree::schemas::bytecode_module_def_cc_fbs
+    flatcc::runtime
+    iree::base::file_mapping
+    iree::schemas::bytecode_module_def_c_fbs
 )
 
 iree_cc_binary(
@@ -106,14 +103,14 @@ iree_cc_binary(
     absl::flags
     absl::strings
     iree::base::file_io
-    iree::base::init
+    iree::base::flags
     iree::base::status
     iree::base::tracing
+    iree::hal::drivers
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
 )
 
 if(${IREE_ENABLE_MLIR})
@@ -122,13 +119,14 @@ if(${IREE_ENABLE_MLIR})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/IREE/Tools/StructAttrGen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
+      LLVMSupport
+      LLVMTableGen
       MLIRSupport
       MLIRTableGen
-      iree::compiler::Dialect::IREE::Tools
-      iree::compiler::Dialect::VM::Tools
-    LINKOPTS
-      "-lpthread"
     HOSTONLY
   )
 endif()
@@ -209,6 +207,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::HAL::Conversion::Passes
+    INCLUDES
+      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 
@@ -296,6 +296,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
       ${IREE_TRANSLATE_CONDITIONAL_DEPS}
+    INCLUDES
+      "${IREE_EMITC_INCLUDES}"
     PUBLIC
   )
 
@@ -328,8 +330,7 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       absl::strings
       iree::base::api
-      iree::base::init
-      iree::base::source_location
+      iree::base::flags
       iree::base::status
       iree::base::tracing
       iree::compiler::Dialect::Flow::Transforms
@@ -340,11 +341,11 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::IREEVM
       iree::hal::api
+      iree::hal::drivers
       iree::modules::hal
       iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
-      ${IREE_HAL_DRIVER_MODULES}
     HOSTONLY
   )
 endif(${IREE_BUILD_COMPILER})

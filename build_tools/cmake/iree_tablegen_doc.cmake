@@ -53,7 +53,10 @@ function(iree_tablegen_doc)
   endif()
 
 
-  set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
+  set(_INCLUDE_DIRS
+    "${MLIR_INCLUDE_DIRS}"
+    "${IREE_SOURCE_DIR}"
+  )
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
 
@@ -73,7 +76,7 @@ function(iree_tablegen_doc)
   endwhile()
 
   # Put all dialect docs at one place.
-  set(_DOC_DIR ${PROJECT_BINARY_DIR}/doc/Dialects/)
+  set(_DOC_DIR ${CMAKE_CURRENT_BINARY_DIR}/doc/Dialects/)
   # Set a target to drive copy.
   add_custom_target(${_NAME}_target
             ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}

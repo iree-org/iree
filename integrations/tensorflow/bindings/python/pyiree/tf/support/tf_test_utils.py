@@ -50,15 +50,12 @@ flags.DEFINE_bool(
     "Summarize the inputs and outputs of each module trace logged to disk.")
 flags.DEFINE_bool("log_all_traces", False,
                   "Log all traces to logging.info, even if comparison passes.")
-flags.DEFINE_bool(
-    "get_saved_model", False,
-    "Creates and stores a SavedModel for the tf.Module class to be tested.")
 
 FLAGS = flags.FLAGS
 DEFAULT_INPUT_GENERATOR = tf_utils.uniform
 
 
-def _setup_artifacts_dir(module_name: str) -> str:
+def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
   parent_dirs = [
       FLAGS.artifacts_dir,
       os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'),
@@ -68,7 +65,7 @@ def _setup_artifacts_dir(module_name: str) -> str:
   # Use the most preferred path in parent_dirs that isn't None.
   parent_dir = next(parent for parent in parent_dirs if parent is not None)
 
-  artifacts_dir = os.path.join(parent_dir, module_name)
+  artifacts_dir = os.path.join(parent_dir, relative_artifacts_dir)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
   os.makedirs(artifacts_dir, exist_ok=True)
   return artifacts_dir
@@ -128,9 +125,9 @@ global _global_modules
 _global_modules = None
 
 
-def compile_tf_module(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = ()) -> Modules:
+def compile_tf_module(module_class: Type[tf.Module],
+                      exported_names: Sequence[str] = (),
+                      relative_artifacts_dir: str = None) -> Modules:
   """Compiles module_class to each backend that we test.
 
   Args:
@@ -138,6 +135,9 @@ def compile_tf_module(
     exported_names: optional iterable of strings representing which of
       module_class's functions to compile. If exported_names is empty all
       functions will be compiled.
+    relative_artifacts_dir: optional string specifying where to save compilation
+      artifacts within the artifacts_dir. If it is not specified then
+      module_class.__name__ will be used.
 
   Returns:
     A 'Modules' namedtuple containing the reference module, target modules and
@@ -148,7 +148,9 @@ def compile_tf_module(
     return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
-  artifacts_dir = _setup_artifacts_dir(module_class.__name__)
+  if relative_artifacts_dir is None:
+    relative_artifacts_dir = module_class.__name__
+  artifacts_dir = _setup_artifacts_dir(relative_artifacts_dir)
 
   # Get the backend information for this test.
   ref_backend_info = module_utils.BackendInfo(FLAGS.reference_backend,
@@ -432,6 +434,7 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
                           atol: float = None,
                           rtol: float = None,
                           name: str = None,
+                          static_signature: Sequence[tf.TensorSpec] = None,
                           **tf_function_kwargs):
   """Creates a tf.function that can be used to generate unit_tests.
 
@@ -453,6 +456,10 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
     name:
       optional, the name to reference this function with. Must be used if
       decorating a lambda.
+    static_signature:
+      optional, a signature with the same structure as 'input_signature'. Used
+      to specify the correct shape for data generation when dynamic dims are
+      provided.
 
   Raises:
     ValueError: if 'input_generator' and 'input_args' are both specified.
@@ -481,17 +488,22 @@ def tf_function_unit_test(input_generator: tf_utils.InputGeneratorType = None,
     global _global_unit_test_configs
     if function.__name__ not in _global_unit_test_configs:
 
+      if static_signature is not None:
+        signature = static_signature
+      else:
+        signature = function.input_signature
+
       if input_generator is not None:
         # Use the user-specificed input_generator.
         get_trace_args = lambda: tf_utils.generate_inputs(
-            function.input_signature, input_generator)
+            signature, input_generator)
       elif input_args is not None:
         # Use the user-specified input_args.
         get_trace_args = lambda: copy.deepcopy(input_args)
       else:
         # No user data specification – default to using random uniform data.
         get_trace_args = lambda: tf_utils.generate_inputs(
-            function.input_signature, DEFAULT_INPUT_GENERATOR)
+            signature, DEFAULT_INPUT_GENERATOR)
 
       _global_unit_test_configs[function.__name__] = dict(
           get_trace_args=get_trace_args,

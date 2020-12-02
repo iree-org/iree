@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
-   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-
 iree_add_all_subdirs()
 
 iree_bytecode_module(
@@ -48,14 +43,11 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::hal::api
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+    iree::hal::testing::driver_registry
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
-    iree::vm::ref_cc
-  LABELS
-    "driver=vulkan"
+    iree::vm::cc
 )

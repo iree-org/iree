@@ -17,9 +17,10 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/file_io.h"
-#include "iree/base/init.h"
+#include "iree/base/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
@@ -156,7 +157,9 @@ Status Run() {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-  iree::InitializeEnvironment(&argc, &argv);
+  iree_flags_parse_checked(&argc, &argv);
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());
   return 0;
 }

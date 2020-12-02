@@ -25,6 +25,7 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     MLIRSupport
+    iree::base::core_headers
     iree::compiler::Dialect::HAL::Target::LLVM::AOT::LinkerTool_hdrs
   PUBLIC
 )

@@ -35,10 +35,10 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
-#include "iree/hal/driver_registry.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
+#include "third_party/half/half.hpp"
 
 namespace iree {
 namespace hal {
@@ -294,9 +294,16 @@ static iree_status_t iree_hal_parse_element_unsafe(
                               reinterpret_cast<uint64_t*>(out_data))
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "float16 parsing not implemented");
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
+      float temp = 0;
+      if (!absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
+                            &temp)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *reinterpret_cast<uint16_t*>(out_data) =
+          half_float::detail::float2half<std::round_to_nearest>(temp);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       return absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<float*>(out_data))
@@ -407,8 +414,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                         *reinterpret_cast<const uint64_t*>(data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "parser for float16 not yet implemented");
+      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                        half_float::detail::half2float<float>(
+                            *reinterpret_cast<const uint16_t*>(data.data)));
+      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const float*>(data.data));
@@ -419,7 +428,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
       break;
     default: {
       // Treat any unknown format as binary.
-      n = 2 * element_size;
+      n = 2 * (int)element_size;
       if (buffer && buffer_capacity > n) {
         iree_hal_bytes_to_hex_string(data.data, buffer, element_size);
         buffer[n] = 0;
@@ -1697,19 +1706,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   // We need to allocate storage to marshal in the semaphores. Ideally we'd
   // change the C++ API to make this 1:1 with a reinterpret_cast, however that
   // makes the C API more difficult. Bleh.
-  int total_semaphore_count = 0;
-  for (int i = 0; i < batch_count; ++i) {
+  iree_host_size_t total_semaphore_count = 0;
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
     total_semaphore_count += batches[i].wait_semaphores.count;
     total_semaphore_count += batches[i].signal_semaphores.count;
   }
   absl::InlinedVector<SemaphoreValue, 4> semaphore_values(
       total_semaphore_count);
   absl::InlinedVector<SubmissionBatch, 2> dst_batches(batch_count);
-  int base_semaphore_index = 0;
-  for (int i = 0; i < batch_count; ++i) {
+  iree_host_size_t base_semaphore_index = 0;
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
     const auto& src_batch = batches[i];
     auto& dst_batch = dst_batches[i];
-    for (int j = 0; j < src_batch.wait_semaphores.count; ++j) {
+    for (iree_host_size_t j = 0; j < src_batch.wait_semaphores.count; ++j) {
       semaphore_values[base_semaphore_index + j] = {
           reinterpret_cast<Semaphore*>(src_batch.wait_semaphores.semaphores[j]),
           src_batch.wait_semaphores.payload_values[j]};
@@ -1721,7 +1730,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     dst_batch.command_buffers =
         iree::ReinterpretSpan<CommandBuffer*>(absl::MakeConstSpan(
             src_batch.command_buffers, src_batch.command_buffer_count));
-    for (int j = 0; j < src_batch.signal_semaphores.count; ++j) {
+    for (iree_host_size_t j = 0; j < src_batch.signal_semaphores.count; ++j) {
       semaphore_values[base_semaphore_index + j] = {
           reinterpret_cast<Semaphore*>(
               src_batch.signal_semaphores.semaphores[j]),
@@ -1861,70 +1870,6 @@ iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
   auto* handle = reinterpret_cast<Driver*>(driver);
   IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// iree::hal::DriverRegistry
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT bool IREE_API_CALL
-iree_hal_driver_registry_has_driver(iree_string_view_t driver_name) {
-  return DriverRegistry::shared_registry()->HasDriver(
-      absl::string_view{driver_name.data, driver_name.size});
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_query_available_drivers(
-    iree_allocator_t allocator, iree_string_view_t** out_driver_names,
-    iree_host_size_t* out_driver_count) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_registry_query_available_drivers");
-  IREE_ASSERT_ARGUMENT(out_driver_names);
-  IREE_ASSERT_ARGUMENT(out_driver_count);
-  *out_driver_count = 0;
-
-  auto* registry = DriverRegistry::shared_registry();
-  auto available_drivers = registry->EnumerateAvailableDrivers();
-  size_t total_string_size = 0;
-  for (const auto& driver_name : available_drivers) {
-    total_string_size += driver_name.size();
-  }
-
-  *out_driver_count = available_drivers.size();
-  iree_string_view_t* driver_name_storage = nullptr;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator,
-      available_drivers.size() * sizeof(*driver_name_storage) +
-          total_string_size,
-      (void**)&driver_name_storage));
-
-  char* p = reinterpret_cast<char*>(driver_name_storage) +
-            available_drivers.size() * sizeof(*driver_name_storage);
-  for (int i = 0; i < available_drivers.size(); ++i) {
-    const auto& driver_name = available_drivers[i];
-    size_t name_size = driver_name.size();
-    std::memcpy(p, driver_name.c_str(), name_size);
-    driver_name_storage[i] = iree_string_view_t{p, name_size};
-    p += name_size;
-  }
-
-  *out_driver_names = driver_name_storage;
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
-                                       iree_allocator_t allocator,
-                                       iree_hal_driver_t** out_driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_registry_create_driver");
-  IREE_ASSERT_ARGUMENT(out_driver);
-  *out_driver = nullptr;
-
-  auto* registry = DriverRegistry::shared_registry();
-  IREE_ASSIGN_OR_RETURN(auto driver, registry->Create(absl::string_view(
-                                         driver_name.data, driver_name.size)));
-
-  *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
   return iree_ok_status();
 }
 

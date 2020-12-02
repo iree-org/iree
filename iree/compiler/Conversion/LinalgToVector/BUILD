@@ -22,6 +22,7 @@ cc_library(
     name = "LinalgToVector",
     srcs = [
         "LoadStoreVectorization.cpp",
+        "VectorizeConv.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -32,6 +33,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",

@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mutex>
+
 #include "iree/base/status.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -141,23 +143,14 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   IREE_ASSERT_OK(command_queue->WaitIdle());
 }
 
-std::vector<std::string> GetSupportedDrivers() {
-  auto drivers = DriverRegistry::shared_registry()->EnumerateAvailableDrivers();
-  auto it = drivers.begin();
-  while (it != drivers.end()) {
-    // Disabled on Vulkan until tests pass with timeline semaphore emulation.
-    if (*it == "vulkan") {
-      it = drivers.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  return drivers;
-}
-
-INSTANTIATE_TEST_SUITE_P(AllDrivers, CommandQueueTest,
-                         ::testing::ValuesIn(GetSupportedDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, CommandQueueTest,
+    ::testing::ValuesIn(
+        // Disabled on Vulkan until tests pass with
+        // timeline semaphore emulation.
+        testing::RemoveDriverByName(testing::EnumerateAvailableDrivers(),
+                                    "vulkan")),
+    GenerateTestName());
 
 }  // namespace
 }  // namespace cts

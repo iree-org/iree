@@ -37,6 +37,7 @@ cc_library(
         "VulkanSPIRVTarget.h",
     ],
     deps = [
+        "//iree/base:flatcc",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Conversion/LinalgToSPIRV:CodeGenOptionUtils",
@@ -45,8 +46,8 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target/SPIRVCommon",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Dialect/Vulkan/Utils",
-        "//iree/schemas:spirv_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
+        "//iree/compiler/Utils",
+        "//iree/schemas:spirv_executable_def_c_fbs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUDialect",

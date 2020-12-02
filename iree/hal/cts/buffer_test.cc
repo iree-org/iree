@@ -14,7 +14,7 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -375,10 +375,10 @@ TEST_P(BufferTest, MapMemorySubspan) {
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 0xCC, 0xDD, 4, 5, 6));
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, BufferTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, BufferTest,
+    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

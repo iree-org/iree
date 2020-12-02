@@ -14,12 +14,10 @@
 
 #include "iree/hal/metal/metal_pipeline_cache.h"
 
-#include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/metal/metal_kernel_library.h"
-#include "iree/schemas/metal_executable_def_generated.h"
 
 namespace iree {
 namespace hal {
@@ -37,19 +35,9 @@ StatusOr<ref_ptr<Executable>> MetalPipelineCache::PrepareExecutable(
     ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
     const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("MetalPipelineCache::PrepareExecutable");
-  if (spec.executable_data.size() <= 4 ||
-      !MetalExecutableDefBufferHasIdentifier(spec.executable_data.data())) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Supplied executable data does not contain a MetalExecutableDef";
-  }
-
-  // Get the Metal executable def flatbuffer.
-  const auto& metal_executable_def =
-      *::flatbuffers::GetRoot<MetalExecutableDef>(spec.executable_data.data());
 
   // Create the Metal library (which may itself own many pipeline states).
-  IREE_ASSIGN_OR_RETURN(auto executable,
-                        MetalKernelLibrary::Create(metal_device_, mode, metal_executable_def));
+  IREE_ASSIGN_OR_RETURN(auto executable, MetalKernelLibrary::Create(metal_device_, mode, spec));
 
   return executable;
 }

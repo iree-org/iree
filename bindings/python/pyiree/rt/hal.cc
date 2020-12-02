@@ -92,24 +92,26 @@ class HalMappedMemory {
 //------------------------------------------------------------------------------
 
 std::vector<std::string> HalDriver::Query() {
-  iree_string_view_t* driver_names;
-  iree_host_size_t driver_count;
-  CheckApiStatus(iree_hal_driver_registry_query_available_drivers(
-                     iree_allocator_system(), &driver_names, &driver_count),
-                 "Error querying drivers");
-
-  std::vector<std::string> drivers;
-  drivers.resize(driver_count);
-  for (iree_host_size_t i = 0; i < driver_count; ++i) {
-    drivers[i] = std::string(driver_names[i].data, driver_names[i].size);
+  iree_hal_driver_info_t* driver_infos = NULL;
+  iree_host_size_t driver_info_count = 0;
+  CheckApiStatus(
+      iree_hal_driver_registry_enumerate(iree_hal_driver_registry_default(),
+                                         iree_allocator_system(), &driver_infos,
+                                         &driver_info_count),
+      "Error enumerating HAL drivers");
+  std::vector<std::string> driver_names(driver_info_count);
+  for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
+    driver_names[i] = std::string(driver_infos[i].driver_name.data,
+                                  driver_infos[i].driver_name.size);
   }
-  free(driver_names);
-  return drivers;
+  iree_allocator_system_free(NULL, driver_infos);
+  return driver_names;
 }
 
 HalDriver HalDriver::Create(const std::string& driver_name) {
   iree_hal_driver_t* driver;
-  CheckApiStatus(iree_hal_driver_registry_create_driver(
+  CheckApiStatus(iree_hal_driver_registry_try_create_by_name(
+                     iree_hal_driver_registry_default(),
                      {driver_name.data(), driver_name.size()},
                      iree_allocator_system(), &driver),
                  "Error creating driver");

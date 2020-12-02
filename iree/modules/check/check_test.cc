@@ -21,6 +21,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -35,12 +36,15 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+        iree_hal_driver_registry_default()));
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
+    IREE_ASSERT_OK(iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_allocator_system(), &hal_driver));
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_ASSERT_OK(
@@ -414,8 +418,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
-  float lhs_contents[] = {1.0, 1.99999, 0.00001, 4};
-  float rhs_contents[] = {1.00001, 2.0, 0, 4};
+  float lhs_contents[] = {1.0f, 1.99999f, 0.00001f, 4.0f};
+  float rhs_contents[] = {1.00001f, 2.0f, 0.0f, 4.0f};
   int32_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));

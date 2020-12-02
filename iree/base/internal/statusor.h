@@ -15,6 +15,9 @@
 #ifndef IREE_BASE_INTERNAL_STATUSOR_H_
 #define IREE_BASE_INTERNAL_STATUSOR_H_
 
+#include <type_traits>
+#include <utility>
+
 #include "absl/base/attributes.h"
 #include "absl/utility/utility.h"
 #include "iree/base/internal/status.h"
@@ -49,12 +52,11 @@ using IsStatusOrConversionAssigmentAmbiguous =
 template <typename T, typename U>
 struct IsAmbiguousStatusOrForInitialization
     :  // Strip const-value refs from type and check again, else false_type.
-       public absl::conditional_t<
-           std::is_same<absl::remove_cv_t<absl::remove_reference_t<U>>,
-                        U>::value,
+       public std::conditional_t<
+           std::is_same<std::remove_cv_t<std::remove_reference_t<U>>, U>::value,
            std::false_type,
            IsAmbiguousStatusOrForInitialization<
-               T, absl::remove_cv_t<absl::remove_reference_t<U>>>> {};
+               T, std::remove_cv_t<std::remove_reference_t<U>>>> {};
 
 template <typename T, typename U>
 struct IsAmbiguousStatusOrForInitialization<T, StatusOr<U>>
@@ -62,17 +64,17 @@ struct IsAmbiguousStatusOrForInitialization<T, StatusOr<U>>
 
 template <typename T, typename U>
 using IsStatusOrDirectInitializationAmbiguous = absl::disjunction<
-    std::is_same<StatusOr<T>, absl::remove_cv_t<absl::remove_reference_t<U>>>,
-    std::is_same<Status, absl::remove_cv_t<absl::remove_reference_t<U>>>,
-    std::is_same<StatusBuilder, absl::remove_cv_t<absl::remove_reference_t<U>>>,
+    std::is_same<StatusOr<T>, std::remove_cv_t<std::remove_reference_t<U>>>,
+    std::is_same<Status, std::remove_cv_t<std::remove_reference_t<U>>>,
+    std::is_same<StatusBuilder, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<absl::in_place_t,
-                 absl::remove_cv_t<absl::remove_reference_t<U>>>,
+                 std::remove_cv_t<std::remove_reference_t<U>>>,
     IsAmbiguousStatusOrForInitialization<T, U>>;
 
 template <typename T, typename U>
 using IsStatusOrDirectInitializationValid = absl::disjunction<
     // The is_same allows nested status ors to ignore this check iff same type.
-    std::is_same<T, absl::remove_cv_t<absl::remove_reference_t<U>>>,
+    std::is_same<T, std::remove_cv_t<std::remove_reference_t<U>>>,
     absl::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
 
 class Helper {
@@ -327,7 +329,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // explicit.
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
@@ -339,7 +341,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
       : Base(static_cast<const typename StatusOr<U>::Base&>(other)) {}
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
@@ -352,7 +354,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
               std::is_convertible<U&&, T>,
@@ -363,7 +365,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
       : Base(static_cast<typename StatusOr<U>::Base&&>(other)) {}
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
               absl::negation<std::is_convertible<U&&, T>>,
@@ -378,7 +380,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // StatusOr<U>.
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>,
               std::is_constructible<T, const U&>,
@@ -393,7 +395,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   }
   template <
       typename U,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               absl::negation<std::is_same<T, U>>, std::is_constructible<T, U&&>,
               std::is_assignable<T, U&&>,
@@ -445,7 +447,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // a StatusOr<J>, where J is convertible to T.
   template <
       typename U = T,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
               std::is_constructible<T, U&&>,
@@ -456,7 +458,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 
   template <
       typename U = T,
-      absl::enable_if_t<
+      std::enable_if_t<
           absl::conjunction<
               internal_statusor::IsStatusOrDirectInitializationValid<T, U&&>,
               std::is_constructible<T, U&&>,

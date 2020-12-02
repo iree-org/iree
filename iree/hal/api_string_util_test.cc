@@ -554,6 +554,8 @@ TEST(ElementTypeStringUtilTest, ParseElementType) {
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_UINT_16)));
   EXPECT_THAT(ParseElementType("f32"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_32)));
+  EXPECT_THAT(ParseElementType("f16"),
+              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_16)));
   EXPECT_THAT(ParseElementType("x64"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_OPAQUE_64)));
   EXPECT_THAT(ParseElementType("*64"),
@@ -1000,6 +1002,7 @@ TEST(BufferViewStringUtilTest, RoundTrip) {
   expect_round_trip("4xi16=0 -1 2 3");
   expect_round_trip("4xu16=0 1 2 3");
   expect_round_trip("2x2xi32=[0 1][2 3]");
+  expect_round_trip("4xf16=0 0.5 2 3");
   expect_round_trip("4xf32=0 1.1 2 3");
   expect_round_trip("4xf64=0 1.1 2 3");
   expect_round_trip("1x2x3xi8=[[0 1 2][3 4 5]]");

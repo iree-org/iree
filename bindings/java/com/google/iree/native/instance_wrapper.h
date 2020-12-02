@@ -16,7 +16,7 @@
 #define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
 
 #include "iree/base/status.h"
-#include "iree/vm/instance.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace java {

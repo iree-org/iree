@@ -84,6 +84,7 @@ static unsigned isMemRefAndVectorizable(Value v,
   if (memrefType && !memrefType.getElementType().isa<VectorType>() &&
       (kMaxVectorizationSizeInBits % memrefType.getElementTypeBitWidth() ==
        0) &&
+      memrefType.getRank() > 0 &&
       !ShapedType::isDynamic(memrefType.getShape().back()) &&
       getUsesIfAllTransferOp(v, uses)) {
     return calculateMemrefVecSize(uses);

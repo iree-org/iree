@@ -18,7 +18,7 @@
 workspace(name = "iree_core")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load(":repo_utils.bzl", "maybe")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ###############################################################################
 # Bazel rules.
@@ -152,6 +152,17 @@ maybe(
     path = "third_party/tensorflow",
 )
 
+# TF depends on tf_toolchains.
+http_archive(
+    name = "tf_toolchains",
+    sha256 = "d60f9637c64829e92dac3f4477a2c45cdddb9946c5da0dd46db97765eb9de08e",
+    strip_prefix = "toolchains-1.1.5",
+    urls = [
+        "http://mirror.tensorflow.org/github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+        "https://github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+    ],
+)
+
 # Import all of the tensorflow dependencies.
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 ###############################################################################
@@ -194,14 +205,6 @@ maybe(
     local_repository,
     name = "com_google_googletest",
     path = "third_party/googletest",
-)
-
-# Note that TensorFlow provides this as "flatbuffers" which is wrong.
-# It is only used for TFLite and may cause ODR issues if not fixed.
-maybe(
-    local_repository,
-    name = "com_github_google_flatbuffers",
-    path = "third_party/flatbuffers",
 )
 
 maybe(

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -30,16 +30,16 @@ TEST_P(DriverTest, CreateDefaultDevice) {
 TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
   IREE_ASSERT_OK_AND_ASSIGN(auto devices, driver_->EnumerateAvailableDevices());
 
-  for (int i = 0; i < devices.size(); ++i) {
+  for (iree_host_size_t i = 0; i < devices.size(); ++i) {
     IREE_ASSERT_OK_AND_ASSIGN(auto device, driver_->CreateDevice(devices[i]));
     IREE_LOG(INFO) << "Device #" << i << " details:\n" << device->DebugString();
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, DriverTest,
-                         ::testing::ValuesIn(DriverRegistry::shared_registry()
-                                                 ->EnumerateAvailableDrivers()),
-                         GenerateTestName());
+INSTANTIATE_TEST_SUITE_P(
+    AllDrivers, DriverTest,
+    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
+    GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

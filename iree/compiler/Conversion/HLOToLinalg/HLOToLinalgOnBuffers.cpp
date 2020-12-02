@@ -32,6 +32,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -44,8 +46,6 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -116,7 +116,7 @@ static unsigned mapDescriptorTypeToMemorySpace(IREE::HAL::DescriptorType type) {
 
 /// Returns the MemRefType to use for a given `tensorType`.
 static MemRefType getMemrefTypeForTensor(
-    RankedTensorType tensorType, ArrayRef<AffineMap> affineMapComposition = {},
+    ShapedType tensorType, ArrayRef<AffineMap> affineMapComposition = {},
     unsigned memorySpace = 0) {
   return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
                          affineMapComposition, memorySpace);
@@ -196,6 +196,14 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
     resultBuffers.reserve(op->getNumResults());
     for (auto result : llvm::enumerate(op->getResults())) {
       Value resultBuffer = resultTensorToBufferMap.lookup(result.value());
+      if (!resultBuffer) {
+        if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
+          if (shapedType.hasStaticShape()) {
+            resultBuffer = rewriter.create<AllocOp>(
+                op->getLoc(), getMemrefTypeForTensor(shapedType));
+          }
+        }
+      }
       if (!resultBuffer) {
         return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
           diag << "failed to create buffer for result #" << result.index();

@@ -41,8 +41,6 @@ SUITE_NAME_TO_TARGET = {
         '//integrations/tensorflow/e2e:e2e_tests',
     'mobile_bert_squad_tests':
         '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
-    'keras_tests':
-        '//integrations/tensorflow/e2e/keras:keras_tests',
     'layers_tests':
         '//integrations/tensorflow/e2e/keras/layers:layers_tests',
     'layers_dynamic_batch_tests':
@@ -54,7 +52,7 @@ SUITE_NAME_TO_TARGET = {
     'keyword_spotting_internal_streaming_tests':
         '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests',
     'imagenet_non_hermetic_tests':
-        '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests',
+        '//integrations/tensorflow/e2e/keras/applications:imagenet_non_hermetic_tests',
     'slim_vision_tests':
         '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests',
 }
@@ -162,10 +160,7 @@ def main(argv):
 
   if FLAGS.run_test_suites:
     # Use bazel test to execute all of the test suites in parallel.
-    command = [
-        'bazel', 'test', *test_suites, '--color=yes',
-        '--test_arg=--get_saved_model'
-    ]
+    command = ['bazel', 'test', *test_suites, '--color=yes']
     print(f'Running: `{" ".join(command)}`')
     if not FLAGS.dry_run:
       subprocess.check_call(command)

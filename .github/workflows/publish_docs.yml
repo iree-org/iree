@@ -37,7 +37,7 @@ jobs:
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Installing Ninja build
-        uses: seanmiddleditch/gha-setup-ninja@v1
+        uses: seanmiddleditch/gha-setup-ninja@v3
       - name: Building documentation
         run: |
           ./build_tools/cmake/build_docs.sh

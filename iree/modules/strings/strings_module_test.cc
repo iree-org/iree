@@ -21,6 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
@@ -40,6 +41,11 @@ namespace {
 
 class StringsModuleTest : public ::testing::Test {
  protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+        iree_hal_driver_registry_default()));
+  }
+
   virtual void SetUp() {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
@@ -52,8 +58,9 @@ class StringsModuleTest : public ::testing::Test {
     // Setup hal module:
     IREE_CHECK_OK(iree_hal_module_register_types());
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
+    IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vmla"),
+        iree_allocator_system(), &hal_driver));
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_CHECK_OK(
@@ -301,7 +308,7 @@ class StringsModuleTest : public ::testing::Test {
     std::vector<iree_string_view_t> out_strings(expected.size());
     IREE_ASSERT_OK(strings_string_tensor_get_elements(
         output_tensor, out_strings.data(), out_strings.size(), 0));
-    for (int i = 0; i < expected.size(); i++) {
+    for (iree_host_size_t i = 0; i < expected.size(); i++) {
       EXPECT_EQ(iree_string_view_compare(out_strings[i], expected[i]), 0)
           << "Expected: " << expected[i].data << " found "
           << out_strings[i].data;

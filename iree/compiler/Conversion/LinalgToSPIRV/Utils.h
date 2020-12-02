@@ -21,19 +21,19 @@
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_UTILS_H_
 
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/FoldUtils.h"
 
 namespace mlir {
-class FuncOp;
-class Value;
-class SubViewOp;
-class OperationFolder;
-class OpBuilder;
-struct LogicalResult;
-
 namespace iree_compiler {
 
 static constexpr int kNumGPUDims = 3;
+
 /// Allocation callback for allocation workgroup local memory.
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
@@ -56,13 +56,10 @@ template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
                                                              Location loc,
                                                              unsigned numDims);
-
-/// Function to get number of outer parallel loops of a linalgOp
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
-
 /// Updates the workgroup size used for the dispatch region.
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
                                   ArrayRef<int64_t> workGroupSize);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -33,6 +33,7 @@ inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
+  createDemoteF32ToF16Pass();
 }
 
 inline void registerLinalgToVectorPasses() {
@@ -47,6 +48,7 @@ inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
     createConvertToGPUPass();
+    createFoldProcessorIDUsesPass();
     createLinalgTileAndFusePass(SPIRVCodegenOptions());
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();
