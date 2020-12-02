@@ -14,7 +14,7 @@
 
 # An image for building IREE with Python bindings using Bazel.
 
-FROM gcr.io/iree-oss/bazel AS final
+FROM gcr.io/iree-oss/bazel@sha256:066af7fcb39c13284ed47b2d6afe75f944c1d7415a21beaa5afd6319176654e8 AS final
 
 # Install python3 and numpy.
 RUN apt-get update \

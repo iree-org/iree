@@ -17,21 +17,20 @@
 
 Includes information on their dependency graph and GCR URL.
 
-See the README for information on how to add and update images.
+See the README for more information on how to add and update images.
 
 Example usage:
 
 Rebuild the cmake image and all images that transitively on depend on it,
-tagging them with `latest`:
-  python3 build_tools/docker/manage_images.py --build --image cmake
+tagging them with `latest` and updating all references to their sha digests:
+  python3 build_tools/docker/manage_images.py --image cmake
 
 Print out output for rebuilding the cmake image and all images that
 transitively on depend on it, but don't take side-effecting actions:
-  python3 build_tools/docker/manage_images.py --build --image cmake --dry-run
+  python3 build_tools/docker/manage_images.py --image cmake --dry-run
 
 Rebuild and push all images and update references to them in the repository:
-  python3 build_tools/docker/manage_images.py --push --images all
-  --update-references
+  python3 build_tools/docker/manage_images.py --images all
 """
 
 import argparse
@@ -41,7 +40,7 @@ import posixpath
 import re
 import subprocess
 import sys
-from typing import List, Sequence, Union
+from typing import Dict, List, Sequence, Union
 
 import utils
 
@@ -89,22 +88,6 @@ def parse_arguments():
                       required=True,
                       action='append',
                       help=f'Name of the image to build: {IMAGES_HELP}.')
-  parser.add_argument('--pull',
-                      action='store_true',
-                      help='Pull the specified image before building.')
-  parser.add_argument('--build',
-                      action='store_true',
-                      help='Build new images from the current Dockerfiles.')
-  parser.add_argument(
-      '--push',
-      action='store_true',
-      help='Push the built images to GCR. Requires gcloud authorization.')
-  parser.add_argument(
-      '--update_references',
-      '--update-references',
-      action='store_true',
-      help='Update all references to the specified images to point at the new'
-      ' digest.')
   parser.add_argument(
       '--dry_run',
       '--dry-run',
@@ -140,6 +123,21 @@ def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
 
   processing_order.reverse()
   return processing_order
+
+
+def get_dependencies(images: Sequence[str]) -> Sequence[str]:
+  dependencies = set()
+
+  def add_dependency(image: str):
+    if image not in dependencies:
+      for dependency in IMAGES_TO_DEPENDENCIES[image]:
+        add_dependency(dependency)
+      dependencies.add(image)
+
+  for image in images:
+    add_dependency(image)
+
+  return dependencies
 
 
 def run_command(command: Sequence[str],
@@ -189,10 +187,13 @@ def get_repo_digest(tagged_image_url: str) -> str:
 def update_rbe_reference(digest: str, dry_run: bool = False):
   print('Updating WORKSPACE file for rbe-toolchain')
   digest_updates = 0
-  for line in fileinput.input(files=['WORKSPACE'], inplace=(not dry_run)):
+  for line in fileinput.input(files=['WORKSPACE'], inplace=True):
     if line.strip().startswith('digest ='):
       digest_updates += 1
-      print(re.sub(DIGEST_REGEX, digest, line), end='')
+      if dry_run:
+        print(line, end='')
+      else:
+        print(re.sub(DIGEST_REGEX, digest, line), end='')
     else:
       print(line, end='')
 
@@ -221,51 +222,67 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
   # Update references in all grepped files.
   files = completed_process.stdout.split()
   print(f'Updating references in {len(files)} files: {files}')
-  for line in fileinput.input(files=files, inplace=(not dry_run)):
-    print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}', line),
-          end='')
+  if not dry_run:
+    for line in fileinput.input(files=files, inplace=True):
+      print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}',
+                   line),
+            end='')
+
+
+# TODO typing
+def get_prod_digests() -> Dict[str, str]:
+  with open(utils.PROD_DIGESTS_PATH, "r") as f:
+    images_with_digests = {}
+    for line in f:
+      url, digest = line.strip().split("@")
+      images_with_digests[url] = digest
+  return images_with_digests
 
 
 if __name__ == '__main__':
   args = parse_arguments()
 
-  if args.push:
-    # Ensure the user has the correct authorization if they try to push to GCR.
-    utils.check_gcloud_auth(dry_run=args.dry_run)
+  # Ensure the user has the correct authorization to push to GCR.
+  utils.check_gcloud_auth(dry_run=args.dry_run)
 
   images_to_process = get_ordered_images_to_process(args.images)
   print(f'Also processing dependent images. Will process: {images_to_process}')
 
+  dependencies = get_dependencies(images_to_process)
+  print(f'Pulling image dependencies: {list(dependencies)}')
+  prod_digests = get_prod_digests()
+  for dependency in dependencies:
+    if dependency in prod_digests:
+      image_with_digest = f'{dependency}@{prod_digests[dependency]}'
+      utils.run_command(["docker", "pull", image_with_digest],
+                        dry_run=args.dry_run)
+
   for image in images_to_process:
     print(f'Processing image {image}')
     image_url = posixpath.join(IREE_GCR_URL, image)
-    tagged_image_url = f'{image_url}:latest'
+    tagged_image_url = f'{image_url}'
     image_path = os.path.join(DOCKER_DIR, image)
 
-    if args.pull:
-      utils.run_command(['docker', 'pull', tagged_image_url], args.dry_run)
+    utils.run_command(
+        ['docker', 'build', '--tag', tagged_image_url, image_path],
+        dry_run=args.dry_run)
 
-    if args.build:
-      utils.run_command(
-          ['docker', 'build', '--tag', tagged_image_url, image_path],
-          args.dry_run)
+    utils.run_command(['docker', 'push', tagged_image_url],
+                      dry_run=args.dry_run)
 
-    if args.push:
-      utils.run_command(['docker', 'push', tagged_image_url], args.dry_run)
+    digest = get_repo_digest(tagged_image_url)
 
-    if args.update_references:
-      digest = get_repo_digest(tagged_image_url)
-
-      # Check that the image is in 'prod_digests.txt' and append it to the list
-      # in the file if it isn't. We know that the GCR digest exists at this
-      # point because 'get_repo_digest' confirms that the image has been pushed.
-      with open(utils.PROD_DIGESTS_PATH, 'r') as f:
-        in_prod_digests = f'{image_url}@' in f.read()
-      if not in_prod_digests:
+    # Check that the image is in 'prod_digests.txt' and append it to the list
+    # in the file if it isn't.
+    if image_url not in prod_digests:
+      image_with_digest = f'{image_url}@{digest}'
+      print(
+          f'Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}')
+      if not args.dry_run:
         with open(utils.PROD_DIGESTS_PATH, 'a') as f:
-          f.write(f'{image_url}@{digest}\n')
+          f.write(f'{image_with_digest}\n')
 
-      # Just hardcode this oddity
-      if image == 'rbe-toolchain':
-        update_rbe_reference(digest, dry_run=args.dry_run)
-      update_references(image_url, digest, dry_run=args.dry_run)
+    # Just hardcode this oddity
+    if image == 'rbe-toolchain':
+      update_rbe_reference(digest, dry_run=args.dry_run)
+    update_references(image_url, digest, dry_run=args.dry_run)

@@ -17,7 +17,7 @@
 
 FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
 
-COPY --from=gcr.io/iree-oss/swiftshader swiftshader/ swiftshader/
+COPY --from=gcr.io/iree-oss/swiftshader@sha256:82c9ca1d8e31cfd7aaf0f0b7dc19899b4f50adaf00b6fdfbea49851007dd31f4 swiftshader/ swiftshader/
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json

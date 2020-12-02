@@ -18,7 +18,7 @@ ARG BAZEL_VERSION=3.3.1
 # Change to a new version if upgrading Bazel.
 ARG NEW_BAZEL_VERSION=3.3.1
 
-FROM gcr.io/iree-oss/util AS install-bazel
+FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-bazel
 WORKDIR /install-bazel
 ARG BAZEL_VERSION
 ARG NEW_BAZEL_VERSION
@@ -42,7 +42,7 @@ RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   # is effectively a noop.
   && apt-get install -y "bazel=${BAZEL_VERSION?}" "bazel-${NEW_BAZEL_VERSION?}"
 
-FROM gcr.io/iree-oss/base AS final
+FROM gcr.io/iree-oss/base@sha256:1e57b0957f71cd1aa9d6e4838c51f40bdbb52dd1be0b4b6b14b337b36654cc63 AS final
 ARG BAZEL_VERSION
 ARG NEW_BAZEL_VERSION
 COPY --from=install-bazel \

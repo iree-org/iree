@@ -16,7 +16,8 @@
 # needed in the final images. Intermediate stages can inherit from this image,
 # but final stages should not.
 
-FROM ubuntu:18.04 AS final
+# Ubuntu 18.04
+FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3 AS final
 
 RUN apt-get update \
   && apt-get install -y \
