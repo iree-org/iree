@@ -25,6 +25,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Test-only passes are not exposed to Passes.h and are declared extern.
+extern std::unique_ptr<OperationPass<FuncOp>>
+createTestRewriteDestructiveUpdatePatternInPlace();
+
 // These functions should be called before creating any MLIRContext if one
 // expects all the possible conversions to be made available to the context
 // automatically.
@@ -65,6 +69,7 @@ inline void registerLinalgToLLVMPasses() {
     createConvImg2ColMatmulConversionPass();
     createLinalgTileAndDistributePass();
     createLinalgTileAndVectorizeWorkgroupsPass();
+    createTestRewriteDestructiveUpdatePatternInPlace();
     return true;
   }();
   (void)init_once;

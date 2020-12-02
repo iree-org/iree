@@ -28,6 +28,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h.inc"
