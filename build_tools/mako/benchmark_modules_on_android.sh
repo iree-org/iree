@@ -21,6 +21,7 @@
 
 set -e
 set -o pipefail
+set -o xtrace
 
 git_hash=UNKNOWN
 while [[ $# -gt 0 ]]; do
@@ -67,7 +68,7 @@ function append_mako_metadata {
   cat >> "${mako_log}" << EOF
 metadata: {
   git_hash: "${git_hash}"
-  timestamp_ms: "${TS}"
+  timestamp_ms: ${TS}
   benchmark_key: "${benchmark_key}"
 }
 EOF
@@ -79,7 +80,7 @@ function append_mako_sample {
   local tag="$3"
   cat >> "${mako_log}" << EOF
 samples: {
-  time: "${value}"
+  time: ${value}
   target: "${tag}"
 }
 EOF

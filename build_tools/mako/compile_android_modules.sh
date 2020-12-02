@@ -22,6 +22,10 @@
 #   2) IREE is built to Android in `build/` directory. E.g., build with
 #      build_tools/cmake/build_android.sh script.
 
+set -e
+set -o pipefail
+set -o xtrace
+
 prefix="module"
 while [[ $# -gt 0 ]]; do
   token="$1"
