@@ -63,7 +63,6 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//mlir:IR",
     ],
-    alwayslink = 1,
 )
 
 gentbl(

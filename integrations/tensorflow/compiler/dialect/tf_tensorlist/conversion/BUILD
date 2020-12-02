@@ -38,7 +38,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -80,5 +79,4 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],
-    alwayslink = 1,
 )

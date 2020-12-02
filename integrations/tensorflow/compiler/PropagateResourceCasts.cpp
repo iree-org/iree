@@ -22,10 +22,10 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace TF {
 
-namespace {
 // Determine whether we should bypass the cast for input (a) to output (b).
-bool shouldBypassCast(ShapedType a, ShapedType b) {
+static bool shouldBypassCast(ShapedType a, ShapedType b) {
   // If the element type changes the cast is required.
   if (a.getElementType() != b.getElementType()) {
     return false;
@@ -56,43 +56,46 @@ bool shouldBypassCast(ShapedType a, ShapedType b) {
   }
   return true;
 }
-}  // namespace
 
 // Attempts to propagate resource casts by bypassing them when they are not
 // necessary or can further refine required types.
-class PropagateResourceCasts
-    : public PassWrapper<PropagateResourceCasts, OperationPass<ModuleOp>> {
+class PropagateResourceCastsPass
+    : public PassWrapper<PropagateResourceCastsPass, OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::TF::TensorFlowDialect>();
+  }
+
   void runOnOperation() override {
     auto operation = getOperation();
     for (auto func : operation.getOps<FuncOp>()) {
-      for (auto cast : func.getOps<TF::CastOp>()) {
+      for (auto cast : func.getOps<mlir::TF::CastOp>()) {
         auto input = cast.x();
         auto output = cast.getResult();
 
-        auto input_ty = input.getType().cast<ShapedType>();
-        auto output_ty = output.getType().cast<ShapedType>();
+        auto inputTy = input.getType().cast<ShapedType>();
+        auto outputTy = output.getType().cast<ShapedType>();
 
         // If the input/output types match we can just bypass it.
-        if (input_ty == output_ty) {
+        if (inputTy == outputTy) {
           output.replaceAllUsesWith(input);
           continue;
         }
 
-        auto input_element_ty =
-            input_ty.getElementType().dyn_cast<TF::ResourceType>();
-        auto output_element_ty =
-            output_ty.getElementType().dyn_cast<TF::ResourceType>();
+        auto inputElementTy =
+            inputTy.getElementType().dyn_cast<mlir::TF::ResourceType>();
+        auto outputElementTy =
+            outputTy.getElementType().dyn_cast<mlir::TF::ResourceType>();
 
         // Check whether it is a
-        if (!input_element_ty || !output_element_ty ||
-            input_element_ty.getSubtypes().empty()) {
+        if (!inputElementTy || !outputElementTy ||
+            inputElementTy.getSubtypes().empty()) {
           continue;
         }
 
-        auto input_resource_ty = input_element_ty.getSubtypes().front();
-        if (!output_element_ty.getSubtypes().empty()) {
-          auto output_resource_ty = output_element_ty.getSubtypes().front();
+        auto input_resource_ty = inputElementTy.getSubtypes().front();
+        if (!outputElementTy.getSubtypes().empty()) {
+          auto output_resource_ty = outputElementTy.getSubtypes().front();
           if (!shouldBypassCast(input_resource_ty, output_resource_ty)) {
             continue;
           }
@@ -106,13 +109,13 @@ class PropagateResourceCasts
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCasts() {
-  return std::make_unique<PropagateResourceCasts>();
+std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass() {
+  return std::make_unique<PropagateResourceCastsPass>();
 }
 
-static PassRegistration<PropagateResourceCasts> pass(
-    "iree-propagate-resource-casts",
-    "Guarantee all func's have only a single use.");
+static PassRegistration<PropagateResourceCastsPass> pass(
+    "iree-tf-propagate-resource-casts", "Propagates tf.resource type casts");
 
+}  // namespace TF
 }  // namespace iree_compiler
 }  // namespace mlir

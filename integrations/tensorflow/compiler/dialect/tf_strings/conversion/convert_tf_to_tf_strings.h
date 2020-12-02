@@ -23,11 +23,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace tf_strings {
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertTfToTfStrings();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTFToTFStringsPass();
 
 // Adds rewrite patterns for lowering tensorflow operations to tf_strings.
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns);
+
 }  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir

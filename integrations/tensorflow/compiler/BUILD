@@ -21,12 +21,13 @@ package(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "CheckNoTF.cpp",
-        "LegalizeTF.cpp",
+        "ConvertToMHLO.cpp",
+        "LowerExportedFunctions.cpp",
+        "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PropagateResourceCasts.cpp",
-        "TFSavedModelLowerExportedFunctions.cpp",
-        "TFSavedModelLowerGlobalTensors.cpp",
+        "StripMetadata.cpp",
+        "VerifyFullyConverted.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -36,6 +37,7 @@ cc_library(
     ],
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/base:signature_mangle",
@@ -58,7 +60,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
-    alwayslink = 1,
 )
 
 cc_binary(

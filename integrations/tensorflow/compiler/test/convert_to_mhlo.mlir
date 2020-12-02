@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -iree-xla-legalize-tf -split-input-file <%s | IreeFileCheck %s
+// RUN: iree-tf-opt -iree-tf-convert-to-mhlo -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<f32>, %arg1: tensor<f32>) -> (tensor<3xf32>) {

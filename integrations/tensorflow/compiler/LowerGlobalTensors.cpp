@@ -36,19 +36,19 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace TF {
 
-static LogicalResult rewriteTfResourceOpToFlowOp(Operation &op, Value flowPtr) {
-  if (auto readVariable = dyn_cast<TF::ReadVariableOp>(op)) {
-    auto load =
-        OpBuilder(readVariable)
-            .create<IREE::Flow::VariableLoadIndirectOp>(
-                readVariable.getLoc(), readVariable.value().getType(), flowPtr);
+static LogicalResult rewriteTFVariableOpToFlowVariableOp(Operation &op,
+                                                         Value flowPtr) {
+  OpBuilder builder(&op);
+  if (auto readVariable = dyn_cast<mlir::TF::ReadVariableOp>(op)) {
+    auto load = builder.create<IREE::Flow::VariableLoadIndirectOp>(
+        readVariable.getLoc(), readVariable.value().getType(), flowPtr);
     readVariable.value().replaceAllUsesWith(load.result());
     readVariable.erase();
-  } else if (auto assignVariable = dyn_cast<TF::AssignVariableOp>(op)) {
-    OpBuilder(assignVariable)
-        .create<IREE::Flow::VariableStoreIndirectOp>(
-            assignVariable.getLoc(), assignVariable.value(), flowPtr);
+  } else if (auto assignVariable = dyn_cast<mlir::TF::AssignVariableOp>(op)) {
+    builder.create<IREE::Flow::VariableStoreIndirectOp>(
+        assignVariable.getLoc(), assignVariable.value(), flowPtr);
     assignVariable.erase();
   } else {
     return op.emitError() << "could not lower resource op to flow: "
@@ -57,14 +57,15 @@ static LogicalResult rewriteTfResourceOpToFlowOp(Operation &op, Value flowPtr) {
   return success();
 }
 
-static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
-    ModuleOp module) {
+static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
   OpBuilder globalBuilder(module.getBodyRegion());
   SymbolTable symbolTable(module);
 
-  if (auto sessionInitializer = tf_saved_model::GetSessionInitializerOp(module))
+  if (auto sessionInitializer =
+          tf_saved_model::GetSessionInitializerOp(module)) {
     return sessionInitializer.emitError()
            << "Session initializer is not supported yet";
+  }
 
   DenseMap<StringRef, std::string> symNameToFlowSymName;
   for (auto globalTensor : module.getOps<tf_saved_model::GlobalTensorOp>()) {
@@ -108,17 +109,18 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
       argsToErase.push_back(i);
     }
     func.eraseArguments(argsToErase);
-    Dialect *ireeFlowDialect =
-        func.getContext()->getLoadedDialect<IREE::Flow::FlowDialect>();
+
     while (!typeConversionWorklist.empty()) {
       Value v = typeConversionWorklist.pop_back_val();
       Type desiredType = v.getType();
       for (OpOperand &use : llvm::make_early_inc_range(v.getUses())) {
         Operation *owner = use.getOwner();
+
         // If the user is already in the flow dialect, then everything is ok.
-        if (owner->getDialect() == ireeFlowDialect) {
+        if (IREE::Flow::FlowDialect::isDialectOp(owner)) {
           continue;
         }
+
         // If a user is just a terminator passing the value through a successor
         // operand, propagate through the successor operand.
         // TODO(silvasean): Handle case of different types in preds.
@@ -135,9 +137,10 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
             continue;
           }
         }
+
         // Resource types can have subtypes (or lack thereof) and casting
         // between them is allowed. Here we just pass through.
-        if (auto castOp = dyn_cast<TF::CastOp>(owner)) {
+        if (auto castOp = dyn_cast<mlir::TF::CastOp>(owner)) {
           assert(v == castOp.x());
           castOp.y().replaceAllUsesWith(castOp.x());
           castOp.erase();
@@ -146,7 +149,8 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
           typeConversionWorklist.push_back(v);
           break;
         }
-        if (failed(rewriteTfResourceOpToFlowOp(*owner, v))) {
+
+        if (failed(rewriteTFVariableOpToFlowVariableOp(*owner, v))) {
           return failure();
         }
       }
@@ -161,29 +165,29 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
   return success();
 }
 
-class TFSavedModelLowerGlobalTensors
-    : public PassWrapper<TFSavedModelLowerGlobalTensors,
-                         OperationPass<ModuleOp>> {
+class LowerGlobalTensors
+    : public PassWrapper<LowerGlobalTensors, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, IREEDialect>();
+    registry.insert<mlir::tf_saved_model::TensorFlowSavedModelDialect,
+                    IREE::Flow::FlowDialect, IREEDialect>();
   }
 
   void runOnOperation() override {
-    if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getOperation()))) {
+    if (failed(convertTFGlobalTensorsToFlowVariables(getOperation()))) {
       signalPassFailure();
     }
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createTFSavedModelLowerGlobalTensors() {
-  return std::make_unique<TFSavedModelLowerGlobalTensors>();
+std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass() {
+  return std::make_unique<LowerGlobalTensors>();
 }
 
-static PassRegistration<TFSavedModelLowerGlobalTensors> pass(
+static PassRegistration<LowerGlobalTensors> pass(
     "iree-tf-saved-model-lower-global-tensors",
-    "Lowers tf_saved_model global tensors to flow dialect.");
+    "Lowers tf_saved_model global tensors to IREE flow dialect variables");
 
+}  // namespace TF
 }  // namespace iree_compiler
 }  // namespace mlir
