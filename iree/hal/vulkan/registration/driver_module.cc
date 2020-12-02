@@ -151,7 +151,7 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
     iree_hal_driver_t** out_driver) {
   if (driver_id != IREE_HAL_VULKAN_1_X_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIXPTR
+                            "no driver with ID %016" PRIu64
                             " is provided by this factory",
                             driver_id);
   }
