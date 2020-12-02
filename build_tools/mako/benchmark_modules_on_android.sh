@@ -112,8 +112,7 @@ function run_and_log {
     "--flagfile=${DEVICE_ROOT}/flagfile" \
     "--module_file=${DEVICE_ROOT}/${model}-${target}.vmfb" \
     "--driver=${driver}" \
-    --benchmark_repetitions=10 \
-    --benchmark_min_time=1 | tee "${test_out}"
+    --benchmark_repetitions=10 | tee "${test_out}"
   while read -r ms; do
     append_mako_sample "${mako_log}" "${ms}" "${TAG}"
   done < <(sed -En -e "${SED_EXPR}" "${test_out}")
