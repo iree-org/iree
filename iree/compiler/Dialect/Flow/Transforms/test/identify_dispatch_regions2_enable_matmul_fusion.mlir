@@ -161,7 +161,7 @@ func @dot_general_lower_swapped
   return %4 : tensor<3x1x1xf32>
 }
 // CHECK-LABEL: func @dot_general_lower_swapped
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x3xxf32>
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x3xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x1x2xf32>
 //       CHECK:   %[[RESULT1:.+]] = flow.dispatch.region
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]] = %[[ARG0]]
