@@ -34,15 +34,17 @@ class UnixLinkerTool : public LinkerTool {
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
     if (targetTriple.isAndroid()) {
+      char *androidNDKPath = std::getenv("ANDROID_NDK");
+      if (!androidNDKPath) return toolPath;
 // TODO(ataei, benvanik): Windows cross-linking android NDK support.
 #if defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_LINUX)
-      return llvm::Twine(std::getenv("ANDROID_NDK"))
+      return llvm::Twine(androidNDKPath)
           .concat("/toolchains/llvm/prebuilt/linux-x86_64/bin/")
           // TODO(ataei): Set target archicture and ABI from targetTriple.
           .concat("aarch64-linux-android30-clang++")
           .str();
 #elif defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_APPLE)
-      return llvm::Twine(std::getenv("ANDROID_NDK"))
+      return llvm::Twine(androidNDKPath)
           .concat("/toolchains/llvm/prebuilt/darwin-x86_64/bin/")
           .concat("aarch64-linux-android30-clang++")
           .str();
