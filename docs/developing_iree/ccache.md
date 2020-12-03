@@ -43,7 +43,7 @@ ccache --max-size=20G
 **Tip:** At the moment (late 2020), most of the code we're building is
 `third_party/llvm-project` so the fundamental limiting factor to how far we can
 cache away rebuilds is how often that dependency gets updated. Given how
-frequently it current is update, I'm finding that `20G` is enough to make the
+frequently it currently is updated, I'm finding that `20G` is enough to make the
 `ccache` size not be the limiting factor.
 
 ## Telling CMake to use `ccache`
