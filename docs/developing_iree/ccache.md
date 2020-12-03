@@ -10,7 +10,7 @@ takes care of executing `clang` with these arguments and caches the output file
 `foo.o`. The next invocation then skips executing `clang` altogether.
 
 When the cache is hit, the speedup is such that the "compilation" becomes
-essentially free. However, `ccache` only caches compilation, [not linking].
+essentially free. However, `ccache` only caches compilation, [not linking](https://stackoverflow.com/a/29828811).
 
 Here a few scenarios where `ccache` helps:
 * Incremental rebuilds. While `cmake` always tries to avoid unnecessary work in

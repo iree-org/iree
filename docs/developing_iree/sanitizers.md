@@ -14,9 +14,14 @@ They all incur large overhead, so only enable them while debugging.
 
 Tool   | Detects | Helps debug what? | Slowdown | Memory overhead | Android support
 ------ | ------- | ----------------- | -------- | --------------- | ---------------
-ASan   | Out-of-bounds accesses,<br>Use-after-free,<br>Use-after-return,<br>Memory leaks, ... | Crashes,<br>non-deterministic results,<br>memory leaks | 2x | 3x | Yes
+ASan   | Out-of-bounds accesses,<br>Use-after-free,<br>Use-after-return,<br>Memory leaks (*), ... | Crashes,<br>non-deterministic results,<br>memory leaks (*) | 2x | 3x | Yes
 MSan   | Uninitialized memory reads | Non-deterministic results | 3x | ? | Yes
 TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](https://github.com/android/ndk/issues/1171)
+
+Notes:
+* (*) See [this
+  documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
+  on leak detection. It is only enabled by default on some platforms.
 
 ## Enabling the sanitizers
 
