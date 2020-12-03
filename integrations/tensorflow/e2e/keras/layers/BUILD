@@ -155,7 +155,7 @@ FAILING_STATIC = [
             "LSTM",  # Failing unless 'return_sequences = True'
             "LayerNormalization",
             "LeakyReLU",
-            "LocallyConnected2D",
+            "LocallyConnected2D",  # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
             "MultiHeadAttention",
             "UpSampling2D",
         ],
