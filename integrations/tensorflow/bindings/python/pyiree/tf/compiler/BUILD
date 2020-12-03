@@ -116,6 +116,7 @@ iree_py_extension(
         ":compiler_library",
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
+        "//integrations/tensorflow/compiler:tensorflow",
     ],
 )
 

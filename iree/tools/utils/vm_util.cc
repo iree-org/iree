@@ -226,7 +226,8 @@ Status CreateDevice(absl::string_view driver_name,
                     iree_hal_device_t** out_device) {
   IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
+      iree_hal_driver_registry_default(),
       iree_string_view_t{driver_name.data(), driver_name.size()},
       iree_allocator_system(), &driver))
       << "Creating driver '" << driver_name << "'";

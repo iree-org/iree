@@ -20,10 +20,12 @@
 #include <set>
 
 #include "iree/base/status.h"
-#include "iree/hal/driver_registry.h"
-#include "iree/hal/drivers/init.h"
+#include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+
+// TODO(3934): rebase this all on the C API.
+#include "iree/hal/driver.h"
 
 namespace iree {
 namespace hal {
@@ -31,24 +33,25 @@ namespace cts {
 
 // Common setup for tests parameterized across all registered drivers.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
- public:
-  static std::vector<std::string> EnumerateAvailableDrivers() {
-    static std::once_flag register_once;
-    std::call_once(register_once, [] {
-      IREE_CHECK_OK(iree_hal_register_all_available_drivers());
-    });
-    return DriverRegistry::shared_registry()->EnumerateAvailableDrivers();
-  }
-
  protected:
   // Per-test-suite set-up. This is called before the first test in this test
   // suite. We use it to set up drivers that must be reused between test cases
   // to work around issues with driver lifetimes (specifically SwiftShader for
   // Vulkan).
+  //
+  // TODO(#3933): this is a very nasty hack that indicates a serious issue. If
+  // we have to do it here in our test suite it means that every user of IREE
+  // will also have to do something like it. We should be reusing all drivers
+  // across tests in a suite (removing the vulkan-specific behavior here) but
+  // ALSO need a test that tries to create a driver twice.
   static void SetUpTestSuite() {
-    auto driver_or = DriverRegistry::shared_registry()->Create("vulkan");
-    if (driver_or.ok()) {
-      shared_drivers_["vulkan"] = std::move(driver_or.value());
+    iree_hal_driver_t* driver = NULL;
+    iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(), iree_make_cstring_view("vulkan"),
+        iree_allocator_system(), &driver);
+    if (iree_status_consume_code(status) == IREE_STATUS_OK) {
+      shared_drivers_["vulkan"] =
+          assign_ref(reinterpret_cast<iree::hal::Driver*>(driver));
     }
   }
 
@@ -102,12 +105,16 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     // No existing driver, attempt to create.
     IREE_LOG(INFO) << "Creating driver '" << driver_name << "'...";
-    auto driver_or = DriverRegistry::shared_registry()->Create(driver_name);
-    if (IsUnavailable(driver_or.status())) {
+    iree_hal_driver_t* driver = NULL;
+    iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+        iree_hal_driver_registry_default(),
+        iree_make_string_view(driver_name.data(), driver_name.size()),
+        iree_allocator_system(), &driver);
+    if (iree_status_is_unavailable(status)) {
       unavailable_driver_names.insert(driver_name);
     }
-    IREE_RETURN_IF_ERROR(driver_or.status());
-    return std::move(driver_or.value());
+    IREE_RETURN_IF_ERROR(status);
+    return assign_ref(reinterpret_cast<iree::hal::Driver*>(driver));
   }
 };
 

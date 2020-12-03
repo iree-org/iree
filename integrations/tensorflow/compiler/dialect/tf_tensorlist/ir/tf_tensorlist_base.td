@@ -17,7 +17,7 @@
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
-def TfTensorList_Dialect : Dialect {
+def TFTensorList_Dialect : Dialect {
   let name = "tf_tensorlist";
 
   let summary = "Dialect used to represent TensorFlow TensorList's in MLIR.";
@@ -31,10 +31,10 @@ def TfTensorList_Dialect : Dialect {
     This allows representing the TensorList construct with greater fidelity.
   }];
 
-  let cppNamespace = "::mlir::tf_tensorlist";
+  let cppNamespace = "::mlir::iree_compiler::tf_tensorlist";
 }
 
-def TfTensorList_TensorList :
-    Type<CPred<"$_self.isa<mlir::tf_tensorlist::TensorListType>()">, "list">;
+def TFTensorList_TensorList :
+    Type<CPred<"$_self.isa<mlir::iree_compiler::tf_tensorlist::TensorListType>()">, "list">;
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TF_TENSORLIST_IR_TF_TENSORLIST_BASE_TD

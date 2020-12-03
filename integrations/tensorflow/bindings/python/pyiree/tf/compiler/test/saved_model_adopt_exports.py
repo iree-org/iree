@@ -23,7 +23,7 @@ import tensorflow.compat.v2 as tf
 SAVED_MODEL_IMPORT_PASSES = [
     "tf-executor-graph-pruning",
     "tf-standard-pipeline",
-    "iree-xla-legalize-tf",
+    "iree-tf-convert-to-mhlo",
     "iree-tf-import-pipeline",
     "canonicalize",
 ]

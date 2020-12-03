@@ -26,6 +26,7 @@ cc_library(
         "WindowsLinkerTool.cpp",
     ],
     deps = [
+        "//iree/base:core_headers",
         "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LinkerTool_hdrs",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",

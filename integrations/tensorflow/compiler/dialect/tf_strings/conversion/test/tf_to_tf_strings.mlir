@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt --convert-tensorflow-to-tf-strings %s --split-input-file | IreeFileCheck %s
+// RUN: iree-tf-opt --iree-tf-convert-to-tf-strings %s --split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: func @as_string.tensor.f32
 func @as_string.tensor.f32(%arg0: tensor<5xf32>) -> tensor<5x!tf.string> {

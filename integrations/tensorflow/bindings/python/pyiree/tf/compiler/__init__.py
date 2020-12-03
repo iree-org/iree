@@ -66,7 +66,7 @@ TF_IMPORT_PASS_PIPELINE = (
     "inline",
     "canonicalize",
     "tf-device-decompose-resource-ops",
-    "iree-propagate-resource-casts",
+    "iree-tf-propagate-resource-casts",
     "tf-shape-inference",
 
     # Lower to CFG.
@@ -80,8 +80,8 @@ TF_IMPORT_PASS_PIPELINE = (
     "symbol-dce",
     "canonicalize",
 
-    # Legalize to XLA
-    "iree-xla-legalize-tf",
+    # Convert TF to MHLO, the expected input to the next stage of lowering.
+    "iree-tf-convert-to-mhlo",
     "canonicalize",
 
     # Now that the IR is starting to look nice, optimize global tensors.

@@ -35,7 +35,6 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
-#include "iree/hal/driver_registry.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
@@ -1871,75 +1870,6 @@ iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
   auto* handle = reinterpret_cast<Driver*>(driver);
   IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// iree::hal::DriverRegistry
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT bool IREE_API_CALL
-iree_hal_driver_registry_has_driver(iree_string_view_t driver_name) {
-  return DriverRegistry::shared_registry()->HasDriver(
-      absl::string_view{driver_name.data, driver_name.size});
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_query_available_drivers(
-    iree_allocator_t allocator, iree_string_view_t** out_driver_names,
-    iree_host_size_t* out_driver_count) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_registry_query_available_drivers");
-  IREE_ASSERT_ARGUMENT(out_driver_names);
-  IREE_ASSERT_ARGUMENT(out_driver_count);
-  *out_driver_count = 0;
-
-  auto* registry = DriverRegistry::shared_registry();
-  auto available_drivers = registry->EnumerateAvailableDrivers();
-  size_t total_string_size = 0;
-  for (const auto& driver_name : available_drivers) {
-    total_string_size += driver_name.size();
-  }
-
-  *out_driver_count = available_drivers.size();
-  *out_driver_names = NULL;
-  if (available_drivers.empty()) {
-    return iree_ok_status();
-  }
-
-  iree_string_view_t* driver_name_storage = nullptr;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator,
-      available_drivers.size() * sizeof(*driver_name_storage) +
-          total_string_size,
-      (void**)&driver_name_storage));
-
-  char* p = reinterpret_cast<char*>(driver_name_storage) +
-            available_drivers.size() * sizeof(*driver_name_storage);
-  for (int i = 0; i < available_drivers.size(); ++i) {
-    const auto& driver_name = available_drivers[i];
-    size_t name_size = driver_name.size();
-    std::memcpy(p, driver_name.c_str(), name_size);
-    driver_name_storage[i] = iree_string_view_t{p, name_size};
-    p += name_size;
-  }
-
-  *out_driver_names = driver_name_storage;
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
-                                       iree_allocator_t allocator,
-                                       iree_hal_driver_t** out_driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_registry_create_driver");
-  IREE_ASSERT_ARGUMENT(out_driver);
-  *out_driver = nullptr;
-
-  auto* registry = DriverRegistry::shared_registry();
-  IREE_ASSIGN_OR_RETURN(auto driver, registry->Create(absl::string_view(
-                                         driver_name.data, driver_name.size)));
-
-  *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
   return iree_ok_status();
 }
 

@@ -4,13 +4,13 @@
 // RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=llvm-ir %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 
-module attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 443 : i32}} {
+module {
   flow.variable @"__iree_flow___sm_node17__model.layer-1.kernel" dense<1.000000e+00> : tensor<784x128xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node18__model.layer-1.bias" dense<5.000000e-01> : tensor<128xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node24__model.layer-2.kernel" dense<0.333333343> : tensor<128x10xf32> attributes {noinline, sym_visibility = "private"}
   flow.variable @"__iree_flow___sm_node25__model.layer-2.bias" dense<2.500000e-01> : tensor<10xf32> attributes {noinline, sym_visibility = "private"}
   // CHECK-LABEL: EXEC @predict
-  func @predict(%arg0: tensor<1x28x28x1xf32> {tf._user_specified_name = "x"}) -> tensor<1x10xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}, tf._input_shapes = [#tf.shape<1x28x28x1>, #tf.shape<*>, #tf.shape<*>, #tf.shape<*>, #tf.shape<*>], tf.signature.is_stateful} {
+  func @predict(%arg0: tensor<1x28x28x1xf32>) -> tensor<1x10xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}} {
     %0 = flow.variable.address @"__iree_flow___sm_node17__model.layer-1.kernel" : !iree.ptr<tensor<784x128xf32>>
     %1 = flow.variable.address @"__iree_flow___sm_node18__model.layer-1.bias" : !iree.ptr<tensor<128xf32>>
     %2 = flow.variable.address @"__iree_flow___sm_node24__model.layer-2.kernel" : !iree.ptr<tensor<128x10xf32>>

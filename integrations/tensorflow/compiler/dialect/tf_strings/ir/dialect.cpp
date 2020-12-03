@@ -30,7 +30,7 @@ namespace tf_strings {
 
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<TFStringsDialect>()) {
-  addInterfaces<TfStringsToHALConversionInterface>();
+  addInterfaces<TFStringsToHALConversionInterface>();
   addTypes<StringType>();
 
 #define GET_OP_LIST

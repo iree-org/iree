@@ -30,13 +30,14 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace TF {
 
 using ::iree::SipSignatureMangler;
 
-namespace {
-
-LogicalResult setRawSignatureIndex(FuncOp funcOp, SipSignatureMangler &mangler,
-                                   int rawIndex, ArrayAttr indexPathAttr) {
+static LogicalResult setRawSignatureIndex(FuncOp funcOp,
+                                          SipSignatureMangler &mangler,
+                                          int rawIndex,
+                                          ArrayAttr indexPathAttr) {
   llvm::SmallVector<SipSignatureMangler::Key, 8> indexKeys;
   for (auto &indexAttr : indexPathAttr) {
     if (auto stringAttr = indexAttr.dyn_cast<StringAttr>()) {
@@ -59,12 +60,14 @@ LogicalResult setRawSignatureIndex(FuncOp funcOp, SipSignatureMangler &mangler,
   return success();
 }
 
-}  // namespace
-
-class TFSavedModelLowerExportedFunctions
-    : public PassWrapper<TFSavedModelLowerExportedFunctions,
-                         OperationPass<ModuleOp>> {
+class LowerExportedFunctionsPass
+    : public PassWrapper<LowerExportedFunctionsPass, OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect,
+                    mlir::tf_saved_model::TensorFlowSavedModelDialect>();
+  }
+
   void runOnOperation() override {
     if (failed(run())) {
       signalPassFailure();
@@ -73,14 +76,11 @@ class TFSavedModelLowerExportedFunctions
 
   LogicalResult run() {
     mlir::Builder builder(getOperation());
-    Identifier savedModelIndexPathIdent =
+    const Identifier savedModelIndexPathIdent =
         builder.getIdentifier("tf_saved_model.index_path");
-    Identifier ireeReflectionIdent = builder.getIdentifier("iree.reflection");
-    Identifier ireeModuleExportIdent =
-        builder.getIdentifier("iree.module.export");
-    Identifier sipIdent = builder.getIdentifier("sip");
-    Identifier abiIdent = builder.getIdentifier("abi");
-    Identifier abiVersionIdent = builder.getIdentifier("abiv");
+    const Identifier sipIdent = builder.getIdentifier("sip");
+    const Identifier abiIdent = builder.getIdentifier("abi");
+    const Identifier abiVersionIdent = builder.getIdentifier("abiv");
 
     // Handle saved model exported functions.
     for (auto func : getOperation().getOps<FuncOp>()) {
@@ -106,7 +106,7 @@ class TFSavedModelLowerExportedFunctions
           builder.getNamedAttr(abiVersionIdent, builder.getI32IntegerAttr(1)));
 
       // Tag it as an IREE exported function.
-      func.setAttr(ireeModuleExportIdent, builder.getUnitAttr());
+      func.setAttr("iree.module.export", builder.getUnitAttr());
 
       // Process per-argument attrs and generate reflection metadata.
       for (int i = 0, e = func.getNumArguments(); i < e; i++) {
@@ -150,7 +150,7 @@ class TFSavedModelLowerExportedFunctions
           sipIdent, builder.getStringAttr(functionSignature->encoded())));
 
       if (!funcReflectAttrs.empty()) {
-        func.setAttr(ireeReflectionIdent,
+        func.setAttr("iree.reflection",
                      builder.getDictionaryAttr(funcReflectAttrs));
       }
 
@@ -164,14 +164,14 @@ class TFSavedModelLowerExportedFunctions
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createTFSavedModelLowerExportedFunctions() {
-  return std::make_unique<TFSavedModelLowerExportedFunctions>();
+std::unique_ptr<OperationPass<ModuleOp>> createLowerExportedFunctionsPass() {
+  return std::make_unique<LowerExportedFunctionsPass>();
 }
 
-static PassRegistration<TFSavedModelLowerExportedFunctions> pass(
+static PassRegistration<LowerExportedFunctionsPass> pass(
     "iree-tf-saved-model-lower-exported-functions",
-    "Lower tf_saved_model exported functions.");
+    "Lower tf_saved_model exported functions to ones with IREE SIP metadata");
 
+}  // namespace TF
 }  // namespace iree_compiler
 }  // namespace mlir

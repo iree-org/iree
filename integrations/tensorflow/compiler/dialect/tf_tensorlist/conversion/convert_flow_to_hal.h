@@ -34,10 +34,10 @@ void populateTensorListToHALPatterns(MLIRContext *context,
 // Exposes conversion patterns that transition tensors to buffers during the
 // Flow->HAL dialect lowering. This is only required if the dialect has ops that
 // use tensor types.
-class TfTensorListToHALConversionInterface
+class TFTensorListToHALConversionInterface
     : public HALConversionDialectInterface {
  public:
-  TfTensorListToHALConversionInterface(Dialect *dialect)
+  TFTensorListToHALConversionInterface(Dialect *dialect)
       : HALConversionDialectInterface(dialect) {
     dialect->getContext()->loadDialect<IREE::TensorList::TensorListDialect>();
   }

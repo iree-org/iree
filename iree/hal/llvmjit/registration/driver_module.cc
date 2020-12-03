@@ -14,28 +14,48 @@
 
 #include "iree/hal/llvmjit/registration/driver_module.h"
 
-#include "iree/base/flags.h"
-#include "iree/base/status.h"
-#include "iree/hal/driver_registry.h"
+#include <inttypes.h>
+
 #include "iree/hal/llvmjit/llvmjit_driver.h"
 #include "llvm/Support/TargetSelect.h"
 
-namespace iree {
-namespace hal {
-namespace llvmjit {
+#define IREE_HAL_LLVMJIT_DRIVER_ID 0x4C4C564Du  // LLVM
 
-static StatusOr<ref_ptr<Driver>> CreateLLVMJITDriver() {
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  return make_ref<LLVMJITDriver>();
+static iree_status_t iree_hal_llvmjit_driver_factory_enumerate(
+    void* self, const iree_hal_driver_info_t** out_driver_infos,
+    iree_host_size_t* out_driver_info_count) {
+  static const iree_hal_driver_info_t driver_infos[1] = {{
+      /*driver_id=*/IREE_HAL_LLVMJIT_DRIVER_ID,
+      /*driver_name=*/iree_make_cstring_view("llvm"),
+      /*full_name=*/iree_make_cstring_view("LLVM Bitcode JIT (deprecated)"),
+  }};
+  *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
+  *out_driver_infos = driver_infos;
+  return iree_ok_status();
 }
 
-}  // namespace llvmjit
-}  // namespace hal
-}  // namespace iree
+static iree_status_t iree_hal_llvmjit_driver_factory_try_create(
+    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    iree_hal_driver_t** out_driver) {
+  if (driver_id != IREE_HAL_LLVMJIT_DRIVER_ID) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "no driver with ID %016" PRIu64
+                            " is provided by this factory",
+                            driver_id);
+  }
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  auto* driver = new iree::hal::llvmjit::LLVMJITDriver();
+  *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver);
+  return iree_ok_status();
+}
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_llvmjit_driver_module_register() {
-  return ::iree::hal::DriverRegistry::shared_registry()->Register(
-      "llvm", ::iree::hal::llvmjit::CreateLLVMJITDriver);
+iree_hal_llvmjit_driver_module_register(iree_hal_driver_registry_t* registry) {
+  static const iree_hal_driver_factory_t factory = {
+      /*self=*/NULL,
+      iree_hal_llvmjit_driver_factory_enumerate,
+      iree_hal_llvmjit_driver_factory_try_create,
+  };
+  return iree_hal_driver_registry_register_factory(registry, &factory);
 }
