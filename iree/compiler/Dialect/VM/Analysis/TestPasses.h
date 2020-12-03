@@ -18,7 +18,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

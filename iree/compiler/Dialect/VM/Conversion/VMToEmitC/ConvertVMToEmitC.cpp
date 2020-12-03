@@ -16,8 +16,8 @@
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

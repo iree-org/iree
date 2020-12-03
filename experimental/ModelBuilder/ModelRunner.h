@@ -53,7 +53,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace llvm {
 class TargetMachine;

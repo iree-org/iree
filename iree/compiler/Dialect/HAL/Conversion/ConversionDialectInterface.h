@@ -15,8 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectInterface.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

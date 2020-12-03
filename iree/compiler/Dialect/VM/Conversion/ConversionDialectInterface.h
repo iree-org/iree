@@ -17,8 +17,8 @@
 
 #include <mutex>
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectInterface.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
