@@ -62,6 +62,9 @@ DOC_TITLE_DICT = {
     'objectives.md': 'Short-term Objectives',
     'tensorflow_integrations.md': 'TensorFlow Integrations',
     'e2e_benchmarking.md': 'Benchmarking TensorFlow with IREE and TFLite',
+    'profiling_cpu_events.md': 'CPU events',
+    'profiling_with_tracy.md': 'Tracy',
+    'profiling_vulkan_gpu.md': 'Vulkan GPU',
 }
 
 # A dictionary containing source file to permanent link mappings.
