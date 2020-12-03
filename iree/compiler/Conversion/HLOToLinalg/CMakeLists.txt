@@ -16,17 +16,40 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    HLOToLinalgOnTensors
+  HDRS
+    "HLOToLinalgOnTensorPasses.h"
+  SRCS
+    "FusionOfTensorOps.cpp"
+    "HLOToLinalgOnTensors.cpp"
+  DEPS
+    MLIRAffine
+    MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    tensorflow::mlir_hlo
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     HLOToLinalg
   HDRS
     "Passes.h"
   SRCS
-    "FusionOfTensorOps.cpp"
     "HLOToLinalgOnBuffers.cpp"
-    "HLOToLinalgOnTensors.cpp"
     "Passes.cpp"
     "ResolveShapeOps.cpp"
   DEPS
+    ::HLOToLinalgOnTensors
     LLVMSupport
+    MLIRAffine
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms

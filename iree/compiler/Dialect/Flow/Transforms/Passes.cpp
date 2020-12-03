@@ -16,12 +16,20 @@
 
 #include <memory>
 
+#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+
+static llvm::cl::opt<bool> clEnableLinalgOnTensors(
+    "iree-enable-linalg-on-tensors",
+    llvm::cl::desc(
+        "Enable use of Linalg on tensors for dispatch region creation"),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -149,6 +157,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
+
+  if (clEnableLinalgOnTensors) {
+    addHLOToLinalgOnTensorsPasses(passManager);
+  }
 
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only
