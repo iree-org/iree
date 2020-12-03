@@ -52,48 +52,9 @@ OutputFormat = binding.OutputFormat
 # Pass pipeline that should run to lower a TF saved_model to a form suitable
 # for input to the IREE compiler.
 TF_IMPORT_PASS_PIPELINE = (
-    # Clean up tf_executor and extraneous unused functions.
-    "symbol-dce",
-    "tf-executor-graph-pruning",
-    "tf-guarantee-all-funcs-one-use",
-    "tf-standard-pipeline",
-    "tf-device-index-selector",
-
-    # Try to get the IR in good condition.
-    # In particular, because IREE doesn't handle dynamic shapes, we need to
-    # guarantee here that all dynamic shapes are gone.
-    # TODO(silvasean): Add a verifier pass that enforces that.
-    "inline",
-    "canonicalize",
-    "tf-device-decompose-resource-ops",
-    "iree-tf-propagate-resource-casts",
-    "tf-shape-inference",
-
-    # Lower to CFG.
-    # After this point, most TF optimizations won't work properly besides
-    # simple canonicalizations.
-    "tf-functional-control-flow-to-cfg",
-    # Inline, as tf-functional-control-flow-to-cfg leaves in calls.
-    "inline",
-
-    # Some further cleanups now that control flow is in better shape.
-    "symbol-dce",
-    "canonicalize",
-
-    # Convert TF to MHLO, the expected input to the next stage of lowering.
-    "iree-tf-convert-to-mhlo",
-    "canonicalize",
-
-    # Now that the IR is starting to look nice, optimize global tensors.
-    "tf-saved-model-optimize-global-tensors",
-
     # IREE-specific passes to prepare TF code for IREE compilation.
     # In particular, this eliminates tf_saved_model.
     "iree-tf-import-pipeline",
-
-    # Temporary: Does some special case fixups of HLO ops with dynamic
-    # shapes until these can be done properly upstream.
-    "iree-shape-convert-hlo",
 )
 
 

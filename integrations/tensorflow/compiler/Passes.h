@@ -62,6 +62,9 @@ std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass();
 // Validates whether any Tensorflow operations remain.
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
 
+// Creates an IREE-specific variant of the upstream XLA LegalizeTF pass.
+std::unique_ptr<OperationPass<FuncOp>> createIREEXLALegalizeTF();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
