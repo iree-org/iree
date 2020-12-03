@@ -20,10 +20,12 @@
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-dispatch"
 
@@ -265,6 +267,18 @@ static LogicalResult moveDispatchOp(DispatchRegionOp dispatchRegionOp,
   Optional<Operation *> lastOperandDef = llvm::None;
   for (Value operand : inlinedOp->getOperands()) {
     if (Operation *definingOp = operand.getDefiningOp()) {
+      if (!lastOperandDef ||
+          lastOperandDef.getValue()->isBeforeInBlock(definingOp)) {
+        lastOperandDef = definingOp;
+      }
+    }
+  }
+  // Check for values that are used in the region of the op but captured from
+  // outside the region.
+  llvm::SetVector<Value> capturedValues;
+  getUsedValuesDefinedAbove(inlinedOp->getRegions(), capturedValues);
+  for (Value capturedValue : capturedValues) {
+    if (Operation *definingOp = capturedValue.getDefiningOp()) {
       if (!lastOperandDef ||
           lastOperandDef.getValue()->isBeforeInBlock(definingOp)) {
         lastOperandDef = definingOp;
