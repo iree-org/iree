@@ -218,7 +218,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
 
       auto memrefType = bufferOp.getType().dyn_cast_or_null<MemRefType>();
       inputMemRefTypes.push_back(memrefType);
-      auto elementType = typeConverter.convertType(memrefType.getElementType())
+      auto elementType = typeConverter->convertType(memrefType.getElementType())
                              .dyn_cast<LLVM::LLVMType>();
       if (!elementType) return failure();
       inputStructPtrs.push_back(
@@ -285,11 +285,11 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
           rewriter.getI64ArrayAttr(index));
       if (memrefType.hasStaticShape()) {
         auto desc = MemRefDescriptor::fromStaticShape(
-            builder, loc, typeConverter, memrefType, bufferPtr);
+            builder, loc, *getTypeConverter(), memrefType, bufferPtr);
         rewriter.replaceOp(bufferOp, {desc});
       } else {
         auto desc = MemRefDescriptor::undef(
-            builder, loc, typeConverter.convertType(memrefType));
+            builder, loc, typeConverter->convertType(memrefType));
         desc.setAllocatedPtr(builder, loc, bufferPtr);
         desc.setAlignedPtr(builder, loc, bufferPtr);
         rewriter.replaceOp(bufferOp, {desc});
@@ -306,7 +306,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                                    ArrayRef<Value>({offset}));
       Value dimConstant = builder.create<LLVM::LoadOp>(loc, constPtr);
       Value dimConstantCasted = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(loadOp.getType()), dimConstant);
+          loc, typeConverter->convertType(loadOp.getType()), dimConstant);
       rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
@@ -326,7 +326,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
             "Unable to map to workgroup coordinate : " + attr.getValue().str());
       }
       Value threadXIndex = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(workgroupCoordOp.getType()),
+          loc, typeConverter->convertType(workgroupCoordOp.getType()),
           newFuncOp.getArgument(argIndex));
       rewriter.replaceOp(workgroupCoordOp, threadXIndex);
     }
