@@ -27,23 +27,12 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Creates a pass to fuse operations on tensors.
-std::unique_ptr<Pass> createFusionOfTensorOpsPass();
-
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
-
-/// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
 
 /// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
 /// them back to the original HAL interface bindings.
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
-
-/// Populates the patterns that convert from XLA to Linalg on tensors. Imports
-/// patterns from XLA, as well as some IREE specific modifications.
-void populateHLOToLinalgOnTensorsConversionPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates the patterns that convert from XLA to Linalg on buffers. Currently
 /// only implements conversions when the XLA op is the only op XLA op in the

@@ -44,6 +44,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRLinalg
     MLIRPass
     MLIRShape
     MLIRShapeOpsTransforms
@@ -52,6 +53,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle
+    iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
