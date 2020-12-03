@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -83,6 +84,13 @@ LogicalResult convertOperation(Operation *oldOp,
                                FlowTypeConverter &typeConverter,
                                BlockAndValueMapping &mapping,
                                OpBuilder &builder) {
+  if (llvm::isa<mlir::linalg::LinalgOp>(oldOp)) {
+    // Currently assumes linalg ops have legal types.
+    // TODO: rewrite to generic and back.
+    builder.clone(*oldOp, mapping);
+    return success();
+  }
+
   OperationState state(oldOp->getLoc(), oldOp->getName());
   for (auto oldType : oldOp->getResultTypes()) {
     if (failed(typeConverter.convertType(oldType, state.types))) {
