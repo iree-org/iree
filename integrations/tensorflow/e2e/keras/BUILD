@@ -91,20 +91,15 @@ iree_e2e_cartesian_product_test_suite(
     srcs = ["keyword_spotting_streaming_test.py"],
     failing_configurations = [
         {
-            # Failing on IREE:
+            # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
             "model": [
-                "att_mh_rnn",  # b/147824465
-                "att_rnn",  # b/147824465
-                "crnn",  # b/162067867
-                "ds_tc_resnet",
-                "gru",  # b/162067867
-                "lstm",  # b/162067867
+                "att_mh_rnn",
+                "att_rnn",
+                "crnn",
+                "gru",
+                "lstm",
             ],
-            "target_backends": [
-                "iree_vmla",
-                "iree_llvmjit",
-                "iree_vulkan",
-            ],
+            "target_backends": "iree_vmla",
         },
     ],
     flags_to_values = {
@@ -138,15 +133,6 @@ iree_e2e_cartesian_product_test_suite(
         {
             # These models do not currently support streaming.
             "model": NON_STREAMING_KEYWORD_SPOTTING_MODELS,
-        },
-        {
-            # Failing on IREE:
-            "model": "ds_tc_resnet",
-            "target_backends": [
-                "iree_vmla",
-                "iree_llvmjit",
-                "iree_vulkan",
-            ],
         },
     ],
     flags_to_values = {
