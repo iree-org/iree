@@ -65,6 +65,7 @@ inline void registerLinalgToLLVMPasses() {
     // LinalgToLLVM
     createConvImg2ColMatmulConversionPass();
     createLinalgTileAndDistributePass();
+    createLinalgTileAndDistributeOnTensorsPass();
     createLinalgTileAndVectorizeWorkgroupsPass();
     return true;
   }();
