@@ -20,9 +20,9 @@
 
 #include "bindings/python/pyiree/common/binding.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 
 namespace iree {
 namespace python {

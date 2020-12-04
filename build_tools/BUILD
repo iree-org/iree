@@ -24,6 +24,10 @@ cc_library(
     name = "default_linkopts",
     linkopts = select({
         "//iree:iree_is_msvc": [],
+        "//iree:iree_is_android": [
+            "-ldl",
+            # Android provides its own pthreads support with no linking required.
+        ],
         "//conditions:default": [
             # Just include libraries that should be presumed in 2020.
             "-ldl",

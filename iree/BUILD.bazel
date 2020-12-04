@@ -44,3 +44,11 @@ config_setting(
         "iree_is_msvc": "true",
     },
 )
+
+# Same as above. Should be a query on @bazel_tools but this is simpler for now.
+config_setting(
+    name = "iree_is_android",
+    define_values = {
+        "iree_is_android": "true",
+    },
+)

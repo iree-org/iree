@@ -15,8 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_ANALYSIS_DISPATCHABILITY_H_
 #define IREE_COMPILER_DIALECT_FLOW_ANALYSIS_DISPATCHABILITY_H_
 
-#include "mlir/IR/Function.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
