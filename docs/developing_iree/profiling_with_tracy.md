@@ -146,11 +146,10 @@ TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
 ## Running the Tracy profiler UI, connecting and visualizing
 
 While the profile program is still running (possibly thanks to
-`TRACY_NO_EXIT=1`), start the Tracy profiler UI. If above you had checked out
-Tracy and built it in `$HOME/tracy`, then you would run:
-
+`TRACY_NO_EXIT=1`), start the Tracy profiler UI which we had built above.
+From the IREE root directory:
 ```shell
-$HOME/tracy/profiler/build/unix/Tracy-release
+./third_party/tracy/profiler/build/unix/Tracy-release
 ```
 
 It should show a dialog offering to connect to a client i.e. a profiled program.
