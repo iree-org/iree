@@ -33,6 +33,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
