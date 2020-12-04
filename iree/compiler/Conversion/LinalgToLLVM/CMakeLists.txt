@@ -24,6 +24,7 @@ iree_cc_library(
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
+    "LinalgRewriteDestructiveUpdatesPass.cpp"
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "Passes.cpp"
@@ -37,11 +38,13 @@ iree_cc_library(
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRPass
+    MLIRSCF
     MLIRSCFToStandard
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRStandardToSPIRVTransforms
+    MLIRSupport
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM
