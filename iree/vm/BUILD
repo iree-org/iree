@@ -182,6 +182,7 @@ cc_library(
     ],
     hdrs = [
         "bytecode_module.h",
+        "bytecode_op_table.h",
     ],
     deps = [
         ":vm",
@@ -193,8 +194,7 @@ cc_library(
     ],
 )
 
-# TODO(#357): Commented out for now, but a script should be added to update
-# https://github.com/google/iree/blob/main/bindings/java/com/google/iree/native/bytecode_op_table.h
+# TODO(#357): Add a script to update bytecode_op_table.h.
 # gentbl(
 #     name = "bytecode_op_table_gen",
 #     tbl_outs = [

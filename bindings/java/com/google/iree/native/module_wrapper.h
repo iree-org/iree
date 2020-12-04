@@ -15,7 +15,6 @@
 #ifndef IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_MODULE_WRAPPER_H_
 #define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_MODULE_WRAPPER_H_
 
-#include "bindings/java/com/google/iree/native/bytecode_op_table.h"
 #include "iree/base/status.h"
 #include "iree/vm/bytecode_module.h"
 
