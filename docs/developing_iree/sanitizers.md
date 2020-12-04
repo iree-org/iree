@@ -1,4 +1,4 @@
-# Using Address/Memory/Thread sanitizers
+# Using Address/Memory/Thread Sanitizers
 
 [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html),
 [MemorySanitizer](https://clang.llvm.org/docs/MemorySanitizer.html) and
@@ -8,7 +8,7 @@ consist of compiler instrumentation (so your program's executable code is
 modified) and runtime libraries (so e.g. the `malloc` function may get
 replaced).
 
-They are routinely abbreviated "ASan", "MSan" and "TSan" respectively.
+They are abbreviated as "ASan", "MSan" and "TSan" respectively.
 
 They all incur large overhead, so only enable them while debugging.
 
