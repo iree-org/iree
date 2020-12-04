@@ -45,7 +45,7 @@ or
 -DIREE_ENABLE_TSAN=ON
 ```
 
-These symbolizers will be most helpful on builds with debug info, so consider
+These sanitizers will be most helpful on builds with debug info, so consider
 using
 
 ```
