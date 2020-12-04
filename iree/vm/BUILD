@@ -185,7 +185,6 @@ cc_library(
         "bytecode_module.h",
     ],
     deps = [
-        ":bytecode_op_table_gen",
         ":vm",
         "//iree/base:api",
         "//iree/base:core_headers",
@@ -195,24 +194,25 @@ cc_library(
     ],
 )
 
-# TODO(benvanik): see if we can remove this; not good to have this dep.
-gentbl(
-    name = "bytecode_op_table_gen",
-    tbl_outs = [
-        ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
-    ],
-    tblgen = "//iree/tools:iree-tblgen",
-    td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
-    td_srcs = [
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "//iree/compiler/Dialect/VM/IR:td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
-        "@llvm-project//mlir:SideEffectTdFiles",
-    ],
-)
+# TODO(#357): Commented out for now, but a script should be added to update
+# https://github.com/google/iree/blob/main/bindings/java/com/google/iree/native/bytecode_op_table.h
+# gentbl(
+#     name = "bytecode_op_table_gen",
+#     tbl_outs = [
+#         ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
+#     ],
+#     tblgen = "//third_party/iree/iree/tools:iree-tblgen",
+#     td_file = "//third_party/iree/iree/compiler/Dialect/VM/IR:VMOps.td",
+#     td_srcs = [
+#         "//third_party/iree/iree/compiler/Dialect/IREE/IR:td_files",
+#         "//third_party/iree/iree/compiler/Dialect/VM/IR:td_files",
+#         "//third_party/llvm/llvm-project/mlir:OpBaseTdFiles",
+#         "//third_party/llvm/llvm-project/mlir:include/mlir/IR/SymbolInterfaces.td",
+#         "//third_party/llvm/llvm-project/mlir:include/mlir/Interfaces/CallInterfaces.td",
+#         "//third_party/llvm/llvm-project/mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+#         "//third_party/llvm/llvm-project/mlir:SideEffectTdFiles",
+#     ],
+# )
 
 cc_test(
     name = "bytecode_module_test",

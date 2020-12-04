@@ -21,6 +21,7 @@ iree_cc_library(
     "instance_wrapper.cc"
     "module_wrapper.cc"
   HDRS
+    "bytecode_op_table.h"
     "context_wrapper.h"
     "function_wrapper.h"
     "instance_wrapper.h"
