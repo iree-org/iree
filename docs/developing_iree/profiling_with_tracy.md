@@ -28,7 +28,7 @@ give some more detailed instructions for some systems.
 The IREE repository contains its own clone of the Tracy repository in
 `third_party/tracy`, so there is no need to make a separate clone of it. You can
 use one if you want, but be aware that the Tracy client/server protocol gets
-updated sometimes (it's at version 43 now!). Building both sides from the same
+updated sometimes. Building both sides from the same
 `iree/third_party/tracy` lowers the risk of running into a protocol version
 mismatch.
 
