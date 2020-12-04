@@ -14,7 +14,7 @@
 
 # Transforms specific to the IREE Strings module.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
