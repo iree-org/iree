@@ -161,6 +161,7 @@ iree_cc_library(
     bytecode_module
   HDRS
     "bytecode_module.h"
+    "bytecode_op_table.h"
   SRCS
     "bytecode_dispatch.c"
     "bytecode_dispatch_util.h"
@@ -175,17 +176,6 @@ iree_cc_library(
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    bytecode_op_table_gen
-  TD_FILE
-    "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/IR/VMOps.td"
-  OUTS
-    -gen-iree-vm-op-table-defs bytecode_op_table.h
-  TBLGEN
-    IREE
 )
 
 iree_cc_test(

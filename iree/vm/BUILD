@@ -203,13 +203,13 @@ cc_library(
 #     tblgen = "//third_party/iree/iree/tools:iree-tblgen",
 #     td_file = "//third_party/iree/iree/compiler/Dialect/VM/IR:VMOps.td",
 #     td_srcs = [
-#         "//third_party/iree/iree/compiler/Dialect/IREE/IR:td_files",
-#         "//third_party/iree/iree/compiler/Dialect/VM/IR:td_files",
-#         "//third_party/llvm/llvm-project/mlir:OpBaseTdFiles",
-#         "//third_party/llvm/llvm-project/mlir:include/mlir/IR/SymbolInterfaces.td",
-#         "//third_party/llvm/llvm-project/mlir:include/mlir/Interfaces/CallInterfaces.td",
-#         "//third_party/llvm/llvm-project/mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
-#         "//third_party/llvm/llvm-project/mlir:SideEffectTdFiles",
+#         "//iree/compiler/Dialect/IREE/IR:td_files",
+#         "//iree/compiler/Dialect/VM/IR:td_files",
+#         "@llvm-project//mlir:OpBaseTdFiles",
+#         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
+#         "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
+#         "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+#         "@llvm-project//mlir:SideEffectTdFiles",
 #     ],
 # )
 
