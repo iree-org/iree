@@ -200,8 +200,8 @@ cc_library(
 #     tbl_outs = [
 #         ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
 #     ],
-#     tblgen = "//third_party/iree/iree/tools:iree-tblgen",
-#     td_file = "//third_party/iree/iree/compiler/Dialect/VM/IR:VMOps.td",
+#     tblgen = "//iree/tools:iree-tblgen",
+#     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
 #     td_srcs = [
 #         "//iree/compiler/Dialect/IREE/IR:td_files",
 #         "//iree/compiler/Dialect/VM/IR:td_files",
