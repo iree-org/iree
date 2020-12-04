@@ -157,5 +157,6 @@ module attributes {
 //          CHECK:   spv.mlir.merge
 //  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
 //      CHECK-NOT:   spv.Load "StorageBuffer"
+//      CHECK-NOT:   spv.Store "StorageBuffer"
 //  CHECK-COUNT-8:   spv.FAdd %{{.*}}, %{{.*}} : vector<4xf32>
 //  CHECK-COUNT-8:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>

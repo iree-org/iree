@@ -20,6 +20,39 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Return true if all the uses of op are either Store/transfer_write.
+// There can be SubviewOp users as long as all its users are also
+// StoreOp/transfer_write. If return true it also fills out the uses, if it
+// returns false uses is unchanged.
+static bool allUsesAreStores(Operation* op, std::vector<Operation*>& uses) {
+  std::vector<Operation*> opUses;
+  for (OpOperand& use : op->getUses()) {
+    Operation* useOp = use.getOwner();
+    if (isa<vector::TransferWriteOp, StoreOp>(useOp) ||
+        (isa<SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
+      opUses.push_back(useOp);
+      continue;
+    }
+    return false;
+  }
+  uses.insert(uses.end(), opUses.begin(), opUses.end());
+  return true;
+}
+
+// Track temporary allocations that are never read from. If this is the case
+// it means both the allocations and associated stores can be removed.
+static void eraseDeadAllocAndStores(FuncOp funcOp) {
+  std::vector<Operation*> opToErase;
+  funcOp.walk([&](AllocOp op) {
+    if (allUsesAreStores(op, opToErase)) {
+      opToErase.push_back(op.getOperation());
+    }
+  });
+  for (Operation* op : opToErase) {
+    op->erase();
+  }
+}
+
 namespace {
 
 struct VectorTransferOptimizationPass
@@ -29,39 +62,6 @@ struct VectorTransferOptimizationPass
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     eraseDeadAllocAndStores(getFunction());
-  }
-
- private:
-  // Track temporary allocations that are never read from. If this is the case
-  // it means both the allocations and associated stores can be removed.
-  void eraseDeadAllocAndStores(FuncOp funcOp) {
-    std::vector<Operation*> opToErase;
-    funcOp.walk([&](AllocOp op) {
-      if (allUsesAreStores(op, opToErase)) {
-        opToErase.push_back(op.getOperation());
-      }
-    });
-    for (Operation* op : opToErase) {
-      op->erase();
-    }
-  }
-  // Return true if all the uses of op are either Store/transfer_write.
-  // There can be SubviewOp users as long as all its users are also
-  // StoreOp/transfer_write. If return true it also fills out the uses, if it
-  // returns false uses is unchanged.
-  bool allUsesAreStores(Operation* op, std::vector<Operation*>& uses) {
-    std::vector<Operation*> opUses;
-    for (OpOperand& use : op->getUses()) {
-      Operation* useOp = use.getOwner();
-      if (isa<vector::TransferWriteOp, StoreOp>(useOp) ||
-          (isa<SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-        opUses.push_back(useOp);
-        continue;
-      }
-      return false;
-    }
-    uses.insert(uses.end(), opUses.begin(), opUses.end());
-    return true;
   }
 };
 
