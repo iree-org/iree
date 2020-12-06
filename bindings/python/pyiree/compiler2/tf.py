@@ -55,7 +55,15 @@ class ImportType(Enum):
   V1 = "savedmodel_v1"
 
   @staticmethod
-  def parse(spec) -> "ImportType":
+  def parse(spec: Union[str, "ImportType"]) -> "ImportType":
+    """Parses or returns an ImportType.
+
+    Args:
+      spec: An ImportType instance or the case-insensitive name of one of
+        the enum values.
+    Returns:
+      An ImportType instance.
+    """
     if isinstance(spec, ImportType):
       return spec
     spec = spec.upper()
@@ -126,7 +134,15 @@ def build_import_command_line(input_path: str,
 
 
 def compile_saved_model(saved_model_dir: str, **kwargs):
-  """Compiles an on-disk saved model to an IREE binary."""
+  """Compiles an on-disk saved model to an IREE binary.
+
+  Args:
+    saved_model_dir: Path to directory where the model was saved.
+    **kwargs: Keyword args corresponding to ImportOptions or CompilerOptions.
+  Returns:
+    A bytes-like object with the compiled output or None if output_file=
+    was specified.
+  """
   options = ImportOptions(**kwargs)
   import_cl = build_import_command_line(saved_model_dir, options)
   if options.import_only:
@@ -151,6 +167,7 @@ def compile_module(module, saved_model_dir: Optional[str] = None, **kwargs):
     module: The tf.Module instance to convert to MLIR
     saved_model_dir: Optional path to save the tf.Module to. The module will not
       be persisted on disk outside of this call if this is not provided.
+    **kwargs: Keyword args corresponding to ImportOptions or CompilerOptions.
   Returns:
     Same as compile_saved_model().
   """

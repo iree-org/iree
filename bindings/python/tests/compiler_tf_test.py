@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import sys
 import tempfile
@@ -53,13 +54,13 @@ class TfCompilerTest(unittest.TestCase):
   def testCompileSavedModel(self):
     binary = compile_saved_model(self.smdir,
                                  target_backends=DEFAULT_TESTING_BACKENDS)
-    print("Compiled len:", len(binary))
+    logging.info("Compiled len: %d", len(binary))
     self.assertIn(b"simple_matmul", binary)
     self.assertIn(b"simple_mul", binary)
 
   def testCompileModule(self):
     binary = compile_module(self.m, target_backends=DEFAULT_TESTING_BACKENDS)
-    print("Compiled len:", len(binary))
+    logging.info("Compiled len: %d", len(binary))
     self.assertIn(b"simple_matmul", binary)
     self.assertIn(b"simple_mul", binary)
 
@@ -79,4 +80,5 @@ class TfCompilerTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.DEBUG)
   unittest.main()

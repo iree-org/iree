@@ -131,6 +131,11 @@ def invoke_immediate(command_line: List[str],
   This is separate from invoke_pipeline as it is simpler and supports more
   complex input redirection, using recommended facilities for sub-processes
   (less magic).
+
+  Note that this differs from the usual way of using subprocess.run or
+  subprocess.Popen().communicate() because we need to pump all of the error
+  streams individually and only pump pipes not connected to a different stage.
+  Uses threads to pump everything that is required.
   """
   run_args = {}
   input_file_handle = None
@@ -179,7 +184,8 @@ def invoke_pipeline(command_lines: List[List[str]]):
     }
     process = subprocess.Popen(command_line, **popen_args)
     prev_out = process.stdout
-    stages.append(_PipelineStage(process, i == (len(command_lines) - 1)))
+    capture_output = (i == (len(command_lines) - 1))
+    stages.append(_PipelineStage(process, capture_output))
 
   # Start stages.
   for stage in stages:

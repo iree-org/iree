@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import contextlib
+import logging
 import os
 import io
 import tempfile
@@ -40,7 +41,7 @@ class CompilerTest(unittest.TestCase):
   def testCompileStr(self):
     binary = compiler.compile_str(
         SIMPLE_MUL_ASM, target_backends=compiler.DEFAULT_TESTING_BACKENDS)
-    print("Flatbuffer size =", len(binary))
+    logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
   def testCompileInputFile(self):
@@ -52,7 +53,7 @@ class CompilerTest(unittest.TestCase):
             f.name, target_backends=compiler.DEFAULT_TESTING_BACKENDS)
       finally:
         os.remove(f.name)
-    print("Flatbuffer size =", len(binary))
+    logging.info("Flatbuffer size = %d", len(binary))
     self.assertIn(b"simple_mul", binary)
 
   def testCompileOutputFile(self):
@@ -69,7 +70,7 @@ class CompilerTest(unittest.TestCase):
           binary = f_read.read()
       finally:
         os.remove(f.name)
-    print("Flatbuffer size =", len(binary))
+    logging.info("Flatbuffer size = %d", len(binary))
     self.assertIn(b"simple_mul", binary)
 
   def testOutputFbText(self):
@@ -133,4 +134,5 @@ class CompilerTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.DEBUG)
   unittest.main()

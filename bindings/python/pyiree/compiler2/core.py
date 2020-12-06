@@ -40,7 +40,15 @@ class OutputFormat(Enum):
   MLIR_TEXT = "mlir-text"
 
   @staticmethod
-  def parse(spec) -> "OutputFormat":
+  def parse(spec: Union[str, "OutputFormat"]) -> "OutputFormat":
+    """Parses or returns an OutputFormat.
+
+    Args:
+      spec: An OutputFormat instance or the case-insensitive name of one of
+        the enum values.
+    Returns:
+      An OutputFormat instance.
+    """
     if isinstance(spec, OutputFormat):
       return spec
     spec = spec.upper()
@@ -51,7 +59,32 @@ class OutputFormat(Enum):
 
 
 class CompilerOptions:
-  """Options to the compiler backend."""
+  """Options to the compiler backend.
+
+  Keyword options:
+    output_file: Optionally save the compiled binary to a file instead of
+      returning it.
+    target_backends: List of str names of target backends to compile into
+      the binary. The resulting binary will run on targets that match one
+      or more of the compiled backends.
+    output_format: Override the output format. See the OutputFormat enum.
+      Values can either be an enum value or a case-insensitive name of
+      the option. Typically used for debugging
+    extra_args: Optional list of additional arguments to pass to the compiler.
+      Example: ["--print-ir-after-all"]
+    optimize: Whether to apply some default high level optimizations (default
+      True).
+    strip_debug_ops: Whether to strip high level operations used to aid
+      debugging.
+    strip_source_map: Whether to strip source map information (used to generate
+      better errors).
+    strip_symbols: Whether to strip extra symbols not needed for execution
+      (but which may aid debugging).
+    crash_reproducer_path: File name to output an MLIR crash dump to if there
+      is a compiler failure.
+    enable_benchmark: Whether to generate instrumented binaries suitable
+      for benchmarking.
+  """
 
   def __init__(self,
                *,
@@ -96,7 +129,7 @@ def build_compile_command_line(input_file: str,
       iree_translate,
       input_file,
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
-      f"--iree-hal-target-backends={','.join(options.target_backends or [])}",
+      f"--iree-hal-target-backends={','.join(options.target_backends)}",
   ]
 
   # Output file.
@@ -126,8 +159,8 @@ def compile_file(input_file: str, **kwargs):
   """Invokes the IREE compiler on an input file.
 
   Args:
-    input_file: Path to the input file.
-    **kwargs: Keyword arguments corresponding to CompilerOptions named tuple.
+    input_file: File containing MLIR assembly to compile.
+    **kwargs: Keyword arguments corresponding to CompilerOptions.
   Returns:
     Either a byte buffer of the compiled content or None if output_file
     was specified in the options.
@@ -144,8 +177,8 @@ def compile_str(input_str: str, **kwargs):
   """Invokes the IREE compiler with an input string.
 
   Args:
-    input_file: Path to the input file.
-    **kwargs: Keyword arguments corresponding to CompilerOptions named tuple.
+    input_str: MLIR assembly to parse/compile.
+    **kwargs: Keyword arguments corresponding to CompilerOptions.
   Returns:
     Either a byte buffer of the compiled content or None if output_file
     was specified in the options.
