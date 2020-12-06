@@ -44,6 +44,8 @@ class SimpleArithmeticModule(tf.Module):
     return tf.matmul(a, b)
 
 
+# TODO(laurenzo): More test cases needed (may need additional files).
+# Specifically, figure out how to test v1 models.
 class TfCompilerTest(unittest.TestCase):
 
   def testImportSavedModel(self):
