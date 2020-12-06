@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from enum import Enum
+import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
@@ -39,10 +40,12 @@ def is_available():
   try:
     import tensorflow as tf
   except ModuleNotFoundError:
+    logging.warn("Unable to import tensorflow")
     return False
   try:
     find_tool(_TF_IMPORT_TOOL)
   except ValueError:
+    logging.warning("Unable to find IREE tool %s", _TF_IMPORT_TOOL)
     return False
   return True
 

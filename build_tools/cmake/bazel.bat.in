@@ -1,0 +1,3 @@
+@echo off
+cd /d "@_bazel_src_root@"
+@IREE_BAZEL_EXECUTABLE@ @_bazel_startup_options@ %* || exit /b

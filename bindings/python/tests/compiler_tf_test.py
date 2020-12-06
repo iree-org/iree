@@ -23,7 +23,8 @@ import unittest
 from pyiree.compiler2.tf import *
 
 if not is_available():
-  print(f"Skipping test {__file__} because TensorFlow is not installed")
+  print(f"Skipping test {__file__} because the IREE TensorFlow compiler "
+        f"is not installed")
   sys.exit(0)
 
 import tensorflow as tf

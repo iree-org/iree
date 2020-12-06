@@ -49,7 +49,7 @@ def write_python_path(bazelrc):
     user_site = subprocess.check_output(
         [sys.executable, "-m", "site", "--user-site"]).decode("utf-8").strip()
     print("Found user site directory:", user_site)
-  except OSError:
+  except subprocess.CalledProcessError:
     print("Could not resolve user site directory")
     return
   print("build --action_env PYTHONPATH=\"{}\"".format(
@@ -57,7 +57,10 @@ def write_python_path(bazelrc):
         file=bazelrc)
 
 
-local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")
+if len(sys.argv) > 1:
+  local_bazelrc = sys.argv[1]
+else:
+  local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")
 with open(local_bazelrc, "wt") as bazelrc:
   write_platform(bazelrc)
   write_python_bin(bazelrc)

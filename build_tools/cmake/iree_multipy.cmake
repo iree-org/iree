@@ -23,12 +23,20 @@ function(iree_multipy_configure)
   # Note that this is using the pybind11 configuration vars, which creates
   # a fragile dependency. It would be better to derive these locally.
   if(Python3_FOUND)
-    set(IREE_MULTIPY_DEFAULT_EXECUTABLE "${PYTHON_EXECUTABLE}" CACHE INTERNAL "Python executable" )
-    set(IREE_MULTIPY_DEFAULT_INCLUDE_DIRS "${PYTHON_INCLUDE_DIRS}" CACHE INTERNAL "Python include dirs" )
-    set(IREE_MULTIPY_DEFAULT_LIBRARIES "${PYTHON_LIBRARIES}" CACHE INTERNAL "Python libraries")
-    set(IREE_MULTIPY_DEFAULT_PREFIX "${PYTHON_MODULE_PREFIX}" CACHE INTERNAL "Python module prefix")
-    set(IREE_MULTIPY_DEFAULT_SUFFIX "${PYTHON_MODULE_SUFFIX}" CACHE INTERNAL "Python module suffix")
-    set(IREE_MULTIPY_DEFAULT_EXTENSION "${PYTHON_MODULE_EXTENSION}" CACHE INTERNAL "Python module extension")
+    set(IREE_MULTIPY_DEFAULT_EXECUTABLE "${Python3_EXECUTABLE}" CACHE INTERNAL "Python executable" )
+    set(IREE_MULTIPY_DEFAULT_INCLUDE_DIRS "${Python3_INCLUDE_DIRS}" CACHE INTERNAL "Python include dirs" )
+    set(IREE_MULTIPY_DEFAULT_LIBRARIES "${Python3_LIBRARIES}" CACHE INTERNAL "Python libraries")
+    set(IREE_MULTIPY_DEFAULT_PREFIX "${Python3_MODULE_PREFIX}" CACHE INTERNAL "Python module prefix")
+    set(IREE_MULTIPY_DEFAULT_SUFFIX "${Python3_MODULE_SUFFIX}" CACHE INTERNAL "Python module suffix")
+    # CMake 3.19 and there-abouts does define Python3_SOABI, but get it
+    # ourselves for compatibility.
+    execute_process(
+      OUTPUT_VARIABLE _FOUND_DEFAULT_EXTENSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      COMMAND
+        "${Python3_EXECUTABLE}" -c "import sysconfig;print(sysconfig.get_config_var('EXT_SUFFIX'))"
+    )
+    set(IREE_MULTIPY_DEFAULT_EXTENSION "${_FOUND_DEFAULT_EXTENSION}" CACHE INTERNAL "Python module extension")
   endif()
 
   if(IREE_MULTIPY_VERSIONS)
@@ -51,13 +59,13 @@ function(iree_multipy_configure)
 
     # Check for required settings.
     if(NOT IREE_MULTIPY_${V}_INCLUDE_DIRS)
-      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXECUTABLE var")
+      message(FATAL_ERROR " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXECUTABLE var")
     endif()
     if(NOT IREE_MULTIPY_${V}_INCLUDE_DIRS)
-      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_INCLUDE_DIRS var")
+      message(FATAL_ERROR " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_INCLUDE_DIRS var")
     endif()
     if(NOT IREE_MULTIPY_${V}_EXTENSION)
-      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXTENSION var")
+      message(FATAL_ERROR " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXTENSION var")
     endif()
   endforeach()
 endfunction()

@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_py_test(
-  NAME
-    compiler_core_test
-  SRCS
-    "compiler_core_test.py"
-)
+# Overlays a subdirectory into the main python bindings directory.
+function(_add_overlay_subdirectory dir)
+  # Overlay binary directories onto the main bindings directory.
+  set(_MAIN_PYTHON_DIR "${CMAKE_BINARY_DIR}/bindings/python")
+  add_subdirectory(${dir} "${_MAIN_PYTHON_DIR}/${dir}")
+endfunction()
 
-iree_py_test(
-  NAME
-    compiler_tf_test
-  SRCS
-    "compiler_tf_test.py"
-)
+_add_overlay_subdirectory(pyiree/tools/tf)

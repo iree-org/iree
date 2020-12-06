@@ -1,0 +1,3 @@
+#!/bin/bash
+cd "@_bazel_src_root@"
+exec '@IREE_BAZEL_EXECUTABLE@' @_bazel_startup_options@ "$@"

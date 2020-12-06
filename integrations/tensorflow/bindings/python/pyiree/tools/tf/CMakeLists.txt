@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_py_test(
+iree_py_library(
   NAME
-    compiler_core_test
+    tf
   SRCS
-    "compiler_core_test.py"
+    "__init__.py"
+  DEPS
+    integrations_iree_tensorflow_importers
 )
 
-iree_py_test(
-  NAME
-    compiler_tf_test
-  SRCS
-    "compiler_tf_test.py"
+iree_symlink_tool(
+  TARGET tf
+  FROM_TOOL_TARGET integrations_tensorflow_compiler_iree-tf-import
+  TO_EXE_NAME iree-tf-import
 )

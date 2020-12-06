@@ -87,6 +87,7 @@ function(iree_create_configuration CONFIG_NAME)
   iree_to_bool(_CONFIG_BUILD_PYTHON_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_PYTHON_BINDINGS}")
   iree_to_bool(_CONFIG_BUILD_JAVA_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_JAVA_BINDINGS}")
   iree_to_bool(_CONFIG_BUILD_EXPERIMENTAL "${IREE_${CONFIG_NAME}_BUILD_EXPERIMENTAL}")
+  iree_to_bool(_CONFIG_BUILD_TENSORFLOW_COMPILER "${IREE_${CONFIG_NAME}_BUILD_TENSORFLOW_COMPILER")
 
   # Escape semicolons in the targets list so that CMake doesn't expand them to
   # spaces.
@@ -119,6 +120,7 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_PYTHON_BINDINGS=${_CONFIG_BUILD_PYTHON_BINDINGS}
         -DIREE_BUILD_JAVA_BINDINGS=${_CONFIG_BUILD_JAVA_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
+        -DIREE_BUILD_TENSORFLOW_COMPILER=${_CONFIG_BUILD_TENSORFLOW_COMPILER}
         # LINT.ThenChange(
         #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
         #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
