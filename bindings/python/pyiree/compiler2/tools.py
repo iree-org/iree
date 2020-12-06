@@ -197,6 +197,7 @@ def invoke_pipeline(command_lines: List[List[str]]):
 
   # Check for errors.
   for stage in stages:
+    assert stage.completed
     if stage.completed.returncode != 0:
       raise CompilerToolError(stage.completed)
 
@@ -213,7 +214,7 @@ class _PipelineStage(threading.Thread):
     super().__init__()
     self.process = process
     self.capture_output = capture_output
-    self.completed = None
+    self.completed: Optional[subprocess.CompletedProcess] = None
     self.outs = None
     self.errs = None
 
