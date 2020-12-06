@@ -237,13 +237,19 @@ function(iree_py_library)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
 
-  # Add path to each source file
-  list(TRANSFORM ARG_SRCS PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
-
   add_custom_target(${_NAME} ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${ARG_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/"
     DEPENDS ${ARG_DEPS}
   )
+
+  # Symlink each file as its own target.
+  foreach(SRC_FILE ${ARG_SRCS})
+    add_custom_command(
+      TARGET ${_NAME}
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+        "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}"
+      BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}"
+    )
+  endforeach()
 
   # Add PYEXT_DEPS.
   if(${ARG_PYEXT_DEPS})

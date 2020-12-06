@@ -13,7 +13,9 @@
 # limitations under the License.
 
 add_subdirectory(common)
+add_subdirectory(compiler2)
 add_subdirectory(rt)
+add_subdirectory(tools/core)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(compiler)

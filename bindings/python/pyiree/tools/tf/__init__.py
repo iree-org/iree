@@ -1,3 +1,6 @@
+# Lint-as: python3
+"""TensorFlow tools."""
+
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
+from typing import Optional
 
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
+import os
+import platform
 
-add_subdirectory(pyiree)
-add_subdirectory(tests)
+
+def get_tool(exe_name: str) -> Optional[str]:
+  if platform.system() == "Windows":
+    exe_name = exe_name + ".exe"
+  this_path = os.path.dirname(__file__)
+  tool_path = os.path.join(this_path, exe_name)
+  return tool_path

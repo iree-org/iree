@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
-
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
-
-add_subdirectory(pyiree)
-add_subdirectory(tests)
+iree_py_library(
+  NAME
+    compiler2
+  SRCS
+    "__init__.py"
+    "core.py"
+    "tf.py"
+    "tools.py"
+)

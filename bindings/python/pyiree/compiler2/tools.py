@@ -149,7 +149,9 @@ def invoke_immediate(command_line: List[str],
       run_args["input"] = immediate_input
 
     # Capture output.
-    run_args["capture_output"] = True
+    # Upgrade note: Python >= 3.7 can just use capture_output=True
+    run_args["stdout"] = subprocess.PIPE
+    run_args["stderr"] = subprocess.PIPE
     process = subprocess.run(command_line, **run_args)
     if process.returncode != 0:
       raise CompilerToolError(process)

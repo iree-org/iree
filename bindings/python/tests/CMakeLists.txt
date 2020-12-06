@@ -12,10 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
+iree_py_test(
+  NAME
+    compiler_core_test
+  SRCS
+    "compiler_core_test.py"
+  DEPS
+    bindings::python::pyiree::compiler2
+    bindings::python::pyiree::tools::core
+)
 
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
-
-add_subdirectory(pyiree)
-add_subdirectory(tests)
+iree_py_test(
+  NAME
+    compiler_tf_test
+  SRCS
+    "compiler_tf_test.py"
+  DEPS
+    bindings::python::pyiree::compiler2
+    bindings::python::pyiree::tools::tf
+)
