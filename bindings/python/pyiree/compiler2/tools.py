@@ -213,6 +213,7 @@ class _PipelineStage(threading.Thread):
     super().__init__()
     self.process = process
     self.capture_output = capture_output
+    self.completed = None
     self.outs = None
     self.errs = None
 
