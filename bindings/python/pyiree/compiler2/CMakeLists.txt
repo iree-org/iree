@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Static and generated files.
+configure_file(README.md README.md COPYONLY)
+
 iree_py_library(
   NAME
     compiler2

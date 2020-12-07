@@ -1,19 +1,43 @@
-# IREE Python Sandbox
+# IREE Python API
 
-This directory contains various integration-oriented Python utilities that are
-not intended to be a public API. They are, however, useful for lower level
-compiler interop work. And of course, they are useful since we presently lack a
-real API :)
+Top-level packages:
 
-We're still untangling build support, jupyter integration, etc for OSS builds.
-Stand by.
+* `pyiree.compiler2` : Main compiler API (soon to be renamed to 'compiler').
+* `pyiree.rt` : Runtime components for executing binaries.
+* `pyiree.tools.core` : Core tools for executing the compiler.
+* `pyiree.tools.tf` : TensorFlow compiler tools (if enabled).
 
-## Issues:
+Deprecated packages:
 
-*   This is called `pyiree` vs `iree` to avoid pythonpath collisions that tend
-    to arise when an iree directory is inside of an iree directory.
-*   The above could be solved in the bazel build by making iree/bindings/python
-    its own sub-workspace.
-*   However, doing so presently breaks both flatbuffer and tablegen generation
-    because of fixes needed to those build rules so that they are sub-worksapce
-    aware.
+* `pyiree.compiler`
+* `pyiree.common`
+* `pyiree.tf.compiler`
+
+## Installing
+
+First perform a normal CMake build with the following options:
+
+* `-DIREE_BUILD_PYTHON_BINDINGS=ON` : Enables Python Bindings
+* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON` (optional) : Enables building the
+  TensorFlow compilers (note: requires additional dependencies. see overall
+  build docs).
+
+Then from the build directory, run:
+
+```shell
+# Install into a local installation or virtualenv.
+python bindings/python/setup.py install
+
+# Build wheels.
+python bindings/python/setup.py bdist_wheel
+```
+
+## Development mode
+
+For development, just set your `PYTHONPATH` environment variable to the
+`bindings/python` directory in your CMake build dir.
+
+## Run tests
+
+Tests under `bindings/python/tests` can be run directly once installed.
+Additional tests under `integrations/tensorflow/e2e` will be runnable soon.

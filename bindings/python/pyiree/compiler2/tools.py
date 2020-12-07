@@ -44,8 +44,8 @@ _TOOL_MODULE_MAP = {
 # Map of tool module to package name as distributed to archives (used for
 # error messages).
 _TOOL_MODULE_PACKAGES = {
-    "pyiree.tools.tf": "pyiree_compiler_tf",
-    "pyiree.tools.core": "pyiree_compiler_core",
+    "pyiree.tools.core": "google-iree-tools-core",
+    "pyiree.tools.tf": "google-iree-tools-tf",
 }
 
 # Environment variable holding directories to be searched for named tools.
