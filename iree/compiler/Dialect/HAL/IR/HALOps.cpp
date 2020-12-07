@@ -1351,8 +1351,12 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
       failed(parser.parseAttribute(targetBackendFilterAttr,
                                    "target_backend_filter",
                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseOptionalRegion(*body, llvm::None, llvm::None))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
+  if (parseResult.hasValue() && failed(*parseResult)) {
     return failure();
   }
 
@@ -1403,8 +1407,11 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseOptionalRegion(*body, llvm::None, llvm::None))) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
+  if (parseResult.hasValue() && failed(*parseResult)) {
     return failure();
   }
 

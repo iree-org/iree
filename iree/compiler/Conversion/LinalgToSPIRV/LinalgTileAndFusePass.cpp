@@ -337,13 +337,9 @@ static void populateVectorizationPatterns(MLIRContext *context,
 
 static void populateVectorUnrollPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
-  patterns.insert<vector::UnrollVectorPattern<vector::TransferReadOp>,
-                  vector::UnrollVectorPattern<vector::ContractionOp>,
-                  vector::UnrollVectorPattern<vector::TransferWriteOp>>(
+  patterns.insert<vector::UnrollVectorPattern>(
       context,
       vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
-  vector::populateVectorToVectorCanonicalizationPatterns(patterns, context);
-  vector::populateVectorToVectorTransformationPatterns(patterns, context);
 }
 
 //====---------------------------------------------------------------------===//
@@ -356,10 +352,17 @@ static void applyVectorTransformation(FuncOp funcOp) {
     populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
     applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
 
-    OwningRewritePatternList canonicalizationPatterns;
-    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns,
+    OwningRewritePatternList canonicalizationPatterns1;
+    vector::populateVectorToVectorCanonicalizationPatterns(
+        canonicalizationPatterns1, funcOp.getContext());
+    vector::populateVectorToVectorTransformationPatterns(
+        canonicalizationPatterns1, funcOp.getContext());
+    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns1));
+
+    OwningRewritePatternList canonicalizationPatterns2;
+    vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2,
                                                  funcOp.getContext());
-    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns2));
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Vector Unroll ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());

@@ -101,6 +101,14 @@ iree_e2e_cartesian_product_test_suite(
             ],
             "target_backends": "iree_vmla",
         },
+        {
+            # Timing out on SwiftShader
+            "model": [
+                "att_mh_rnn",
+                "att_rnn",
+            ],
+            "target_backends": "iree_vulkan",
+        },
     ],
     flags_to_values = {
         "reference_backend": "tf",
