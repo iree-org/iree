@@ -65,3 +65,59 @@ func @noRematerializeIntoDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   }
   return %0 : tensor<4x4xf32>
 }
+
+// -----
+
+func @constant_capture(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
+  %c200 = constant 200 : index
+  %cst = constant 1.000000e+00 : f32
+  %cst_0 = constant dense<2.000000e+00> : tensor<10x20xf32>
+  %cst_1 = constant dense<
+    [1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00,
+     6.000000e+00, 7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01]>
+    : tensor<10xf32>
+  %0 = flow.dispatch.region[%c200 : index]
+    (%arg1 = %arg0 : tensor<10x20xf32>, %arg2 = %cst_0 : tensor<10x20xf32>,
+     %arg3 = %cst_1 : tensor<10xf32>, %arg4 = %cst : f32) -> tensor<10x20xf32> {
+    %1 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%arg1, %arg2, %arg3
+        : tensor<10x20xf32>, tensor<10x20xf32>, tensor<10xf32>) {
+    ^bb0(%arg5: f32, %arg6: f32, %arg7: f32):  // no predecessors
+      %2 = addf %arg5, %arg4 : f32
+      %3 = mulf %2, %arg6 : f32
+      %4 = addf %3, %arg7 : f32
+      linalg.yield %4 : f32
+    } -> tensor<10x20xf32>
+    flow.return %1 : tensor<10x20xf32>
+  }
+  return %0 : tensor<10x20xf32>
+}
+
+// CHECK-LABEL: func @constant_capture
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<10x20xf32>
+//       CHECK:   %[[CST:.+]] = constant dense<[1.000000e+00, 2.000000e+00,
+//  CHECK-SAME:     3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00,
+//  CHECK-SAME:     7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01]>
+//       CHECK:   flow.dispatch.region
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]] = %[[ARG0]]
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]] = %[[CST]]
+//   CHECK-DAG:     %[[CST_0:.+]] = constant 1.000000e+00 : f32
+//   CHECK-DAG:     %[[CST_1:.+]] = constant dense<2.000000e+00> : tensor<10x20xf32>
+//       CHECK:     %[[RESULT:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG1]], %[[CST_1]], %[[ARG2]]
+//  CHECK-SAME:       ) {
+//       CHECK:     ^{{[a-zA-Z0-9_]+}}(
+//  CHECK-SAME:         %[[ARG3:.[a-zA-Z0-9_]+]]: f32
+//  CHECK-SAME:         %[[ARG4:.[a-zA-Z0-9_]+]]: f32
+//  CHECK-SAME:         %[[ARG5:.[a-zA-Z0-9_]+]]: f32)
+//       CHECK:         %[[T0:.+]] = addf %[[ARG3]], %[[CST_0]]
+//       CHECK:         %[[T1:.+]] = mulf %[[T0]], %[[ARG4]]
+//       CHECK:         %[[T2:.+]] = addf %[[T1]], %[[ARG5]]
+//       CHECK:         linalg.yield %[[T2]]
+//       CHECK:       }
+//       CHECK:     flow.return %[[RESULT]]
