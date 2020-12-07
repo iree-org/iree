@@ -294,14 +294,6 @@ static Operation *inlineOpIntoDispatchRegion(OpBuilder &builder,
   Block *block = builder.getInsertionBlock();
   for (Value capturedInput : capturedInputs) {
     if (map.contains(capturedInput)) continue;
-    // If the capturedInput is a constant scalar or splat constant clone it in
-    // the dispatch region.
-    if (ConstantOp constOp = capturedInput.getDefiningOp<ConstantOp>()) {
-      if (constOp.getType().isIntOrIndexOrFloat()) {
-        builder.clone(*constOp.getOperation(), map);
-        continue;
-      }
-    }
     dispatchRegionOp.getOperation()->insertOperands(
         dispatchRegionOp.getOperation()->getNumOperands(), {capturedInput});
     Value newBlockArgument = block->addArgument(capturedInput.getType());

@@ -30,20 +30,20 @@ func @constant_capture(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf32> {
 //  CHECK-SAME:     7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01]>
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region[%{{.+}} : index](
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]] = %[[ARG0]]
-//  CHECK-SAME:       %[[ARG2:[a-zA-Z0-9_]+]] = %[[CST3]]
+//  CHECK-SAME:       %[[ARG2:[a-zA-Z0-9_]+]] = %[[CST2]]
+//  CHECK-SAME:       %[[ARG3:[a-zA-Z0-9_]+]] = %[[CST3]]
+//  CHECK-SAME:       %[[ARG4:[a-zA-Z0-9_]+]] = %[[CST1]]
 //  CHECK-SAME:     ) -> tensor<10x20xf32> {
-//   CHECK-DAG:     %[[CST4:.+]] = constant dense<2.000000e+00> : tensor<10x20xf32>
-//   CHECK-DAG:     %[[CST5:.+]] = constant 1.000000e+00 : f32
 //       CHECK:     %[[RETURN:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[ARG1]], %[[CST4]], %[[ARG2]]
+//  CHECK-SAME:       ins(%[[ARG1]], %[[ARG2]], %[[ARG3]]
 //  CHECK-SAME:       ) {
 //  CHECK-NEXT:       ^{{[a-zA-Z0-9]+}}(
-//  CHECK-SAME:         %[[ARG3:.[a-zA-Z0-9_]+]]: f32
-//  CHECK-SAME:         %[[ARG4:.[a-zA-Z0-9_]+]]: f32
-//  CHECK-SAME:         %[[ARG5:.[a-zA-Z0-9_]+]]: f32)
-//       CHECK:         %[[T0:.+]] = addf %[[ARG3]], %[[CST5]]
-//       CHECK:         %[[T1:.+]] = mulf %[[T0]], %[[ARG4]]
-//       CHECK:         %[[T2:.+]] = addf %[[T1]], %[[ARG5]]
+//  CHECK-SAME:         %[[ARG5:.[a-zA-Z0-9_]+]]: f32
+//  CHECK-SAME:         %[[ARG6:.[a-zA-Z0-9_]+]]: f32
+//  CHECK-SAME:         %[[ARG7:.[a-zA-Z0-9_]+]]: f32)
+//       CHECK:         %[[T0:.+]] = addf %[[ARG5]], %[[ARG4]]
+//       CHECK:         %[[T1:.+]] = mulf %[[T0]], %[[ARG6]]
+//       CHECK:         %[[T2:.+]] = addf %[[T1]], %[[ARG7]]
 //       CHECK:         linalg.yield %[[T2]]
 //       CHECK:       }
 //       CHECK:     flow.return %[[RETURN]]

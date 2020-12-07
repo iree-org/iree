@@ -82,13 +82,13 @@ func @copyAdd(%arg0 : tensor<4xf32>) -> tensor<4x16xf32> {
 
 // CHECK-LABEL: @single_reduction
 func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
+  // CHECK-DAG: %[[INITIAL:.+]] = constant dense<0.000000e+00>
   %0 = constant dense<0.000000e+00> : tensor<f32>
-  //      CHECK: %[[WORKLOAD0:.+]] = constant 4 : index
+  // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[RESULT:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>) -> tensor<4xf32>
-  //      CHECK: %[[INITIAL:.+]] = constant dense<0.000000e+00>
-  // CHECK-NEXT: = "mhlo.reduce"(%arg1, %[[INITIAL]])
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>, %arg2 = %[[INITIAL]] : tensor<f32>) -> tensor<4xf32>
+  // CHECK-NEXT: = "mhlo.reduce"(%arg1, %arg2)
   %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):
     %2 = mhlo.add %arg1, %arg2 : tensor<f32>
@@ -103,15 +103,15 @@ func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: @multi_reduction
 func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
+  // CHECK-DAG: %[[INITIALA:.+]] = constant dense<0.000000e+00>
   %0 = constant dense<0.000000e+00> : tensor<f32>
+  // CHECK-DAG: %[[INITIALB:.+]] = constant dense<1.000000e+00>
   %1 = constant dense<1.000000e+00> : tensor<f32>
   // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %arg1 : tensor<4x8xf32>) -> (tensor<4xf32>, tensor<4xf32>)
-  // CHECK-DAG: %[[INITIALA:.+]] = constant dense<0.000000e+00>
-  // CHECK-DAG: %[[INITIALB:.+]] = constant dense<1.000000e+00>
-  //     CHECK: = "mhlo.reduce"(%arg2, %arg3, %[[INITIALA]], %[[INITIALB]])
+  // CHECK-SAME: (%arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %arg1 : tensor<4x8xf32>, %arg4 = %[[INITIALA]] : tensor<f32>, %arg5 = %[[INITIALB]] : tensor<f32>) -> (tensor<4xf32>, tensor<4xf32>)
+  // CHECK-NEXT: = "mhlo.reduce"(%arg2, %arg3, %arg4, %arg5)
   %2, %3 = "mhlo.reduce"(%arg0, %arg1, %0, %1) ( {
   ^bb0(%arg0_lhs : tensor<f32>, %arg1_lhs : tensor<f32>, %arg0_rhs : tensor<f32>, %arg1_rhs : tensor<f32>):
     %4 = mhlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
