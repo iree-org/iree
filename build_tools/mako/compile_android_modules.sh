@@ -50,8 +50,6 @@ if [[ -z "${model}" ]]; then
   exit 1
 fi
 
-export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
-
 IFS=',' read -ra targets_array <<< "$targets"
 for target in "${targets_array[@]}"
 do
@@ -60,7 +58,7 @@ do
   extra_flags=()
   case "${target}" in
     "dylib-llvm-aot")
-      extra_flags+=('--iree-llvm-target-triple=aarch64-linux-android')
+      extra_flags+=('--iree-llvm-target-triple=aarch64-none-linux-android30')
       ;;
     *)
       ;;
