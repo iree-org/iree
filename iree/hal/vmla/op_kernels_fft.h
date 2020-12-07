@@ -37,7 +37,7 @@
 #include "absl/types/span.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
-#include "third_party/pffft/src/pffft.h"
+#include "third_party/pffft/pffft.h"
 
 namespace iree {
 namespace hal {
