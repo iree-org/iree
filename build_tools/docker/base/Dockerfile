@@ -17,7 +17,6 @@ FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73
 # Environment variables for IREE.
 ENV CC /usr/bin/clang
 ENV CXX /usr/bin/clang++
-ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld
 
 RUN apt-get update \
   && apt-get install -y \
