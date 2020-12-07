@@ -43,7 +43,6 @@ iree_cc_binary(
     "TestDotProdJIT.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     MLIRSCFTransforms
@@ -59,9 +58,9 @@ iree_cc_binary(
   SRCS
     "TestVectorTransfersJIT.cpp"
   DEPS
-    runtime-support.so
     LLVMSupport
-    MLIRAllDialects
+    # TODO(thomasraoux): Fix dependecy to shared library.
+    # runtime-support.so
     MLIREDSC
     MLIRIR
     MLIRSCFTransforms
@@ -77,11 +76,9 @@ iree_cc_binary(
   SRCS
     "TestMNISTJIT.cpp"
   DEPS
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     MLIRSCFTransforms
-    MLIRmlir_runner_utils
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
 )
@@ -95,7 +92,6 @@ iree_cc_binary(
     "TestSimpleJIT.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     MLIRSCFTransforms
@@ -112,17 +108,11 @@ iree_cc_binary(
     "TestSimpleJITVulkan.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRIR
     MLIRParser
     MLIRSPIRV
-    MLIRmlir_runner_utils
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
-    iree::base::initializer
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
     vulkan-runtime-wrappers
 )
 
@@ -135,7 +125,6 @@ iree_cc_binary(
     "TestMatMulVulkan.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRExecutionEngine
     MLIRGPU
     MLIRGPUToSPIRVTransforms
@@ -153,15 +142,11 @@ iree_cc_binary(
     MLIRTargetLLVMIR
     MLIRTransformUtils
     MLIRVectorToLLVM
-    MLIRmlir_runner_utils
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
     experimental::ModelBuilder::VulkanLaunchWrapper
-    iree::base::initializer
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+    iree::tools::init_mlir_passes_and_dialects
     vulkan-runtime-wrappers
 )
 
@@ -174,7 +159,6 @@ iree_cc_binary(
     "TestVectorToGPU.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRExecutionEngine
     MLIRGPU
     MLIRGPUToVulkanTransforms
@@ -189,16 +173,12 @@ iree_cc_binary(
     MLIRStandardToSPIRVTransforms
     MLIRTransformUtils
     MLIRVector
-    MLIRmlir_runner_utils
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
     experimental::ModelBuilder::VulkanLaunchWrapper
-    iree::base::initializer
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+    iree::tools::init_mlir_passes_and_dialects
     vulkan-runtime-wrappers
 )
 
@@ -211,7 +191,6 @@ iree_cc_binary(
     "BenchMatMulVectorGPU.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRExecutionEngine
     MLIRGPU
     MLIRGPUToVulkanTransforms
@@ -226,16 +205,12 @@ iree_cc_binary(
     MLIRStandardToSPIRVTransforms
     MLIRTransformUtils
     MLIRVector
-    MLIRmlir_runner_utils
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
     experimental::ModelBuilder::VulkanLaunchWrapper
-    iree::base::initializer
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::LinalgToSPIRV
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+    iree::tools::init_mlir_passes_and_dialects
     vulkan-runtime-wrappers
 )
 
@@ -247,7 +222,6 @@ iree_cc_binary(
   SRCS
     "TestSimpleMLIR.cpp"
   DEPS
-    MLIRAllDialects
     experimental::ModelBuilder
     experimental::ModelBuilder::ModelRunner
 )
@@ -260,7 +234,6 @@ iree_cc_binary(
   SRCS
     "BenchMatVecVectorJIT.cpp"
   DEPS
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     benchmark
@@ -276,7 +249,6 @@ iree_cc_binary(
   SRCS
     "BenchMatMulVectorJIT.cpp"
   DEPS
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     benchmark
@@ -292,7 +264,6 @@ iree_cc_binary(
   SRCS
     "BenchMatMulVectorColumnMajorLLVMIntrinsicsJIT.cpp"
   DEPS
-    MLIRAllDialects
     MLIREDSC
     MLIRIR
     benchmark
