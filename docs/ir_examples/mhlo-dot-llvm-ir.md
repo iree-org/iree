@@ -891,7 +891,7 @@ module  {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
+### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
 ```
 func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
@@ -899,10 +899,15 @@ func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[3
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
+### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
 ```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %cst = constant 0.000000e+00 : f32
+  %c1024 = constant 1024 : index
+  %c64 = constant 64 : index
+  %c0 = constant 0 : index
+  %c4 = constant 4 : index
+  %c32 = constant 32 : index
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
@@ -919,12 +924,34 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %13 = subview %0[%10, %12] [%11, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %14 = subview %0[%5, %8] [%6, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   linalg.fill(%14, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32
-  linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%7, %9 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%13 : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+  scf.for %arg0 = %c0 to %6 step %c32 {
+    scf.for %arg1 = %c0 to %c64 step %c32 {
+      scf.for %arg2 = %c0 to %c1024 step %c32 {
+        %15 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%6]
+        %16 = subview %7[%arg0, %arg2] [%15, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %17 = subview %9[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %18 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%11]
+        %19 = subview %13[%arg0, %arg1] [%18, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        scf.for %arg3 = %c0 to %15 step %c4 {
+          scf.for %arg4 = %c0 to %c32 step %c4 {
+            scf.for %arg5 = %c0 to %c32 step %c4 {
+              %20 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%15, %arg3)
+              %21 = subview %16[%arg3, %arg5] [%20, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %22 = subview %17[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %23 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%18, %arg3)
+              %24 = subview %19[%arg3, %arg4] [%23, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              linalg.matmul {__internal_linalg_transform__ = "vectorize"} ins(%21, %22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%24 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+            }
+          }
+        }
+      }
+    }
+  }
   return
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
+### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
 ```
 func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
   %c1 = constant 1 : index
@@ -932,7 +959,7 @@ func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[3
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
+### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
 ```
 func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
   %cst = constant 0.000000e+00 : f32

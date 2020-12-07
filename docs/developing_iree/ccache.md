@@ -18,7 +18,7 @@ takes care of executing `clang` with these arguments and caches the output file
 `foo.o`. The next invocation then skips executing `clang` altogether.
 
 When the cache is hit, the speedup is such that the "compilation" becomes
-essentially free. However, `ccache` only caches compilation, [not linking].
+essentially free. However, `ccache` only caches compilation, [not linking](https://stackoverflow.com/a/29828811).
 
 Here a few scenarios where `ccache` helps:
 * Incremental rebuilds. While `cmake` always tries to avoid unnecessary work in
@@ -81,5 +81,5 @@ Notes:
 The `ccache -s` command dumps statistics, including a cache hit count and ratio.
 It's convenient to run periodically with `watch` in a separate terminal:
 ```shell
-watch ccache -s  # defaults to running it every 2 seconds
+watch -n 0.1 ccache -s  # update the stats readout every 0.1 seconds
 ```
