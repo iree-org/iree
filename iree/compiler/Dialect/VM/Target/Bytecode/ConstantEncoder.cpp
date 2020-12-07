@@ -106,6 +106,19 @@ static flatbuffers_uint8_vec_ref_t serializeConstantF64Array(
   return flatbuffers_uint8_vec_end(fbb);
 }
 
+static flatbuffers_uint8_vec_ref_t serializeConstantF16Array(
+    DenseFPElementsAttr attr, FlatbufferBuilder &fbb) {
+  flatbuffers_uint8_vec_start(fbb);
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(
+      fbb, attr.getNumElements() * sizeof(uint16_t));
+  uint16_t *nativePtr = reinterpret_cast<uint16_t *>(bytePtr);
+  for (const APFloat &value : attr.getFloatValues()) {
+    *(nativePtr++) =
+        value.bitcastToAPInt().extractBitsAsZExtValue(16, 0) & UINT16_MAX;
+  }
+  return flatbuffers_uint8_vec_end(fbb);
+}
+
 flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
                                               ElementsAttr elementsAttr,
                                               FlatbufferBuilder &fbb) {
@@ -126,6 +139,8 @@ flatbuffers_uint8_vec_ref_t serializeConstant(Location loc,
     }
   } else if (auto attr = elementsAttr.dyn_cast<DenseFPElementsAttr>()) {
     switch (attr.getType().getElementTypeBitWidth()) {
+      case 16:
+        return serializeConstantF16Array(attr, fbb);
       case 32:
         return serializeConstantF32Array(attr, fbb);
       case 64:
