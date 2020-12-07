@@ -21,9 +21,6 @@ from pyiree.tf.support import tf_test_driver
 import tensorflow.compat.v2 as tf
 
 SAVED_MODEL_IMPORT_PASSES = [
-    "tf-executor-graph-pruning",
-    "tf-standard-pipeline",
-    "iree-tf-convert-to-mhlo",
     "iree-tf-import-pipeline",
     "canonicalize",
 ]
@@ -141,19 +138,6 @@ class T0002e_Error_VarMultipleExportedNames(tf.Module):
     self.v2 = self.v
 
 
-# CHECK-LABEL: RUN_TEST: T0002f_Error_UnsupportedResourceOp
-# CHECK: [ERROR]: could not lower resource op to flow
-# CHECK: FINISH_TEST
-class T0002f_Error_UnsupportedResourceOp(tf.Module):
-
-  def __init__(self):
-    self.v = tf.Variable([0.], shape=[None])
-
-  @tf.function(input_signature=[])
-  def f(self):
-    self.v.assign_add(tf.constant([0., 1.]))
-
-
 tf_test_driver.add_test(test_name="T0002a_SimpleVarRead",
                         tf_module_builder=T0002a_SimpleVarRead,
                         passes=SAVED_MODEL_IMPORT_PASSES,
@@ -172,11 +156,6 @@ tf_test_driver.add_test(test_name="T0002d_VarCompatibleShapeChange",
                         print_input_module=True)
 tf_test_driver.add_test(test_name="T0002e_Error_VarMultipleExportedNames",
                         tf_module_builder=T0002e_Error_VarMultipleExportedNames,
-                        passes=SAVED_MODEL_IMPORT_PASSES,
-                        print_input_module=True,
-                        expect_pass_failure=True)
-tf_test_driver.add_test(test_name="T0002f_Error_UnsupportedResourceOp",
-                        tf_module_builder=T0002f_Error_UnsupportedResourceOp,
                         passes=SAVED_MODEL_IMPORT_PASSES,
                         print_input_module=True,
                         expect_pass_failure=True)

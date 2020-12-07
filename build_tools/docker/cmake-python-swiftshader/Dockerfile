@@ -16,7 +16,7 @@
 # Vulkan implementation.
 
 FROM gcr.io/iree-oss/cmake-python-vulkan AS final
-COPY --from=gcr.io/iree-oss/swiftshader /swiftshader /swiftshader
+COPY --from=gcr.io/iree-oss/swiftshader@sha256:883a33e4b9d33c6c7b73fc34319a7510f218c1c1598f5253dcb2f64c5aa263a5 /swiftshader /swiftshader
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json

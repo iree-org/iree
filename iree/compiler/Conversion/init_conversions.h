@@ -66,6 +66,7 @@ inline void registerLinalgToLLVMPasses() {
     createConvImg2ColMatmulConversionPass();
     createLinalgTileAndDistributePass();
     createLinalgTileAndVectorizeWorkgroupsPass();
+    createLinalgRewriteDestructiveUpdatesPass();
     return true;
   }();
   (void)init_once;

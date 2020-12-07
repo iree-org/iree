@@ -21,7 +21,7 @@ ARG CMAKE_MAJOR_VERSION=3
 ARG CMAKE_MINOR_VERSION=13
 ARG CMAKE_PATCH_VERSION=5
 
-FROM gcr.io/iree-oss/util AS install-cmake
+FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-cmake
 ARG CMAKE_MAJOR_VERSION
 ARG CMAKE_MINOR_VERSION
 ARG CMAKE_PATCH_VERSION
@@ -33,7 +33,7 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 RUN chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh"
 RUN "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/
 
-FROM gcr.io/iree-oss/base AS final
+FROM gcr.io/iree-oss/base@sha256:1e57b0957f71cd1aa9d6e4838c51f40bdbb52dd1be0b4b6b14b337b36654cc63 AS final
 ARG CMAKE_MAJOR_VERSION
 ARG CMAKE_MINOR_VERSION
 

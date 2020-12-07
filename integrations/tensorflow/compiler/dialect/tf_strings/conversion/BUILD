@@ -81,7 +81,6 @@ cc_library(
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
-        "//iree/compiler/Utils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

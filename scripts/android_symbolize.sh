@@ -23,8 +23,10 @@
 #
 # Other lines are just echo'd to stdout.
 # This is meant to be used like this:
-# ANDROID_NDK=~/android-ndk-r21d ~/android-symbolize.sh < ~/a
-# Where one has previously stored e.g. some ASan report to a file, here ~/a.
+# ANDROID_NDK=~/android-ndk-r21d ./scripts/android_symbolize.sh < /tmp/asan.txt
+# Where one has previously stored e.g. some ASan report to a file, here /tmp/asan.txt.
+#
+# See docs/developing_iree/sanitizers.md.
 #
 # Discussion of alternatives: https://github.com/android/ndk/issues/753
 

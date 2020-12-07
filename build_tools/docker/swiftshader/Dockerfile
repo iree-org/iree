@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake AS install-swiftshader
+FROM gcr.io/iree-oss/cmake@sha256:644cc10ea5a33bd97be51a8f6fd6ee7e2ab3904f468873be0f71373b0ec48919 AS install-swiftshader
 WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git
 
-ARG SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
+ARG SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
 
 # zlib is needed for compiling SwiftShader.
 RUN apt-get update && apt-get install -y zlib1g-dev
@@ -40,5 +40,6 @@ RUN cp -rf build-swiftshader/Linux /swiftshader
 # Keep track of the commit we are using.
 RUN echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit
 
-FROM ubuntu:18.04 AS final
+# Ubuntu 18.04
+FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3 AS final
 COPY --from=install-swiftshader /swiftshader /swiftshader

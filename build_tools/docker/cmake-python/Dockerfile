@@ -14,7 +14,7 @@
 
 # An image for building IREE and its Python bindings using CMake.
 
-FROM gcr.io/iree-oss/cmake AS final
+FROM gcr.io/iree-oss/cmake@sha256:644cc10ea5a33bd97be51a8f6fd6ee7e2ab3904f468873be0f71373b0ec48919 AS final
 # Dependencies for the python bindings tests.
 RUN apt-get update \
   && apt-get install -y \

@@ -293,15 +293,13 @@ VMLA_FAILING = [
     "igammac",
     "in_top_k",
     "invert_permutation",
-    "is_nan",
+    "is_nan",  # TODO(#4061): tf.math.is_nan miscompiles with static shapes.
     "is_non_decreasing",
     "is_strictly_increasing",
     "ndtri",
     "nextafter",
     "polygamma",
     "pow",  # Failing for integer inputs.
-    "reduce_all",
-    "reduce_any",
     "reduce_euclidean_norm",
     "reduce_prod",
     "rint",
@@ -563,6 +561,7 @@ VULKAN_FAILING_MULTIPLE = VULKAN_FAILING + ["square"]
             "--target_backends={}".format(target_backend),
             "--functions={}".format(",".join(functions)),
             "--dynamic_dims=False",
+            "--test_complex=False",
         ],
         main = "math_test.py",
         python_version = "PY3",
@@ -588,9 +587,8 @@ VMLA_FAILING_DYNAMIC = VMLA_FAILING + [
     "angle",
     "cumsum",
     "divide_no_nan",
-    "equal",
-    "floormod",
-    "imag",
+    "floordiv",  # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
+    "floormod",  # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
     "lbeta",
     "lgamma",
     "log_sigmoid",
@@ -599,12 +597,12 @@ VMLA_FAILING_DYNAMIC = VMLA_FAILING + [
     "logical_not",
     "logical_or",
     "logical_xor",
-    "mod",
-    "floordiv",
+    "mod",  # TODO(#4065): VMLA raises INVALID_ARGUMENT errors after DeviceQueue failure.
     "multiply_no_nan",
     "round",
-    "not_equal",
     "reciprocal_no_nan",
+    "reduce_all",
+    "reduce_any",
     "reduce_logsumexp",
     "reduce_max",
     "reduce_min",
@@ -615,6 +613,9 @@ VMLA_FAILING_DYNAMIC = VMLA_FAILING + [
     "softplus",
     "zero_fraction",
 ]
+
+# TODO(#4061): tf.math.is_nan miscompiles with static shapes.
+VMLA_FAILING_DYNAMIC.remove("is_nan")
 
 # keep sorted
 LLVM_FAILING_DYNAMIC = LLVM_FAILING + [
@@ -796,7 +797,8 @@ VMLA_FAILING_DYNAMIC_MULTIPLE = VMLA_FAILING_DYNAMIC + ["multiply"]
             "--reference_backend=tf",
             "--target_backends={}".format(target_backend),
             "--functions={}".format(",".join(functions)),
-            "--dynamic_dims=False",
+            "--dynamic_dims=True",
+            "--test_complex=False",
         ],
         main = "math_test.py",
         python_version = "PY3",
@@ -974,6 +976,7 @@ VULKAN_FAILING_COMPLEX_MULTIPLE = VULKAN_FAILING_COMPLEX + ["square"]
             "--target_backends={}".format(target_backend),
             "--functions={}".format(",".join(functions)),
             "--dynamic_dims=False",
+            "--test_complex=True",
         ],
         main = "math_test.py",
         python_version = "PY3",
