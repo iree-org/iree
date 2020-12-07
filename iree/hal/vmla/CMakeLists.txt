@@ -26,6 +26,7 @@ iree_cc_library(
   TEXTUAL_HDRS
     "op_kernels_generic.h"
     "op_kernels_ruy.h"
+    "op_kernels_fft.h"
   DEPS
     absl::algorithm
     absl::core_headers
@@ -36,6 +37,7 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     ruy
+    pffft
   PUBLIC
 )
 
