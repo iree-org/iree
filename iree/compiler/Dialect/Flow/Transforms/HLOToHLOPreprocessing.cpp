@@ -56,7 +56,7 @@ static bool isAllZero(DenseIntElementsAttr attr) {
 }
 
 static bool isIota(ArrayRef<int64_t> array) {
-  for (auto it :  llvm::enumerate(array)) {
+  for (auto it : llvm::enumerate(array)) {
     if (it.index() != it.value()) {
       return false;
     }
@@ -101,26 +101,27 @@ static bool hasKernelDilation(mhlo::ConvOp op) {
 static bool hasNormalizedConvolution(mhlo::ConvOp op) {
   auto dimensionNumbers = op.dimension_numbers();
 
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) return false;
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) return false;
+  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0)
+    return false;
+  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0)
+    return false;
 
-  for (auto it : llvm::enumerate(dimensionNumbers.input_spatial_dimensions())) {      
+  for (auto it : llvm::enumerate(dimensionNumbers.input_spatial_dimensions())) {
     if (it.value() != it.index() + 1) return false;
   }
 
-  for (auto it : llvm::enumerate(dimensionNumbers.kernel_spatial_dimensions())) {      
+  for (auto it :
+       llvm::enumerate(dimensionNumbers.kernel_spatial_dimensions())) {
     if (it.value() != it.index()) return false;
   }
 
-  for (auto it : llvm::enumerate(dimensionNumbers.output_spatial_dimensions())) {      
+  for (auto it :
+       llvm::enumerate(dimensionNumbers.output_spatial_dimensions())) {
     if (it.value() != it.index() + 1) return false;
   }
 
-
-
   return true;
 }
-
 
 static DenseIntElementsAttr make1DElementsAttr(PatternRewriter &rewriter,
                                                ArrayRef<int64_t> integers) {
@@ -228,12 +229,13 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
-
-// Guarantee that the input dimensions are ordered batch, spatial_dims, feature dim.
-class ReorderConvOpInputDimensions: public OpRewritePattern<mhlo::ConvOp> {
+// Guarantee that the input dimensions are ordered batch, spatial_dims, feature
+// dim.
+class ReorderConvOpInputDimensions : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::ConvOp op, PatternRewriter &rewriter) const override {        
+  LogicalResult matchAndRewrite(mhlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
     auto lhsType = op.lhs().getType().cast<ShapedType>();
     auto lhsShape = lhsType.getShape();
     if (!lhsType.hasRank()) {
@@ -249,9 +251,11 @@ class ReorderConvOpInputDimensions: public OpRewritePattern<mhlo::ConvOp> {
 
     // Compute the permutation required to create a standard order.
     llvm::SmallVector<int64_t, 4> permutations;
-    permutations.push_back(dimensionNumbers.input_batch_dimension().getValue().getSExtValue());
+    permutations.push_back(
+        dimensionNumbers.input_batch_dimension().getValue().getSExtValue());
     permutations.append(spatialDims.begin(), spatialDims.end());
-    permutations.push_back(dimensionNumbers.input_feature_dimension().getValue().getSExtValue());
+    permutations.push_back(
+        dimensionNumbers.input_feature_dimension().getValue().getSExtValue());
 
     // If the permutation is iota then no reordering is required.
     if (isIota(permutations)) {
@@ -259,35 +263,36 @@ class ReorderConvOpInputDimensions: public OpRewritePattern<mhlo::ConvOp> {
     }
 
     llvm::SmallVector<int64_t, 4> transposeShape;
-    for (auto p : permutations) {        
+    for (auto p : permutations) {
       transposeShape.push_back(lhsShape[p]);
     }
 
     auto transposed = rewriter.create<mhlo::TransposeOp>(
-      op.getLoc(), RankedTensorType::get(transposeShape, lhsType.getElementType()),
-      op.lhs(), rewriter.getI64TensorAttr(permutations));
+        op.getLoc(),
+        RankedTensorType::get(transposeShape, lhsType.getElementType()),
+        op.lhs(), rewriter.getI64TensorAttr(permutations));
 
     llvm::SmallVector<int64_t, 4> newSpatialDimensions(spatialDims.size());
     std::iota(newSpatialDimensions.begin(), newSpatialDimensions.end(), 1);
 
     auto newDimensionNumbers = mhlo::ConvDimensionNumbers::get(
-      /*input_batch_dimension=*/rewriter.getI64IntegerAttr(0),
-      /*input_feature_dimension=*/rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
-      /*input_spatial_dimensions=*/rewriter.getI64TensorAttr(newSpatialDimensions),
-      dimensionNumbers.kernel_input_feature_dimension(),
-      dimensionNumbers.kernel_output_feature_dimension(),
-      dimensionNumbers.kernel_spatial_dimensions(),
-      dimensionNumbers.output_batch_dimension(),
-      dimensionNumbers.output_feature_dimension(),
-      dimensionNumbers.output_spatial_dimensions(),
-      op.getContext());
+        /*input_batch_dimension=*/rewriter.getI64IntegerAttr(0),
+        /*input_feature_dimension=*/
+        rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
+        /*input_spatial_dimensions=*/
+        rewriter.getI64TensorAttr(newSpatialDimensions),
+        dimensionNumbers.kernel_input_feature_dimension(),
+        dimensionNumbers.kernel_output_feature_dimension(),
+        dimensionNumbers.kernel_spatial_dimensions(),
+        dimensionNumbers.output_batch_dimension(),
+        dimensionNumbers.output_feature_dimension(),
+        dimensionNumbers.output_spatial_dimensions(), op.getContext());
 
     SmallVector<Value, 2> operands = {transposed, op.rhs()};
-    auto newConv = rewriter.create<mhlo::ConvOp>(
-        op.getLoc(), op.getType(), operands, op.getAttrs());
+    auto newConv = rewriter.create<mhlo::ConvOp>(op.getLoc(), op.getType(),
+                                                 operands, op.getAttrs());
     newConv.dimension_numbersAttr(newDimensionNumbers);
     rewriter.replaceOp(op, newConv.getResult());
-
 
     return success();
   }
@@ -332,20 +337,22 @@ struct ReorderConvOpKernelDimensions : public OpRewritePattern<mhlo::ConvOp> {
     std::iota(newSpatialDimensions.begin(), newSpatialDimensions.end(), 0);
 
     auto transposeKernel = rewriter.create<mhlo::TransposeOp>(
-        op.getLoc(), RankedTensorType::get(transposeShape, kernelType.getElementType()),
+        op.getLoc(),
+        RankedTensorType::get(transposeShape, kernelType.getElementType()),
         kernel, rewriter.getI64TensorAttr(permutation));
 
     auto newDimensionNumbers = mhlo::ConvDimensionNumbers::get(
         dimensionNumbers.input_batch_dimension(),
         dimensionNumbers.input_feature_dimension(),
         dimensionNumbers.input_spatial_dimensions(),
-        /*kernel_input_feature_dimension=*/rewriter.getI64IntegerAttr(newSpatialDimensions.size()),
-        /*kernel_output_feature_dimension=*/rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
+        /*kernel_input_feature_dimension=*/
+        rewriter.getI64IntegerAttr(newSpatialDimensions.size()),
+        /*kernel_output_feature_dimension=*/
+        rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
         rewriter.getI64TensorAttr(newSpatialDimensions),
         dimensionNumbers.output_batch_dimension(),
         dimensionNumbers.output_feature_dimension(),
-        dimensionNumbers.output_spatial_dimensions(),
-        op.getContext());
+        dimensionNumbers.output_spatial_dimensions(), op.getContext());
 
     SmallVector<Value, 2> operands = {op.lhs(), transposeKernel};
     mhlo::ConvOp newConv = rewriter.create<mhlo::ConvOp>(
@@ -357,11 +364,13 @@ struct ReorderConvOpKernelDimensions : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
-// Guarantee that the output dimensions are ordered batch, spatial_dims, feature dim.
-class ReorderConvOpOutputDimensions: public OpRewritePattern<mhlo::ConvOp> {
+// Guarantee that the output dimensions are ordered batch, spatial_dims, feature
+// dim.
+class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::ConvOp op, PatternRewriter &rewriter) const override {        
+  LogicalResult matchAndRewrite(mhlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
     auto resultType = op.getType().cast<ShapedType>();
     auto resultShape = resultType.getShape();
     if (!resultType.hasRank()) {
@@ -377,9 +386,11 @@ class ReorderConvOpOutputDimensions: public OpRewritePattern<mhlo::ConvOp> {
 
     // Compute the permutation to transpose to an ordered output.
     llvm::SmallVector<int64_t, 4> permutation;
-    permutation.push_back(dimensionNumbers.output_batch_dimension().getValue().getSExtValue());
+    permutation.push_back(
+        dimensionNumbers.output_batch_dimension().getValue().getSExtValue());
     permutation.append(spatialDims.begin(), spatialDims.end());
-    permutation.push_back(dimensionNumbers.output_feature_dimension().getValue().getSExtValue());
+    permutation.push_back(
+        dimensionNumbers.output_feature_dimension().getValue().getSExtValue());
 
     // If the permutation is iota then no reordering is required.
     if (isIota(permutation)) {
@@ -388,7 +399,7 @@ class ReorderConvOpOutputDimensions: public OpRewritePattern<mhlo::ConvOp> {
 
     // Compute what the new conv shape should be.
     llvm::SmallVector<int64_t, 4> convShape;
-    for (auto p : permutation) {        
+    for (auto p : permutation) {
       convShape.push_back(resultShape[p]);
     }
 
@@ -402,25 +413,29 @@ class ReorderConvOpOutputDimensions: public OpRewritePattern<mhlo::ConvOp> {
     std::iota(newSpatialDimensions.begin(), newSpatialDimensions.end(), 1);
 
     auto newDimensionNumbers = mhlo::ConvDimensionNumbers::get(
-      dimensionNumbers.input_batch_dimension(),
-      dimensionNumbers.input_feature_dimension(),
-      dimensionNumbers.input_spatial_dimensions(),
-      dimensionNumbers.kernel_input_feature_dimension(),
-      dimensionNumbers.kernel_output_feature_dimension(),
-      dimensionNumbers.kernel_spatial_dimensions(),
-      /*output_batch_dimension=*/rewriter.getI64IntegerAttr(0),
-      /*output_feature_dimension=*/rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
-      /*output_sptial_dimensions=*/rewriter.getI64TensorAttr(newSpatialDimensions),
-      op.getContext());
+        dimensionNumbers.input_batch_dimension(),
+        dimensionNumbers.input_feature_dimension(),
+        dimensionNumbers.input_spatial_dimensions(),
+        dimensionNumbers.kernel_input_feature_dimension(),
+        dimensionNumbers.kernel_output_feature_dimension(),
+        dimensionNumbers.kernel_spatial_dimensions(),
+        /*output_batch_dimension=*/rewriter.getI64IntegerAttr(0),
+        /*output_feature_dimension=*/
+        rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
+        /*output_sptial_dimensions=*/
+        rewriter.getI64TensorAttr(newSpatialDimensions),
+        op.getContext());
 
     SmallVector<Value, 2> operands = {op.lhs(), op.rhs()};
     auto newConv = rewriter.create<mhlo::ConvOp>(
-        op.getLoc(), RankedTensorType::get(convShape, resultType.getElementType()),
-        operands, op.getAttrs()); newConv.dimension_numbersAttr(newDimensionNumbers);
+        op.getLoc(),
+        RankedTensorType::get(convShape, resultType.getElementType()), operands,
+        op.getAttrs());
+    newConv.dimension_numbersAttr(newDimensionNumbers);
 
     auto transposed = rewriter.create<mhlo::TransposeOp>(
-      op.getLoc(), resultType,
-      newConv, rewriter.getI64TensorAttr(invertPermutation));
+        op.getLoc(), resultType, newConv,
+        rewriter.getI64TensorAttr(invertPermutation));
 
     rewriter.replaceOp(op, transposed.getResult());
 
