@@ -281,9 +281,7 @@ static LogicalResult verifyVariableStoreIndirectOp(
 
 /// Inlines operation |op| into the |dispatchRegionOp| by making all operands,
 /// as well as values caputred implicitly by the regions of the operation, that
-/// are outside the dispatch region operands of the dispatch region as well. For
-/// ConstantOp of scalar values or splat constants, the defining op is inlined
-/// as well.
+/// are outside the dispatch region operands of the dispatch region as well.
 static Operation *inlineOpIntoDispatchRegion(OpBuilder &builder,
                                              DispatchRegionOp dispatchRegionOp,
                                              Operation *op,
