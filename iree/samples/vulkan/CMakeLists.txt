@@ -28,8 +28,6 @@ iree_bytecode_module(
     "-iree-hal-target-backends=vulkan-spirv"
 )
 
-# bazel_to_cmake: DO NOT EDIT (special Vulkan and Windows logic is needed)
-
 # This sample statically links against Vulkan.
 # One way to achieve this is by installing the Vulkan SDK from
 # https://vulkan.lunarg.com/.
