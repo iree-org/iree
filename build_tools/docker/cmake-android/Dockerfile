@@ -24,7 +24,7 @@ RUN wget "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION?}-l
 
 RUN unzip "android-ndk-${NDK_VERSION?}-linux-x86_64.zip" -d /usr/src/
 
-FROM gcr.io/iree-oss/cmake@sha256:644cc10ea5a33bd97be51a8f6fd6ee7e2ab3904f468873be0f71373b0ec48919 AS final
+FROM gcr.io/iree-oss/cmake@sha256:9d9953acf5ca0cf1ff3e8de32f10f24dfab1c4e8ec5d1fc047f556024ee4bed6 AS final
 ARG NDK_VERSION
 COPY --from=install-ndk "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
 ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
