@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Overlays a subdirectory into the main python bindings directory.
-function(_add_overlay_subdirectory dir)
-  # Overlay binary directories onto the main bindings directory.
-  set(_MAIN_PYTHON_DIR "${CMAKE_BINARY_DIR}/bindings/python")
-  add_subdirectory(${dir} "${_MAIN_PYTHON_DIR}/${dir}")
-endfunction()
+iree_py_library(
+  NAME
+    support
+  SRCS
+    "__init__.py"
+    "module_utils.py"
+    "tf_test_driver.py"
+    "tf_test_utils.py"
+    "tf_utils.py"
+    "trace_utils.py"
+)
 
-_add_overlay_subdirectory(pyiree/tools/tf)
-# TODO: Find another place for the TF support library.
-_add_overlay_subdirectory(pyiree/tf/support)
+# TODO: Add tests.

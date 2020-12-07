@@ -85,6 +85,8 @@ class ImportOptions(CompilerOptions):
                import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH,
                saved_model_tags: Set[str] = set(),
                import_extra_args: Sequence[str] = (),
+               save_temp_tf_input: Optional[str] = None,
+               save_temp_iree_input: Optional[str] = None,
                **kwargs):
     """Initialize options from keywords.
 
@@ -101,6 +103,10 @@ class ImportOptions(CompilerOptions):
       saved_model_tags: Set of tags to export (signature def/v1 saved models
         only).
       import_extra_args: Extra arguments to pass to the iree-tf-import tool.
+      save_temp_tf_input: Optionally save the IR that is input to the
+        TensorFlow pipeline.
+      save_temp_iree_input: Optionally save the IR that is the result of the
+        import (ready to be passed to IREE).
     """
     super().__init__(**kwargs)
     self.exported_names = exported_names
@@ -108,6 +114,8 @@ class ImportOptions(CompilerOptions):
     self.import_type = ImportType.parse(import_type)
     self.saved_model_tags = saved_model_tags
     self.import_extra_args = import_extra_args
+    self.save_temp_tf_input = save_temp_tf_input
+    self.save_temp_iree_input = save_temp_iree_input
 
 
 def build_import_command_line(input_path: str,
@@ -132,6 +140,12 @@ def build_import_command_line(input_path: str,
     # Import stage directly outputs.
     if options.output_file:
       cl.append(f"-o={options.output_file}")
+  # Save temps flags.
+  if options.save_temp_tf_input:
+    cl.append(f"--save-temp-tf-input={options.save_temp_tf_input}")
+  if options.save_temp_iree_input:
+    cl.append(f"--save-temp-iree-input={options.save_temp_iree_input}")
+  # Extra args.
   cl.extend(options.import_extra_args)
   return cl
 

@@ -56,13 +56,14 @@ static OwningModuleRef importSavedModelV2(
   tensorflow::SavedModelV2Bundle bundle;
   auto loadStatus = tensorflow::SavedModelV2Bundle::Load(inputPath, &bundle);
   if (!loadStatus.ok()) {
-    std::cerr << "TensorFlow reported error loading saved model:\n  "
-              << loadStatus << "\n\n";
+    llvm::errs() << "TensorFlow reported error loading saved model:\n  "
+                 << loadStatus.ToString() << "\n\n";
     if (!tensorflow::errors::IsNotFound(loadStatus)) {
-      std::cerr << "Note: Attempted to load V2 SavedModel. Double check that "
-                   "this is correct "
-                << "and adjust via the flag "
-                   "--tf-import-type=savedmodel_v1|savedmodel_v2\n";
+      llvm::errs()
+          << "Note: Attempted to load V2 SavedModel. Double check that "
+             "this is correct "
+          << "and adjust via the flag "
+             "--tf-import-type=savedmodel_v1|savedmodel_v2\n";
     }
     return nullptr;
   }
@@ -72,9 +73,9 @@ static OwningModuleRef importSavedModelV2(
   auto loadedModule = tensorflow::ConvertSavedModelToMlir(
       &bundle, &context, absl::MakeSpan(exportedNamesVector));
   if (!loadedModule.ok()) {
-    std::cerr << "Error performing initial import from SavedModel to MLIR. "
-              << "Reported error below (and see diagnostics):\n"
-              << "  " << loadedModule.status() << "\n";
+    llvm::errs() << "Error performing initial import from SavedModel to MLIR. "
+                 << "Reported error below (and see diagnostics):\n"
+                 << "  " << loadedModule.status().ToString() << "\n";
     return nullptr;
   }
 
@@ -96,13 +97,14 @@ static OwningModuleRef importSavedModelV1(
       tensorflow::LoadSavedModel(session_options,
                                  /*run_options=*/{}, inputPath, tags, &bundle);
   if (!loadStatus.ok()) {
-    std::cerr << "TensorFlow reported error loading saved model:\n  "
-              << loadStatus << "\n\n";
+    llvm::errs() << "TensorFlow reported error loading saved model:\n  "
+                 << loadStatus.ToString() << "\n\n";
     if (!tensorflow::errors::IsNotFound(loadStatus)) {
-      std::cerr << "Note: Attempted to load V1 SavedModel. Double check that "
-                   "this is correct "
-                << "and adjust via the flag "
-                   "--tf-import-type=savedmodel_v1|savedmodel_v2\n";
+      llvm::errs()
+          << "Note: Attempted to load V1 SavedModel. Double check that "
+             "this is correct "
+          << "and adjust via the flag "
+             "--tf-import-type=savedmodel_v1|savedmodel_v2\n";
     }
     return nullptr;
   }
@@ -115,9 +117,9 @@ static OwningModuleRef importSavedModelV1(
       /*upgrade_legacy=*/false);
 
   if (!loadedModule.ok()) {
-    std::cerr << "Error performing initial import from SavedModel to MLIR. "
-              << "Reported error below (and see diagnostics):\n"
-              << "  " << loadedModule.status() << "\n";
+    llvm::errs() << "Error performing initial import from SavedModel to MLIR. "
+                 << "Reported error below (and see diagnostics):\n"
+                 << "  " << loadedModule.status().ToString() << "\n";
     return nullptr;
   }
 
@@ -150,6 +152,15 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Tags used to indicate which MetaGraphDef to import, "
                      "separated by ','"),
       llvm::cl::init("serve"));
+  static llvm::cl::opt<std::string> saveTempTfInput(
+      "save-temp-tf-input",
+      llvm::cl::desc("Save the TF pipeline input to this file"),
+      llvm::cl::init(""));
+  static llvm::cl::opt<std::string> saveTempIreeImport(
+      "save-temp-iree-input",
+      llvm::cl::desc("Save the resultant IR to this file (useful for saving an "
+                     "intermediate in a pipeline)"),
+      llvm::cl::init(""));
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -163,6 +174,20 @@ int main(int argc, char **argv) {
   MLIRContext context;
   OwningModuleRef module;
   registry.loadAll(&context);
+
+  auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
+    auto outputFile = openOutputFile(savePath);
+    if (!outputFile) {
+      llvm::errs() << "Could not open output file: " << savePath << "\n";
+      return failure();
+    }
+    OpPrintingFlags printFlags;
+    printFlags.enableDebugInfo();
+    module->print(outputFile->os(), printFlags);
+    outputFile->os() << "\n";
+    outputFile->keep();
+    return success();
+  };
 
   // First stage import.
   switch (importType) {
@@ -178,25 +203,26 @@ int main(int argc, char **argv) {
   }
   if (!module) return 1;
 
+  // Save temp output.
+  if (!saveTempTfInput.empty()) {
+    if (failed(saveToFile(saveTempTfInput))) return 10;
+  }
+
   // Run passes.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   iree_compiler::TF::buildTFImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
-    std::cerr
+    llvm::errs()
         << "Running iree-tf-import pass pipeline failed (see diagnostics)\n";
     return 2;
   }
 
-  // Output.
-  auto outputFile = openOutputFile(outputFilename);
-  if (!outputFile) {
-    return 3;
+  // Save temp output.
+  if (!saveTempIreeImport.empty()) {
+    if (failed(saveToFile(saveTempIreeImport))) return 10;
   }
-  OpPrintingFlags printFlags;
-  printFlags.enableDebugInfo();
-  module->print(outputFile->os(), printFlags);
-  outputFile->os() << "\n";
-  outputFile->keep();
 
+  // Save output.
+  if (failed(saveToFile(outputFilename))) return 3;
   return 0;
 }
