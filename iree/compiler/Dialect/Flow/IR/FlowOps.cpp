@@ -297,9 +297,7 @@ static Operation *inlineOpIntoDispatchRegion(OpBuilder &builder,
     // If the capturedInput is a constant scalar or splat constant clone it in
     // the dispatch region.
     if (ConstantOp constOp = capturedInput.getDefiningOp<ConstantOp>()) {
-      if (constOp.getType().isIntOrIndexOrFloat() ||
-          (constOp.getType().isa<RankedTensorType>() &&
-           constOp.value().cast<DenseElementsAttr>().isSplat())) {
+      if (constOp.getType().isIntOrIndexOrFloat()) {
         builder.clone(*constOp.getOperation(), map);
         continue;
       }
