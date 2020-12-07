@@ -52,17 +52,34 @@ function(iree_check_test)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
-  iree_bytecode_module(
-    NAME
-      "${_MODULE_NAME}"
-    SRC
-      "${_RULE_SRC}"
-    FLAGS
-      "-iree-mlir-to-vm-bytecode-module"
-      "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-      ${_RULE_COMPILER_FLAGS}
-    TESTONLY
-  )
+
+  if(ANDROID)
+    iree_bytecode_module(
+      NAME
+        "${_MODULE_NAME}"
+      SRC
+        "${_RULE_SRC}"
+      FLAGS
+        "-iree-mlir-to-vm-bytecode-module"
+        "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+        # TODO(ataei): Get target from arguments passed to build
+        "--iree-llvm-target-triple=aarch64-none-linux-android30"
+        ${_RULE_COMPILER_FLAGS}
+      TESTONLY
+    )
+  else(ANDROID)
+    iree_bytecode_module(
+      NAME
+        "${_MODULE_NAME}"
+      SRC
+        "${_RULE_SRC}"
+      FLAGS
+        "-iree-mlir-to-vm-bytecode-module"
+        "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+        ${_RULE_COMPILER_FLAGS}
+      TESTONLY
+    )
+  endif(ANDROID)
 
   # TODO(b/146898896): It would be nice if this were something we could query
   # rather than having to know the conventions used by iree_bytecode_module.
