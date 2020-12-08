@@ -38,7 +38,7 @@ class ResolveCommandBufferDispatchOrdinals
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
         op.command_buffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
-        entryPointOp.getParentOp()->getParentOp());
+        entryPointOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
         op.getLoc(), device, executableOp.sym_name());
 
@@ -67,7 +67,7 @@ class ResolveCommandBufferDispatchIndirectOrdinals
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
         op.command_buffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
-        entryPointOp.getParentOp()->getParentOp());
+        entryPointOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
         op.getLoc(), device, executableOp.sym_name());
 

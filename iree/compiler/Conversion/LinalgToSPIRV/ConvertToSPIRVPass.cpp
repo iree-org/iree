@@ -512,7 +512,7 @@ void ConvertToSPIRVPass::runOnOperation() {
       moduleOp.getLoc(), spirv::AddressingModel::Logical,
       spirv::MemoryModel::GLSL450);
   Operation *terminator = spvModule.getBlock().getTerminator();
-  Dialect *spvDialect = spvModule.getDialect();
+  Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {
     // Skip the newly created spv.module itself.
     if (&op == spvModule) continue;

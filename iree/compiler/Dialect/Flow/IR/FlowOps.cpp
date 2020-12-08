@@ -648,7 +648,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operands);
   // Construct Executable::Entry nested reference.
   StringRef executableOpSymName =
-      entryPoint.getParentOp()
+      entryPoint->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
   state.addAttribute(
