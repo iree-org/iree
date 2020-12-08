@@ -20,9 +20,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -67,7 +68,8 @@ struct FuseWithHALInterfaceStoreTensor
 struct FusionOfTensorOpsPass
     : public PassWrapper<FusionOfTensorOpsPass, OperationPass<>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect>();
+    registry
+        .insert<AffineDialect, IREE::HAL::HALDialect, linalg::LinalgDialect>();
   }
 
   void runOnOperation() override {

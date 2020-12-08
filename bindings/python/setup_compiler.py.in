@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build platform specific wheel files for the pyiree.rt package.
+# Built artifacts are per-platform and build out of the build tree.
+
+import os
+from setuptools import setup, find_namespace_packages
+
+# Make this setup position independent and make it not conflict with
+# parallel scripts.
+this_dir = os.path.abspath(os.path.dirname(__file__))
+setup_dir = os.path.join(this_dir, "setupbuild", "compiler")
+os.makedirs(setup_dir, exist_ok=True)
+os.chdir(setup_dir)
+
+def read(fname):
+  return open(os.path.join(this_dir, fname), "rt").read()
+
+
+setup(
+    name="google-iree-compiler",
+    version="@IREE_PYTHON_VERSION@",
+    author="The IREE Team",
+    author_email="iree-discuss@googlegroups.com",
+    license="Apache",
+    description="IREE Python Compiler API",
+    long_description=read("pyiree/compiler2/README.md"),
+    long_description_content_type="text/markdown",
+    url="https://github.com/google/iree",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache License",
+        "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+    ],
+    python_requires=">=3.6",
+    package_dir={"": this_dir},
+    packages=find_namespace_packages(
+        where=this_dir,
+        include=["pyiree.compiler2", "pyiree.compiler2.*"],
+        exclude=["*.CMakeFiles"]),
+    zip_safe=False,  # This package is fine but not zipping is more versatile.
+)

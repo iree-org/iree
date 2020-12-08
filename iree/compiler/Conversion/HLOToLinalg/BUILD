@@ -19,11 +19,35 @@ package(
 )
 
 cc_library(
-    name = "HLOToLinalg",
+    name = "HLOToLinalgOnTensors",
     srcs = [
         "FusionOfTensorOps.cpp",
-        "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
+    ],
+    hdrs = [
+        "HLOToLinalgOnTensorPasses.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/IR:HALDialect",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+    ],
+)
+
+cc_library(
+    name = "HLOToLinalg",
+    srcs = [
+        "HLOToLinalgOnBuffers.cpp",
         "Passes.cpp",
         "ResolveShapeOps.cpp",
     ],
@@ -31,6 +55,7 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        ":HLOToLinalgOnTensors",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Dialect/HAL/IR",
@@ -38,6 +63,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
@@ -48,7 +74,6 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
     ],
 )

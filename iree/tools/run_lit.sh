@@ -17,9 +17,16 @@ set -e
 set -o pipefail
 
 if [ -z "${RUNFILES_DIR}" ]; then
-  # Some versions of bazel do not set RUNFILES_DIR. Instead they just cd
-  # into the directory.
-  RUNFILES_DIR="$PWD"
+  if [ -f "CMakeCache.txt" ]; then
+    # If running under CMake/CTest in the build directory, just scope to the
+    # iree directory to avoid blowing up the search through things like
+    # bazel out directories and the like.
+    RUNFILES_DIR="$PWD/iree"
+  else
+    # Some versions of bazel do not set RUNFILES_DIR. Instead they just cd
+    # into the directory.
+    RUNFILES_DIR="$PWD"
+  fi
 fi
 
 # Detect whether cygwin/msys2 paths need to be translated.

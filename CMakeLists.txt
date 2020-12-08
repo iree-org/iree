@@ -46,6 +46,7 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
+option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
@@ -268,6 +269,18 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
+# Configure python early if there are any features that need it.
+# Note that doing this early ensures that dependencies that make incidental
+# use of Python (such as LLVM) resolve the same version.
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_COMPILER} OR
+   ${IREE_BUILD_PYTHON_BINDINGS} OR
+   ${IREE_BUILD_TENSORFLOW_COMPILER})
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+#-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
 # We treat the LLVM dependency specially because we support several different
 # ways to use it:
@@ -371,21 +384,27 @@ if(${IREE_ENABLE_MLIR})
 endif()
 
 #-------------------------------------------------------------------------------
-# Non-LLVM Dependencies
+# Python bindings.
 #-------------------------------------------------------------------------------
 
-# Use the FindPython functions before any of our dependencies do. See
-# https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
-# If one dependency finds Python 2 (the default),
-# any others that try to find Python 3 will fail.
-# (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
-if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(Python3 COMPONENTS Interpreter REQUIRED)
-endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   # Note: Optional because python libs can be manually specified.
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
+
+#-------------------------------------------------------------------------------
+# Bazel setup (conditional on whether features need it)
+# Depends on python configuration.
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_TENSORFLOW_COMPILER})
+  include(configure_bazel)
+  iree_configure_bazel()
+endif()
+
+#-------------------------------------------------------------------------------
+# Other dependencies.
+#-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
@@ -514,6 +533,10 @@ endif()
 
 if(${IREE_BUILD_EXPERIMENTAL})
   add_subdirectory(experimental)
+endif()
+
+if(${IREE_BUILD_TENSORFLOW_COMPILER})
+  add_subdirectory(integrations/tensorflow)
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})

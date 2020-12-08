@@ -84,7 +84,7 @@ bazel \
   --nosystem_rc --nohome_rc --noworkspace_rc \
   --bazelrc=build_tools/bazel/iree.bazelrc \
   query \
-    //integrations/... + //colab/... + //packaging/... | \
+    //integrations/... + //colab/... | \
       xargs bazel \
         --nosystem_rc --nohome_rc --noworkspace_rc \
         --bazelrc=build_tools/bazel/iree.bazelrc \

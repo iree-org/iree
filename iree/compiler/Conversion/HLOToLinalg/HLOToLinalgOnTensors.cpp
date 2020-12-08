@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
