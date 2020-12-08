@@ -17,7 +17,8 @@ ways:
   interpretation even more complicated.
 
 There are two parts to this page: platform-specific information about [how to
-query](#perf-and-simpleperf-on-linux-and-android) this data, and, at the end, a platform-independent explanation of [how to
+query](#perf-and-simpleperf-on-linux-and-android) this data, and, at the end, a
+platform-independent explanation of [how to
 interpret](#interpreting-cpu-event-counts) it.
 
 ## Perf and Simpleperf, on Linux and Android
@@ -72,9 +73,10 @@ report` and `perf annotate`.
 
 `perf report` breaks down the event counts by symbol. In the default case where
 what was sampled was time, this is just an ordinary profile by symbol name, no
-different than what could be viewed in other profilers such as [Tracy](profiling_with_tracy.md). Where it
-gets really interesting is when the profile was recording a specific event type,
-as in the above `-e L1-dcache-load-misses` example:
+different than what could be viewed in other profilers such as
+[Tracy](profiling_with_tracy.md). Where it gets really interesting is when the
+profile was recording a specific event type, as in the above `-e
+L1-dcache-load-misses` example:
 
 ```
 perf report -i /tmp/perf.data
@@ -179,12 +181,12 @@ There are multiple layers of complexity in interpreting CPU event counts.
 The first difficulty is in the fact that most of these events are *normal*. So
 just knowing that they happened is not in itself actionable.
 
-For example, if we learn that some causes has cache misses... big deal! So does
-all code. Maybe this code has *too many* cache misses... but how many is too
-many? Maybe this code alone accounts for a large fraction of the overall total
-of the whole program... but maybe even that is normal, for instance if the code
-being studied is the 'hot' part of the program where a large fraction of overall
-time is spent?
+For example, if we learn that some code causes cache misses, that isn't big
+news: so does all code. Maybe this code has *too many* cache misses, but how
+many is too many? Maybe this code alone accounts for a large fraction of the
+overall total of the whole program, but maybe even that is normal, for instance
+if the code being studied is the 'hot' part of the program where a large
+fraction of overall time is spent?
 
 #### These events are hardware-dependent and under-documented
 
