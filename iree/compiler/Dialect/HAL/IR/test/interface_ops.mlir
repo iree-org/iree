@@ -2,12 +2,12 @@
 
 // CHECK-LABEL: @interface_workgroup_info
 func @interface_workgroup_info() {
-  // CHECK: %workgroup_id = hal.interface.workgroup.id : tuple<index, index, index>
-  %0 = hal.interface.workgroup.id : tuple<index, index, index>
-  // CHECK: %workgroup_count = hal.interface.workgroup.count : tuple<index, index, index>
-  %1 = hal.interface.workgroup.count : tuple<index, index, index>
-  // CHECK: %workgroup_size = hal.interface.workgroup.size : tuple<index, index, index>
-  %2 = hal.interface.workgroup.size : tuple<index, index, index>
+  // CHECK: %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %0 = hal.interface.workgroup.id[0] : index
+  // CHECK: %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %1 = hal.interface.workgroup.count[1] : index
+  // CHECK: %workgroup_size_z = hal.interface.workgroup.size[2] : index
+  %2 = hal.interface.workgroup.size[2] : index
   return
 }
 

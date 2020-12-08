@@ -161,7 +161,7 @@ LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getI32IntegerAttr(nextEntryPointOrdinal++),
                 builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
-                entryPointOp.signatureAttr());
+                entryPointOp.signatureAttr(), ArrayAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.

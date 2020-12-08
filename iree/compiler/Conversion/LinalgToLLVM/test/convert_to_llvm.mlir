@@ -14,7 +14,7 @@ func @convert_dynamic_shape() -> f32 {
 hal.interface @legacy_io attributes {push_constants = 2 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 }
-// CHECK: llvm.func @convert_dynamic_shape(%[[ARG0:.+]]: !llvm.ptr<ptr<i8>>, %[[ARG1:.+]]: !llvm.ptr<i32>, %[[THREAD_X_ID:.+]]: !llvm.i32, %[[THREAD_Y_ID:.+]]: !llvm.i32, %[[THREAD_Z_ID:.+]]: !llvm.i32)
+// CHECK: llvm.func @convert_dynamic_shape(%[[ARG0:.+]]: !llvm.ptr<ptr<i8>>, %[[ARG1:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_ID:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_COUNT:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_SIZE:.+]]: !llvm.ptr<i32>)
 // CHECK: %[[PACKED_ARGS_PTR:.+]] = llvm.bitcast %[[ARG0]] : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>)>>
 // CHECK: %[[PACKED_ARGS:.+]] = llvm.load %[[PACKED_ARGS_PTR]] : !llvm.ptr<struct<(ptr<float>)>>
 // CHECK: %[[MEMREF0_DATA_PTR:.+]] = llvm.extractvalue %[[PACKED_ARGS]][0] : !llvm.struct<(ptr<float>)>
@@ -53,7 +53,7 @@ func @convert_dynamic_shape2() -> f32 {
 hal.interface @legacy_io2 attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 }
-// CHECK: llvm.func @convert_dynamic_shape2(%[[ARG0:.+]]: !llvm.ptr<ptr<i8>>, %[[ARG1:.+]]: !llvm.ptr<i32>, %[[THREAD_X_ID:.+]]: !llvm.i32, %[[THREAD_Y_ID:.+]]: !llvm.i32, %[[THREAD_Z_ID:.+]]: !llvm.i32)
+// CHECK: llvm.func @convert_dynamic_shape2(%[[ARG0:.+]]: !llvm.ptr<ptr<i8>>, %[[ARG1:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_ID:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_COUNT:.+]]: !llvm.ptr<i32>, %[[WORKGROUP_SIZE:.+]]: !llvm.ptr<i32>)
 // CHECK: %[[PACKED_ARGS_PTR:.+]] = llvm.bitcast %[[ARG0]] : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>)>>
 // CHECK: %[[PACKED_ARGS:.+]] = llvm.load %[[PACKED_ARGS_PTR]] : !llvm.ptr<struct<(ptr<float>)>>
 // CHECK: %[[MEMREF0_DATA_PTR:.+]] = llvm.extractvalue %[[PACKED_ARGS]][0] : !llvm.struct<(ptr<float>)>
@@ -86,9 +86,9 @@ hal.interface @legacy_io2 attributes {push_constants = 1 : i32, sym_visibility =
 // CHECK_LABEL: @distribute_lookup
 func @distribute_lookup() -> f32 {
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io3::@arg0} : memref<2x2x2xf32>
-  %1 = iree.workgroup_id {dimension = "x"} : index
-  %2 = iree.workgroup_id {dimension = "y"} : index
-  %3 = iree.workgroup_id {dimension = "z"} : index
+  %1 = hal.interface.workgroup.id[0] : index
+  %2 = hal.interface.workgroup.id[1] : index
+  %3 = hal.interface.workgroup.id[2] : index
   %4 = load %0[%1, %2, %3] : memref<2x2x2xf32>
   return %4 : f32
 }

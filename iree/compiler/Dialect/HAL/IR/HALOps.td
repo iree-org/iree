@@ -1856,7 +1856,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
-    TypeAttr:$signature
+    TypeAttr:$signature,
+    OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
 }
 
@@ -2095,15 +2096,16 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
     built-in variable.
 
     ```mlir
-    %xyz = hal.interface.workgroup.id : tuple<index, index, index>
-    %x = extract_element %xyz[0] : tuple<index, index, index>
+    %x = hal.interface.workgroup.id[0] : index
+    %y = hal.interface.workgroup.id[1] : index
+    %z = hal.interface.workgroup.id[2] : index
     ```
   }];
 
-  let arguments = (ins);
-  let results = (outs HAL_WorkgroupXYZ:$result);
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
 
-  let assemblyFormat = "attr-dict `:` type($result)";
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
 def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
@@ -2119,15 +2121,16 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
     built-in variable.
 
     ```mlir
-    %xyz = hal.interface.workgroup.count : tuple<index, index, index>
-    %x = extract_element %xyz[0] : tuple<index, index, index>
+    %x = hal.interface.workgroup.count[0] : index
+    %y = hal.interface.workgroup.count[1] : index
+    %z = hal.interface.workgroup.count[2] : index
     ```
   }];
 
-  let arguments = (ins);
-  let results = (outs HAL_WorkgroupXYZ:$result);
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
 
-  let assemblyFormat = "attr-dict `:` type($result)";
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
 def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
@@ -2143,15 +2146,16 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
     built-in variable.
 
     ```mlir
-    %xyz = hal.interface.workgroup.size : tuple<index, index, index>
-    %x = extract_element %xyz[0] : tuple<index, index, index>
+    %x = hal.interface.workgroup.size[0] : index
+    %y = hal.interface.workgroup.size[1] : index
+    %z = hal.interface.workgroup.size[2] : index
     ```
   }];
 
-  let arguments = (ins);
-  let results = (outs HAL_WorkgroupXYZ:$result);
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
 
-  let assemblyFormat = "attr-dict `:` type($result)";
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
 def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {

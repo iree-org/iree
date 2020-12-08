@@ -464,9 +464,6 @@ def HAL_Dim : TypeAlias<Index>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;
 
-// Ideally this would be a vector<3xindex> but you can't put indices in vectors.
-def HAL_WorkgroupXYZ : TupleOf<[HAL_Dim, HAL_Dim, HAL_Dim]>;
-
 // TODO(benvanik): assert rank 3
 def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
     IREE_IndexAttrBase<"size_t">,

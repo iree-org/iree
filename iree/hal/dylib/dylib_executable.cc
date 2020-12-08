@@ -185,6 +185,8 @@ struct DyLibDispatchState : public HostExecutable::DispatchState {
 
   IREE_TRACE(const char* entry_name = nullptr);
 
+  std::array<uint32_t, 3> workgroup_count;
+  std::array<uint32_t, 3> workgroup_size;
   void* entry_function = nullptr;
   std::array<void*, 32> args;
   std::array<uint32_t, 32> push_constants;
@@ -200,6 +202,8 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
   }
 
   auto dispatch_state = make_ref<DyLibDispatchState>();
+  dispatch_state->workgroup_count = params.workgroup_count;
+  dispatch_state->workgroup_size = params.workgroup_size;
   IREE_TRACE(dispatch_state->entry_name = entry_names_[params.entry_point]);
   dispatch_state->entry_function = entry_functions_[params.entry_point];
 
@@ -226,11 +230,12 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
   IREE_TRACE_SCOPE_DYNAMIC(dispatch_state->entry_name);
 
-  auto entry_function = (void (*)(void**, uint32_t*, int32_t, int32_t,
-                                  int32_t))dispatch_state->entry_function;
+  auto entry_function = (void (*)(void**, uint32_t*, uint32_t*, uint32_t*,
+                                  uint32_t*))dispatch_state->entry_function;
   entry_function(dispatch_state->args.data(),
-                 dispatch_state->push_constants.data(), workgroup_xyz[0],
-                 workgroup_xyz[1], workgroup_xyz[2]);
+                 dispatch_state->push_constants.data(), workgroup_xyz.data(),
+                 dispatch_state->workgroup_count.data(),
+                 dispatch_state->workgroup_size.data());
 
   return OkStatus();
 }

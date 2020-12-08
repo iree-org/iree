@@ -277,7 +277,7 @@ static LogicalResult declareEntryPointOps(
             builder.getStringAttr(thunkFuncOp->getName()),
             builder.getI32IntegerAttr(nextOrdinal++),
             builder.getSymbolRefAttr(interfaceOp),
-            TypeAttr::get(sourceFuncOp.getType()));
+            TypeAttr::get(sourceFuncOp.getType()), ArrayAttr{});
       }
     }
 
