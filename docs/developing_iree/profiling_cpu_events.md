@@ -160,15 +160,17 @@ adb shell simpleperf list
 
 #### No support for `annotate` by CPU event
 
-There is no way to perform `perf annotate` based on a CPU event on an ARM-based
-Android device, for two reasons. The first is a basic hardware reason: the
-performance counters of ARM CPUs found in Android devices are not precise enough
-at pinning events to the right instruction. The second is a software issue:
-`simpleperf` has no `annotate` command, so to try this, one needs to somehow use
-`perf` instead, which, as noted above, is hard.
+There is no `simpleperf annotate`. The `simpleperf` documentation lists a couple
+of
+[ways](https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md#show-annotated-source-code-and-disassembly)
+of achieving the same thing.
 
-Fortunately, the common case of `annotate` by time, as opposed to by CPU event,
-is supported by [Tracy](profiling_with_tracy.md). 
+However:
+* The common case of annotating by time, as opposed to annotating by CPU event,
+  is supported by [Tracy](profiling_with_tracy.md).
+* Annotating by CPU event is inherently not working due to hardware limitations
+  of the ARM CPUs found in Android devices. That is, the hardware is too
+  imprecise at pinning an event to a particular instruction.
 
 ## Interpreting CPU event counts
 
