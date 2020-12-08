@@ -101,10 +101,12 @@ static bool hasKernelDilation(mhlo::ConvOp op) {
 static bool hasNormalizedConvolution(mhlo::ConvOp op) {
   auto dimensionNumbers = op.dimension_numbers();
 
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0)
+  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) {
     return false;
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0)
+  }
+  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) {
     return false;
+  }
 
   for (auto it : llvm::enumerate(dimensionNumbers.input_spatial_dimensions())) {
     if (it.value() != it.index() + 1) return false;
