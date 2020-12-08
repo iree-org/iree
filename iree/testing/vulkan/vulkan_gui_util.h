@@ -14,17 +14,14 @@
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
+#include <imgui.h>
+#include <imgui_impl_sdl.h>
+#include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan.h>
 
 #include <vector>
 
 #include "iree/hal/vulkan/api.h"
-
-// NOTE: order matters here, imgui must come first:
-#include "third_party/dear_imgui/imgui.h"
-// NOTE: must follow imgui.h:
-#include "third_party/dear_imgui/examples/imgui_impl_sdl.h"
-#include "third_party/dear_imgui/examples/imgui_impl_vulkan.h"
 
 namespace iree {
 

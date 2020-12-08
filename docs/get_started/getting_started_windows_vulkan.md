@@ -140,13 +140,12 @@ Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
 
 ## Running IREE's Vulkan Samples
 
+> Note:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;The Vulkan samples are CMake-only.
+
 Install the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/), then run:
 
 ```powershell
-# -- CMake --
 > cmake --build ..\iree-build\ --target iree_samples_vulkan_vulkan_inference_gui
 > ..\iree-build\iree\samples\vulkan\vulkan_inference_gui.exe
-
-# -- Bazel --
-> bazel run iree/samples/vulkan:vulkan_inference_gui
 ```

@@ -253,30 +253,6 @@ maybe(
 
 maybe(
     new_local_repository,
-    name = "sdl2",
-    build_file = "build_tools/third_party/sdl2/BUILD.overlay",
-    path = "third_party/sdl2",
-)
-
-maybe(
-    new_local_repository,
-    name = "sdl2_config",
-    build_file_content = """
-package(default_visibility = ["//visibility:public"])
-cc_library(name = "headers", srcs = glob(["*.h"]))
-""",
-    path = "build_tools/third_party/sdl2",
-)
-
-maybe(
-    new_local_repository,
-    name = "dear_imgui",
-    build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
-    path = "third_party/dear_imgui",
-)
-
-maybe(
-    new_local_repository,
     name = "renderdoc_api",
     build_file = "build_tools/third_party/renderdoc_api/BUILD.overlay",
     path = "third_party/renderdoc_api",

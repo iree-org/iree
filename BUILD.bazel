@@ -30,7 +30,6 @@
 #  "@iree_pybind11//"
 #  "@renderdoc_api//"
 #  "@com_google_ruy//"
-#  "@sdl2//"
 #  "@org_tensorflow//tensorflow/"
 #  "@com_google_tracing_framework_cpp//"
 #  "@iree_vulkan_headers//"
