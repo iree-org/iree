@@ -105,7 +105,7 @@ def import_versions(repo_dir):
              "still in the version file") % (path,))
       continue
     if written is None:
-      print("Warning: Submodule %s is not in the version file" % (current,))
+      print(f"Warning: Submodule '{current}' is not in the version file")
       continue
     # Directly update the submodule commit hash in the index.
     # See: https://stackoverflow.com/questions/33514642
@@ -138,7 +138,7 @@ def check_submodule_versions(repo_dir):
         "  ./scripts/git/submodule_versions.py export # Use version in git state ('actual')"
     )
     for k, (current, written) in diff_versions.items():
-      print("%s : actual=%s written=%s" % (k, current, written))
+      print(f"{k} : actual={current} written={written}")
     return False
   return True
 

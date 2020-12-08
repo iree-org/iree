@@ -53,17 +53,17 @@ def setup_environment():
 
   # Determine the repository root (one dir-level up).
   repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-  print("Repository root: %s" % (repo_root,))
+  print(f"Repository root: {repo_root}")
 
   # Use 'bazelisk' instead of 'bazel' if it exists on the path.
   # Bazelisk is an optional utility that pick versions of Bazel to use and
   # passes through all command-line arguments to the real Bazel binary:
   # https://github.com/bazelbuild/bazelisk
   bazel_exe = "bazelisk" if shutil.which("bazelisk") else "bazel"
-  print("Using bazel executable: %s" % (bazel_exe))
+  print(f"Using bazel executable: {bazel_exe}")
 
   # Detect python and query bazel for its output.
-  print("Setting Bazel PYTHON_BIN=%s" % (sys.executable,))
+  print(f"Setting Bazel PYTHON_BIN={sys.executable}")
   bazel_env["PYTHON_BIN"] = sys.executable
   bazel_bin = subprocess.check_output([bazel_exe, "info", "bazel-bin"],
                                       cwd=repo_root,
@@ -74,7 +74,7 @@ def setup_environment():
   # right way.
   if os.path.sep == "\\":
     bazel_bin = bazel_bin.replace("/", "\\")
-  print("Found Bazel bin: %s" % (bazel_bin))
+  print(f"Found Bazel bin: {bazel_bin}")
 
 
 def build():
@@ -139,9 +139,9 @@ def launch_jupyter(python_path):
 def show_install_instructions():
   """Prints some install instructions."""
   print("ERROR: Unable to load Jupyter. Ensure that it is installed:")
-  print("  %s -m pip install --upgrade pip" % (sys.executable,))
-  print("  %s -m pip install jupyter" % (sys.executable,))
-  print("  %s -m pip install jupyter_http_over_ws" % (sys.executable,))
+  print(f"  {sys.executable} -m pip install --upgrade pip")
+  print(f"  {sys.executable} -m pip install jupyter")
+  print(f"  {sys.executable} -m pip install jupyter_http_over_ws")
   print("  jupyter serverextension enable --py jupyter_http_over_ws")
 
 

@@ -56,7 +56,7 @@ def execute(args, cwd, capture_output=False, silent=False, **kwargs):
     The output if capture_output, otherwise None.
   """
   if not silent:
-    print("+", " ".join(args), "  [from %s]" % cwd)
+    print(f"+{' '.join(args)}  [from {cwd}]")
   if capture_output:
     return subprocess.check_output(args, cwd=cwd, **kwargs)
   else:

@@ -58,7 +58,7 @@ def _create_default_iree_driver(
   driver_exceptions = {}
   for driver_name in driver_names:
     if driver_name not in available_driver_names:
-      print("Could not create driver %s (not registered)" % driver_name,
+      print(f"Could not create driver {driver_name} (not registered)",
             file=sys.stderr)
       continue
     try:
@@ -66,7 +66,7 @@ def _create_default_iree_driver(
       # TODO(laurenzo): Remove these prints to stderr (for now, more information
       # is better and there is no better way to report it yet).
     except Exception as ex:  # pylint: disable=broad-except
-      print("Could not create default driver %s: %r" % (driver_name, ex),
+      print(f"Could not create default driver {driver_name}: {ex:!r}",
             file=sys.stderr)
       driver_exceptions[driver_name] = ex
       continue
@@ -78,18 +78,18 @@ def _create_default_iree_driver(
     try:
       device = driver.create_default_device()
     except Exception as ex:
-      print("Could not create default driver device %s: %r" % (driver_name, ex),
+      print(f"Could not create default driver device {driver_name}: {ex:!r}",
             file=sys.stderr)
       driver_exceptions[driver_name] = ex
       continue
 
-    print("Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
+    print("Created IREE driver {driver_name}: {driver:!r}", file=sys.stderr)
     return driver
 
   # All failed.
-  raise RuntimeError("Could not create any requested driver "
-                     "%r (available=%r) : %r" %
-                     (driver_names, available_driver_names, driver_exceptions))
+  raise RuntimeError(
+      f"Could not create any requested driver {driver_names:!r} (available="
+      f"{available_driver_names:!r}) : {driver_exceptions:!r}")
 
 
 class Config:
@@ -147,10 +147,7 @@ class BoundFunction:
     return unpacked_results
 
   def __repr__(self):
-    return "<BoundFunction %r (%r)>" % (
-        self._abi,
-        self._vm_function,
-    )
+    return f"<BoundFunction {self._abi:!r} ({self._vm_function:!r})>"
 
   def get_serialized_values(self):
     if self._serialized_inputs is None:
@@ -187,14 +184,13 @@ class BoundModule:
 
     vm_function = self._vm_module.lookup_function(name)
     if vm_function is None:
-      raise KeyError("Function '%s' not found in module '%s'" %
-                     (name, self.name))
+      raise KeyError(f"Function '{name}' not found in module '{self.name}'")
     bound_function = BoundFunction(self._context, vm_function)
     self._lazy_functions[name] = bound_function
     return bound_function
 
   def __repr__(self):
-    return "<BoundModule %r>" % (self._vm_module,)
+    return f"<BoundModule {self._vm_module:!r}>"
 
 
 class Modules(dict):
@@ -212,7 +208,8 @@ class SystemContext:
 
   def __init__(self, modules=None, config: Optional[Config] = None):
     self._config = config if config is not None else _get_global_config()
-    print("SystemContext driver=%r" % self._config.driver, file=sys.stderr)
+    # :!r does not work with the _binding.HalDriver class.
+    print(f"SystemContext driver={repr(self._config.driver)}", file=sys.stderr)
     self._is_dynamic = modules is None
     if not self._is_dynamic:
       init_modules = self._config.default_modules + tuple(modules)
@@ -258,7 +255,7 @@ class SystemContext:
     for m in modules:
       name = m.name
       if name in self._modules:
-        raise ValueError("Attempt to register duplicate module: '%s'" % (name,))
+        raise ValueError(f"Attempt to register duplicate module: '{name}'")
       self._modules[m.name] = BoundModule(self, m)
     self._vm_context.register_modules(modules)
 
