@@ -33,7 +33,7 @@ iree_bytecode_module(
 # https://vulkan.lunarg.com/.
 # If Vulkan is not found, omit the target.
 if(NOT TARGET iree::testing::vulkan::vulkan_gui_util)
-  message(NOTICE "Vulkan was not found, skipping vulkan_inference_gui sample")
+  message(VERBOSE "Missing Vulkan dependencies, skipping vulkan_inference_gui sample")
   return()
 endif()
 
