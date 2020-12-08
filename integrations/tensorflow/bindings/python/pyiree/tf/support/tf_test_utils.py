@@ -22,6 +22,8 @@
 #   ref: reference – for the reference CompiledModule
 #   tar: target - for one of the target CompiledModules
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 import collections
 import copy
 import itertools
@@ -111,7 +113,7 @@ def get_target_backends() -> Sequence[module_utils.BackendInfo]:
     backends = module_utils.BackendInfo.get_all_backends()
   return backends
 
-
+# TODO(#4131) python>=3.7: Consider using a (frozen) dataclass.
 Modules = collections.namedtuple("Modules",
                                  ["ref_module", "tar_modules", "artifacts_dir"])
 

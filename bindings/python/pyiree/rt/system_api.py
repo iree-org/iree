@@ -23,6 +23,8 @@ and functions.
 # pylint: disable=unused-argument
 # pylint: disable=g-explicit-length-test
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 __all__ = ["load_module", "load_modules", "Config", "SystemContext"]
 
 import os

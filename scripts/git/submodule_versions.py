@@ -46,7 +46,7 @@ def get_submodule_versions(repo_dir):
   raw_status = utils.execute(["git", "submodule", "status"],
                              cwd=repo_dir,
                              silent=True,
-                             capture_output=True).decode("UTF-8")
+                             capture_output=True).stdout
   status_lines = []
   for line in raw_status.splitlines():
     # Format is a status char followed by revision, space and path.

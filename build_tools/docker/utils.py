@@ -25,23 +25,25 @@ def run_command(command: Sequence[str],
                 dry_run: bool = False,
                 check: bool = True,
                 capture_output: bool = False,
-                universal_newlines: bool = True,
+                text: bool = True,
                 **run_kwargs) -> subprocess.CompletedProcess:
   """Thin wrapper around subprocess.run"""
   print(f"Running: `{' '.join(command)}`")
-  if not dry_run:
-    if capture_output:
-      # Hardcode support for python <= 3.6.
-      run_kwargs["stdout"] = subprocess.PIPE
-      run_kwargs["stderr"] = subprocess.PIPE
+  if dry_run:
+    # Dummy CompletedProess with successful returncode.
+    return subprocess.CompletedProcess(command, returncode=0)
 
-    completed_process = subprocess.run(command,
-                                       universal_newlines=universal_newlines,
-                                       check=check,
-                                       **run_kwargs)
-    return completed_process
-  # Dummy CompletedProess with successful returncode.
-  return subprocess.CompletedProcess(command, returncode=0)
+  if capture_output:
+    # TODO(#4131) python>=3.7: Use capture_output=True.
+    run_kwargs["stdout"] = subprocess.PIPE
+    run_kwargs["stderr"] = subprocess.PIPE
+
+  # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+  completed_process = subprocess.run(command,
+                                      universal_newlines=text,
+                                      check=check,
+                                      **run_kwargs)
+  return completed_process
 
 
 def check_gcloud_auth(dry_run: bool = False):

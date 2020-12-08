@@ -25,7 +25,7 @@ def find_git_toplevel():
   return execute(["git", "rev-parse", "--show-toplevel"],
                  cwd=os.path.dirname(__file__),
                  capture_output=True,
-                 silent=True).strip().decode("UTF-8")
+                 silent=True).stdout.strip()
 
 
 def str2bool(v):
@@ -42,22 +42,30 @@ def str2bool(v):
     raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-def execute(args, cwd, capture_output=False, silent=False, **kwargs):
+def execute(args, cwd, capture_output=False, text=True, silent=False, **kwargs):
   """Executes a command.
 
   Args:
     args: List of command line arguments.
     cwd: Directory to execute in.
     capture_output: Whether to capture the output.
+    text: Whether or not to treat std* as text (as opposed to binary streams).
     silent: Whether to skip logging the invocation.
     **kwargs: Extra arguments to pass to subprocess.exec
 
   Returns:
-    The output if capture_output, otherwise None.
+    A subprocess.CompletedProcess
   """
   if not silent:
     print(f"+{' '.join(args)}  [from {cwd}]")
   if capture_output:
-    return subprocess.check_output(args, cwd=cwd, **kwargs)
-  else:
-    return subprocess.check_call(args, cwd=cwd, **kwargs)
+    # TODO(#4131) python>=3.7: Use capture_output=True.
+    kwargs["stdout"] = subprocess.PIPE
+    kwargs["stderr"] = subprocess.PIPE
+  return subprocess.run(
+      args,
+      cwd=cwd,
+      check=True,
+      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+      universal_newlines=text,
+      **kwargs)

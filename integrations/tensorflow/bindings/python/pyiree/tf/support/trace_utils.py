@@ -18,6 +18,8 @@
 #   ref: reference – for the reference CompiledModule
 #   tar: target - for one of the target CompiledModules
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 import copy
 import glob
 import inspect
