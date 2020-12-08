@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake@sha256:644cc10ea5a33bd97be51a8f6fd6ee7e2ab3904f468873be0f71373b0ec48919 AS install-swiftshader
+FROM gcr.io/iree-oss/cmake@sha256:9d9953acf5ca0cf1ff3e8de32f10f24dfab1c4e8ec5d1fc047f556024ee4bed6 AS install-swiftshader
 WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git

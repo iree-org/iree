@@ -33,7 +33,7 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 RUN chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh"
 RUN "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/
 
-FROM gcr.io/iree-oss/base@sha256:1e57b0957f71cd1aa9d6e4838c51f40bdbb52dd1be0b4b6b14b337b36654cc63 AS final
+FROM gcr.io/iree-oss/base@sha256:9b73f4e2b1239f65a19f2022e54f4b15310b805570831fbe2cf8b4dc928f1d10 AS final
 ARG CMAKE_MAJOR_VERSION
 ARG CMAKE_MINOR_VERSION
 

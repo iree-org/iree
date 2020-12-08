@@ -25,6 +25,7 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
+    "LinalgTileAndDistributeOnTensorsPass.cpp"
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "Passes.cpp"

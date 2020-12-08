@@ -198,8 +198,11 @@ class ConvertBroadcastOp : public OpConversionPattern<shape::BroadcastOp> {
       ConversionPatternRewriter &rewriter) const override {
     Value lhs = operands[0];
     Value rhs = operands[1];
-    auto lhsType = lhs.getType().cast<RankedShapeType>();
-    auto rhsType = rhs.getType().cast<RankedShapeType>();
+    auto lhsType = lhs.getType().dyn_cast<RankedShapeType>();
+    auto rhsType = rhs.getType().dyn_cast<RankedShapeType>();
+    if (!lhsType || !rhsType) {
+      return failure();
+    }
     // Establish invariant that rank(lhs) <= rank(rhs)
     if (lhsType.getRank() > rhsType.getRank()) {
       std::swap(lhsType, rhsType);

@@ -12,6 +12,15 @@ cc_library(
     hdrs = [
         "pffft.h",
     ],
+    deps =  [":pffft_internal"],
+    include_prefix = "third_party/pffft",
+)
+
+cc_library(
+    name = "pffft_internal",
+    hdrs = [
+        "pffft.h",
+    ],
 )
 
 cc_library(

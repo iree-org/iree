@@ -21,8 +21,8 @@ import tensorflow.compat.v2 as tf
 class FftModule(tf.Module):
   # TODO(natashaknk) when multiple outputs are supported, make into one test.
   @tf.function(input_signature=[
-      tf.TensorSpec([4], tf.float32),
-      tf.TensorSpec([4], tf.float32)
+      tf.TensorSpec([16], tf.float32),
+      tf.TensorSpec([16], tf.float32)
   ])
   def fft_real(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
@@ -30,8 +30,8 @@ class FftModule(tf.Module):
     return tf.math.real(complex_out)
 
   @tf.function(input_signature=[
-      tf.TensorSpec([4], tf.float32),
-      tf.TensorSpec([4], tf.float32)
+      tf.TensorSpec([16], tf.float32),
+      tf.TensorSpec([16], tf.float32)
   ])
   def fft_imag(self, real_array, imag_array):
     complex_in = tf.complex(real_array, imag_array)
@@ -48,18 +48,34 @@ class FftTest(tf_test_utils.TracedModuleTestCase):
   def test_fft_real(self):
 
     def fft_real(module):
-      real_array = np.array([9., 1., 4.5, -0.3], dtype=np.float32)
-      imag_array = np.array([0., -1., 17.7, 10.], dtype=np.float32)
-      module.fft_real(real_array, imag_array)
+      real_array = np.array([
+          9., 1., 4.5, -0.3, 10., -1., 5.5, 0.3, 299., 3.5, -0.777, 2., 1.7,
+          3.5, -4.5, 0.0
+      ],
+                            dtype=np.float32)
+      imag_array = np.array([
+          0., -1., 17.7, 10., 0., -11., 2763, 0., 0., -1.5, 16.8, 100., 0.,
+          -111., 2.3, 1.
+      ],
+                            dtype=np.float32)
+      module.fft_real(real_array, imag_array, rtol=1e-4)
 
     self.compare_backends(fft_real, self._modules)
 
   def test_fft_imag(self):
 
     def fft_imag(module):
-      real_array = np.array([9., 1., 4.5, -0.3], dtype=np.float32)
-      imag_array = np.array([0., -1., 17.7, 10.], dtype=np.float32)
-      module.fft_imag(real_array, imag_array)
+      real_array = np.array([
+          9., 1., 4.5, -0.3, 10., -1., 5.5, 0.3, 299., 3.5, -0.777, 2, 1.7, 3.5,
+          -4.5, 0.0
+      ],
+                            dtype=np.float32)
+      imag_array = np.array([
+          0., -1., 17.7, 10., 0., -11., 2763, 0., 0., -1.5, 16.8, 100., 0.,
+          -111., 2.3, 1.
+      ],
+                            dtype=np.float32)
+      module.fft_imag(real_array, imag_array, rtol=1e-4)
 
     self.compare_backends(fft_imag, self._modules)
 
