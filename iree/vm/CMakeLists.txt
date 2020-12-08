@@ -161,13 +161,12 @@ iree_cc_library(
     bytecode_module
   HDRS
     "bytecode_module.h"
-    "bytecode_op_table.h"
+    "generated/bytecode_op_table.h"
   SRCS
     "bytecode_dispatch.c"
     "bytecode_dispatch_util.h"
     "bytecode_module.c"
     "bytecode_module_impl.h"
-    "bytecode_op_table.h"
   DEPS
     ::vm
     iree::base::api
@@ -175,6 +174,8 @@ iree_cc_library(
     iree::base::flatcc
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
+  COPTS
+    "-Iiree/vm/generated"
   PUBLIC
 )
 

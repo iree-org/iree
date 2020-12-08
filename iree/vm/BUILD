@@ -178,11 +178,10 @@ cc_library(
         "bytecode_dispatch_util.h",
         "bytecode_module.c",
         "bytecode_module_impl.h",
-        "bytecode_op_table.h",
     ],
     hdrs = [
         "bytecode_module.h",
-        "bytecode_op_table.h",
+        "generated/bytecode_op_table.h",
     ],
     deps = [
         ":vm",
@@ -192,6 +191,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
+    copts = ["-Iiree/vm/generated"],
 )
 
 # TODO(#357): Add a script to update bytecode_op_table.h.
