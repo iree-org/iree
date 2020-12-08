@@ -29,8 +29,8 @@ target | tflite | vmla | vulkan-spirv
 
 target | tflite | vmla | vulkan-spirv
 :-: | :-: | :-: | :-:
-[att_mh_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span>
-[att_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span>
+[att_mh_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
+[att_rnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 [cnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [cnn_stride](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [crnn](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="success-table-element">✓</span>

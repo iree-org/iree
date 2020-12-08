@@ -114,6 +114,15 @@ or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
 `MLIR_DIR` needs to be passed and that LLVM needs to be compiled with
 `LLVM_ENABLE_RTTI` set to `ON`.
 
+#### `IREE_BUILD_TENSORFLOW_COMPILER`:BOOL
+
+Enables building of the TensorFlow to IREE compiler under
+`integrations/tensorflow`, including some native binaries and Python packages.
+Note that TensorFlow's build system is bazel-based and this will require a
+functioning `bazel` installation. A `bazel` wrapper script will be emitted
+in your build directory and `bazel-bin` link will point to artifacts. This
+can be used to manually invoke additional bazel actions if desired.
+
 ## MLIR-specific CMake Options and Variables
 
 #### `MLIR_DIR`:STRING
