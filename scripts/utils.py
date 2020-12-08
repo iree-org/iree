@@ -39,8 +39,7 @@ def check_and_get_output_lines(command: Sequence[str],
       stderr=subprocess.PIPE,
       stdout=subprocess.PIPE,
       # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
-      universal_newlines=True,
-  )
+      universal_newlines=True)
 
   if log_stderr:
     for line in process.stderr.splitlines():

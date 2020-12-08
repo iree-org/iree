@@ -59,6 +59,7 @@ class OutputFormat(Enum):
                        f"{', '.join(OutputFormat.__members__.keys())}")
     return OutputFormat[spec]
 
+
 # TODO(#4131) python>=3.7: Consider using a dataclass.
 class CompilerOptions:
   """Options to the compiler backend.

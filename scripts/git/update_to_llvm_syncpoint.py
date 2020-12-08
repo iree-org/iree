@@ -149,13 +149,10 @@ def main(args):
 
 
 def get_commit(path, rev="HEAD"):
-
-  return utils.execute(
-      ["git", "rev-parse", rev],
-      cwd=path,
-      silent=True,
-      capture_output=True,
-  ).stdout.strip()
+  return utils.execute(["git", "rev-parse", rev],
+                       cwd=path,
+                       silent=True,
+                       capture_output=True).stdout.strip()
 
 
 def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_commit):

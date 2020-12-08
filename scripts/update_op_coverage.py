@@ -79,9 +79,15 @@ def get_backend_op_pair(test):
 def get_tested_ops_for_backends(build_dir):
   """Parses current op tests for each backend."""
 
-  ctest_output = subprocess.check_output(
-      ['ctest', '-N', '-L', E2E_XLA_OPS_PATH], cwd=build_dir)
-  tests = ctest_output.decode('ascii').strip().split('\n')
+  completed_process = subprocess.run(
+      ['ctest', '-N', '-L', E2E_XLA_OPS_PATH],
+      cwd=build_dir,
+      # TODO(#4131) python>=3.7: Use capture_output=True.
+      stderr=subprocess.PIPE,
+      stdout=subprocess.PIPE,
+      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+      universal_newlines=True)
+  tests = completed_process.stdout.strip().split('\n')
   res = collections.defaultdict(list)
   for t in tests:
     if not t.endswith('.mlir'):

@@ -65,10 +65,16 @@ def setup_environment():
   # Detect python and query bazel for its output.
   print(f"Setting Bazel PYTHON_BIN={sys.executable}")
   bazel_env["PYTHON_BIN"] = sys.executable
-  bazel_bin = subprocess.check_output([bazel_exe, "info", "bazel-bin"],
-                                      cwd=repo_root,
-                                      env=bazel_env).decode("utf-8")
-  bazel_bin = bazel_bin.splitlines()[0]
+  completed_process = subprocess.run(
+      [bazel_exe, "info", "bazel-bin"],
+      cwd=repo_root,
+      env=bazel_env,
+      check=True,
+      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+      universal_newlines=True,
+      # TODO(#4131) python>=3.7: Use capture_output=True.
+      stdout=subprocess.PIPE)
+  bazel_bin = completed_process.stdout.splitlines()[0]
   # Bazel always reports the path with '/'. On windows, switch it
   # since we need native path manipulation code below to have it the
   # right way.
@@ -80,9 +86,10 @@ def setup_environment():
 def build():
   """Builds the python bundle."""
   print("Building python bindings...")
-  subprocess.check_call([bazel_exe, "build", "//colab:everything_for_colab"],
-                        cwd=repo_root,
-                        env=bazel_env)
+  subprocess.run([bazel_exe, "build", "//colab:everything_for_colab"],
+                 cwd=repo_root,
+                 env=bazel_env,
+                 check=True)
 
 
 def run():

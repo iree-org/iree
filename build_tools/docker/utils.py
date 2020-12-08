@@ -40,9 +40,9 @@ def run_command(command: Sequence[str],
 
   # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
   completed_process = subprocess.run(command,
-                                      universal_newlines=text,
-                                      check=check,
-                                      **run_kwargs)
+                                     universal_newlines=text,
+                                     check=check,
+                                     **run_kwargs)
   return completed_process
 
 
