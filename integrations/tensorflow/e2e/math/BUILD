@@ -293,7 +293,6 @@ VMLA_FAILING = [
     "igammac",
     "in_top_k",
     "invert_permutation",
-    "is_nan",  # TODO(#4061): tf.math.is_nan miscompiles with static shapes.
     "is_non_decreasing",
     "is_strictly_increasing",
     "ndtri",
@@ -613,9 +612,6 @@ VMLA_FAILING_DYNAMIC = VMLA_FAILING + [
     "softplus",
     "zero_fraction",
 ]
-
-# TODO(#4061): tf.math.is_nan miscompiles with static shapes.
-VMLA_FAILING_DYNAMIC.remove("is_nan")
 
 # keep sorted
 LLVM_FAILING_DYNAMIC = LLVM_FAILING + [
