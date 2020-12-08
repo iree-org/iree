@@ -2083,6 +2083,77 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   );
 }
 
+def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current tile in the range of
+    `[0, hal.interface.workgroup.count)` along each XYZ dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable.
+
+    ```mlir
+    %xyz = hal.interface.workgroup.id : tuple<index, index, index>
+    %x = extract_element %xyz[0] : tuple<index, index, index>
+    ```
+  }];
+
+  let arguments = (ins);
+  let results = (outs HAL_WorkgroupXYZ:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+    Matches what was passed to the `hal.command_buffer.dispatch` command (or
+    what was indirectly specified).
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %xyz = hal.interface.workgroup.count : tuple<index, index, index>
+    %x = extract_element %xyz[0] : tuple<index, index, index>
+    ```
+  }];
+
+  let arguments = (ins);
+  let results = (outs HAL_WorkgroupXYZ:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %xyz = hal.interface.workgroup.size : tuple<index, index, index>
+    %x = extract_element %xyz[0] : tuple<index, index, index>
+    ```
+  }];
+
+  let arguments = (ins);
+  let results = (outs HAL_WorkgroupXYZ:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
 def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   let summary = [{loads a constant value from the interface constant block}];
   let description = [{

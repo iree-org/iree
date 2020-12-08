@@ -1580,6 +1580,25 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.workgroup.*
+//===----------------------------------------------------------------------===//
+
+void InterfaceWorkgroupIDOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "workgroup_id");
+}
+
+void InterfaceWorkgroupCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "workgroup_count");
+}
+
+void InterfaceWorkgroupSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "workgroup_size");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface.load.tensor
 //===----------------------------------------------------------------------===//
 
