@@ -213,9 +213,9 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   return regionOp.body().getBlocks().size() == 1;
 }
 
-// Returns true if rhs has ops that can only be root op and will lose the
+// Returns true if rhs has ops that can only be leaf op and will lose the
 // characteristic if merge two dispatch regions.
-bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
+bool rhsHasLeafOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
   auto &rhsBlock = rhs.body().front();
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
@@ -224,16 +224,16 @@ bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
          ++lhsResultIdx) {
       if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
       for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
-        if (OpDispatchPolicy::isRootOnlyOp(user)) return true;
+        if (OpDispatchPolicy::isLeafOnlyOp(user)) return true;
       }
     }
   }
   return false;
 }
 
-// Returns true if lhs has ops that can only be leaf op and will lose the
+// Returns true if lhs has ops that can only be root op and will lose the
 // characteristic if merge two dispatch regions.
-bool lhsHasLeafOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
+bool lhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
   auto &lhsBlock = lhs.body().front();
@@ -248,7 +248,7 @@ bool lhsHasLeafOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
 
   for (int lhsResultIdx = 0; lhsResultIdx < lhs.getNumResults();
        ++lhsResultIdx) {
-    if (!OpDispatchPolicy::isLeafOnlyOp(
+    if (!OpDispatchPolicy::isRootOnlyOp(
             lhsReturnValues[lhsResultIdx].getDefiningOp())) {
       continue;
     }
@@ -395,7 +395,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
         LLVM_DEBUG(llvm::dbgs()
                    << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
       }
-      if (rhsHasRootOnlyOp(lhs, rhs) || lhsHasLeafOnlyOp(lhs, rhs)) {
+      if (rhsHasLeafOnlyOp(lhs, rhs) || lhsHasRootOnlyOp(lhs, rhs)) {
         LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS ROOT OP-\n");
         continue;
       }

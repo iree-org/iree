@@ -163,7 +163,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
   if (inputOp->isKnownTerminator()) return FusionType::DISABLED;
 
   if ((isIdentityMetadata(inputOp) || isViewModificationOp(inputOp)) &&
-      !isRootOnlyOp(anchorOp)) {
+      !isLeafOnlyOp(anchorOp)) {
     // Shape ties must always be duplicated into the region and remain in their
     // original position. This should apply to any such "metadata" ops.
     return FusionType::CLONE_INTO;
@@ -189,7 +189,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
     return FusionType::DISABLED;
   }
   if ((isIdentityMetadata(outputOp) || isViewModificationOp(outputOp)) &&
-      !isLeafOnlyOp(anchorOp)) {
+      !isRootOnlyOp(anchorOp)) {
     return FusionType::MOVE_INTO;
   }
 
@@ -232,11 +232,11 @@ bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
          isRootOnlyOp(op) || isLeafOnlyOp(op);
 }
 
-bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
+bool OpDispatchPolicy::isLeafOnlyOp(Operation *op) {
   return isa<mhlo::SliceOp>(op);
 }
 
-bool OpDispatchPolicy::isLeafOnlyOp(Operation *op) {
+bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
   return isa<mhlo::PadOp>(op);
 }
 

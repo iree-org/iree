@@ -56,10 +56,9 @@ class OpDispatchPolicy {
   // Returns true if |op| is not able to fuse with either producer or consumer.
   static bool isUnsupportedFusionOp(Operation *op);
 
-  // Returns true if |op| can only be a root op.
+  // Returns true if |op| can only be a root/leaf op. See #3924 for more
+  // details.
   static bool isRootOnlyOp(Operation *op);
-
-  // Returns true if |op| can only be a root op.
   static bool isLeafOnlyOp(Operation *op);
 
   // Returns true if the given |op| can be dispatched in all cases.
