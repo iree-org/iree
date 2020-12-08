@@ -20,6 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 #define DEBUG_TYPE "iree-detail"
@@ -129,7 +130,7 @@ bool OpDispatchPolicy::isIdentityMetadata(Operation *op) {
 }
 
 bool OpDispatchPolicy::isViewModificationOp(Operation *op) {
-  return isa<mhlo::ReshapeOp>(op);
+  return isa<mhlo::ReshapeOp, linalg::TensorReshapeOp>(op);
 }
 
 int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
@@ -221,8 +222,9 @@ bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
 
 // TODO(b/144530470): replace with tablegen attributes/interfaces.
 bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
-  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::PadOp, mhlo::ReduceOp,
-             mhlo::ReduceWindowOp, mhlo::TorchIndexSelectOp>(op) ||
+  return isa<linalg::IndexedGenericOp, linalg::GenericOp, mhlo::ConcatenateOp,
+             mhlo::ConvOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
+             mhlo::TorchIndexSelectOp>(op) ||
          (!clEnableConsumerOnlyFusion &&
           isa<mhlo::DotOp, mhlo::DotGeneralOp>(op)) ||
          isRootOnlyOp(op);

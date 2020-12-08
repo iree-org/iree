@@ -1356,8 +1356,9 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
   }
 
   OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
-  if (parseResult.hasValue() && failed(*parseResult))
+  if (parseResult.hasValue() && failed(*parseResult)) {
     return failure();
+  }
 
   // Ensure that this module has a valid terminator.
   ExecutableTargetOp::ensureTerminator(*body, parser.getBuilder(),
@@ -1410,8 +1411,9 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
     return failure();
   }
   OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
-  if (parseResult.hasValue() && failed(*parseResult))
+  if (parseResult.hasValue() && failed(*parseResult)) {
     return failure();
+  }
 
   // Ensure that this module has a valid terminator.
   ExecutableBinaryOp::ensureTerminator(*body, parser.getBuilder(),

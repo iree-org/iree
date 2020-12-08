@@ -304,7 +304,8 @@ static void populateTilingToInvocationPatterns(
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
                   linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -326,7 +327,8 @@ static void populateVectorizationPatterns(MLIRContext *context,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
                   linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgVectorizationPattern<linalg::FillOp>>(
+                  linalg::LinalgVectorizationPattern<linalg::FillOp>,
+                  linalg::LinalgVectorizationPattern<linalg::GenericOp>>(
       context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
 }

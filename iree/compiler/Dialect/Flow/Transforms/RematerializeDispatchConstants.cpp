@@ -46,6 +46,8 @@ bool isSplatConstant(ConstantOp constantOp) {
     return true;
   } else if (auto value = constantOp.getValue().dyn_cast<DenseElementsAttr>()) {
     return value.isSplat();
+  } else if (constantOp.getType().isIntOrFloat()) {
+    return true;
   }
 
   // Assume anything unshaped is small. This may not always be true in custom

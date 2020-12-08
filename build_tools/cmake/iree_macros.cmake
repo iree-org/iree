@@ -265,6 +265,49 @@ function(iree_add_executable_dependencies EXECUTABLE DEPENDENCY)
 endfunction()
 
 #-------------------------------------------------------------------------------
+# Tool symlinks
+#-------------------------------------------------------------------------------
+
+# iree_symlink_tool
+#
+# Adds a command to TARGET which symlinks a tool from elsewhere
+# (FROM_TOOL_TARGET_NAME) to a local file name (TO_EXE_NAME) in the current
+# binary directory.
+#
+# Parameters:
+#   TARGET: Local target to which to add the symlink command (i.e. an
+#     iree_py_library, etc).
+#   FROM_TOOL_TARGET: Target of the tool executable that is the source of the
+#     link.
+#   TO_EXE_NAME: The executable name to output in the current binary dir.
+function(iree_symlink_tool)
+  cmake_parse_arguments(
+    ARG
+    ""
+    "TARGET;FROM_TOOL_TARGET;TO_EXE_NAME"
+    ""
+    ${ARGN}
+  )
+
+  # Transform TARGET
+  iree_package_ns(_PACKAGE_NS)
+  iree_package_name(_PACKAGE_NAME)
+  set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
+  set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
+
+  add_custom_command(
+    TARGET "${_TARGET}"
+    BYPRODUCTS
+      "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+    COMMAND
+      ${CMAKE_COMMAND} -E create_symlink
+        "$<TARGET_FILE:${_FROM_TOOL_TARGET}>"
+        "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+  )
+endfunction()
+
+
+#-------------------------------------------------------------------------------
 # Tests
 #-------------------------------------------------------------------------------
 
