@@ -152,8 +152,7 @@ def get_commit(path, rev="HEAD"):
   return utils.execute(["git", "rev-parse", rev],
                        cwd=path,
                        silent=True,
-                       capture_output=True,
-                       universal_newlines=True).strip()
+                       capture_output=True).stdout.strip()
 
 
 def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_commit):
@@ -192,8 +191,7 @@ def find_llvm_bazel_llvm_commit(llvm_bazel_path):
   return utils.execute(
       ["git", "submodule", "status", "third_party/llvm-project"],
       capture_output=True,
-      universal_newlines=True,
-      cwd=llvm_bazel_path).split()[0].lstrip("+-")
+      cwd=llvm_bazel_path).stdout.split()[0].lstrip("+-")
 
 
 def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
@@ -233,8 +231,7 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
           "tensorflow/workspace.bzl"
       ],
       capture_output=True,
-      universal_newlines=True,
-      cwd=tensorflow_path).split()
+      cwd=tensorflow_path).stdout.split()
   if len(tf_integrate_commits) > 2:
     raise RuntimeError(
         f"Expected one or two TF commits to involve LLVM commit {llvm_commit},"

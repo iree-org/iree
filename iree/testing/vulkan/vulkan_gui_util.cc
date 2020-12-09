@@ -295,9 +295,9 @@ void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd,
 
   // Create SwapChain, RenderPass, Framebuffer, etc.
   IM_ASSERT(min_image_count >= 2);
-  ImGui_ImplVulkanH_CreateWindow(instance, physical_device, device, wd,
-                                 queue_family_index, allocator, width, height,
-                                 min_image_count);
+  ImGui_ImplVulkanH_CreateOrResizeWindow(instance, physical_device, device, wd,
+                                         queue_family_index, allocator, width,
+                                         height, min_image_count);
 
   // Set clear color.
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

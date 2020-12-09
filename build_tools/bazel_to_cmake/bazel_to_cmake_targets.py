@@ -22,11 +22,6 @@ EXPLICIT_TARGET_MAPPING = {
     # absl
     "@com_google_absl//absl/flags:flag": ["absl::flags"],
     "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
-    # dear_imgui
-    "@dear_imgui": ["dear_imgui::dear_imgui"],
-    "@dear_imgui//:imgui_sdl_vulkan": [
-        "dear_imgui::impl_sdl", "dear_imgui::impl_vulkan"
-    ],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
@@ -70,7 +65,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
-    "@sdl2//:SDL2": ["SDL2-static"],
     "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
     "@half//:half": ["half"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
@@ -137,4 +131,4 @@ def convert_external_target(target):
     # All Bazel targets map to a single CMake target.
     return ["ruy"]
 
-  raise KeyError("No conversion found for target '%s'" % target)
+  raise KeyError(f"No conversion found for target '{target}'")

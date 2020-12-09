@@ -27,12 +27,10 @@ configure_file(setup_tools_core.py.in setup_tools_core.py)
 configure_file(setup_tools_tf.py.in setup_tools_tf.py)
 
 # Namespace packages.
-add_subdirectory(pyiree/common)  # Deprecated
 add_subdirectory(pyiree/compiler2)
 add_subdirectory(pyiree/rt)
 
 if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler)  # Deprecated
 add_subdirectory(pyiree/tools/core)
 endif()
 

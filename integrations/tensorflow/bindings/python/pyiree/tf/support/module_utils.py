@@ -14,6 +14,8 @@
 # limitations under the License.
 """Utilities for compiling 'tf.Module's"""
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 import collections
 import os
 import tempfile

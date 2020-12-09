@@ -149,7 +149,7 @@ def invoke_immediate(command_line: List[str],
       run_args["input"] = immediate_input
 
     # Capture output.
-    # Upgrade note: Python >= 3.7 can just use capture_output=True
+    # TODO(#4131) python>=3.7: Use capture_output=True.
     run_args["stdout"] = subprocess.PIPE
     run_args["stderr"] = subprocess.PIPE
     process = subprocess.run(command_line, **run_args)

@@ -450,17 +450,6 @@ if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
 endif()
 
-if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
-  # sdl2 logs are spammy - change log level while adding
-  function(include_sdl2)
-    set(CMAKE_MESSAGE_LOG_LEVEL "WARNING")
-    add_subdirectory(third_party/sdl2 EXCLUDE_FROM_ALL)
-  endfunction()
-  include_sdl2()
-
-  add_subdirectory(build_tools/third_party/dear_imgui EXCLUDE_FROM_ALL)
-endif()
-
 if(${IREE_BUILD_TESTS})
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
   enable_testing(iree)

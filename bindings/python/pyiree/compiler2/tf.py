@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 from enum import Enum
 import logging
 import tempfile
@@ -76,6 +78,7 @@ class ImportType(Enum):
     return ImportType[spec]
 
 
+# TODO(#4131) python>=3.7: Consider using a dataclass.
 class ImportOptions(CompilerOptions):
   """Import options layer on top of the backend compiler options."""
 
