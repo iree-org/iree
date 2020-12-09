@@ -198,7 +198,8 @@ CPUs.
 
 For example, take the "L2 data cache refill". On ARM, with `simpleperf`, that
 would be `raw-l2d-cache-refill`. Questions:
-* Is “L2” inclusive of “L1”?
+* Is “L2” [inclusive](https://en.wikipedia.org/wiki/Cache_inclusion_policy) of
+  “L1”?
 * How many bytes are transferred per “refill”?
 * Are accesses induced by speculative execution or by automatic pre-fetching
   counted in the same way as accesses induced by actual code execution?
@@ -219,12 +220,12 @@ have any access to true hardware counts.
 
 Here is a workflow pattern that allows to make significant use of CPU event
 counts, despite all the problems noted above:
-* Hypothetize that some code diff might help performance, and might help
+* Hypothesize that some code diff might help performance, and might help
   reducing the number of CPU events of a certain type, and that the two might be
   related.
 * Benchmark with and without the code diff, on the same device, everything else
   being equal.
-  * Let your benchmark performa a fixed number of iterations, or, if using a
+  * Let your benchmark perform a fixed number of iterations, or, if using a
     benchmark termination condition of the form "run until at least N seconds
     have elapsed", carefully divide event counts by the actual number of
     iterations that were run.
