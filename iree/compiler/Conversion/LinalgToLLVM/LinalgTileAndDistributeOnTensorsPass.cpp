@@ -88,9 +88,10 @@ void LinalgTileAndDistributeOnTensorsPass::runOnOperation() {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
         // TODO: drop magic names.
         std::array<StringRef, 3> dimStrs{"x", "y", "z"};
-        auto numParallelDims = parallelLoopRanges.size();
+        size_t numParallelDims = parallelLoopRanges.size();
         SmallVector<linalg::ProcInfo, 2> procInfo(numParallelDims);
-        for (unsigned dim = 0; dim < std::min(numParallelDims, 3ul); ++dim) {
+        for (size_t dim = 0;
+             dim < std::min(numParallelDims, static_cast<size_t>(3)); ++dim) {
           auto p = buildWorkgroupOpPair(builder, dimStrs[dim]);
           procInfo[dim] = {p.first, p.second};
         }
