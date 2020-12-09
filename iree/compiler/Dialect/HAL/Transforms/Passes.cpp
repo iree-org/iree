@@ -62,6 +62,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
   passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
+      createPropagateConstantWorkgroupInfoPass());
+  passManager.nest<ExecutableOp>().addNestedPass<ExecutableTargetOp>(
       createTranslateExecutablesPass(targetOptions));
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.

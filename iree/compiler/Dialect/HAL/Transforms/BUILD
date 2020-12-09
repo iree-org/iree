@@ -31,6 +31,7 @@ cc_library(
         "MemoizeDeviceQueries.cpp",
         "PackConstantPoolStorage.cpp",
         "Passes.cpp",
+        "PropagateConstantWorkgroupInfo.cpp",
         "PublicAbiGeneration.cpp",
         "ResolveEntryPointOrdinals.cpp",
         "SerializeExecutables.cpp",
