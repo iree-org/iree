@@ -112,12 +112,11 @@ def _incrementally_compile_tf_module(
     A compiled IREE module blob and the path to the compiled VM FlatBuffer if
     artifacts_dir is provided.
   """
-  output_kwargs = (
-      _get_tf_import_output_kwargs(
-          artifacts_dir,
-          backend_info.backend_id,
-          needs_temp_saved_model_dir=True,
-      ) if artifacts_dir else {})
+  output_kwargs = (_get_tf_import_output_kwargs(
+      artifacts_dir,
+      backend_info.backend_id,
+      needs_temp_saved_model_dir=True,
+  ) if artifacts_dir else {})
   immediate_result = tf_compiler.compile_module(
       module,
       target_backends=backend_info.compiler_targets,
@@ -153,9 +152,8 @@ def _incrementally_compile_tf_signature_def_saved_model(
     A compiled IREE module blob and the path to the compiled VM FlatBuffer if
     artifacts_dir is provided.
   """
-  output_kwargs = (
-      _get_tf_import_output_kwargs(artifacts_dir, backend_info.backend_id)
-      if artifacts_dir else {})
+  output_kwargs = (_get_tf_import_output_kwargs(
+      artifacts_dir, backend_info.backend_id) if artifacts_dir else {})
   immediate_result = tf_compiler.compile_saved_model(
       saved_model_dir,
       import_type="SIGNATURE_DEF",

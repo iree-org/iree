@@ -116,5 +116,5 @@ cc_binary(
             # TODO: Enable this for all builds once dependency bug is fixed.
             #"@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
         ],
-    })
+    }),
 )
