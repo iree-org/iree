@@ -193,21 +193,16 @@ Click the 'Statistics' button at the top. It will open a window like this:
 window](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_statistics.jpeg)
 
 See how the above screenshot has two radio buttons at the top: 'Instrumentation'
-and 'Sampling'. At this point, if you don't a the 'Sampling' radio button, you
+and 'Sampling'. At this point, if you don't see the 'Sampling' radio button, you
 need to resolve that first, as discussed above about possible permissions
 issues.
 
 These 'Instrumentation' and 'Sampling' statistics correspond the two kinds of
 data that Tracy collects about your program. In the Tracy main view, they
-correspond, respectively, to 'normal' and 'ghost' zones. For each thread, the
-ghost icon toggles the view between these two kinds of zones. 'Normal' zones are
-explicitly recorded by the instrumented program, with timestamps. The stacks
-shown are stacks of Tracy instrumentation zones, not real call stacks. 'Ghost'
-zones are obtained by Tracy sampling the thread's real call stack at a frequency
-of typically roughly 10 kHz. Only ghost zones have the data to show the time
-spent on a line-by-line or instruction-by-instruction basis. That's why when we
-actually click on a zone, we get a very different view depending on whether it's
-a normal or a ghost zone.
+correspond, respectively, to 'instrumentation' and 'ghost' zones. Refer to the
+[Tracy PDF manual](#the-tracy-manual) for a general introduction to these
+concepts. For each thread, the ghost icon toggles the view between these two
+kinds of zones.
 
 Back to the main view, look for the part of the timeline that is of interest to
 you. Your area of interest might not be on the Main thread. In fact, it might be
