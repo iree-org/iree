@@ -536,6 +536,49 @@ TEST(Conv2d, DepthwiseConv) {
   }
 }
 
+TEST(Transpose, 2Dimen) {
+  Shape src_shape = {2, 3};
+  Shape dst_shape = {3, 2};
+  std::vector<int32_t> perm = {1, 0};
+  // clang-format off
+  std::vector<uint16_t> src_buffer = { 1,  2,   3,
+                                      4,  5,   6};
+  std::vector<uint16_t> expected_dst = { 1,  4,
+                                         2,  5,   
+                                         3,  6};
+  // clang-format on
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
+
+  IREE_EXPECT_OK(Transpose::Execute<uint16_t>(
+      src_buffer, absl::Span<uint16_t>(dst_buffer), src_shape, perm));
+
+  EXPECT_EQ(dst_buffer, expected_dst);
+}
+
+TEST(Transpose, 3Dimen) {
+  Shape src_shape = {2, 2, 3};
+  Shape dst_shape = {2, 3, 2};
+  std::vector<int32_t> perm = {0, 2, 1};
+  // clang-format off
+  std::vector<uint16_t> src_buffer = {1,  2,  3,
+                                      4,  5,  6,
+                                      7,  8,  9,
+                                      10, 11, 12};
+  std::vector<uint16_t> expected_dst = { 1,  4,
+                                         2,  5,   
+                                         3,  6,
+                                         7,  10,
+                                         8,  11,
+                                         9,  12};
+  // clang-format on
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
+
+  IREE_EXPECT_OK(Transpose::Execute<uint16_t>(
+      src_buffer, absl::Span<uint16_t>(dst_buffer), src_shape, perm));
+
+  EXPECT_EQ(dst_buffer, expected_dst);
+}
+
 }  // namespace
 }  // namespace kernels
 }  // namespace vmla
