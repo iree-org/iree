@@ -3,7 +3,7 @@
 // RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmla %s -function-input="1x28x28x1xf32" | IreeFileCheck %s
 // RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
-// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=llvm-ir -iree-enable-linalg-on-tensors %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=dylib-llvm-aot -iree-enable-linalg-on-tensors %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all -iree-hal-target-backends=vulkan-spirv -iree-enable-linalg-on-tensors %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 
 module {
