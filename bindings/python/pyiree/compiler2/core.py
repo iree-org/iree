@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 from enum import Enum
 import subprocess
 from typing import Any, Dict, List, Optional, Sequence, Union
@@ -58,6 +60,7 @@ class OutputFormat(Enum):
     return OutputFormat[spec]
 
 
+# TODO(#4131) python>=3.7: Consider using a dataclass.
 class CompilerOptions:
   """Options to the compiler backend.
 

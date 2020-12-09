@@ -163,7 +163,7 @@ def main(argv):
     command = ['bazel', 'test', *test_suites, '--color=yes']
     print(f'Running: `{" ".join(command)}`')
     if not FLAGS.dry_run:
-      subprocess.check_call(command)
+      subprocess.run(command, check=True)
     print()
 
   written_paths = set()

@@ -42,8 +42,8 @@ if os.name == "nt":
                                                       minor=sys.version_info[1])
   implib_abs_path = os.path.join(exec_prefix, "libs", implib_basename)
   if not os.path.exists(implib_abs_path):
-    raise RuntimeError("Could not find Windows python import library: %s" %
-                       (implib_abs_path,))
+    raise RuntimeError(
+        f"Could not find Windows python import library: {implib_abs_path}")
   implib_ws_path = "libs/" + implib_basename
   print("# SYMLINK: {abs}\t{ws}".format(abs=implib_abs_path, ws=implib_ws_path))
   extra_srcs.append(implib_ws_path)

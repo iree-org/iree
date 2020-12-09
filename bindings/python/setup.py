@@ -30,7 +30,7 @@ def run_sub_setup(name):
   sub_path = os.path.join(this_dir, f"{name}.py")
   args = [sys.executable, sub_path] + sys.argv[1:]
   print(f"##### Running sub setup: {' '.join(args)}")
-  subprocess.check_call(args)
+  subprocess.run(args, check=True)
   print("")
 
 

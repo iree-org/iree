@@ -46,8 +46,15 @@ def write_python_path(bazelrc):
   # For some reason, bazel doesn't always find the user site path, which
   # is typically where "pip install --user" libraries end up. Inject it.
   try:
-    user_site = subprocess.check_output(
-        [sys.executable, "-m", "site", "--user-site"]).decode("utf-8").strip()
+    user_site = subprocess.run(
+        [sys.executable, "-m", "site", "--user-site"],
+        check=True,
+        # TODO(#4131) python>=3.7: Use capture_output=True.
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+        universal_newlines=True,
+    ).stdout.strip()
     print("Found user site directory:", user_site)
   except subprocess.CalledProcessError:
     print("Could not resolve user site directory")

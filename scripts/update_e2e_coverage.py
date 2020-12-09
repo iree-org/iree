@@ -30,6 +30,7 @@ TENSORFLOW_COVERAGE_DIR = 'tensorflow_coverage'
 REFERENCE_BACKEND = 'tf'
 # Assumes that tests are expanded for the tf, iree_vmla, and
 # iree_vulkan backends.
+# TODO(#4131) python>=3.7: Remove redundant OrderedDict
 BACKENDS_TO_TITLES = collections.OrderedDict([
     ('tf', 'tensorflow'),
     ('tflite', 'tflite'),
