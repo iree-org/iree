@@ -85,7 +85,7 @@ def _create_default_iree_driver(
       driver_exceptions[driver_name] = ex
       continue
 
-    print(f"Created IREE driver {driver_name}: {driver:!r}", file=sys.stderr)
+    print("Created IREE driver {driver_name}: {driver:!r}", file=sys.stderr)
     return driver
 
   # All failed.
