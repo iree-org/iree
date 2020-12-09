@@ -25,7 +25,6 @@ from absl import app
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
-from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS

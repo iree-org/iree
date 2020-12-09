@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = ["layering_check"],
-    licenses = ["notice"],  # Apache 2.0
+iree_py_library(
+  NAME
+    support
+  SRCS
+    "__init__.py"
+    "module_utils.py"
+    "tf_test_driver.py"
+    "tf_test_utils.py"
+    "tf_utils.py"
+    "trace_utils.py"
 )
+
+# TODO: Add tests.

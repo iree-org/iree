@@ -20,3 +20,5 @@ function(_add_overlay_subdirectory dir)
 endfunction()
 
 _add_overlay_subdirectory(pyiree/tools/tf)
+# TODO: Find another place for the TF support library.
+_add_overlay_subdirectory(pyiree/tf/support)
