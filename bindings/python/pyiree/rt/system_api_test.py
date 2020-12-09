@@ -25,8 +25,7 @@ from pyiree import rt
 
 
 def create_simple_mul_module():
-  binary = compiler.compile_str(
-      """
+  binary = compiler.compile_str("""
   module @arithmetic {
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
@@ -35,7 +34,7 @@ def create_simple_mul_module():
     }
   }
   """,
-      target_backends=["vulkan-spirv"])
+                                target_backends=["vulkan-spirv"])
   m = rt.VmModule.from_flatbuffer(binary)
   return m
 
