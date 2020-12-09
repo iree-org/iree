@@ -55,6 +55,9 @@ createLinalgRewriteDestructiveUpdatesPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLinalgTileAndDistributeOnTensorsPass();
 
+/// Pass to perform linalg on tensor bufferization.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgLLVMBufferizePass();
+
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.

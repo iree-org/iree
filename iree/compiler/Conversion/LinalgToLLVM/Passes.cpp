@@ -104,10 +104,16 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {
     // TODO: implement and connect these.
-    // passManager.addPass(createLinalgTileAndDistributeOnTensorsPass());
-    // passManager.addPass(createLinalgRewriteDestructiveUpdatesPass());
-    // passManager.addPass(createLinalgLLVMBufferizePass());
+    passManager.addPass(createLinalgTileAndDistributeOnTensorsPass());
+    passManager.addPass(createLinalgRewriteDestructiveUpdatesPass());
+    passManager.addPass(createLinalgLLVMBufferizePass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
     passManager.addPass(createLegalizeNumWorkgroupsFnPass());
+    passManager.addPass(createCopyRemovalPass());
+    passManager.addPass(createBufferHoistingPass());
+    passManager.addPass(createBufferLoopHoistingPass());
+    passManager.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(passManager);
