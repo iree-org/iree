@@ -24,3 +24,8 @@ iree_py_library(
     name = "pathsetup",
     imports = ["."],
 )
+
+filegroup(
+    name = "python_extension_headers",
+    srcs = glob(["**/*.h"]),
+)

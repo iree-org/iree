@@ -104,6 +104,7 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir:init_mlir",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
         "@org_tensorflow//tensorflow/core/platform:errors",
     ],
 )

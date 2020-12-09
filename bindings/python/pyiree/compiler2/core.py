@@ -173,11 +173,11 @@ def compile_file(input_file: str, **kwargs):
   return result
 
 
-def compile_str(input_str: str, **kwargs):
+def compile_str(input_str: Union[str, bytes], **kwargs):
   """Invokes the IREE compiler with an input string.
 
   Args:
-    input_str: MLIR assembly to parse/compile.
+    input_str: MLIR assembly to parse/compile (str or bytes).
     **kwargs: Keyword arguments corresponding to CompilerOptions.
   Returns:
     Either a byte buffer of the compiled content or None if output_file
@@ -185,7 +185,9 @@ def compile_str(input_str: str, **kwargs):
   """
   options = CompilerOptions(**kwargs)
   cl = build_compile_command_line("-", options)
-  result = invoke_immediate(cl, immediate_input=input_str.encode("utf-8"))
+  input_bytes = input_str.encode("utf-8") if isinstance(input_str,
+                                                        str) else input_str
+  result = invoke_immediate(cl, immediate_input=input_bytes)
   if options.output_file:
     return None
   return result

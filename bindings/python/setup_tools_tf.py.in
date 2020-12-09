@@ -68,9 +68,10 @@ setup(
     ],
     python_requires=">=3.6",
     package_dir={"": this_dir},
-    packages=find_namespace_packages(where=this_dir,
-                                     include=["pyiree.tools.tf"],
-                                     exclude=["*.CMakeFiles"]),
+    packages=find_namespace_packages(
+        where=this_dir,
+        include=["pyiree.tools.tf", "pyiree.tf.support"],
+        exclude=["*.CMakeFiles"]),
     # Matching the native extension as a data file keeps setuptools from
     # "building" it (i.e. turning it into a static binary).
     package_data={

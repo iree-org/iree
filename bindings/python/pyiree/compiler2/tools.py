@@ -23,7 +23,7 @@ import sys
 import textwrap
 import threading
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 __all__ = [
     "find_tool",
@@ -124,7 +124,7 @@ def find_tool(exe_name: str) -> str:
 
 def invoke_immediate(command_line: List[str],
                      *,
-                     input_file: Optional[str] = None,
+                     input_file: Optional[bytes] = None,
                      immediate_input=None):
   """Invokes an immediate command.
 
