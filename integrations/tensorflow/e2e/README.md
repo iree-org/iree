@@ -18,7 +18,7 @@ instructions.
 If you do not have your environment setup to use IREE with Vulkan (see
 [this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
 then you can run the manual test targets with
-`--target_backends=tf,iree_vmla` (that is, by omitting
+`--target_backends=tf,iree_vmla,iree_llvmaot` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -234,8 +234,8 @@ Test targets are automatically generated for each test file and for each backend
 to check numerical correctness against TensorFlow. Tests targets that pass are
 placed into the `e2e_tests` test suite. Tests that fail on particular backends
 are recorded in lists in the `BUILD` files. For example, if
-`experimental_new_test.py` fails on the `iree_vulkan` backend then the following
-lines should be added to the `BUILD` file:
+`experimental_new_test.py` fails on the `iree_llvmaot` and `iree_vulkan`
+backend then the following lines should be added to the `BUILD` file:
 
 ```build
 LLVM_FAILING = [

@@ -19,10 +19,6 @@ load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 def get_driver(backend):
     # TODO(#2175): Simplify this after backend names are standardized.
     driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
-
-    # TODO(#2673): enable LLVM AOT for these tests. JIT is deprecated.
-    if driver == "llvmjit":
-        driver = ""
     return driver
 
 def set_difference(include, exclude):

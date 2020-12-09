@@ -80,7 +80,7 @@ void LLVMBaseTargetBackend::buildTranslationPassPipeline(
   buildLLVMTransformPassPipeline(passManager);
 }
 
-static FileLineColLoc findFirstFileLoc(Location baseLoc) {
+static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
@@ -89,15 +89,19 @@ static FileLineColLoc findFirstFileLoc(Location baseLoc) {
   } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
     return loc;
   }
-  return FileLineColLoc{};
+  return llvm::None;
 }
 
 static std::string guessModuleName(mlir::ModuleOp moduleOp) {
   std::string moduleName =
       moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
   if (!moduleName.empty()) return moduleName;
-  FileLineColLoc loc = findFirstFileLoc(moduleOp.getLoc());
-  return llvm::sys::path::stem(loc.getFilename()).str();
+  auto loc = findFirstFileLoc(moduleOp.getLoc());
+  if (loc.hasValue()) {
+    return llvm::sys::path::stem(loc.getValue().getFilename()).str();
+  } else {
+    return "llvm_module";
+  }
 }
 
 LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
