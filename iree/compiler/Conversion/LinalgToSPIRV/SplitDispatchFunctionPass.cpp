@@ -238,7 +238,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   }
   if (fusedOpsList.size() <= 1) return success();
 
-  ModuleOp moduleOp = cast<ModuleOp>(oldFn.getParentOp());
+  ModuleOp moduleOp = cast<ModuleOp>(oldFn->getParentOp());
   Block &oldFnBlock = oldFn.getBlocks().front();
   Location loc = oldFn.getLoc();
 

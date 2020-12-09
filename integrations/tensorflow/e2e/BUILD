@@ -43,7 +43,7 @@ package(
         main = src,
         python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+            "//third_party/py/pyiree:pylib_tf_support",
         ],
     )
     for src in glob(["*_test.py"])
@@ -87,6 +87,7 @@ VMLA_FAILING = [
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -109,6 +110,7 @@ LLVM_FAILING = [
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -131,6 +133,7 @@ VULKAN_FAILING = [
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 TF_PASSING = glob(
@@ -169,7 +172,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )
 
@@ -189,7 +192,7 @@ iree_e2e_test_suite(
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )
 
@@ -213,6 +216,6 @@ iree_e2e_test_suite(
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )

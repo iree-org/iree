@@ -109,7 +109,7 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
     if (value.getValue() != 0) return failure();
     rewriter.replaceOpWithNewOp<T>(op, op.sym_name(), op.is_mutable(),
                                    op.type(),
-                                   llvm::to_vector<4>(op.getDialectAttrs()));
+                                   llvm::to_vector<4>(op->getDialectAttrs()));
     return success();
   }
 };

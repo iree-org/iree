@@ -18,49 +18,46 @@
 from absl import logging
 from absl.testing import absltest
 import numpy as np
-from pyiree import compiler
+from pyiree import compiler2 as compiler
 from pyiree import rt
 
 
 def create_add_scalar_module():
-  ctx = compiler.Context()
-  input_module = ctx.parse_asm("""
+  binary = compiler.compile_str("""
     func @add_scalar(%arg0: i32, %arg1: i32) -> i32 attributes { iree.module.export } {
       %0 = addi %arg0, %arg1 : i32
       return %0 : i32
     }
-    """)
-  binary = input_module.compile()
+    """,
+                                target_backends=["vmla"])
   m = rt.VmModule.from_flatbuffer(binary)
   return m
 
 
 def create_simple_static_mul_module():
-  ctx = compiler.Context()
-  input_module = ctx.parse_asm("""
+  binary = compiler.compile_str("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
         %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
         return %0 : tensor<4xf32>
     }
-    """)
-  binary = input_module.compile()
+    """,
+                                target_backends=["vmla"])
   m = rt.VmModule.from_flatbuffer(binary)
   return m
 
 
 def create_simple_dynamic_abs_module():
-  ctx = compiler.Context()
   # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
   target_backends = ["vmla"]
-  input_module = ctx.parse_asm("""
+  binary = compiler.compile_str("""
     func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
           attributes { iree.module.export } {
         %0 = "mhlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
         return %0 : tensor<?x?xf32>
     }
-    """)
-  binary = input_module.compile(target_backends=target_backends)
+    """,
+                                target_backends=target_backends)
   m = rt.VmModule.from_flatbuffer(binary)
   return m
 

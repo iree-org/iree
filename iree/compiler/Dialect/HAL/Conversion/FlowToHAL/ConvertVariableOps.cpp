@@ -80,7 +80,7 @@ class VariableOpConversion
     auto newOp = rewriter.create<IREE::HAL::VariableOp>(
         variableOp.getLoc(), variableOp.sym_name(), variableOp.is_mutable(),
         converter.convertType(variableOp.type()), initializer, initialValue,
-        llvm::to_vector<4>(variableOp.getDialectAttrs()));
+        llvm::to_vector<4>(variableOp->getDialectAttrs()));
     newOp.setVisibility(variableOp.getVisibility());
     rewriter.replaceOp(variableOp, {});
     return success();

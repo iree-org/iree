@@ -306,7 +306,7 @@ class FlattenTuplesInCFGPass
           builder.getFunctionType(newInputTypes, newResultTypes);
       auto newFunction =
           FuncOp::create(oldFunction.getLoc(), oldFunction.getName(),
-                         newFunctionType, oldFunction.getDialectAttrs());
+                         newFunctionType, oldFunction->getDialectAttrs());
       convertedFunctions.push_back({oldFunction, newFunction});
 
       // Perform the actual body conversion now that we have proper signatures.

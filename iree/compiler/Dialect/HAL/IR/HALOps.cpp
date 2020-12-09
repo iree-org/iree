@@ -905,14 +905,14 @@ void CommandBufferDispatchSymbolOp::build(
   state.addOperands({commandBuffer, workgroupX, workgroupY, workgroupZ});
   // Construct Executable::Target::EntryPoint nested reference.
   StringRef executableOpSymName =
-      entryPoint.getParentOp()
+      entryPoint->getParentOp()
           ->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
   state.addAttribute("entry_point",
                      builder.getSymbolRefAttr(
                          executableOpSymName,
-                         {builder.getSymbolRefAttr(entryPoint.getParentOp()),
+                         {builder.getSymbolRefAttr(entryPoint->getParentOp()),
                           builder.getSymbolRefAttr(entryPoint)}));
 }
 
