@@ -131,4 +131,4 @@ def convert_external_target(target):
     # All Bazel targets map to a single CMake target.
     return ["ruy"]
 
-  raise KeyError("No conversion found for target '%s'" % target)
+  raise KeyError(f"No conversion found for target '{target}'")

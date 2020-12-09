@@ -47,7 +47,7 @@ def install_deps():
         "numpy",
     ]
     print("EXEC:", " ".join(args))
-    subprocess.check_call(args)
+    subprocess.run(args, check=True)
 
 
 def dump_current(identifier):
@@ -65,8 +65,8 @@ def dump_all():
     identifier = python_exe.parent.parent.name
     versions_ids.append(identifier)
     # Invoke ourselves with a different interpreter/args to dump config.
-    subprocess.check_call(
-        [str(python_exe), __file__, "_current_args", identifier])
+    subprocess.run([str(python_exe), __file__, "_current_args", identifier],
+                   check=True)
   print("-DIREE_MULTIPY_VERSIONS='{}'".format(";".join(versions_ids)))
 
 
