@@ -90,8 +90,8 @@ def _create_default_iree_driver(
 
   # All failed.
   raise RuntimeError(
-      f"Could not create any requested driver {driver_names:!r} (available="
-      f"{available_driver_names:!r}) : {driver_exceptions:!r}")
+      f"Could not create any requested driver {repr(driver_names)} (available="
+      f"{repr(available_driver_names)}) : {repr(driver_exceptions)}")
 
 
 class Config:
@@ -149,7 +149,7 @@ class BoundFunction:
     return unpacked_results
 
   def __repr__(self):
-    return f"<BoundFunction {self._abi:!r} ({self._vm_function:!r})>"
+    return f"<BoundFunction {repr(self._abi)} ({repr(self._vm_function)})>"
 
   def get_serialized_values(self):
     if self._serialized_inputs is None:
