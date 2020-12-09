@@ -22,8 +22,8 @@ navigate [here](https://github.com/wolfpld/tracy/releases) and search for
 
 ## Building the Tracy UI (the "server")
 
-This is explained in section 2.3 of the manual for Windows and Linux. Here we
-give some more detailed instructions for some systems.
+This is explained in section 2.3 of the [manual](#the-tracy-manual) for Windows
+and Linux. Here we give some more detailed instructions for some systems.
 
 The IREE repository contains its own clone of the Tracy repository in
 `third_party/tracy`, so there is no need to make a separate clone of it. You can
@@ -92,10 +92,10 @@ The Android device must be prepared as follows to enable Tracy profiling.
     to restart the `adbd` server as non-root. Not mandatory, but again, running
     anything as root on Android is a deviation from normal user conditions.
 * Execute the following commands in a root shell on the device (i.e. `adb
-  shell`, then `su`, then the following commands). These are from the Tracy PDF
-  manual, but hard to find there, and copy-pasting from PDF introduces unwanted
-  whitespace. These settings normally persist until the next reboot of the
-  device.
+  shell`, then `su`, then the following commands). These are from the
+  [manual](#the-tracy-manual), but hard to find there, and copy-pasting from PDF
+  introduces unwanted whitespace. These settings normally persist until the next
+  reboot of the device.
   * `setenforce 0`
   * `mount -o remount,hidepid=0 /proc`
   * `echo 0 > /proc/sys/kernel/perf_event_paranoid`
@@ -214,8 +214,8 @@ IREE generated code tends to run on a thread named `cpu0`, which is actually a
 thread name and unrelated to `CPU0` from the systrace view.
 
 Once you have identified the thread of interest, use its ghost icon to toggle
-between normal and ghost zones, and zoom until you have found the zone of
-interest.
+between instrumentation and ghost zones, and zoom until you have found the zone
+of interest.
 
 Here is what you should get when clicking on a ghost zone:
 
@@ -224,10 +224,10 @@ view](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a
 
 The percentages column to the left of the disassembly shows where time is being
 spent. This is unique to the sampling data (ghost zones) and has no equivalent
-in the instrumentation data (normal zones). Here is what we get clicking on the
-corresponding normal zone:
+in the instrumentation data (instrumentation zones). Here is what we get
+clicking on the corresponding instrumentation zone:
 
-![normal zone source
+![instrumentation zone source
 view](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_normal_zone_info.jpeg)
 
 This still has a 'Source' button but that only shows the last C++ caller that
