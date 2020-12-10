@@ -43,7 +43,6 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler." OFF)
@@ -52,6 +51,14 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+
+# Default python bindings to enabled for some features.
+if(${IREE_BUILD_TENSORFLOW_COMPILER})
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
+else()
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+endif()
+
 # LINT.ThenChange(
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
