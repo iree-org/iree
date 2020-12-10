@@ -144,7 +144,7 @@ class MaterializeConstantPoolBuffersPass
         funcBuilder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
             storageOp.getLoc(), IREE::ByteBufferType::get(context),
             funcBuilder.getSymbolRefAttr(
-                storageOp.getParentOfType<ConstantPoolOp>().getName(),
+                storageOp->getParentOfType<ConstantPoolOp>().getName(),
                 {funcBuilder.getSymbolRefAttr(storageOp)}));
     auto offsetValue =
         funcBuilder.createOrFold<mlir::ConstantIndexOp>(storageOp.getLoc(), 0);

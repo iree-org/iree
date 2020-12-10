@@ -93,8 +93,8 @@ int dimensionToIndex(StringRef dimension) {
 /// Gets the block processor ID's upper bound. This queries the workgroup count
 /// function.
 Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
-  auto numWorkgroupsFn = getNumWorkgroupsFn(blockIDOp.getParentOfType<FuncOp>(),
-                                            getNumWorkgroupsFnAttrName());
+  auto numWorkgroupsFn = getNumWorkgroupsFn(
+      blockIDOp->getParentOfType<FuncOp>(), getNumWorkgroupsFnAttrName());
   if (!numWorkgroupsFn) return llvm::None;
 
   Operation *terminator = numWorkgroupsFn.getBlocks().back().getTerminator();
@@ -114,8 +114,8 @@ Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
 /// Gets the thread processor ID's upper bound. This queries the SPIR-V entry
 /// point ABI.
 Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
-  FuncOp funcOp = threadIDOp.getParentOfType<FuncOp>();
-  auto abiAttr = funcOp.getAttrOfType<spirv::EntryPointABIAttr>(
+  FuncOp funcOp = threadIDOp->getParentOfType<FuncOp>();
+  auto abiAttr = funcOp->getAttrOfType<spirv::EntryPointABIAttr>(
       spirv::getEntryPointABIAttrName());
   if (!abiAttr) return llvm::None;
 

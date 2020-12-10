@@ -245,7 +245,7 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
       SymbolTable::lookupNearestSymbolFrom<FuncOp>(callerFunc, functionName);
   if (!calleeFunc) {
     OpBuilder::InsertionGuard insertGuard(builder);
-    auto module = callerFunc.getParentOfType<ModuleOp>();
+    auto module = callerFunc->getParentOfType<ModuleOp>();
     builder.setInsertionPointToStart(module.getBody());
     calleeFunc = builder.create<FuncOp>(
         module.getLoc(), functionName,

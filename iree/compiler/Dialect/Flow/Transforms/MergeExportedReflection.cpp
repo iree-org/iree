@@ -109,7 +109,7 @@ class MergeExportedReflectionPass
     functionSignature.Span(inputsAccum, 'I');
     functionSignature.Span(resultsAccum, 'R');
     MutableDictionaryAttr l(
-        func.getAttrOfType<DictionaryAttr>(reflectionIdent));
+        func->getAttrOfType<DictionaryAttr>(reflectionIdent));
     l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
     l.set(fVersionIdent, builder.getStringAttr("1"));
     func.setAttr(reflectionIdent, l.getDictionary(&getContext()));
