@@ -112,7 +112,7 @@ iree-opt -iree-transformation-pipeline \\
 
 mkdir -p ${BUILD_DIR}/doc/ir_examples
 
-build_one_example iree/samples/ops/mhlo-dot.mlir llvm-ir
+build_one_example iree/samples/ops/mhlo-dot.mlir dylib-llvm-aot
 build_one_example iree/samples/ops/mhlo-dot.mlir vmla
 build_one_example iree/samples/ops/mhlo-dot.mlir vulkan-spirv
 build_one_example iree/samples/ops/dynamic-mhlo-dot.mlir vmla

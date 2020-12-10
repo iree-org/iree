@@ -34,3 +34,7 @@ iree_add_bazel_invocation(
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
 endif()
+
+if(${IREE_BUILD_TESTS} AND ${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(e2e)
+endif()

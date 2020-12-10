@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests for end-to-end IREE support specific to the vulkan-spirv lowering.
+# Tests for end-to-end IREE support specific to the LLVM lowering.
 # TODO(ravishankarm): Reorganize these tests.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -24,25 +24,25 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_llvm-ir-conv_img2col",
+    name = "check_llvm-aot-conv_img2col",
     srcs = [
         "conv.mlir",
     ],
     compiler_flags = [
         "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true",
     ],
-    driver = "llvm",
-    target_backend = "llvm-ir",
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_llvm-ir-exponential_fast",
+    name = "check_llvm-aot-exponential_fast",
     srcs = [
         "exponential.mlir",
     ],
     compiler_flags = [
         "-iree-codegen-linalg-to-llvm-fast-exp=true",
     ],
-    driver = "llvm",
-    target_backend = "llvm-ir",
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
 )

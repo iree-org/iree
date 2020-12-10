@@ -875,6 +875,11 @@ class BackendInfo:
           "driver": "vulkan",
           "compiler_targets": ["vulkan-*"]
       },
+      "iree_llvmaot": {
+          "compiled_module_class": IreeCompiledModule,
+          "driver": "dylib",
+          "compiler_targets": ["dylib-llvm-aot"]
+      },
   }
 
   def __init__(self, backend_name: str, backend_id: str = None):
@@ -882,13 +887,13 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'tflite', 'iree_vmla', 'iree_vulkan'.
+        'tf', 'tflite', 'iree_vmla', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
       KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmla',
-        'iree_vulkan'].
+        'iree_vulkan', 'iree_llvmaot'].
       ValueError: if backend_id doesn't start with backend_name.
     """
     if backend_name not in self._name_to_info:

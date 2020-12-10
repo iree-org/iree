@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -31,7 +31,7 @@ struct LinalgTileAndDistributeOnTensorsPass
     : public PassWrapper<LinalgTileAndDistributeOnTensorsPass,
                          OperationPass<ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, IREEDialect, AffineDialect,
+    registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect, AffineDialect,
                     scf::SCFDialect>();
   }
   LinalgTileAndDistributeOnTensorsPass() = default;
@@ -44,16 +44,6 @@ struct LinalgTileAndDistributeOnTensorsPass
       *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
-
-static std::pair<Value, Value> buildWorkgroupOpPair(OpBuilder &b,
-                                                    StringRef dim) {
-  Type indexType = b.getIndexType();
-  StringAttr attr = b.getStringAttr(dim);
-  return {b.create<IREE::WorkgroupIdOp>(b.getInsertionPoint()->getLoc(),
-                                        indexType, attr),
-          b.create<IREE::WorkgroupSizeOp>(b.getInsertionPoint()->getLoc(),
-                                          indexType, attr)};
-}
 
 // Rewrite pattern to ensure only ops with tensor semantics are tiled.
 struct TileAndDistributeOnTensorsPattern
@@ -86,13 +76,16 @@ void LinalgTileAndDistributeOnTensorsPass::runOnOperation() {
   // range [0, WorkgroupSizeOp).
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-        // TODO: drop magic names.
-        std::array<StringRef, 3> dimStrs{"x", "y", "z"};
         auto numParallelDims = parallelLoopRanges.size();
-        SmallVector<linalg::ProcInfo, 2> procInfo(numParallelDims);
-        for (unsigned dim = 0; dim < std::min(numParallelDims, 3ul); ++dim) {
-          auto p = buildWorkgroupOpPair(builder, dimStrs[dim]);
-          procInfo[dim] = {p.first, p.second};
+        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+        for (size_t dim = 0;
+             dim < std::min(numParallelDims, static_cast<size_t>(3)); ++dim) {
+          procInfo[numParallelDims - dim - 1] = {
+              builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
+                  loc, builder.getIndexType(), APInt(64, dim)),
+              builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
+                  loc, builder.getIndexType(), APInt(64, dim)),
+          };
         }
         return procInfo;
       },

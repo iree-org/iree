@@ -56,9 +56,12 @@ def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Executable ABI
+// Executable ABI DO NOT ADD THINGS HERE
 //===----------------------------------------------------------------------===//
 
+// ***WARNING***: this is going away soon - please don't extend or add more
+// things like this to this file. Ops should go to the dialect they relate to
+// (HAL, in this case).
 def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
   let summary = "A placeholder op to feed a value/buffer into computation";
   let description = [{
@@ -74,38 +77,6 @@ def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
 
   let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
 }
-
-def IREE_WorkgroupIdOp : IREE_PureOp<"workgroup_id"> {
-  let summary = "Get grid index of an iree workgoup among a specific dimension.";
-  let description = [{
-    IREE workgroups are logically distributed among a hypergrid, each point sampled 
-    from the grid corresponds to a logical thread. For example in a 3d grid case 
-    the op quries (x, y, z) dimensions:
-
-    ```mlir
-     %0 = iree.workgroup_id {dimension = "x"} : index
-     %1 = iree.workgroup_id {dimension = "y"} : index
-     %2 = iree.workgroup_id {dimension = "z"} : index
-    ```
-  }];
-  
-  let arguments = (ins StrAttr:$dimension);
-  let results = (outs Index:$result);
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-}
-
-def IREE_WorkgroupSizeOp: IREE_PureOp<"workgoup_size"> {
-  let summary = "Get grid size of an iree thread among a specific dimension";
-  let description = [{
-    Get grid size of an iree workgroups among a specific dimension
-  }];
-  let arguments = (ins StrAttr:$dimension);
- let results = (outs Index:$result);
-
- let assemblyFormat = "attr-dict `:` type($result)";
-}
-
 
 //===----------------------------------------------------------------------===//
 // Compiler hints

@@ -7,8 +7,8 @@ func @matmul_128x128x128(%arg0 : memref<128x128xf32>, %arg1: memref<128x128xf32>
 // CHECK: #[[MAP0:map.*]] =  affine_map<()[s0] -> (s0 * 64)>
 // CHECK-LABEL: func @matmul_128x128x128
 // CHECK-SAME: (%[[ARG0:.+]]: memref<128x128xf32>, %[[ARG1:.+]]: memref<128x128xf32>, %[[ARG2:.+]]: memref<128x128xf32>)
-// CHECK-DaG: %[[WORKGROUP_TILE_X:.+]] = iree.workgroup_id {dimension = "x"} : index
-// CHECK-DAG: %[[WORKGROUP_TILE_Y:.+]] = iree.workgroup_id {dimension = "y"} : index
+// CHECK-DaG: %[[WORKGROUP_TILE_X:.+]] = hal.interface.workgroup.id[0] : index
+// CHECK-DAG: %[[WORKGROUP_TILE_Y:.+]] = hal.interface.workgroup.id[1] : index
 // CHECK-DAG: %[[START:.+]] = constant 0
 // CHECK-DAG: %[[WORGKROUP_SIZE:.+]] = constant 64
 // CHECK-DAG: %[[VECTOR_SIZE:.+]] = constant 4

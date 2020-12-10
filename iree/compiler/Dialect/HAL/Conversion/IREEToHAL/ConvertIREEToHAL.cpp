@@ -24,6 +24,7 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
 class DynamicShapeConstantOpConversion
     : public OpConversionPattern<IREE::DynamicShapeConstantOp> {
  public:

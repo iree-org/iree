@@ -73,6 +73,8 @@ bool isLinearExpr(AffineExpr expr) {
     case mlir::AffineExprKind::DimId:
     case mlir::AffineExprKind::SymbolId:
       return true;
+    default:
+      llvm_unreachable("unhandled affine expr kind");
   }
 }
 
