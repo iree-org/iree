@@ -1,4 +1,18 @@
-cmake_minimum_required (VERSION 3.5)
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+cmake_minimum_required (VERSION 3.13)
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR riscv)
@@ -12,23 +26,24 @@ endif()
 set(RISCV_TOOLCHAIN_NAME clang)
 
 set(RISCV_TOOL_PATH "$ENV{HOME}/riscv/prebuilt" CACHE PATH "RISC-V tool path")
-set(RISCV_TOOLCHAIN_ROOT "${RISCV_TOOL_PATH}/prebuilt/toolchain/clang/${RISCV_HOST_TAG}/RISCV")
+
+set(RISCV_TOOLCHAIN_ROOT "${RISCV_TOOL_PATH}/toolchain/clang/${RISCV_HOST_TAG}/RISCV")
 set(RISCV_TOOLCHAIN_PREFIX "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_NAME}")
 
 list(APPEND CMAKE_PREFIX_PATH "${RISCV_TOOLCHAIN_ROOT}")
 
-set(CMAKE_SYSROOT "${RISCV_TOOLCHAIN_ROOT}/sysroot")
+set(CMAKE_SYSROOT "${RISCV_TOOLCHAIN_ROOT}/sysroot" CACHE PATH "Sysroot")
 
 set(CMAKE_C_COMPILER "${RISCV_TOOLCHAIN_ROOT}/bin/clang")
 set(CMAKE_CXX_COMPILER "${RISCV_TOOLCHAIN_ROOT}/bin/clang++")
 set(CMAKE_AR "${RISCV_TOOLCHAIN_ROOT}/bin/llvm-ar" CACHE FILEPATH "Archiver")
 set(CMAKE_RANLIB "${RISCV_TOOLCHAIN_ROOT}/bin/llvm-ranlib" CACHE FILEPATH "Ranlib")
 set(CMAKE_STRIP "${RISCV_TOOLCHAIN_ROOT}/bin/llvm-strip" CACHE FILEPATH "Strip")
-set(_CMAKE_TOOLCHAIN_PREFIX "${RISCV_TOOLCHAIN_PREFIX}")
-set(CMAKE_FIND_ROOT_PATH ${RISCV_TOOLCHAIN_ROOT})
-set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN   "${RISCV_TOOLCHAIN_ROOT}")
-set(CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN "${RISCV_TOOLCHAIN_ROOT}")
-set(CMAKE_ASM_COMPILER_EXTERNAL_TOOLCHAIN "${RISCV_TOOLCHAIN_ROOT}")
+set(_CMAKE_TOOLCHAIN_PREFIX "${RISCV_TOOLCHAIN_PREFIX}" CACHE PATH "Toolchain Prefix")
+set(CMAKE_FIND_ROOT_PATH ${RISCV_TOOLCHAIN_ROOT} CACHE PATH "Find toolchain root")
+set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN   "${RISCV_TOOLCHAIN_ROOT}" CACHE PATH "External toolchain")
+set(CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN "${RISCV_TOOLCHAIN_ROOT}" CACHE PATH "External cxx")
+set(CMAKE_ASM_COMPILER_EXTERNAL_TOOLCHAIN "${RISCV_TOOLCHAIN_ROOT}" CACHE PATH "External asm")
 
 set(RISCV_COMPILER_FLAGS)
 set(RISCV_COMPILER_FLAGS_CXX)
