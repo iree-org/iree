@@ -1,3 +1,6 @@
+# Lint-as: python3
+"""TFLite tools."""
+
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
+from typing import Optional
 
-iree_py_library(
-  NAME
-    compiler2
-  SRCS
-    "__init__.py"
-    "core.py"
-    "tf.py"
-    "tflite.py"
-    "tools.py"
-    "xla.py"
-)
+import os
+import platform
+
+
+def get_tool(exe_name: str) -> Optional[str]:
+  if platform.system() == "Windows":
+    exe_name = exe_name + ".exe"
+  this_path = os.path.dirname(__file__)
+  tool_path = os.path.join(this_path, exe_name)
+  return tool_path

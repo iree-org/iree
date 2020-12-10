@@ -37,6 +37,7 @@ __all__ = [
 # a python module that provides a `get_tool` function for getting its absolute
 # path. This dictionary maps the tool name to the module.
 _TOOL_MODULE_MAP = {
+    "iree-import-tflite": "pyiree.tools.tflite",
     "iree-import-xla": "pyiree.tools.xla",
     "iree-tf-import": "pyiree.tools.tf",
     "iree-translate": "pyiree.tools.core",
@@ -47,6 +48,7 @@ _TOOL_MODULE_MAP = {
 _TOOL_MODULE_PACKAGES = {
     "pyiree.tools.core": "google-iree-tools-core",
     "pyiree.tools.tf": "google-iree-tools-tf",
+    "pyiree.tools.tflite": "google-iree-tools-tflite",
     "pyiree.tools.xla": "google-iree-tools-xla",
 }
 

@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
-
 iree_py_library(
   NAME
-    compiler2
+    tflite
   SRCS
     "__init__.py"
-    "core.py"
-    "tf.py"
-    "tflite.py"
-    "tools.py"
-    "xla.py"
+  DEPS
+    integrations_iree_tensorflow_importers
+)
+
+iree_symlink_tool(
+  TARGET tflite
+  FROM_TOOL_TARGET integrations_tensorflow_compiler_iree-import-tflite
+  TO_EXE_NAME iree-import-tflite
 )

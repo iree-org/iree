@@ -46,6 +46,7 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
+option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
@@ -57,7 +58,9 @@ set(IREE_TARGET_BACKENDS_TO_BUILD "all"
 # Note that this is a normal CMake variable used to gate build features (not
 # a cache variable that is user-settable).
 set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_XLA_COMPILER})
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+   ${IREE_BUILD_TFLITE_COMPILER} OR
+   ${IREE_BUILD_XLA_COMPILER})
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
 

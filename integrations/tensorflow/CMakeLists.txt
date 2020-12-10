@@ -30,6 +30,11 @@ if(${IREE_BUILD_TENSORFLOW_COMPILER})
   list(APPEND _executable_paths integrations/tensorflow/compiler/iree-tf-import)
 endif()
 
+if(${IREE_BUILD_TFLITE_COMPILER})
+  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-import-tflite)
+  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-import-tflite)
+endif()
+
 if(${IREE_BUILD_XLA_COMPILER})
   list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-import-xla)
   list(APPEND _executable_paths integrations/tensorflow/compiler/iree-import-xla)

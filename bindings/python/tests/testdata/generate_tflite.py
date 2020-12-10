@@ -12,17 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
+import os
 
-iree_py_library(
-  NAME
-    compiler2
-  SRCS
-    "__init__.py"
-    "core.py"
-    "tf.py"
-    "tflite.py"
-    "tools.py"
-    "xla.py"
-)
+import tensorflow as tf
+
+
+class Squared(tf.Module):
+
+  @tf.function
+  def __call__(self, x):
+    return tf.square(x)
+
+
+model = Squared()
+concrete_func = model.__call__.get_concrete_function(
+    tf.TensorSpec(shape=[4, 3], dtype=tf.float32))
+
+converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete_func])
+tflite_model = converter.convert()
+
+this_dir = os.path.dirname(__file__)
+with open(os.path.join(this_dir, "tflite_sample.fb"), "wb") as f:
+  f.write(tflite_model)
