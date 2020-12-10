@@ -1,5 +1,13 @@
 # TensorFlow e2e tests
 
+<!-- TODO(meadowlark): Update this doc once the API is stable. -->
+
+> Note:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
+  refactored. The `bazel` build is deprecated. Refer to
+  https://google.github.io/iree/get-started/getting-started-python for a general
+  overview of how to build and execute the e2e tests.
+
 This is a collection of e2e tests that compile a TensorFlow model with IREE (and
 potentially TFLite), run it on multiple backends, and crosscheck the results.
 
