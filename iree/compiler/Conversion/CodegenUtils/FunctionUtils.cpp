@@ -20,10 +20,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-bool isEntryPoint(FuncOp func) {
-  return SymbolTable::getSymbolVisibility(func) ==
-         SymbolTable::Visibility::Public;
-}
+bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()

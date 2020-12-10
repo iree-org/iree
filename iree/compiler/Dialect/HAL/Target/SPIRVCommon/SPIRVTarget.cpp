@@ -94,9 +94,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   SmallVector<spirv::FuncOp, 2> spvEntryPointFns;
   if (!entryPointScheduleAttr) {
     for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
-          SymbolTable::Visibility::Public)
-        spvEntryPointFns.push_back(spvFuncOp);
+      if (spvFuncOp.isPublic()) spvEntryPointFns.push_back(spvFuncOp);
     }
     if (!llvm::hasSingleElement(spvEntryPointFns)) {
       return spvModuleOp.emitError(
@@ -106,9 +104,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   } else {
     llvm::StringMap<spirv::FuncOp> publicFns;
     for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
-          SymbolTable::Visibility::Public)
-        publicFns[spvFuncOp.sym_name()] = spvFuncOp;
+      if (spvFuncOp.isPublic()) publicFns[spvFuncOp.sym_name()] = spvFuncOp;
     }
     for (Attribute entryNameAttr : entryPointScheduleAttr) {
       StringRef entryName = entryNameAttr.cast<StringAttr>().getValue();

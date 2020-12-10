@@ -42,8 +42,7 @@ namespace VMLA {
 // The runtime will provide these values during invocation.
 static LogicalResult insertInterfacesToEntryPoints(mlir::ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(funcOp) !=
-        SymbolTable::Visibility::Public) {
+    if (!funcOp.isPublic()) {
       continue;
     }
     auto originalType = funcOp.getType();
