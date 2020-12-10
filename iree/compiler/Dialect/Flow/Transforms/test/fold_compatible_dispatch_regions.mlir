@@ -162,3 +162,29 @@ module {
 //       CHECK: flow.dispatch.region
 //  CHECK-NEXT:   mhlo.slice
 //  CHECK-NEXT:   mhlo.multiply
+
+// -----
+
+module {
+  func @torch_index_select_producer(%arg0: tensor<5x1x5xi32>,
+                                    %arg1: tensor<2xi32>) -> tensor<2x1x5xi32> {
+    %c10 = constant 0 : index
+    %0 = flow.dispatch.region[%c10 : index](%arg2 = %arg0 : tensor<5x1x5xi32>,
+                                            %arg3 = %arg1 : tensor<2xi32>) -> tensor<2x1x5xi32> {
+      %1 = "mhlo.torch_index_select"(%arg2, %arg3) {
+        dim = 0 : i64,
+        batch_dims = 0 : i64
+      } : (tensor<5x1x5xi32>, tensor<2xi32>) -> tensor<2x1x5xi32>
+      flow.return %1 : tensor<2x1x5xi32>
+    }
+    %1 = flow.dispatch.region[%c10 : index](%arg2 = %0 : tensor<2x1x5xi32>) -> tensor<2x1x5xi32> {
+      %2 = mhlo.add %arg2, %arg2 : tensor<2x1x5xi32>
+      flow.return %2 : tensor<2x1x5xi32>
+    }
+    return %1 : tensor<2x1x5xi32>
+  }
+}
+// CHECK-LABEL: func @torch_index_select_producer
+//       CHECK: flow.dispatch.region
+//  CHECK-NEXT:   mhlo.torch_index_select
+//  CHECK-NEXT:   mhlo.add
