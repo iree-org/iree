@@ -15,9 +15,12 @@
 # An image for building IREE using CMake and testing IREE with SwiftShader
 # Vulkan implementation.
 
-FROM gcr.io/iree-oss/cmake-python-vulkan@sha256:6722f69c6300749f6bd4b141fc653244990381a6b0111f9c361061adcd65c07c AS final
-COPY --from=gcr.io/iree-oss/swiftshader@sha256:ccae32c83c89a31e8fc5542e480c29f28bbf4a3b3b80198c06b687a92c6813f3 \
-  /swiftshader /swiftshader
+FROM gcr.io/iree-oss/cmake-python@sha256:c1f05139fa478107bdd5889d6b3ca9f8a4bcf19e77e3e8058e2084367a1aa23d AS final
 
-# Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
-ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
+# Install bazel.
+COPY --from=gcr.io/iree-oss/bazel@sha256:a5c4e189f48e503276c1ba208fee8365b20df503a1b201cde6608dee5eeebadd \
+  /usr/bin/bazel* \
+  /usr/bin/
+
+# Install tensorflow.
+RUN python3 -m pip install tf-nightly==2.5.0.dev20201116

@@ -25,7 +25,7 @@
 #      does not support Ubuntu 18.04.
 # This allows to share configuration with base CMake, but it also means we need
 # to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/cmake-python-vulkan@sha256:6722f69c6300749f6bd4b141fc653244990381a6b0111f9c361061adcd65c07c AS final
+FROM gcr.io/iree-oss/cmake-bazel-tensorflow-vulkan@sha256:f7ebc07ccfe03e6bb7de11e178583b43660f9fb152f4154a02b44fbb1b42cd4f AS final
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-440=440.100-0ubuntu0.18.04.1
