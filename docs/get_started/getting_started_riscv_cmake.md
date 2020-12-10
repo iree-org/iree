@@ -29,7 +29,7 @@ Execute the following script to download RISC-V toolchain and QEMU:
 # In IREE source root
 $ ./scripts/riscv_bootstrap.sh
 ```
-RISC-V toolchain is built from https://github.com/llvm/llvm-project  
+RISC-V toolchain is built from https://github.com/llvm/llvm-project
 RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.1.0-rvv-zfh-pmp
 
 ## Configure and build
@@ -46,6 +46,7 @@ $ cmake -G Ninja \
 ```
 
 *   The above configures IREE to cross-compile towards `rv64` cpu platform.
+*   If user uses different download path in `riscv_bootscrap.sh`, please setup `-DRISCV_TOOL_PATH=$(YOUR PATH)` in cmake command.
 
 ### Build all targets
 
@@ -72,9 +73,9 @@ $ ./host/iree/tools/iree-translate \
 Then run on the RISC-V QEMU:
 
 ```shell
-$ ../Prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
+$ $HOME/riscv/prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-  -L ../Prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
+  -L $HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=vmla -module_file=/tmp/simple-vmla.vmfb -entry_function=abs -function_inputs="i32=-5"
 ```
 
@@ -87,11 +88,11 @@ i32=5
 ```
 ### Dylib LLVM AOT backend
 To compile an IREE module using the Dylib LLVM ahead-of-time (AOT) backend for
-a target RISC-V we need to use the corresponding toolchain which we have downloaded at the `Prebuilt` folder.
+a target RISC-V we need to use the corresponding toolchain which we have downloaded at the `$HOME/riscv/prebuilt` folder.
 Set the AOT linker path environment variable:
 ```shell
 # Still in "build-riscv" folder
-$ export IREE_LLVMAOT_LINKER_PATH="../Prebuilt/toolchain/clang/linux/RISCV/bin/clang++ -static-libstdc++ -O3"
+$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/bin/clang++ -static-libstdc++ -O3"
 ```
 Translate a source MLIR into an IREE module:
 
@@ -108,9 +109,9 @@ $ ./host/iree/tools/iree-translate \
 Then run on the RISC-V QEMU:
 
 ```shell
-$ ../Prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
+$ $HOME/riscv/prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-  -L ../Prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
+  -L $HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=dylib -module_file=/tmp/simple-llvm_aot.vmfb -entry_function=abs -function_inputs="i32=-5"
 ```
 
