@@ -128,7 +128,7 @@ Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
   // aligns with the semantics of this memory which is available at the entry of
   // the function.
   OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  FuncOp funcOp = subview->getParentOfType<FuncOp>();
   if (!funcOp) {
     subview.emitError("expected op to be within std.func");
     return llvm::None;

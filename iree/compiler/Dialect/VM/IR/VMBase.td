@@ -394,15 +394,15 @@ class VM_EncType<string expr> : VM_EncEncodeExpr<
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType(" # name # "())">;
 class VM_EncIntAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodeIntAttr(getAttrOfType<IntegerAttr>(\"" # name # "\"))"> {
+    "e.encodeIntAttr(getOperation()->getAttrOfType<IntegerAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncIntArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodeIntArrayAttr(getAttrOfType<DenseIntElementsAttr>(\"" # name # "\"))"> {
+    "e.encodeIntArrayAttr(getOperation()->getAttrOfType<DenseIntElementsAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeStrAttr(getAttrOfType<StringAttr>(\"" # name # "\"))">;
+    "e.encodeStrAttr(getOperation()->getAttrOfType<StringAttr>(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
     "e.encodeBranch(" # blockName # "(), " # operandsName # "(), " # successorIndex # ")">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<

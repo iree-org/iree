@@ -64,7 +64,7 @@ static void hoistRedundantCopies(FuncOp func) {
   while (changed) {
     changed = false;
     func.walk([&](linalg::FillOp op) {
-      auto loop = op.getParentOfType<scf::ForOp>();
+      auto loop = op->getParentOfType<scf::ForOp>();
       if (!loop) return;
 
       for (auto operand : op.getOperands())
@@ -76,7 +76,7 @@ static void hoistRedundantCopies(FuncOp func) {
     });
 
     func.walk([&](linalg::CopyOp op) {
-      auto loop = op.getParentOfType<scf::ForOp>();
+      auto loop = op->getParentOfType<scf::ForOp>();
       if (!loop) return;
 
       for (auto operand : op.getOperands())

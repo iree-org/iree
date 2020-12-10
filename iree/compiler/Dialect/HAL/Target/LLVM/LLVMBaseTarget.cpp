@@ -243,7 +243,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
     }
     std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
     FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-        funcOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+        funcOp->getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
     if (!numWorkgroupsFn) {
       return funcOp.emitError("unable to find function ")
              << numWorkgroupsFnAttr
