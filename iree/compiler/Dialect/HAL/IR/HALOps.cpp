@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
@@ -1577,6 +1578,44 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
                                          "type",
                                          "access",
                                      });
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface.workgroup.*
+//===----------------------------------------------------------------------===//
+
+static void getAsmResultNamesForInterfaceWorkgroupOp(
+    StringRef prefix, const APInt &dimension, Value result,
+    function_ref<void(Value, StringRef)> setNameFn) {
+  switch (dimension.getZExtValue()) {
+    case 0:
+      setNameFn(result, (prefix + "x").str());
+      return;
+    case 1:
+      setNameFn(result, (prefix + "y").str());
+      return;
+    case 2:
+      setNameFn(result, (prefix + "z").str());
+      return;
+  }
+}
+
+void InterfaceWorkgroupIDOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_id_", dimension(),
+                                           result(), setNameFn);
+}
+
+void InterfaceWorkgroupCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_count_", dimension(),
+                                           result(), setNameFn);
+}
+
+void InterfaceWorkgroupSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", dimension(),
+                                           result(), setNameFn);
 }
 
 //===----------------------------------------------------------------------===//

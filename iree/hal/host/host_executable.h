@@ -46,6 +46,9 @@ class HostExecutable : public Executable {
     // Total workgroup XYZ count for the grid.
     std::array<uint32_t, 3> workgroup_count;
 
+    // Size of each tile in the grid in local space.
+    std::array<uint32_t, 3> workgroup_size;
+
     // Push constants populated by the command buffer.
     const PushConstantBlock* push_constants = nullptr;
 

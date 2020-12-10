@@ -13,8 +13,8 @@ func @tile_from_tensor_load() {
   %2 = hal.interface.load.tensor @legacy_io::@TENSOR_INIT, offset = %c0
     {operand_result_index = 2 : i32} : tensor<2x4xf32>
 
-  %3 = iree.workgroup_id {dimension = "x"} : index
-  %4 = iree.workgroup_id {dimension = "y"} : index
+  %3 = hal.interface.workgroup.id[0] : index
+  %4 = hal.interface.workgroup.id[1] : index
   // Test step %{{[0-9a-z]}} { to ensure yield has been folded away.
   //      CHECK: scf.for %[[I:.*]] = {{.*}} step %{{[0-9a-z]+}} {
   //      CHECK:   scf.for %[[J:.*]] = {{.*}} step %{{[0-9a-z]+}} {
@@ -83,8 +83,8 @@ func @tile_from_pointwise_lhs() {
   %2 = hal.interface.load.tensor @legacy_io::@TENSOR_RHS, offset = %c0
     {operand_result_index = 2 : i32} : tensor<3x4xf32>
 
-  %4 = iree.workgroup_id {dimension = "x"} : index
-  %5 = iree.workgroup_id {dimension = "y"} : index
+  %4 = hal.interface.workgroup.id[0] : index
+  %5 = hal.interface.workgroup.id[1] : index
   // Test step %{{[0-9a-z]}} { to ensure yield has been folded away.
   //      CHECK: scf.for %[[I:.*]] = {{.*}} step %{{[0-9a-z]+}} {
   //      CHECK:   scf.for %[[J:.*]] = {{.*}} step %{{[0-9a-z]+}} {
@@ -168,8 +168,8 @@ func @tile_from_pointwise_init() {
     linalg.yield %arg0 : f32
   } -> tensor<2x4xf32>
 
-  %4 = iree.workgroup_id {dimension = "x"} : index
-  %5 = iree.workgroup_id {dimension = "y"} : index
+  %4 = hal.interface.workgroup.id[0] : index
+  %5 = hal.interface.workgroup.id[1] : index
 
   // Test step %{{[0-9a-z]}} { to ensure yield has been folded away.
   //      CHECK: scf.for %[[I:.*]] = {{.*}} step %{{[0-9a-z]+}} {

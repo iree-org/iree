@@ -75,6 +75,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions executableOptions);
 
+// Propagates hal.interface.workload.* information when constant.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createPropagateConstantWorkgroupInfoPass();
+
 // Translates hal.executable.target ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createTranslateExecutablesPass(TargetOptions executableOptions);

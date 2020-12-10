@@ -176,6 +176,8 @@ LLVMJITExecutable::~LLVMJITExecutable() = default;
 struct LLVMJITDispatchState : public HostExecutable::DispatchState {
   LLVMJITDispatchState() = default;
 
+  std::array<uint32_t, 3> workgroup_count;
+  std::array<uint32_t, 3> workgroup_size;
   llvm::JITEvaluatedSymbol symbol;
   llvm::SmallVector<void*, 4> args;
   llvm::SmallVector<int32_t, 4> push_constant;
@@ -191,6 +193,8 @@ LLVMJITExecutable::PrepareDispatch(const DispatchParams& params) {
   }
 
   auto dispatch_state = make_ref<LLVMJITDispatchState>();
+  dispatch_state->workgroup_count = params.workgroup_count;
+  dispatch_state->workgroup_size = params.workgroup_size;
   dispatch_state->symbol = symbols_[params.entry_point];
 
   for (size_t set = 0; set < params.set_bindings.size(); ++set) {
@@ -218,10 +222,11 @@ Status LLVMJITExecutable::DispatchTile(DispatchState* state,
   IREE_TRACE_SCOPE0("LLVMJITExecutable::DispatchTile");
   auto* dispatch_state = static_cast<LLVMJITDispatchState*>(state);
 
-  auto func_ptr = (void (*)(void**, int32_t*, int32_t, int32_t,
-                            int32_t))dispatch_state->symbol.getAddress();
+  auto func_ptr = (void (*)(void**, int32_t*, uint32_t*, uint32_t*,
+                            uint32_t*))dispatch_state->symbol.getAddress();
   func_ptr(dispatch_state->args.data(), dispatch_state->push_constant.data(),
-           workgroup_xyz[0], workgroup_xyz[1], workgroup_xyz[2]);
+           workgroup_xyz.data(), dispatch_state->workgroup_count.data(),
+           dispatch_state->workgroup_size.data());
 
   return OkStatus();
 }
