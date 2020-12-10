@@ -135,11 +135,11 @@ module {
 
 // -----
 
-// Test if the op that only can be a root op fuse with consumer but not
-// producer. This test use a dummy workload to test on root only op
+// Test if the op that only can be a leaf op fuse with consumer but not
+// producer. This test use a dummy workload to test on leaf only op
 // functionality.
 module {
-  func @rootOnlyOp(%arg0: tensor<3x4xi32>, %arg1: tensor<1x2xi32>) -> tensor<1x2xi32> {
+  func @leafOnlyOp(%arg0: tensor<3x4xi32>, %arg1: tensor<1x2xi32>) -> tensor<1x2xi32> {
     %c0 = constant 0 : index
     %0 = flow.dispatch.region[%c0 : index](%arg2 = %arg0 : tensor<3x4xi32>) -> tensor<3x4xi32> {
       %3 = mhlo.add %arg2, %arg2 : tensor<3x4xi32>
@@ -156,7 +156,7 @@ module {
     return %2 : tensor<1x2xi32>
   }
 }
-// CHECK-LABEL: func @rootOnlyOp
+// CHECK-LABEL: func @leafOnlyOp
 //       CHECK: flow.dispatch.region
 //  CHECK-NEXT:   mhlo.add
 //       CHECK: flow.dispatch.region

@@ -227,10 +227,10 @@ bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
              op) ||
          (!clEnableConsumerOnlyFusion &&
           isa<mhlo::DotOp, mhlo::DotGeneralOp>(op)) ||
-         isRootOnlyOp(op);
+         isLeafOnlyOp(op);
 }
 
-bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
+bool OpDispatchPolicy::isLeafOnlyOp(Operation *op) {
   return isa<mhlo::SliceOp, mhlo::TorchIndexSelectOp>(op);
 }
 
