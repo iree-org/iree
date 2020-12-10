@@ -12,28 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- LinalgRewriteDestructiveUpdates.cpp - Pass for destructive updates--===//
+//===- DestructiveUpdateUtilss.cpp - Utils to rewrite destructive updates--===//
 //
-// Pass to rewrite Linalg on tensors destructive updates into updates through
-// memory.
+// Implementation to rewrite Linalg on tensors destructive updates into updates
+// through memory.
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-linalg-bufferize"
+#define DEBUG_TYPE "iree-flow-linalg-rewrite-destructive-updates"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Flow {
 
 // Detect the pattern:
 // %d0 = for  (iter_args %e0 = %0)
@@ -55,7 +60,7 @@ struct SpecialTerminatorOpCapture {
   bool writeOnly = false;
 };
 
-// TODO: Use some interface instead of op names directly.
+// TODO(nicolasvasilache): Use some interface instead of op names directly.
 static bool hasDestructiveUpdateSubTensorUses(
     Value v, SpecialTerminatorOpCapture &capture) {
   SmallVector<SubTensorOp, 4> reads;
@@ -213,7 +218,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
 static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
-  auto loadOp = op.source().getDefiningOp<IREE::HAL::InterfaceLoadTensorOp>();
+  auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchInputLoadOp>();
   if (!loadOp) {
     BlockArgument val = op.source().dyn_cast<BlockArgument>();
     while (val) {
@@ -222,16 +227,22 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
       if (!forOp) return failure();
       unsigned idx = val.getArgNumber() - 1;  // accounting for IV arg.
       Value iterOperand = *(forOp.getIterOperands().begin() + idx);
-      loadOp = iterOperand.getDefiningOp<IREE::HAL::InterfaceLoadTensorOp>();
+      loadOp = iterOperand.getDefiningOp<IREE::Flow::DispatchInputLoadOp>();
       val = iterOperand.dyn_cast<BlockArgument>();
     }
   }
   if (!loadOp) return failure();
 
-  Value loaded = b.create<IREE::HAL::InterfaceLoadTensorTileOp>(
-      op.getLoc(), op.getResult().getType(), loadOp.binding(), loadOp.offset(),
-      op.offsets(), op.sizes(), op.strides(), op.static_offsets(),
-      op.static_sizes(), op.static_strides());
+  SmallVector<Range, 4> ranges = getOrCreateRanges(op, b, op.getLoc());
+  SmallVector<Value, 4> offsets, sizes, strides;
+  for (auto &r : ranges) {
+    offsets.push_back(r.offset);
+    sizes.push_back(r.size);
+    strides.push_back(r.stride);
+  }
+  Value loaded = b.create<IREE::Flow::DispatchInputLoadOp>(
+      op.getLoc(), op.getResult().getType(), loadOp.source(), offsets, sizes,
+      strides);
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();
   return success();
@@ -239,8 +250,7 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
 
 static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
                                                    SubTensorInsertOp op,
-                                                   SymbolRefAttr binding,
-                                                   Value offset) {
+                                                   Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteSubTensorInsertInPlace: "
                           << *(op.getOperation()) << "\n");
   OpBuilder::InsertionGuard g(b);
@@ -256,10 +266,16 @@ static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
 
   // Kills the SSA use-def chain.
   op.replaceAllUsesWith(dest);
-  b.create<IREE::HAL::InterfaceStoreTensorTileOp>(
-      op.getLoc(), TypeRange{}, op.source(), binding, offset, op.offsets(),
-      op.sizes(), op.strides(), op.static_offsets(), op.static_sizes(),
-      op.static_strides());
+
+  SmallVector<Range, 4> ranges = getOrCreateRanges(op, b, op.getLoc());
+  SmallVector<Value, 4> offsets, sizes, strides;
+  for (auto &r : ranges) {
+    offsets.push_back(r.offset);
+    sizes.push_back(r.size);
+    strides.push_back(r.stride);
+  }
+  b.create<IREE::Flow::DispatchOutputStoreOp>(op.getLoc(), op.source(), target,
+                                              offsets, sizes, strides);
   return success();
 }
 
@@ -268,7 +284,9 @@ static bool hasNonScfForControlFlow(FuncOp funcOp) {
   return funcOp
       .walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
-          if (!isa<scf::ForOp>(op)) return WalkResult::interrupt();
+          if (!isa<scf::ForOp>(op) &&
+              !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
+            return WalkResult::interrupt();
         }
         return WalkResult::advance();
       })
@@ -370,8 +388,7 @@ static bool hasNonScfForControlFlow(FuncOp funcOp) {
 // This should probably become a dedicated pass based on core alias analysis,
 // when the latter becomes available.
 static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
-                                                     SymbolRefAttr binding,
-                                                     Value offset) {
+                                                     Value target) {
   SpecialTerminatorOpCapture capture;
   capture.initValue = v;
   Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
@@ -385,63 +402,20 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   LLVM_DEBUG(llvm::dbgs() << "outermost producing: " << *outermostProducingOp
                           << "\n");
 
-  // Helper to clone the load right after `outermostProducingOp` and use it in
-  // `op`.
-  auto buildAndUseLoad = [&](SymbolRefAttr bindingAttr, Value offsetValue) {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointAfter(outermostProducingOp);
-    // TODO: no attributes other than `bindingAttr` on hal.interface.load.tensor
-    // atm. Do we need other attributes propagated?
-    Value newLoad = b.create<IREE::HAL::InterfaceLoadTensorOp>(
-        outermostProducingOp->getLoc(), v.getType(), bindingAttr, offsetValue);
-    // TODO: this brutally replaces all uses by the result of this load.
-    // In practice we may want more recompute and we may have lost information.
-    // Revisit this when things are morefleshed out.
-    v.replaceAllUsesWith(newLoad);
-  };
-
-  // `sourceValue`-specific determination of binding and offset for inplace
-  // update.
-  // TODO: when the destructively updated value comes from a LoadTensorOp, we
-  // need to decide whether to perform an update "into" the init tensor (i.e.
-  // the loadOp binding + offset) or directly into the output.
-  // In the fullness of time, this is dependent on whether or not the
-  // destructive update can guarantee that any particular subtensor of the
-  // result is updated only once.
-  // This is guaranteed for loops that come from tiling "parallel" Linalg
-  // iterators.
-  // Reduction iterators are subject to additional first-read/last-write
-  // considerations, usually derived from traditional memory-based dependence
-  // analysis.
-  // For now we assume that Linalg on tensors only tiles and fuses across
-  // parallel iterators, which allows reading the proper init value and updating
-  // the result.
-  SymbolRefAttr bindingAttr =
-      TypeSwitch<Operation *, SymbolRefAttr>(sourceValue.getDefiningOp())
-          .Case<IREE::HAL::InterfaceLoadTensorOp>(
-              // [&](auto op) { return op.binding(); })
-              [&](auto op) { return binding; })
-          .Case<linalg::LinalgOp>([&](auto op) { return binding; })
-          .Default([](Operation *) { return nullptr; });
-  Value offsetValue =
-      TypeSwitch<Operation *, Value>(sourceValue.getDefiningOp())
-          .Case<IREE::HAL::InterfaceLoadTensorOp>(
-              // [&](auto op) { return op.offset(); })
-              [&](auto op) { return offset; })
-          .Case<linalg::LinalgOp>([&](auto op) { return offset; })
-          .Default([](Operation *) { return nullptr; });
-
-  // TODO: support more cases as needed.
-  if (!bindingAttr) return failure();
-
   // Try to rewrite inplace.
   if (failed(rewriteSubTensorInsertInPlace(
-          b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate),
-          bindingAttr, offsetValue)))
+          b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target)))
     return failure();
 
   // Reload the value produced inplace right after the inplace update.
-  buildAndUseLoad(bindingAttr, offsetValue);
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPointAfter(outermostProducingOp);
+  Value newLoad = b.create<IREE::Flow::DispatchInputLoadOp>(
+      outermostProducingOp->getLoc(), v.getType(), target);
+  // TODO(nicolasvasilache): this brutally replaces all uses by the result of
+  // this load. In practice we may want more recompute and we may have lost
+  // information. Revisit this when things are more fleshed out.
+  v.replaceAllUsesWith(newLoad);
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
     loopOp.walk([&](SubTensorOp op) { propagateSubTensorOp(b, op); });
@@ -449,15 +423,16 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   return success();
 }
 
-// TODO: generalize to more than naive "top of the function consecutive ops".
-// Probably better to wait until core alias analysis is upstreamed.
-// TODO: interfaces.
-static bool hasInterleavedAliases(IREE::HAL::InterfaceLoadTensorOp loadOp,
-                                  IREE::HAL::InterfaceStoreTensorOp storeOp) {
+// TODO(nicolasvasilache): generalize to more than naive "top of the region
+// consecutive ops". Probably better to wait until core alias analysis is
+// upstreamed.
+// TODO(nicolasvasilache): interfaces.
+static bool hasInterleavedAliases(IREE::Flow::DispatchInputLoadOp loadOp,
+                                  IREE::Flow::DispatchOutputStoreOp storeOp) {
   Block *bLoad = loadOp.getOperation()->getBlock();
   Block *bStore = loadOp.getOperation()->getBlock();
-  if (!isa<FuncOp>(bLoad->getParentOp()) ||
-      !isa<FuncOp>(bStore->getParentOp()) ||
+  if (!isa<IREE::Flow::DispatchWorkgroupsOp>(bLoad->getParentOp()) ||
+      !isa<IREE::Flow::DispatchWorkgroupsOp>(bStore->getParentOp()) ||
       bLoad->getParentOp() != bStore->getParentOp())
     return true;
 
@@ -466,81 +441,45 @@ static bool hasInterleavedAliases(IREE::HAL::InterfaceLoadTensorOp loadOp,
   return false;
 }
 
-namespace {
-struct LinalgRewriteDestructiveUpdates
-    : public PassWrapper<LinalgRewriteDestructiveUpdates, FunctionPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, linalg::LinalgDialect, scf::SCFDialect,
-                    StandardOpsDialect>();
-  }
-  void runOnFunction() override;
-};
-}  // namespace
-
-void LinalgRewriteDestructiveUpdates::runOnFunction() {
-  FuncOp funcOp = getFunction();
-
+LogicalResult rewriteLinalgDestructiveUpdates(FuncOp funcOp) {
   // Bail on any control-flow for now.
-  if (hasNonScfForControlFlow(funcOp)) return signalPassFailure();
+  if (hasNonScfForControlFlow(funcOp)) return failure();
 
-  MLIRContext *context = &getContext();
+  bool fail = false;
+  MLIRContext *context = funcOp->getContext();
   OpBuilder b(context);
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
-  funcOp.walk([&](IREE::HAL::InterfaceStoreTensorOp op) {
-    if (failed(rewriteDestructiveUpdateInPlace(b, op.operand(), op.binding(),
-                                               op.offset()))) {
-      signalPassFailure();
+  funcOp.walk([&](IREE::Flow::DispatchOutputStoreOp op) {
+    if (failed(rewriteDestructiveUpdateInPlace(b, op.value(), op.target()))) {
+      fail = true;
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
   });
+  if (fail) return failure();
 
   // For each tensor store op, redundant load/store optimization.
-  funcOp.walk([&](IREE::HAL::InterfaceStoreTensorOp storeOp) {
-    auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceLoadTensorOp>(
-        storeOp.operand().getDefiningOp());
+  funcOp.walk([&](IREE::Flow::DispatchOutputStoreOp storeOp) {
+    auto loadOp = dyn_cast_or_null<IREE::Flow::DispatchInputLoadOp>(
+        storeOp.value().getDefiningOp());
 
     // Bail if there exists an interleaved aliasing.
     if (!loadOp || hasInterleavedAliases(loadOp, storeOp)) return;
-
-    // Bail if this is not a simple forwarding.
-    // TODO: Handle more advanced forwarding, but we may need to do it
-    // earlier while we still have SSA use-def chains.
-    // I.e. revisit later cases such as:
-    // ```
-    //   inplace_update_tiles_rooted_at @legacy_io::@arg0, offset = %c0
-    //   %2 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 :
-    //     tensor<2x4xf32>
-    //   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0
-    //     {operand_result_index = 3 : i32} : tensor<2x4xf32>
-    //   return
-    // ```
-    // where the inplace update could be done directly in @legacy_io::@ret0,
-    // offset = %c0.
-    if (loadOp.binding() != storeOp.binding() ||
-        loadOp.offset() != storeOp.offset())
-      return;
 
     storeOp.erase();
   });
 
   // Non-default canonicalization patterns.
-  // TODO: add Linalg tiling canonicalization patterns, affineminscf and others
-  // as needed.
+  // TODO(nicolasvasilache): add Linalg tiling canonicalization patterns,
+  // affineminscf and others as needed.
   OwningRewritePatternList canonicalizationPatterns;
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+  return success();
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
-createLinalgRewriteDestructiveUpdatesPass() {
-  return std::make_unique<LinalgRewriteDestructiveUpdates>();
-}
-
-static PassRegistration<LinalgRewriteDestructiveUpdates> pass(
-    "iree-codegen-linalg-rewrite-destructive-updates",
-    "Test the rewrite of destructive update patterns to inplace update form.",
-    [] { return std::make_unique<LinalgRewriteDestructiveUpdates>(); });
+}  // namespace Flow
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

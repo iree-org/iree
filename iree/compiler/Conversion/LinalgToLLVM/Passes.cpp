@@ -29,7 +29,7 @@ namespace mlir {
 namespace iree_compiler {
 
 static llvm::cl::opt<bool> clEnableLinalgOnTensors(
-    "iree-llvm-experimental-linalg-on-tensors",
+    "iree-codegen-llvm-experimental-linalg-on-tensors",
     llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
     llvm::cl::init(false));
 
@@ -80,7 +80,11 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
   // (HAL, IREE, Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
-  passManager.addPass(createConvertToLLVMPass());
+  if (clEnableLinalgOnTensors) {
+    passManager.addPass(createConvertToLLVM2Pass());
+  } else {
+    passManager.addPass(createConvertToLLVMPass());
+  }
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -103,9 +107,6 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
 
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {
-    // TODO: implement and connect these.
-    passManager.addPass(createLinalgTileAndDistributeOnTensorsPass());
-    passManager.addPass(createLinalgRewriteDestructiveUpdatesPass());
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
