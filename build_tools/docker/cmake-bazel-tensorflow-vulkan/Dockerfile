@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A base image for building IREE using CMake and running Vulkan tests.
 # This image provides the Vulkan SDK. Requires a child image to provide
 # a Vulkan ICD.
 

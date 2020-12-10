@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE using CMake and testing IREE with NVIDIA GPUs.
-
 # To use the host GPUs, `docker run` must be called with the `--gpus all` flag.
 
 # Set up the image and working directory by inheriting the vulkan CMake

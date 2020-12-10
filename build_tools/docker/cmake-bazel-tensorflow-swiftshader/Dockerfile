@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE using CMake and testing IREE with SwiftShader
-# Vulkan implementation.
-
 FROM gcr.io/iree-oss/cmake-bazel-tensorflow-vulkan@sha256:f7ebc07ccfe03e6bb7de11e178583b43660f9fb152f4154a02b44fbb1b42cd4f AS final
 COPY --from=gcr.io/iree-oss/swiftshader@sha256:ccae32c83c89a31e8fc5542e480c29f28bbf4a3b3b80198c06b687a92c6813f3 \
   /swiftshader /swiftshader
