@@ -23,6 +23,7 @@ iree_cc_library(
   SRCS
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
+    "ConvertToLLVM2.cpp"
     "KernelDispatch.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
@@ -46,7 +47,6 @@ iree_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
-    MLIRSupport
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM
@@ -56,6 +56,8 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LLVMToLLVM
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

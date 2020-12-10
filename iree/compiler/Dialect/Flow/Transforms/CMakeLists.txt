@@ -18,12 +18,15 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "DestructiveUpdateUtils.h"
     "DispatchConfig.h"
     "Passes.h"
   SRCS
     "CreateBenchmarkFuncs.cpp"
     "DeduplicateExecutables.cpp"
+    "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"
+    "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
@@ -47,7 +50,9 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalg
+    MLIRLinalgTransforms
     MLIRPass
+    MLIRSCF
     MLIRShape
     MLIRShapeOpsTransforms
     MLIRStandard
@@ -63,6 +68,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Conversion
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
