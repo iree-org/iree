@@ -137,7 +137,7 @@ function(iree_add_bazel_invocation)
   add_custom_target(${ARG_INVOCATION_TARGET}
     USES_TERMINAL
     COMMAND ${CMAKE_COMMAND} -E echo
-        "Starting bazel build of targets ${ARG_BAZEL_TARGETS}"
+        "Starting bazel build of targets '${ARG_BAZEL_TARGETS}'"
     COMMAND "${IREE_BAZEL_WRAPPER}" build ${ARG_BAZEL_TARGETS}
     COMMAND ${CMAKE_COMMAND} -E echo "Bazel build complete."
   )

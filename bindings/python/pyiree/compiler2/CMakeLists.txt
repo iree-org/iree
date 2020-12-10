@@ -23,4 +23,5 @@ iree_py_library(
     "core.py"
     "tf.py"
     "tools.py"
+    "xla.py"
 )

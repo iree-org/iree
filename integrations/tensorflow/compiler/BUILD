@@ -70,7 +70,7 @@ cc_library(
 
 cc_binary(
     name = "iree-tf-opt",
-    srcs = ["iree-tf-opt-main.cc"],
+    srcs = ["iree-tf-opt-main.cpp"],
     deps = [
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
@@ -98,7 +98,7 @@ cc_binary(
 
 cc_binary(
     name = "iree-tf-import",
-    srcs = ["iree-tf-import-main.cc"],
+    srcs = ["iree-tf-import-main.cpp"],
     deps = [
         ":tensorflow",
         "@llvm-project//llvm:Support",
@@ -117,4 +117,17 @@ cc_binary(
             #"@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
         ],
     }),
+)
+
+cc_binary(
+    name = "iree-import-xla",
+    srcs = ["iree-import-xla-main.cpp"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_to_mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_proto_cc",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
 )

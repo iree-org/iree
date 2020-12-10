@@ -22,13 +22,24 @@
 # If this directory is included, then building TensorFlow is assumed (the
 # config option happens at the higher level).
 
+set(_bazel_targets)
+set(_executable_paths)
+
+if(${IREE_BUILD_TENSORFLOW_COMPILER})
+  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-tf-import)
+  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-tf-import)
+endif()
+
+if(${IREE_BUILD_XLA_COMPILER})
+  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-import-xla)
+  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-import-xla)
+endif()
+
 iree_add_bazel_invocation(
   INVOCATION_TARGET
     integrations_iree_tensorflow_importers
-  BAZEL_TARGETS
-    //integrations/tensorflow/compiler:iree-tf-import
-  EXECUTABLE_PATHS
-    integrations/tensorflow/compiler/iree-tf-import
+  BAZEL_TARGETS ${_bazel_targets}
+  EXECUTABLE_PATHS ${_executable_paths}
 )
 
 if(${IREE_BUILD_PYTHON_BINDINGS})

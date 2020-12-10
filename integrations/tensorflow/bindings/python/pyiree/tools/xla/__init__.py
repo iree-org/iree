@@ -1,3 +1,6 @@
+# Lint-as: python3
+"""TensorFlow tools."""
+
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,23 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_py_test(
-  NAME
-    compiler_core_test
-  SRCS
-    "compiler_core_test.py"
-)
+from typing import Optional
 
-iree_py_test(
-  NAME
-    compiler_tf_test
-  SRCS
-    "compiler_tf_test.py"
-)
+import os
+import platform
 
-iree_py_test(
-  NAME
-    compiler_xla_test
-  SRCS
-    "compiler_xla_test.py"
-)
+
+def get_tool(exe_name: str) -> Optional[str]:
+  if platform.system() == "Windows":
+    exe_name = exe_name + ".exe"
+  this_path = os.path.dirname(__file__)
+  tool_path = os.path.join(this_path, exe_name)
+  return tool_path
