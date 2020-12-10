@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = [
+        "gather_add.mlir",
         "matmul_add.mlir",
         "slice_add.mlir",
     ],
@@ -41,6 +42,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = [
+        "gather_add.mlir",
         "matmul_add.mlir",
         "slice_add.mlir",
     ],
