@@ -31,25 +31,33 @@ You should already have IREE cloned and building on your machine. See the other
 Minimally, the following CMake flags must be specified:
 
 * `-DIREE_BUILD_PYTHON_BINDINGS=ON`
-* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON` : Optional. Also builds the
-  TensorFlow compiler integration.
+* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON`: Optional. Also builds the TensorFlow
+  compiler integration.
 
 If building any parts of TensorFlow, you must have a working `bazel` command
-on your path. See the `.bazelversion` file at the root of the project for the
-recommended version.
+on your path. See the relevant "OS with Bazel" [getting started](../get-started)
+doc for more information.
 
 ## Python Setup
 
-Install a recent version of [Python 3](https://www.python.org/downloads/) and
+Install [Python 3](https://www.python.org/downloads/) `>= 3.6` and
 [pip](https://pip.pypa.io/en/stable/installing/), if needed.
 
-(Recommended) Setup a virtual environment (use your preferred mechanism):
+> Note
+> {: .label .label-blue }
+> If using `pyenv` (or an interpreter manager that
+  depends on it like `asdf`), you'll need to use
+  [`--enable-shared`](https://github.com/pyenv/pyenv/tree/master/plugins/python-build#building-with---enable-shared)
+  during interpreter installation.
+
+(Recommended) Setup a virtual environment with `venv` (or your preferred
+mechanism):
 
 ```shell
 # Note that venv is only available in python3 and is therefore a good check
 # that you are in fact running a python3 binary.
-python -m venv .venv
-source .venv/bin/activate
+$ python -m venv .venv
+$ source .venv/bin/activate
 # When done: run 'deactivate'
 ```
 
@@ -63,12 +71,24 @@ $ python -m pip install numpy absl-py
 $ python -m pip install tf-nightly
 ```
 
+## Building
+
+```shell
+# Also include -DIREE_BUILD_TENSORFLOW_COMPILER=ON if you want the TF compiler.
+$ cmake -G Ninja -B ../iree-build/ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DIREE_BUILD_PYTHON_BINDINGS=ON  .
+$ cd ../iree-build/
+$ ninja
+```
+
 ## Running Python Tests
 
 To run tests for core Python bindings built with CMake:
 
 ```shell
-$ cd build
+$ cd ../iree-build/
 $ ctest -L bindings/python
 ```
 
@@ -76,16 +96,15 @@ To run tests for the TensorFlow integration, which include end-to-end backend
 comparison tests:
 
 ```shell
-cd build
+$ cd ../iree-build/
 # TODO: Revisit once more patches land.
-ctest -L integrations/tensorflow/e2e
+$ ctest -L integrations/tensorflow/e2e
 
 # Or run individually as:
-export PYTHONPATH=bindings/python # In build dir
-python integrations/tensorflow/e2e/simple_arithmetic_test.py \
-  --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
+$ export PYTHONPATH=../iree-build/bindings/python
+$ python ../iree/integrations/tensorflow/e2e/simple_arithmetic_test.py \
+    --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
 ```
-
 
 ## Using Colab
 
@@ -94,7 +113,6 @@ project with CMake/ninja and set your `PYTHONPATH` to the `bindings/python`
 directory in the build dir (or installed per below), you should be able to
 start a kernel by following the stock instructions at
 https://colab.research.google.com/ .
-
 
 ## Installing and Packaging
 

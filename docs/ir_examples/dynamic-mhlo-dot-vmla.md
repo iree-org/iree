@@ -942,6 +942,42 @@ module  {
 }
 
 ```
+### IR Dump After mlir::iree_compiler::IREE::HAL::PropagateConstantWorkgroupInfoPass
+```
+hal.executable.target @vmla, filter="vmla" {
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>}
+  module  {
+    func @dot_ex_dispatch_0() {
+      %c0 = constant 0 : index
+      %0 = hal.interface.load.constant offset = 0 : index
+      %1 = hal.interface.load.constant offset = 1 : index
+      %2 = hal.interface.load.constant offset = 2 : index
+      %3 = hal.interface.load.constant offset = 3 : index
+      %4 = hal.interface.load.tensor @legacy_io::@arg2, offset = %c0 : tensor<?x?xf32>
+      %5 = hal.interface.load.constant offset = 4 : index
+      %6 = hal.interface.load.constant offset = 5 : index
+      %7 = hal.interface.load.tensor @legacy_io::@arg5, offset = %c0 : tensor<?x?xf32>
+      %8 = call @dot_ex_dispatch_0_impl(%0, %1, %4, %2, %3, %7, %5, %6) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      hal.interface.store.tensor %8, @legacy_io::@ret0, offset = %c0 : tensor<?x?xf32>
+      return
+    }
+    func private @dot_ex_dispatch_0_impl(%arg0: index, %arg1: index, %arg2: tensor<?x?xf32>, %arg3: index, %arg4: index, %arg5: tensor<?x?xf32>, %arg6: index, %arg7: index) -> tensor<?x?xf32> {
+      %0 = shapex.make_ranked_shape %arg3, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?]>
+      %1 = shapex.make_ranked_shape %arg6, %arg7 : (index, index) -> !shapex.ranked_shape<[?,?]>
+      %2 = shapex.tie_shape %arg5, %1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+      %3 = shapex.tie_shape %arg2, %0 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+      %4 = "mhlo.dot"(%2, %3) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+      return %4 : tensor<?x?xf32>
+    }
+    hal.interface @legacy_io attributes {push_constants = 6 : i32, sym_visibility = "private"} {
+      hal.interface.binding @arg2, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg5, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+  }
+}
+
+```
 ### IR Dump After Canonicalizer
 ```
 module  {

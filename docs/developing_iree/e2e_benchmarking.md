@@ -68,7 +68,7 @@ include those relevant for benchmarking):
 
 # Example for MatrixOpsStaticModule:
 /tmp/iree/modules/MatrixOpsStaticModule
-  ├── iree_llvmjit
+  ├── iree_llvmaot
   │   ├── compiled.vmfb
   │   └── traces
   │       ├── basic_matmul
@@ -81,10 +81,10 @@ include those relevant for benchmarking):
   │           └── flagfile
   ├── iree_vmla
   │   ├── compiled.vmfb
-  │   └── traces  # ...same as iree_llvmjit/traces above.
+  │   └── traces  # ...same as iree_llvmaot/traces above.
   ├── iree_vulkan
   │   ├── compiled.vmfb
-  │   └── traces  # ...same as iree_llvmjit/traces above.
+  │   └── traces  # ...same as iree_llvmaot/traces above.
   └── tflite
       ├── basic_matmul.tflite
       ├── matmul_broadcast_singleton_dimension.tflite

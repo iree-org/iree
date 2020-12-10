@@ -30,15 +30,14 @@ navigate [here](https://github.com/wolfpld/tracy/releases) and search for
 
 ## Building the Tracy UI (the "server")
 
-This is explained in section 2.3 of the manual for Windows and Linux. Here we
-give some more detailed instructions for some systems.
+This is explained in section 2.3 of the [manual](#the-tracy-manual) for Windows
+and Linux. Here we give some more detailed instructions for some systems.
 
 The IREE repository contains its own clone of the Tracy repository in
 `third_party/tracy`, so there is no need to make a separate clone of it. You can
 use one if you want, but be aware that the Tracy client/server protocol gets
-updated sometimes. Building both sides from the same
-`iree/third_party/tracy` lowers the risk of running into a protocol version
-mismatch.
+updated sometimes. Building both sides from the same `iree/third_party/tracy`
+lowers the risk of running into a protocol version mismatch.
 
 ### Linux
 
@@ -101,10 +100,10 @@ The Android device must be prepared as follows to enable Tracy profiling.
     to restart the `adbd` server as non-root. Not mandatory, but again, running
     anything as root on Android is a deviation from normal user conditions.
 * Execute the following commands in a root shell on the device (i.e. `adb
-  shell`, then `su`, then the following commands). These are from the Tracy PDF
-  manual, but hard to find there, and copy-pasting from PDF introduces unwanted
-  whitespace. These settings normally persist until the next reboot of the
-  device.
+  shell`, then `su`, then the following commands). These are from the
+  [manual](#the-tracy-manual), but hard to find there, and copy-pasting from PDF
+  introduces unwanted whitespace. These settings normally persist until the next
+  reboot of the device.
   * `setenforce 0`
   * `mount -o remount,hidepid=0 /proc`
   * `echo 0 > /proc/sys/kernel/perf_event_paranoid`
@@ -153,14 +152,17 @@ TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
 
 ## Running the Tracy profiler UI, connecting and visualizing
 
-While the profile program is still running (possibly thanks to
-`TRACY_NO_EXIT=1`), start the Tracy profiler UI which we had built above.
-From the IREE root directory:
+While the program that you want to profile is still running (possibly thanks to
+`TRACY_NO_EXIT=1`), start the Tracy profiler UI which we had built above. From
+the IREE root directory:
 ```shell
 ./third_party/tracy/profiler/build/unix/Tracy-release
 ```
 
-It should show a dialog offering to connect to a client i.e. a profiled program.
+It should show a dialog offering to connect to a client i.e. a profiled program:
+
+![Tracy connection
+dialog](https://gist.github.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_connect.jpeg)
 
 If connecting doesn't work:
 * If the profiled program is on a separate machine, make sure you've correctly
@@ -170,42 +172,76 @@ If connecting doesn't work:
   `TRACY_NO_EXIT=1`?
 * Kill the profiled program and restart it.
 
-You should then start seeing a profile.
+You should then start seeing a profile. The initial view should look like this:
 
-Before going further, check that your profile has sampling data recorded, not
-just instrumentation data. Click the 'Statistics' button at the top. The window
-that it opens should show a 'Sampling' radio button next to 'Instrumentation'.
-Back to the main view, look for the 'Main thread' label on the far left. Next to
-it should be a small ghost icon. If either of these things are missing, you need
-to fix that first, because many of Tracy's interesting features rely on
-smapling. Most likely this is a permissions issue: make sure that you have
-performed the steps outlined in the above section on permissions. As an
-experiment, retry with the profiled program running as root. Look for any
-interesting `stderr` message (in the profiled program's terminal). Try
-`strace`'ing it.
+![Tracy initial view, normal
+case](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_initial_view.jpeg)
 
-Besides sampling, let's check that you also have "systrace" working. In the
-initial main view, on the far left, you should see a list of CPU cores,
-typically labelled `CPU0`, `CPU1`, etc. To the right, a timeline view should
-show system-wide activity on all these CPUs - so for instance you can see
-context switches and you can see if anything else happened on your device that
-could have interfered with the benchmark's performance. If this "systrace"
-functionality isn't working, then again that's likely a permissions issue,
-perform the same troubleshooting as above about sampling.
+Before going further, take a second to check that your recorded profile data has
+all the data that it should have. Permissions issues, as discussed above, could
+cause it to lack "sampling" or "CPU data" information. For example, here is what
+he initial view looks like when one forgot to run the profiled program as root
+on Desktop Linux (where running as root is required, as explained above):
 
-Finally, look for the part of the timeline that is of interest to you. Your area
-of interest might not be on the Main thread. In fact, it might be on a thread
-that's not visible in the initial view at all. Indeed, the initial view tends to
-be zoomed-in a lot. Either use the mouse directly to zoom out and navigate, to
-look for the 'Frame' control at the top of the Tracy window. Use the 'next
-frame' arrow button until more interesting threads appear. Typically, IREE
-generated code tends to run on a thread named `cpu0`, which is actually a thread
-name and unrelated to `CPU0` from the systrace view.
+![Tracy initial view, permissions
+issue](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_permissions_issue.jpeg)
 
-Once you click a zone, you should see a line-by-line or
-instruction-by-instruction view annotated with the percentage of time spent. If
-you don't see the percentages, then again that would point to sampling not
-working, refer to the above steps.
+Notice how the latter screenshot is lacking the following elements:
+* No 'CPU data' header on the left side, with the list of all CPU cores. The
+  'CPU usage' graph is something else.
+* No 'ghost' icon next to the 'Main thread' header.
+
+When running into any of the above issues, refer to the above Permissions
+section. Look for any interesting `stderr` message (in the profiled program's
+terminal).
+
+Click the 'Statistics' button at the top. It will open a window like this:
+
+![Tracy statistics
+window](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_statistics.jpeg)
+
+See how the above screenshot has two radio buttons at the top: 'Instrumentation'
+and 'Sampling'. At this point, if you don't see the 'Sampling' radio button, you
+need to resolve that first, as discussed above about possible permissions
+issues.
+
+These 'Instrumentation' and 'Sampling' statistics correspond the two kinds of
+data that Tracy collects about your program. In the Tracy main view, they
+correspond, respectively, to 'instrumentation' and 'ghost' zones. Refer to the
+[Tracy PDF manual](#the-tracy-manual) for a general introduction to these
+concepts. For each thread, the ghost icon toggles the view between these two
+kinds of zones.
+
+Back to the main view, look for the part of the timeline that is of interest to
+you. Your area of interest might not be on the Main thread. In fact, it might be
+on a thread that's not visible in the initial view at all. Indeed, the initial
+view tends to be zoomed-in a lot. Either use the mouse directly to zoom out and
+navigate, to look for the 'Frame' control at the top of the Tracy window. Use
+the 'next frame' arrow button until more interesting threads appear. Typically,
+IREE generated code tends to run on a thread named `cpu0`, which is actually a
+thread name and unrelated to `CPU0` from the systrace view.
+
+Once you have identified the thread of interest, use its ghost icon to toggle
+between instrumentation and ghost zones, and zoom until you have found the zone
+of interest.
+
+Here is what you should get when clicking on a ghost zone:
+
+![ghost zone source
+view](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_source_view.jpeg)
+
+The percentages column to the left of the disassembly shows where time is being
+spent. This is unique to the sampling data (ghost zones) and has no equivalent
+in the instrumentation data (instrumentation zones). Here is what we get
+clicking on the corresponding instrumentation zone:
+
+![instrumentation zone source
+view](https://gist.githubusercontent.com/bjacob/ff7dec20c1dfc7d0fc556cc7275bca9a/raw/fe4e22ca0301ebbfd537c47332a4a2c300a417b3/tracy_normal_zone_info.jpeg)
+
+This still has a 'Source' button but that only shows the last C++ caller that
+had explicit Tracy information, so here we see a file under `iree/hal` whereas
+the Ghost zone saw into the IREE compiled module that that calls into, with the
+source view pointing to the `.mlir` file.
 
 ## Configuring Tracy instrumentation
 

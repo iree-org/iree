@@ -12,13 +12,13 @@ js_files:
 There are three backend [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
-- llvm-ir
+- dylib-llvm-aot
 - vulkan-spirv
 
 The table shows the supported XLA HLO ops on each backend. It is auto-generated
 from IREE's test status.
 
-op | vmla | vulkan-spirv | llvm-ir
+op | vmla | vulkan-spirv | dylib-llvm-aot
 :-: | :-: | :-: | :-:
 abs | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 add | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
