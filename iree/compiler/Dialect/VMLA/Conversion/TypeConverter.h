@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

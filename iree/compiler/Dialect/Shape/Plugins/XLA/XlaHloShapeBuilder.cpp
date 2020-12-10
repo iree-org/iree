@@ -14,13 +14,13 @@
 
 #include "iree/compiler/Dialect/Shape/Plugins/XLA/XlaHloShapeBuilder.h"
 
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/Optional.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 
 using llvm::None;

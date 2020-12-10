@@ -15,9 +15,9 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 #define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 
