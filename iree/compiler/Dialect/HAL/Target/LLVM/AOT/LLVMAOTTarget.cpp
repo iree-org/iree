@@ -53,7 +53,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp.getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+        targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     // TODO(#3737): don't add functions we don't want to serialize to the
     // module. Right now workgroup count calculation functions end up in here

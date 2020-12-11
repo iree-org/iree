@@ -424,7 +424,7 @@ class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
         /*output_batch_dimension=*/rewriter.getI64IntegerAttr(0),
         /*output_feature_dimension=*/
         rewriter.getI64IntegerAttr(newSpatialDimensions.size() + 1),
-        /*output_sptial_dimensions=*/
+        /*output_spatial_dimensions=*/
         rewriter.getI64TensorAttr(newSpatialDimensions), op.getContext());
 
     SmallVector<Value, 2> operands = {op.lhs(), op.rhs()};

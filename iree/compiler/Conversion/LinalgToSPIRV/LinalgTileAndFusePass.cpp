@@ -497,7 +497,7 @@ void LinalgTileAndFusePass::runOnOperation() {
     // we will need to query the workgroup count function to simplify GPU
     // processor ID uses. It relies on constant upper bounds. So we need to
     // canonicalize the workgroup count function first.
-    if (funcOp.getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName())) {
+    if (funcOp->getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName())) {
       FuncOp numWorkGroupFunc =
           getNumWorkgroupsFn(funcOp, getNumWorkgroupsFnAttrName());
       applyIndexCalculationCanonicalization(numWorkGroupFunc);

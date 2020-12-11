@@ -193,7 +193,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
 
-  if (failed(passManager.run(moduleOp.getParentOfType<mlir::ModuleOp>()))) {
+  if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
   }
 
