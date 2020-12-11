@@ -33,7 +33,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   gcr.io/iree-oss/cmake-bazel-tensorflow-swiftshader@sha256:e4516f3ffadf40f2111c3f152453928f5af24951c7b5770ef3477f897709df0d \
-  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
+  build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
