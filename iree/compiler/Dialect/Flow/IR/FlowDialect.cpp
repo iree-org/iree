@@ -19,7 +19,9 @@
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Parser.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -46,6 +48,7 @@ struct FlowFolderInterface : public DialectFoldInterface {
 FlowDialect::FlowDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
   addInterfaces<FlowFolderInterface>();
+  addTypes<DispatchInputType, DispatchOutputType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -58,6 +61,33 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
   if (ConstantOp::isBuildableWith(value, type))
     return builder.create<ConstantOp>(loc, type, value);
   return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// Type printing and parsing
+//===----------------------------------------------------------------------===//
+
+Type FlowDialect::parseType(DialectAsmParser &parser) const {
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
+  llvm::StringRef spec = parser.getFullSymbolSpec();
+  if (succeeded(parser.parseOptionalKeyword("dispatch.input"))) {
+    return DispatchInputType::parse(parser);
+  } else if (succeeded(parser.parseOptionalKeyword("dispatch.output"))) {
+    return DispatchOutputType::parse(parser);
+  }
+  parser.emitError(parser.getCurrentLocation())
+      << "unknown Flow type: " << spec;
+  return {};
+}
+
+void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
+  if (auto inputType = type.dyn_cast<DispatchInputType>()) {
+    IREE::Flow::printType(inputType, p);
+  } else if (auto outputType = type.dyn_cast<DispatchOutputType>()) {
+    IREE::Flow::printType(outputType, p);
+  } else {
+    llvm_unreachable("unknown Flow type");
+  }
 }
 
 }  // namespace Flow

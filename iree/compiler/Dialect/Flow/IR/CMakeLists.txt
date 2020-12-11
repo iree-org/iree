@@ -38,11 +38,13 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
 
