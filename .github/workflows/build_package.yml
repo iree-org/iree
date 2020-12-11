@@ -1,0 +1,57 @@
+name: Build and package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cidev
+
+jobs:
+  mondo-build:
+    name: Performs a mondo-build of all optional components
+    runs-on: ubuntu-18.04
+    env:
+      BUILD_DIR: ${{ github.workspace }}/../iree-build
+      INSTALL_DIR: ${{ github.workspace }}/../iree-install
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: Report environment
+        shell: bash
+        run: |
+          echo "GITHUB_RUN_ID=${GITHUB_RUN_ID}"
+          echo "GITHUB_RUN_NUMBER=${GITHUB_RUN_NUMBER}"
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          echo "PWD=${PWD}"
+          echo "PATH=${PATH}"
+
+      - name: Configure
+        shell: bash
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+          cmake -B "${BUILD_DIR}" "${GITHUB_WORKSPACE}" \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DIREE_BUILD_TENSORFLOW_COMPILER=ON \
+            -DIREE_BUILD_XLA_COMPILER=ON \
+            -DIREE_BUILD_TFLITE_COMPILER=ON \
+            -DPython3_EXECUTABLE=$(which python)
+
+      - name: Build
+        shell: bash
+        run: |
+          cd "${BUILD_DIR}"
+          make -j 4
+          make install
+          ls -lRh "${INSTALL_DIR}"
+
+      - name: Upload Install Directory
+        uses: actions/upload-artifact@v2
+        with:
+          name: iree-install-ubuntu-18.04
+          path: ${{env.INSTALL_DIR}}/
+          retention-days: 5
