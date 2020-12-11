@@ -17,10 +17,9 @@ executables that can be run on the target platform.
 
 ### Set up host development environment
 
-The host platform should have been set up for developing IREE. Right now Linux
-and Windows are supported. Please make sure you have followed the steps for
-[Linux](./getting_started_linux_cmake.md) or
-[Windows](./getting_started_windows_cmake.md).
+The host platform should have been set up for developing IREE. Right now only
+Linux is supported. Please make sure you have followed the steps for
+[Linux](./getting_started_linux_cmake.md).
 
 ### Install RISC-V Tools
 
@@ -50,7 +49,7 @@ $ cmake -G Ninja \
 ```
 
 *   The above configures IREE to cross-compile towards `rv64` cpu platform.
-*   If user specify different download path (default in `${HOME}/riscv/prebuilt`) in `riscv_bootscrap.sh`, please append `-DRISCV_TOOL_PATH="/path/to/the/downloaded/folder"` in cmake command.
+*   If user specify different download path (default in `${HOME}/riscv`) in `riscv_bootscrap.sh`, please append `-DRISCV_TOOL_PATH="/path/to/the/downloaded/folder"` in cmake command.
 
 ### Build all targets
 
@@ -81,9 +80,9 @@ Then run on the RISC-V QEMU:
 
 ```shell
 
-$ $HOME/riscv/prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
+$ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-  -L $HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
+  -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=vmla \
   -module_file=/tmp/simple-vmla.vmfb \
   -entry_function=abs \
@@ -102,12 +101,12 @@ i32=5
 ```
 ### Dylib LLVM AOT backend
 To compile an IREE module using the Dylib LLVM ahead-of-time (AOT) backend for
-a target RISC-V we need to use the corresponding toolchain which we have downloaded at the `$HOME/riscv/prebuilt` folder.
+a target RISC-V we need to use the corresponding toolchain which we have downloaded at the `$HOME/riscv` folder.
 Set the AOT linker path environment variable:
 ```shell
 
 # Still in "build-riscv" folder
-$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/bin/clang++ -static-libstdc++ -O3"
+$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/toolchain/clang/linux/RISCV/bin/clang++ -static-libstdc++ -O3"
 
 ```
 Translate a source MLIR into an IREE module:
@@ -128,9 +127,9 @@ Then run on the RISC-V QEMU:
 
 ```shell
 
-$ $HOME/riscv/prebuilt/qemu/linux/RISCV/bin/qemu-riscv64 \
+$ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-  -L $HOME/riscv/prebuilt/toolchain/clang/linux/RISCV/sysroot/ \
+  -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=dylib \
   -module_file=/tmp/simple-llvm_aot.vmfb \
   -entry_function=abs \

@@ -19,7 +19,7 @@
 BOOTSTRAP_SCRIPT_PATH=$(dirname "$0")
 BOOTSTRAP_WORK_DIR=${BOOTSTRAP_SCRIPT_PATH}/.bootstrap
 
-PREBUILT_DIR=${HOME}/riscv/prebuilt
+PREBUILT_DIR=${HOME}/riscv
 
 read -p "Enter the riscv tools root path(press enter to use default path:${PREBUILT_DIR}): " INPUT_PATH
 if [[ "${INPUT_PATH}" ]]; then
