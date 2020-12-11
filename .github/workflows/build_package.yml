@@ -42,6 +42,7 @@ jobs:
           cmake -B "${BUILD_DIR}" "${GITHUB_WORKSPACE}" \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DIREE_BUILD_TENSORFLOW_COMPILER=ON \
             -DIREE_BUILD_XLA_COMPILER=ON \
             -DIREE_BUILD_TFLITE_COMPILER=ON \
