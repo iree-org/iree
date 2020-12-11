@@ -13,7 +13,7 @@ module {
   // CHECK-SAME: ins(%[[INDEX]] : tensor<2xi32>)
   // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[CAST]], %[[J]], %[[K]]] : tensor<5x1x5xi32>
+  //      CHECK:   %[[VAL2:.+]] = tensor.extract %[[INPUT]][%[[CAST]], %[[J]], %[[K]]] : tensor<5x1x5xi32>
   //      CHECK:   linalg.yield %[[VAL2]] : i32
   func @torch_select_index() {
     %c0 = constant 0 : index
@@ -47,7 +47,7 @@ module {
   // CHECK-SAME: ins(%[[INDEX]] : tensor<i32>)
   // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[CAST]], %[[I]]] : tensor<4x8xf32>
+  //      CHECK:   %[[VAL2:.+]] = tensor.extract %[[INPUT]][%[[CAST]], %[[I]]] : tensor<4x8xf32>
   //      CHECK:   linalg.yield %[[VAL2]] : f32
   func @torch_select_index_scalar() {
     %c0 = constant 0 : index
@@ -81,7 +81,7 @@ module {
   // CHECK-SAME: ins(%[[INDEX]] : tensor<4x1xi32>)
   // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[L:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[I]], %[[J]], %[[CAST]], %[[L]]] : tensor<4x7x8x2xf32>
+  //      CHECK:   %[[VAL2:.+]] = tensor.extract %[[INPUT]][%[[I]], %[[J]], %[[CAST]], %[[L]]] : tensor<4x7x8x2xf32>
   //      CHECK:   linalg.yield %[[VAL2]] : f32
   func @torch_select_index_batch() {
     %c0 = constant 0 : index
