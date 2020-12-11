@@ -28,7 +28,13 @@ jobs:
           echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
           echo "PWD=${PWD}"
           echo "PATH=${PATH}"
-
+      - name: Install python deps
+        shell: bash
+        run: |
+          # We aren't actually building anything that requires this, but the
+          # TensorFlow build hard fails without it, even though we are only
+          # building C++ (facepalm).
+          python -m pip install numpy
       - name: Configure
         shell: bash
         run: |
