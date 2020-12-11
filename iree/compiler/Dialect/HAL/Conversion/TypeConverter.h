@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
