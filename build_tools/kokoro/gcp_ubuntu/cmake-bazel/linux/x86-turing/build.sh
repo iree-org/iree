@@ -36,7 +36,7 @@ python3 -c 'import tensorflow as tf; print(tf.__version__)'
 cat /swiftshader/git-commit
 
 # TODO(4195): TensorFlow integrations can only be built out-of-tree (and kokoro
-#             does not support that).
+# does not support that).
 # Temporarily get around these conflicting restrictions by nesting the git
 # repo under `/src/github/iree/iree`
 echo "Nesting iree.git into /src/github/iree/iree"
