@@ -18,11 +18,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-config_setting(
-    name = "open_source_build",
-    define_values = {"open_source_build": "true"},
-)
-
 cc_library(
     name = "tensorflow",
     srcs = [
@@ -111,7 +106,7 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
         "@org_tensorflow//tensorflow/core/platform:errors",
     ] + select({
-        ":open_source_build": [],
+        "@org_tensorflow//tensorflow:oss": [],
         "//conditions:default": [
             # TODO: Enable this for all builds once dependency bug is fixed.
             "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
