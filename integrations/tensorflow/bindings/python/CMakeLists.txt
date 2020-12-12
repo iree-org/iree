@@ -19,6 +19,18 @@ function(_add_overlay_subdirectory dir)
   add_subdirectory(${dir} "${_MAIN_PYTHON_DIR}/${dir}")
 endfunction()
 
-_add_overlay_subdirectory(pyiree/tools/tf)
+if(${IREE_BUILD_TENSORFLOW_COMPILER})
+  _add_overlay_subdirectory(pyiree/tools/tf)
+endif()
+
+if(${IREE_BUILD_TFLITE_COMPILER})
+  _add_overlay_subdirectory(pyiree/tools/tflite)
+endif()
+
+if(${IREE_BUILD_XLA_COMPILER})
+  _add_overlay_subdirectory(pyiree/tools/xla)
+endif()
+
 # TODO: Find another place for the TF support library.
+# Pure python so can just always be generated.
 _add_overlay_subdirectory(pyiree/tf/support)
