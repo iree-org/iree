@@ -114,30 +114,23 @@ cc_binary(
     }),
 )
 
-# TODO(laurenzo): Add the target back.
-#cc_binary(
-#name = "iree-import-tflite",
-#srcs = ["iree-import-tflite-main.cpp"],
-#deps = [
-#"@llvm-project//llvm:Support",
-#"@llvm-project//mlir:IR",
-#"@llvm-project//mlir:Support",
-#"@llvm-project//mlir:QuantOps",
-#"@llvm-project//mlir:StandardOps",
-#"@llvm-project//mlir:TosaDialect",
-#"@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
-#"@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
-#"@org_tensorflow//tensorflow/compiler/mlir/tosa:tosa_legalize_tfl",
-#] + [
-## TODO: See about removing this dep (TFLite shouldn't need tf ops).
-#"@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow",
-## TODO: There are layering violations upstream. Fix and remove these.
-#"@org_tensorflow//tensorflow/compiler/mlir/tosa:tosa_legalize_common",
-#"@org_tensorflow//tensorflow/compiler/mlir/tosa:tosa_pipelines",
-#"@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_tosa_passes",
-#"@llvm-project//mlir:Transforms",
-#],
-#)
+cc_binary(
+    name = "iree-import-tflite",
+    srcs = ["iree-import-tflite-main.cpp"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TosaDialect",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
+    ],
+)
 
 cc_binary(
     name = "iree-import-xla",

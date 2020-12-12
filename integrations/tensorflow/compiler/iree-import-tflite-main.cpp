@@ -24,11 +24,12 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
-#include "tensorflow/compiler/mlir/tosa/tosa_passpipes.h"
+#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -124,7 +125,7 @@ int main(int argc, char **argv) {
   }
 
   // Run transformations.
-  mlir::tosa::TOSALegalizationPipelineOptions tosaOptions;
+  mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
   mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
