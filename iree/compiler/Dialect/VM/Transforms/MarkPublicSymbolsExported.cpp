@@ -29,8 +29,7 @@ class MarkPublicSymbolsExportedPass
  public:
   void runOnOperation() override {
     for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(funcOp) ==
-          SymbolTable::Visibility::Public) {
+      if (funcOp.isPublic()) {
         funcOp.setAttr("iree.module.export", UnitAttr::get(&getContext()));
       }
     }

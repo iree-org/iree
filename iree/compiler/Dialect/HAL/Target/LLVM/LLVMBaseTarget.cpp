@@ -220,8 +220,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
 
   SmallVector<LLVM::LLVMFuncOp, 2> entryPointFns;
   for (LLVM::LLVMFuncOp funcOp : llvmIRModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(funcOp) ==
-        SymbolTable::Visibility::Public) {
+    if (funcOp.isPublic()) {
       entryPointFns.push_back(funcOp);
     }
   }
