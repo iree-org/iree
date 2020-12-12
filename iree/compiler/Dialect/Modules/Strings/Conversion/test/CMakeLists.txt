@@ -14,20 +14,13 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    Conversion
-  HDRS
-    "ConversionPatterns.h"
+    lit
   SRCS
-    "ConversionPatterns.cpp"
-  DEPS
-    MLIRPass
-    MLIRTransforms
-    iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::Modules::TensorList::IR
-    iree::compiler::Dialect::VM::Conversion
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

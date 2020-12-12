@@ -14,7 +14,6 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 
-#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_flow_to_hal.h"
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
@@ -28,7 +27,6 @@ namespace tf_tensorlist {
 TFTensorListDialect::TFTensorListDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context,
               TypeID::get<TFTensorListDialect>()) {
-  addInterfaces<iree_compiler::TFTensorListToHALConversionInterface>();
   addOperations<
 #define GET_OP_LIST
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.cc.inc"

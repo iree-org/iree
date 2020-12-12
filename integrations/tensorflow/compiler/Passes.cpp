@@ -30,8 +30,8 @@ namespace iree_compiler {
 namespace TF {
 
 void registerAllDialects(mlir::DialectRegistry &registry) {
-  registry.insert<tf_tensorlist::TFTensorListDialect,
-                  tf_strings::TFStringsDialect>();
+  registry.insert<tf_strings::TFStringsDialect>();
+  registry.insert<tf_tensorlist::TFTensorListDialect>();
 }
 
 // All IREE-specific passes that lower TF representations before reaching the
@@ -93,10 +93,13 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
-  // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect
+  // Lowering module specific TF behavior to custom dialects.
   //----------------------------------------------------------------------------
-  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
   pm.addPass(tf_strings::createConvertTFToTFStringsPass());
+  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(tf_strings::createConvertTFStringsToStringsPass());
+  pm.addPass(tf_tensorlist::createConvertTFTensorListToTensorListPass());
 
   //----------------------------------------------------------------------------
   // Lowering tf_saved_model dialect to IREE dialects

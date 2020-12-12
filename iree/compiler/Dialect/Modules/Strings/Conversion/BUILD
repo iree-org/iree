@@ -21,12 +21,13 @@ package(
 cc_library(
     name = "Conversion",
     srcs = [
-        "StringsToVM.cc",
+        "ConversionPatterns.cc",
     ],
     hdrs = [
-        "StringsToVM.h",
+        "ConversionPatterns.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/Strings/IR",
         "//iree/compiler/Dialect/VM/Conversion",

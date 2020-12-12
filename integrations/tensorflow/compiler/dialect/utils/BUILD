@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,20 +19,17 @@ package(
 )
 
 cc_library(
-    name = "Conversion",
-    srcs = [
-        "ConversionPatterns.cpp",
-    ],
+    name = "conversion_utils",
     hdrs = [
-        "ConversionPatterns.h",
+        "conversion_utils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/Modules/TensorList/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardOpsTransforms",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
 )
+

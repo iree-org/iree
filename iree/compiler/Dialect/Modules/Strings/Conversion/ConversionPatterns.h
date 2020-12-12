@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
-#define IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
+#ifndef IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_CONVERSION_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_CONVERSION_PATTERNS_H_
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -22,6 +22,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Strings {
+
+// Populates conversion patterns from the string dialect to the VM dialect.
+void populateStringsToHALPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns,
+                                  TypeConverter &typeConverter);
 
 // Populates conversion patterns from the string dialect to the VM dialect.
 void populateStringsToVMPatterns(MLIRContext *context,
@@ -34,4 +39,4 @@ void populateStringsToVMPatterns(MLIRContext *context,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
+#endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_CONVERSION_PATTERNS_H_

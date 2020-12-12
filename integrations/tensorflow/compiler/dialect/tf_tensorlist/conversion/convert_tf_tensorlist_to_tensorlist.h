@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERT_HAL_TO_VM_H_
-#define IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERT_HAL_TO_VM_H_
+#ifndef IREE_INTEGRATIONS_TENSORFLOW_TFTENSORLIST_CONVERSION_CONVERTTFTENSORLISTTOTENSORLIST_H_
+#define IREE_INTEGRATIONS_TENSORFLOW_TFTENSORLIST_CONVERSION_CONVERTTFTENSORLISTTOTENSORLIST_H_
 
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_types.h"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListDialect.h"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace TensorList {
+namespace tf_tensorlist {
 
-// Populates conversion patterns from the TensorList dialect to the VM
-// dialect.
-void populateTensorListToVMPatterns(MLIRContext *context,
-                                    SymbolTable &importSymbols,
-                                    OwningRewritePatternList &patterns,
-                                    TypeConverter &typeConverter);
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertTFTensorListToTensorListPass();
 
-}  // namespace TensorList
-}  // namespace IREE
+}  // namespace tf_tensorlist
 }  // namespace iree_compiler
 }  // namespace mlir
 

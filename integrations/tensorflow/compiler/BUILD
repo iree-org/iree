@@ -37,8 +37,10 @@ cc_library(
     ],
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_tf_strings_to_strings",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
+        "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_tf_tensorlist_to_tensorlist",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/base:signature_mangle",
         "//iree/compiler/Dialect/Flow/IR",
@@ -69,7 +71,7 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
-        "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
+        # "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
         "@llvm-project//llvm:Support",

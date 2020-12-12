@@ -16,7 +16,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Modules/TensorList/Conversion/ConvertHALToVM.h"
+#include "iree/compiler/Dialect/Modules/TensorList/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
 #include "iree/compiler/Dialect/Modules/TensorList/tensorlist.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
@@ -32,6 +32,19 @@ namespace IREE {
 namespace TensorList {
 
 namespace {
+
+class TensorListToHALConversionInterface
+    : public HALConversionDialectInterface {
+ public:
+  using HALConversionDialectInterface::HALConversionDialectInterface;
+
+  void setupConversionTarget(ConversionTarget &target,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter) const override {
+    populateTensorListToHALPatterns(getDialect()->getContext(), patterns,
+                                    typeConverter);
+  };
+};
 
 class TensorListToVMConversionInterface : public VMConversionDialectInterface {
  public:
@@ -56,6 +69,7 @@ class TensorListToVMConversionInterface : public VMConversionDialectInterface {
 TensorListDialect::TensorListDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context,
               TypeID::get<TensorListDialect>()) {
+  addInterfaces<TensorListToHALConversionInterface>();
   addInterfaces<TensorListToVMConversionInterface>();
 
   addTypes<TensorListType>();
