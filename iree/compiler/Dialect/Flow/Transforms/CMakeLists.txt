@@ -32,6 +32,7 @@ iree_cc_library(
     "HoistUnstreamableOps.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyDispatchRegions2.cpp"
+    "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
     "MaterializeExportedReflection.cpp"
     "MergeExportedReflection.cpp"

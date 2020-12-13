@@ -31,6 +31,13 @@ static llvm::cl::opt<bool> clEnableLinalgOnTensors(
         "Enable use of Linalg on tensors for dispatch region creation"),
     llvm::cl::init(false));
 
+// TODO(benvanik): change to a pipeline option.
+static llvm::cl::opt<bool> clTraceDispatchTensors(
+    "iree-flow-trace-dispatch-tensors2",
+    llvm::cl::desc(
+        "Trace runtime input/output tensors for each dispatch function"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -193,6 +200,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+
+  // Inject tracing that logs both input and output tensors from all dispatches.
+  // We do this after deduping so that the executable names match later stages.
+  if (clTraceDispatchTensors) {
+    passManager.addNestedPass<FuncOp>(createInjectDispatchTracingPass());
+  }
 
   // Convert any leftover ops outside of dispatch regions to flow ops.
   passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
