@@ -197,9 +197,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert any leftover ops outside of dispatch regions to flow ops.
   passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
 
-  // Assign attributes and negotiate each executable's ABI signature.
-  // passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
-
   //----------------------------------------------------------------------------
   // Stream formation.
   // Pre-conditions:

@@ -14,6 +14,7 @@
 
 #include <numeric>
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"

@@ -15,6 +15,7 @@
 #include <limits>
 
 #include "iree/base/signature_mangle.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
