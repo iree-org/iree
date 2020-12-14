@@ -130,10 +130,6 @@ struct ConvertHLOToLinalgOnTensorsPass
     populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);
 
     ConversionTarget target(getContext());
-    // Allow constant to appear in Linalg op regions.
-    target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) -> bool {
-      return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
-    });
     // Don't convert the body of reduction ops.
     target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
