@@ -50,7 +50,8 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
   def test_print_ids(self):
 
     def print_ids(module):
-      input_ids = np.asarray([[1, 2, 3, 4, 5, 6],[10, 11, 12, 14, 15, 16]], dtype=np.int32)
+      input_ids = np.asarray([[1, 2, 3, 4, 5, 6],[10, 11, 12, 14, 15, 16]],
+                             dtype=np.int32)
       module.print_ids(input_ids)
 
     self.compare_backends(print_ids, self._modules)
