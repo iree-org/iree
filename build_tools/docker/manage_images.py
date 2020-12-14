@@ -60,9 +60,15 @@ IMAGES_TO_DEPENDENCIES = {
     'cmake': ['base', 'util'],
     'cmake-android': ['cmake', 'util'],
     'cmake-python': ['cmake'],
-    'cmake-python-nvidia': ['cmake-python-vulkan'],
-    'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
     'cmake-python-vulkan': ['cmake-python', 'vulkan'],
+    'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
+    'cmake-python-nvidia': ['cmake-python-vulkan'],
+    'cmake-bazel-tensorflow': ['cmake-python', 'bazel'],
+    'cmake-bazel-tensorflow-vulkan': ['cmake-bazel-tensorflow', 'vulkan'],
+    'cmake-bazel-tensorflow-swiftshader': [
+        'cmake-bazel-tensorflow-vulkan', 'swiftshader'
+    ],
+    'cmake-bazel-tensorflow-nvidia': ['cmake-bazel-tensorflow-vulkan'],
     'rbe-toolchain': ['vulkan'],
     'swiftshader': ['cmake'],
     'util': [],
@@ -134,7 +140,7 @@ def get_dependencies(images: Sequence[str]) -> List[str]:
   return _dag_dfs(images, IMAGES_TO_DEPENDENCIES)
 
 
-def get_repo_digest(tagged_image_url: str) -> str:
+def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
   inspect_command = [
       'docker',
       'image',
@@ -150,8 +156,12 @@ def get_repo_digest(tagged_image_url: str) -> str:
         capture_output=True,
         timeout=10)
   except subprocess.CalledProcessError as error:
-    raise RuntimeError(f'Computing the repository digest for {tagged_image_url}'
-                       ' failed. Has it been pushed to GCR?') from error
+    if dry_run:
+      return ""
+    else:
+      raise RuntimeError(
+          f'Computing the repository digest for {tagged_image_url} failed. Has '
+          'it been pushed to GCR?') from error
   _, repo_digest = completed_process.stdout.strip().split('@')
   return repo_digest
 
@@ -232,7 +242,7 @@ if __name__ == '__main__':
                         dry_run=args.dry_run)
 
   for image in images_to_process:
-    print(f'Processing image {image}')
+    print('\n' * 5 + f'Processing image {image}')
     image_url = posixpath.join(IREE_GCR_URL, image)
     tagged_image_url = f'{image_url}'
     image_path = os.path.join(DOCKER_DIR, image)
@@ -244,7 +254,7 @@ if __name__ == '__main__':
     utils.run_command(['docker', 'push', tagged_image_url],
                       dry_run=args.dry_run)
 
-    digest = get_repo_digest(tagged_image_url)
+    digest = get_repo_digest(tagged_image_url, args.dry_run)
 
     # Check that the image is in 'prod_digests.txt' and append it to the list
     # in the file if it isn't.

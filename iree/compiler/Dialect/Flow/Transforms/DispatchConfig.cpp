@@ -223,15 +223,15 @@ bool OpDispatchPolicy::isFusableWithConsumersOnly(Operation *op) {
 // TODO(b/144530470): replace with tablegen attributes/interfaces.
 bool OpDispatchPolicy::isUnsupportedFusionOp(Operation *op) {
   return isa<linalg::IndexedGenericOp, linalg::GenericOp, mhlo::ConcatenateOp,
-             mhlo::ConvOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp,
-             mhlo::TorchIndexSelectOp>(op) ||
+             mhlo::ConvOp, mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp>(
+             op) ||
          (!clEnableConsumerOnlyFusion &&
           isa<mhlo::DotOp, mhlo::DotGeneralOp>(op)) ||
-         isRootOnlyOp(op);
+         isLeafOnlyOp(op);
 }
 
-bool OpDispatchPolicy::isRootOnlyOp(Operation *op) {
-  return isa<mhlo::SliceOp>(op);
+bool OpDispatchPolicy::isLeafOnlyOp(Operation *op) {
+  return isa<mhlo::SliceOp, mhlo::TorchIndexSelectOp>(op);
 }
 
 }  // namespace Flow

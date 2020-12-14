@@ -109,7 +109,7 @@ static iree_status_t iree_vm_bytecode_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_vm_stack_frame_t** out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
-  IREE_DISPATCH_LOG_CALL(function);
+  IREE_DISPATCH_LOG_CALL(&function);
 
   iree_vm_bytecode_module_t* module =
       (iree_vm_bytecode_module_t*)function.module->self;

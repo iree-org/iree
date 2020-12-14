@@ -37,6 +37,8 @@ __all__ = [
 # a python module that provides a `get_tool` function for getting its absolute
 # path. This dictionary maps the tool name to the module.
 _TOOL_MODULE_MAP = {
+    "iree-import-tflite": "pyiree.tools.tflite",
+    "iree-import-xla": "pyiree.tools.xla",
     "iree-tf-import": "pyiree.tools.tf",
     "iree-translate": "pyiree.tools.core",
 }
@@ -46,6 +48,8 @@ _TOOL_MODULE_MAP = {
 _TOOL_MODULE_PACKAGES = {
     "pyiree.tools.core": "google-iree-tools-core",
     "pyiree.tools.tf": "google-iree-tools-tf",
+    "pyiree.tools.tflite": "google-iree-tools-tflite",
+    "pyiree.tools.xla": "google-iree-tools-xla",
 }
 
 # Environment variable holding directories to be searched for named tools.
@@ -163,7 +167,7 @@ def invoke_immediate(command_line: List[str],
       input_file_handle.close()
 
 
-def invoke_pipeline(command_lines: List[List[str]]):
+def invoke_pipeline(command_lines: List[List[str]], immediate_input=None):
   """Invoke a pipeline of commands.
 
   The first stage of the pipeline will have its stdin set to DEVNULL and each
@@ -173,7 +177,9 @@ def invoke_pipeline(command_lines: List[List[str]]):
   an exception raised with its stderr output.
   """
   stages = []
-  prev_out = subprocess.DEVNULL
+  pipeline_input = (subprocess.DEVNULL
+                    if immediate_input is None else subprocess.PIPE)
+  prev_out = pipeline_input
   stderr_handle = sys.stderr
 
   # Create all stages.
@@ -193,6 +199,16 @@ def invoke_pipeline(command_lines: List[List[str]]):
   for stage in stages:
     stage.start()
 
+  # Pump input.
+  pipe_success = True
+  if immediate_input is not None:
+    try:
+      pipe_success = False
+      stages[0].process.stdin.write(immediate_input)
+      pipe_success = True
+    finally:
+      stages[0].process.stdin.close()
+
   # Join.
   for stage in stages:
     stage.join()
@@ -202,6 +218,10 @@ def invoke_pipeline(command_lines: List[List[str]]):
     assert stage.completed
     if stage.completed.returncode != 0:
       raise CompilerToolError(stage.completed)
+
+  # Broken pipe.
+  if not pipe_success:
+    raise CompilerToolError(stages[0].completed)
 
   # Print any stderr output.
   for stage in stages:

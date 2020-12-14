@@ -25,3 +25,17 @@ iree_py_test(
   SRCS
     "compiler_tf_test.py"
 )
+
+iree_py_test(
+  NAME
+    compiler_tflite_test
+  SRCS
+    "compiler_tflite_test.py"
+)
+
+iree_py_test(
+  NAME
+    compiler_xla_test
+  SRCS
+    "compiler_xla_test.py"
+)
