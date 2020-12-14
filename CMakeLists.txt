@@ -43,15 +43,34 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler." OFF)
+option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
+option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
+option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+
+# Master enable for tensorflow build support.
+# Note that this is a normal CMake variable used to gate build features (not
+# a cache variable that is user-settable).
+set(IREE_ENABLE_TENSORFLOW OFF)
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+   ${IREE_BUILD_TFLITE_COMPILER} OR
+   ${IREE_BUILD_XLA_COMPILER})
+  set(IREE_ENABLE_TENSORFLOW ON)
+endif()
+
+# Default python bindings to enabled for some features.
+if(${IREE_ENABLE_TENSORFLOW})
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
+else()
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+endif()
+
 # LINT.ThenChange(
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
@@ -269,8 +288,7 @@ include(iree_setup_toolchain)
 #-------------------------------------------------------------------------------
 
 if(${IREE_BUILD_COMPILER} OR
-   ${IREE_BUILD_PYTHON_BINDINGS} OR
-   ${IREE_BUILD_TENSORFLOW_COMPILER})
+   ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
 
@@ -391,7 +409,7 @@ endif()
 # Depends on python configuration.
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
+if(${IREE_ENABLE_TENSORFLOW})
   include(configure_bazel)
   iree_configure_bazel()
 endif()
@@ -518,7 +536,7 @@ if(${IREE_BUILD_EXPERIMENTAL})
   add_subdirectory(experimental)
 endif()
 
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
+if(${IREE_ENABLE_TENSORFLOW})
   add_subdirectory(integrations/tensorflow)
 endif()
 

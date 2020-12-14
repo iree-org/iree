@@ -74,7 +74,9 @@ python3 build_tools/docker/manage_images.py --image all
 
 1. Update the `Dockerfile` for the image that you want to modify or add. If
    you're adding a new image, or updating the dependencies between images, be
-   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well.
+   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well. If
+   you are adding new images, it is best add them via `git add` before
+   proceeding.
 2. Build the image, push the image to GCR and update all references to the image
    with the new GCR digest:
 

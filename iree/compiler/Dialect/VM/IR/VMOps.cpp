@@ -422,7 +422,8 @@ static LogicalResult verifyGlobalOp(Operation *op) {
 }
 
 static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
-  auto *globalOp = op.getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
+  auto *globalOp =
+      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
   if (!globalOp) {
     return op.emitOpError() << "Undefined global: " << op.global();
   }
@@ -660,7 +661,8 @@ void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 }
 
 static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
-  auto *rodataOp = op.getParentOfType<VM::ModuleOp>().lookupSymbol(op.rodata());
+  auto *rodataOp =
+      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.rodata());
   if (!rodataOp) {
     return op.emitOpError() << "Undefined rodata section: " << op.rodata();
   }

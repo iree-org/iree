@@ -28,10 +28,10 @@ std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 /// order.
 std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
 
-/// Distributes linalg ops among iree.workgroup logical threads.
+/// Distributes linalg ops among hal.interface.workgroup logical threads.
 std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
 
-/// Vectorizes linalg ops executed in the same iree.workgroup.
+/// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -54,6 +54,9 @@ createLinalgRewriteDestructiveUpdatesPass();
 /// to sequentialized SPMD loops.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLinalgTileAndDistributeOnTensorsPass();
+
+/// Pass to perform linalg on tensor bufferization.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgLLVMBufferizePass();
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

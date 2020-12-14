@@ -24,6 +24,7 @@ cc_library(
         "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
+        "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",
         "LinalgTileAndDistributeOnTensorsPass.cpp",
         "LinalgTileAndDistributePass.cpp",

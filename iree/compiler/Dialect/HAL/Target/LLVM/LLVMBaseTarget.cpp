@@ -165,7 +165,7 @@ LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getI32IntegerAttr(nextEntryPointOrdinal++),
                 builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
-                entryPointOp.signatureAttr());
+                entryPointOp.signatureAttr(), ArrayAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.
@@ -220,8 +220,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
 
   SmallVector<LLVM::LLVMFuncOp, 2> entryPointFns;
   for (LLVM::LLVMFuncOp funcOp : llvmIRModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(funcOp) ==
-        SymbolTable::Visibility::Public) {
+    if (funcOp.isPublic()) {
       entryPointFns.push_back(funcOp);
     }
   }
@@ -247,7 +246,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
     }
     std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
     FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-        funcOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+        funcOp->getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
     if (!numWorkgroupsFn) {
       return funcOp.emitError("unable to find function ")
              << numWorkgroupsFnAttr

@@ -53,7 +53,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp.getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
+        targetOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     // TODO(#3737): don't add functions we don't want to serialize to the
     // module. Right now workgroup count calculation functions end up in here
@@ -212,6 +212,7 @@ void registerLLVMAOTTargetBackends(
     INIT_LLVM_TARGET(X86)
     INIT_LLVM_TARGET(ARM)
     INIT_LLVM_TARGET(AArch64)
+    INIT_LLVM_TARGET(RISCV)
     return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
   });
 }

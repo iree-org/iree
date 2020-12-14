@@ -17,14 +17,14 @@
 # Simulates the behavior of Kokoro on a local machine.
 # Usage:
 #   ./build_tools/kokoro/gcp_ubuntu/simulate_kokoro.sh \
-#     build_tools/kokoro/gcp_ubuntu/bazel/core/build.sh
+#     build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh
 #
 # Just does the part of the Kokoro setup that we care about and invokes the
 # given build script.
 # An optional second parameter can be used to specify a different repo to clone
 # from. Especially useful for cloning the current git repo.
 #   ./build_tools/kokoro/gcp_ubuntu/simulate_kokoro.sh \
-#     build_tools/kokoro/gcp_ubuntu/bazel/core/build.sh \
+#     build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh \
 #     "${PWD?}/.git"
 
 set -x

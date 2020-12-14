@@ -22,5 +22,7 @@ iree_py_library(
     "__init__.py"
     "core.py"
     "tf.py"
+    "tflite.py"
     "tools.py"
+    "xla.py"
 )

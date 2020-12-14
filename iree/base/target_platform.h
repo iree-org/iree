@@ -22,6 +22,8 @@
 //
 // IREE_ARCH_ARM_32
 // IREE_ARCH_ARM_64
+// IREE_ARCH_RISCV_32
+// IREE_ARCH_RISCV_64
 // IREE_ARCH_WASM_32
 // IREE_ARCH_WASM_64
 // IREE_ARCH_X86_32
@@ -80,8 +82,15 @@
 #define IREE_ARCH_X86_64 1
 #endif  // X86
 
-#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&   \
-    !defined(IREE_ARCH_WASM_32) && !defined(IREE_ARCH_WASM_64) && \
+#if defined(__riscv) && (__riscv_xlen == 32)
+#define IREE_ARCH_RISCV_32 1
+#elif defined(__riscv) && (__riscv_xlen == 64)
+#define IREE_ARCH_RISCV_64 1
+#endif
+
+#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&     \
+    !defined(IREE_ARCH_RISCV_32) && !defined(IREE_ARCH_RISCV_64) && \
+    !defined(IREE_ARCH_WASM_32) && !defined(IREE_ARCH_WASM_64) &&   \
     !defined(IREE_ARCH_X86_32) && !defined(IREE_ARCH_X86_64)
 #error Unknown architecture.
 #endif  // all archs

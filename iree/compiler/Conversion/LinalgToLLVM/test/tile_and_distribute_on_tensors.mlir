@@ -13,14 +13,14 @@ func @tensor() -> tensor<2x4xf32> {
   //  CHECK-DAG: %[[C1:.*]] = constant 1 : index
   //  CHECK-DAG: %[[C2:.*]] = constant 2 : index
   //  CHECK-DAG: %[[C4:.*]] = constant 4 : index
-  //  CHECK-DAG: %[[bix:.*]] = iree.workgroup_id {dimension = "x"} : index
-  //  CHECK-DAG: %[[bdx:.*]] = iree.workgoup_size {dimension = "x"} : index
-  //  CHECK-DAG: %[[biy:.*]] = iree.workgroup_id {dimension = "y"} : index
-  //  CHECK-DAG: %[[bdy:.*]] = iree.workgoup_size {dimension = "y"} : index
-  //      CHECK: %{{.*}} = scf.for %[[I:.*]] = %[[bix]] to %[[C2]] step %[[bdx]] iter_args(%arg1 = %2) -> (tensor<2x4xf32>) {
-  // CHECK-NEXT:   %[[biy_scaled:.*]] = muli %[[biy]], %[[C2]] : index
-  // CHECK-NEXT:   %[[bdy_scaled:.*]] = muli %[[bdy]], %[[C2]] : index
-  // CHECK-NEXT:   %{{.*}} = scf.for %[[J:.*]] = %[[biy_scaled]] to %[[C4]] step %[[bdy_scaled]] iter_args(%arg3 = %arg1) -> (tensor<2x4xf32>) {
+  //  CHECK-DAG: %[[bix:.*]] = hal.interface.workgroup.id[0] : index
+  //  CHECK-DAG: %[[bdx:.*]] = hal.interface.workgroup.count[0] : index
+  //  CHECK-DAG: %[[biy:.*]] = hal.interface.workgroup.id[1] : index
+  //  CHECK-DAG: %[[bdy:.*]] = hal.interface.workgroup.count[1] : index
+  //      CHECK: %{{.*}} = scf.for %[[I:.*]] = %[[biy]] to %[[C2]] step %[[bdy]] iter_args(%arg1 = %2) -> (tensor<2x4xf32>) {
+  // CHECK-NEXT:   %[[bix_scaled:.*]] = muli %[[bix]], %[[C2]] : index
+  // CHECK-NEXT:   %[[bdx_scaled:.*]] = muli %[[bdx]], %[[C2]] : index
+  // CHECK-NEXT:   %{{.*}} = scf.for %[[J:.*]] = %[[bix_scaled]] to %[[C4]] step %[[bdx_scaled]] iter_args(%arg3 = %arg1) -> (tensor<2x4xf32>) {
   // CHECK-NEXT:     subtensor %{{.*}}[%[[I]], 0] [1, 3] [1, 1] : tensor<2x3xf32> to tensor<1x3xf32>
   //
   // Canonicalizations not yet powerful enough here.

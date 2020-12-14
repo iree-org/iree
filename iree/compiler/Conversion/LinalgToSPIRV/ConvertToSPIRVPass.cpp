@@ -170,7 +170,7 @@ std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(
     IREE::PlaceholderOp op) {
   auto bindingOp =
       cast<IREE::HAL::InterfaceBindingOp>(SymbolTable::lookupNearestSymbolFrom(
-          op, op.getAttrOfType<SymbolRefAttr>("binding")));
+          op, op->getAttrOfType<SymbolRefAttr>("binding")));
   return {bindingOp.set(), bindingOp.binding()};
 }
 
@@ -409,7 +409,7 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   // TODO(#1519): hal.interface.load.constant should point to the
   // hal.interface op.
-  auto moduleOp = loadOp.getParentOfType<ModuleOp>();
+  auto moduleOp = loadOp->getParentOfType<ModuleOp>();
   auto halInterfaceOps =
       llvm::to_vector<1>(moduleOp.getOps<IREE::HAL::InterfaceOp>());
   assert(halInterfaceOps.size() == 1);
@@ -428,7 +428,7 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
 LogicalResult IREEPlaceholderConverter::matchAndRewrite(
     IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
-  auto moduleOp = phOp.getParentOfType<ModuleOp>();
+  auto moduleOp = phOp->getParentOfType<ModuleOp>();
 
   Type convertedType = getTypeConverter()->convertType(phOp.getType());
   if (!convertedType) {
@@ -437,7 +437,7 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
   }
   auto bindingOp = dyn_cast_or_null<IREE::HAL::InterfaceBindingOp>(
       SymbolTable::lookupNearestSymbolFrom(
-          phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
+          phOp, phOp->getAttrOfType<SymbolRefAttr>("binding")));
 
   // We always create a new resource variable for the placeholder and use the
   // placeholder op's pointer address as the `id`.
@@ -496,8 +496,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
   SmallVector<FuncOp, 1> functions;
   for (FuncOp fn : moduleOp.getOps<FuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(fn) != SymbolTable::Visibility::Public)
-      continue;
+    if (!fn.isPublic()) continue;
     functions.push_back(fn);
   }
 

@@ -630,7 +630,7 @@ struct MapLinalgOpToGlobalInvocationId
       ConversionPatternRewriter &rewriter) const override {
     // If marker exists do nothing.
     if (hasMarker(linalgOp)) return failure();
-    FuncOp funcOp = linalgOp.template getParentOfType<FuncOp>();
+    FuncOp funcOp = linalgOp->template getParentOfType<FuncOp>();
     if (!funcOp) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
