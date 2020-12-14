@@ -16,6 +16,9 @@
 
 # This script will download and setup the riscv-linux required toolchain and tool.
 
+set -e
+set -o pipefail
+
 BOOTSTRAP_SCRIPT_PATH=$(dirname "$0")
 BOOTSTRAP_WORK_DIR=${BOOTSTRAP_SCRIPT_PATH}/.bootstrap
 
@@ -57,34 +60,31 @@ function cleanup {
   fi
 }
 
-set -o pipefail
-
 # Call the cleanup function when this tool exits.
 trap cleanup EXIT
 
-execute () {
-  eval $1
-  if [[ $? -ne 0 ]]; then
-    echo "command:\"$1\" error"
-    exit 1
-  fi
-}
-
-# $1: file_id
-# $2: file name
-# $3: install path
-# $4: tar_option
 wget_google_drive() {
-  execute "wget --save-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \"https://docs.google.com/uc?export=download&id=\"$1 -O- | sed -En \"s/.*confirm=([0-9A-Za-z_]+).*/\1/p\" > ${BOOTSTRAP_WORK_DIR}/confirm.txt"
-  execute "wget --progress=bar:force:noscroll --load-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \"https://docs.google.com/uc?export=download&id=$1&confirm=`cat ${BOOTSTRAP_WORK_DIR}/confirm.txt`\" -O- | tar $4 - --no-same-owner --strip-components=1 -C $3"
+  local file_id="$1"
+  local file_name="$2"
+  local install_path="$3"
+  local tar_option="$4"
+
+  wget --save-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \
+    "https://docs.google.com/uc?export=download&id="$file_id -O- | \
+    sed -En "s/.*confirm=([0-9A-Za-z_]+).*/\1/p" > ${BOOTSTRAP_WORK_DIR}/confirm.txt
+  wget --progress=bar:force:noscroll --load-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \
+    "https://docs.google.com/uc?export=download&id=$file_id&confirm=`cat ${BOOTSTRAP_WORK_DIR}/confirm.txt`" -O- | \
+    tar $tar_option - --no-same-owner --strip-components=1 -C $install_path
 }
 
-# $1: server name or google drive file_id
-# $2: file name
-# $3: install path
-# $4: download method(scp or wget_google_drive)
-# (optional) $5: the post-processing for the file
 download_file() {
+  # server name or google drive file_id
+  local file_download_info="$1"
+  local file_name="$2"
+  local install_path="$3"
+  # download method(e.g. wget_google_drive)
+  local download_method="$4"
+
   echo "Install $2 to $3"
   if [[ -e $3/file_info.txt ]]; then
     read -p "The file already exists. Keep it (y/n)? " replaced
@@ -99,30 +99,30 @@ download_file() {
     esac
   fi
 
-  if [[ "${2##*.}" == "gz" ]]; then
+  local tar_option=""
+  if [[ "${file_name##*.}" == "gz" ]]; then
     tar_option="zxpf"
-  elif [[ "${2##*.}" == "bz2" ]]; then
+  elif [[ "${file_name##*.}" == "bz2" ]]; then
     tar_option="jxpf"
   fi
   echo "tar option: $tar_option"
 
-  echo "Download $2 ..."
-  execute "mkdir -p $3"
-  $4 $1 $2 $3 $tar_option
+  echo "Download $file_name ..."
+  mkdir -p $install_path
+  $download_method $file_download_info $file_name $install_path $tar_option
 
-  if [[ $# -eq 5 ]]; then
-    $5
-  fi
-
-  echo "$1 $2" > $3/file_info.txt
+  echo "$file_download_info $file_name" > $install_path/file_info.txt
 }
 
-execute "mkdir -p ${BOOTSTRAP_WORK_DIR}"
+mkdir -p ${BOOTSTRAP_WORK_DIR}
 
 read -p "Install RISCV clang toolchain(y/n)? " answer
 case ${answer:0:1} in
   y|Y )
-    download_file ${RISCV_CLANG_TOOLCHAIN_FILE_ID} ${RISCV_CLANG_TOOLCHAIN_FILE_NAME} ${TOOLCHAIN_PATH_PREFIX} wget_google_drive
+    download_file ${RISCV_CLANG_TOOLCHAIN_FILE_ID} \
+                  ${RISCV_CLANG_TOOLCHAIN_FILE_NAME} \
+                  ${TOOLCHAIN_PATH_PREFIX} \
+                  wget_google_drive
   ;;
   * )
     echo "Skip RISCV clang toolchain."
@@ -132,7 +132,10 @@ esac
 read -p "Install RISCV qemu(y/n)? " answer
 case ${answer:0:1} in
   y|Y )
-    download_file $QEMU_FILE_ID ${QEMU_FILE_NAME} ${QEMU_PATH_PREFIX} wget_google_drive
+    download_file $QEMU_FILE_ID \
+                  ${QEMU_FILE_NAME} \
+                  ${QEMU_PATH_PREFIX} \
+                  wget_google_drive
   ;;
   * )
     echo "Skip RISCV qemu."
