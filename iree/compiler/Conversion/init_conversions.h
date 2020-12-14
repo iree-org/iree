@@ -65,10 +65,11 @@ inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
     // LinalgToLLVM
     createConvImg2ColMatmulConversionPass();
+    createLinalgLLVMBufferizePass();
+    createLinalgRewriteDestructiveUpdatesPass();
     createLinalgTileAndDistributePass();
     createLinalgTileAndDistributeOnTensorsPass();
     createLinalgTileAndVectorizeWorkgroupsPass();
-    createLinalgRewriteDestructiveUpdatesPass();
     return true;
   }();
   (void)init_once;

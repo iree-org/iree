@@ -184,9 +184,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (SymbolTable::getSymbolVisibility(op) != SymbolTable::Visibility::Public)
-      return failure();
-    auto funcOp = dyn_cast_or_null<FuncOp>(op);
+    auto funcOp = dyn_cast<FuncOp>(op);
+    if (!funcOp.isPublic()) return failure();
     FunctionType fnType = funcOp.getType();
     if (fnType.getNumInputs() != 0) {
       return rewriter.notifyMatchFailure(

@@ -34,20 +34,25 @@ function(iree_configure_bazel)
 
   # Use the utility to emit _bazelrc_file configuration options.
   set(_bazelrc_file "${CMAKE_BINARY_DIR}/bazelrc")
-  execute_process(
-    RESULT_VARIABLE RC
-    COMMAND
-      "${Python3_EXECUTABLE}"
-      "${_bazel_src_root}/configure_bazel.py"
-      "${_bazelrc_file}"
-  )
-  if(NOT RC EQUAL 0)
-    message(FATAL_ERROR "Error running ${_bazel_src_root}/configure_bazel.py script")
+  if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+    set(_bazel_platform_config generic_clang)
+  elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    message(WARNING "Configuring bazel build for GCC: This receives minimal testing (recommend clang)")
+    set(_bazel_platform_config generic_gcc)
+  elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+    set(_bazel_platform_config windows)
+  else()
+    message(WARNING "Did not recognize C++ compiler R{CMAKE_CXX_COMPILER_ID}. Configuring bazel for gcc mode and hoping for the best.")
+    set(_bazel_platform_config generic_gcc)
   endif()
-
   # Now add an import to the configured.bazelrc to load the project-wide
   # bazelrc file.
-  file(APPEND "${_bazelrc_file}" "
+  file(WRITE "${_bazelrc_file}" "
+build --config ${_bazel_platform_config}
+build --progress_report_interval=30
+build --python_path='${Python3_EXECUTABLE}'
+build --action_env CC='${CMAKE_C_COMPILER}'
+build --action_env CXX='${CMAKE_CXX_COMPILER}'
 import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
 ")
 

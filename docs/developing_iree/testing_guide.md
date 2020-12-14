@@ -27,6 +27,13 @@ $ bazel test iree/base:arena_test
 
 ### Setting test environments
 
+Parallel testing for `ctest` can be enabled via the `CTEST_PARALLEL_LEVEL` 
+environment variable. For example:
+
+```shell
+$ export CTEST_PARALLEL_LEVEL=$(nproc)
+```
+
 To use the Vulkan backend as test driver, you may need to select between a
 Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware
 devices. This can be done via environment variables. See the
