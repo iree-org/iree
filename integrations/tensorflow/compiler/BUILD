@@ -109,7 +109,7 @@ cc_binary(
         "@org_tensorflow//tensorflow:oss": [],
         "//conditions:default": [
             # TODO: Enable this for all builds once dependency bug is fixed.
-            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_hooks",  # Note: always_links in random foo that makes constant folding work
+            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
         ],
     }),
 )
