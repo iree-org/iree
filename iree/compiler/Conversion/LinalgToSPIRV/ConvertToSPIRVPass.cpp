@@ -114,10 +114,11 @@ spirv::GlobalVariableOp getPushConstantVariable(Block &body,
 /// `elementCount` 32-bit integer values in `block`.
 spirv::GlobalVariableOp getOrInsertPushConstantVariable(Location loc,
                                                         Block &block,
-                                                        unsigned elementCount) {
+                                                        unsigned elementCount,
+                                                        OpBuilder &b) {
   if (auto varOp = getPushConstantVariable(block, elementCount)) return varOp;
 
-  auto builder = OpBuilder::atBlockBegin(&block);
+  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto typeAttr =
       TypeAttr::get(getPushConstantStorageType(elementCount, builder));
   StringRef name = "__push_constant_var__";
@@ -139,7 +140,7 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
   }
 
   spirv::GlobalVariableOp varOp = getOrInsertPushConstantVariable(
-      loc, parent->getRegion(0).front(), elementCount);
+      loc, parent->getRegion(0).front(), elementCount, builder);
 
   auto i32Type = SPIRVTypeConverter::getIndexType(builder.getContext());
   Value zeroOp = spirv::ConstantOp::getZero(i32Type, loc, builder);
@@ -156,9 +157,9 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
 spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
                                                uint64_t id, unsigned set,
                                                unsigned binding, bool alias,
-                                               Block &block) {
+                                               Block &block, OpBuilder &b) {
   auto name = llvm::formatv("__resource_var_{0}__", id).str();
-  auto builder = OpBuilder::atBlockBegin(&block);
+  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
   if (alias) variable.setAttr("aliased", builder.getUnitAttr());
@@ -445,7 +446,7 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       phOp.getLoc(), convertedType,
       reinterpret_cast<uint64_t>(phOp.getOperation()), bindingOp.set(),
       bindingOp.binding(), aliasedResources.contains(phOp),
-      *moduleOp.getBody());
+      *moduleOp.getBody(), rewriter);
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();

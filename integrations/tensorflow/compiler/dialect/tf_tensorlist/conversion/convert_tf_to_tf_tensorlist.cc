@@ -71,14 +71,12 @@ class ConvertTfTensorlistConcatV2
     Value out_tensor = op.tensor();
     Value out_lengths = op.lengths();
 
-    auto concat = rewriter.create<tf_tensorlist::Concat>(
+    Value concat = rewriter.create<tf_tensorlist::Concat>(
         op.getLoc(), out_tensor.getType(), tensor_list);
-    auto dim0Lengths = rewriter.create<tf_tensorlist::GetDim0>(
+    Value dim0Lengths = rewriter.create<tf_tensorlist::GetDim0>(
         op.getLoc(), out_lengths.getType(), tensor_list);
 
-    out_tensor.replaceAllUsesWith(concat);
-    out_lengths.replaceAllUsesWith(dim0Lengths);
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, {concat, dim0Lengths});
     return success();
   }
 };
