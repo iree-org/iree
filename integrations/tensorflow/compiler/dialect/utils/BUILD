@@ -32,4 +32,3 @@ cc_library(
         "@llvm-project//mlir:Transforms",
     ],
 )
-
