@@ -121,6 +121,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     // if we serialized things.
     passManager.addPass(createSymbolDCEPass());
   }
+
+  // Run our own CSE on variable loads before moving on.
+  // When specifying side effects can help MLIR's core CSE pass eliminate
+  // redundant loads we can remove this.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
