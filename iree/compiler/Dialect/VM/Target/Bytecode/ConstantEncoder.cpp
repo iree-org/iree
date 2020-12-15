@@ -15,8 +15,8 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

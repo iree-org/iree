@@ -40,9 +40,9 @@
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 
 #define DEBUG_TYPE "kernel-dispatch-utils"
 

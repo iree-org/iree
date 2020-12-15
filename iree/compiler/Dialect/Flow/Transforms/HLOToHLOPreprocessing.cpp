@@ -22,7 +22,7 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
@@ -223,9 +223,9 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
     auto newOp = rewriter.create<mhlo::ConvOp>(
         op.getLoc(), resultType, padOp.getResult(), op.rhs(),
         op.window_stridesAttr(), /*padding=*/nullptr, op.lhs_dilationAttr(),
-        op.rhs_dilationAttr(), op.dimension_numbersAttr(),
-        op.feature_group_countAttr(), op.batch_group_countAttr(),
-        op.precision_configAttr());
+        op.rhs_dilationAttr(), /*window_reversal=*/nullptr,
+        op.dimension_numbersAttr(), op.feature_group_countAttr(),
+        op.batch_group_countAttr(), op.precision_configAttr());
     rewriter.replaceOp(op, newOp.getResult());
     return success();
   }

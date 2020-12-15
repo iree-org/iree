@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 
 // Order matters:

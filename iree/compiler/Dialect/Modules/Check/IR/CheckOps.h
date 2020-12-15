@@ -15,8 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_
 #define IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/StandardTypes.h"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h.inc"

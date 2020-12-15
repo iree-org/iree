@@ -19,9 +19,9 @@
 #ifndef INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_TYPES_H_
 #define INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_TYPES_H_
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/StorageUniquerSupport.h"
 #include "mlir/IR/Types.h"
 
