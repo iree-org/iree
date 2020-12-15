@@ -15,10 +15,13 @@
 # Static and generated files.
 configure_file(README.md README.md COPYONLY)
 
-iree_pyext_library(
+iree_pyext_module(
   NAME
-    PyExtRtLib
+    PyExtRt
+  MODULE_NAME binding
   SRCS
+    "initialize_module.cc"
+    "binding.h"
     "function_abi.h"
     "hal.h"
     "host_types.h"
@@ -26,13 +29,18 @@ iree_pyext_library(
     "function_abi.cc"
     "hal.cc"
     "host_types.cc"
+    "status_utils.cc"
+    "status_utils.h"
     "vm.cc"
-  PYEXT_DEPS
-    bindings::python::pyiree::common::PyextCommonLib
+  UNIX_LINKER_SCRIPT
+    "unix_version.lds"
+  INCLUDES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../.."
   DEPS
     iree::base::api
     iree::base::signature_mangle
     iree::hal::api
+    iree::hal::drivers
     iree::modules::hal
     iree::modules::strings::strings_module
     iree::modules::tensorlist::native_module
@@ -43,21 +51,6 @@ iree_pyext_library(
     absl::strings
     absl::optional
     absl::span
-)
-
-iree_pyext_module(
-  NAME
-    PyExtRt
-  MODULE_NAME binding
-  SRCS
-    "initialize_module.cc"
-  UNIX_LINKER_SCRIPT
-    "unix_version.lds"
-  PYEXT_DEPS
-    ::PyExtRtLib
-    bindings::python::pyiree::common::PyextCommonLib
-  DEPS
-    iree::hal::drivers
 )
 
 iree_py_library(
