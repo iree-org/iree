@@ -63,6 +63,7 @@ iree_check_single_backend_test_suite(
     ],
     driver = "metal",
     target_backend = "metal-spirv",
+    compatible_with = "darwin",
 )
 
 iree_check_single_backend_test_suite(
@@ -177,7 +178,6 @@ test_suite(
     name = "check",
     tests = [
         ":check_dylib-llvm-aot_dylib",
-        ":check_metal-spirv_metal",
         ":check_vmla_vmla",
         ":check_vulkan-spirv_vulkan",
     ],
