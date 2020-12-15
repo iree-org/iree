@@ -15,7 +15,7 @@
 # An image for building IREE with TensorFlow integrations using Bazel and
 # running Vulkan tests on SwiftShader.
 
-FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
+FROM gcr.io/iree-oss/bazel-tensorflow-vulkan@sha256:b69ecaa70fde817bba4f01e47a77db8e7053d7d7b25ad8d4b1e47d370b055c3e AS final
 
 COPY --from=gcr.io/iree-oss/swiftshader@sha256:ccae32c83c89a31e8fc5542e480c29f28bbf4a3b3b80198c06b687a92c6813f3 swiftshader/ swiftshader/
 

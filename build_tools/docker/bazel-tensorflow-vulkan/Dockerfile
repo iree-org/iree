@@ -16,7 +16,7 @@
 # running Vulkan tests. This image provides the Vulkan SDK. Requires a child
 # image to provide a Vulkan ICD.
 
-FROM gcr.io/iree-oss/bazel-tensorflow AS final
+FROM gcr.io/iree-oss/bazel-tensorflow@sha256:0d2b9f60c310b58353064125a1075f04b9a82e577f19fefdeea066082061b491 AS final
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
