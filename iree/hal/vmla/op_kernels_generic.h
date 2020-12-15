@@ -249,18 +249,20 @@ void TransposeRecurse(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
   // -- dim_i < rank - 1: iterate on dim_i; set offsets and recurse on dim_i + 1
   // -- dim_i = rank - 1: base case, fast copy with strides and offsets
 
+  int src_stride = src_strides[perm[dim_i]];
+  int dst_stride =  dst_strides[dim_i];
   if (dim_i < rank - 1) {
     int recurse_dim_i = dim_i + 1;
     for (size_t i = 0; i < dst_shape[dim_i]; ++i) {
-      size_t src_offset = src_base_offset + i * src_strides[perm[dim_i]];
-      size_t dst_offset = dst_base_offset + i * dst_strides[dim_i];
+      size_t src_offset = src_base_offset + i * src_stride;
+      size_t dst_offset = dst_base_offset + i * dst_stride;
       TransposeRecurse(src_buffer, dst_buffer, src_shape, dst_shape,
                        src_strides, dst_strides, perm, rank, recurse_dim_i,
                        src_offset, dst_offset);
     }
   } else {
     for (size_t i = 0; i < dst_shape[dim_i]; ++i) {
-      size_t src_i = src_base_offset + i * src_strides[perm[dim_i]];
+      size_t src_i = src_base_offset + i * src_stride;
       // Stride for the last dim of dst is always 1.
       size_t dst_i = dst_base_offset + i;
       dst_buffer[dst_i] = src_buffer[src_i];
