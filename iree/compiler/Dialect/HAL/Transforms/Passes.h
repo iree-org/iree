@@ -19,8 +19,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/StringMap.h"
-#include "mlir/IR/Function.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
@@ -75,6 +74,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions executableOptions);
+
+// Propagates hal.interface.workload.* information when constant.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createPropagateConstantWorkgroupInfoPass();
 
 // Translates hal.executable.target ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>

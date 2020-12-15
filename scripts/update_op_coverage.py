@@ -31,12 +31,11 @@ FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
-# TODO(scotttodd): LLVM AOT (dylib-llvm-aot) HAL target(s)
 OP_COVERAGE_DESCRIPTION = """# XLA HLO Op Coverage
 There are three backend [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
-- llvm-ir
+- dylib-llvm-aot
 - vulkan-spirv
 
 The table shows the supported XLA HLO ops on each backend. It is auto-generated
@@ -65,7 +64,7 @@ def get_backend_op_pair(test):
   """Returns the target backend and operation pair of the test."""
   test_suite_backends = {
       'check_vmla_vmla': 'vmla',
-      'check_llvm-ir_llvm': 'llvm-ir',
+      'check_dylib-llvm-aot_dylib': 'dylib-llvm-aot',
       'check_vulkan-spirv_vulkan': 'vulkan-spirv'
   }
   for (test_suite, backend) in test_suite_backends.items():
@@ -79,9 +78,15 @@ def get_backend_op_pair(test):
 def get_tested_ops_for_backends(build_dir):
   """Parses current op tests for each backend."""
 
-  ctest_output = subprocess.check_output(
-      ['ctest', '-N', '-L', E2E_XLA_OPS_PATH], cwd=build_dir)
-  tests = ctest_output.decode('ascii').strip().split('\n')
+  completed_process = subprocess.run(
+      ['ctest', '-N', '-L', E2E_XLA_OPS_PATH],
+      cwd=build_dir,
+      # TODO(#4131) python>=3.7: Use capture_output=True.
+      stderr=subprocess.PIPE,
+      stdout=subprocess.PIPE,
+      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+      universal_newlines=True)
+  tests = completed_process.stdout.strip().split('\n')
   res = collections.defaultdict(list)
   for t in tests:
     if not t.endswith('.mlir'):

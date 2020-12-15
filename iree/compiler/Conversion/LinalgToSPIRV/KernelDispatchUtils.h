@@ -19,6 +19,7 @@
 // the number of workgroups to use for launch, etc.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 
@@ -31,7 +32,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Types.h"
@@ -52,4 +53,5 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_DISPATCHUTILS_H_

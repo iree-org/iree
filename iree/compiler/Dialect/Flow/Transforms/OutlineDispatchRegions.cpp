@@ -24,8 +24,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -167,7 +167,7 @@ LogicalResult outlineDispatchRegion(
     DispatchRegionOp regionOp, int outlinedRegionOrdinal,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
   // Create the dispatch function.
-  auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
+  auto parentFuncOp = regionOp->getParentOfType<FuncOp>();
   std::string namePrefix = parentFuncOp.getName().str() + "_ex_dispatch_" +
                            std::to_string(outlinedRegionOrdinal);
 
@@ -181,7 +181,7 @@ LogicalResult outlineDispatchRegion(
   // Create the executable with the region cloned into it.
   auto executableOp = createExecutable(
       regionOp.getLoc(), namePrefix, {dispatchFuncOp},
-      parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
+      parentFuncOp->getParentOfType<ModuleOp>(), dispatchableFuncOps);
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 

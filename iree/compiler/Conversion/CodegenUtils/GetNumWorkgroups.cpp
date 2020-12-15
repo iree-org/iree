@@ -23,9 +23,8 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
 
 #define DEBUG_TYPE "workgroup-calculation"
 
@@ -35,13 +34,13 @@ namespace iree_compiler {
 FuncOp getNumWorkgroupsFn(FuncOp entryPointFn,
                           llvm::StringRef numWorkgroupsFnAttr) {
   SymbolRefAttr attr =
-      entryPointFn.getAttrOfType<SymbolRefAttr>(numWorkgroupsFnAttr);
+      entryPointFn->getAttrOfType<SymbolRefAttr>(numWorkgroupsFnAttr);
   if (!attr) {
     entryPointFn.emitError("missing attribute '") << numWorkgroupsFnAttr << "'";
     return nullptr;
   }
   FuncOp numWorkgroupsFn = dyn_cast_or_null<FuncOp>(SymbolTable::lookupSymbolIn(
-      entryPointFn.getParentOfType<ModuleOp>(), attr));
+      entryPointFn->getParentOfType<ModuleOp>(), attr));
   if (!numWorkgroupsFn) {
     entryPointFn.emitError("unable to find num workgroups fn ") << attr;
     return nullptr;
@@ -125,7 +124,7 @@ static LogicalResult createNumWorkgroupsFromResultShapeImpl(
     llvm::StringRef numWorkgroupsFnAttr, ArrayRef<int64_t> tileSizes,
     ArrayRef<unsigned> distributedLoops) {
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
-      linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
+      linalgOp->getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
   if (!numWorkgroupsFn) return failure();
 
   Location loc = linalgOp.getLoc();
@@ -176,7 +175,7 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
     FuncOp entryPointFn, llvm::StringRef numWorkgroupsFnAttr,
     int64_t workgroupSizeX) {
   FuncOp numWorkgroupsFn = getNumWorkgroupsFn(
-      linalgOp.getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
+      linalgOp->getParentOfType<FuncOp>(), numWorkgroupsFnAttr);
   if (!numWorkgroupsFn) return failure();
   if (!numWorkgroupsFn.empty()) {
     // TODO(ravishankarm): We can end up with multiple linalg operations

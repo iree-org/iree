@@ -31,8 +31,8 @@
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
@@ -193,7 +193,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
 
-  if (failed(passManager.run(moduleOp.getParentOfType<mlir::ModuleOp>()))) {
+  if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
   }
 

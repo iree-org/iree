@@ -21,10 +21,10 @@
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LogicalResult.h"
@@ -86,12 +86,12 @@ struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {
   }
 };
 
-class LowerTensorflowToStringsPass
-    : public PassWrapper<LowerTensorflowToStringsPass,
-                         OperationPass<ModuleOp>> {
+class ConvertTFToTFStringsPass
+    : public PassWrapper<ConvertTFToTFStringsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<TFStringsDialect>();
+    registry.insert<mlir::TF::TensorFlowDialect, TFStringsDialect,
+                    StandardOpsDialect>();
   }
 
   void runOnOperation() override {
@@ -160,12 +160,13 @@ void populateTFToTFStringsPatterns(MLIRContext *ctx,
   patterns.insert<StringFormatOpLowering>(ctx);
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertTfToTfStrings() {
-  return std::make_unique<LowerTensorflowToStringsPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTFToTFStringsPass() {
+  return std::make_unique<ConvertTFToTFStringsPass>();
 }
 
-static PassRegistration<LowerTensorflowToStringsPass> pass(
-    "convert-tensorflow-to-tf-strings", "Lower tensorflow to tf-strings.");
+static PassRegistration<ConvertTFToTFStringsPass> pass(
+    "iree-tf-convert-to-tf-strings",
+    "Converts TF string ops to the IREE tf_strings dialect");
 
 }  // namespace tf_strings
 }  // namespace iree_compiler

@@ -48,7 +48,6 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -82,7 +81,6 @@ cc_library(
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
-        "//iree/compiler/Utils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
@@ -92,5 +90,4 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
-    alwayslink = 1,
 )

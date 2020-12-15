@@ -16,8 +16,8 @@
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONTARGET_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

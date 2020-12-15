@@ -21,12 +21,13 @@ package(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "CheckNoTF.cpp",
-        "LegalizeTF.cpp",
+        "ConvertToMHLO.cpp",
+        "LowerExportedFunctions.cpp",
+        "LowerGlobalTensors.cpp",
         "Passes.cpp",
         "PropagateResourceCasts.cpp",
-        "TFSavedModelLowerExportedFunctions.cpp",
-        "TFSavedModelLowerGlobalTensors.cpp",
+        "StripMetadata.cpp",
+        "VerifyFullyConverted.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -36,6 +37,7 @@ cc_library(
     ],
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/base:signature_mangle",
@@ -56,14 +58,14 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:lower_tf_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
-    alwayslink = 1,
 )
 
 cc_binary(
     name = "iree-tf-opt",
-    srcs = ["iree-tf-opt-main.cc"],
+    srcs = ["iree-tf-opt-main.cpp"],
     deps = [
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
@@ -86,5 +88,59 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//iree/tools:iree_translate_main",
+    ],
+)
+
+cc_binary(
+    name = "iree-tf-import",
+    srcs = ["iree-tf-import-main.cpp"],
+    deps = [
+        ":tensorflow",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@org_tensorflow//tensorflow/cc/saved_model:loader",
+        "@org_tensorflow//tensorflow/compiler/mlir:init_mlir",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "@org_tensorflow//tensorflow/core/platform:errors",
+    ] + select({
+        "@org_tensorflow//tensorflow:oss": [],
+        "//conditions:default": [
+            # TODO: Enable this for all builds once dependency bug is fixed.
+            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
+        ],
+    }),
+)
+
+cc_binary(
+    name = "iree-import-tflite",
+    srcs = ["iree-import-tflite-main.cpp"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TosaDialect",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
+    ],
+)
+
+cc_binary(
+    name = "iree-import-xla",
+    srcs = ["iree-import-xla-main.cpp"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_to_mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_proto_cc",
+        "@org_tensorflow//tensorflow/core:lib",
     ],
 )

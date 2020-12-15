@@ -71,13 +71,12 @@ cc_library(
     ],
     deps = [
         ":op_interface_gen",
+        ":ops",
         ":ops_gen",
         "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_flow_to_hal",
-        "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -97,5 +96,4 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
-    alwayslink = 1,
 )

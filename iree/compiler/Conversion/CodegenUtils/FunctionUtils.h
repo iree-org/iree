@@ -16,7 +16,7 @@
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {

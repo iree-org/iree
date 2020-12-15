@@ -132,6 +132,34 @@ class RemoveMakeRankedShape : public ConvertToLLVMPattern {
   }
 };
 
+template <typename Op, int ArgIndex>
+class ConvertWorkgroupInfoOpPattern : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertWorkgroupInfoOpPattern(MLIRContext *context,
+                                         LLVMTypeConverter &typeConverter)
+      : ConvertToLLVMPattern(Op::getOperationName(), context, typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto newFuncOp = cast<LLVM::LLVMFuncOp>(rewriter.getBlock()->getParentOp());
+    auto xyzTy =
+        LLVM::LLVMType::getInt32Ty(rewriter.getContext()).getPointerTo();
+    auto xyzArgument = newFuncOp.getArgument(ArgIndex);
+    auto dimIndex = rewriter.createOrFold<LLVM::ConstantOp>(
+        op->getLoc(), LLVM::LLVMType::getInt64Ty(rewriter.getContext()),
+        op->getAttrOfType<IntegerAttr>("dimension"));
+    auto dimPtr = rewriter.createOrFold<LLVM::GEPOp>(
+        op->getLoc(), xyzTy, xyzArgument, ValueRange{dimIndex});
+    auto dimValue = rewriter.createOrFold<LLVM::LoadOp>(op->getLoc(), dimPtr);
+    auto dimValueCasted = rewriter.createOrFold<LLVM::ZExtOp>(
+        op->getLoc(), typeConverter->convertType(op->getResult(0).getType()),
+        dimValue);
+    rewriter.replaceOp(op, dimValueCasted);
+    return success();
+  }
+};
+
 /// Returns true if `aOp` has a desciptor (set, binding) pair smaller than
 /// `bOp`. Note that this ignores the offset.
 bool operator<(IREE::HAL::InterfaceBindingOp aOp,
@@ -156,9 +184,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (SymbolTable::getSymbolVisibility(op) != SymbolTable::Visibility::Public)
-      return failure();
-    auto funcOp = dyn_cast_or_null<FuncOp>(op);
+    auto funcOp = dyn_cast<FuncOp>(op);
+    if (!funcOp.isPublic()) return failure();
     FunctionType fnType = funcOp.getType();
     if (fnType.getNumInputs() != 0) {
       return rewriter.notifyMatchFailure(
@@ -168,16 +195,13 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Get interface buffers from all the blocks.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
     SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
-    SmallVector<IREE::WorkgroupIdOp, 3> workgroupIdOps;
     for (Block &block : funcOp.getBlocks()) {
       for (Operation &op : block) {
-        if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
+        if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op)) {
           bufferOps.push_back(phOp);
-        if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+        } else if (auto phOp =
+                       dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
           loadOps.push_back(phOp);
-        }
-        if (auto threadIdOp = dyn_cast<IREE::WorkgroupIdOp>(op)) {
-          workgroupIdOps.push_back(threadIdOp);
         }
       }
     }
@@ -218,7 +242,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
 
       auto memrefType = bufferOp.getType().dyn_cast_or_null<MemRefType>();
       inputMemRefTypes.push_back(memrefType);
-      auto elementType = typeConverter.convertType(memrefType.getElementType())
+      auto elementType = typeConverter->convertType(memrefType.getElementType())
                              .dyn_cast<LLVM::LLVMType>();
       if (!elementType) return failure();
       inputStructPtrs.push_back(
@@ -233,14 +257,12 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     auto packedBuffersArgsTy =
         LLVM::LLVMType::getInt8PtrTy(context).getPointerTo();
     auto pushConstantArgTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
-    auto threadIdXTy = LLVM::LLVMType::getInt32Ty(context);
-    auto threadIdYTy = LLVM::LLVMType::getInt32Ty(context);
-    auto threadIdZTy = LLVM::LLVMType::getInt32Ty(context);
+    auto xyzTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
-    signatureConverter.addInputs(threadIdXTy);
-    signatureConverter.addInputs(threadIdYTy);
-    signatureConverter.addInputs(threadIdZTy);
+    signatureConverter.addInputs(xyzTy);  // workgroup_id
+    signatureConverter.addInputs(xyzTy);  // workgroup_count
+    signatureConverter.addInputs(xyzTy);  // workgroup_size
 
     Location loc = funcOp.getLoc();
 
@@ -285,11 +307,11 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
           rewriter.getI64ArrayAttr(index));
       if (memrefType.hasStaticShape()) {
         auto desc = MemRefDescriptor::fromStaticShape(
-            builder, loc, typeConverter, memrefType, bufferPtr);
+            builder, loc, *getTypeConverter(), memrefType, bufferPtr);
         rewriter.replaceOp(bufferOp, {desc});
       } else {
         auto desc = MemRefDescriptor::undef(
-            builder, loc, typeConverter.convertType(memrefType));
+            builder, loc, typeConverter->convertType(memrefType));
         desc.setAllocatedPtr(builder, loc, bufferPtr);
         desc.setAlignedPtr(builder, loc, bufferPtr);
         rewriter.replaceOp(bufferOp, {desc});
@@ -306,30 +328,10 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                                    ArrayRef<Value>({offset}));
       Value dimConstant = builder.create<LLVM::LoadOp>(loc, constPtr);
       Value dimConstantCasted = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(loadOp.getType()), dimConstant);
+          loc, typeConverter->convertType(loadOp.getType()), dimConstant);
       rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
-    // Lower iree.workgroup_idd ops to get indices from function arugments.
-    for (auto workgroupCoordOp : workgroupIdOps) {
-      auto attr = workgroupCoordOp.getAttrOfType<StringAttr>("dimension");
-      int argIndex = -1;
-      if (attr.getValue().str() == "x") {
-        argIndex = 2;
-      } else if (attr.getValue().str() == "y") {
-        argIndex = 3;
-      } else if (attr.getValue().str() == "z") {
-        argIndex = 4;
-      } else {
-        return rewriter.notifyMatchFailure(
-            funcOp,
-            "Unable to map to workgroup coordinate : " + attr.getValue().str());
-      }
-      Value threadXIndex = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(workgroupCoordOp.getType()),
-          newFuncOp.getArgument(argIndex));
-      rewriter.replaceOp(workgroupCoordOp, threadXIndex);
-    }
     rewriter.eraseOp(funcOp);
     return success();
   }
@@ -388,7 +390,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToSCFConversionPatterns(patterns, &getContext());
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
-  populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
+  populateLinalgToLLVMConversionPatterns(converter, patterns);
   // The following patterns resolves dynamic shapes by substituting tie_shape
   // ops with an updated memref descriptors and replacing RankDimOp with
   // actual index loaded from memref<?xi32> that holds all dynamic shapes push
@@ -396,6 +398,13 @@ void ConvertToLLVMPass::runOnOperation() {
   patterns.insert<ConvertFuncWithHALInterface, ConvertRankedDimPattern,
                   ConvertTieShapePattern, RemoveMakeRankedShape,
                   RemoveInterfaceOpPattern>(&getContext(), converter);
+
+  patterns.insert<
+      ConvertWorkgroupInfoOpPattern<IREE::HAL::InterfaceWorkgroupIDOp, 2>,
+      ConvertWorkgroupInfoOpPattern<IREE::HAL::InterfaceWorkgroupCountOp, 3>,
+      ConvertWorkgroupInfoOpPattern<IREE::HAL::InterfaceWorkgroupSizeOp, 4>>(
+      &getContext(), converter);
+
   LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp, ModuleTerminatorOp>();
 

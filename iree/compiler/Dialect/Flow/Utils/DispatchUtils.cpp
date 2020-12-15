@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -32,9 +33,10 @@ bool isOpOfKnownDialect(Operation *op) {
   // TODO(benvanik): replace with op dispatchability interface to allow dialects
   // to opt into dispatch.
   auto dialectNamespace = op->getDialect()->getNamespace();
-  return dialectNamespace == mhlo::MhloDialect::getDialectNamespace() ||
+  return dialectNamespace == FlowDialect::getDialectNamespace() ||
+         dialectNamespace == linalg::LinalgDialect::getDialectNamespace() ||
+         dialectNamespace == mhlo::MhloDialect::getDialectNamespace() ||
          dialectNamespace == mlir::StandardOpsDialect::getDialectNamespace() ||
-         dialectNamespace == FlowDialect::getDialectNamespace() ||
          dialectNamespace == ShapeDialect::getDialectNamespace();
 }
 

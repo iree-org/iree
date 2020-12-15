@@ -17,7 +17,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {

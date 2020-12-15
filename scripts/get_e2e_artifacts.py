@@ -41,8 +41,6 @@ SUITE_NAME_TO_TARGET = {
         '//integrations/tensorflow/e2e:e2e_tests',
     'mobile_bert_squad_tests':
         '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
-    'keras_tests':
-        '//integrations/tensorflow/e2e/keras:keras_tests',
     'layers_tests':
         '//integrations/tensorflow/e2e/keras/layers:layers_tests',
     'layers_dynamic_batch_tests':
@@ -54,7 +52,7 @@ SUITE_NAME_TO_TARGET = {
     'keyword_spotting_internal_streaming_tests':
         '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests',
     'imagenet_non_hermetic_tests':
-        '//integrations/tensorflow/e2e/keras:imagenet_non_hermetic_tests',
+        '//integrations/tensorflow/e2e/keras/applications:imagenet_non_hermetic_tests',
     'slim_vision_tests':
         '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests',
 }
@@ -157,6 +155,13 @@ def extract_artifacts(test_path: str, test_name: str, written_paths: Set[str],
 def main(argv):
   del argv  # Unused.
 
+  print("The bazel integrations build and tests are deprecated. This script "
+        "may be reworked in the future. For the time being refer to "
+        "https://google.github.io/iree/get-started/getting-started-python "
+        "and https://google.github.io/iree/developing-iree/e2e-benchmarking "
+        "for information on how to run TensorFlow benchmarks.")
+  exit(1)
+
   # Convert test suite shorthands to full test suite targets.
   test_suites = [SUITE_NAME_TO_TARGET[suite] for suite in FLAGS.test_suites]
 
@@ -165,7 +170,7 @@ def main(argv):
     command = ['bazel', 'test', *test_suites, '--color=yes']
     print(f'Running: `{" ".join(command)}`')
     if not FLAGS.dry_run:
-      subprocess.check_call(command)
+      subprocess.run(command, check=True)
     print()
 
   written_paths = set()

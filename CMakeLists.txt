@@ -43,14 +43,34 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
+option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
+option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
+option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+
+# Master enable for tensorflow build support.
+# Note that this is a normal CMake variable used to gate build features (not
+# a cache variable that is user-settable).
+set(IREE_ENABLE_TENSORFLOW OFF)
+if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
+   ${IREE_BUILD_TFLITE_COMPILER} OR
+   ${IREE_BUILD_XLA_COMPILER})
+  set(IREE_ENABLE_TENSORFLOW ON)
+endif()
+
+# Default python bindings to enabled for some features.
+if(${IREE_ENABLE_TENSORFLOW})
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
+else()
+  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+endif()
+
 # LINT.ThenChange(
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
@@ -123,7 +143,7 @@ endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
-  # TODO(#2645): Add DYLIB-LLVM-AOT when it doesn't require an env var
+  DYLIB-LLVM-AOT
   LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
@@ -268,6 +288,17 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
+# Configure python early if there are any features that need it.
+# Note that doing this early ensures that dependencies that make incidental
+# use of Python (such as LLVM) resolve the same version.
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_COMPILER} OR
+   ${IREE_BUILD_PYTHON_BINDINGS})
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+#-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
 # We treat the LLVM dependency specially because we support several different
 # ways to use it:
@@ -371,21 +402,27 @@ if(${IREE_ENABLE_MLIR})
 endif()
 
 #-------------------------------------------------------------------------------
-# Non-LLVM Dependencies
+# Python bindings.
 #-------------------------------------------------------------------------------
 
-# Use the FindPython functions before any of our dependencies do. See
-# https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
-# If one dependency finds Python 2 (the default),
-# any others that try to find Python 3 will fail.
-# (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
-if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(Python3 COMPONENTS Interpreter REQUIRED)
-endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   # Note: Optional because python libs can be manually specified.
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
+
+#-------------------------------------------------------------------------------
+# Bazel setup (conditional on whether features need it)
+# Depends on python configuration.
+#-------------------------------------------------------------------------------
+
+if(${IREE_ENABLE_TENSORFLOW})
+  include(configure_bazel)
+  iree_configure_bazel()
+endif()
+
+#-------------------------------------------------------------------------------
+# Other dependencies.
+#-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
@@ -429,17 +466,6 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
-endif()
-
-if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
-  # sdl2 logs are spammy - change log level while adding
-  function(include_sdl2)
-    set(CMAKE_MESSAGE_LOG_LEVEL "WARNING")
-    add_subdirectory(third_party/sdl2 EXCLUDE_FROM_ALL)
-  endfunction()
-  include_sdl2()
-
-  add_subdirectory(build_tools/third_party/dear_imgui EXCLUDE_FROM_ALL)
 endif()
 
 if(${IREE_BUILD_TESTS})
@@ -514,6 +540,10 @@ endif()
 
 if(${IREE_BUILD_EXPERIMENTAL})
   add_subdirectory(experimental)
+endif()
+
+if(${IREE_ENABLE_TENSORFLOW})
+  add_subdirectory(integrations/tensorflow)
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})

@@ -17,21 +17,20 @@
 
 Includes information on their dependency graph and GCR URL.
 
-See the README for information on how to add and update images.
+See the README for more information on how to add and update images.
 
 Example usage:
 
 Rebuild the cmake image and all images that transitively on depend on it,
-tagging them with `latest`:
-  python3 build_tools/docker/manage_images.py --build --image cmake
+tagging them with `latest` and updating all references to their sha digests:
+  python3 build_tools/docker/manage_images.py --image cmake
 
 Print out output for rebuilding the cmake image and all images that
 transitively on depend on it, but don't take side-effecting actions:
-  python3 build_tools/docker/manage_images.py --build --image cmake --dry-run
+  python3 build_tools/docker/manage_images.py --image cmake --dry-run
 
 Rebuild and push all images and update references to them in the repository:
-  python3 build_tools/docker/manage_images.py --push --images all
-  --update-references
+  python3 build_tools/docker/manage_images.py --images all
 """
 
 import argparse
@@ -41,7 +40,7 @@ import posixpath
 import re
 import subprocess
 import sys
-from typing import List, Sequence, Union
+from typing import Dict, List, Sequence, Union
 
 import utils
 
@@ -61,9 +60,15 @@ IMAGES_TO_DEPENDENCIES = {
     'cmake': ['base', 'util'],
     'cmake-android': ['cmake', 'util'],
     'cmake-python': ['cmake'],
-    'cmake-python-nvidia': ['cmake-python-vulkan'],
-    'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
     'cmake-python-vulkan': ['cmake-python', 'vulkan'],
+    'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
+    'cmake-python-nvidia': ['cmake-python-vulkan'],
+    'cmake-bazel-tensorflow': ['cmake-python', 'bazel'],
+    'cmake-bazel-tensorflow-vulkan': ['cmake-bazel-tensorflow', 'vulkan'],
+    'cmake-bazel-tensorflow-swiftshader': [
+        'cmake-bazel-tensorflow-vulkan', 'swiftshader'
+    ],
+    'cmake-bazel-tensorflow-nvidia': ['cmake-bazel-tensorflow-vulkan'],
     'rbe-toolchain': ['vulkan'],
     'swiftshader': ['cmake'],
     'util': [],
@@ -89,22 +94,6 @@ def parse_arguments():
                       required=True,
                       action='append',
                       help=f'Name of the image to build: {IMAGES_HELP}.')
-  parser.add_argument('--pull',
-                      action='store_true',
-                      help='Pull the specified image before building.')
-  parser.add_argument('--build',
-                      action='store_true',
-                      help='Build new images from the current Dockerfiles.')
-  parser.add_argument(
-      '--push',
-      action='store_true',
-      help='Push the built images to GCR. Requires gcloud authorization.')
-  parser.add_argument(
-      '--update_references',
-      '--update-references',
-      action='store_true',
-      help='Update all references to the specified images to point at the new'
-      ' digest.')
   parser.add_argument(
       '--dry_run',
       '--dry-run',
@@ -124,47 +113,34 @@ def parse_arguments():
   return args
 
 
+def _dag_dfs(input_nodes: Sequence[str],
+             node_to_child_nodes: Dict[str, Sequence[str]]) -> List[str]:
+  # Python doesn't have a builtin OrderedSet, but we don't have many images, so
+  # we just use a list.
+  ordered_nodes = []
+
+  def add_children(parent_node: str):
+    if parent_node not in ordered_nodes:
+      for child_node in node_to_child_nodes[parent_node]:
+        add_children(child_node)
+      ordered_nodes.append(parent_node)
+
+  for node in input_nodes:
+    add_children(node)
+  return ordered_nodes
+
+
 def get_ordered_images_to_process(images: Sequence[str]) -> List[str]:
-  # Python doesn't have a builtin OrderedSet, so we mimic one to the extent
-  # that we need by using 'in' before adding any elements.
-  processing_order = []
-
-  def add_dependent_images(image: str):
-    if image not in processing_order:
-      for dependent_image in IMAGES_TO_DEPENDENT_IMAGES[image]:
-        add_dependent_images(dependent_image)
-      processing_order.append(image)
-
-  for image in images:
-    add_dependent_images(image)
-
-  processing_order.reverse()
-  return processing_order
+  dependents = _dag_dfs(images, IMAGES_TO_DEPENDENT_IMAGES)
+  dependents.reverse()
+  return dependents
 
 
-def run_command(command: Sequence[str],
-                dry_run: bool = False,
-                check: bool = True,
-                capture_output: bool = False,
-                universal_newlines: bool = True,
-                **run_kwargs) -> subprocess.CompletedProcess:
-  """Thin wrapper around subprocess.run"""
-  print(f'Running: `{" ".join(command)}`')
-  if dry_run:
-    # Dummy CompletedProess with successful returncode.
-    return subprocess.CompletedProcess(command, returncode=0)
-
-  if capture_output:
-    # Hardcode support for python <= 3.6.
-    run_kwargs['stdout'] = subprocess.PIPE
-    run_kwargs['stderr'] = subprocess.PIPE
-  return subprocess.run(command,
-                        universal_newlines=universal_newlines,
-                        check=check,
-                        **run_kwargs)
+def get_dependencies(images: Sequence[str]) -> List[str]:
+  return _dag_dfs(images, IMAGES_TO_DEPENDENCIES)
 
 
-def get_repo_digest(tagged_image_url: str) -> str:
+def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
   inspect_command = [
       'docker',
       'image',
@@ -180,8 +156,12 @@ def get_repo_digest(tagged_image_url: str) -> str:
         capture_output=True,
         timeout=10)
   except subprocess.CalledProcessError as error:
-    raise RuntimeError(f'Computing the repository digest for {tagged_image_url}'
-                       ' failed. Has it been pushed to GCR?') from error
+    if dry_run:
+      return ""
+    else:
+      raise RuntimeError(
+          f'Computing the repository digest for {tagged_image_url} failed. Has '
+          'it been pushed to GCR?') from error
   _, repo_digest = completed_process.stdout.strip().split('@')
   return repo_digest
 
@@ -189,10 +169,13 @@ def get_repo_digest(tagged_image_url: str) -> str:
 def update_rbe_reference(digest: str, dry_run: bool = False):
   print('Updating WORKSPACE file for rbe-toolchain')
   digest_updates = 0
-  for line in fileinput.input(files=['WORKSPACE'], inplace=(not dry_run)):
+  for line in fileinput.input(files=['WORKSPACE'], inplace=True):
     if line.strip().startswith('digest ='):
       digest_updates += 1
-      print(re.sub(DIGEST_REGEX, digest, line), end='')
+      if dry_run:
+        print(line, end='')
+      else:
+        print(re.sub(DIGEST_REGEX, digest, line), end='')
     else:
       print(line, end='')
 
@@ -209,9 +192,9 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
 
   grep_command = ['git', 'grep', '-l', f'{image_url}@sha256']
   try:
-    completed_process = run_command(grep_command,
-                                    capture_output=True,
-                                    timeout=5)
+    completed_process = utils.run_command(grep_command,
+                                          capture_output=True,
+                                          timeout=5)
   except subprocess.CalledProcessError as error:
     if error.returncode == 1:
       print(f'Found no references to {image_url}')
@@ -221,51 +204,69 @@ def update_references(image_url: str, digest: str, dry_run: bool = False):
   # Update references in all grepped files.
   files = completed_process.stdout.split()
   print(f'Updating references in {len(files)} files: {files}')
-  for line in fileinput.input(files=files, inplace=(not dry_run)):
-    print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}', line),
-          end='')
+  if not dry_run:
+    for line in fileinput.input(files=files, inplace=True):
+      print(re.sub(f'{image_url}@{DIGEST_REGEX}', f'{image_url}@{digest}',
+                   line),
+            end='')
+
+
+def parse_prod_digests() -> Dict[str, str]:
+  image_urls_to_prod_digests = {}
+  with open(utils.PROD_DIGESTS_PATH, "r") as f:
+    for line in f:
+      image_url, digest = line.strip().split("@")
+      image_urls_to_prod_digests[image_url] = digest
+  return image_urls_to_prod_digests
 
 
 if __name__ == '__main__':
   args = parse_arguments()
 
-  if args.push:
-    # Ensure the user has the correct authorization if they try to push to GCR.
-    utils.check_gcloud_auth(dry_run=args.dry_run)
+  # Ensure the user has the correct authorization to push to GCR.
+  utils.check_gcloud_auth(dry_run=args.dry_run)
 
   images_to_process = get_ordered_images_to_process(args.images)
   print(f'Also processing dependent images. Will process: {images_to_process}')
 
+  dependencies = get_dependencies(images_to_process)
+  print(f'Pulling image dependencies: {dependencies}')
+  image_urls_to_prod_digests = parse_prod_digests()
+  for dependency in dependencies:
+    dependency_url = posixpath.join(IREE_GCR_URL, dependency)
+    # If `dependency` is a new image then it may not have a prod digest yet.
+    if dependency_url in image_urls_to_prod_digests:
+      digest = image_urls_to_prod_digests[dependency_url]
+      dependency_with_digest = f'{dependency_url}@{digest}'
+      utils.run_command(["docker", "pull", dependency_with_digest],
+                        dry_run=args.dry_run)
+
   for image in images_to_process:
-    print(f'Processing image {image}')
+    print('\n' * 5 + f'Processing image {image}')
     image_url = posixpath.join(IREE_GCR_URL, image)
-    tagged_image_url = f'{image_url}:latest'
+    tagged_image_url = f'{image_url}'
     image_path = os.path.join(DOCKER_DIR, image)
 
-    if args.pull:
-      utils.run_command(['docker', 'pull', tagged_image_url], args.dry_run)
+    utils.run_command(
+        ['docker', 'build', '--tag', tagged_image_url, image_path],
+        dry_run=args.dry_run)
 
-    if args.build:
-      utils.run_command(
-          ['docker', 'build', '--tag', tagged_image_url, image_path],
-          args.dry_run)
+    utils.run_command(['docker', 'push', tagged_image_url],
+                      dry_run=args.dry_run)
 
-    if args.push:
-      utils.run_command(['docker', 'push', tagged_image_url], args.dry_run)
+    digest = get_repo_digest(tagged_image_url, args.dry_run)
 
-    if args.update_references:
-      digest = get_repo_digest(tagged_image_url)
-
-      # Check that the image is in 'prod_digests.txt' and append it to the list
-      # in the file if it isn't. We know that the GCR digest exists at this
-      # point because 'get_repo_digest' confirms that the image has been pushed.
-      with open(utils.PROD_DIGESTS_PATH, 'r') as f:
-        in_prod_digests = f'{image_url}@' in f.read()
-      if not in_prod_digests:
+    # Check that the image is in 'prod_digests.txt' and append it to the list
+    # in the file if it isn't.
+    if image_url not in image_urls_to_prod_digests:
+      image_with_digest = f'{image_url}@{digest}'
+      print(
+          f'Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}')
+      if not args.dry_run:
         with open(utils.PROD_DIGESTS_PATH, 'a') as f:
-          f.write(f'{image_url}@{digest}\n')
+          f.write(f'{image_with_digest}\n')
 
-      # Just hardcode this oddity
-      if image == 'rbe-toolchain':
-        update_rbe_reference(digest, dry_run=args.dry_run)
-      update_references(image_url, digest, dry_run=args.dry_run)
+    # Just hardcode this oddity
+    if image == 'rbe-toolchain':
+      update_rbe_reference(digest, dry_run=args.dry_run)
+    update_references(image_url, digest, dry_run=args.dry_run)

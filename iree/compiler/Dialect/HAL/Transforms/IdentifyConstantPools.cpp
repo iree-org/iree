@@ -25,8 +25,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -255,7 +255,7 @@ class IdentifyConstantPoolsPass
     auto constValue = funcBuilder.createOrFold<IREE::HAL::ConstantPoolLoadOp>(
         variableOp.getLoc(), variableOp.type(),
         funcBuilder.getSymbolRefAttr(
-            valueOp.getParentOfType<ConstantPoolOp>().getName(),
+            valueOp->getParentOfType<ConstantPoolOp>().getName(),
             {funcBuilder.getSymbolRefAttr(valueOp)}));
     funcBuilder.create<mlir::ReturnOp>(variableOp.getLoc(), constValue);
 
@@ -291,7 +291,7 @@ class IdentifyConstantPoolsPass
     auto loadOp = builder.create<ConstantPoolLoadOp>(
         variableLoadOp.getLoc(), variableLoadOp.getType(),
         builder.getSymbolRefAttr(
-            valueOp.getParentOfType<ConstantPoolOp>().getName(),
+            valueOp->getParentOfType<ConstantPoolOp>().getName(),
             {builder.getSymbolRefAttr(valueOp)}));
     variableLoadOp.replaceAllUsesWith(loadOp.result());
     variableLoadOp.erase();

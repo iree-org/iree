@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (special Vulkan logic is needed)
-
 if(NOT ${IREE_HAL_DRIVER_VULKAN} OR NOT ${IREE_BUILD_SAMPLES})
   return()
 endif()
@@ -24,6 +22,21 @@ endif()
 # If Vulkan is not found, omit the target.
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
+  message(VERBOSE "Could not find Vulkan, disabling Vulkan GUI programs")
+  return()
+endif()
+
+# vcpkg install imgui[vulkan-binding,sdl2-binding]
+find_package(imgui CONFIG QUIET)
+if(NOT imgui_FOUND)
+  message(VERBOSE "Could not find Dear ImGui, disabling Vulkan GUI programs")
+  return()
+endif()
+
+# vcpkg install sdl2[vulkan]
+find_package(SDL2 CONFIG QUIET)
+if(NOT SDL2_FOUND)
+  message(VERBOSE "Could not find SDL2, disabling Vulkan GUI programs")
   return()
 endif()
 
@@ -35,13 +48,11 @@ iree_cc_library(
   SRCS
     "vulkan_gui_util.cc"
   DEPS
-    dear_imgui::dear_imgui
-    dear_imgui::impl_sdl
-    dear_imgui::impl_vulkan
+    imgui::imgui
     iree::base::api
     iree::base::logging
     iree::hal::vulkan::api
-    SDL2-static
+    SDL2::SDL2
     Vulkan::Vulkan
 )
 

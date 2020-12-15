@@ -718,13 +718,18 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
 // IREE Core API
 //===----------------------------------------------------------------------===//
 
+// Sprinkle this wherever to make it easier to find structs/functions that are
+// not yet stable.
+#define IREE_API_UNSTABLE
+
 // Known versions of the API that can be referenced in code.
 // Out-of-bounds values are possible in forward-versioned changes.
-typedef enum {
-  IREE_API_VERSION_0 = 0,
+enum iree_api_version_e {
+  IREE_API_VERSION_0 = 0u,
   // Always set to the latest version of the library from source.
   IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
-} iree_api_version_t;
+};
+typedef uint32_t iree_api_version_t;
 
 // Checks whether the |expected_version| of the caller matches the implemented
 // version of |out_actual_version|. Forward compatibility of the API is

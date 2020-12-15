@@ -24,7 +24,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -46,8 +46,12 @@ struct UnrollVector : public Transformation {
   OwningRewritePatternList buildRewritePatterns(
       MLIRContext *ctx, linalg::LinalgMarker m) override {
     OwningRewritePatternList vectorUnrollPatterns;
-    vectorUnrollPatterns.insert<vector::UnrollVectorPattern<VectorOpType>>(
-        ctx, vector::UnrollVectorOptions().setNativeShape(targetShape));
+    vectorUnrollPatterns.insert<vector::UnrollVectorPattern>(
+        ctx, vector::UnrollVectorOptions()
+                 .setNativeShape(targetShape)
+                 .setFilterConstraint([](Operation *op) {
+                   return success(isa<VectorOpType>(op));
+                 }));
     vector::populateVectorToVectorCanonicalizationPatterns(vectorUnrollPatterns,
                                                            ctx);
     vector::populateVectorToVectorTransformationPatterns(vectorUnrollPatterns,

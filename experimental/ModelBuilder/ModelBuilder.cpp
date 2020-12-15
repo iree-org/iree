@@ -27,8 +27,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
@@ -245,7 +245,7 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
       SymbolTable::lookupNearestSymbolFrom<FuncOp>(callerFunc, functionName);
   if (!calleeFunc) {
     OpBuilder::InsertionGuard insertGuard(builder);
-    auto module = callerFunc.getParentOfType<ModuleOp>();
+    auto module = callerFunc->getParentOfType<ModuleOp>();
     builder.setInsertionPointToStart(module.getBody());
     calleeFunc = builder.create<FuncOp>(
         module.getLoc(), functionName,

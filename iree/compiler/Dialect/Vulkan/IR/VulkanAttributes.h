@@ -17,7 +17,7 @@
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
-#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir {
 namespace iree_compiler {

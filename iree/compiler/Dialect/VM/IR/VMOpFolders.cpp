@@ -109,7 +109,7 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
     if (value.getValue() != 0) return failure();
     rewriter.replaceOpWithNewOp<T>(op, op.sym_name(), op.is_mutable(),
                                    op.type(),
-                                   llvm::to_vector<4>(op.getDialectAttrs()));
+                                   llvm::to_vector<4>(op->getDialectAttrs()));
     return success();
   }
 };
@@ -142,9 +142,9 @@ struct InlineConstGlobalLoadIntegerOp : public OpRewritePattern<LOAD_OP> {
   using OpRewritePattern<LOAD_OP>::OpRewritePattern;
   LogicalResult matchAndRewrite(LOAD_OP op,
                                 PatternRewriter &rewriter) const override {
-    auto globalAttr = op.template getAttrOfType<FlatSymbolRefAttr>("global");
+    auto globalAttr = op->template getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
-        op.template getParentOfType<VM::ModuleOp>()
+        op->template getParentOfType<VM::ModuleOp>()
             .template lookupSymbol<GLOBAL_OP>(globalAttr.getValue());
     if (!globalOp) return failure();
     if (globalOp.is_mutable()) return failure();
@@ -181,9 +181,9 @@ struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
   using OpRewritePattern<GlobalLoadRefOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(GlobalLoadRefOp op,
                                 PatternRewriter &rewriter) const override {
-    auto globalAttr = op.getAttrOfType<FlatSymbolRefAttr>("global");
+    auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
-        op.getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
+        op->getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
             globalAttr.getValue());
     if (!globalOp) return failure();
     if (globalOp.is_mutable()) return failure();
@@ -1644,7 +1644,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
     }
 
     auto *calleeOp = SymbolTable::lookupSymbolIn(
-        op.template getParentOfType<ModuleOp>(), op.callee());
+        op->template getParentOfType<ModuleOp>(), op.callee());
 
     bool hasNoSideEffects = false;
     if (calleeOp->getAttr("nosideeffects")) {

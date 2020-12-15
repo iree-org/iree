@@ -113,7 +113,7 @@ def VM_FuncOp : VM_Op<"func", [
 
     /// Returns the type of this function.
     FunctionType getType() {
-      return getAttrOfType<TypeAttr>(getTypeAttrName())
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
     }
@@ -193,7 +193,7 @@ def VM_ImportOp : VM_Op<"import", [
   let extraClassDeclaration = [{
     /// Returns the type of this function.
     FunctionType getType() {
-      return getAttrOfType<TypeAttr>(getTypeAttrName())
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
     }
@@ -2096,7 +2096,7 @@ class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
     }
   }];
 }

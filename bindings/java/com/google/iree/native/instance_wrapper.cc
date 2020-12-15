@@ -37,7 +37,8 @@ void SetupVm() {
   iree_flags_parse_checked(&argc, &aargv);
 
   // TODO(jennik): register all available drivers
-  IREE_CHECK_OK(iree_hal_vmla_driver_module_register());
+  IREE_CHECK_OK(iree_hal_vmla_driver_module_register(
+      iree_hal_driver_registry_default()));
   IREE_CHECK_OK(iree_vm_register_builtin_types());
   IREE_CHECK_OK(iree_hal_module_register_types());
   IREE_CHECK_OK(iree_tensorlist_module_register_types());

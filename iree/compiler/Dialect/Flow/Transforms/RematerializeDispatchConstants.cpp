@@ -21,9 +21,9 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
@@ -46,6 +46,8 @@ bool isSplatConstant(ConstantOp constantOp) {
     return true;
   } else if (auto value = constantOp.getValue().dyn_cast<DenseElementsAttr>()) {
     return value.isSplat();
+  } else if (constantOp.getType().isIntOrFloat()) {
+    return true;
   }
 
   // Assume anything unshaped is small. This may not always be true in custom

@@ -1,5 +1,13 @@
 # TensorFlow e2e tests
 
+<!-- TODO(meadowlark): Update this doc once the API is stable. -->
+
+> Note:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
+  refactored. The `bazel` build is deprecated. Refer to
+  https://google.github.io/iree/get-started/getting-started-python for a general
+  overview of how to build and execute the e2e tests.
+
 This is a collection of e2e tests that compile a TensorFlow model with IREE (and
 potentially TFLite), run it on multiple backends, and crosscheck the results.
 
@@ -18,7 +26,7 @@ instructions.
 If you do not have your environment setup to use IREE with Vulkan (see
 [this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
 then you can run the manual test targets with
-`--target_backends=tf,iree_vmla` (that is, by omitting
+`--target_backends=tf,iree_vmla,iree_llvmaot` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -234,8 +242,8 @@ Test targets are automatically generated for each test file and for each backend
 to check numerical correctness against TensorFlow. Tests targets that pass are
 placed into the `e2e_tests` test suite. Tests that fail on particular backends
 are recorded in lists in the `BUILD` files. For example, if
-`experimental_new_test.py` fails on the `iree_vulkan` backend then the following
-lines should be added to the `BUILD` file:
+`experimental_new_test.py` fails on the `iree_llvmaot` and `iree_vulkan`
+backend then the following lines should be added to the `BUILD` file:
 
 ```build
 LLVM_FAILING = [

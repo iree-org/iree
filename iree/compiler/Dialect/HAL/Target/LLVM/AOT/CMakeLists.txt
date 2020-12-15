@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
   return()
 endif()
 
@@ -32,6 +32,8 @@ iree_cc_library(
     LLVMARMAsmParser
     LLVMARMCodeGen
     LLVMCore
+    LLVMRISCVAsmParser
+    LLVMRISCVCodeGen
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen

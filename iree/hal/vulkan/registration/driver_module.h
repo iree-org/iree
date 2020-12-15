@@ -22,7 +22,7 @@ extern "C" {
 #endif  // __cplusplus
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_module_register();
+iree_hal_vulkan_driver_module_register(iree_hal_driver_registry_t* registry);
 
 #ifdef __cplusplus
 }  // extern "C"

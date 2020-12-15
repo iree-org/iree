@@ -19,6 +19,7 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 
 class HAL_PureOp<string mnemonic, list<OpTrait> traits = []> :
     HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
@@ -1855,7 +1856,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
-    TypeAttr:$signature
+    TypeAttr:$signature,
+    OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
 }
 
@@ -2082,6 +2084,80 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   );
 }
 
+def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current tile in the range of
+    `[0, hal.interface.workgroup.count)` along each XYZ dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = hal.interface.workgroup.id[0] : index
+    %y = hal.interface.workgroup.id[1] : index
+    %z = hal.interface.workgroup.id[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+    Matches what was passed to the `hal.command_buffer.dispatch` command (or
+    what was indirectly specified).
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = hal.interface.workgroup.count[0] : index
+    %y = hal.interface.workgroup.count[1] : index
+    %z = hal.interface.workgroup.count[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = hal.interface.workgroup.size[0] : index
+    %y = hal.interface.workgroup.size[1] : index
+    %z = hal.interface.workgroup.size[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs HAL_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
 def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   let summary = [{loads a constant value from the interface constant block}];
   let description = [{
@@ -2176,6 +2252,155 @@ def HAL_InterfaceStoreTensorOp : HAL_Op<"interface.store.tensor"> {
   }];
 }
 
+def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
+    "interface.load.tensor.tile",
+    [AttrSizedOperandSegments, OffsetSizeAndStrideOpInterface]> {
+  let summary = [{loads a tensor tile from an executable IO binding}];
+  let description = [{
+    Loads a tensor tile value from an executable IO binding at the given
+    offset/size/stride. This is a pseudo op that can be used to tie SSA tensor
+    values in the IR to the bindings that contain those tensors.
+
+    Note that because there may not be a 1:1 mapping between original tensor
+    arguments to the entry point function and the bindings in the interface the
+    backend must use the offset provided on this op to properly compute the base
+    address of the tensor data. The offset is in bytes relative to the base
+    binding address, irrespective of the type of the tensor loaded by this
+    operation.
+
+    The base_offset provided, if non-zero, will have an alignment compatible
+    with the tensor type represented. For example, a `tensor<16xf32>` will be
+    aligned on at least a 4 byte boundary.
+
+    The op follows the semantic of similar core MLIR strided subview / subtensor
+    ops where offset-list, size-list and stride-list are SSA value or constants
+    of type index.
+
+    Example:
+    ```
+      `hal.interface.load.tensor.tile` $binding `,`
+        `base_offset` `=` base_offset `,`
+        `offsets` `=` `[` offset-list `]` `,`
+        `sizes` `=` `[` size-list `]` `,`
+        `strides` `=` `[` stride-list `]` attr-dict `:` type($result)
+    ```
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$base_offset,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
+
+    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrRanks() {
+      unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
+      return {resultRank, resultRank, resultRank};
+    }
+
+    /// Special attribute names.
+    static StringRef getBindingAttrName() {
+      return "binding";
+    }
+    static ArrayRef<StringRef> getSpecialAttrNames() {
+      static SmallVector<StringRef, 5> names{getBindingAttrName()};
+      if (names.size() !=
+          1 + OffsetSizeAndStrideOpInterface::getSpecialAttrNames().size()) {
+        auto otherNames = OffsetSizeAndStrideOpInterface::getSpecialAttrNames();
+        names.append(otherNames.begin(), otherNames.end());
+      }
+      return names;
+    }
+  }];
+}
+
+def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
+    "interface.store.tensor.tile",
+    [AttrSizedOperandSegments, OffsetSizeAndStrideOpInterface]> {
+  let summary = [{stores a tensor tile in an executable IO binding}];
+  let description = [{
+    Stores a tensor value into an executable IO binding. This is a pseudo op
+    indicating that the value of the operand tensor should be stored into the
+    specified binding at the given offset/size/stride.
+
+    Note that because there may not be a 1:1 mapping between original tensor
+    arguments to the entry point function and the bindings in the interface the
+    backend must use the offset provided on this op to properly compute the base
+    address of the tensor data. The offset is in bytes relative to the base
+    binding address, irrespective of the type of the tensor loaded by this
+    operation.
+
+    The base_offset provided, if non-zero, will have an alignment compatible
+    with the tensor type represented. For example, a `tensor<16xf32>` will be
+    aligned on at least a 4 byte boundary.
+
+    The op follows the semantic of similar core MLIR strided subview / subtensor
+    ops where offset-list, size-list and stride-list are SSA value or constants
+    of type index.
+
+    Grammar:
+    ```
+      `hal.interface.store.tensor.tile` $operand $binding `,`
+        `base_offset` `=` base_offset `,`
+        `offsets` `=` `[` offset-list `]` `,`
+        `sizes` `=` `[` size-list `]` `,`
+        `strides` `=` `[` stride-list `]` attr-dict `:` type($operand)
+    ```
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$operand,
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$base_offset,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    I64ArrayAttr:$static_offsets,
+    I64ArrayAttr:$static_sizes,
+    I64ArrayAttr:$static_strides
+  );
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
+
+    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrRanks() {
+      unsigned rank = operand().getType().cast<ShapedType>().getRank();
+      return {rank, rank, rank};
+    }
+
+    /// Special attribute names.
+    static StringRef getBindingAttrName() {
+      return "binding";
+    }
+    static ArrayRef<StringRef> getSpecialAttrNames() {
+      static SmallVector<StringRef, 5> names{getBindingAttrName()};
+      if (names.size() !=
+          1 + OffsetSizeAndStrideOpInterface::getSpecialAttrNames().size()) {
+        auto otherNames = OffsetSizeAndStrideOpInterface::getSpecialAttrNames();
+        llvm::append_range(names, otherNames);
+      }
+      return names;
+    }
+  }];
+}
 //===----------------------------------------------------------------------===//
 // iree::hal::ExecutableCache
 //===----------------------------------------------------------------------===//

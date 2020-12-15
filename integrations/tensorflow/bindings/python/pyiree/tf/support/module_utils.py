@@ -14,16 +14,18 @@
 # limitations under the License.
 """Utilities for compiling 'tf.Module's"""
 
+# TODO(#4131) python>=3.7: Use postponed type annotations.
+
 import collections
 import os
 import tempfile
-from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
-from pyiree.tf import compiler
+from pyiree.compiler2 import tf as tf_compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
@@ -40,107 +42,63 @@ def _running_bazel_test() -> bool:
   return "TEST_TMPDIR" in os.environ
 
 
-def _setup_mlir_crash_reproducer(
-    function: Any,  # pytype doesn't support arbitrary Callable[*args, **kwargs]
-    artifacts_dir: str,
-    backend_id: str,
-) -> Any:  # Callable[Any, Any]
-  """Wraps `function` so that it a MLIR crash reproducer is saved if it crashes.
+def _get_tf_import_output_kwargs(artifacts_dir: str,
+                                 backend_id: str,
+                                 *,
+                                 needs_temp_saved_model_dir: bool = False):
+  """Gets output kwargs dict to pass to tf.compile() for output generation.
 
-  Writes to `artifacts_dir/reproducer__{backend}.mlir` in the case of a crash.
-
-  Args:
-    function: The callable to decorate.
-    artifacts_dir: The directory to write the reproducer to.
-    backend_id: The unique backend name to use when writting the reproducer.
-
-  Returns:
-    A function with the same API as the passed function.
-  """
-
-  def decorator(*args, **kwargs):
-    # Set up a crash reproducer for debugging.
-    if artifacts_dir is not None:
-      compiler.Context.default_crash_reproducer_path = os.path.join(
-          artifacts_dir, f"reproducer__{backend_id}.mlir")
-    try:
-      results = function(*args, **kwargs)
-    except Exception:  # pylint: disable=broad-except
-      # Disable the crash reproducer (to avoid inadvertently overwriting it).
-      if artifacts_dir is not None:
-        compiler.Context.default_crash_reproducer_path = None
-      raise
-    return results
-
-  return decorator
-
-
-def _incrementally_lower_compiler_module(
-    compiler_module: compiler.Module,
-    backend_info: "BackendInfo",
-    artifacts_dir: str,
-) -> Tuple[compiler.binding.OpaqueBlob, Union[str, None]]:
-  """Lowers a MLIR compiler module incrementally and saves its outputs.
-
-  If artifacts_dir is provided then the following artifacts will be saved:
+  When artifacts_dir is set, writes:
     tf_input.mlir:
       MLIR for the module in TF's input dialect.
     iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
     backend_id/compiled.vmfb:
       A VM FlatBuffer compiled to the target backend from the IREE MLIR above.
+    `artifacts_dir/reproducer__{backend}.mlir` in the case of a crash.
 
   Args:
-    compiler_module: A compiler.Module to lower.
-    backend_info: BackendInfo with the details for lowering compiler_module to
-      IREE.
-    artifacts_dir: An optional string pointing to where compilation artifacts
-      should be saved. No compilation artifacts will be saved if this is not
-      provided.
+    artifacts_dir: The artifacts directory.
+    backend_id: The backend id (for artifacts that are backend dependent).
+    needs_temp_saved_model_dir: Whether a temporary 'saved_model_dir' directory
+      needs to be set.
+
+  Returns:
+    A dict of output kwargs.
   """
-  if artifacts_dir is not None:
-    os.makedirs(artifacts_dir, exist_ok=True)
-    tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
-    logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
-    with open(tf_mlir_path, "w") as f:
-      f.write(compiler_module.to_asm())
+  kwargs = {}
+  backend_dir = os.path.join(artifacts_dir, backend_id)
+  os.makedirs(backend_dir, exist_ok=True)
+  kwargs["output_file"] = os.path.join(backend_dir, "compiled.vmfb")
+  if needs_temp_saved_model_dir:
+    kwargs["saved_model_dir"] = os.path.join(artifacts_dir,
+                                             "tfmodule.saved_model")
+  kwargs["save_temp_tf_input"] = os.path.join(artifacts_dir, "tf_input.mlir")
+  kwargs["save_temp_iree_input"] = os.path.join(artifacts_dir,
+                                                "iree_input.mlir")
 
-  # Manually run the passes that tf_module_to_compiler_module usually would.
-  compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
-
-  if artifacts_dir is not None:
-    iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
-    logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
-    with open(iree_mlir_path, "w") as f:
-      f.write(compiler_module.to_asm())
-
-  compiled_module = compiler_module.compile(
-      target_backends=backend_info.compiler_targets)
-
-  compiled_path = None
-  if artifacts_dir is not None:
-    backend_dir = os.path.join(artifacts_dir, backend_info.backend_id)
-    os.makedirs(backend_dir, exist_ok=True)
-    compiled_path = os.path.join(backend_dir, "compiled.vmfb")
-    logging.info("Saving compiled IREE module to: %s", compiled_path)
-    with open(compiled_path, "wb") as f:
-      f.write(compiled_module)
-  return compiled_module, compiled_path
+  # Avoid the crash reproducer under tests or if the flag is false.
+  if (FLAGS.capture_crash_reproducer):
+    kwargs["crash_reproducer_path"] = os.path.join(
+        artifacts_dir, f"reproducer__{backend_id}.mlir")
+  else:
+    logging.info("Crash reproducer suppressed")
+  logging.info(
+      "Outputting intermediate artifacts (--artifacts_dir is set):\n%s",
+      "\n".join(f"  {k}: {v}" for k, v in kwargs.items()))
+  return kwargs
 
 
 def _incrementally_compile_tf_module(
     module: Type[tf.Module],
     backend_info: "BackendInfo",
     exported_names: Sequence[str] = (),
-    artifacts_dir: str = None,
-) -> Tuple[compiler.binding.OpaqueBlob, Union[str, None]]:
+    artifacts_dir: Optional[str] = None,
+) -> Tuple[bytes, Optional[str]]:
   """Compile a TensorFlow tf.Module and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
   API that returns a module that can be called without any further steps.
-
-  See _incrementally_lower_compiler_module's docstring for details about which
-  artifacts will be saved.
 
   Args:
     module: A tf.Module.
@@ -154,22 +112,22 @@ def _incrementally_compile_tf_module(
     A compiled IREE module blob and the path to the compiled VM FlatBuffer if
     artifacts_dir is provided.
   """
+  output_kwargs = (_get_tf_import_output_kwargs(
+      artifacts_dir,
+      backend_info.backend_id,
+      needs_temp_saved_model_dir=True,
+  ) if artifacts_dir else {})
+  immediate_result = tf_compiler.compile_module(
+      module,
+      target_backends=backend_info.compiler_targets,
+      exported_names=exported_names,
+      **output_kwargs)
 
-  def _compile_module(module, backend_info, exported_names, artifacts_dir):
-    compiler_module = compiler.tf_module_to_compiler_module(module,
-                                                            exported_names,
-                                                            pass_pipeline=())
-    return _incrementally_lower_compiler_module(compiler_module, backend_info,
-                                                artifacts_dir)
-
-  # Avoid the crash reproducer under tests or if the flag is false.
-  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
-  # use the crash reproducer.
-  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
-    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
-                                                   artifacts_dir,
-                                                   backend_info.backend_id)
-  return _compile_module(module, backend_info, exported_names, artifacts_dir)
+  output_file = output_kwargs.get("output_file")
+  if output_file:
+    with open(output_file, "rb") as f:
+      immediate_result = f.read()
+  return immediate_result, output_file
 
 
 def _incrementally_compile_tf_signature_def_saved_model(
@@ -179,9 +137,6 @@ def _incrementally_compile_tf_signature_def_saved_model(
 
   The module blob this creates is not callable. See IreeCompiledModule for an
   API that returns a module that can be called without any further steps.
-
-  See _incrementally_lower_compiler_module's docstring for details about which
-  artifacts will be saved.
 
   Args:
     saved_model_dir: Directory of the saved model.
@@ -197,24 +152,21 @@ def _incrementally_compile_tf_signature_def_saved_model(
     A compiled IREE module blob and the path to the compiled VM FlatBuffer if
     artifacts_dir is provided.
   """
+  output_kwargs = (_get_tf_import_output_kwargs(
+      artifacts_dir, backend_info.backend_id) if artifacts_dir else {})
+  immediate_result = tf_compiler.compile_saved_model(
+      saved_model_dir,
+      import_type="SIGNATURE_DEF",
+      target_backends=backend_info.compiler_targets,
+      exported_names=[exported_name],
+      saved_model_tags=saved_model_tags,
+      **output_kwargs)
 
-  def _compile_module(saved_model_dir, saved_model_tags, backend_info,
-                      exported_name, artifacts_dir):
-    # Convert the tf_module into raw TF input MLIR.
-    compiler_module = compiler.tf_signature_def_saved_model_to_compiler_module(
-        saved_model_dir, saved_model_tags, [exported_name], pass_pipeline=())
-    return _incrementally_lower_compiler_module(compiler_module, backend_info,
-                                                artifacts_dir)
-
-  # Avoid the crash reproducer under tests or if the flag is false.
-  # Developers can run tests outside of the test runner (e.g. `bazel run`) to
-  # use the crash reproducer.
-  if (FLAGS.capture_crash_reproducer and not _running_bazel_test()):
-    _compile_module = _setup_mlir_crash_reproducer(_compile_module,
-                                                   artifacts_dir,
-                                                   backend_info.backend_id)
-  return _compile_module(saved_model_dir, saved_model_tags, backend_info,
-                         exported_name, artifacts_dir)
+  output_file = output_kwargs.get("output_file")
+  if output_file:
+    with open(output_file, "rb") as f:
+      immediate_result = f.read()
+  return immediate_result, output_file
 
 
 class _FunctionWrapper(object):
@@ -923,6 +875,11 @@ class BackendInfo:
           "driver": "vulkan",
           "compiler_targets": ["vulkan-*"]
       },
+      "iree_llvmaot": {
+          "compiled_module_class": IreeCompiledModule,
+          "driver": "dylib",
+          "compiler_targets": ["dylib-llvm-aot"]
+      },
   }
 
   def __init__(self, backend_name: str, backend_id: str = None):
@@ -930,13 +887,13 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'tflite', 'iree_vmla', 'iree_vulkan'.
+        'tf', 'tflite', 'iree_vmla', 'iree_vulkan', 'iree_llvmaot'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
       KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmla',
-        'iree_vulkan'].
+        'iree_vulkan', 'iree_llvmaot'].
       ValueError: if backend_id doesn't start with backend_name.
     """
     if backend_name not in self._name_to_info:

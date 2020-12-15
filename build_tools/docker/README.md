@@ -4,6 +4,8 @@ This directory contains the Dockerfiles that specify the container images used
 for IREE. Images are uploaded to
 [Google Container Registry (GCR)](https://cloud.google.com/container-registry).
 
+## Running Images Locally
+
 To build an image, use `docker build`, e.g.:
 
 ```shell
@@ -14,6 +16,12 @@ To explore an image interactively, use `docker run`, e.g.
 
 ```shell
 docker run --interactive --tty --rm cmake
+```
+
+Production versions of the images can be downloaded from GCR:
+
+```shell
+docker pull gcr.io/iree-oss/cmake:prod
 ```
 
 You can find more information in the
@@ -37,57 +45,43 @@ dependencies based on these image names.
 
 We use a helper python script to manage the Docker image deployment. It lists
 all images and their dependencies and manages their canonical registry location.
-When creating a new image, add it to this mapping. To build an image and all
-images it depends on:
+This script pushes images to GCR which requires the `Storage Admin` role in the
+`iree-oss` GCP project.
+
+When creating a new image, add it to the mapping in this script. To build an
+image and all images it depends on as well as pushing them to GCR and updating
+all references to the image digest.
 
 ```shell
-python3 build_tools/docker/manage_images.py --build --image cmake
+python3 build_tools/docker/manage_images.py --image cmake
 ```
 
-To build multiple images
+For multiple images
 
 ```shell
-python3 build_tools/docker/manage_images.py --build --image cmake --image bazel
+python3 build_tools/docker/manage_images.py --image cmake --image bazel
 ```
 
-There is also the special option `--image all` to build all registered images.
-
-Pushing images to GCR requires the `Storage Admin` role in the `iree-oss` GCP
-project. To push these images to GCR with the `latest` tag:
+There is also the special option `--image all` for all registered images.
 
 ```shell
-python3 build_tools/docker/manage_images.py --image cmake --push
+python3 build_tools/docker/manage_images.py --image all
 ```
-
-Kokoro build scripts and RBE configuration refer to images by their repository
-digest. You can update references to the digest:
-
-```shell
-python3 build_tools/docker/manage_images.py --images all --tag latest --update_references
-```
-
-This requires that the tagged image have a repository digest, which means it was
-pushed to or pulled from GCR.
 
 ## Adding or Updating an Image
-
-If you have worked with the `docker` images before, it is prudent to follow the
-steps in the "Debugging" section below before continuing.
 
 ### Part 1. Local Changes
 
 1. Update the `Dockerfile` for the image that you want to modify or add. If
    you're adding a new image, or updating the dependencies between images, be
-   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well.
+   sure to update `IMAGES_TO_DEPENDENCIES` in `manage_images.py` as well. If
+   you are adding new images, it is best add them via `git add` before
+   proceeding.
 2. Build the image, push the image to GCR and update all references to the image
    with the new GCR digest:
 
     ```shell
-    python3 build_tools/docker/manage_images.py \
-      --image "${IMAGE?}" --build \
-      --tag latest \
-      --push \
-      --update_references
+    python3 build_tools/docker/manage_images.py --image "${IMAGE?}"
     ```
 
 3. Test that the changes behave as expected locally and iterate on the steps
@@ -116,25 +110,3 @@ modify the `docker` images.
     ```shell
     python3 build_tools/docker/manage_prod.py
     ```
-
-## Debugging
-
-Sometimes old versions of the `:latest` images can be stored locally and produce
-unexpected behaviors. The following commands will download all of the prod
-images and then update the images tagged with `:latest` on your machine (and on
-GCR).
-
-```shell
-# Pull all images that should have :prod tags. (They won't if someone ignores
-# step 6 above, but the images that this command pulls are correct regardless).
-python3 build_tools/docker/manage_prod.py --pull_only
-
-# Update the :latest images to match the :prod images.
-# If you have a clean workspace this shouldn't require building anything as
-# everything should be cache hits from the :prod images downloaded above.
-python3 build_tools/docker/manage_images.py \
-  --images all --build \
-  --tag latest \
-  --push \
-  --update_references
-```

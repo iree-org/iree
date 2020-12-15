@@ -148,7 +148,8 @@ Status RunModuleAndUpdateImGuiWindow(
 
 int iree::IreeMain(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
-  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register());
+  IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
+      iree_hal_driver_registry_default()));
 
   // --------------------------------------------------------------------------
   // Create a window.
@@ -393,10 +394,10 @@ int iree::IreeMain(int argc, char** argv) {
     if (g_SwapChainRebuild) {
       g_SwapChainRebuild = false;
       ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
-      ImGui_ImplVulkanH_CreateWindow(g_Instance, g_PhysicalDevice, g_Device,
-                                     &g_MainWindowData, g_QueueFamily,
-                                     g_Allocator, g_SwapChainResizeWidth,
-                                     g_SwapChainResizeHeight, g_MinImageCount);
+      ImGui_ImplVulkanH_CreateOrResizeWindow(
+          g_Instance, g_PhysicalDevice, g_Device, &g_MainWindowData,
+          g_QueueFamily, g_Allocator, g_SwapChainResizeWidth,
+          g_SwapChainResizeHeight, g_MinImageCount);
       g_MainWindowData.FrameIndex = 0;
     }
 

@@ -107,3 +107,11 @@ func @compareI64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) 
 ^bb2(%4 : i1, %5 : tensor<i64>):
   return %4, %5 : i1, tensor<i64>
 }
+
+// -----
+
+func @tensor(%A: tensor<2x3xf32>, %B: tensor<3x4xf32>, %C: tensor<2x4xf32>)  -> tensor<2x4xf32> attributes { iree.module.export } {
+  %E = linalg.matmul ins(%A, %B: tensor<2x3xf32>, tensor<3x4xf32>)
+                    init(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
+  return %E : tensor<2x4xf32>
+}

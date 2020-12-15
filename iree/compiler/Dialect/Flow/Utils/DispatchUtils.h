@@ -21,7 +21,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/IR/Block.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"

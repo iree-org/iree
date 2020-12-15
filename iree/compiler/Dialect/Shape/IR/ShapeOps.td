@@ -264,7 +264,8 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
       return shape().getType().cast<RankedShapeType>();
     }
     unsigned getIndex() {
-      return getAttrOfType<IntegerAttr>("index").getValue().getZExtValue();
+      auto index = getOperation()->getAttrOfType<IntegerAttr>("index");
+      return index.getValue().getZExtValue();
     }
   }];
   let hasFolder = 1;

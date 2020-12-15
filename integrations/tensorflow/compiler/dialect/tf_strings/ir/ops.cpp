@@ -20,7 +20,7 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 

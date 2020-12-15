@@ -29,7 +29,6 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::hal::api
-    iree::hal::driver_registry
     iree::hal::vulkan
     iree::hal::vulkan::utils
   DEFINES

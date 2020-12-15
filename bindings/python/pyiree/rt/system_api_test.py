@@ -20,13 +20,12 @@ import re
 from absl import logging
 from absl.testing import absltest
 import numpy as np
-from pyiree import compiler
+from pyiree import compiler2 as compiler
 from pyiree import rt
 
 
 def create_simple_mul_module():
-  ctx = compiler.Context()
-  input_module = ctx.parse_asm("""
+  binary = compiler.compile_str("""
   module @arithmetic {
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
@@ -34,8 +33,8 @@ def create_simple_mul_module():
         return %0 : tensor<4xf32>
     }
   }
-  """)
-  binary = input_module.compile()
+  """,
+                                target_backends=["vulkan-spirv"])
   m = rt.VmModule.from_flatbuffer(binary)
   return m
 

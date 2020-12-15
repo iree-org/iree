@@ -123,10 +123,8 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
-# TODO(ataei): Enable dylib-llvm-aot tests.
-# See: https://github.com/google/iree/issues/2645
 iree_check_single_backend_test_suite(
-    name = "check_llvm-ir_llvm",
+    name = "check_dylib-llvm-aot_dylib",
     srcs = [
         "abs.mlir",
         "add.mlir",
@@ -171,14 +169,14 @@ iree_check_single_backend_test_suite(
         "transpose.mlir",
         "while.mlir",
     ],
-    driver = "llvm",
-    target_backend = "llvm-ir",
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
 )
 
 test_suite(
     name = "check",
     tests = [
-        ":check_llvm-ir_llvm",
+        ":check_dylib-llvm-aot_dylib",
         ":check_metal-spirv_metal",
         ":check_vmla_vmla",
         ":check_vulkan-spirv_vulkan",

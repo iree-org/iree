@@ -56,3 +56,17 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-spirv-enable-memref-vectorization"
 )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan_vectorized_conv
+  SRCS
+    "vectorized_conv.mlir"
+  TARGET_BACKEND
+    vulkan-spirv
+  DRIVER
+    vulkan
+  COMPILER_FLAGS
+    "-iree-spirv-enable-vectorization"
+    "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+)

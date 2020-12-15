@@ -17,17 +17,19 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -277,27 +279,45 @@ static LogicalResult verifyVariableStoreIndirectOp(
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
 
+/// Inlines operation |op| into the |dispatchRegionOp| by making all operands,
+/// as well as values caputred implicitly by the regions of the operation, that
+/// are outside the dispatch region operands of the dispatch region as well.
+static Operation *inlineOpIntoDispatchRegion(OpBuilder &builder,
+                                             DispatchRegionOp dispatchRegionOp,
+                                             Operation *op,
+                                             BlockAndValueMapping &map) {
+  llvm::SetVector<Value> capturedInputs(op->getOperands().begin(),
+                                        op->getOperands().end());
+  getUsedValuesDefinedAbove(op->getRegions(), capturedInputs);
+  Block *block = builder.getInsertionBlock();
+  for (Value capturedInput : capturedInputs) {
+    if (map.contains(capturedInput)) continue;
+    dispatchRegionOp.getOperation()->insertOperands(
+        dispatchRegionOp.getOperation()->getNumOperands(), {capturedInput});
+    Value newBlockArgument = block->addArgument(capturedInput.getType());
+    map.map(capturedInput, newBlockArgument);
+  }
+
+  return builder.clone(*op, map);
+}
+
 llvm::Optional<std::pair<DispatchRegionOp, Operation *>>
 DispatchRegionOp::formFromAnchorOp(Value workload, Operation *anchorOp,
                                    OpBuilder &builder) {
   builder.setInsertionPoint(anchorOp);
   auto loc = anchorOp->getLoc();
   // Map anchor into new dispatch region.
-  llvm::SmallVector<Value, 4> capturedInputs(anchorOp->getOperands());
   auto drOp = builder.create<DispatchRegionOp>(
       loc, llvm::to_vector<1>(anchorOp->getResultTypes()), workload,
-      capturedInputs);
+      ArrayRef<Value>());
   auto *drBlock = new Block();
   drOp.body().push_back(drBlock);
   BlockAndValueMapping mapping;
-  for (Value capturedInput : capturedInputs) {
-    auto blockArg = drBlock->addArgument(capturedInput.getType());
-    mapping.map(capturedInput, blockArg);
-  }
-
-  // Create new body.
   builder.setInsertionPointToEnd(drBlock);
-  auto *newAnchorOp = builder.clone(*anchorOp, mapping);
+  Operation *newAnchorOp =
+      inlineOpIntoDispatchRegion(builder, drOp, anchorOp, mapping);
+
+  // Insert terminator
   builder.create<IREE::Flow::ReturnOp>(loc, newAnchorOp->getResults());
 
   // Replace anchor uses with region result.
@@ -366,16 +386,8 @@ Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,
     origOpResultValues.push_back(mapping.lookupOrNull(result));
   }
 
-  // Add arguments for any op arguments that need to be captured.
-  for (Value newArgument : origOp->getOperands()) {
-    if (mapping.contains(newArgument)) continue;
-    getOperation()->insertOperands(getNumOperands(), {newArgument});
-    Value newBlockArgument = block.addArgument(newArgument.getType());
-    mapping.map(newArgument, newBlockArgument);
-  }
-
-  // Clone the op.
-  Operation *inlinedOp = builder.clone(*origOp, mapping);
+  Operation *inlinedOp =
+      inlineOpIntoDispatchRegion(builder, *this, origOp, mapping);
 
   // Replace any results from the orig with results from the clone.
   for (unsigned i = 0, e = origOp->getNumResults(); i < e; ++i) {
@@ -636,7 +648,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operands);
   // Construct Executable::Entry nested reference.
   StringRef executableOpSymName =
-      entryPoint.getParentOp()
+      entryPoint->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
   state.addAttribute(

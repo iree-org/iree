@@ -16,7 +16,7 @@
 
 #include <vector>
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

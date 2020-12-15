@@ -27,7 +27,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -169,7 +169,7 @@ class VMLATargetBackend final : public TargetBackend {
                   entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                   builder.getI32IntegerAttr(nextEntryPointOrdinal++),
                   builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
-                  entryPointOp.signatureAttr());
+                  entryPointOp.signatureAttr(), ArrayAttr{});
 
           // Add to replacement table for fixing up dispatch calls referencing
           // this entry point.

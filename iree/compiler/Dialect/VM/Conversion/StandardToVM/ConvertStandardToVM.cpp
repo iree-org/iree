@@ -21,9 +21,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -39,7 +38,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
-    if (!srcOp.getParentOp() || !isa<ModuleOp>(srcOp.getParentOp())) {
+    if (!srcOp->getParentOp() || !isa<ModuleOp>(srcOp->getParentOp())) {
       return failure();
     }
 
@@ -68,7 +67,7 @@ class ModuleTerminatorOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module's terminator.
     // This mechanism can only support rewriting non top-level modules.
-    if (!isa<IREE::VM::ModuleOp>(srcOp.getParentOp())) {
+    if (!isa<IREE::VM::ModuleOp>(srcOp->getParentOp())) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::VM::ModuleTerminatorOp>(srcOp);

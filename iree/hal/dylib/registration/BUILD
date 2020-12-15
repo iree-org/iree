@@ -40,7 +40,6 @@ cc_library(
         "//iree/base:flags",
         "//iree/base:status",
         "//iree/hal:api",
-        "//iree/hal:driver_registry",
         "//iree/hal/dylib",
     ],
 )

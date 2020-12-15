@@ -19,8 +19,8 @@
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -37,7 +37,7 @@ namespace {
 struct LinalgTileAndDistributePass
     : public PassWrapper<LinalgTileAndDistributePass, OperationPass<ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, IREEDialect, AffineDialect,
+    registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect, AffineDialect,
                     scf::SCFDialect>();
   }
   LinalgTileAndDistributePass() = default;
@@ -128,7 +128,7 @@ Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
   // aligns with the semantics of this memory which is available at the entry of
   // the function.
   OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  FuncOp funcOp = subview->getParentOfType<FuncOp>();
   if (!funcOp) {
     subview.emitError("expected op to be within std.func");
     return llvm::None;
@@ -155,16 +155,16 @@ void LinalgTileAndDistributePass::runOnOperation() {
 
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-        Type indexType = builder.getIndexType();
         auto numParallelDims = parallelLoopRanges.size();
-        SmallVector<linalg::ProcInfo, 2> procInfo(numParallelDims);
-        for (int dim = 0; dim < numParallelDims; ++dim) {
-          std::array<StringRef, 3> dimAttr{"x", "y", "z"};
-          StringAttr attr =
-              builder.getStringAttr(dimAttr[std::min<unsigned>(dim, 3)]);
+        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+        for (size_t dim = 0;
+             dim < std::min(numParallelDims, static_cast<size_t>(3)); ++dim) {
           procInfo[numParallelDims - dim - 1] = {
-              builder.create<IREE::WorkgroupIdOp>(loc, indexType, attr),
-              builder.create<IREE::WorkgroupSizeOp>(loc, indexType, attr)};
+              builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
+                  loc, builder.getIndexType(), APInt(64, dim)),
+              builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
+                  loc, builder.getIndexType(), APInt(64, dim)),
+          };
         }
         return procInfo;
       },

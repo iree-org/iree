@@ -26,8 +26,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -149,7 +149,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
                                     clonedFuncOp.getName(), thunkFuncType);
   clonedFuncOp.setName((clonedFuncOp.getName() + "_impl").str());
   clonedFuncOp.setPrivate();
-  clonedFuncOp.getParentRegion()->getBlocks().front().push_front(thunkFuncOp);
+  clonedFuncOp->getParentRegion()->getBlocks().front().push_front(thunkFuncOp);
 
   // For now we only support tensor types, so bindings are in order.
   // In the future we will want to provide N:M mappings (as well as the
@@ -277,7 +277,7 @@ static LogicalResult declareEntryPointOps(
             builder.getStringAttr(thunkFuncOp->getName()),
             builder.getI32IntegerAttr(nextOrdinal++),
             builder.getSymbolRefAttr(interfaceOp),
-            TypeAttr::get(sourceFuncOp.getType()));
+            TypeAttr::get(sourceFuncOp.getType()), ArrayAttr{});
       }
     }
 

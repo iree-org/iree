@@ -34,9 +34,9 @@
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -293,6 +293,44 @@ class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
   }
 };
 
+// Lower elementwise operation from N-D vector to 1-D vectors that can be
+// natively supported.
+class ElementwiseLowering : public RewritePattern {
+ public:
+  ElementwiseLowering(MLIRContext *context)
+      : RewritePattern(0, MatchAnyOpTypeTag()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    if (!op->hasTrait<OpTrait::ElementwiseMappable>() ||
+        op->getNumResults() != 1)
+      return failure();
+    auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>();
+    if (!vecType || vecType.getRank() == 1) return failure();
+
+    SmallVector<Value, 4> newOperands;
+    for (Value operand : op->getOperands()) {
+      if (auto opVecType = operand.getType().dyn_cast<VectorType>()) {
+        auto newType = VectorType::get({opVecType.getNumElements()},
+                                       opVecType.getElementType());
+        newOperands.push_back(rewriter.create<vector::ShapeCastOp>(
+            op->getLoc(), newType, operand));
+      } else {
+        newOperands.push_back(operand);
+      }
+    }
+    OperationState state(op->getLoc(), op->getName());
+    state.addAttributes(op->getAttrs());
+    state.addOperands(newOperands);
+    state.addTypes({VectorType::get({vecType.getNumElements()},
+                                    vecType.getElementType())});
+    Operation *newOp = rewriter.createOperation(state);
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, vecType,
+                                                     newOp->getResult(0));
+    return success();
+  }
+};
+
 // Lower ExtractStridedSliceOp to an ExtractOp instruction that can be natively
 // converted to SPIR-V. Add a BroadcastOp to keep the type consistent, we expect
 // the Broadcast to be removed by canonicalization.
@@ -325,7 +363,8 @@ void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
                                             MLIRContext *context) {
   OwningRewritePatternList patterns;
   patterns.insert<VectorContractLowering, VectorTransferReadToLoad,
-                  VectorTransferWriteToStore, ExtractStridedLowering>(context);
+                  VectorTransferWriteToStore, ExtractStridedLowering,
+                  ElementwiseLowering>(context);
   applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 

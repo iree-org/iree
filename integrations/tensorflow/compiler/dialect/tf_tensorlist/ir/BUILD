@@ -60,10 +60,8 @@ cc_library(
     deps = [
         ":ir",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_flow_to_hal",
-        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//mlir:IR",
     ],
-    alwayslink = 1,
 )
 
 gentbl(

@@ -48,6 +48,7 @@ cc_library(
     ],
     deps = [
         "//iree/base:signature_mangle",
+        "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/Conversion",
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
@@ -61,6 +62,7 @@ cc_library(
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:ShapeTransforms",

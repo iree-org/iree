@@ -26,7 +26,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Region.h"
@@ -67,7 +67,7 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
   // aligns with the semantics of this memory which is available at the entry of
   // the function.
   OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  FuncOp funcOp = subview->getParentOfType<FuncOp>();
   if (!funcOp) {
     subview.emitError("expected op to be within std.func");
     return llvm::None;

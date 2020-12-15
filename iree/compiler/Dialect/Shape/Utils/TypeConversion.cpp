@@ -18,8 +18,8 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

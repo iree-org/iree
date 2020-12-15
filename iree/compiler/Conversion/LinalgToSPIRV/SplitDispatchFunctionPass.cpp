@@ -44,7 +44,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -81,9 +81,15 @@ static bool isFusableWithCurrentOpsList(
       dependenceGraph.hasDependenceFrom(srcOp, dstOp, DependenceTy)) \
     return true;
 
+    ADD_FUSABLE_PAIR(linalg::BatchMatmulOp, linalg::GenericOp,
+                     linalg::LinalgDependenceGraph::DependenceType::RAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::BatchMatmulOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::BatchMatmulOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
@@ -232,7 +238,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   }
   if (fusedOpsList.size() <= 1) return success();
 
-  ModuleOp moduleOp = cast<ModuleOp>(oldFn.getParentOp());
+  ModuleOp moduleOp = cast<ModuleOp>(oldFn->getParentOp());
   Block &oldFnBlock = oldFn.getBlocks().front();
   Location loc = oldFn.getLoc();
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
 
 module attributes {
   spv.target_env =
@@ -515,3 +515,41 @@ module attributes {
 //  CHECK-SAME:       )
 //  CHECK-SAME:     outs(%[[SV_RET0]]
 //  CHECK-SAME:       )
+
+// -----
+
+module attributes {
+  spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
+}  {
+  func @conv_tiled_and_vectorized() attributes {hal.num_workgroups_fn = @get_num_workgroups} {
+    %cst = constant 0.000000e+00 : f32
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x112x112x32xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x225x225x16xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x16x32xf32>
+    linalg.fill(%0, %cst) : memref<1x112x112x32xf32>, f32
+    linalg.conv(%2, %1, %0) {dilations = [1, 1], strides = [2, 2]} : memref<3x3x16x32xf32>, memref<1x225x225x16xf32>, memref<1x112x112x32xf32>
+    return
+  }
+
+  func private @get_num_workgroups(!shapex.ranked_shape<[1,225,225,16]>, !shapex.ranked_shape<[3,3,16,32]>, !shapex.ranked_shape<[1,112,112,32]>) -> (index, index, index)
+
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @conv_tiled_and_vectorized()
+
+// CHECK-COUNT-4: vector.transfer_read
+
+// check tiling loop along filter height/width and input channel
+// CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK:     scf.for %{{.*}} = %c0 to %c16 step %c4
+
+// CHECK-COUNT-16: vector.contract
+
+// CHECK-COUNT-3: scf.yield
+// CHECK-COUNT-4: vector.transfer_write

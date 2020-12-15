@@ -22,9 +22,11 @@ set -o pipefail
 BASE_REF="${1:-main}"
 
 declare -a excluded_files_patterns=(
-  "^.gitmodules$"
+  "^\.gitmodules$"
   "/third_party/"
   "^third_party/"
+  "\.pb$"
+  "\.fb$"
 )
 
 # Join on |

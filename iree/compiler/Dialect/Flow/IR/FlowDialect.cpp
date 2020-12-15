@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Transforms/FoldUtils.h"
@@ -50,6 +51,13 @@ FlowDialect::FlowDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
       >();
+}
+
+Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                            Type type, Location loc) {
+  if (ConstantOp::isBuildableWith(value, type))
+    return builder.create<ConstantOp>(loc, type, value);
+  return nullptr;
 }
 
 }  // namespace Flow

@@ -59,11 +59,7 @@ cp integrations/tensorflow/e2e/README.md \
 # Update op_coverage.md
 scripts/update_op_coverage.py ${BUILD_DIR}
 
-# Update e2e_coverage.md
-PYTHON_BIN=`which python3` scripts/update_e2e_coverage.py ${BUILD_DIR}
-
 # Generate IR conversion flow examples
-
 build_one_example() {
   example=$1
   target=$2
@@ -116,7 +112,7 @@ iree-opt -iree-transformation-pipeline \\
 
 mkdir -p ${BUILD_DIR}/doc/ir_examples
 
-build_one_example iree/samples/ops/mhlo-dot.mlir llvm-ir
+build_one_example iree/samples/ops/mhlo-dot.mlir dylib-llvm-aot
 build_one_example iree/samples/ops/mhlo-dot.mlir vmla
 build_one_example iree/samples/ops/mhlo-dot.mlir vulkan-spirv
 build_one_example iree/samples/ops/dynamic-mhlo-dot.mlir vmla

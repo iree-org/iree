@@ -29,19 +29,23 @@ package(
 
 cc_library(
     name = "api",
-    srcs = ["api.cc"],
+    srcs = [
+        "api.c",
+        "api.cc",
+    ],
     hdrs = [
         "api.h",
         "api_detail.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":driver_registry",
         ":hal",
         ":heap_buffer",
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:ref_ptr",
+        "//iree/base:synchronization",
+        "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/hal/host:host_local_allocator",
         "@com_google_absl//absl/container:inlined_vector",
@@ -176,19 +180,6 @@ cc_library(
         "//iree/base:tracing",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "driver_registry",
-    srcs = ["driver_registry.cc"],
-    hdrs = ["driver_registry.h"],
-    deps = [
-        ":hal",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
     ],
 )
 

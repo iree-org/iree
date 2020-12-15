@@ -22,7 +22,8 @@
 # own toolchains.
 
 ######################## Install Swiftshader ###################################
-FROM ubuntu:16.04 AS install-swiftshader
+# Ubuntu 16.04
+FROM ubuntu@sha256:3355b6e4ba1b12071ba5fe9742042a2f10b257c908fbdfac81912a16eb463879 AS install-swiftshader
 WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y wget
@@ -43,7 +44,7 @@ RUN apt-get update && apt-get install -y \
 
 # This commit fixed support for the max version of libstdc++6 available through
 # Ubuntu 16.04 apt.
-ARG SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
+ARG SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
 
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
@@ -82,7 +83,7 @@ RUN apt-get update \
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-COPY --from=gcr.io/iree-oss/vulkan /opt/vulkan-sdk/ /opt/vulkan-sdk/
+COPY --from=gcr.io/iree-oss/vulkan@sha256:5812ee64806a7f3df0739ccf0930c27cabce346901488eceb1ee66c9c0a5ae96 /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
 

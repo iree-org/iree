@@ -24,7 +24,8 @@ namespace iree {
 namespace python {
 
 PYBIND11_MODULE(binding, m) {
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
 
   m.doc() = "IREE Binding Backend Helpers";
   SetupFunctionAbiBindings(m);

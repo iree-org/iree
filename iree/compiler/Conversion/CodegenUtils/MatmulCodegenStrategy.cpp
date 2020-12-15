@@ -37,11 +37,11 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
@@ -64,7 +64,7 @@ static void hoistRedundantCopies(FuncOp func) {
   while (changed) {
     changed = false;
     func.walk([&](linalg::FillOp op) {
-      auto loop = op.getParentOfType<scf::ForOp>();
+      auto loop = op->getParentOfType<scf::ForOp>();
       if (!loop) return;
 
       for (auto operand : op.getOperands())
@@ -76,7 +76,7 @@ static void hoistRedundantCopies(FuncOp func) {
     });
 
     func.walk([&](linalg::CopyOp op) {
-      auto loop = op.getParentOfType<scf::ForOp>();
+      auto loop = op->getParentOfType<scf::ForOp>();
       if (!loop) return;
 
       for (auto operand : op.getOperands())

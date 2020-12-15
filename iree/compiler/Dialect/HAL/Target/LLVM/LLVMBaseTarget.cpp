@@ -80,7 +80,7 @@ void LLVMBaseTargetBackend::buildTranslationPassPipeline(
   buildLLVMTransformPassPipeline(passManager);
 }
 
-static FileLineColLoc findFirstFileLoc(Location baseLoc) {
+static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
@@ -89,15 +89,19 @@ static FileLineColLoc findFirstFileLoc(Location baseLoc) {
   } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
     return loc;
   }
-  return FileLineColLoc{};
+  return llvm::None;
 }
 
 static std::string guessModuleName(mlir::ModuleOp moduleOp) {
   std::string moduleName =
       moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
   if (!moduleName.empty()) return moduleName;
-  FileLineColLoc loc = findFirstFileLoc(moduleOp.getLoc());
-  return llvm::sys::path::stem(loc.getFilename()).str();
+  auto loc = findFirstFileLoc(moduleOp.getLoc());
+  if (loc.hasValue()) {
+    return llvm::sys::path::stem(loc.getValue().getFilename()).str();
+  } else {
+    return "llvm_module";
+  }
 }
 
 LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
@@ -161,7 +165,7 @@ LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getI32IntegerAttr(nextEntryPointOrdinal++),
                 builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
-                entryPointOp.signatureAttr());
+                entryPointOp.signatureAttr(), ArrayAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.
@@ -216,8 +220,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
 
   SmallVector<LLVM::LLVMFuncOp, 2> entryPointFns;
   for (LLVM::LLVMFuncOp funcOp : llvmIRModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(funcOp) ==
-        SymbolTable::Visibility::Public) {
+    if (funcOp.isPublic()) {
       entryPointFns.push_back(funcOp);
     }
   }
@@ -243,7 +246,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
     }
     std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
     FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-        funcOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+        funcOp->getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
     if (!numWorkgroupsFn) {
       return funcOp.emitError("unable to find function ")
              << numWorkgroupsFnAttr

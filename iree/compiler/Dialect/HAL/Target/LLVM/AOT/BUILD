@@ -20,10 +20,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(scotttodd): filter on IREE_TARGET_BACKEND_DYLIB-LLVM-AOT when it exists
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
   return()
 endif()
 """,
@@ -51,6 +50,8 @@ cc_library(
         "@llvm-project//llvm:ARMAsmParser",
         "@llvm-project//llvm:ARMCodeGen",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:RISCVAsmParser",
+        "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",

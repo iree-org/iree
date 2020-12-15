@@ -23,9 +23,9 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
@@ -201,10 +201,10 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   // that substituting library calls is easier.
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
-      // A root only op is mergable.
+      // A leaf only op is mergable.
       if ((OpDispatchPolicy::isUnsupportedFusionOp(&op) ||
            OpDispatchPolicy::isFusableWithConsumersOnly(&op)) &&
-          !OpDispatchPolicy::isRootOnlyOp(&op)) {
+          !OpDispatchPolicy::isLeafOnlyOp(&op)) {
         return false;
       }
     }
@@ -212,9 +212,9 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   return regionOp.body().getBlocks().size() == 1;
 }
 
-// Returns true if rhs has ops that can only be root op and will lose the
+// Returns true if rhs has ops that can only be leaf op and will lose the
 // characteristic if merge two dispatch regions.
-bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
+bool rhsHasLeafOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
   auto &rhsBlock = rhs.body().front();
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
@@ -223,7 +223,7 @@ bool rhsHasRootOnlyOp(DispatchRegionOp &lhs, DispatchRegionOp &rhs) {
          ++lhsResultIdx) {
       if (rhsArgs[rhsOpIdx] != lhs.getResult(lhsResultIdx)) continue;
       for (auto *user : rhsBlock.getArgument(rhsOpIdx).getUsers()) {
-        if (OpDispatchPolicy::isRootOnlyOp(user)) return true;
+        if (OpDispatchPolicy::isLeafOnlyOp(user)) return true;
       }
     }
   }
@@ -364,8 +364,8 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
         LLVM_DEBUG(llvm::dbgs()
                    << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
       }
-      if (rhsHasRootOnlyOp(lhs, rhs)) {
-        LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS ROOT OP-\n");
+      if (rhsHasLeafOnlyOp(lhs, rhs)) {
+        LLVM_DEBUG(llvm::dbgs() << "   -RHS REGION HAS LEAF OP-\n");
         continue;
       }
       mergableRegions[i] = mergeDispatchRegions(lhs, rhs);

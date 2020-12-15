@@ -14,48 +14,96 @@
 
 #include "integrations/tensorflow/compiler/Passes.h"
 
-#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
-#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
+#include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace TF {
+
+void registerAllDialects(mlir::DialectRegistry &registry) {
+  registry.insert<tf_tensorlist::TFTensorListDialect,
+                  tf_strings::TFStringsDialect>();
+}
 
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
-void createIreeTfImportPipeline(OpPassManager &pm) {
-  ////////////////////////////////////////////////////////////////////////////
+void buildTFImportPassPipeline(OpPassManager &pm) {
+  //----------------------------------------------------------------------------
+  // Clean up tf_executor and extraneous unused functions.
+  //----------------------------------------------------------------------------
+  pm.addPass(createSymbolDCEPass());
+  pm.addPass(tf_executor::CreateTFExecutorGraphPruningPass());
+  pm.addPass(::mlir::TF::CreateGuaranteeAllFuncsOneUsePass());
+  ::mlir::TF::CreateTFStandardPipeline(pm,
+                                       ::mlir::TF::StandardPipelineOptions());
+  pm.addPass(::mlir::TF::CreateDeviceIndexSelectorPass());
+
+  //----------------------------------------------------------------------------
+  // Try to get the IR in good condition.
+  //----------------------------------------------------------------------------
+  pm.addPass(createInlinerPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(TFDevice::CreateDecomposeResourceOpsPass());
+  pm.addPass(createPropagateResourceCastsPass());
+  pm.addPass(::mlir::TF::CreateTFShapeInferencePass());
+
+  //----------------------------------------------------------------------------
+  // Lower to CFG.
+  // After this point, most TF optimizations won't work properly besides
+  // simple canonicalizations.
+  //----------------------------------------------------------------------------
+  pm.addPass(::mlir::TF::CreateTFFunctionalControlFlowToCFG());
+  // Inline, as tf-functional-control-flow-to-cfg leaves in calls.
+  pm.addPass(createInlinerPass());
+
+  //----------------------------------------------------------------------------
+  // Some further cleanups now that control flow is in better shape.
+  //----------------------------------------------------------------------------
+  pm.addPass(createSymbolDCEPass());
+  pm.addPass(createCanonicalizerPass());
+
+  //----------------------------------------------------------------------------
+  // Legalize to XLA
+  //----------------------------------------------------------------------------
+  pm.addPass(createConvertToMHLOPass());
+  pm.addPass(createCanonicalizerPass());
+
+  //----------------------------------------------------------------------------
+  // Now that the IR is starting to look nice, optimize global tensors.
+  //----------------------------------------------------------------------------
+  pm.addPass(tf_saved_model::CreateOptimizeGlobalTensorsPass());
+
+  //----------------------------------------------------------------------------
   // Lowering shape-related constructs.
-  ////////////////////////////////////////////////////////////////////////////
+  //----------------------------------------------------------------------------
   pm.addPass(Shape::createConvertHLOToShapePass());
   // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
   pm.addPass(createRemoveShapeConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(Shape::createConvertShapeToShapexPass());
-  // Clean up trivial redundancies.
   pm.addPass(createCanonicalizerPass());
 
-  ////////////////////////////////////////////////////////////////////////////
-  // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect.
-  ////////////////////////////////////////////////////////////////////////////
-  pm.addPass(tf_tensorlist::createConvertTfToTfTensorList());
+  //----------------------------------------------------------------------------
+  // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect
+  //----------------------------------------------------------------------------
+  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
+  pm.addPass(tf_strings::createConvertTFToTFStringsPass());
 
-  ////////////////////////////////////////////////////////////////////////////
-  // Lowering strings-related parts of tf dialect to tf_strings dialect.
-  ////////////////////////////////////////////////////////////////////////////
-  pm.addPass(tf_strings::createConvertTfToTfStrings());
-
-  ////////////////////////////////////////////////////
-  // Lowering tf_saved_model dialect to IREE dialects.
-  ////////////////////////////////////////////////////
+  //----------------------------------------------------------------------------
+  // Lowering tf_saved_model dialect to IREE dialects
+  //----------------------------------------------------------------------------
   // First, eliminate tf_saved_model.global_tensor's and corresponding
   // tf_saved_model.bound_input's.
-  pm.addPass(createTFSavedModelLowerGlobalTensors());
+  pm.addPass(createLowerGlobalTensorsPass());
 
   // Lower exported functions.
   //
@@ -63,18 +111,31 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // - It assumes that tf_saved_model.bound_inputs have been eliminated
   // - It removes tf_saved_model.semantics from the module, which we can only
   //   do at the very end.
-  pm.addPass(createTFSavedModelLowerExportedFunctions());
+  pm.addPass(createLowerExportedFunctionsPass());
+
+  //----------------------------------------------------------------------------
+  // Ensure that all Tensorflow has been legalized away
+  //----------------------------------------------------------------------------
+  pm.addPass(createStripModuleMetadataPass());
+  pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
+  pm.addPass(createVerifyFullyConvertedPass());
 
   ////////////////////////////////////////////////////////////////////////////
-  // Validate that all Tensorflow has been legalized away.
+  // Temporary: Does some special case fixups of HLO ops with dynamic
+  // shapes until these can be done properly upstream.
   ////////////////////////////////////////////////////////////////////////////
-  pm.addPass(createCheckNoTF());
+  pm.addPass(Shape::createConvertHLOToShapePass());
 }
 
-static mlir::PassPipelineRegistration<> pipeline(
-    "iree-tf-import-pipeline",
-    "Run IREE-specific passes for importing TF code into IREE.",
-    createIreeTfImportPipeline);
+void registerTFImportPassPipeline() {
+  mlir::PassPipelineRegistration<> pipeline(
+      "iree-tf-import-pipeline",
+      "Run IREE-specific passes for importing TF code into IREE",
+      [](OpPassManager &passManager) {
+        buildTFImportPassPipeline(passManager);
+      });
+}
 
+}  // namespace TF
 }  // namespace iree_compiler
 }  // namespace mlir

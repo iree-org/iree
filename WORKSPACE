@@ -63,7 +63,7 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 rbe_autoconfig(
     name = "rbe_default",
     base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:d6d895294076b5289e81489f664656211c41656cffe7c448ecb5c6f54f045974",
+    digest = "sha256:d69c260b98a97ad430d34c4591fb2399e00888750f5d47ede00c1e6f3e774e5a",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
     use_checked_in_confs = "Force",
@@ -152,6 +152,17 @@ maybe(
     path = "third_party/tensorflow",
 )
 
+# TF depends on tf_toolchains.
+http_archive(
+    name = "tf_toolchains",
+    sha256 = "d60f9637c64829e92dac3f4477a2c45cdddb9946c5da0dd46db97765eb9de08e",
+    strip_prefix = "toolchains-1.1.5",
+    urls = [
+        "http://mirror.tensorflow.org/github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+        "https://github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+    ],
+)
+
 # Import all of the tensorflow dependencies.
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 ###############################################################################
@@ -238,30 +249,6 @@ maybe(
     local_repository,
     name = "com_google_benchmark",
     path = "third_party/benchmark",
-)
-
-maybe(
-    new_local_repository,
-    name = "sdl2",
-    build_file = "build_tools/third_party/sdl2/BUILD.overlay",
-    path = "third_party/sdl2",
-)
-
-maybe(
-    new_local_repository,
-    name = "sdl2_config",
-    build_file_content = """
-package(default_visibility = ["//visibility:public"])
-cc_library(name = "headers", srcs = glob(["*.h"]))
-""",
-    path = "build_tools/third_party/sdl2",
-)
-
-maybe(
-    new_local_repository,
-    name = "dear_imgui",
-    build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
-    path = "third_party/dear_imgui",
 )
 
 maybe(

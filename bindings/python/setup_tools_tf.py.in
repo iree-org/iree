@@ -1,0 +1,82 @@
+#!/usr/bin/python3
+
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build platform specific wheel files for the pyiree.rt package.
+# Built artifacts are per-platform and build out of the build tree.
+
+import os
+import platform
+from setuptools import setup, find_namespace_packages
+
+# Make this setup position independent and make it not conflict with
+# parallel scripts.
+this_dir = os.path.abspath(os.path.dirname(__file__))
+setup_dir = os.path.join(this_dir, "setupbuild", "tools_tf")
+os.makedirs(setup_dir, exist_ok=True)
+os.chdir(setup_dir)
+
+exe_suffix = ".exe" if platform.system() == "Windows" else ""
+
+
+def read(fname):
+  return open(os.path.join(this_dir, fname), "rt").read()
+
+
+# Force platform specific wheel.
+# https://stackoverflow.com/questions/45150304
+try:
+  from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+  class bdist_wheel(_bdist_wheel):
+
+    def finalize_options(self):
+      _bdist_wheel.finalize_options(self)
+      self.root_is_pure = False
+except ImportError:
+  bdist_wheel = None
+
+setup(
+    name="google-iree-tools-tf",
+    version="@IREE_PYTHON_VERSION@",
+    author="The IREE Team",
+    author_email="iree-discuss@googlegroups.com",
+    license="Apache",
+    description="IREE Python TensorFlow Tools Binaries",
+    long_description=
+    "Package containing platform-specific binaries for TensorFlow "
+    "compiler tools",
+    long_description_content_type="text/plain",
+    url="https://github.com/google/iree",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache License",
+        "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+    ],
+    python_requires=">=3.6",
+    package_dir={"": this_dir},
+    packages=find_namespace_packages(
+        where=this_dir,
+        include=["pyiree.tools.tf", "pyiree.tf.support"],
+        exclude=["*.CMakeFiles"]),
+    # Matching the native extension as a data file keeps setuptools from
+    # "building" it (i.e. turning it into a static binary).
+    package_data={
+        "pyiree.tools.tf": [f"iree-tf-import{exe_suffix}",],
+    },
+    cmdclass={'bdist_wheel': bdist_wheel},
+    zip_safe=False,
+)

@@ -153,7 +153,8 @@ ContextWrapper::~ContextWrapper() {
 
 // TODO(jennik): Also create default string and tensorlist modules.
 Status ContextWrapper::CreateDefaultModules() {
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
+      iree_hal_driver_registry_default(),
       iree_make_cstring_view("vmla"), iree_allocator_system(), &driver_));
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
       driver_, iree_allocator_system(), &device_));

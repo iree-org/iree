@@ -24,7 +24,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -45,15 +45,15 @@ struct LegalizeTieShapeOp : OpRewritePattern<Shape::TieShapeOp> {
         tieShapeOp.operand().getDefiningOp());
     if (!phOp) return failure();
     IntegerAttr operandNumAttr =
-        phOp.getAttrOfType<IntegerAttr>(getOperandResultNumAttrName());
+        phOp->getAttrOfType<IntegerAttr>(getOperandResultNumAttrName());
     if (!operandNumAttr) {
       return phOp.emitRemark("expected operand_result_index attribute");
     }
-    FuncOp numWorkgroupsFn = phOp.getParentOfType<FuncOp>();
+    FuncOp numWorkgroupsFn = phOp->getParentOfType<FuncOp>();
     rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(
         tieShapeOp, phOp,
         numWorkgroupsFn.getArgument(
-            phOp.getAttrOfType<IntegerAttr>(getOperandResultNumAttrName())
+            phOp->getAttrOfType<IntegerAttr>(getOperandResultNumAttrName())
                 .getInt()));
     return success();
   }
@@ -103,7 +103,7 @@ void LegalizeNumWorkgroupsFnPass::runOnOperation() {
   for (FuncOp fn : fns) {
     if (!isEntryPoint(fn)) continue;
     auto numWorkgroupsFnAttr =
-        fn.getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName());
+        fn->getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName());
     if (!numWorkgroupsFnAttr) continue;
     StringRef numWorkgroupsFnName = numWorkgroupsFnAttr.getLeafReference();
     FuncOp numWorkgroupsFn = symbolTable.lookup<FuncOp>(numWorkgroupsFnName);

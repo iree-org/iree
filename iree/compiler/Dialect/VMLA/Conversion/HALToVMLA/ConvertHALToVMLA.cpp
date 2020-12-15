@@ -23,10 +23,9 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -56,7 +55,7 @@ struct InterfaceLoadConstantOpConversion
       IREE::HAL::InterfaceLoadConstantOp loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmla.interface argument to the function.
-    auto interfaceArg = loadOp.getParentOfType<FuncOp>().getArgument(0);
+    auto interfaceArg = loadOp->getParentOfType<FuncOp>().getArgument(0);
     assert(interfaceArg &&
            interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
            "exported VMLA functions require vmla.interface ops as their only "
@@ -82,7 +81,7 @@ struct InterfaceLoadTensorOpConversion
       IREE::HAL::InterfaceLoadTensorOp loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmla.interface argument to the function.
-    auto interfaceArg = loadOp.getParentOfType<FuncOp>().getArgument(0);
+    auto interfaceArg = loadOp->getParentOfType<FuncOp>().getArgument(0);
     assert(interfaceArg &&
            interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
            "exported VMLA functions require vmla.interface ops as their only "
@@ -115,7 +114,7 @@ struct InterfaceStoreTensorOpConversion
       IREE::HAL::InterfaceStoreTensorOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmla.interface argument to the function.
-    auto interfaceArg = storeOp.getParentOfType<FuncOp>().getArgument(0);
+    auto interfaceArg = storeOp->getParentOfType<FuncOp>().getArgument(0);
     assert(interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
            "exported VMLA functions require vmla.interface ops as their only "
            "argument");

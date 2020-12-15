@@ -20,7 +20,7 @@ FROM gcr.io/iree-oss/bazel-tensorflow AS final
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-COPY --from=gcr.io/iree-oss/vulkan /opt/vulkan-sdk/ /opt/vulkan-sdk/
+COPY --from=gcr.io/iree-oss/vulkan@sha256:5812ee64806a7f3df0739ccf0930c27cabce346901488eceb1ee66c9c0a5ae96 /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
 

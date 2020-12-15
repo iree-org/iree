@@ -16,8 +16,7 @@
 #define IREE_COMPILER_DIALECT_FLOW_ANALYSIS_TESTPASSES_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "mlir/IR/Function.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"

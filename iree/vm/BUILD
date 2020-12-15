@@ -13,7 +13,6 @@
 # limitations under the License.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -179,13 +178,12 @@ cc_library(
         "bytecode_dispatch_util.h",
         "bytecode_module.c",
         "bytecode_module_impl.h",
-        "bytecode_op_table.h",
+        "generated/bytecode_op_table.h",
     ],
     hdrs = [
         "bytecode_module.h",
     ],
     deps = [
-        ":bytecode_op_table_gen",
         ":vm",
         "//iree/base:api",
         "//iree/base:core_headers",
@@ -195,24 +193,24 @@ cc_library(
     ],
 )
 
-# TODO(benvanik): see if we can remove this; not good to have this dep.
-gentbl(
-    name = "bytecode_op_table_gen",
-    tbl_outs = [
-        ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
-    ],
-    tblgen = "//iree/tools:iree-tblgen",
-    td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
-    td_srcs = [
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "//iree/compiler/Dialect/VM/IR:td_files",
-        "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
-        "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
-        "@llvm-project//mlir:SideEffectTdFiles",
-    ],
-)
+# TODO(#357): Add a script to update bytecode_op_table.h.
+# gentbl(
+#     name = "bytecode_op_table_gen",
+#     tbl_outs = [
+#         ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
+#     ],
+#     tblgen = "//iree/tools:iree-tblgen",
+#     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
+#     td_srcs = [
+#         "//iree/compiler/Dialect/IREE/IR:td_files",
+#         "//iree/compiler/Dialect/VM/IR:td_files",
+#         "@llvm-project//mlir:OpBaseTdFiles",
+#         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
+#         "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
+#         "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+#         "@llvm-project//mlir:SideEffectTdFiles",
+#     ],
+# )
 
 cc_test(
     name = "bytecode_module_test",

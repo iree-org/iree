@@ -33,10 +33,13 @@ def check_and_get_output_lines(command: Sequence[str],
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
     return None, None
-  process = subprocess.run(command,
-                           stderr=subprocess.PIPE,
-                           stdout=subprocess.PIPE,
-                           universal_newlines=True)
+  process = subprocess.run(
+      command,
+      # TODO(#4131) python>=3.7: Use capture_output=True.
+      stderr=subprocess.PIPE,
+      stdout=subprocess.PIPE,
+      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
+      universal_newlines=True)
 
   if log_stderr:
     for line in process.stderr.splitlines():

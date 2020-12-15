@@ -22,8 +22,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -144,7 +144,7 @@ class MaterializeConstantPoolBuffersPass
         funcBuilder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
             storageOp.getLoc(), IREE::ByteBufferType::get(context),
             funcBuilder.getSymbolRefAttr(
-                storageOp.getParentOfType<ConstantPoolOp>().getName(),
+                storageOp->getParentOfType<ConstantPoolOp>().getName(),
                 {funcBuilder.getSymbolRefAttr(storageOp)}));
     auto offsetValue =
         funcBuilder.createOrFold<mlir::ConstantIndexOp>(storageOp.getLoc(), 0);

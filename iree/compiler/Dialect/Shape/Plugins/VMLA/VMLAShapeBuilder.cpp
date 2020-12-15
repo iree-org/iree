@@ -20,7 +20,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/Optional.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 
 using namespace mlir::iree_compiler::Shape;

@@ -69,10 +69,9 @@
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
@@ -162,15 +161,16 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
   auto target_backends =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags().targets;
   if (target_backends.empty()) {
-    iree_string_view_t* driver_names = nullptr;
-    iree_host_size_t driver_count = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
-        iree_allocator_system(), &driver_names, &driver_count));
-    for (iree_host_size_t i = 0; i < driver_count; ++i) {
-      target_backends.push_back(
-          std::string(driver_names[i].data, driver_names[i].size));
+    iree_hal_driver_info_t* driver_infos = NULL;
+    iree_host_size_t driver_info_count = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
+        iree_hal_driver_registry_default(), iree_allocator_system(),
+        &driver_infos, &driver_info_count));
+    for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
+      target_backends.push_back(std::string(driver_infos[i].driver_name.data,
+                                            driver_infos[i].driver_name.size));
     }
-    iree_allocator_free(iree_allocator_system(), driver_names);
+    iree_allocator_system_free(NULL, driver_infos);
   }
   return target_backends;
 }
@@ -524,7 +524,8 @@ extern "C" int main(int argc, char** argv) {
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
   iree_flags_parse_checked(&argc_absl, &argv_absl_ptr);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers());
+  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
+      iree_hal_driver_registry_default()));
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {

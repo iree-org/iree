@@ -43,7 +43,7 @@ package(
         main = src,
         python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+            "//third_party/py/pyiree:pylib_tf_support",
         ],
     )
     for src in glob(["*_test.py"])
@@ -71,7 +71,6 @@ TFLITE_FAILING = [
     "mandelbrot_test.py",
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
-    "reduce_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
     "scatter_update_test.py",
@@ -85,10 +84,10 @@ VMLA_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
-    "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -108,10 +107,10 @@ LLVM_FAILING = [
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
     "range_test.py",
-    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 # keep sorted
@@ -131,10 +130,10 @@ VULKAN_FAILING = [
     "matrix_ops_dynamic_test.py",
     "quantization_dyn_test.py",
     "range_test.py",
-    "reduce_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
+    "tensorlist_test.py",  # TODO(suderman): Re-enable once dependencies resolved
 ]
 
 TF_PASSING = glob(
@@ -168,12 +167,12 @@ iree_e2e_test_suite(
         "tf": TF_PASSING,
         "tflite": TFLITE_PASSING,
         "iree_vmla": VMLA_PASSING,
-        "iree_llvmjit": LLVM_PASSING,
+        "iree_llvmaot": LLVM_PASSING,
         "iree_vulkan": VULKAN_PASSING,
     },
     reference_backend = "tf",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )
 
@@ -182,7 +181,7 @@ iree_e2e_test_suite(
     backends_to_srcs = {
         "tflite": TFLITE_FAILING,
         "iree_vmla": VMLA_FAILING,
-        "iree_llvmjit": LLVM_FAILING,
+        "iree_llvmaot": LLVM_FAILING,
         "iree_vulkan": VULKAN_FAILING,
     },
     reference_backend = "tf",
@@ -193,7 +192,7 @@ iree_e2e_test_suite(
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )
 
@@ -204,7 +203,7 @@ iree_e2e_test_suite(
         "tf": ["mobile_bert_squad_test.py"],
         "tflite": ["mobile_bert_squad_test.py"],
         "iree_vmla": ["mobile_bert_squad_test.py"],
-        "iree_llvmjit": ["mobile_bert_squad_test.py"],
+        "iree_llvmaot": ["mobile_bert_squad_test.py"],
         "iree_vulkan": ["mobile_bert_squad_test.py"],
     },
     reference_backend = "tf",
@@ -217,6 +216,6 @@ iree_e2e_test_suite(
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//third_party/py/pyiree:pylib_tf_support",
     ],
 )

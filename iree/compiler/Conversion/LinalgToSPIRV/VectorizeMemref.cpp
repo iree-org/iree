@@ -22,7 +22,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 constexpr int kMaxVectorizationSizeInBits = 128;
 constexpr int kMaxVectorNumElements = 4;

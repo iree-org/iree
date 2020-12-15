@@ -19,7 +19,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Utils.h"
@@ -306,7 +306,7 @@ class FlattenTuplesInCFGPass
           builder.getFunctionType(newInputTypes, newResultTypes);
       auto newFunction =
           FuncOp::create(oldFunction.getLoc(), oldFunction.getName(),
-                         newFunctionType, oldFunction.getDialectAttrs());
+                         newFunctionType, oldFunction->getDialectAttrs());
       convertedFunctions.push_back({oldFunction, newFunction});
 
       // Perform the actual body conversion now that we have proper signatures.
