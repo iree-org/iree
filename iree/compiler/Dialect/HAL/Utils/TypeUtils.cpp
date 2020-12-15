@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
@@ -22,6 +21,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/Debug.h"
+#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
