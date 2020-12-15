@@ -37,6 +37,7 @@ iree_cc_library(
     "MaterializeExportedReflection.cpp"
     "MergeExportedReflection.cpp"
     "OutlineDispatchRegions.cpp"
+    "OutlineDispatchRegions2.cpp"
     "OutlineLargeConstants.cpp"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"

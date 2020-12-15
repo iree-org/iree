@@ -123,6 +123,7 @@ createRematerializeDispatchConstantsPass();
 
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();

@@ -191,6 +191,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // executables. This separates sequencer functions performing dispatches from
   // dispatchees.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
