@@ -23,18 +23,6 @@ iree_select_compiler_opts(RUY_COPTS_BASE
     "-I${IREE_ROOT_DIR}/third_party/ruy"
 )
 
-# Some clang-based Windows toolchains have more aggressive interpretations
-# of -Wextra.
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-  iree_select_compiler_opts(RUY_COPTS_WARNINGS
-    CLANG_OR_GCC
-      -Wall
-      -Wextra
-      -Wc++14-compat
-      -Wundef
-  )
-endif()
-
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL arm)
   # This is assuming modern toolchains where no -mfloat-abi flag is
   # needed to actually enable NEON.
@@ -43,7 +31,6 @@ endif()
 
 set(RUY_COPTS
   ${RUY_COPTS_BASE}
-  ${RUY_COPTS_WARNINGS}
   ${RUY_COPTS_NEON}
 )
 

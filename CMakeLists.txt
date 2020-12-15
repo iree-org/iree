@@ -254,7 +254,7 @@ include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
-include(iree_multipy)
+include(iree_python)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
@@ -474,10 +474,7 @@ if(${IREE_BUILD_TESTS})
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
-  # NOTE: The multipy defaults come from pybind's configuration and must come
-  # after. This should be pulled in locally at some point.
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  iree_multipy_configure()
 endif()
 
 if(${IREE_TARGET_BACKEND_METAL-SPIRV})
@@ -544,10 +541,6 @@ endif()
 
 if(${IREE_ENABLE_TENSORFLOW})
   add_subdirectory(integrations/tensorflow)
-endif()
-
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  iree_complete_py_extension_link_options()
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
