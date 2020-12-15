@@ -38,6 +38,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
@@ -1159,24 +1160,24 @@ struct TensorReshapeOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// std.extract_element op conversion.
+// tensor.extract op conversion.
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// A pattern to replace ExtractElementOp with LoadOp. Typically, this comes
+/// A pattern to replace tensor::ExtractOp with LoadOp. Typically, this comes
 /// from indirect access in Linalg ops on tensors, eg, TorchIndexSelectOp. The
 /// pattern expects other patterns to convert the operand to MemRefType.
 struct ExtractElementOpPattern final
-    : public OpConversionPattern<ExtractElementOp> {
-  using OpConversionPattern<ExtractElementOp>::OpConversionPattern;
+    : public OpConversionPattern<tensor::ExtractOp> {
+  using OpConversionPattern<tensor::ExtractOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      ExtractElementOp op, ArrayRef<Value> operands,
+      tensor::ExtractOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (!operands[0].getType().isa<MemRefType>()) {
       return op.emitError("expected operands[0] to be a MemRefType");
     }
-    ExtractElementOpAdaptor adaptor(operands);
+    tensor::ExtractOp::Adaptor adaptor(operands);
     rewriter.replaceOpWithNewOp<LoadOp>(op, operands[0], adaptor.indices());
     return success();
   }
@@ -1469,7 +1470,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
-                      IREE::HAL::InterfaceStoreTensorOp, ExtractElementOp>();
+                      IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

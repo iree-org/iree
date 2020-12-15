@@ -26,6 +26,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -110,7 +111,7 @@ struct TorchIndexSelectOpConversion
     }
 
     Value res =
-        rewriter.create<ExtractElementOp>(loc, adaptor.input(), indices);
+        rewriter.create<tensor::ExtractOp>(loc, adaptor.input(), indices);
     rewriter.create<linalg::YieldOp>(loc, res);
 
     rewriter.replaceOp(op, linalgOp.getResults());
