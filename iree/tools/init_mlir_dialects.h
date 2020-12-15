@@ -30,6 +30,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
@@ -47,6 +48,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   spirv::SPIRVDialect,
                   StandardOpsDialect,
                   vector::VectorDialect,
+                  tensor::TensorDialect,
                   SDBMDialect,
                   shape::ShapeDialect>();
   // clang-format on
