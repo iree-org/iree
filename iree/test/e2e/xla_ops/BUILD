@@ -61,9 +61,9 @@ iree_check_single_backend_test_suite(
         "transpose.mlir",
         "while.mlir",
     ],
+    compatible_with = "darwin",
     driver = "metal",
     target_backend = "metal-spirv",
-    compatible_with = "darwin",
 )
 
 iree_check_single_backend_test_suite(
