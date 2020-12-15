@@ -46,8 +46,7 @@ class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
     // Remove all private functions, e.g tile size calcuations.
     SmallVector<FuncOp, 4> nonPublicFn;
     for (auto func : targetOp.getInnerModule().getOps<FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(func) !=
-          SymbolTable::Visibility::Public) {
+      if (!func.isPublic()) {
         nonPublicFn.push_back(func);
       }
     }

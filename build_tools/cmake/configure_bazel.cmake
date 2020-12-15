@@ -49,6 +49,7 @@ function(iree_configure_bazel)
   # bazelrc file.
   file(WRITE "${_bazelrc_file}" "
 build --config ${_bazel_platform_config}
+build --progress_report_interval=30
 build --python_path='${Python3_EXECUTABLE}'
 build --action_env CC='${CMAKE_C_COMPILER}'
 build --action_env CXX='${CMAKE_CXX_COMPILER}'

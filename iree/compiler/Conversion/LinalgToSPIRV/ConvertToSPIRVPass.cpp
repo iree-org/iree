@@ -41,8 +41,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -496,8 +496,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
   SmallVector<FuncOp, 1> functions;
   for (FuncOp fn : moduleOp.getOps<FuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(fn) != SymbolTable::Visibility::Public)
-      continue;
+    if (!fn.isPublic()) continue;
     functions.push_back(fn);
   }
 

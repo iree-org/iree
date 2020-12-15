@@ -15,9 +15,9 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 
 #include "llvm/ADT/Twine.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 
 namespace mlir {

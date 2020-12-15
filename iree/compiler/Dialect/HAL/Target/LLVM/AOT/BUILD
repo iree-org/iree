@@ -50,6 +50,8 @@ cc_library(
         "@llvm-project//llvm:ARMAsmParser",
         "@llvm-project//llvm:ARMCodeGen",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:RISCVAsmParser",
+        "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",

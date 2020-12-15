@@ -11,12 +11,14 @@ jobs:
     name: Performs a mondo-build of all optional components
     runs-on: ubuntu-18.04
     env:
-      BUILD_DIR: ${{ github.workspace }}/../iree-build
-      INSTALL_DIR: ${{ github.workspace }}/../iree-install
+      SRC_DIR: ${{ github.workspace }}/iree-src
+      BUILD_DIR: ${{ github.workspace }}/iree-build
+      INSTALL_DIR: ${{ github.workspace }}/iree-install
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
+          path: "iree-src"
       - uses: actions/setup-python@v2
         with:
           python-version: '3.8'
@@ -38,8 +40,7 @@ jobs:
       - name: Configure
         shell: bash
         run: |
-          cd "${GITHUB_WORKSPACE}"
-          cmake -B "${BUILD_DIR}" "${GITHUB_WORKSPACE}" \
+          cmake -B "${BUILD_DIR}" "${SRC_DIR}" \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \

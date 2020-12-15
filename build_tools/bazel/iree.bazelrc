@@ -42,10 +42,6 @@ build --enable_runfiles
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
 
-# TensorFlow always sets these in OSS which makes it impossible to build TF
-# without them...
-build --define open_source_build=true
-
 ###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
