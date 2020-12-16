@@ -19,8 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/PatternMatch.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
