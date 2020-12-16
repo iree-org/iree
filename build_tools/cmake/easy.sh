@@ -26,6 +26,9 @@ set -e
 : ${CC:=clang}
 : ${CXX:=clang++}
 
+android_abi="arm64-v8a"
+android_platform="android-29"
+
 if [[ $# < 1 || $1 == "-h" || $1 == "--help" ]]
 then
   echo "Usage: $(basename "$0") [list of configuration options] [build [list of targets]]"
@@ -48,7 +51,9 @@ then
   echo "  tsan         Build with ThreadSanitizer."
   echo "  Debug|Release|RelWithDebInfo|MinSizeRel    Set the CMake build type."
   echo "  src <path>   Specify IREE source path. Default: inferred from script path."
-  echo "  ndk <path>   Specify Android NDK path. Make an Android build."
+  echo "  ndk <path>   Specify Android NDK path. Configure an Android build."
+  echo "  android_abi <abi> Specify Android ABI. Optional. Default: ${android_abi}." 
+  echo "  android_platform <platform> Specify Android platform version. Optional. Default: ${android_platform}."
   echo "  docs         Build docs."
   echo "  tracy        Build with Tracy profiler instrumentation."
   echo "  py           Build Python bindings."
@@ -96,11 +101,9 @@ do
     tracy) arg_tracy=1;;
     docs) arg_docs=1;;
     Debug|Release|RelWithDebInfo|MinSizeRel) arg_build_type="${args[i]}";;
-    ndk)
-      arg_ndk="$(realpath -s "${args[$((i+1))]}")"
-      i=$((i+1))
-      android_platform="$(ls -1v "${arg_ndk}/platforms/" | tail -n1)"
-      ;;
+    ndk) arg_ndk="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
+    android_abi) android_abi="${args[$((i+1))]}"; i=$((i+1));;
+    android_platform) android_platform="${args[$((i+1))]}"; i=$((i+1));;
     src) arg_src="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
     build)
       arg_build=1
@@ -175,7 +178,7 @@ function add_cmake_var() {
 
 add_cmake_var "${arg_build_type}" CMAKE_BUILD_TYPE "${arg_build_type}"
 add_cmake_var "${arg_ndk}" CMAKE_TOOLCHAIN_FILE "${arg_ndk}/build/cmake/android.toolchain.cmake"
-add_cmake_var "${arg_ndk}" ANDROID_ABI "arm64-v8a"
+add_cmake_var "${arg_ndk}" ANDROID_ABI "${android_abi}"
 add_cmake_var "${arg_ndk}" ANDROID_PLATFORM "${android_platform}"
 add_cmake_var "${arg_ndk}" IREE_HOST_C_COMPILER "$(which "$CC")"
 add_cmake_var "${arg_ndk}" IREE_HOST_CXX_COMPILER "$(which "$CXX")"
