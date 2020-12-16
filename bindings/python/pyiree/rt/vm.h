@@ -15,12 +15,12 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
 
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/host_types.h"
 #include "absl/types/optional.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "pyiree/rt/binding.h"
+#include "pyiree/rt/host_types.h"
 
 namespace iree {
 namespace python {

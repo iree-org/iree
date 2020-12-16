@@ -17,10 +17,10 @@
 
 #include <array>
 
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/hal.h"
 #include "absl/types/span.h"
 #include "iree/base/signature_mangle.h"
+#include "pyiree/rt/binding.h"
+#include "pyiree/rt/hal.h"
 
 namespace iree {
 namespace python {

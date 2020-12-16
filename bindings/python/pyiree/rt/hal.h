@@ -15,10 +15,10 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
 
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/status_utils.h"
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"
+#include "pyiree/rt/binding.h"
+#include "pyiree/rt/status_utils.h"
 
 namespace iree {
 namespace python {

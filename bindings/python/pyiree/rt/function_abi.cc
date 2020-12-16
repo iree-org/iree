@@ -14,9 +14,6 @@
 
 #include "pyiree/rt/function_abi.h"
 
-#include "pyiree/rt/hal.h"
-#include "pyiree/rt/status_utils.h"
-#include "pyiree/rt/vm.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
@@ -25,6 +22,9 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
+#include "pyiree/rt/hal.h"
+#include "pyiree/rt/status_utils.h"
+#include "pyiree/rt/vm.h"
 
 namespace iree {
 namespace python {

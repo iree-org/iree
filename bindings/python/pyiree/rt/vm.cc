@@ -14,8 +14,6 @@
 
 #include "pyiree/rt/vm.h"
 
-#include "pyiree/rt/function_abi.h"
-#include "pyiree/rt/status_utils.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
@@ -25,6 +23,8 @@
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/api.h"
+#include "pyiree/rt/function_abi.h"
+#include "pyiree/rt/status_utils.h"
 
 namespace iree {
 namespace python {
