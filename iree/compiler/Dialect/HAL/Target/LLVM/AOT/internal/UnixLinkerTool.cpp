@@ -103,15 +103,15 @@ class UnixLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+      getToolPath(),
 #if defined(IREE_PLATFORM_MACOS)
-        "-dylib",
-        "-undefined suppress",
-        "-flat_namespace",
+      "-dylib",
+      "-undefined suppress",
+      "-flat_namespace",
 #else
-        "-shared",
+      "-shared",
 #endif
-        "-o " + artifacts.libraryFile.path,
+      "-o " + artifacts.libraryFile.path,
     };
 
     if (targetTriple.isAndroid()) {
