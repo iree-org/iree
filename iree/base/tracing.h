@@ -32,6 +32,7 @@
 // enables the C++ when in a valid context. Do not use C++ features or include
 // other files that are not C-compatible.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -221,6 +222,7 @@ void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
 void iree_tracing_mutex_terminate(uint32_t lock_id);
 void iree_tracing_mutex_before_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
 void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #endif  // IREE_TRACING_FEATURES
