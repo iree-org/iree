@@ -24,7 +24,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 
 template <typename SRC, typename DST>
 class OpConversion : public OpConversionPattern<SRC> {
@@ -106,5 +106,5 @@ class ConversionPass : public PassWrapper<T, OperationPass<ModuleOp>> {
   }
 };
 
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

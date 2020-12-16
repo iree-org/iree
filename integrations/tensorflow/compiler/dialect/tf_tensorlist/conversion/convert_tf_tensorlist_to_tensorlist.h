@@ -23,14 +23,14 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createConvertTFTensorListToTensorListPass();
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif

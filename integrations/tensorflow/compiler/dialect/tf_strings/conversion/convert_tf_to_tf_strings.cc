@@ -32,7 +32,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 namespace {
@@ -120,5 +120,5 @@ static PassRegistration<ConvertTFToTFStringsPass> pass(
     "Converts TF string ops to the IREE tf_strings dialect");
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

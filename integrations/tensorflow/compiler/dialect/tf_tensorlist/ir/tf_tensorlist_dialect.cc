@@ -17,7 +17,7 @@
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 //===----------------------------------------------------------------------===//
@@ -51,5 +51,5 @@ void TFTensorListDialect::printType(Type type,
 }
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

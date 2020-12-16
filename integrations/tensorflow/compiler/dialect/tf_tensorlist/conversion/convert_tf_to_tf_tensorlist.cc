@@ -22,7 +22,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 namespace {
@@ -183,5 +183,5 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertTFToTFTensorListPass() {
 }
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

@@ -21,7 +21,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 static bool isTFOp(Operation *op) {
@@ -91,5 +91,5 @@ std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
 }
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

@@ -30,7 +30,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 namespace {
@@ -41,11 +41,11 @@ class StringTypeConverter : public TypeConverter {
     // Required to covert any unknown or already converted types.
     addConversion([](Type type) { return type; });
     addConversion([](tf_strings::StringType type) {
-      return IREE::Strings::StringType::get(type.getContext());
+      return iree_compiler::IREE::Strings::StringType::get(type.getContext());
     });
     addConversion([](TensorType type) -> Type {
       if (type.getElementType().isa<tf_strings::StringType>()) {
-        return IREE::Strings::StringTensorType::get(type.getContext());
+        return iree_compiler::IREE::Strings::StringTensorType::get(type.getContext());
       }
       return type;
     });
@@ -57,14 +57,14 @@ class ConvertTFStringsToStringsPass
                             StringTypeConverter> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<TFStringsDialect, IREE::Strings::StringsDialect,
+    registry.insert<TFStringsDialect, iree_compiler::IREE::Strings::StringsDialect,
                     StandardOpsDialect>();
   }
 
   void Setup(ConversionTarget &target,
              OwningRewritePatternList &patterns) override {
     target.addIllegalDialect<tf_strings::TFStringsDialect>();
-    target.addLegalDialect<IREE::Strings::StringsDialect>();
+    target.addLegalDialect<iree_compiler::IREE::Strings::StringsDialect>();
     populateTFStringsToStringsPatterns(&this->getContext(), patterns);
   }
 };
@@ -72,14 +72,14 @@ class ConvertTFStringsToStringsPass
 
 void populateTFStringsToStringsPatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns) {
-  patterns.insert<OpConversion<tf_strings::PrintOp, IREE::Strings::PrintOp>>(
+  patterns.insert<OpConversion<tf_strings::PrintOp, iree_compiler::IREE::Strings::PrintOp>>(
       context);
   patterns.insert<OpConversion<tf_strings::ToStringTensorOp,
-                               IREE::Strings::ToStringTensorOp>>(context);
+                               iree_compiler::IREE::Strings::ToStringTensorOp>>(context);
   patterns.insert<OpConversion<tf_strings::StringTensorToStringOp,
-                               IREE::Strings::StringTensorToStringOp>>(context);
+                               iree_compiler::IREE::Strings::StringTensorToStringOp>>(context);
   patterns.insert<
-      OpConversion<tf_strings::ToStringOp, IREE::Strings::I32ToStringOp>>(
+      OpConversion<tf_strings::ToStringOp, iree_compiler::IREE::Strings::I32ToStringOp>>(
       context);
 }
 
@@ -92,5 +92,5 @@ static PassRegistration<ConvertTFStringsToStringsPass> pass(
     "Converts TF string ops to the IREE tf_strings dialect");
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

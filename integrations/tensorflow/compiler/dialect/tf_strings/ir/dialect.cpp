@@ -22,7 +22,7 @@
 #include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/op_interface.cpp.inc"
@@ -59,5 +59,5 @@ bool TFStringsType::classof(Type type) {
 }
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

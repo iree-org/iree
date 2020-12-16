@@ -26,7 +26,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 void registerAllDialects(mlir::DialectRegistry &registry) {
@@ -85,11 +85,11 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
   // Lowering shape-related constructs.
   //----------------------------------------------------------------------------
-  pm.addPass(Shape::createConvertHLOToShapePass());
+  pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
   // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
   pm.addPass(createRemoveShapeConstraintsPass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(Shape::createConvertShapeToShapexPass());
+  pm.addPass(iree_compiler::Shape::createConvertShapeToShapexPass());
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
@@ -127,7 +127,7 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   // Temporary: Does some special case fixups of HLO ops with dynamic
   // shapes until these can be done properly upstream.
   ////////////////////////////////////////////////////////////////////////////
-  pm.addPass(Shape::createConvertHLOToShapePass());
+  pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
 }
 
 void registerTFImportPassPipeline() {
@@ -140,5 +140,5 @@ void registerTFImportPassPipeline() {
 }
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

@@ -23,7 +23,7 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertTFStringsToStringsPass();
@@ -34,7 +34,7 @@ void populateTFStringsToStringsPatterns(MLIRContext *ctx,
                                         OwningRewritePatternList &patterns);
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // IREE_INTEGRATIONS_TFSTRINGS_TRANSFORMS_TFSTRINGSTOSTRINGS_H_

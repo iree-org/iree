@@ -22,7 +22,7 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 //===----------------------------------------------------------------------===//
@@ -91,7 +91,7 @@ inline void registerAllPasses() {
 }
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_PASSES_H_
