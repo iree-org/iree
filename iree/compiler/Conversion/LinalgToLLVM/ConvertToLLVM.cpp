@@ -287,7 +287,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                 newFuncOp.end());
     rewriter.applySignatureConversion(&newFuncOp.getBody(), signatureConverter);
 
-    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()),
+                                           rewriter.getListener());
 
     // Cast and unpack input packed_buffer_arguments and construct memref
     // descriptors.
