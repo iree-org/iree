@@ -145,19 +145,21 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   thread->entry_arg = entry_arg;
   strncpy_s(thread->name, IREE_ARRAYSIZE(thread->name), params.name.data,
             min(params.name.size, IREE_ARRAYSIZE(thread->name) - 1));
-  iree_atomic_store_int32(&thread->is_suspended, 1, iree_memory_order_relaxed);
+  iree_atomic_store_int32(&thread->is_suspended,
+                          params.create_suspended ? 1 : 0,
+                          iree_memory_order_relaxed);
   iree_thread_override_list_initialize(iree_thread_set_priority_class,
                                        params.priority_class, thread->allocator,
                                        &thread->qos_override_list);
 
-  // Always create the thread suspended.
-  // If we didn't do this it's possible the OS could schedule the thread
-  // immediately inside of CreateThread and we wouldn't be able to prepare it
-  // (and even weirder, it's possible the thread would have exited and the
-  // handle would be closed before we even do anything with it!).
-  thread->handle =
-      CreateThread(NULL, params.stack_size, iree_thread_start_routine, thread,
-                   CREATE_SUSPENDED, &thread->id);
+  // Create the thread either suspended or running as the user requested.
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "CreateThread");
+    thread->handle = CreateThread(
+        NULL, params.stack_size, iree_thread_start_routine, thread,
+        params.create_suspended ? CREATE_SUSPENDED : 0, &thread->id);
+    IREE_TRACE_ZONE_END(z1);
+  }
   if (thread->handle == INVALID_HANDLE_VALUE) {
     iree_allocator_free(allocator, thread);
     IREE_TRACE_ZONE_END(z0);
@@ -181,11 +183,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // releases the iree_thread_t handle the thread won't explode.
   iree_thread_retain(thread);
 
-  // If the thread is being created unsuspended then resume now. Otherwise the
-  // caller must resume when they want it spun up.
-  if (!params.create_suspended) {
-    iree_thread_resume(thread);
-  }
 
   IREE_TRACE_ZONE_END(z0);
   *out_thread = thread;

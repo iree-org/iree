@@ -95,7 +95,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   thread->entry_arg = entry_arg;
   iree_strncpy_s(thread->name, IREE_ARRAYSIZE(thread->name), params.name.data,
                  iree_min(params.name.size, IREE_ARRAYSIZE(thread->name) - 1));
-  iree_atomic_store_int32(&thread->is_suspended, 1, iree_memory_order_relaxed);
+  iree_atomic_store_int32(&thread->is_suspended,
+                          params.create_suspended ? 1 : 0,
+                          iree_memory_order_relaxed);
 
   pthread_attr_t thread_attr;
   pthread_attr_init(&thread_attr);
@@ -109,13 +111,19 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
       iree_thread_qos_class_for_priority_class(params.priority_class);
   pthread_attr_set_qos_class_np(&thread_attr, qos_class, 0);
 
-  // Always create the thread suspended.
-  // If we didn't do this it's possible the OS could schedule the thread
-  // immediately inside of CreateThread and we wouldn't be able to prepare
-  // it (and even weirder, it's possible the thread would have exited and
-  // the handle would be closed before we even do anything with it!).
-  int rc = pthread_create_suspended_np(&thread->handle, &thread_attr,
-                                       &iree_thread_start_routine, thread);
+  // Create the thread either suspended or running as the user requested.
+  int rc;
+  if (params.create_suspended) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "pthread_create_suspended_np");
+    rc = pthread_create_suspended_np(&thread->handle, &thread_attr,
+                                     &iree_thread_start_routine, thread);
+    IREE_TRACE_ZONE_END(z1);
+  } else {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "pthread_create");
+    rc = pthread_create(&thread->handle, &thread_attr,
+                        &iree_thread_start_routine, thread);
+    IREE_TRACE_ZONE_END(z1);
+  }
   pthread_attr_destroy(&thread_attr);
   if (rc != 0) {
     iree_allocator_free(allocator, thread);
@@ -132,12 +140,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // Retain the thread for the thread itself; this way if the caller immediately
   // releases the iree_thread_t handle the thread won't explode.
   iree_thread_retain(thread);
-
-  // If the thread is being created unsuspended then resume now. Otherwise the
-  // caller must resume when they want it spun up.
-  if (!params.create_suspended) {
-    iree_thread_resume(thread);
-  }
 
   IREE_TRACE_ZONE_END(z0);
   *out_thread = thread;

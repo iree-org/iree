@@ -88,8 +88,11 @@ static void* iree_thread_start_routine(void* param) {
   IREE_TRACE_SET_THREAD_NAME(thread->name);
 
   // Wait until we resume if we were created suspended.
-  iree_notification_await(&thread->suspend_barrier,
-                          iree_thread_resumed_predicate, thread);
+  while (iree_atomic_load_int32(&thread->suspend_count,
+                                iree_memory_order_seq_cst) > 0) {
+    iree_notification_await(&thread->suspend_barrier,
+                            iree_thread_resumed_predicate, thread);
+  }
 
   // "Consume" the entry info so that we don't see it again (as we don't own
   // its lifetime).
@@ -151,8 +154,13 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // immediately. We emulate the create_suspended behavior by waiting in the
   // thread until iree_thread_resume is called which at least gives us the same
   // execution order guarantee across all platforms.
-  int rc = pthread_create(&thread->handle, &thread_attr,
-                          &iree_thread_start_routine, thread);
+  int rc;
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "pthread_create");
+    rc = pthread_create(&thread->handle, &thread_attr,
+                        &iree_thread_start_routine, thread);
+    IREE_TRACE_ZONE_END(z1);
+  }
   pthread_attr_destroy(&thread_attr);
   if (rc != 0) {
     iree_allocator_free(allocator, thread);
