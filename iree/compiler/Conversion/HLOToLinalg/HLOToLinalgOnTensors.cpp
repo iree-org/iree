@@ -79,11 +79,13 @@ struct TorchIndexSelectOpConversion
         AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
     indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
     SmallVector<StringRef, 3> loopTypes(rank, getParallelIteratorTypeName());
+    ShapedType outputType = op.getResult().getType().cast<ShapedType>();
+    Value initOp = rewriter.create<linalg::InitTensorOp>(
+        loc, outputType.getShape(), outputType.getElementType());
     auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
         loc, /*resultTensors=*/ArrayRef<Type>{op.getResult().getType()},
         /*inputs=*/adaptor.index(),
-        /*outputBuffers=*/ArrayRef<Value>{}, /*initTensors=*/ValueRange{},
-        indexingMaps, loopTypes);
+        /*outputBuffers=*/initOp, indexingMaps, loopTypes);
 
     SmallVector<Type, 4> bodyArgTypes, opResultTypes;
     SmallVector<Value, 2> linalgOpArgs = {adaptor.index()};
