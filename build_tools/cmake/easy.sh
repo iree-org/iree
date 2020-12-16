@@ -26,11 +26,9 @@ set -e
 : ${CC:=clang}
 : ${CXX:=clang++}
 
-relative_path_to_this_script="$(realpath --relative-to="$(pwd)" $0)"
-
 if [[ $# < 1 || $1 == "-h" || $1 == "--help" ]]
 then
-  echo "Usage: ${relative_path_to_this_script} [list of configuration options] [build [list of targets]]"
+  echo "Usage: $(basename "$0") [list of configuration options] [build [list of targets]]"
   echo
   echo "Runs CMake to perform configuration and/or build."
   echo "By default, erases CMakeCache.txt everytime for stateless operation."
@@ -62,26 +60,20 @@ then
   echo "Examples:"
   echo
   echo "  Configure and build with ASan, CCache, and Tracy. Note how 'build' comes last!"
-  echo "    ${relative_path_to_this_script} asan ccache tracy build"
+  echo "    $(basename "$0") asan ccache tracy build"
   echo
   echo "  Configure and build and Android NDK build, passing the NDK path. Also with CCache and Tracy."
-  echo "    ${relative_path_to_this_script} ndk ~/android-ndk-r21d ccache tracy build"
+  echo "    $(basename "$0") ndk ~/android-ndk-r21d ccache tracy build"
   echo
   echo "  Configure a Debug build, build only iree_tools_iree-translate:"
-  echo "    ${relative_path_to_this_script} Debug build iree_tools_iree-translate"
+  echo "    $(basename "$0") Debug build iree_tools_iree-translate"
   echo
   echo "  Configure, but do not build, a Release build with Python bindings and TensorFlow compiler:"
-  echo "    ${relative_path_to_this_script} Release py tf"
+  echo "    $(basename "$0") Release py tf"
   echo
   echo "  Do not configure, just build iree_tools_iree-translate"
-  echo "    ${relative_path_to_this_script} build iree_tools_iree-translate"
+  echo "    $(basename "$0") build iree_tools_iree-translate"
 
-  exit 1
-fi
-
-if [[ -f "CMakeLists.txt" ]]
-then
-  echo "Error: We seem to be in a source directory. Please cd into a build directory."
   exit 1
 fi
 
@@ -104,8 +96,8 @@ do
     tracy) arg_tracy=1;;
     docs) arg_docs=1;;
     Debug|Release|RelWithDebInfo|MinSizeRel) arg_build_type="${args[i]}";;
-    ndk) arg_ndk="$(realpath -s ${args[$((i+1))]})"; i=$((i+1));;
-    src) arg_src="$(realpath -s ${args[$((i+1))]})"; i=$((i+1));;
+    ndk) arg_ndk="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
+    src) arg_src="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
     build)
       arg_build=1
       if [[ $i < $(($# - 1)) ]]
@@ -113,9 +105,15 @@ do
         arg_targets="${args[@]:$((i+1))}"
       fi  
       break;;
-    *) echo "Error: unkown argument ${args[i]}"; exit 1;;
+    *) echo "Error: unkown argument ${args[i]}" >&2; exit 1;;
   esac
 done
+
+if [[ "${arg_printonly}" != 1 && -f "CMakeLists.txt" ]]
+then
+  echo "Error: We seem to be in a source directory. Please cd into a build directory." >&2
+  exit 1
+fi
 
 if [[ -z "${arg_build_type}" ]]
 then
@@ -124,15 +122,32 @@ then
   arg_build_type=RelWithDebInfo
 fi
 
+function walk_up_to_iree_root() {
+  path="$(realpath -s "$1")"
+  while true
+  do
+    if [[ "$(basename "${path}")" == "iree" ]]
+    then
+      echo "${path}"
+      return
+    fi
+    if [[ -z "${path}" ]]
+    then
+      echo "Error: Could not find IREE root directory by walking up from $1" >&2
+      exit 1
+    fi
+    path="$(dirname "${path}")"
+  done
+}
+
 if [[ -z "${arg_src}" ]]
 then
   # No explicit src directory specified. Infer from this script's location.
-  tentative_iree_dir="$(dirname "${relative_path_to_this_script}" | sed 's|\(.*/iree\).*|\1|')"
-  if [[ -f "${tentative_iree_dir}/CMakeLists.txt" ]]
+  absolute_iree_dir="$(walk_up_to_iree_root "$0")"
+  relative_iree_dir="$(realpath -s --relative-to="$(pwd)" "${absolute_iree_dir}")"
+  if [[ -f "${relative_iree_dir}/CMakeLists.txt" ]]
   then
-    arg_src="${tentative_iree_dir}"
-    echo "Inferred IREE source directory from this script's location: ${arg_src} (pass src <path> to override)"
-    echo
+    arg_src="${relative_iree_dir}"
   fi
 fi
 
@@ -187,13 +202,13 @@ then
   # Then we need a source directory.
   if [[ -z "${arg_src}" ]]
   then
-    echo "Please specify the IREE source directory (src <path>)."
+    echo "Please specify the IREE source directory (src <path>)." >&2
     exit 1
   fi
 
   if [[ ! -f "${arg_src}/CMakeLists.txt" ]]
   then
-    echo "Error: ${arg_src} does not look like a source directory: it should contain CMakeLists.txt"
+    echo "Error: ${arg_src} does not look like a source directory: it should contain CMakeLists.txt" >&2
     exit 1
   fi
 
@@ -255,8 +270,8 @@ then
   do
     if ! grep -xq "${cmake_var_names[$i]}\b.*=${cmake_var_values[$i]}"  "CMakeCache.txt"
     then
-      echo "Error: After running CMake, CMakeCache.txt does not have ${cmake_var_names[$i]} set to ${cmake_var_values[$i]} as requested."
-      echo "Suggestion: rm CMakeCache.txt and rerun this script."
+      echo "Error: After running CMake, CMakeCache.txt does not have ${cmake_var_names[$i]} set to ${cmake_var_values[$i]} as requested." >&2
+      echo "Suggestion: rm CMakeCache.txt and rerun this script." >&2
       exit 1
     fi
   done
