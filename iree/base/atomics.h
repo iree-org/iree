@@ -91,6 +91,12 @@ typedef struct {
   InterlockedExchangeAdd((volatile LONG*)object, operand)
 #define iree_atomic_fetch_sub_int32(object, operand, order) \
   InterlockedExchangeAdd((volatile LONG*)object, -((int32_t)(operand)))
+#define iree_atomic_fetch_and_int32(object, operand, order) \
+  InterlockedAnd((volatile LONG*)object, operand)
+#define iree_atomic_fetch_or_int32(object, operand, order) \
+  InterlockedOr((volatile LONG*)object, operand)
+#define iree_atomic_fetch_xor_int32(object, operand, order) \
+  InterlockedXor((volatile LONG*)object, operand)
 #define iree_atomic_exchange_int32(object, desired, order) \
   InterlockedExchange((volatile LONG*)object, desired)
 static inline bool iree_atomic_compare_exchange_strong_int32(
@@ -117,6 +123,12 @@ static inline bool iree_atomic_compare_exchange_strong_int32(
   InterlockedExchangeAdd64((volatile LONG64*)object, operand)
 #define iree_atomic_fetch_sub_int64(object, operand, order) \
   InterlockedExchangeAdd64((volatile LONG64*)object, -(operand))
+#define iree_atomic_fetch_and_int64(object, operand, order) \
+  InterlockedAnd64((volatile LONG64*)object, operand)
+#define iree_atomic_fetch_or_int64(object, operand, order) \
+  InterlockedOr64((volatile LONG64*)object, operand)
+#define iree_atomic_fetch_xor_int64(object, operand, order) \
+  InterlockedXor64((volatile LONG64*)object, operand)
 #define iree_atomic_exchange_int64(object, desired, order) \
   InterlockedExchange64((volatile LONG64*)object, desired)
 static inline bool iree_atomic_compare_exchange_strong_int64(
@@ -164,6 +176,12 @@ typedef _Atomic int64_t iree_atomic_int64_t;
   __c11_atomic_fetch_add((object), (operand), (order))
 #define iree_atomic_fetch_sub_auto(object, operand, order) \
   __c11_atomic_fetch_sub((object), (operand), (order))
+#define iree_atomic_fetch_and_auto(object, operand, order) \
+  __c11_atomic_fetch_and((object), (operand), (order))
+#define iree_atomic_fetch_or_auto(object, operand, order) \
+  __c11_atomic_fetch_or((object), (operand), (order))
+#define iree_atomic_fetch_xor_auto(object, operand, order) \
+  __c11_atomic_fetch_xor((object), (operand), (order))
 #define iree_atomic_exchange_auto(object, operand, order) \
   __c11_atomic_exchange((object), (operand), (order))
 #define iree_atomic_compare_exchange_strong_auto(object, expected, desired, \
@@ -220,6 +238,12 @@ typedef int64_t iree_atomic_int64_t;
   __atomic_fetch_add((object), (operand), (order))
 #define iree_atomic_fetch_sub_auto(object, operand, order) \
   __atomic_fetch_sub((object), (operand), (order))
+#define iree_atomic_fetch_and_auto(object, operand, order) \
+  __atomic_fetch_and((object), (operand), (order))
+#define iree_atomic_fetch_or_auto(object, operand, order) \
+  __atomic_fetch_or((object), (operand), (order))
+#define iree_atomic_fetch_xor_auto(object, operand, order) \
+  __atomic_fetch_xor((object), (operand), (order))
 #define iree_atomic_exchange_auto(object, operand, order) \
   __atomic_exchange_n((object), (operand), (order))
 #define iree_atomic_compare_exchange_strong_auto(object, expected, desired, \
@@ -247,6 +271,9 @@ typedef int64_t iree_atomic_int64_t;
 #define iree_atomic_store_int32 iree_atomic_store_auto
 #define iree_atomic_fetch_add_int32 iree_atomic_fetch_add_auto
 #define iree_atomic_fetch_sub_int32 iree_atomic_fetch_sub_auto
+#define iree_atomic_fetch_and_int32 iree_atomic_fetch_and_auto
+#define iree_atomic_fetch_or_int32 iree_atomic_fetch_or_auto
+#define iree_atomic_fetch_xor_int32 iree_atomic_fetch_xor_auto
 #define iree_atomic_exchange_int32 iree_atomic_exchange_auto
 #define iree_atomic_compare_exchange_strong_int32 \
   iree_atomic_compare_exchange_strong_auto
@@ -257,6 +284,9 @@ typedef int64_t iree_atomic_int64_t;
 #define iree_atomic_store_int64 iree_atomic_store_auto
 #define iree_atomic_fetch_add_int64 iree_atomic_fetch_add_auto
 #define iree_atomic_fetch_sub_int64 iree_atomic_fetch_sub_auto
+#define iree_atomic_fetch_and_int64 iree_atomic_fetch_and_auto
+#define iree_atomic_fetch_or_int64 iree_atomic_fetch_or_auto
+#define iree_atomic_fetch_xor_int64 iree_atomic_fetch_xor_auto
 #define iree_atomic_exchange_int64 iree_atomic_exchange_auto
 #define iree_atomic_compare_exchange_strong_int64 \
   iree_atomic_compare_exchange_strong_auto
