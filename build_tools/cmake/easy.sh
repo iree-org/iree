@@ -96,7 +96,11 @@ do
     tracy) arg_tracy=1;;
     docs) arg_docs=1;;
     Debug|Release|RelWithDebInfo|MinSizeRel) arg_build_type="${args[i]}";;
-    ndk) arg_ndk="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
+    ndk)
+      arg_ndk="$(realpath -s "${args[$((i+1))]}")"
+      i=$((i+1))
+      android_platform="$(ls -1v "${arg_ndk}/platforms/" | tail -n1)"
+      ;;
     src) arg_src="$(realpath -s "${args[$((i+1))]}")"; i=$((i+1));;
     build)
       arg_build=1
@@ -172,7 +176,7 @@ function add_cmake_var() {
 add_cmake_var "${arg_build_type}" CMAKE_BUILD_TYPE "${arg_build_type}"
 add_cmake_var "${arg_ndk}" CMAKE_TOOLCHAIN_FILE "${arg_ndk}/build/cmake/android.toolchain.cmake"
 add_cmake_var "${arg_ndk}" ANDROID_ABI "arm64-v8a"
-add_cmake_var "${arg_ndk}" ANDROID_PLATFORM "$(ls -1v "${arg_ndk}/platforms/" | tail -n1)"
+add_cmake_var "${arg_ndk}" ANDROID_PLATFORM "${android_platform}"
 add_cmake_var "${arg_ndk}" IREE_HOST_C_COMPILER "$(which "$CC")"
 add_cmake_var "${arg_ndk}" IREE_HOST_CXX_COMPILER "$(which "$CXX")"
 add_cmake_var "${arg_ndk}" IREE_BUILD_COMPILER OFF
