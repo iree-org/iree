@@ -37,21 +37,22 @@ then
   echo
   echo "Available configuration options:"
   echo
-  echo "  noclear      Do not erase CMakeCache.txt"
+  echo "  printonly    Just print cmake commands, do not actually run them."
+  echo "  noclear      Do not erase CMakeCache.txt."
   echo "  ccache       Use ccache if found."
-  echo "  asan         Build with AddressSanitizer"
-  echo "  msan         Build with MemorySanitizer"
-  echo "  tsan         Build with ThreadSanitizer"
-  echo "  Debug|Release|RelWithDebInfo|MinSizeRel    Set the CMake build type"
+  echo "  asan         Build with AddressSanitizer."
+  echo "  msan         Build with MemorySanitizer."
+  echo "  tsan         Build with ThreadSanitizer."
+  echo "  Debug|Release|RelWithDebInfo|MinSizeRel    Set the CMake build type."
   echo "  src <path>   Specify IREE source path. Default: inferred from script path."
   echo "  ndk <path>   Specify Android NDK path. Make an Android build."
-  echo "  docs         Build docs"
-  echo "  tracy        Build with Tracy profiler instrumentation"
-  echo "  py           Build Python bindings"
-  echo "  java         Build Java bindings"
-  echo "  tf           Build TensorFlow compiler frontend"
-  echo "  tflite       Build TFLite compiler frontend"
-  echo "  xla          Build XLA compiler frontend"
+  echo "  docs         Build docs."
+  echo "  tracy        Build with Tracy profiler instrumentation."
+  echo "  py           Build Python bindings."
+  echo "  java         Build Java bindings."
+  echo "  tf           Build TensorFlow compiler frontend."
+  echo "  tflite       Build TFLite compiler frontend."
+  echo "  xla          Build XLA compiler frontend."
   echo
   echo "Examples:"
   echo
@@ -87,6 +88,7 @@ for (( i=0; i < $#; i++ ))
 do
   case "${args[i]}" in
     noclear) arg_noclear=1;;
+    printonly) arg_printonly=1;;
     ccache) arg_ccache=1;;
     asan) arg_asan=1;;
     msan) arg_msan=1;;
@@ -226,6 +228,11 @@ then
   echo
   echo "$build_cmdline"
   echo
+fi
+
+if [[ "${arg_printonly}" == 1 ]]
+then
+  exit 0
 fi
 
 if [[ -f "CMakeCache.txt" && -z "${arg_noclear}" ]]
