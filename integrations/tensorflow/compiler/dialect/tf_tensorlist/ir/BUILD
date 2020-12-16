@@ -59,7 +59,6 @@ cc_library(
     hdrs = ["tf_tensorlist_dialect.h"],
     deps = [
         ":ir",
-        "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_flow_to_hal",
         "@llvm-project//mlir:IR",
     ],
 )

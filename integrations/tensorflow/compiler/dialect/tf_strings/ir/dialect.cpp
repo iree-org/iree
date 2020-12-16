@@ -14,7 +14,6 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
 
-#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_flow_to_hal.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -23,14 +22,13 @@
 #include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/op_interface.cpp.inc"
 
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<TFStringsDialect>()) {
-  addInterfaces<TFStringsToHALConversionInterface>();
   addTypes<StringType>();
 
 #define GET_OP_LIST
@@ -61,5 +59,5 @@ bool TFStringsType::classof(Type type) {
 }
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

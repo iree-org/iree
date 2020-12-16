@@ -20,6 +20,25 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListBase.td"
 include "mlir/IR/OpBase.td"
 
+def TensorList_TensorOrBuffer : AnyTypeOf<[HAL_BufferView, AnyRankedTensor]>;
+
+def TensorList_ReserveTensor : Op<TensorList_Dialect, "Reserve.Tensor"> {
+  let summary = [{Create a new tensorlist with a given capacity.}];
+  let description = [{
+    Create a new tensorlist with a given capacity.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$element_shape,
+    AnyRankedTensor:$count,
+    TypeAttr:$element_type
+  );
+
+  let results = (outs
+    TensorList_TensorList:$list
+  );
+}
+
 def TensorList_Reserve : Op<TensorList_Dialect, "Reserve"> {
   let summary = [{Create a new tensorlist with a given capacity.}];
   let description = [{
@@ -47,12 +66,10 @@ def TensorList_GetItem : Op<TensorList_Dialect, "GetItem"> {
   let arguments = (ins
     TensorList_TensorList:$list,
     // TODO(silvasean): Convert to `I32:$index` instead.
-    HAL_BufferView:$index
+    TensorList_TensorOrBuffer:$index
   );
 
-  let results = (outs
-    HAL_BufferView:$item
-  );
+  let results = (outs TensorList_TensorOrBuffer:$item);
 }
 
 def TensorList_SetItem : Op<TensorList_Dialect, "SetItem"> {
@@ -65,8 +82,8 @@ def TensorList_SetItem : Op<TensorList_Dialect, "SetItem"> {
   let arguments = (ins
     TensorList_TensorList:$list,
     // TODO(silvasean): Convert to `I32:$index` instead.
-    HAL_BufferView:$index,
-    HAL_BufferView:$item
+    TensorList_TensorOrBuffer:$index,
+    TensorList_TensorOrBuffer:$item
   );
 
   let results = (outs
@@ -81,10 +98,28 @@ def TensorList_FromTensor : Op<TensorList_Dialect, "FromTensor"> {
     a tensorlist `list` of length equal to `tensor`'s leading dimension.
   }];
   let arguments = (ins
-    HAL_BufferView:$tensor
+    TensorList_TensorOrBuffer:$tensor
   );
   let results = (outs
     TensorList_TensorList:$list
+  );
+}
+
+def TensorList_StackTensor : Op<TensorList_Dialect, "Stack.Tensor"> {
+  let summary = "Creates a tensor by stacking the tensors in the tensorlist";
+  let description = [{
+    Creates a new tensor `tensor` by stacking the tensors in `list`.
+    The resulting tensor has a leading dimension equal to the length of `list`.
+
+    Requires the list to be non-empty.
+    Requires all tensors contained in `list` to be the same shape.
+  }];
+  let arguments = (ins
+    TensorList_TensorList:$list,
+    AnyRankedTensor:$num_elements
+  );
+  let results = (outs
+    AnyRankedTensor:$tensor
   );
 }
 
@@ -104,6 +139,24 @@ def TensorList_Stack : Op<TensorList_Dialect, "Stack"> {
   );
   let results = (outs
     HAL_BufferView:$tensor
+  );
+}
+
+def TensorList_ConcatTensor : Op<TensorList_Dialect, "Concat.Tensor"> {
+  let summary = "Creates a tensor by concatenate the tensors in the tensorlist";
+  let description = [{
+    Creates a new tensor `tensor` by concatenating the tensors in `list` along
+    the leading dimension.
+
+    Requires the list to be non-empty.
+    Requires all tensors contained in `list` to have the same dimensions along
+    the non-leading axes.
+  }];
+  let arguments = (ins
+    TensorList_TensorList:$list
+  );
+  let results = (outs
+    AnyRankedTensor:$tensor
   );
 }
 

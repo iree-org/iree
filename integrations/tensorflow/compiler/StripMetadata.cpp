@@ -20,7 +20,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 static bool isTFAttr(NamedAttribute &namedAttr) {
@@ -101,5 +101,5 @@ static PassRegistration<StripFunctionMetadataPass> funcPass(
     "Remove unneeded TensorFlow attributes from func ops");
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

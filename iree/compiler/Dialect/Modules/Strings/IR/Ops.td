@@ -20,6 +20,8 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
+def STRINGS_ValueTensor : AnyTypeOf<[HAL_BufferView, AnyRankedTensor]>;
+
 def STRINGS_Dialect : Dialect {
   let name = "strings";
   let cppNamespace = "::mlir::iree_compiler::IREE::Strings";
@@ -71,7 +73,7 @@ def STRINGS_ToStringTensorOp : Op<STRINGS_Dialect, "to_string_tensor", [NoSideEf
     Converts a hal buffer to a tensor of strings representation.
   }];
 
-  let arguments = (ins HAL_BufferView:$value);
+  let arguments = (ins STRINGS_ValueTensor:$value);
 
   let results = (outs
     STRINGS_StringTensor:$result
@@ -98,7 +100,7 @@ def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
   }];
 
   let arguments = (ins STRINGS_StringTensor:$dict,
-                  HAL_BufferView:$ids);
+                  STRINGS_ValueTensor:$ids);
 
   let results = (outs
     STRINGS_StringTensor:$result

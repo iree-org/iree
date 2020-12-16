@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "Conversion",
-    srcs = [
-        "ConversionPatterns.cpp",
-    ],
-    hdrs = [
-        "ConversionPatterns.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/Modules/TensorList/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Transforms",
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
     ],
 )

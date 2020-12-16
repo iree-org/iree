@@ -19,8 +19,7 @@
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
+#include "integrations/tensorflow/compiler/dialect/utils/conversion_utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -33,7 +32,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 namespace {
@@ -87,68 +86,20 @@ struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {
 };
 
 class ConvertTFToTFStringsPass
-    : public PassWrapper<ConvertTFToTFStringsPass, OperationPass<ModuleOp>> {
+    : public ConversionPass<ConvertTFToTFStringsPass, StringTypeConverter> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::TF::TensorFlowDialect, TFStringsDialect,
                     StandardOpsDialect>();
   }
 
-  void runOnOperation() override {
-    if (failed(run())) {
-      signalPassFailure();
-    }
-  }
-  LogicalResult run() {
-    auto module = getOperation();
-    OpBuilder builder(module.getContext());
-    OwningRewritePatternList patterns;
-    StringTypeConverter typeConverter;
-
-    // Lower to the standard string operations.
-    ConversionTarget target(getContext());
+  void Setup(ConversionTarget &target,
+             OwningRewritePatternList &patterns) override {
     target.addIllegalOp<TF::AsStringOp>();
     target.addIllegalOp<TF::PrintV2Op>();
     target.addLegalDialect<tf_strings::TFStringsDialect>();
-    target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-      StringTypeConverter typeConverter;
-      return typeConverter.isSignatureLegal(op.getType()) &&
-             typeConverter.isLegal(&op.getBody());
-    });
 
-    target.addDynamicallyLegalOp<ReturnOp>([](ReturnOp op) {
-      StringTypeConverter typeConverter;
-      auto func = [&](Type type) { return typeConverter.isLegal(type); };
-      return llvm::all_of(op.getOperandTypes(), func);
-    });
-
-    target.addDynamicallyLegalOp<CallOp>([](CallOp op) {
-      StringTypeConverter typeConverter;
-      auto func = [&](Type type) { return typeConverter.isLegal(type); };
-      return llvm::all_of(op.getOperandTypes(), func) &&
-             llvm::all_of(op.getResultTypes(), func);
-    });
-
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), typeConverter);
-    populateCallOpTypeConversionPattern(patterns, &getContext(), typeConverter);
-    populateTFToTFStringsPatterns(&getContext(), patterns);
-
-    auto result = applyPartialConversion(module.getOperation(), target,
-                                         std::move(patterns));
-
-    // Partial conversion doesn't include return types. Update in a separate
-    // walk.
-    module.walk([&](Operation *op) {
-      for (auto result : op->getResults()) {
-        auto result_type = result.getType();
-        auto new_type = typeConverter.convertType(result_type);
-        if (new_type) {
-          result.setType(typeConverter.convertType(result_type));
-        }
-      }
-    });
-
-    return result;
+    populateTFToTFStringsPatterns(&this->getContext(), patterns);
   }
 };
 
@@ -169,5 +120,5 @@ static PassRegistration<ConvertTFToTFStringsPass> pass(
     "Converts TF string ops to the IREE tf_strings dialect");
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

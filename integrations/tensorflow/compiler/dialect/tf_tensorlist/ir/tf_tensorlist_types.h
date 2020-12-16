@@ -18,7 +18,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 class TensorListType
@@ -28,7 +28,7 @@ class TensorListType
 };
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // THIRD_PARTY_TENSORFLOW_COMPILER_MLIR_TENSORFLOW_IR_TF_TENSORLIST_TYPES_H_

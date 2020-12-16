@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
-#define IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
+#ifndef IREE_INTEGRATIONS_TENSORFLOW_TFTENSORLIST_CONVERSION_CONVERTTFTENSORLISTTOTENSORLIST_H_
+#define IREE_INTEGRATIONS_TENSORFLOW_TFTENSORLIST_CONVERSION_CONVERTTFTENSORLISTTOTENSORLIST_H_
 
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_types.h"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListDialect.h"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Strings {
+namespace iree_integrations {
+namespace tf_tensorlist {
 
-// Populates conversion patterns from the string dialect to the VM dialect.
-void populateStringsToVMPatterns(MLIRContext *context,
-                                 SymbolTable &importSymbols,
-                                 OwningRewritePatternList &patterns,
-                                 TypeConverter &typeConverter);
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertTFTensorListToTensorListPass();
 
-}  // namespace Strings
-}  // namespace IREE
-}  // namespace iree_compiler
+}  // namespace tf_tensorlist
+}  // namespace iree_integrations
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_CONVERSION_STRINGSTOVM_H_
+#endif

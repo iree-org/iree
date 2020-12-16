@@ -63,6 +63,7 @@ cc_library(
     deps = [
         ":IR",
         ":Ops_gen",
+        "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/Strings:strings_imports",
         "//iree/compiler/Dialect/Modules/Strings/Conversion",

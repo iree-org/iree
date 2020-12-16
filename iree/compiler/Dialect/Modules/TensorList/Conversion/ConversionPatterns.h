@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERT_HAL_TO_VM_H_
-#define IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERT_HAL_TO_VM_H_
+#ifndef IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERSION_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERSION_PATTERNS_H_
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -22,6 +22,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace TensorList {
+
+// Populates conversion patterns from the TensorList dialect to the HAL
+// dialect.
+void populateTensorListToHALPatterns(MLIRContext *context,
+                                     OwningRewritePatternList &patterns,
+                                     TypeConverter &typeConverter);
 
 // Populates conversion patterns from the TensorList dialect to the VM
 // dialect.
@@ -35,4 +41,4 @@ void populateTensorListToVMPatterns(MLIRContext *context,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif
+#endif  // IREE_COMPILER_DIALECT_MODULES_TENSORLIST_CONVERSION_CONVERSION_PATTERNS_H_
