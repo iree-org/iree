@@ -16,9 +16,9 @@
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
 
 #include "absl/container/inlined_vector.h"
-#include "bindings/python/pyiree/common/binding.h"
-#include "bindings/python/pyiree/common/status_utils.h"
 #include "iree/hal/api.h"
+#include "pyiree/rt/binding.h"
+#include "pyiree/rt/status_utils.h"
 
 namespace iree {
 namespace python {

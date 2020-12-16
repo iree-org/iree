@@ -1004,7 +1004,8 @@ LogicalResult ReduceOpConversion::apply(
       indexingMaps,
       getParallelAndReductionIterators(nInputRank, reductionDims.size()));
 
-  linalgOp.region().takeBody(reduceOp.body());
+  rewriter.inlineRegionBefore(reduceOp.body(), linalgOp.region(),
+                              linalgOp.region().end());
   {
     OpBuilder::InsertionGuard regionGuard(rewriter);
 
@@ -1088,7 +1089,7 @@ struct LinalgOpOnTensorConversion
     unsigned numIndices =
         op.region().begin()->getNumArguments() - numTensorOperands;
     auto &region = linalgBufferOp.region();
-    region.takeBody(op.region());
+    rewriter.inlineRegionBefore(op.region(), region, region.end());
     // Need to convert the signature to take extra arguments for the return
     // type.
     TypeConverter::SignatureConversion signatureConverter(numIndices +
