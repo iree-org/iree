@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// NOTE: the best kind of synchronization is no synchronization; always try to
-// design your algorithm so that you don't need anything from this file :)
-// See https://travisdowns.github.io/blog/2020/07/06/concurrency-costs.html
-
 #ifndef IREE_BASE_DEBUGGING_H_
 #define IREE_BASE_DEBUGGING_H_
 

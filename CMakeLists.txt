@@ -499,6 +499,7 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
+add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 
