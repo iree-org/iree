@@ -47,6 +47,14 @@ struct iree_thread_s {
 static qos_class_t iree_thread_qos_class_for_priority_class(
     iree_thread_priority_class_t priority_class);
 
+static void iree_thread_set_name(const char* name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  pthread_setname_np(name);
+  IREE_TRACE_SET_THREAD_NAME(name);
+  IREE_TRACE_ZONE_END(z0);
+  return rc;
+}
+
 static void* iree_thread_start_routine(void* param) {
   // NOTE: we own a reference to the thread handle so that the creation
   // thread can't delete this out from under us.
@@ -54,8 +62,7 @@ static void* iree_thread_start_routine(void* param) {
 
   // Set the thread name used by debuggers and tracy (which must be called on
   // the thread).
-  pthread_setname_np(thread->name);
-  IREE_TRACE_SET_THREAD_NAME(thread->name);
+  iree_thread_set_name(thread->name);
 
   // "Consume" the entry info so that we don't see it again (as we don't own
   // its lifetime).

@@ -68,13 +68,20 @@ static bool iree_thread_resumed_predicate(void* arg) {
 typedef int (*pthread_setname_np_fn_t)(pthread_t thread, const char* name);
 
 static int iree_thread_set_name(pthread_t handle, const char* name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   static pthread_setname_np_fn_t pthread_setname_np_fn = NULL;
   if (!pthread_setname_np_fn) {
     pthread_setname_np_fn =
         (pthread_setname_np_fn_t)dlsym(RTLD_DEFAULT, "pthread_setname_np");
   }
-  if (!pthread_setname_np_fn) return EINVAL;
-  return pthread_setname_np_fn(handle, name);
+  int rc;
+  if (pthread_setname_np_fn) {
+    rc = pthread_setname_np_fn(handle, name);
+  } else {
+    rc = EINVAL;
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return rc;
 }
 
 static void* iree_thread_start_routine(void* param) {

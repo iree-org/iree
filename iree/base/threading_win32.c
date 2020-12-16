@@ -50,6 +50,8 @@ static void iree_thread_set_priority_class(
 // See:
 // https://docs.microsoft.com/en-us/visualstudio/debugger/how-to-set-a-thread-name-in-native-code
 static void iree_thread_set_name(HANDLE handle, const char* name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Try first to use the modern SetThreadDescription API.
   // This will work even if a debugger is not attached meaning that tools that
   // don't use the debugger API can still query thread names. It's only
@@ -64,6 +66,7 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1, name_wide,
                         IREE_ARRAYSIZE(name_wide) - 1);
     pSetThreadDescription(handle, name_wide);
+    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -72,6 +75,7 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
     // doing any of the work if none is present. This means that a debugger
     // attached to the process after thread creation won't see thread names but
     // that's a rare case anyway.
+    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -97,6 +101,8 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
   } __except (EXCEPTION_EXECUTE_HANDLER) {
   }
 #pragma warning(pop)
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static DWORD WINAPI iree_thread_start_routine(LPVOID param) {
