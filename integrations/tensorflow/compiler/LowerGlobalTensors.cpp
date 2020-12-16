@@ -42,8 +42,9 @@ static LogicalResult rewriteTFVariableOpToFlowVariableOp(Operation &op,
                                                          Value flowPtr) {
   OpBuilder builder(&op);
   if (auto readVariable = dyn_cast<mlir::TF::ReadVariableOp>(op)) {
-    auto load = builder.create<iree_compiler::IREE::Flow::VariableLoadIndirectOp>(
-        readVariable.getLoc(), readVariable.value().getType(), flowPtr);
+    auto load =
+        builder.create<iree_compiler::IREE::Flow::VariableLoadIndirectOp>(
+            readVariable.getLoc(), readVariable.value().getType(), flowPtr);
     readVariable.value().replaceAllUsesWith(load.result());
     readVariable.erase();
   } else if (auto assignVariable = dyn_cast<mlir::TF::AssignVariableOp>(op)) {
@@ -80,9 +81,10 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
              << "Multiple exported names for global tensor not supported yet";
     }
     symNameToFlowSymName[globalTensor.sym_name()] = flowSymName;
-    auto variableOp = globalBuilder.create<iree_compiler::IREE::Flow::VariableOp>(
-        globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
-        globalTensor.type(), globalTensor.value());
+    auto variableOp =
+        globalBuilder.create<iree_compiler::IREE::Flow::VariableOp>(
+            globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
+            globalTensor.type(), globalTensor.value());
     variableOp.setPrivate();
   }
 
@@ -100,10 +102,12 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
       if (!globalTensor) {
         continue;
       }
-      auto variableAddressOp = builder.create<iree_compiler::IREE::Flow::VariableAddressOp>(
-          globalTensor.getLoc(), iree_compiler::IREE::PtrType::get(globalTensor.type()),
-          builder.getSymbolRefAttr(
-              symNameToFlowSymName[globalTensor.sym_name()]));
+      auto variableAddressOp =
+          builder.create<iree_compiler::IREE::Flow::VariableAddressOp>(
+              globalTensor.getLoc(),
+              iree_compiler::IREE::PtrType::get(globalTensor.type()),
+              builder.getSymbolRefAttr(
+                  symNameToFlowSymName[globalTensor.sym_name()]));
       typeConversionWorklist.push_back(variableAddressOp.getResult());
       func.getArgument(i).replaceAllUsesWith(variableAddressOp.getResult());
       argsToErase.push_back(i);
@@ -170,7 +174,8 @@ class LowerGlobalTensors
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::tf_saved_model::TensorFlowSavedModelDialect,
-                    iree_compiler::IREE::Flow::FlowDialect, iree_compiler::IREEDialect>();
+                    iree_compiler::IREE::Flow::FlowDialect,
+                    iree_compiler::IREEDialect>();
   }
 
   void runOnOperation() override {

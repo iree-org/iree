@@ -45,7 +45,8 @@ class StringTypeConverter : public TypeConverter {
     });
     addConversion([](TensorType type) -> Type {
       if (type.getElementType().isa<tf_strings::StringType>()) {
-        return iree_compiler::IREE::Strings::StringTensorType::get(type.getContext());
+        return iree_compiler::IREE::Strings::StringTensorType::get(
+            type.getContext());
       }
       return type;
     });
@@ -57,8 +58,9 @@ class ConvertTFStringsToStringsPass
                             StringTypeConverter> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<TFStringsDialect, iree_compiler::IREE::Strings::StringsDialect,
-                    StandardOpsDialect>();
+    registry
+        .insert<TFStringsDialect, iree_compiler::IREE::Strings::StringsDialect,
+                StandardOpsDialect>();
   }
 
   void Setup(ConversionTarget &target,
@@ -72,14 +74,18 @@ class ConvertTFStringsToStringsPass
 
 void populateTFStringsToStringsPatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns) {
-  patterns.insert<OpConversion<tf_strings::PrintOp, iree_compiler::IREE::Strings::PrintOp>>(
+  patterns.insert<
+      OpConversion<tf_strings::PrintOp, iree_compiler::IREE::Strings::PrintOp>>(
       context);
   patterns.insert<OpConversion<tf_strings::ToStringTensorOp,
-                               iree_compiler::IREE::Strings::ToStringTensorOp>>(context);
-  patterns.insert<OpConversion<tf_strings::StringTensorToStringOp,
-                               iree_compiler::IREE::Strings::StringTensorToStringOp>>(context);
+                               iree_compiler::IREE::Strings::ToStringTensorOp>>(
+      context);
   patterns.insert<
-      OpConversion<tf_strings::ToStringOp, iree_compiler::IREE::Strings::I32ToStringOp>>(
+      OpConversion<tf_strings::StringTensorToStringOp,
+                   iree_compiler::IREE::Strings::StringTensorToStringOp>>(
+      context);
+  patterns.insert<OpConversion<tf_strings::ToStringOp,
+                               iree_compiler::IREE::Strings::I32ToStringOp>>(
       context);
 }
 

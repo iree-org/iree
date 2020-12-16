@@ -39,7 +39,8 @@ class TensorListTypeConverter : public TypeConverter {
     // Required to covert any unknown or already converted types.
     addConversion([](Type type) { return type; });
     addConversion([](tf_tensorlist::TensorListType type) {
-      return iree_compiler::IREE::TensorList::TensorListType::get(type.getContext());
+      return iree_compiler::IREE::TensorList::TensorListType::get(
+          type.getContext());
     });
   }
 };
@@ -52,23 +53,23 @@ void populateTensorListToHALPatterns(MLIRContext *context,
 
 void populateTFTensorListToTensorListPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<
-      OpConversion<tf_tensorlist::Reserve, iree_compiler::IREE::TensorList::ReserveTensor>>(
+  patterns.insert<OpConversion<tf_tensorlist::Reserve,
+                               iree_compiler::IREE::TensorList::ReserveTensor>>(
       context);
-  patterns
-      .insert<OpConversion<tf_tensorlist::GetItem, iree_compiler::IREE::TensorList::GetItem>>(
-          context);
-  patterns
-      .insert<OpConversion<tf_tensorlist::SetItem, iree_compiler::IREE::TensorList::SetItem>>(
-          context);
-  patterns.insert<
-      OpConversion<tf_tensorlist::FromTensor, iree_compiler::IREE::TensorList::FromTensor>>(
+  patterns.insert<OpConversion<tf_tensorlist::GetItem,
+                               iree_compiler::IREE::TensorList::GetItem>>(
       context);
-  patterns.insert<
-      OpConversion<tf_tensorlist::Concat, iree_compiler::IREE::TensorList::ConcatTensor>>(
+  patterns.insert<OpConversion<tf_tensorlist::SetItem,
+                               iree_compiler::IREE::TensorList::SetItem>>(
       context);
-  patterns.insert<
-      OpConversion<tf_tensorlist::Stack, iree_compiler::IREE::TensorList::StackTensor>>(
+  patterns.insert<OpConversion<tf_tensorlist::FromTensor,
+                               iree_compiler::IREE::TensorList::FromTensor>>(
+      context);
+  patterns.insert<OpConversion<tf_tensorlist::Concat,
+                               iree_compiler::IREE::TensorList::ConcatTensor>>(
+      context);
+  patterns.insert<OpConversion<tf_tensorlist::Stack,
+                               iree_compiler::IREE::TensorList::StackTensor>>(
       context);
 }
 
@@ -78,13 +79,15 @@ class ConvertTFTensorlistToTensorlistPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tf_tensorlist::TFTensorListDialect,
-                    iree_compiler::IREE::TensorList::TensorListDialect, StandardOpsDialect>();
+                    iree_compiler::IREE::TensorList::TensorListDialect,
+                    StandardOpsDialect>();
   }
 
   void Setup(ConversionTarget &target,
              OwningRewritePatternList &patterns) override {
     target.addIllegalDialect<tf_tensorlist::TFTensorListDialect>();
-    target.addLegalDialect<iree_compiler::IREE::TensorList::TensorListDialect>();
+    target
+        .addLegalDialect<iree_compiler::IREE::TensorList::TensorListDialect>();
     populateTFTensorListToTensorListPatterns(&this->getContext(), patterns);
   }
 };
