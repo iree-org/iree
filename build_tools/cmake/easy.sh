@@ -18,7 +18,11 @@
 
 set -e
 
-# This syntax allows the user to override this by defining environment variables.
+# This syntax allows the user to override this by defining environment
+# variables.
+# Note that these are currently only used on Linux and Android builds, whence
+# the lack of concern about hardcoding clang as default. Might still need to
+# change this to support Android builds on Windows host?
 : ${CC:=clang}
 : ${CXX:=clang++}
 
