@@ -239,13 +239,46 @@ Status Finite::Execute(absl::Span<const T> src_buffer,
 }
 
 template <typename T>
+void TransposeRecurse(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
+                      ShapeSpan src_shape, ShapeSpan dst_shape,
+                      absl::Span<const int> src_strides,
+                      absl::Span<const int> dst_strides,
+                      absl::Span<const int32_t> perm, int rank, int dim_i,
+                      size_t src_base_offset, size_t dst_base_offset) {
+  // Two cases:
+  // -- dim_i < rank - 1: iterate on dim_i; set offsets and recurse on dim_i + 1
+  // -- dim_i = rank - 1: base case, fast copy with strides and offsets
+
+  int src_stride = src_strides[perm[dim_i]];
+  int dst_stride = dst_strides[dim_i];
+  if (dim_i < rank - 1) {
+    int recurse_dim_i = dim_i + 1;
+    for (size_t i = 0; i < dst_shape[dim_i]; ++i) {
+      size_t src_offset = src_base_offset + i * src_stride;
+      size_t dst_offset = dst_base_offset + i * dst_stride;
+      TransposeRecurse(src_buffer, dst_buffer, src_shape, dst_shape,
+                       src_strides, dst_strides, perm, rank, recurse_dim_i,
+                       src_offset, dst_offset);
+    }
+  } else {
+    for (size_t i = 0; i < dst_shape[dim_i]; ++i) {
+      size_t src_i = src_base_offset + i * src_stride;
+      // Stride for the last dim of dst is always 1.
+      size_t dst_i = dst_base_offset + i;
+      dst_buffer[dst_i] = src_buffer[src_i];
+    }
+  }
+}
+
+template <typename T>
 Status Transpose::Execute(absl::Span<const T> src_buffer,
                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
                           absl::Span<const int32_t> perm) {
-  // This implementation is .... not fast.
   int rank = src_shape.size();
+
   absl::InlinedVector<int, 8> src_strides(rank);
   absl::InlinedVector<int, 8> dst_strides(rank);
+  absl::InlinedVector<int32_t, 8> dst_shape(rank);
   size_t src_stride = 1;
   size_t dst_stride = 1;
   for (int dim_i = rank - 1; dim_i >= 0; --dim_i) {
@@ -253,17 +286,16 @@ Status Transpose::Execute(absl::Span<const T> src_buffer,
     dst_strides[dim_i] = dst_stride;
     src_stride *= src_shape[dim_i];
     dst_stride *= src_shape[perm[dim_i]];
+    dst_shape[dim_i] = src_shape[perm[dim_i]];
   }
-  for (size_t dst_i = 0; dst_i < dst_buffer.size(); ++dst_i) {
-    size_t src_i = 0;
-    size_t t = dst_i;
-    for (int dim_i = 0; dim_i < rank; ++dim_i) {
-      size_t ratio = t / dst_strides[dim_i];
-      t -= ratio * dst_strides[dim_i];
-      src_i += ratio * src_strides[perm[dim_i]];
-    }
-    dst_buffer[dst_i] = src_buffer[src_i];
-  }
+
+  // Recurse starting from the first dimension with 0 offsets.
+  int dim_i = 0;
+  size_t src_base_offset = 0;
+  size_t dst_base_offset = 0;
+  TransposeRecurse(src_buffer, dst_buffer, src_shape, dst_shape, src_strides,
+                   dst_strides, perm, rank, dim_i, src_base_offset,
+                   dst_base_offset);
   return OkStatus();
 }
 
@@ -476,7 +508,7 @@ Status Scatter::Execute(absl::Span<const T> src_buffer,
     batch_size = indices_shape[0];
   }
 
-  // Secnd dimensions of indices is the indice offset to scatter along.
+  // Second dimensions of indices is the indice offset to scatter along.
   int32_t indices_size = 1;
   if (indices_rank > 1) {
     indices_size = indices_shape[1];

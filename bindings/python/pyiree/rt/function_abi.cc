@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/rt/function_abi.h"
+#include "pyiree/rt/function_abi.h"
 
+#include "pyiree/rt/hal.h"
+#include "pyiree/rt/status_utils.h"
+#include "pyiree/rt/vm.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
-#include "bindings/python/pyiree/common/status_utils.h"
-#include "bindings/python/pyiree/rt/hal.h"
-#include "bindings/python/pyiree/rt/vm.h"
 #include "iree/base/api.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/hal/api.h"

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/common/status_utils.h"
+#include "pyiree/rt/status_utils.h"
 
 #include "absl/strings/str_cat.h"
 

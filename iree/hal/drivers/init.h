@@ -15,12 +15,12 @@
 #ifndef IREE_HAL_DRIVERS_INIT_H_
 #define IREE_HAL_DRIVERS_INIT_H_
 
+#include "iree/base/api.h"
+#include "iree/hal/api.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-#include "iree/base/api.h"
-#include "iree/hal/api.h"
 
 // Registers all drivers that were linked into the current binary based on the
 // build configuration. Note that there may be no drivers available.

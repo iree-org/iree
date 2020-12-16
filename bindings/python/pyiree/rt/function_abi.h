@@ -18,15 +18,15 @@
 #include <utility>
 #include <vector>
 
+#include "binding.h"
+#include "hal.h"
+#include "host_types.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "bindings/python/pyiree/common/binding.h"
-#include "bindings/python/pyiree/rt/hal.h"
-#include "bindings/python/pyiree/rt/host_types.h"
-#include "bindings/python/pyiree/rt/vm.h"
 #include "iree/base/signature_mangle.h"
+#include "vm.h"
 
 namespace iree {
 namespace python {
