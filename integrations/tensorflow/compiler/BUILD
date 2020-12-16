@@ -71,7 +71,7 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
-        # "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
+        "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
         "@llvm-project//llvm:Support",
