@@ -35,6 +35,11 @@ then
   echo "Runs CMake to perform configuration and/or build."
   echo "By default, erases CMakeCache.txt everytime for stateless operation."
   echo
+  echo "If 'build' is present on the command line, then all subsequent arguments are interpreted "
+  echo "as build targets. If no target is specified then everything is built."
+  echo
+  echo "If 'build' is not present on the command line then we are only configuring."
+  echo
   echo "Available configuration options:"
   echo
   echo "  printonly    Just print cmake commands, do not actually run them."
@@ -70,8 +75,6 @@ then
   echo
   echo "  Do not configure, just build iree_tools_iree-translate"
   echo "    ${relative_path_to_this_script} build iree_tools_iree-translate"
-  echo
-  echo "  Configure and build a build with ASan and CCache, only build iree_tools_iree-translate:"
 
   exit 1
 fi
