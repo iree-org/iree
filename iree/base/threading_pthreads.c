@@ -308,6 +308,9 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   CPU_SET(affinity.id, &cpu_set);
+  if (affinity.smt) {
+    CPU_SET(affinity.id + 1, &cpu_set);
+  }
   sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
 
   IREE_TRACE_ZONE_END(z0);

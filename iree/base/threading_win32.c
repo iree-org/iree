@@ -17,6 +17,8 @@
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
+#include <stdio.h>
+
 #include "iree/base/atomics.h"
 #include "iree/base/threading.h"
 #include "iree/base/threading_impl.h"
@@ -189,7 +191,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // releases the iree_thread_t handle the thread won't explode.
   iree_thread_retain(thread);
 
-
   IREE_TRACE_ZONE_END(z0);
   *out_thread = thread;
   return iree_ok_status();
@@ -271,7 +272,29 @@ void iree_thread_request_affinity(iree_thread_t* thread,
                                   iree_thread_affinity_t affinity) {
   if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  char affinity_desc[32];
+  int affinity_desc_length = snprintf(
+      affinity_desc, IREE_ARRAYSIZE(affinity_desc), "group=%d, id=%d, smt=%d",
+      affinity.group, affinity.id, affinity.smt);
+  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, affinity_desc,
+                                          affinity_desc_length);
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+  GROUP_AFFINITY group_affinity;
+  memset(&group_affinity, 0, sizeof(group_affinity));
+  group_affinity.Group = affinity.group;
+  KAFFINITY affinity_mask = 1ull << affinity.id;
+  if (affinity.smt) {
+    affinity_mask |= 1ull << (affinity.id + 1);
+  }
+  group_affinity.Mask = affinity_mask;
+  SetThreadGroupAffinity(thread->handle, &group_affinity, NULL);
+
+  // TODO(benvanik): figure out of this is a bad thing; sometimes it can result
+  // in the scheduler alternating cores within the affinity mask; in theory it's
+  // just an SMT ID change and doesn't have any impact on caches but it'd be
+  // good to check.
   PROCESSOR_NUMBER ideal_processor;
   memset(&ideal_processor, 0, sizeof(ideal_processor));
   ideal_processor.Group = affinity.group;
