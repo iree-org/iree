@@ -53,7 +53,7 @@ class UnixLinkerTool : public LinkerTool {
 #endif  // IREE_ARCH_X86_64 && IREE_PLATFORM_LINUX
     }
 // TODO(ataei, benvanik): Windows cross-linking discovery support.
-#if defined(IREE_PLATFORM_LINUX)
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
 #define UNIX_SYS_LINKER_PATH_LENGTH 255
     auto sysLinkers = {"ld", "ld.gold", "lld.ld"};
     for (auto syslinker : sysLinkers) {
@@ -68,7 +68,7 @@ class UnixLinkerTool : public LinkerTool {
 #undef UNIX_SYS_LINKER_PATH_LENGTH
 #else
     return toolPath;
-#endif  // IREE_PLATFORM_LINUX
+#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_MACOS
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,
@@ -104,7 +104,13 @@ class UnixLinkerTool : public LinkerTool {
 
     SmallVector<std::string, 8> flags = {
         getToolPath(),
+#if defined(IREE_PLATFORM_MACOS)
+        "-dylib",
+        "-undefined suppress",
+        "-flat_namespace",
+#else
         "-shared",
+#endif
         "-o " + artifacts.libraryFile.path,
     };
 
