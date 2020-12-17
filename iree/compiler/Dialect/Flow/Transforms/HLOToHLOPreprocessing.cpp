@@ -73,58 +73,6 @@ static bool hasPadding(mhlo::ConvOp op) {
                       [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
-/// Returns true if the conv op has stride attribute, and that it has
-/// non-zero entries.
-static bool hasStride(mhlo::ConvOp op) {
-  Optional<DenseIntElementsAttr> stride = op.window_strides();
-  if (!stride) return false;
-  return llvm::any_of(stride.getValue(),
-                      [](APInt v) -> bool { return !v.isOneValue(); });
-}
-
-/// Returns true if the conv op has input dilation.
-static bool hasInputDilation(mhlo::ConvOp op) {
-  Optional<DenseIntElementsAttr> dilation = op.lhs_dilation();
-  if (!dilation) return false;
-  return llvm::any_of(dilation.getValue(),
-                      [](APInt v) -> bool { return !v.isOneValue(); });
-}
-
-/// Returns true if the conv op has kernel dilation.
-static bool hasKernelDilation(mhlo::ConvOp op) {
-  Optional<DenseIntElementsAttr> dilation = op.rhs_dilation();
-  if (!dilation) return false;
-  return llvm::any_of(dilation.getValue(),
-                      [](APInt v) -> bool { return !v.isOneValue(); });
-}
-
-static bool hasNormalizedConvolution(mhlo::ConvOp op) {
-  auto dimensionNumbers = op.dimension_numbers();
-
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) {
-    return false;
-  }
-  if (dimensionNumbers.input_batch_dimension().getValue().getSExtValue() != 0) {
-    return false;
-  }
-
-  for (auto it : llvm::enumerate(dimensionNumbers.input_spatial_dimensions())) {
-    if (it.value() != it.index() + 1) return false;
-  }
-
-  for (auto it :
-       llvm::enumerate(dimensionNumbers.kernel_spatial_dimensions())) {
-    if (it.value() != it.index()) return false;
-  }
-
-  for (auto it :
-       llvm::enumerate(dimensionNumbers.output_spatial_dimensions())) {
-    if (it.value() != it.index() + 1) return false;
-  }
-
-  return true;
-}
-
 static DenseIntElementsAttr make1DElementsAttr(PatternRewriter &rewriter,
                                                ArrayRef<int64_t> integers) {
   auto type = RankedTensorType::get({static_cast<int64_t>(integers.size())},
@@ -439,8 +387,6 @@ class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
         rewriter.getI64TensorAttr(invertPermutation));
 
     rewriter.replaceOp(op, transposed.getResult());
-
-    transposed.dump();
     return success();
   }
 };
