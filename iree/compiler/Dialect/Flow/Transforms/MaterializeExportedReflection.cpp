@@ -140,7 +140,7 @@ class MaterializeExportedReflectionPass
             << " may not be invokable by standard tools";
         mangled = unrecognizedTypeAttr(builder, 'I');
       }
-      MutableDictionaryAttr l(
+      NamedAttrList l(
           func.getArgAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
       func.setArgAttr(i, "iree.reflection",
@@ -157,7 +157,7 @@ class MaterializeExportedReflectionPass
             << " may not be invokable by standard tools";
         mangled = unrecognizedTypeAttr(builder, 'R');
       }
-      MutableDictionaryAttr l(
+      NamedAttrList l(
           func.getResultAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
       func.setResultAttr(i, "iree.reflection",
