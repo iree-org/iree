@@ -46,8 +46,8 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo_fuse_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
+        "@mlir_hlo//:hlo",
+        "@mlir_hlo//:lhlo_fuse_linalg",
+        "@mlir_hlo//:mhlo_to_mhlo_lowering_patterns",
     ],
 )

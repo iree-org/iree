@@ -38,9 +38,9 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir_hlo//:hlo",
+        "@mlir_hlo//:legalize_to_linalg",
+        "@mlir_hlo//:map_lmhlo_to_scalar_op",
     ],
 )
 
@@ -73,7 +73,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir_hlo//:hlo",
+        "@mlir_hlo//:map_lmhlo_to_scalar_op",
     ],
 )

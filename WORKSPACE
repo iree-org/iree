@@ -168,6 +168,16 @@ load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 ###############################################################################
 
 ###############################################################################
+# MLIR-HLO
+
+maybe(
+    local_repository,
+    name = "mlir_hlo",
+    path = "third_party/mlir-hlo",
+)
+###############################################################################
+
+###############################################################################
 # Autoconfigure native build repo for python.
 load("//bindings/python/build_tools/python:configure.bzl", "python_configure")
 

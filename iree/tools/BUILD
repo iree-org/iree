@@ -184,8 +184,8 @@ cc_library(
     ],
     deps = [
         "@llvm-project//mlir:IR",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo",
+        "@mlir_hlo//:hlo",
+        "@mlir_hlo//:lhlo",
     ],
 )
 
