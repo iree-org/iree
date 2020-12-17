@@ -62,9 +62,18 @@ $ python -m pip install tf-nightly
 
 ## Building
 
+From the *parent* directory of the IREE git repository clone, create and enter
+a build directory, such as:
+
+```shell
+$ mkdir iree-build
+$ cd iree-build
+```
+
+Then build like this:
+
 ```shell
 # Also include -DIREE_BUILD_TENSORFLOW_COMPILER=ON if you want the TF compiler.
-$ cd iree-build/  # Make and cd into some build directory
 $ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
