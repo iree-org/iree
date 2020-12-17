@@ -255,9 +255,8 @@ if(${IREE_BUILD_COMPILER})
       "init_translations.h"
     DEPS
       iree::compiler::Translation::IREEVM
-      MLIRSPIRVSerialization
       MLIRSPIRVTranslateRegistration
-      ) 
+      )
 
   iree_cc_library(
     NAME
