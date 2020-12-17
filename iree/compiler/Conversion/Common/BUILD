@@ -45,7 +45,6 @@ cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
