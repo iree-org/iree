@@ -168,7 +168,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRAffine
       MLIRAffineTransforms
       MLIRGPU
-      MLIRGPUToSPIRVTransforms
+      MLIRGPUToSPIRV
       MLIRIR
       MLIRLLVMIR
       MLIRLinalg
@@ -184,7 +184,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTransforms
       MLIRShape
       MLIRStandard
-      MLIRStandardToSPIRVTransforms
+      MLIRStandardToSPIRV
       MLIRTransforms
       MLIRVector
     PUBLIC
