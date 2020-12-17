@@ -294,7 +294,7 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult DispatchWorkgroupRankOp::fold(ArrayRef<Attribute> operands) {
-  if (auto dispatchOp = this->getParentOfType<DispatchWorkgroupsOp>()) {
+  if (auto dispatchOp = (*this)->getParentOfType<DispatchWorkgroupsOp>()) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             APInt(64, dispatchOp.workgroup_count().size()));
   }
