@@ -256,7 +256,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::compiler::Translation::IREEVM
       MLIRSPIRVTranslateRegistration
-      )
+ )
 
   iree_cc_library(
     NAME
