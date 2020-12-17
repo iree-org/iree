@@ -21,6 +21,7 @@
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -944,7 +945,8 @@ class ReorderBroadcastInDimOpAndElementwiseOp
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<shape::ShapeDialect, mhlo::MhloDialect>();
+    registry.insert<shape::ShapeDialect, mhlo::MhloDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnFunction() override {
@@ -956,7 +958,8 @@ struct HLOToHLOPreprocessing
     // whether it was legalized away at a higher level.
     chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<shape::ShapeDialect, mhlo::MhloDialect,
-                                     mlir::StandardOpsDialect>();
+                                     mlir::StandardOpsDialect,
+                                     mlir::tensor::TensorDialect>();
     conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
                                       std::move(conversionPatterns)))) {

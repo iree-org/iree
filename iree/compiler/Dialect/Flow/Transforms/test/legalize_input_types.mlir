@@ -81,9 +81,9 @@ func @tensorUnrankedArg(%arg0 : tensor<*xi64>) -> tensor<*xi64> {
 
 // -----
 func @tensorUnrankedValue(%arg0 : tensor<4xi64>) -> tensor<4xi64> {
-  // expected-error@+1 {{'std.tensor_cast' op unable to legalize operation types}}
-  %0 = tensor_cast %arg0 : tensor<4xi64> to tensor<*xi64>
-  %1 = tensor_cast %0 : tensor<*xi64> to tensor<4xi64>
+  // expected-error@+1 {{'tensor.cast' op unable to legalize operation types}}
+  %0 = tensor.cast %arg0 : tensor<4xi64> to tensor<*xi64>
+  %1 = tensor.cast %0 : tensor<*xi64> to tensor<4xi64>
   return %1 : tensor<4xi64>
 }
 
