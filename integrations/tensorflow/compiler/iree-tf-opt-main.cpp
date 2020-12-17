@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerHALTargetBackends();
 
   mlir::RegisterAllTensorFlowDialects(registry);
-  mlir::iree_compiler::TF::registerAllDialects(registry);
-  mlir::iree_compiler::TF::registerAllPasses();
+  mlir::iree_integrations::TF::registerAllDialects(registry);
+  mlir::iree_integrations::TF::registerAllPasses();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,

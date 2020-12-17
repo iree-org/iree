@@ -33,12 +33,12 @@ class StringsModule(tf.Module):
     string_tensor = tf.strings.as_string(ids)
     tf.print(string_tensor)
 
-  @tf.function(input_signature=[
-      tf.TensorSpec((None, None), dtype=tf.int32),
-  ])
-  def strings_to_ids(self, ids):
-    wps = tf.gather(self.wordparts, ids)
-    return tf.strings.reduce_join(wps, 1)
+#  @tf.function(input_signature=[
+#      tf.TensorSpec((None, None), dtype=tf.int32),
+#  ])
+#  def strings_to_ids(self, ids):
+#    wps = tf.gather(self.wordparts, ids)
+#    return tf.strings.reduce_join(wps, 1)
 
 
 class StringsTest(tf_test_utils.TracedModuleTestCase):
@@ -50,22 +50,21 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
   def test_print_ids(self):
 
     def print_ids(module):
-      input_ids = np.asarray(
-          [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
-           [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
+      input_ids = np.asarray([[1, 2, 3, 4, 5, 6], [10, 11, 12, 14, 15, 16]],
+                             dtype=np.int32)
       module.print_ids(input_ids)
 
     self.compare_backends(print_ids, self._modules)
 
-  def test_strings_to_ids(self):
-
-    def strings_to_ids(module):
-      input_ids = np.asarray(
-          [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
-           [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-      module.strings_to_ids(input_ids)
-
-    self.compare_backends(strings_to_ids, self._modules)
+#  def test_strings_to_ids(self):
+#
+#    def strings_to_ids(module):
+#      input_ids = np.asarray(
+#          [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
+#           [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
+#      module.strings_to_ids(input_ids)
+#
+#    self.compare_backends(strings_to_ids, self._modules)
 
 
 def main(argv):

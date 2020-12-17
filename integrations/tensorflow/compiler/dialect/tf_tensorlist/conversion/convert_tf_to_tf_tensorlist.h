@@ -18,13 +18,13 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 std::unique_ptr<OperationPass<FuncOp>> createConvertTFToTFTensorListPass();
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_CONVERTTFTOTFTENSORLIST_H_

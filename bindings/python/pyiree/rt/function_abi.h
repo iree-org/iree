@@ -18,13 +18,13 @@
 #include <utility>
 #include <vector>
 
-#include "binding.h"
-#include "hal.h"
-#include "host_types.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "binding.h"
+#include "hal.h"
+#include "host_types.h"
 #include "iree/base/signature_mangle.h"
 #include "vm.h"
 

@@ -21,7 +21,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 // Determine whether we should bypass the cast for input (a) to output (b).
@@ -117,5 +117,5 @@ static PassRegistration<PropagateResourceCastsPass> pass(
     "iree-tf-propagate-resource-casts", "Propagates tf.resource type casts");
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

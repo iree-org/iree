@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
-    "StringsToVM.h"
+    "ConversionPatterns.h"
   SRCS
-    "StringsToVM.cc"
+    "ConversionPatterns.cc"
   DEPS
     LLVMSupport
     MLIRIR
@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Modules::Strings::IR
     iree::compiler::Dialect::VM::Conversion

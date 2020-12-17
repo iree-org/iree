@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_flow_to_hal.h"
+#include "iree/compiler/Dialect/Modules/TensorList/Conversion/ConversionPatterns.h"
 
-#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.h"
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/PatternMatch.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace TensorList {
 
 namespace {
 
@@ -46,13 +45,15 @@ Value getBufferView(Operation *srcOp, Value srcOperand, Value dstOperand,
   return bufferView;
 }
 
-class ReserveOpConversion : public OpConversionPattern<tf_tensorlist::Reserve> {
+class ReserveOpConversion
+    : public OpConversionPattern<IREE::TensorList::ReserveTensor> {
  public:
   ReserveOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      tf_tensorlist::Reserve reserveOp, llvm::ArrayRef<Value> newOperands,
+      IREE::TensorList::ReserveTensor reserveOp,
+      llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     auto elementTy = reserveOp.element_type();
     auto element_value = IREE::HAL::getElementTypeValue(elementTy).getValue();
@@ -74,13 +75,15 @@ class ReserveOpConversion : public OpConversionPattern<tf_tensorlist::Reserve> {
   }
 };
 
-class ConcatOpConversion : public OpConversionPattern<tf_tensorlist::Concat> {
+class ConcatOpConversion
+    : public OpConversionPattern<IREE::TensorList::ConcatTensor> {
  public:
   ConcatOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      tf_tensorlist::Concat concatOp, llvm::ArrayRef<Value> newOperands,
+      IREE::TensorList::ConcatTensor concatOp,
+      llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     auto device =
         rewriter.createOrFold<IREE::HAL::ExSharedDeviceOp>(concatOp.getLoc());
@@ -101,13 +104,14 @@ class ConcatOpConversion : public OpConversionPattern<tf_tensorlist::Concat> {
   }
 };
 
-class StackOpConversion : public OpConversionPattern<tf_tensorlist::Stack> {
+class StackOpConversion
+    : public OpConversionPattern<IREE::TensorList::StackTensor> {
  public:
   StackOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      tf_tensorlist::Stack stackOp, llvm::ArrayRef<Value> newOperands,
+      IREE::TensorList::StackTensor stackOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     auto device =
         rewriter.createOrFold<IREE::HAL::ExSharedDeviceOp>(stackOp.getLoc());
@@ -136,24 +140,39 @@ class StackOpConversion : public OpConversionPattern<tf_tensorlist::Stack> {
 void populateTensorListToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
                                      TypeConverter &typeConverter) {
-  // We can use the HAL conversion handler for this tensor->buffer conversion
-  // as we just want the simple form. If we wanted to perform additional
-  // verification or have a specific use case (such as a place where only the
-  // buffer is required and the shape is not) we could add our own.
+  patterns.insert<HALOpConversion<IREE::TensorList::FromTensor,
+                                  IREE::TensorList::FromTensor>>(context,
+                                                                 typeConverter);
   patterns.insert<
-      HALOpConversion<tf_tensorlist::GetItem, IREE::TensorList::GetItem>>(
+      HALOpConversion<IREE::TensorList::GetItem, IREE::TensorList::GetItem>>(
       context, typeConverter);
   patterns.insert<
-      HALOpConversion<tf_tensorlist::SetItem, IREE::TensorList::SetItem>>(
+      HALOpConversion<IREE::TensorList::SetItem, IREE::TensorList::SetItem>>(
       context, typeConverter);
-  patterns.insert<
-      HALOpConversion<tf_tensorlist::FromTensor, IREE::TensorList::FromTensor>>(
-      context, typeConverter);
-
   patterns.insert<ConcatOpConversion>(context, typeConverter);
   patterns.insert<ReserveOpConversion>(context, typeConverter);
   patterns.insert<StackOpConversion>(context, typeConverter);
 }
 
+void populateTensorListToVMPatterns(MLIRContext *context,
+                                    SymbolTable &importSymbols,
+                                    OwningRewritePatternList &patterns,
+                                    TypeConverter &typeConverter) {
+  patterns.insert<VMImportOpConversion<IREE::TensorList::Reserve>>(
+      context, importSymbols, typeConverter, "tensorlist.reserve");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::GetItem>>(
+      context, importSymbols, typeConverter, "tensorlist.get_item");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::SetItem>>(
+      context, importSymbols, typeConverter, "tensorlist.set_item");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::FromTensor>>(
+      context, importSymbols, typeConverter, "tensorlist.from_tensor");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::Concat>>(
+      context, importSymbols, typeConverter, "tensorlist.concat");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::Stack>>(
+      context, importSymbols, typeConverter, "tensorlist.stack");
+}
+
+}  // namespace TensorList
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

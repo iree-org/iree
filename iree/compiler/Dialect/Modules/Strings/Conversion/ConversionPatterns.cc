@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Modules/Strings/Conversion/StringsToVM.h"
+#include "iree/compiler/Dialect/Modules/Strings/Conversion/ConversionPatterns.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 
@@ -21,6 +22,14 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Strings {
+
+void populateStringsToHALPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns,
+                                  TypeConverter &typeConverter) {
+  patterns.insert<HALOpConversion<IREE::Strings::ToStringTensorOp,
+                                  IREE::Strings::ToStringTensorOp>>(
+      context, typeConverter);
+}
 
 void populateStringsToVMPatterns(MLIRContext *context,
                                  SymbolTable &importSymbols,

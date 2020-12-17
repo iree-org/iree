@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/hal/drivers/init.h"
 #include "pyiree/rt/binding.h"
 #include "pyiree/rt/function_abi.h"
 #include "pyiree/rt/hal.h"
 #include "pyiree/rt/host_types.h"
 #include "pyiree/rt/status_utils.h"
 #include "pyiree/rt/vm.h"
-#include "iree/hal/drivers/init.h"
 
 namespace iree {
 namespace python {
