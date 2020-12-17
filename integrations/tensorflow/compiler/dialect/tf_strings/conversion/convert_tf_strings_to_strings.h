@@ -30,7 +30,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertTFStringsToStringsPass();
 
 // Populates conversion patterns from the tensor-based custom dialect ops to the
 // HAL buffer-based ones.
-void populateTFStringsToStringsPatterns(MLIRContext *ctx,
+void populateTFStringsToStringsPatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns);
 
 }  // namespace tf_strings
