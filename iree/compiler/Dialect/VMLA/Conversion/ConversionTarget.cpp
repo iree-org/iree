@@ -77,7 +77,7 @@ static Attribute convertAttribute(Attribute srcAttribute) {
   auto elementsAttr = srcAttribute.dyn_cast<ElementsAttr>();
   auto tensorType = attrType.dyn_cast<RankedTensorType>();
   auto indexType = IndexType::get(context);
-  auto i64Type = IntegerType::get(64, context);
+  auto i64Type = IntegerType::get(context, 64);
   // Detect and convert index and i64 tensor attributes to i32 since these
   // invariably must be imported as some kind of VM constant, and the VM is
   // 32bit only.
@@ -86,7 +86,7 @@ static Attribute convertAttribute(Attribute srcAttribute) {
   if (elementsAttr && tensorType &&
       (tensorType.getElementType() == i64Type ||
        tensorType.getElementType() == indexType)) {
-    auto i32Type = IntegerType::get(32, context);
+    auto i32Type = IntegerType::get(context, 32);
     using func_type = APInt(const APInt &);
     return elementsAttr.mapValues(
         i32Type, llvm::function_ref<func_type>([](const APInt &in) -> APInt {

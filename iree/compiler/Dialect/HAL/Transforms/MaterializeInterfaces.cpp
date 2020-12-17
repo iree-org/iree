@@ -144,7 +144,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
 
   // Functions take all I/O through the interface API.
   auto sourceFuncType = clonedFuncOp.getType();
-  auto thunkFuncType = FunctionType::get({}, {}, clonedFuncOp.getContext());
+  auto thunkFuncType = FunctionType::get(clonedFuncOp.getContext(), {}, {});
   auto thunkFuncOp = FuncOp::create(clonedFuncOp.getLoc(),
                                     clonedFuncOp.getName(), thunkFuncType);
   clonedFuncOp.setName((clonedFuncOp.getName() + "_impl").str());

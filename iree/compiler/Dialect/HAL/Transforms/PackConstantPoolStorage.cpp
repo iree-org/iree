@@ -269,7 +269,7 @@ class PackConstantPoolStoragePass
     }
     storageBuffer.data = DenseElementsAttr::getFromRawBuffer(
         VectorType::get({static_cast<int64_t>(storageBuffer.totalSize)},
-                        IntegerType::get(8, context)),
+                        IntegerType::get(context, 8)),
         buffer,
         /*isSplatBuffer=*/false);
   }

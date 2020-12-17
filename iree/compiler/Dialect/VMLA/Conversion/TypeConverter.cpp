@@ -25,7 +25,7 @@ VMLATypeConverter::VMLATypeConverter() {
   addConversion([](Type type) -> Type {
     if (type.isInteger(1)) {
       // Widen i1 to i8.
-      return IntegerType::get(8, type.getContext());
+      return IntegerType::get(type.getContext(), 8);
     }
     return type;
   });

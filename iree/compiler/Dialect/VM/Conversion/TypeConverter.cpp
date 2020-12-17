@@ -58,7 +58,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
       return integerType;
     } else if (integerType.getIntOrFloatBitWidth() < 32) {
       // Promote i1/i8/i16 -> i32.
-      return IntegerType::get(32, integerType.getContext());
+      return IntegerType::get(integerType.getContext(), 32);
     } else if (integerType.isInteger(64)) {
       if (targetOptions_.i64Extension) {
         // i64 is supported by the VM, use directly.
@@ -66,7 +66,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
       } else if (targetOptions_.truncateUnsupportedIntegers) {
         // i64 is not supported and we still want to compile, so truncate to i32
         // (unsafe if all bits are actually required!).
-        return IntegerType::get(32, integerType.getContext());
+        return IntegerType::get(integerType.getContext(), 32);
       }
     }
     return llvm::None;
@@ -74,7 +74,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
 
   // Convert index types to the target bit width.
   addConversion([this](IndexType indexType) -> Optional<Type> {
-    return IntegerType::get(targetOptions_.indexBits, indexType.getContext());
+    return IntegerType::get(indexType.getContext(), targetOptions_.indexBits);
   });
 
   // Vectors are used for arbitrary byte storage.
@@ -87,7 +87,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   addConversion([this](Shape::RankedShapeType rankedShape,
                        SmallVectorImpl<Type> &results) {
     auto indexType =
-        IntegerType::get(targetOptions_.indexBits, rankedShape.getContext());
+        IntegerType::get(rankedShape.getContext(), targetOptions_.indexBits);
     for (int i = 0; i < rankedShape.getRank(); ++i) {
       if (rankedShape.isDimDynamic(i)) {
         results.push_back(indexType);

@@ -158,14 +158,14 @@ struct MatMulF32 {
 struct MatMulI8 {
   using Type = uint8_t;
   static mlir::Type getMLIRType(MLIRContext &ctx) {
-    return IntegerType::get(8, &ctx);
+    return IntegerType::get(&ctx, 8);
   }
 };
 
 struct MatMulI32 {
   using Type = uint32_t;
   static mlir::Type getMLIRType(MLIRContext &ctx) {
-    return IntegerType::get(32, &ctx);
+    return IntegerType::get(&ctx, 32);
   }
 };
 

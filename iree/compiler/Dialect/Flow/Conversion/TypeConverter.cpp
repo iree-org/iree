@@ -32,7 +32,7 @@ FlowTypeConverter::FlowTypeConverter() {
       // Don't support 64-bit types in general. Rewrite to i32 (if desired).
       // TODO(benvanik): split to i32+i32? allow and use availability?
       // TODO(benvanik): make an option.
-      return IntegerType::get(32, integerType.getContext());
+      return IntegerType::get(integerType.getContext(), 32);
     }
     return llvm::None;
   });

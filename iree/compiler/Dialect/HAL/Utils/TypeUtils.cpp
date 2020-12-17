@@ -45,7 +45,7 @@ TensorType convertTensorTypeToABIType(TensorType sourceType) {
   if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
     int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
     targetElementType =
-        IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+        IntegerType::get(sourceElementType.getContext(), targetByteWidth * 8);
   }
   return RankedTensorType::get(sourceType.getShape(), targetElementType);
 }

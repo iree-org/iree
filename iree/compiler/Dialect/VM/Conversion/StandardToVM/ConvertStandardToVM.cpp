@@ -109,9 +109,9 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
-    auto newFuncType =
-        mlir::FunctionType::get(signatureConversion.getConvertedTypes(),
-                                convertedResultTypes, srcOp.getContext());
+    auto newFuncType = mlir::FunctionType::get(
+        srcOp.getContext(), signatureConversion.getConvertedTypes(),
+        convertedResultTypes);
     auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
@@ -296,7 +296,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     uint64_t amountRaw = amount.getZExtValue();
     if (amountRaw > kBits) return failure();
     IntegerAttr amountAttr =
-        IntegerAttr::get(IntegerType::get(8, srcOp.getContext()), amountRaw);
+        IntegerAttr::get(IntegerType::get(srcOp.getContext(), 8), amountRaw);
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
                                          srcAdaptor.lhs(), amountAttr);
     return success();
@@ -321,7 +321,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SelectOp::Adaptor srcAdaptor(operands);
-    IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
+    IntegerType requiredType = IntegerType::get(srcOp.getContext(), 32);
     // Note: This check can correctly just be a verification that
     // actualType == requiredType, but since the VM type conversion also
     // maps Indextype to this type, widening the check here reduces red-herrings
