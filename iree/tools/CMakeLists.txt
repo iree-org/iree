@@ -256,7 +256,8 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::compiler::Translation::IREEVM
       MLIRSPIRVSerialization
-  )
+      MLIRSPIRVTranslateRegistration
+      ) 
 
   iree_cc_library(
     NAME
