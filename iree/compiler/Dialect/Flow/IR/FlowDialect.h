@@ -34,6 +34,9 @@ class FlowDialect : public Dialect {
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
+  Type parseType(DialectAsmParser &parser) const override;
+  void printType(Type type, DialectAsmPrinter &p) const override;
+
   static bool isDialectOp(Operation *op) {
     return op && op->getDialect() &&
            op->getDialect()->getNamespace() == getDialectNamespace();
