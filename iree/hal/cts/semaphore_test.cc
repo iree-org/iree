@@ -110,8 +110,8 @@ TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
 // Waiting any semaphore to signal.
 TEST_P(SemaphoreTest, WaitAny) {
   // TODO: fix this.
-  if (driver_->name() == "dylib" || driver_->name() == "llvmjit" ||
-      driver_->name() == "vmla" || driver_->name() == "vulkan") {
+  if (driver_->name() == "dylib" || driver_->name() == "vmla" ||
+      driver_->name() == "vulkan") {
     GTEST_SKIP();
   }
 
