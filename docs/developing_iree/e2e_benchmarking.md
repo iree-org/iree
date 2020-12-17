@@ -50,10 +50,10 @@ $ tree /tmp/iree/modules/MatrixOpsStaticModule/
 # --data: the dataset (and corresponding image shapes) to create the model for
 $ python ../iree/integrations/tensorflow/e2e/keras/applications/applications_test.py \
     --target_backends=iree_vmla \
-    --model=MobileNetV3 \
+    --model=MobileNetV3Small \
     --data=imagenet
 # View the generated artifacts:
-$ tree /tmp/iree/modules/MobileNetV3/
+$ tree /tmp/iree/modules/MobileNetV3Small/
 ```
 
 Each test/module has a folder with the following artifacts (filtered to only
@@ -168,12 +168,12 @@ $ ./bazel-bin/iree/tools/iree-benchmark-module \
   --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
 ```
 
-If you ran `applications_test.py` then you'll be able to benchmark `MobileNetV3`
+If you ran `applications_test.py` then you'll be able to benchmark `MobileNetV3Small`
 on `imagenet` input shapes. For example:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --flagfile="/tmp/iree/modules/MobileNetV3/imagenet/iree_vmla/traces/predict/flagfile"
+  --flagfile="/tmp/iree/modules/MobileNetV3Small/imagenet/iree_vmla/traces/predict/flagfile"
 ```
 
 ## 3. Benchmarking TFLite on desktop
