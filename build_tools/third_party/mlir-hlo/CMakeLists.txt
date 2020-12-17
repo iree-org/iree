@@ -13,10 +13,10 @@
 # limitations under the License.
 
 set(TF_MLIR_HLO_SOURCE_DIR
-  "${IREE_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
+  "${IREE_SOURCE_DIR}/third_party/mlir-hlo/"
 )
 set(TF_MLIR_HLO_BINARY_DIR
-  "${IREE_BINARY_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/"
+  "${IREE_BINARY_DIR}/third_party/mlir-hlo/"
 )
 
 external_cc_library(

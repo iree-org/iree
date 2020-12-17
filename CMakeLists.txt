@@ -322,7 +322,7 @@ function(add_bundled_mlir_dependent_projects)
   endif()
 
   if(${IREE_BUILD_COMPILER})
-    add_subdirectory(third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
+    add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
   endif()
 endfunction()
 
@@ -465,7 +465,7 @@ else()
 endif()
 
 if(${IREE_BUILD_COMPILER})
-  add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
 endif()
 
 if(${IREE_BUILD_TESTS})
