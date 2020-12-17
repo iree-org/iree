@@ -14,4 +14,4 @@ REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
 cd /d "@_bazel_src_root@"
-@IREE_BAZEL_EXECUTABLE@ @_bazel_startup_options@ %* || exit /b
+@IREE_BAZEL_EXECUTABLE@ @_bazel_startup_options@ %* @_bazel_build_options@ || exit /b
