@@ -43,9 +43,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
-    "@llvm-project//mlir:SPIRVTranslateRegistration": [
-        "MLIRSPIRVSerialization"
-    ],
     "@llvm-project//mlir:StandardToSPIRVConversions": [
         "MLIRStandardToSPIRVTransforms"
     ],
