@@ -33,21 +33,33 @@ class CSEVariableLoadsPass
   void runOnOperation() override {
     auto funcOp = getOperation();
 
-    Block *entryBlock = &funcOp.body().front();
-    auto entryBlockBuilder = OpBuilder::atBlockBegin(entryBlock);
-
+    // Note: we assume that no IsolatedFromAbove regions are used with HAL
+    // variables here. If there are any, they would need to be treated
+    // independently of other regions.
     DenseMap<StringRef, SmallVector<VariableLoadOp, 4>>
         loadOpsGroupedByVariable;
-    funcOp.walk([&](VariableLoadOp loadOp) {
-      // Note: we assume that no IsolatedFromAbove regions are used with HAL
-      // variables here. If there are any, they would need to be treated
-      // independently of other regions.
-      loadOpsGroupedByVariable[loadOp.variable()].push_back(loadOp);
-    });
     DenseSet<StringRef> storeOps;
-    funcOp.walk(
-        [&](VariableStoreOp storeOp) { storeOps.insert(storeOp.variable()); });
-    // TODO(scotttodd): check for VariableStoreIndirectOps?
+    funcOp.walk([&](Operation *op) {
+      if (auto loadOp = dyn_cast<VariableLoadOp>(op)) {
+        loadOpsGroupedByVariable[loadOp.variable()].push_back(loadOp);
+      } else if (auto storeOp = dyn_cast<VariableStoreOp>(op)) {
+        storeOps.insert(storeOp.variable());
+      } else if (auto storeIndirectOp = dyn_cast<VariableStoreIndirectOp>(op)) {
+        // Not sure (without more analysis) which variable is being stored,
+        // so give up.
+        // TODO(scotttodd): handle indirect stores (trace to variable names)
+        return;
+      } else if (auto callOp = dyn_cast<CallOp>(op)) {
+        // Not sure (without more analysis) which variables may be written to
+        // as a result of the call, so give up.
+        // TODO(scotttodd): handle calls (aggregate set of variables written
+        //   by the function or any function that may be reached under it)
+        return;
+      }
+    });
+
+    Block *entryBlock = &funcOp.body().front();
+    auto entryBlockBuilder = OpBuilder::atBlockBegin(entryBlock);
 
     for (auto loadOpsGroup : loadOpsGroupedByVariable) {
       StringRef variableName = loadOpsGroup.first;
