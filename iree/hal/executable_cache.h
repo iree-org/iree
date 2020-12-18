@@ -16,7 +16,6 @@
 #define IREE_HAL_EXECUTABLE_CACHE_H_
 
 #include "iree/base/api.h"
-#include "iree/base/bitfield.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"

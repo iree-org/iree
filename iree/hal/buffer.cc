@@ -28,46 +28,53 @@ namespace iree {
 namespace hal {
 
 std::string MemoryTypeString(iree_hal_memory_type_t memory_type) {
-  return FormatBitfieldValue(
-      memory_type, {
-                       // Combined:
-                       {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, "kHostLocal"},
-                       {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, "kDeviceLocal"},
-                       // Separate:
-                       {IREE_HAL_MEMORY_TYPE_TRANSIENT, "kTransient"},
-                       {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, "kHostVisible"},
-                       {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, "kHostCoherent"},
-                       {IREE_HAL_MEMORY_TYPE_HOST_CACHED, "kHostCached"},
-                       {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, "kDeviceVisible"},
-                   });
+  return "TODO";
+  // return FormatBitfieldValue(
+  //     memory_type, {
+  //                      // Combined:
+  //                      {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, "kHostLocal"},
+  //                      {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, "kDeviceLocal"},
+  //                      // Separate:
+  //                      {IREE_HAL_MEMORY_TYPE_TRANSIENT, "kTransient"},
+  //                      {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, "kHostVisible"},
+  //                      {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, "kHostCoherent"},
+  //                      {IREE_HAL_MEMORY_TYPE_HOST_CACHED, "kHostCached"},
+  //                      {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+  //                      "kDeviceVisible"},
+  //                  });
 }
 
 std::string MemoryAccessString(iree_hal_memory_access_t memory_access) {
-  return FormatBitfieldValue(
-      memory_access,
-      {
-          // Combined:
-          {IREE_HAL_MEMORY_ACCESS_ALL, "kAll"},
-          {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, "kDiscardWrite"},
-          // Separate:
-          {IREE_HAL_MEMORY_ACCESS_READ, "kRead"},
-          {IREE_HAL_MEMORY_ACCESS_WRITE, "kWrite"},
-          {IREE_HAL_MEMORY_ACCESS_DISCARD, "kDiscard"},
-          {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, "kMayAlias"},
-      });
+  return "TODO";
+  // return FormatBitfieldValue(
+  //     memory_access,
+  //     {
+  //         // Combined:
+  //         {IREE_HAL_MEMORY_ACCESS_ALL, "kAll"},
+  //         {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, "kDiscardWrite"},
+  //         // Separate:
+  //         {IREE_HAL_MEMORY_ACCESS_READ, "kRead"},
+  //         {IREE_HAL_MEMORY_ACCESS_WRITE, "kWrite"},
+  //         {IREE_HAL_MEMORY_ACCESS_DISCARD, "kDiscard"},
+  //         {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, "kMayAlias"},
+  //     });
 }
 
 std::string BufferUsageString(iree_hal_buffer_usage_t buffer_usage) {
-  return FormatBitfieldValue(buffer_usage,
-                             {
-                                 // Combined:
-                                 {IREE_HAL_BUFFER_USAGE_ALL, "kAll"},
-                                 // Separate:
-                                 {IREE_HAL_BUFFER_USAGE_CONSTANT, "kConstant"},
-                                 {IREE_HAL_BUFFER_USAGE_TRANSFER, "kTransfer"},
-                                 {IREE_HAL_BUFFER_USAGE_MAPPING, "kMapping"},
-                                 {IREE_HAL_BUFFER_USAGE_DISPATCH, "kDispatch"},
-                             });
+  return "TODO";
+  // return FormatBitfieldValue(buffer_usage,
+  //                            {
+  //                                // Combined:
+  //                                {IREE_HAL_BUFFER_USAGE_ALL, "kAll"},
+  //                                // Separate:
+  //                                {IREE_HAL_BUFFER_USAGE_CONSTANT,
+  //                                "kConstant"},
+  //                                {IREE_HAL_BUFFER_USAGE_TRANSFER,
+  //                                "kTransfer"},
+  //                                {IREE_HAL_BUFFER_USAGE_MAPPING, "kMapping"},
+  //                                {IREE_HAL_BUFFER_USAGE_DISPATCH,
+  //                                "kDispatch"},
+  //                            });
 }
 
 // Special router for buffers that just reference other buffers.
