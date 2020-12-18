@@ -54,9 +54,6 @@ class MetalDirectAllocator final : public Allocator {
                                      BufferUsageBitfield buffer_usage,
                                      size_t allocation_size) override;
 
-  StatusOr<ref_ptr<Buffer>> AllocateConstant(
-      BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) override;
-
   StatusOr<ref_ptr<Buffer>> WrapMutable(MemoryTypeBitfield memory_type,
                                         MemoryAccessBitfield allowed_access,
                                         BufferUsageBitfield buffer_usage,

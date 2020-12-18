@@ -167,9 +167,6 @@ void SetupHalBindings(pybind11::module m) {
   py::class_<HalMappedMemory>(m, "MappedMemory", py::buffer_protocol())
       .def_buffer(&HalMappedMemory::ToBufferInfo);
   py::class_<HalBuffer>(m, "HalBuffer")
-      .def_static("allocate_heap", &HalBuffer::AllocateHeapBuffer,
-                  py::arg("memory_type"), py::arg("usage"),
-                  py::arg("allocation_size"))
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
            py::arg("byte_length"))
       .def("create_view", &HalBuffer::CreateView, py::arg("shape"),

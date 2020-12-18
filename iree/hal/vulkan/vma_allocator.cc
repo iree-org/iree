@@ -214,23 +214,6 @@ StatusOr<ref_ptr<Buffer>> VmaAllocator::Allocate(
                           allocation_size, /*flags=*/0);
 }
 
-StatusOr<ref_ptr<Buffer>> VmaAllocator::AllocateConstant(
-    BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) {
-  IREE_TRACE_SCOPE0("VmaAllocator::AllocateConstant");
-  // TODO(benvanik): import memory to avoid the copy.
-  IREE_ASSIGN_OR_RETURN(
-      auto buffer,
-      AllocateInternal(MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-                       buffer_usage,
-                       MemoryAccess::kRead | MemoryAccess::kDiscardWrite,
-                       source_buffer->byte_length(),
-                       /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
-  buffer->set_allowed_access(MemoryAccess::kRead);
-  return buffer;
-}
-
 StatusOr<ref_ptr<Buffer>> VmaAllocator::WrapMutable(
     MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
     BufferUsageBitfield buffer_usage, void* data, size_t data_length) {
