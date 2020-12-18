@@ -30,7 +30,7 @@ iree_cc_library(
     MLIRPass
     MLIRStandard
     MLIRSupport
-    MLIRTensorDialect
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
@@ -58,7 +58,7 @@ iree_cc_library(
     MLIRSPIRV
     MLIRStandard
     MLIRSupport
-    MLIRTensorDialect
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::HLOToHLO

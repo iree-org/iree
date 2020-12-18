@@ -26,7 +26,7 @@ iree_cc_library(
   DEPS
     MLIRIR
     MLIRStandard
-    MLIRTensorDialect
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR

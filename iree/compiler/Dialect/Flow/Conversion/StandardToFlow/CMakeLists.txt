@@ -25,7 +25,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRStandard
-    MLIRTensorDialect
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::IREE::IR
