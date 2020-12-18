@@ -26,7 +26,6 @@
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_layout.h"
-#include "iree/hal/executable_spec.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/pipeline_executable_layout.h"
@@ -40,7 +39,8 @@ class PipelineExecutable final : public Executable {
   static StatusOr<ref_ptr<PipelineExecutable>> Create(
       ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
       PipelineExecutableLayout* executable_layout,
-      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec);
+      ExecutableCachingModeBitfield mode,
+      iree_const_byte_span_t executable_data);
 
   PipelineExecutable(ref_ptr<VkDeviceHandle> logical_device,
                      absl::InlinedVector<VkPipeline, 1> pipelines);
@@ -49,8 +49,6 @@ class PipelineExecutable final : public Executable {
   const ref_ptr<DynamicSymbols>& syms() const {
     return logical_device_->syms();
   }
-
-  bool supports_debugging() const override { return false; }
 
   StatusOr<VkPipeline> GetPipelineForEntryPoint(int entry_ordinal) const;
 

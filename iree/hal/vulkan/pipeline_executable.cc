@@ -128,13 +128,12 @@ class VkShaderModuleHandle : public RefObject<VkShaderModuleHandle> {
 StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
     PipelineExecutableLayout* executable_layout,
-    ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
+    ExecutableCachingModeBitfield mode,
+    iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("PipelineExecutable::Create");
   const auto& syms = logical_device->syms();
 
   // Verify and fetch the executable flatbuffer wrapper.
-  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
-      spec.executable_data.data(), spec.executable_data.size());
   IREE_RETURN_IF_ERROR(
       iree_hal_spirv_executable_flatbuffer_verify(executable_data));
   iree_SpirVExecutableDef_table_t executable_def =
