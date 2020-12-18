@@ -1,0 +1,84 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+namespace iree.remoting.protocol_v1;
+
+file_identifier "IRV1";
+file_extension "irv1";
+
+// Opens a device, establishing a protocol-local device_id for the device.
+// TODO: This is just a stub and needs to be adapted to match the real API.
+table HalDeviceOpenRequest {
+  // Protocol local id to assign to the opened device.
+  // Device ids are assigned by the client and must be unique for the duration
+  // of the connection.
+  device_id:uint32;
+  // TODO: Fields for selecting a device.
+}
+table HalDeviceOpenResponse {
+  // An identifier describing the device based.
+  // See: iree_hal_device_id()
+  device_identifier:string;
+}
+
+// Union of all request types (client->server).
+union AnyRequest {
+  // HAL Device Requests.
+  HalDeviceOpenRequest,
+}
+
+// Failing status information. A NULL ErrorStatus == OK.
+table ErrorStatusResponse {
+  // Non-zero status code corresponding to IREE_STATUS_* define values in the
+  // API.
+  code:uint8;
+  // An error message as a string (if available).
+  message:string;
+}
+
+// Union of all response types (server->client).
+union AnyResponse {
+  ErrorStatusResponse,
+  // HAL Device Response.
+  HalDeviceOpenResponse,
+}
+
+// A request from client->server in the protocol.
+table RequestEnvelope {
+  request:AnyRequest;
+  // If the request includes arbitrary payload data following this envelope,
+  // its size is noted here.
+  payload_size:uint32 = 0;
+  correlation_id:uint32 = 0xffffffff;
+}
+
+// Root type for messages.
+table Envelope {
+  // Specific request (client->server) in the protocol.
+  request:AnyRequest;
+  // Specific response (server->client) in the protocol. NULL indicates
+  // successful completion with no further data.
+  response:AnyResponse;
+
+  // A client assigned, opaque identifier which will be echoed in the
+  // ResponseEnvelope for related responses. Typical use is for clients to
+  // assign a monotonically increasing number that can be used to identify
+  // specific responses and/or set fences at response points in the stream
+  // (being mindful of wrap-around).
+  // The value of 0xffffffff is reserved and is used for server responses that
+  // do not correspond with a request.
+  correlation_id:uint32;
+}
+
+root_type Envelope;

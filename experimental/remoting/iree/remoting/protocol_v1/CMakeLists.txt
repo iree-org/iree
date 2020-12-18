@@ -12,4 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(iree/remoting)
+iree_cc_library(
+  NAME
+    protocol_v1
+  HDRS
+    "common.h"
+    "hal_stub.h"
+    "handler.h"
+  SRCS
+    "common.cc"
+    "hal_stub.cc"
+    "handler.cc"
+  DEPS
+    iree::base::logging
+    iree::base::flatcc
+    experimental::remoting::iree::remoting::support
+    experimental::remoting::iree::remoting::schemas::protocol_v1_c_fbs
+)

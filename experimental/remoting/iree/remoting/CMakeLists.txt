@@ -12,4 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(iree/remoting)
+add_subdirectory(protocol_v1)
+add_subdirectory(schemas)
+add_subdirectory(simple)
+add_subdirectory(support)

@@ -545,8 +545,10 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
   # NOTE: Currently liburing is only used by the experimental remoting
   # support, so keeping it scoped here. If this broadens, then include along
   # with other dependencies as normal.
+  set(IREE_HAVE_IO_URING 0)
   if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     message(STATUS "Enabling liburing")
+    set(IREE_HAVE_IO_URING 1)
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)

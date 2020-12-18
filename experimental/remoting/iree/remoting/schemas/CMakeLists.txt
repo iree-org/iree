@@ -12,4 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(iree/remoting)
+flatbuffer_c_library(
+  NAME
+    protocol_v1_c_fbs
+  SRCS
+    "protocol_v1.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  PUBLIC
+)
