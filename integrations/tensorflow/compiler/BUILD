@@ -72,24 +72,14 @@ cc_binary(
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
-        "//iree/tools:init_passes_and_dialects",
-        "//iree/tools:init_targets",
+        "//iree/tools:init_xla_dialects",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
-    ],
-)
-
-cc_binary(
-    name = "iree-tf-translate",
-    deps = [
-        ":tensorflow",
-        "//iree/tools:iree_translate_main",
     ],
 )
 
