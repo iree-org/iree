@@ -29,29 +29,30 @@ namespace host {
 // An allocator implementation that allocates buffers from host memory.
 // This can be used for drivers that do not have a memory space of their own.
 //
-// Buffers allocated will have be MemoryType::kHostLocal | kDeviceVisible as
-// the 'device' in the case of a host-local queue *is* the host. To keep code
-// written initially for a host-local queue working when other queues are used
-// the allocator only works with buffers that are kDeviceVisible.
+// Buffers allocated will have be IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+// kDeviceVisible as the 'device' in the case of a host-local queue *is* the
+// host. To keep code written initially for a host-local queue working when
+// other queues are used the allocator only works with buffers that are
+// kDeviceVisible.
 class HostLocalAllocator : public Allocator {
  public:
   HostLocalAllocator();
   ~HostLocalAllocator() override;
 
   bool CanUseBufferLike(Allocator* source_allocator,
-                        MemoryTypeBitfield memory_type,
-                        BufferUsageBitfield buffer_usage,
-                        BufferUsageBitfield intended_usage) const override;
+                        iree_hal_memory_type_t memory_type,
+                        iree_hal_buffer_usage_t buffer_usage,
+                        iree_hal_buffer_usage_t intended_usage) const override;
 
-  bool CanAllocate(MemoryTypeBitfield memory_type,
-                   BufferUsageBitfield buffer_usage,
+  bool CanAllocate(iree_hal_memory_type_t memory_type,
+                   iree_hal_buffer_usage_t buffer_usage,
                    size_t allocation_size) const override;
 
-  Status MakeCompatible(MemoryTypeBitfield* memory_type,
-                        BufferUsageBitfield* buffer_usage) const override;
+  Status MakeCompatible(iree_hal_memory_type_t* memory_type,
+                        iree_hal_buffer_usage_t* buffer_usage) const override;
 
-  StatusOr<ref_ptr<Buffer>> Allocate(MemoryTypeBitfield memory_type,
-                                     BufferUsageBitfield buffer_usage,
+  StatusOr<ref_ptr<Buffer>> Allocate(iree_hal_memory_type_t memory_type,
+                                     iree_hal_buffer_usage_t buffer_usage,
                                      size_t allocation_size) override;
 };
 

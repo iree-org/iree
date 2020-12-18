@@ -770,8 +770,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
   auto* handle = reinterpret_cast<Allocator*>(allocator);
   IREE_ASSIGN_OR_RETURN(
       auto buffer,
-      handle->Allocate(static_cast<MemoryTypeBitfield>(memory_type),
-                       static_cast<BufferUsageBitfield>(buffer_usage),
+      handle->Allocate(static_cast<iree_hal_memory_type_t>(memory_type),
+                       static_cast<iree_hal_buffer_usage_t>(buffer_usage),
                        allocation_size));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
@@ -791,9 +791,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
   auto* handle = reinterpret_cast<Allocator*>(allocator);
   IREE_ASSIGN_OR_RETURN(
       auto buffer,
-      handle->WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
-                          static_cast<MemoryAccessBitfield>(allowed_access),
-                          static_cast<BufferUsageBitfield>(buffer_usage),
+      handle->WrapMutable(static_cast<iree_hal_memory_type_t>(memory_type),
+                          static_cast<iree_hal_memory_access_t>(allowed_access),
+                          static_cast<iree_hal_buffer_usage_t>(buffer_usage),
                           data.data, data.data_length));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
@@ -902,10 +902,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
   std::memset(out_mapped_memory, 0, sizeof(*out_mapped_memory));
 
   auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_ASSIGN_OR_RETURN(auto mapping,
-                        buffer_handle->MapMemory<uint8_t>(
-                            static_cast<MemoryAccessBitfield>(memory_access),
-                            byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(
+      auto mapping, buffer_handle->MapMemory<uint8_t>(
+                        static_cast<iree_hal_memory_access_t>(memory_access),
+                        byte_offset, byte_length));
 
   static_assert(sizeof(iree_hal_mapped_memory_t::reserved) >=
                     sizeof(MappedMemory<uint8_t>),
@@ -1014,7 +1014,7 @@ iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view) {
   return buffer_view->shape_rank;
 }
 
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
+IREE_API_EXPORT iree_hal_dim_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t index) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   if (index > buffer_view->shape_rank) {
@@ -1309,8 +1309,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
   IREE_ASSIGN_OR_RETURN(
       auto command_buffer,
       handle->CreateCommandBuffer(
-          static_cast<CommandBufferModeBitfield>(mode),
-          static_cast<CommandCategoryBitfield>(command_categories)));
+          static_cast<iree_hal_command_buffer_mode_t>(mode),
+          static_cast<iree_hal_command_category_t>(command_categories)));
 
   *out_command_buffer =
       reinterpret_cast<iree_hal_command_buffer_t*>(command_buffer.release());
@@ -1345,22 +1345,10 @@ iree_hal_command_buffer_execution_barrier(
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_execution_barrier");
   IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  // TODO(benvanik): refactor the C++ types to use the C types for storage so
-  // that we can safely map between the two. For now assume size equality
-  // is layout equality (as compilers aren't allowed to reorder structs).
-  static_assert(sizeof(MemoryBarrier) == sizeof(iree_hal_memory_barrier_t),
-                "Expecting identical layout");
-  static_assert(sizeof(BufferBarrier) == sizeof(iree_hal_buffer_barrier_t),
-                "Expecting identical layout");
   return handle->ExecutionBarrier(
-      static_cast<ExecutionStageBitfield>(source_stage_mask),
-      static_cast<ExecutionStageBitfield>(target_stage_mask),
-      absl::MakeConstSpan(
-          reinterpret_cast<const MemoryBarrier*>(memory_barriers),
-          memory_barrier_count),
-      absl::MakeConstSpan(
-          reinterpret_cast<const BufferBarrier*>(buffer_barriers),
-          buffer_barrier_count));
+      source_stage_mask, target_stage_mask,
+      absl::MakeConstSpan(memory_barriers, memory_barrier_count),
+      absl::MakeConstSpan(buffer_barriers, buffer_barrier_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
@@ -1443,17 +1431,9 @@ iree_hal_command_buffer_push_descriptor_set(
                             "bindings/binding_count mismatch");
   }
 
-  // TODO(benvanik): refactor the C++ types to use the C types for storage so
-  // that we can safely map between the two. For now assume size equality
-  // is layout equality (as compilers aren't allowed to reorder structs).
-  static_assert(sizeof(DescriptorSet::Binding) ==
-                    sizeof(iree_hal_descriptor_set_binding_t),
-                "Expecting identical layout");
   return handle->PushDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
-      absl::MakeConstSpan(
-          reinterpret_cast<const DescriptorSet::Binding*>(bindings),
-          binding_count));
+      absl::MakeConstSpan(bindings, binding_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1472,8 +1452,6 @@ iree_hal_command_buffer_bind_descriptor_set(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "dynamic_offset_count/dynamic_offsets mismatch");
   }
-  static_assert(sizeof(iree_device_size_t) == sizeof(device_size_t),
-                "Device sizes must match");
   return handle->BindDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
       reinterpret_cast<DescriptorSet*>(descriptor_set),
@@ -1531,19 +1509,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
   }
   auto* handle = reinterpret_cast<Device*>(device);
 
-  // TODO(benvanik): refactor the C++ types to use the C types for storage so
-  // that we can safely map between the two. For now assume size equality
-  // is layout equality (as compilers aren't allowed to reorder structs).
-  static_assert(sizeof(DescriptorSet::Binding) ==
-                    sizeof(iree_hal_descriptor_set_binding_t),
-                "Expecting identical layout");
-  IREE_ASSIGN_OR_RETURN(
-      auto descriptor_set,
-      handle->CreateDescriptorSet(
-          reinterpret_cast<DescriptorSetLayout*>(set_layout),
-          absl::MakeConstSpan(
-              reinterpret_cast<const DescriptorSet::Binding*>(bindings),
-              binding_count)));
+  IREE_ASSIGN_OR_RETURN(auto descriptor_set,
+                        handle->CreateDescriptorSet(
+                            reinterpret_cast<DescriptorSetLayout*>(set_layout),
+                            absl::MakeConstSpan(bindings, binding_count)));
 
   *out_descriptor_set =
       reinterpret_cast<iree_hal_descriptor_set_t*>(descriptor_set.release());
@@ -1574,19 +1543,10 @@ iree_hal_descriptor_set_layout_create(
   }
   auto* handle = reinterpret_cast<Device*>(device);
 
-  // TODO(benvanik): refactor the C++ types to use the C types for storage so
-  // that we can safely map between the two. For now assume size equality
-  // is layout equality (as compilers aren't allowed to reorder structs).
-  static_assert(sizeof(DescriptorSetLayout::Binding) ==
-                    sizeof(iree_hal_descriptor_set_layout_binding_t),
-                "Expecting identical layout");
   IREE_ASSIGN_OR_RETURN(
       auto descriptor_set_layout,
       handle->CreateDescriptorSetLayout(
-          static_cast<DescriptorSetLayout::UsageType>(usage_type),
-          absl::MakeConstSpan(
-              reinterpret_cast<const DescriptorSetLayout::Binding*>(bindings),
-              binding_count)));
+          usage_type, absl::MakeConstSpan(bindings, binding_count)));
 
   *out_descriptor_set_layout =
       reinterpret_cast<iree_hal_descriptor_set_layout_t*>(
@@ -1851,7 +1811,8 @@ iree_hal_executable_cache_prepare_executable(
       auto executable,
       handle->PrepareExecutable(
           reinterpret_cast<ExecutableLayout*>(executable_layout),
-          static_cast<ExecutableCachingMode>(caching_mode), executable_data));
+          static_cast<iree_hal_executable_caching_mode_t>(caching_mode),
+          executable_data));
 
   *out_executable =
       reinterpret_cast<iree_hal_executable_t*>(executable.release());

@@ -32,16 +32,17 @@ bool DyLibExecutableCache::CanPrepareFormat(ExecutableFormat format) const {
 }
 
 StatusOr<ref_ptr<Executable>> DyLibExecutableCache::PrepareExecutable(
-    ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+    ExecutableLayout* executable_layout,
+    iree_hal_executable_caching_mode_t mode,
     iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("DyLibExecutableCache::PrepareExecutable");
 
   // TODO(scotttodd): Options for using in-memory files where supported, or not
   //    writing to temp files on disk (and failing if necessary) if not allowed.
   // TODO(scotttodd): Use stable (possibly temp, but reusable) files when
-  //    ExecutableCachingMode::AllowPersistentCaching is set. For example,
-  //    hash data into a filename and read from / write to GetTempPath() or
-  //    GetCachePath() rather than use GetTempFile().
+  //    IREE_HAL_EXECUTABLE_CACHING_MODE_AllowPersistentCaching is set. For
+  //    example, hash data into a filename and read from / write to
+  //    GetTempPath() or GetCachePath() rather than use GetTempFile().
 
   return DyLibExecutable::Load(executable_data);
 }

@@ -70,8 +70,8 @@ TEST_P(CommandQueueTest, BlockingSubmit) {
 
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kDispatch));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(0ull));
 
   IREE_ASSERT_OK(command_queue->Submit(
@@ -86,8 +86,8 @@ TEST_P(CommandQueueTest, WaitTimeout) {
 
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kDispatch));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore,
                             device_->CreateSemaphore(0ull));
   IREE_ASSERT_OK_AND_ASSIGN(auto signal_semaphore,
@@ -112,8 +112,8 @@ TEST_P(CommandQueueTest, WaitMultiple) {
 
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kDispatch));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore_1,
                             device_->CreateSemaphore(0ull));
   IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore_2,

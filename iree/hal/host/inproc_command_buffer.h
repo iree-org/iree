@@ -33,8 +33,8 @@ namespace host {
 // Thread-compatible (as with CommandBuffer itself).
 class InProcCommandBuffer final : public CommandBuffer {
  public:
-  InProcCommandBuffer(CommandBufferModeBitfield mode,
-                      CommandCategoryBitfield command_categories);
+  InProcCommandBuffer(iree_hal_command_buffer_mode_t mode,
+                      iree_hal_command_category_t command_categories);
   ~InProcCommandBuffer() override;
 
   bool is_recording() const override { return is_recording_; }
@@ -43,55 +43,56 @@ class InProcCommandBuffer final : public CommandBuffer {
   Status End() override;
 
   Status ExecutionBarrier(
-      ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) override;
+      iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
 
   Status SignalEvent(Event* event,
-                     ExecutionStageBitfield source_stage_mask) override;
+                     iree_hal_execution_stage_t source_stage_mask) override;
 
   Status ResetEvent(Event* event,
-                    ExecutionStageBitfield source_stage_mask) override;
+                    iree_hal_execution_stage_t source_stage_mask) override;
 
-  Status WaitEvents(absl::Span<Event*> events,
-                    ExecutionStageBitfield source_stage_mask,
-                    ExecutionStageBitfield target_stage_mask,
-                    absl::Span<const MemoryBarrier> memory_barriers,
-                    absl::Span<const BufferBarrier> buffer_barriers) override;
+  Status WaitEvents(
+      absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
 
-  Status FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length, const void* pattern,
+  Status FillBuffer(Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length, const void* pattern,
                     size_t pattern_length) override;
 
   Status DiscardBuffer(Buffer* buffer) override;
 
-  Status UpdateBuffer(const void* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length) override;
+  Status UpdateBuffer(const void* source_buffer,
+                      iree_device_size_t source_offset, Buffer* target_buffer,
+                      iree_device_size_t target_offset,
+                      iree_device_size_t length) override;
 
-  Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                    Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length) override;
+  Status CopyBuffer(Buffer* source_buffer, iree_device_size_t source_offset,
+                    Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length) override;
 
   Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
                        absl::Span<const uint32_t> values) override;
 
   Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) override;
 
   Status BindDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       DescriptorSet* descriptor_set,
-      absl::Span<const device_size_t> dynamic_offsets) override;
+      absl::Span<const iree_device_size_t> dynamic_offsets) override;
 
   Status Dispatch(Executable* executable, int32_t entry_point,
                   std::array<uint32_t, 3> workgroups) override;
 
   Status DispatchIndirect(Executable* executable, int32_t entry_point,
                           Buffer* workgroups_buffer,
-                          device_size_t workgroups_offset) override;
+                          iree_device_size_t workgroups_offset) override;
 
   // Processes all commands in the buffer using the given |command_processor|.
   // The commands are issued in the order they were recorded.
@@ -145,42 +146,42 @@ class InProcCommandBuffer final : public CommandBuffer {
   // Defines an execution barrier.
   struct ExecutionBarrierCmd {
     static constexpr CmdType kType = CmdType::kExecutionBarrier;
-    ExecutionStageBitfield source_stage_mask;
-    ExecutionStageBitfield target_stage_mask;
-    absl::Span<const MemoryBarrier> memory_barriers;
-    absl::Span<const BufferBarrier> buffer_barriers;
+    iree_hal_execution_stage_t source_stage_mask;
+    iree_hal_execution_stage_t target_stage_mask;
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers;
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers;
   };
 
   // Signals an event.
   struct SignalEventCmd {
     static constexpr CmdType kType = CmdType::kSignalEvent;
     Event* event;
-    ExecutionStageBitfield source_stage_mask;
+    iree_hal_execution_stage_t source_stage_mask;
   };
 
   // Resets an event.
   struct ResetEventCmd {
     static constexpr CmdType kType = CmdType::kResetEvent;
     Event* event;
-    ExecutionStageBitfield source_stage_mask;
+    iree_hal_execution_stage_t source_stage_mask;
   };
 
   // Waits for one or more events.
   struct WaitEventsCmd {
     static constexpr CmdType kType = CmdType::kWaitEvents;
     absl::Span<Event*> events;
-    ExecutionStageBitfield source_stage_mask;
-    ExecutionStageBitfield target_stage_mask;
-    absl::Span<const MemoryBarrier> memory_barriers;
-    absl::Span<const BufferBarrier> buffer_barriers;
+    iree_hal_execution_stage_t source_stage_mask;
+    iree_hal_execution_stage_t target_stage_mask;
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers;
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers;
   };
 
   // Fills the target buffer with the given repeating value.
   struct FillBufferCmd {
     static constexpr CmdType kType = CmdType::kFillBuffer;
     Buffer* target_buffer;
-    device_size_t target_offset;
-    device_size_t length;
+    iree_device_size_t target_offset;
+    iree_device_size_t length;
     uint8_t pattern[4];
     size_t pattern_length;
   };
@@ -197,18 +198,18 @@ class InProcCommandBuffer final : public CommandBuffer {
     static constexpr CmdType kType = CmdType::kUpdateBuffer;
     const void* source_buffer;
     Buffer* target_buffer;
-    device_size_t target_offset;
-    device_size_t length;
+    iree_device_size_t target_offset;
+    iree_device_size_t length;
   };
 
   // Copies a range of one buffer to another.
   struct CopyBufferCmd {
     static constexpr CmdType kType = CmdType::kCopyBuffer;
     Buffer* source_buffer;
-    device_size_t source_offset;
+    iree_device_size_t source_offset;
     Buffer* target_buffer;
-    device_size_t target_offset;
-    device_size_t length;
+    iree_device_size_t target_offset;
+    iree_device_size_t length;
   };
 
   // Pushes inline constant values.
@@ -224,7 +225,7 @@ class InProcCommandBuffer final : public CommandBuffer {
     static constexpr CmdType kType = CmdType::kPushDescriptorSet;
     ExecutableLayout* executable_layout;
     int32_t set;
-    absl::Span<const DescriptorSet::Binding> bindings;
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings;
   };
 
   // Binds a descriptor set.
@@ -233,7 +234,7 @@ class InProcCommandBuffer final : public CommandBuffer {
     ExecutableLayout* executable_layout;
     int32_t set;
     DescriptorSet* descriptor_set;
-    absl::Span<const device_size_t> dynamic_offsets;
+    absl::Span<const iree_device_size_t> dynamic_offsets;
   };
 
   // Dispatches an execution request.
@@ -250,7 +251,7 @@ class InProcCommandBuffer final : public CommandBuffer {
     Executable* executable;
     int32_t entry_point;
     Buffer* workgroups_buffer;
-    device_size_t workgroups_offset;
+    iree_device_size_t workgroups_offset;
   };
 
   // Resets the command list.
@@ -270,8 +271,9 @@ class InProcCommandBuffer final : public CommandBuffer {
 
   // Appends a byte buffer to the command buffer and returns a pointer to the
   // copied data within the command buffer arena.
-  void* AppendCmdData(const void* source_buffer, device_size_t source_offset,
-                      device_size_t source_length);
+  void* AppendCmdData(const void* source_buffer,
+                      iree_device_size_t source_offset,
+                      iree_device_size_t source_length);
 
   // Appends a span of POD structs to the current CmdList and returns a span
   // pointing into the CmdList arena.

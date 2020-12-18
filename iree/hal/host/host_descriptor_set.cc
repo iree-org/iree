@@ -19,7 +19,7 @@ namespace hal {
 
 HostDescriptorSet::HostDescriptorSet(
     DescriptorSetLayout* set_layout,
-    absl::Span<const DescriptorSet::Binding> bindings)
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings)
     : bindings_(bindings.begin(), bindings.end()) {}
 
 HostDescriptorSet::~HostDescriptorSet() = default;

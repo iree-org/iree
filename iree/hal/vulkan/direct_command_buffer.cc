@@ -29,59 +29,61 @@ namespace vulkan {
 namespace {
 
 VkPipelineStageFlags ConvertPipelineStageFlags(
-    ExecutionStageBitfield stage_mask) {
+    iree_hal_execution_stage_t stage_mask) {
   VkPipelineStageFlags flags = 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kCommandIssue)
+  flags |= iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE)
                ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
                : 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kCommandProcess)
-               ? VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
-               : 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kDispatch)
+  flags |=
+      iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS)
+          ? VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+          : 0;
+  flags |= iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_DISPATCH)
                ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
                : 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kTransfer)
+  flags |= iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_TRANSFER)
                ? VK_PIPELINE_STAGE_TRANSFER_BIT
                : 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kCommandRetire)
+  flags |= iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE)
                ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
                : 0;
-  flags |= AnyBitSet(stage_mask & ExecutionStage::kHost)
+  flags |= iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_HOST)
                ? VK_PIPELINE_STAGE_HOST_BIT
                : 0;
   return flags;
 }
 
-VkAccessFlags ConvertAccessMask(AccessScopeBitfield access_mask) {
+VkAccessFlags ConvertAccessMask(iree_hal_access_scope_t access_mask) {
   VkAccessFlags flags = 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kIndirectCommandRead)
-               ? VK_ACCESS_INDIRECT_COMMAND_READ_BIT
-               : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kConstantRead)
+  flags |=
+      iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ)
+          ? VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+          : 0;
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_CONSTANT_READ)
                ? VK_ACCESS_UNIFORM_READ_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kDispatchRead)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_DISPATCH_READ)
                ? VK_ACCESS_SHADER_READ_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kDispatchWrite)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE)
                ? VK_ACCESS_SHADER_WRITE_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kTransferRead)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_TRANSFER_READ)
                ? VK_ACCESS_TRANSFER_READ_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kTransferWrite)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE)
                ? VK_ACCESS_TRANSFER_WRITE_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kHostRead)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_HOST_READ)
                ? VK_ACCESS_HOST_READ_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kHostWrite)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_HOST_WRITE)
                ? VK_ACCESS_HOST_WRITE_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kMemoryRead)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_MEMORY_READ)
                ? VK_ACCESS_MEMORY_READ_BIT
                : 0;
-  flags |= AnyBitSet(access_mask & AccessScope::kMemoryWrite)
+  flags |= iree_any_bit_set(access_mask, IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE)
                ? VK_ACCESS_MEMORY_WRITE_BIT
                : 0;
   return flags;
@@ -111,7 +113,8 @@ uint32_t SplatPattern(const void* pattern, size_t pattern_length) {
 }  // namespace
 
 DirectCommandBuffer::DirectCommandBuffer(
-    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories,
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
     ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
     ref_ptr<VkCommandPoolHandle> command_pool, VkCommandBuffer command_buffer)
     : CommandBuffer(mode, command_categories),
@@ -136,6 +139,13 @@ StatusOr<VmaBuffer*> DirectCommandBuffer::CastBuffer(Buffer* buffer) const {
   // TODO(benvanik): assert that the buffer is from the right allocator and
   // that it is compatible with our target queue family.
   return static_cast<VmaBuffer*>(buffer->allocated_buffer());
+}
+
+StatusOr<VmaBuffer*> DirectCommandBuffer::CastBuffer(
+    iree_hal_buffer_t* buffer) const {
+  // TODO(benvanik): assert that the buffer is from the right allocator and
+  // that it is compatible with our target queue family.
+  return reinterpret_cast<VmaBuffer*>(iree_hal_buffer_allocated_buffer(buffer));
 }
 
 StatusOr<NativeDescriptorSet*> DirectCommandBuffer::CastDescriptorSet(
@@ -168,9 +178,10 @@ Status DirectCommandBuffer::Begin() {
   VkCommandBufferBeginInfo begin_info;
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.pNext = nullptr;
-  begin_info.flags = AllBitsSet(mode(), CommandBufferMode::kOneShot)
-                         ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-                         : 0;
+  begin_info.flags =
+      iree_all_bits_set(mode(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)
+          ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+          : 0;
   begin_info.pInheritanceInfo = nullptr;
   VK_RETURN_IF_ERROR(
       syms()->vkBeginCommandBuffer(command_buffer_, &begin_info));
@@ -192,10 +203,10 @@ Status DirectCommandBuffer::End() {
 }
 
 Status DirectCommandBuffer::ExecutionBarrier(
-    ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::ExecutionBarrier");
 
   absl::InlinedVector<VkMemoryBarrier, 8> memory_barrier_infos(
@@ -239,7 +250,7 @@ Status DirectCommandBuffer::ExecutionBarrier(
 }
 
 Status DirectCommandBuffer::SignalEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::SignalEvent");
   IREE_ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
   syms()->vkCmdSetEvent(command_buffer_, device_event->handle(),
@@ -248,7 +259,7 @@ Status DirectCommandBuffer::SignalEvent(
 }
 
 Status DirectCommandBuffer::ResetEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::ResetEvent");
   IREE_ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
   syms()->vkCmdResetEvent(command_buffer_, device_event->handle(),
@@ -257,10 +268,10 @@ Status DirectCommandBuffer::ResetEvent(
 }
 
 Status DirectCommandBuffer::WaitEvents(
-    absl::Span<Event*> events, ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::WaitEvents");
 
   absl::InlinedVector<VkEvent, 4> event_handles(events.size());
@@ -310,8 +321,8 @@ Status DirectCommandBuffer::WaitEvents(
 }
 
 Status DirectCommandBuffer::FillBuffer(Buffer* target_buffer,
-                                       device_size_t target_offset,
-                                       device_size_t length,
+                                       iree_device_size_t target_offset,
+                                       iree_device_size_t length,
                                        const void* pattern,
                                        size_t pattern_length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::FillBuffer");
@@ -334,10 +345,10 @@ Status DirectCommandBuffer::DiscardBuffer(Buffer* buffer) {
 }
 
 Status DirectCommandBuffer::UpdateBuffer(const void* source_buffer,
-                                         device_size_t source_offset,
+                                         iree_device_size_t source_offset,
                                          Buffer* target_buffer,
-                                         device_size_t target_offset,
-                                         device_size_t length) {
+                                         iree_device_size_t target_offset,
+                                         iree_device_size_t length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::UpdateBuffer");
   IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
 
@@ -349,8 +360,8 @@ Status DirectCommandBuffer::UpdateBuffer(const void* source_buffer,
   const auto* source_buffer_ptr = static_cast<const uint8_t*>(source_buffer);
   target_offset += target_buffer->byte_offset();
   while (length > 0) {
-    device_size_t chunk_length =
-        std::min(static_cast<device_size_t>(65536u), length);
+    iree_device_size_t chunk_length =
+        std::min(static_cast<iree_device_size_t>(65536u), length);
     syms()->vkCmdUpdateBuffer(command_buffer_, target_device_buffer->handle(),
                               target_offset, chunk_length, source_buffer_ptr);
     source_buffer_ptr += chunk_length;
@@ -362,10 +373,10 @@ Status DirectCommandBuffer::UpdateBuffer(const void* source_buffer,
 }
 
 Status DirectCommandBuffer::CopyBuffer(Buffer* source_buffer,
-                                       device_size_t source_offset,
+                                       iree_device_size_t source_offset,
                                        Buffer* target_buffer,
-                                       device_size_t target_offset,
-                                       device_size_t length) {
+                                       iree_device_size_t target_offset,
+                                       iree_device_size_t length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::CopyBuffer");
   IREE_ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
   IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
@@ -398,7 +409,7 @@ Status DirectCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
 
 Status DirectCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::PushDescriptorSet");
   IREE_ASSIGN_OR_RETURN(auto* device_executable_layout,
                         CastExecutableLayout(executable_layout));
@@ -412,7 +423,7 @@ Status DirectCommandBuffer::PushDescriptorSet(
 Status DirectCommandBuffer::BindDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     DescriptorSet* descriptor_set,
-    absl::Span<const device_size_t> dynamic_offsets) {
+    absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::BindDescriptorSet");
   IREE_ASSIGN_OR_RETURN(auto* device_executable_layout,
                         CastExecutableLayout(executable_layout));
@@ -456,10 +467,9 @@ Status DirectCommandBuffer::Dispatch(Executable* executable,
   return OkStatus();
 }
 
-Status DirectCommandBuffer::DispatchIndirect(Executable* executable,
-                                             int32_t entry_point,
-                                             Buffer* workgroups_buffer,
-                                             device_size_t workgroups_offset) {
+Status DirectCommandBuffer::DispatchIndirect(
+    Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
+    iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::DispatchIndirect");
 
   // Get the compiled and linked pipeline for the specified entry point and

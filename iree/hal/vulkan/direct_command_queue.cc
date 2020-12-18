@@ -28,7 +28,7 @@ namespace hal {
 namespace vulkan {
 
 DirectCommandQueue::DirectCommandQueue(
-    std::string name, CommandCategoryBitfield supported_categories,
+    std::string name, iree_hal_command_category_t supported_categories,
     const ref_ptr<VkDeviceHandle>& logical_device, VkQueue queue)
     : CommandQueue(std::move(name), supported_categories),
       logical_device_(add_ref(logical_device)),

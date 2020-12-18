@@ -24,9 +24,9 @@ namespace metal {
 
 // static
 StatusOr<ref_ptr<MetalBuffer>> MetalBuffer::Create(
-    MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-    MemoryAccessBitfield allowed_access, BufferUsageBitfield usage, device_size_t allocation_size,
-    device_size_t byte_offset, device_size_t byte_length, id<MTLBuffer> buffer,
+    MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length, id<MTLBuffer> buffer,
     id<MTLCommandQueue> transfer_queue) {
   IREE_TRACE_SCOPE0("MetalBuffer::Create");
   return assign_ref(new MetalBuffer(allocator, memory_type, allowed_access, usage, allocation_size,
@@ -35,19 +35,19 @@ StatusOr<ref_ptr<MetalBuffer>> MetalBuffer::Create(
 
 // static
 StatusOr<ref_ptr<MetalBuffer>> MetalBuffer::CreateUnretained(
-    MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-    MemoryAccessBitfield allowed_access, BufferUsageBitfield usage, device_size_t allocation_size,
-    device_size_t byte_offset, device_size_t byte_length, id<MTLBuffer> buffer,
+    MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length, id<MTLBuffer> buffer,
     id<MTLCommandQueue> transfer_queue) {
   IREE_TRACE_SCOPE0("MetalBuffer::Create");
   return assign_ref(new MetalBuffer(allocator, memory_type, allowed_access, usage, allocation_size,
                                     byte_offset, byte_length, buffer, transfer_queue));
 }
 
-MetalBuffer::MetalBuffer(MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-                         MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-                         device_size_t allocation_size, device_size_t byte_offset,
-                         device_size_t byte_length, id<MTLBuffer> buffer,
+MetalBuffer::MetalBuffer(MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
+                         iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
+                         iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+                         iree_device_size_t byte_length, id<MTLBuffer> buffer,
                          id<MTLCommandQueue> transfer_queue)
     : Buffer(allocator, memory_type, allowed_access, usage, allocation_size, byte_offset,
              byte_length),
@@ -60,10 +60,10 @@ MetalBuffer::~MetalBuffer() {
   [metal_transfer_queue_ release];
 }
 
-Status MetalBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                             const void* pattern, device_size_t pattern_length) {
+Status MetalBuffer::FillImpl(iree_device_size_t byte_offset, iree_device_size_t byte_length,
+                             const void* pattern, iree_device_size_t pattern_length) {
   IREE_ASSIGN_OR_RETURN(auto mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, byte_offset, byte_length));
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, byte_offset, byte_length));
   void* data_ptr = static_cast<void*>(mapping.mutable_data());
   switch (pattern_length) {
     case 1: {
@@ -91,38 +91,38 @@ Status MetalBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_lengt
   return OkStatus();
 }
 
-Status MetalBuffer::ReadDataImpl(device_size_t source_offset, void* data,
-                                 device_size_t data_length) {
+Status MetalBuffer::ReadDataImpl(iree_device_size_t source_offset, void* data,
+                                 iree_device_size_t data_length) {
   IREE_ASSIGN_OR_RETURN(auto mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kRead, source_offset, data_length));
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length));
   std::memcpy(data, mapping.data(), mapping.byte_length());
   return OkStatus();
 }
 
-Status MetalBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
-                                  device_size_t data_length) {
+Status MetalBuffer::WriteDataImpl(iree_device_size_t target_offset, const void* data,
+                                  iree_device_size_t data_length) {
   IREE_ASSIGN_OR_RETURN(
-      auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, target_offset, data_length));
+      auto mapping, MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset, data_length));
   std::memcpy(mapping.mutable_data(), data, mapping.byte_length());
   return OkStatus();
 }
 
-Status MetalBuffer::CopyDataImpl(device_size_t target_offset, Buffer* source_buffer,
-                                 device_size_t source_offset, device_size_t data_length) {
+Status MetalBuffer::CopyDataImpl(iree_device_size_t target_offset, Buffer* source_buffer,
+                                 iree_device_size_t source_offset, iree_device_size_t data_length) {
   // This is pretty terrible. Let's not do this.
   // TODO(benvanik): a way for allocators to indicate transfer compat.
   IREE_ASSIGN_OR_RETURN(auto source_mapping, source_buffer->MapMemory<uint8_t>(
-                                                 MemoryAccess::kRead, source_offset, data_length));
+                                                 IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length));
   IREE_CHECK_EQ(data_length, source_mapping.size());
-  IREE_ASSIGN_OR_RETURN(auto target_mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
+  IREE_ASSIGN_OR_RETURN(auto target_mapping, MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
                                                                 target_offset, data_length));
   IREE_CHECK_EQ(data_length, target_mapping.size());
   std::memcpy(target_mapping.mutable_data(), source_mapping.data(), data_length);
   return OkStatus();
 }
 
-Status MetalBuffer::MapMemoryImpl(MappingMode mapping_mode, MemoryAccessBitfield memory_access,
-                                  device_size_t local_byte_offset, device_size_t local_byte_length,
+Status MetalBuffer::MapMemoryImpl(MappingMode mapping_mode, iree_hal_memory_access_t memory_access,
+                                  iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
                                   void** out_data) {
   uint8_t* data_ptr = reinterpret_cast<uint8_t*>([metal_handle_ contents]);
   *out_data = data_ptr + local_byte_offset;
@@ -132,7 +132,7 @@ Status MetalBuffer::MapMemoryImpl(MappingMode mapping_mode, MemoryAccessBitfield
   // heap buffers we could reallocate them such that ASAN yells, but that
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
-  if (AnyBitSet(memory_access & MemoryAccess::kDiscard)) {
+  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
     std::memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
@@ -144,8 +144,8 @@ Status MetalBuffer::MapMemoryImpl(MappingMode mapping_mode, MemoryAccessBitfield
   return OkStatus();
 }
 
-Status MetalBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
-                                    device_size_t local_byte_length, void* data) {
+Status MetalBuffer::UnmapMemoryImpl(iree_device_size_t local_byte_offset,
+                                    iree_device_size_t local_byte_length, void* data) {
   if (requires_autosync()) {
     IREE_RETURN_IF_ERROR(FlushMappedMemoryImpl(local_byte_offset, local_byte_length));
   }
@@ -153,8 +153,8 @@ Status MetalBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
   return OkStatus();
 }
 
-Status MetalBuffer::InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                               device_size_t local_byte_length) {
+Status MetalBuffer::InvalidateMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                                               iree_device_size_t local_byte_length) {
 #ifdef IREE_PLATFORM_MACOS
   // The following is only necessary for MTLStorageManaged.
   if (metal_handle_.storageMode == MTLStorageModeManaged) {
@@ -175,8 +175,8 @@ Status MetalBuffer::InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
   return OkStatus();
 }
 
-Status MetalBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                                          device_size_t local_byte_length) {
+Status MetalBuffer::FlushMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                                          iree_device_size_t local_byte_length) {
 #ifdef IREE_PLATFORM_MACOS
   // The following is only necessary for MTLStorageManaged.
   if (metal_handle_.storageMode == MTLStorageModeManaged) {
@@ -191,7 +191,7 @@ bool MetalBuffer::requires_autosync() const {
   // We only need to perform "automatic" resource synchronization if it's MTLStorageModeManaged,
   // which is only available on macOS.
 #ifdef IREE_PLATFORM_MACOS
-  return AllBitsSet(memory_type(), MemoryType::kHostCoherent) &&
+  return iree_all_bits_set(memory_type(), IREE_HAL_MEMORY_TYPE_HOST_COHERENT) &&
          metal_handle_.storageMode == MTLStorageModeManaged;
 #else
   return false;

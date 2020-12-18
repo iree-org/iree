@@ -22,6 +22,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/api_detail.h"
+#include "iree/hal/device.h"
 #include "iree/vm/native_module_cc.h"
 
 namespace iree {

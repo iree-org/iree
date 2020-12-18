@@ -214,12 +214,11 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
     for (size_t binding = 0; binding < params.set_bindings[set].size();
          ++binding) {
       const auto& io_binding = params.set_bindings[set][binding];
-      IREE_ASSIGN_OR_RETURN(auto memory,
-                            io_binding.buffer->MapMemory<uint8_t>(
-                                MemoryAccessBitfield::kWrite, io_binding.offset,
-                                io_binding.length));
-      auto data = memory.mutable_data();
-      dispatch_state->args[binding_count++] = data;
+      iree_hal_mapped_memory_t mapping;
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_map(io_binding.buffer, IREE_HAL_MEMORY_ACCESS_WRITE,
+                              io_binding.offset, io_binding.length, &mapping));
+      dispatch_state->args[binding_count++] = mapping.contents.data;
     }
   }
   dispatch_state->push_constants = params.push_constants->values;

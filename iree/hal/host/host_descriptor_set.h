@@ -24,16 +24,17 @@ namespace hal {
 
 class HostDescriptorSet final : public DescriptorSet {
  public:
-  HostDescriptorSet(DescriptorSetLayout* set_layout,
-                    absl::Span<const DescriptorSet::Binding> bindings);
+  HostDescriptorSet(
+      DescriptorSetLayout* set_layout,
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings);
   ~HostDescriptorSet() override;
 
-  absl::Span<const DescriptorSet::Binding> bindings() const {
+  absl::Span<const iree_hal_descriptor_set_binding_t> bindings() const {
     return absl::MakeConstSpan(bindings_);
   }
 
  private:
-  absl::InlinedVector<DescriptorSet::Binding, 4> bindings_;
+  absl::InlinedVector<iree_hal_descriptor_set_binding_t, 4> bindings_;
 };
 
 }  // namespace hal

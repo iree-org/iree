@@ -33,7 +33,8 @@ class VMLACache final : public ExecutableCache {
   bool CanPrepareFormat(ExecutableFormat format) const override;
 
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+      ExecutableLayout* executable_layout,
+      iree_hal_executable_caching_mode_t mode,
       iree_const_byte_span_t executable_data) override;
 
  private:

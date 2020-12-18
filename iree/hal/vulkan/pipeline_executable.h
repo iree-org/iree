@@ -39,7 +39,7 @@ class PipelineExecutable final : public Executable {
   static StatusOr<ref_ptr<PipelineExecutable>> Create(
       ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
       PipelineExecutableLayout* executable_layout,
-      ExecutableCachingModeBitfield mode,
+      iree_hal_executable_caching_mode_t mode,
       iree_const_byte_span_t executable_data);
 
   PipelineExecutable(ref_ptr<VkDeviceHandle> logical_device,

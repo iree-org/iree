@@ -76,9 +76,7 @@ cc_test(
 cc_library(
     name = "hal",
     srcs = [
-        "allocator.cc",
         "buffer.cc",
-        "command_buffer.cc",
     ],
     hdrs = [
         "allocator.h",

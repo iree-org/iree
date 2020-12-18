@@ -33,7 +33,8 @@ bool PipelineCache::CanPrepareFormat(ExecutableFormat format) const {
 }
 
 StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
-    ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+    ExecutableLayout* executable_layout,
+    iree_hal_executable_caching_mode_t mode,
     iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("PipelineCache::PrepareExecutable");
 

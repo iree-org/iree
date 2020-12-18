@@ -61,8 +61,8 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create(const MetalDriverOptions& opt
     std::vector<DeviceInfo> device_infos;
     for (id<MTLDevice> device in devices) {
       std::string name = std::string([device.name UTF8String]);
-      DeviceFeatureBitfield supported_features = DeviceFeature::kNone;
-      DriverDeviceID device_id = reinterpret_cast<DriverDeviceID>((__bridge void*)device);
+      iree_hal_device_feature_t supported_features = IREE_HAL_DEVICE_FEATURE_NONE;
+      iree_hal_device_id_t device_id = reinterpret_cast<iree_hal_device_id_t>((__bridge void*)device);
       device_infos.emplace_back("metal", std::move(name), supported_features, device_id);
     }
     return assign_ref(new MetalDriver(std::move(device_infos), std::move(metal_capture_manager)));
@@ -104,7 +104,7 @@ StatusOr<ref_ptr<Device>> MetalDriver::CreateDefaultDevice() {
   return CreateDevice(devices_.front().device_id());
 }
 
-StatusOr<ref_ptr<Device>> MetalDriver::CreateDevice(DriverDeviceID device_id) {
+StatusOr<ref_ptr<Device>> MetalDriver::CreateDevice(iree_hal_device_id_t device_id) {
   IREE_TRACE_SCOPE0("MetalDriver::CreateDevice");
 
   for (const DeviceInfo& info : devices_) {

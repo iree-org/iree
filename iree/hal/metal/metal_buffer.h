@@ -30,18 +30,18 @@ class MetalBuffer final : public Buffer {
  public:
   // Creates a MetalBuffer instance with retaining the given id<MTLBuffer>.
   static StatusOr<ref_ptr<MetalBuffer>> Create(
-      MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-      MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-      device_size_t allocation_size, device_size_t byte_offset,
-      device_size_t byte_length, id<MTLBuffer> buffer,
+      MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
+      iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+      iree_device_size_t byte_length, id<MTLBuffer> buffer,
       id<MTLCommandQueue> transfer_queue);
 
   // Creates a MetalBuffer instance without retaining the given id<MTLBuffer>.
   static StatusOr<ref_ptr<MetalBuffer>> CreateUnretained(
-      MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-      MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-      device_size_t allocation_size, device_size_t byte_offset,
-      device_size_t byte_length, id<MTLBuffer> buffer,
+      MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
+      iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+      iree_device_size_t byte_length, id<MTLBuffer> buffer,
       id<MTLCommandQueue> transfer_queue);
 
   ~MetalBuffer() override;
@@ -50,42 +50,46 @@ class MetalBuffer final : public Buffer {
 
  private:
   // Creates a MetalBuffer instance without retaining the given id<MTLBuffer>.
-  MetalBuffer(MetalDirectAllocator* allocator, MemoryTypeBitfield memory_type,
-              MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-              device_size_t allocation_size, device_size_t byte_offset,
-              device_size_t byte_length, id<MTLBuffer> buffer,
-              id<MTLCommandQueue> transfer_queue);
+  MetalBuffer(MetalDirectAllocator* allocator,
+              iree_hal_memory_type_t memory_type,
+              iree_hal_memory_access_t allowed_access,
+              iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
+              iree_device_size_t byte_offset, iree_device_size_t byte_length,
+              id<MTLBuffer> buffer, id<MTLCommandQueue> transfer_queue);
 
-  Status FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                  const void* pattern, device_size_t pattern_length) override;
-  Status ReadDataImpl(device_size_t source_offset, void* data,
-                      device_size_t data_length) override;
-  Status WriteDataImpl(device_size_t target_offset, const void* data,
-                       device_size_t data_length) override;
-  Status CopyDataImpl(device_size_t target_offset, Buffer* source_buffer,
-                      device_size_t source_offset,
-                      device_size_t data_length) override;
+  Status FillImpl(iree_device_size_t byte_offset,
+                  iree_device_size_t byte_length, const void* pattern,
+                  iree_device_size_t pattern_length) override;
+  Status ReadDataImpl(iree_device_size_t source_offset, void* data,
+                      iree_device_size_t data_length) override;
+  Status WriteDataImpl(iree_device_size_t target_offset, const void* data,
+                       iree_device_size_t data_length) override;
+  Status CopyDataImpl(iree_device_size_t target_offset, Buffer* source_buffer,
+                      iree_device_size_t source_offset,
+                      iree_device_size_t data_length) override;
 
   Status MapMemoryImpl(MappingMode mapping_mode,
-                       MemoryAccessBitfield memory_access,
-                       device_size_t local_byte_offset,
-                       device_size_t local_byte_length,
+                       iree_hal_memory_access_t memory_access,
+                       iree_device_size_t local_byte_offset,
+                       iree_device_size_t local_byte_length,
                        void** out_data) override;
-  Status UnmapMemoryImpl(device_size_t local_byte_offset,
-                         device_size_t local_byte_length, void* data) override;
-  Status InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                    device_size_t local_byte_length) override;
-  Status FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                               device_size_t local_byte_length) override;
+  Status UnmapMemoryImpl(iree_device_size_t local_byte_offset,
+                         iree_device_size_t local_byte_length,
+                         void* data) override;
+  Status InvalidateMappedMemoryImpl(
+      iree_device_size_t local_byte_offset,
+      iree_device_size_t local_byte_length) override;
+  Status FlushMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                               iree_device_size_t local_byte_length) override;
 
   // Returns true if we need to automatically invaliate/flush CPU caches to keep
   // memory hierarchy consistent.
   //
   // Note: this is needed when the buffer is requested with
-  // MemoryType::kHostCoherent bit but under the hood we are using memory types
-  // that does not have that property natively, e.g., MTLStorageModeManaged.
-  // Under such circumstances, we need to perform the invalidate/flush operation
-  // "automatically" for users.
+  // IREE_HAL_MEMORY_TYPE_HOST_COHERENT bit but under the hood we are using
+  // memory types that does not have that property natively, e.g.,
+  // MTLStorageModeManaged. Under such circumstances, we need to perform the
+  // invalidate/flush operation "automatically" for users.
   bool requires_autosync() const;
 
   // We need to hold an reference to the queue so that we can encode

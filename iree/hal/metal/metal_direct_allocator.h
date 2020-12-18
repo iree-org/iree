@@ -39,24 +39,24 @@ class MetalDirectAllocator final : public Allocator {
   ~MetalDirectAllocator() override;
 
   bool CanUseBufferLike(Allocator* source_allocator,
-                        MemoryTypeBitfield memory_type,
-                        BufferUsageBitfield buffer_usage,
-                        BufferUsageBitfield intended_usage) const override;
+                        iree_hal_memory_type_t memory_type,
+                        iree_hal_buffer_usage_t buffer_usage,
+                        iree_hal_buffer_usage_t intended_usage) const override;
 
-  bool CanAllocate(MemoryTypeBitfield memory_type,
-                   BufferUsageBitfield buffer_usage,
+  bool CanAllocate(iree_hal_memory_type_t memory_type,
+                   iree_hal_buffer_usage_t buffer_usage,
                    size_t allocation_size) const override;
 
-  Status MakeCompatible(MemoryTypeBitfield* memory_type,
-                        BufferUsageBitfield* buffer_usage) const override;
+  Status MakeCompatible(iree_hal_memory_type_t* memory_type,
+                        iree_hal_buffer_usage_t* buffer_usage) const override;
 
-  StatusOr<ref_ptr<Buffer>> Allocate(MemoryTypeBitfield memory_type,
-                                     BufferUsageBitfield buffer_usage,
+  StatusOr<ref_ptr<Buffer>> Allocate(iree_hal_memory_type_t memory_type,
+                                     iree_hal_buffer_usage_t buffer_usage,
                                      size_t allocation_size) override;
 
-  StatusOr<ref_ptr<Buffer>> WrapMutable(MemoryTypeBitfield memory_type,
-                                        MemoryAccessBitfield allowed_access,
-                                        BufferUsageBitfield buffer_usage,
+  StatusOr<ref_ptr<Buffer>> WrapMutable(iree_hal_memory_type_t memory_type,
+                                        iree_hal_memory_access_t allowed_access,
+                                        iree_hal_buffer_usage_t buffer_usage,
                                         void* data,
                                         size_t data_length) override;
 
@@ -65,8 +65,8 @@ class MetalDirectAllocator final : public Allocator {
                                 id<MTLCommandQueue> transfer_queue);
 
   StatusOr<ref_ptr<MetalBuffer>> AllocateInternal(
-      MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-      MemoryAccessBitfield allowed_access, size_t allocation_size);
+      iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
+      iree_hal_memory_access_t allowed_access, size_t allocation_size);
 
   id<MTLDevice> metal_device_;
   id<MTLCommandQueue> metal_transfer_queue_;

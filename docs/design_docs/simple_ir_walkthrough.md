@@ -414,10 +414,8 @@ class SimpleMulModule : public iree::vm::Module {
     // Matches IR:
     // %0 = "iree_ll_seq.alloc_heap"() : () -> memref<4xf32>
     ASSIGN_OR_RETURN(auto result, device->allocator()->Allocate(
-        iree::hal::MemoryType::kHostLocal |
-            iree::hal::MemoryType::kDeviceVisible,
-        iree::hal::BufferUsage::kDispatch |
-            iree::hal::BufferUsage::kMapping));
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_MAPPING));
     auto result_view = iree::hal::BufferView(
         std::move(result), {4}, sizeof(float));
 
@@ -468,8 +466,8 @@ class SimpleMulModule : public iree::vm::Module {
     // Matches IR:
     // iree_ll_seq.static_dispatch ...
     ASSIGN_OR_RETURN(auto cmd, device->CreateCommandBuffer(
-        iree::hal::CommandBufferMode::kOneShot,
-        iree::hal::CommandCategory::kDispatch));
+        IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_DISPATCH));
     RETURN_IF_ERROR(cmd->Begin());
     iree::hal::DispatchRequest dispatch_request;
     dispatch_request.executable = device_executable(device, 0);

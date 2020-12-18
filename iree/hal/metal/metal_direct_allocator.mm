@@ -43,8 +43,8 @@ MTLResourceOptions SelectMTLResourceStorageMode(MemoryType memory_type) {
   // there’s no difference in GPU performance between managed and private buffers." But for
   // iOS, MTLStorageShared should be good given we have a unified memory model there.
 
-  if (AllBitsSet(memory_type, MemoryType::kDeviceLocal)) {
-    if (AllBitsSet(memory_type, MemoryType::kHostVisible)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device-local, host-visible.
       // TODO(antiagainst): Enable using MTLResourceStorageModeManaged on macOS once we have
       // defined invalidate/flush C APIs and wired up their usage through the stack. At the
@@ -56,7 +56,7 @@ MTLResourceOptions SelectMTLResourceStorageMode(MemoryType memory_type) {
       return MTLResourceStorageModePrivate;
     }
   } else {
-    if (AllBitsSet(memory_type, MemoryType::kDeviceVisible)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
       // Host-local, device-visible.
       return MTLResourceStorageModeShared;
     } else {
@@ -86,29 +86,29 @@ MetalDirectAllocator::~MetalDirectAllocator() {
 }
 
 bool MetalDirectAllocator::CanUseBufferLike(Allocator* source_allocator,
-                                            MemoryTypeBitfield memory_type,
-                                            BufferUsageBitfield buffer_usage,
-                                            BufferUsageBitfield intended_usage) const {
+                                            iree_hal_memory_type_t memory_type,
+                                            iree_hal_buffer_usage_t buffer_usage,
+                                            iree_hal_buffer_usage_t intended_usage) const {
   // TODO(benvanik): ensure there is a memory type that can satisfy the request.
   return source_allocator == this;
 }
 
-bool MetalDirectAllocator::CanAllocate(MemoryTypeBitfield memory_type,
-                                       BufferUsageBitfield buffer_usage,
+bool MetalDirectAllocator::CanAllocate(iree_hal_memory_type_t memory_type,
+                                       iree_hal_buffer_usage_t buffer_usage,
                                        size_t allocation_size) const {
   // TODO(benvanik): ensure there is a memory type that can satisfy the request.
   return true;
 }
 
-Status MetalDirectAllocator::MakeCompatible(MemoryTypeBitfield* memory_type,
-                                            BufferUsageBitfield* buffer_usage) const {
+Status MetalDirectAllocator::MakeCompatible(iree_hal_memory_type_t* memory_type,
+                                            iree_hal_buffer_usage_t* buffer_usage) const {
   // TODO(benvanik): mutate to match supported memory types.
   return OkStatus();
 }
 
 StatusOr<ref_ptr<MetalBuffer>> MetalDirectAllocator::AllocateInternal(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-    MemoryAccessBitfield allowed_access, size_t allocation_size) {
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
+    iree_hal_memory_access_t allowed_access, size_t allocation_size) {
   IREE_TRACE_SCOPE0("MetalDirectAllocator::AllocateInternal");
 
   MTLResourceOptions resource_options = SelectMTLResourceStorageMode(memory_type);
@@ -125,16 +125,16 @@ StatusOr<ref_ptr<MetalBuffer>> MetalDirectAllocator::AllocateInternal(
       /*byte_length=*/allocation_size, metal_buffer, metal_transfer_queue_);
 }
 
-StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::Allocate(MemoryTypeBitfield memory_type,
-                                                         BufferUsageBitfield buffer_usage,
+StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::Allocate(iree_hal_memory_type_t memory_type,
+                                                         iree_hal_buffer_usage_t buffer_usage,
                                                          size_t allocation_size) {
   IREE_TRACE_SCOPE0("MetalDirectAllocator::Allocate");
-  return AllocateInternal(memory_type, buffer_usage, MemoryAccess::kAll, allocation_size);
+  return AllocateInternal(memory_type, buffer_usage, IREE_HAL_MEMORY_ACCESS_ALL, allocation_size);
 }
 
-StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::WrapMutable(MemoryTypeBitfield memory_type,
-                                                            MemoryAccessBitfield allowed_access,
-                                                            BufferUsageBitfield buffer_usage,
+StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::WrapMutable(iree_hal_memory_type_t memory_type,
+                                                            iree_hal_memory_access_t allowed_access,
+                                                            iree_hal_buffer_usage_t buffer_usage,
                                                             void* data, size_t data_length) {
   IREE_TRACE_SCOPE0("MetalDirectAllocator::WrapMutable");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalDirectAllocator::WrapMutable";

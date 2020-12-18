@@ -34,15 +34,18 @@ class BufferTest : public CtsTestBase {};
 
 TEST_P(BufferTest, Allocate) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 14));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 14));
 
   EXPECT_NE(nullptr, buffer->allocator());
-  EXPECT_EQ(MemoryAccess::kAll, buffer->allowed_access());
-  EXPECT_EQ(MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-            buffer->memory_type());
-  EXPECT_EQ(BufferUsage::kTransfer | BufferUsage::kMapping, buffer->usage());
+  EXPECT_EQ(IREE_HAL_MEMORY_ACCESS_ALL, buffer->allowed_access());
+  EXPECT_EQ(
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      buffer->memory_type());
+  EXPECT_EQ(IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+            buffer->usage());
 
   EXPECT_LE(14, buffer->allocation_size());
   EXPECT_EQ(0, buffer->byte_offset());
@@ -51,17 +54,19 @@ TEST_P(BufferTest, Allocate) {
 
 TEST_P(BufferTest, AllocateZeroLength) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 0));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 0));
   EXPECT_LE(0, buffer->allocation_size());
 }
 
 TEST_P(BufferTest, Fill8) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 5));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 5));
 
   std::vector<uint8_t> actual_data(buffer->allocation_size());
 
@@ -75,8 +80,8 @@ TEST_P(BufferTest, Fill8) {
   IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x33, 0x33, 0x33));
 
-  // Fill the remaining parts of the buffer by using kWholeBuffer.
-  IREE_EXPECT_OK(buffer->Fill8(2, kWholeBuffer, 0x55u));
+  // Fill the remaining parts of the buffer by using IREE_WHOLE_BUFFER.
+  IREE_EXPECT_OK(buffer->Fill8(2, IREE_WHOLE_BUFFER, 0x55u));
   IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x55, 0x55, 0x55));
 
@@ -93,9 +98,10 @@ TEST_P(BufferTest, Fill8) {
 
 TEST_P(BufferTest, Fill16) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 9));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 9));
 
   std::vector<uint8_t> actual_data(buffer->allocation_size());
 
@@ -109,13 +115,13 @@ TEST_P(BufferTest, Fill16) {
   IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x22, 0x11, 0x22, 0x11, 0, 0, 0, 0, 0));
 
-  // Fill the remaining parts of the buffer by using kWholeBuffer.
+  // Fill the remaining parts of the buffer by using IREE_WHOLE_BUFFER.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto aligned_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, 8));
-  IREE_EXPECT_OK(aligned_buffer->Fill16(4, kWholeBuffer, 0x5566u));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 8));
+  IREE_EXPECT_OK(aligned_buffer->Fill16(4, IREE_WHOLE_BUFFER, 0x5566u));
   std::vector<uint8_t> aligned_actual_data(aligned_buffer->allocation_size());
   IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
                                           aligned_actual_data.size()));
@@ -132,9 +138,10 @@ TEST_P(BufferTest, Fill16) {
 
 TEST_P(BufferTest, Fill32) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 9));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 9));
 
   std::vector<uint8_t> actual_data(buffer->allocation_size());
 
@@ -150,13 +157,13 @@ TEST_P(BufferTest, Fill32) {
   EXPECT_THAT(actual_data,
               ElementsAre(0x44, 0x33, 0x22, 0x11, 0x44, 0x33, 0x22, 0x11, 0));
 
-  // Fill the remaining parts of the buffer by using kWholeBuffer.
+  // Fill the remaining parts of the buffer by using IREE_WHOLE_BUFFER.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto aligned_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, 8));
-  IREE_EXPECT_OK(aligned_buffer->Fill32(4, kWholeBuffer, 0x55667788u));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 8));
+  IREE_EXPECT_OK(aligned_buffer->Fill32(4, IREE_WHOLE_BUFFER, 0x55667788u));
   std::vector<uint8_t> aligned_actual_data(aligned_buffer->allocation_size());
   IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
                                           aligned_actual_data.size()));
@@ -173,9 +180,10 @@ TEST_P(BufferTest, Fill32) {
 
 TEST_P(BufferTest, ReadWriteData) {
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto buffer, device_->allocator()->Allocate(
-                       MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-                       BufferUsage::kTransfer | BufferUsage::kMapping, 4));
+      auto buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING, 4));
 
   std::vector<uint8_t> actual_data(4);
 
@@ -204,16 +212,18 @@ TEST_P(BufferTest, CopyData) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto src_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(src_buffer->WriteData(0, src_data.data(), src_data.size()));
 
   std::vector<uint8_t> dst_data = {0, 1, 2, 3, 4};
   IREE_ASSERT_OK_AND_ASSIGN(
       auto dst_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, dst_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          dst_data.size()));
   IREE_EXPECT_OK(dst_buffer->WriteData(0, dst_data.data(), dst_data.size()));
 
   // Copy of length 0 should not change the dest buffer.
@@ -229,22 +239,26 @@ TEST_P(BufferTest, CopyData) {
       dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 2, 3, 3, 4));
 
-  // Copy the entire buffer using kWholeBuffer. This will adjust sizes
+  // Copy the entire buffer using IREE_WHOLE_BUFFER. This will adjust sizes
   // to ensure that the min buffer is taken. We test both src and dst buffer
   // offset/length calculations (note that some may end up as 0 copies).
-  IREE_EXPECT_OK(dst_buffer->CopyData(3, src_buffer.get(), 0, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->CopyData(3, src_buffer.get(), 0, IREE_WHOLE_BUFFER));
   IREE_EXPECT_OK(
       dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 2, 3, 0, 1));
-  IREE_EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 2, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->CopyData(0, src_buffer.get(), 2, IREE_WHOLE_BUFFER));
   IREE_EXPECT_OK(
       dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(2, 3, 3, 0, 1));
-  IREE_EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 3, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->CopyData(0, src_buffer.get(), 3, IREE_WHOLE_BUFFER));
   IREE_EXPECT_OK(
       dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(3, 3, 3, 0, 1));
-  IREE_EXPECT_OK(dst_buffer->CopyData(4, src_buffer.get(), 0, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->CopyData(4, src_buffer.get(), 0, IREE_WHOLE_BUFFER));
   IREE_EXPECT_OK(
       dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(3, 3, 3, 0, 0));
@@ -255,13 +269,15 @@ TEST_P(BufferTest, MapMemory) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(buffer->WriteData(0, src_data.data(), src_data.size()));
 
   // 0-length mappings are valid.
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 0, 0));
+      auto mapping,
+      buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ, 0, 0));
   EXPECT_TRUE(mapping.empty());
   EXPECT_EQ(0, mapping.size());
   EXPECT_EQ(0, mapping.byte_length());
@@ -271,8 +287,9 @@ TEST_P(BufferTest, MapMemory) {
   mapping.reset();
 
   // Map the whole buffer for reading.
-  IREE_ASSERT_OK_AND_ASSIGN(mapping, buffer->MapMemory<uint8_t>(
-                                         MemoryAccess::kRead, 0, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      mapping, buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                          IREE_WHOLE_BUFFER));
   EXPECT_EQ(src_data.size(), mapping.size());
   IREE_ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
   EXPECT_THAT(span, ElementsAre(0, 1, 2, 3, 4, 5, 6));
@@ -280,7 +297,7 @@ TEST_P(BufferTest, MapMemory) {
 
   // Map a portion of the buffer for reading.
   IREE_ASSERT_OK_AND_ASSIGN(
-      mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 1, 2));
+      mapping, buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ, 1, 2));
   EXPECT_EQ(2, mapping.size());
   IREE_ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
   EXPECT_THAT(span, ElementsAre(1, 2));
@@ -292,15 +309,16 @@ TEST_P(BufferTest, MapMemoryNonByte) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(buffer->WriteData(0, src_data.data(), src_data.size()));
 
   // Map the buffer as non-byte values.
   // Note that we'll round down to the number of valid elements at the
   // alignment.
-  IREE_ASSERT_OK_AND_ASSIGN(auto mapping16,
-                            buffer->MapMemory<uint16_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping16, buffer->MapMemory<uint16_t>(IREE_HAL_MEMORY_ACCESS_READ));
   EXPECT_EQ(3, mapping16.size());
   EXPECT_LE(6, mapping16.byte_length());
   IREE_ASSERT_OK_AND_ASSIGN(auto span16, mapping16.Subspan());
@@ -313,13 +331,15 @@ TEST_P(BufferTest, MapMemoryWrite) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(buffer->WriteData(0, src_data.data(), src_data.size()));
 
   // Map and modify the data. We should see it when we read back.
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kWrite, 1, 2));
+      auto mapping,
+      buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_WRITE, 1, 2));
   auto mutable_data = mapping.mutable_data();
   mutable_data[0] = 0xAA;
   mutable_data[1] = 0xBB;
@@ -334,8 +354,9 @@ TEST_P(BufferTest, MapMemoryDiscard) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(buffer->WriteData(0, src_data.data(), src_data.size()));
 
   // Map for discard. Note that we can't really rely on the value of the data
@@ -344,7 +365,7 @@ TEST_P(BufferTest, MapMemoryDiscard) {
   std::vector<uint8_t> actual_data(src_data.size());
   IREE_ASSERT_OK_AND_ASSIGN(
       auto mapping,
-      buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, 1, 2));
+      buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 1, 2));
   IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, _, _, 3, 4, 5, 6));
   mapping.reset();
@@ -355,15 +376,16 @@ TEST_P(BufferTest, MapMemorySubspan) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto parent_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-          BufferUsage::kTransfer | BufferUsage::kMapping, src_data.size()));
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+          src_data.size()));
   IREE_EXPECT_OK(parent_buffer->WriteData(0, src_data.data(), src_data.size()));
 
   IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
                             Buffer::Subspan(parent_buffer, 1, 3));
-  IREE_ASSERT_OK_AND_ASSIGN(
-      auto mapping,
-      subspan_buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mapping,
+                            subspan_buffer->MapMemory<uint8_t>(
+                                IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 1, 2));
   auto* mutable_data = mapping.mutable_data();
   mutable_data[0] = 0xCC;
   mutable_data[1] = 0xDD;

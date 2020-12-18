@@ -175,14 +175,16 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
        ++set_ordinal) {
     for (const auto& binding : params.set_bindings[set_ordinal]) {
       // TODO(benvanik): plumb binding directly into VMLA to avoid this.
-      void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
+      void* data = reinterpret_cast<HostBuffer*>(
+                       iree_hal_buffer_allocated_buffer(binding.buffer))
                        ->mutable_data();
-      data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
-                                     binding.buffer->byte_offset() +
-                                     binding.offset);
+      data = reinterpret_cast<void*>(
+          reinterpret_cast<uintptr_t>(data) +
+          iree_hal_buffer_byte_offset(binding.buffer) + binding.offset);
       IREE_ASSIGN_OR_RETURN(
-          auto buffer, Buffer::WrapMutable(data, binding.buffer->byte_length(),
-                                           iree_allocator_null()));
+          auto buffer,
+          Buffer::WrapMutable(data, iree_hal_buffer_byte_length(binding.buffer),
+                              iree_allocator_null()));
       IREE_RETURN_IF_ERROR(interface->SetBinding(set_ordinal, binding.binding,
                                                  {std::move(buffer)}));
     }

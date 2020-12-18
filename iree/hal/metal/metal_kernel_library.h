@@ -44,7 +44,7 @@ namespace metal {
 class MetalKernelLibrary final : public Executable {
  public:
   static StatusOr<ref_ptr<MetalKernelLibrary>> Create(
-      id<MTLDevice> device, ExecutableCachingModeBitfield mode,
+      id<MTLDevice> device, iree_hal_executable_caching_mode_t mode,
       iree_const_byte_span_t executable_data);
   ~MetalKernelLibrary() override;
 

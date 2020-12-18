@@ -62,7 +62,7 @@ MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info,
   }
 
   command_queue_ = absl::make_unique<MetalCommandQueue>(
-      name, CommandCategory::kDispatch | CommandCategory::kTransfer, metal_queue);
+      name, IREE_HAL_COMMAND_CATEGORY_ANY, metal_queue);
   common_queue_ = command_queue_.get();
   // MetalCommandQueue retains by itself. Release here to avoid leaking.
   [metal_queue release];
@@ -97,8 +97,8 @@ ref_ptr<ExecutableCache> MetalDevice::CreateExecutableCache() {
 }
 
 StatusOr<ref_ptr<DescriptorSetLayout>> MetalDevice::CreateDescriptorSetLayout(
-    DescriptorSetLayout::UsageType usage_type,
-    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSetLayout");
   return make_ref<MetalArgumentBufferLayout>(usage_type, bindings);
 }
@@ -110,14 +110,14 @@ StatusOr<ref_ptr<ExecutableLayout>> MetalDevice::CreateExecutableLayout(
 }
 
 StatusOr<ref_ptr<DescriptorSet>> MetalDevice::CreateDescriptorSet(
-    DescriptorSetLayout* set_layout, absl::Span<const DescriptorSet::Binding> bindings) {
+    DescriptorSetLayout* set_layout, absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSet");
   return make_ref<MetalArgumentBuffer>(static_cast<MetalArgumentBufferLayout*>(set_layout),
                                        bindings);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> MetalDevice::CreateCommandBuffer(
-    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories) {
+    iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t command_categories) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateCommandBuffer");
   @autoreleasepool {
     StatusOr<ref_ptr<CommandBuffer>> command_buffer;

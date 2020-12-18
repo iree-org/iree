@@ -26,10 +26,10 @@ namespace metal {
 
 namespace {
 
-MTLResourceUsage ConvertResourceUsage(MemoryAccessBitfield memory_access) {
+MTLResourceUsage ConvertResourceUsage(iree_hal_memory_access_t memory_access) {
   MTLResourceUsage usage = 0;
-  if (AllBitsSet(memory_access, MemoryAccess::kRead)) usage |= MTLResourceUsageRead;
-  if (AllBitsSet(memory_access, MemoryAccess::kWrite)) usage |= MTLResourceUsageWrite;
+  if (iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_READ)) usage |= MTLResourceUsageRead;
+  if (iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_WRITE)) usage |= MTLResourceUsageWrite;
   return usage;
 }
 
@@ -37,13 +37,13 @@ MTLResourceUsage ConvertResourceUsage(MemoryAccessBitfield memory_access) {
 
 // static
 StatusOr<ref_ptr<CommandBuffer>> MetalCommandBuffer::Create(
-    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories,
+    iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t command_categories,
     id<MTLCommandBuffer> command_buffer) {
   return assign_ref(new MetalCommandBuffer(mode, command_categories, command_buffer));
 }
 
-MetalCommandBuffer::MetalCommandBuffer(CommandBufferModeBitfield mode,
-                                       CommandCategoryBitfield command_categories,
+MetalCommandBuffer::MetalCommandBuffer(iree_hal_command_buffer_mode_t mode,
+                                       iree_hal_command_category_t command_categories,
                                        id<MTLCommandBuffer> command_buffer)
     : CommandBuffer(mode, command_categories), metal_handle_([command_buffer retain]) {
   metal_handle_.label = @"IREE MetalCommandBuffer";
@@ -58,6 +58,12 @@ StatusOr<MetalBuffer*> MetalCommandBuffer::CastBuffer(Buffer* buffer) const {
   // TODO(benvanik): assert that the buffer is from the right allocator and
   // that it is compatible with our target queue family.
   return static_cast<MetalBuffer*>(buffer->allocated_buffer());
+}
+
+StatusOr<MetalBuffer*> MetalCommandBuffer::CastBuffer(iree_hal_buffer_t* buffer) const {
+  // TODO(benvanik): assert that the buffer is from the right allocator and
+  // that it is compatible with our target queue family.
+  return reinterpret_cast<MetalBuffer*>(iree_hal_buffer_allocated_buffer(buffer));
 }
 
 id<MTLBlitCommandEncoder> MetalCommandBuffer::GetOrBeginBlitEncoder() {
@@ -120,14 +126,14 @@ Status MetalCommandBuffer::End() {
   return OkStatus();
 }
 
-Status MetalCommandBuffer::ExecutionBarrier(ExecutionStageBitfield source_stage_mask,
-                                            ExecutionStageBitfield target_stage_mask,
-                                            absl::Span<const MemoryBarrier> memory_barriers,
-                                            absl::Span<const BufferBarrier> buffer_barriers) {
+Status MetalCommandBuffer::ExecutionBarrier(iree_hal_execution_stage_t source_stage_mask,
+                                            iree_hal_execution_stage_t target_stage_mask,
+                                            absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+                                            absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::ExecutionBarrier");
 
-  if (AllBitsSet(source_stage_mask, ExecutionStage::kHost) ||
-      AllBitsSet(target_stage_mask, ExecutionStage::kHost)) {
+  if (iree_all_bits_set(source_stage_mask, IREE_HAL_EXECUTION_STAGE_HOST) ||
+      iree_all_bits_set(target_stage_mask, IREE_HAL_EXECUTION_STAGE_HOST)) {
     return UnimplementedErrorBuilder(IREE_LOC)
            << "MetalCommandBuffer::ExecutionBarrier with host bit set";
   }
@@ -149,27 +155,27 @@ Status MetalCommandBuffer::ExecutionBarrier(ExecutionStageBitfield source_stage_
   return OkStatus();
 }
 
-Status MetalCommandBuffer::SignalEvent(Event* event, ExecutionStageBitfield source_stage_mask) {
+Status MetalCommandBuffer::SignalEvent(Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::SignalEvent");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::SignalEvent";
 }
 
-Status MetalCommandBuffer::ResetEvent(Event* event, ExecutionStageBitfield source_stage_mask) {
+Status MetalCommandBuffer::ResetEvent(Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::ResetEvent");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::ResetEvent";
 }
 
 Status MetalCommandBuffer::WaitEvents(absl::Span<Event*> events,
-                                      ExecutionStageBitfield source_stage_mask,
-                                      ExecutionStageBitfield target_stage_mask,
-                                      absl::Span<const MemoryBarrier> memory_barriers,
-                                      absl::Span<const BufferBarrier> buffer_barriers) {
+                                      iree_hal_execution_stage_t source_stage_mask,
+                                      iree_hal_execution_stage_t target_stage_mask,
+                                      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+                                      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::WaitEvents");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::WaitEvents";
 }
 
-Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                                      device_size_t length, const void* pattern,
+Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, iree_device_size_t target_offset,
+                                      iree_device_size_t length, const void* pattern,
                                       size_t pattern_length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::FillBuffer");
   IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
@@ -207,16 +213,16 @@ Status MetalCommandBuffer::DiscardBuffer(Buffer* buffer) {
   return OkStatus();
 }
 
-Status MetalCommandBuffer::UpdateBuffer(const void* source_buffer, device_size_t source_offset,
-                                        Buffer* target_buffer, device_size_t target_offset,
-                                        device_size_t length) {
+Status MetalCommandBuffer::UpdateBuffer(const void* source_buffer, iree_device_size_t source_offset,
+                                        Buffer* target_buffer, iree_device_size_t target_offset,
+                                        iree_device_size_t length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::UpdateBuffer");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::UpdateBuffer";
 }
 
-Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                                      Buffer* target_buffer, device_size_t target_offset,
-                                      device_size_t length) {
+Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, iree_device_size_t source_offset,
+                                      Buffer* target_buffer, iree_device_size_t target_offset,
+                                      iree_device_size_t length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::CopyBuffer");
 
   IREE_ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
@@ -249,7 +255,7 @@ Status MetalCommandBuffer::PushConstants(ExecutableLayout* executable_layout, si
 }
 
 Status MetalCommandBuffer::PushDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
-                                             absl::Span<const DescriptorSet::Binding> bindings) {
+                                             absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::PushDescriptorSet");
   if (set != 0) {
     return UnimplementedErrorBuilder(IREE_LOC)
@@ -262,7 +268,7 @@ Status MetalCommandBuffer::PushDescriptorSet(ExecutableLayout* executable_layout
 
 Status MetalCommandBuffer::BindDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
                                              DescriptorSet* descriptor_set,
-                                             absl::Span<const device_size_t> dynamic_offsets) {
+                                             absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::BindDescriptorSet");
   if (set != 0) {
     return UnimplementedErrorBuilder(IREE_LOC)
@@ -341,7 +347,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
       for (const auto& resource_binding : push_state.resource_bindings) {
         IREE_DVLOG(3) << "  Resource @[" << resource_binding.DebugStringShort() << "]";
 
-        if (resource_binding.length != kWholeBuffer &&
+        if (resource_binding.length != IREE_WHOLE_BUFFER &&
             resource_binding.length != resource_binding.buffer->allocation_size()) {
           return UnimplementedErrorBuilder(IREE_LOC)
                  << "MetalCommandBuffer::Dispatch with sub-buffer";
@@ -379,7 +385,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
 
 Status MetalCommandBuffer::DispatchIndirect(Executable* executable, int32_t entry_point,
                                             Buffer* workgroups_buffer,
-                                            device_size_t workgroups_offset) {
+                                            iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::DispatchIndirect");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::DispatchIndirect";
 }

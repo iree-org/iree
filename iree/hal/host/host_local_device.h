@@ -44,8 +44,9 @@ class HostLocalDevice : public Device {
   }
 
   StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings) override;
+      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings)
+      override;
 
   StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
       absl::Span<DescriptorSetLayout* const> set_layouts,
@@ -53,11 +54,11 @@ class HostLocalDevice : public Device {
 
   StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
       DescriptorSetLayout* set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) override;
 
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) override;
+      iree_hal_command_buffer_mode_t mode,
+      iree_hal_command_category_t command_categories) override;
 
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 
