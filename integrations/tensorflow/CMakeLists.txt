@@ -47,6 +47,20 @@ iree_add_bazel_invocation(
   EXECUTABLE_PATHS ${_executable_paths}
 )
 
+if(${IREE_BUILD_TESTS})
+  # Separate bazel invocation for test tools.
+  iree_add_bazel_invocation(
+    ALL
+    INVOCATION_TARGET
+      integrations_iree_tensorflow_test_tools
+    BAZEL_TARGETS
+      //integrations/tensorflow/compiler:iree-tf-opt
+    EXECUTABLE_PATHS
+      integrations/tensorflow/compiler/iree-tf-opt
+  )
+  add_subdirectory(compiler/test)
+endif()
+
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
 endif()
