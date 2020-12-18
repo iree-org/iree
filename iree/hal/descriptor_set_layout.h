@@ -22,43 +22,12 @@
 namespace iree {
 namespace hal {
 
-// Specifies the type of a descriptor in a descriptor set.
-enum class DescriptorType : uint32_t {
-  kUniformBuffer = 6,
-  kStorageBuffer = 7,
-  kUniformBufferDynamic = 8,
-  kStorageBufferDynamic = 9,
-};
-
 // Opaque handle to a descriptor set layout object.
 //
 // Maps to VkDescriptorSetLayout:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
 class DescriptorSetLayout : public Resource {
  public:
-  // Specifies the usage type of the descriptor set.
-  enum class UsageType : uint32_t {
-    // Descriptor set will be initialized once and never changed.
-    kImmutable = 0,
-    // Descriptor set is never created and instead used with push descriptors.
-    kPushOnly = 1,
-  };
-
-  // Specifies a descriptor set layout binding.
-  struct Binding {
-    // The binding number of this entry and corresponds to a resource of the
-    // same binding number in the executable interface.
-    int32_t binding = 0;
-    // Specifies which type of resource descriptors are used for this binding.
-    DescriptorType type = DescriptorType::kStorageBuffer;
-    // Specifies the memory access performed by the executables.
-    MemoryAccessBitfield access = MemoryAccess::kRead | MemoryAccess::kWrite;
-
-    std::string DebugStringShort() const {
-      return absl::StrCat("binding=", binding, ", type=", type,
-                          ", access=", MemoryAccessString(access));
-    }
-  };
 };
 
 }  // namespace hal

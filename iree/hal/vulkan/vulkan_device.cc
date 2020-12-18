@@ -183,14 +183,12 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
 
     if (fence_pool != nullptr) {
       command_queues.push_back(absl::make_unique<SerializingCommandQueue>(
-          std::move(queue_name),
-          CommandCategory::kDispatch | CommandCategory::kTransfer,
-          logical_device, fence_pool, queue));
+          std::move(queue_name), IREE_HAL_COMMAND_CATEGORY_ANY, logical_device,
+          fence_pool, queue));
     } else {
       command_queues.push_back(absl::make_unique<DirectCommandQueue>(
-          std::move(queue_name),
-          CommandCategory::kDispatch | CommandCategory::kTransfer,
-          logical_device, queue));
+          std::move(queue_name), IREE_HAL_COMMAND_CATEGORY_ANY, logical_device,
+          queue));
     }
   }
 
@@ -205,12 +203,12 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     std::string queue_name = absl::StrCat(device_info.name(), ":t", i);
     if (fence_pool != nullptr) {
       command_queues.push_back(absl::make_unique<SerializingCommandQueue>(
-          std::move(queue_name), CommandCategory::kTransfer, logical_device,
-          fence_pool, queue));
+          std::move(queue_name), IREE_HAL_COMMAND_CATEGORY_TRANSFER,
+          logical_device, fence_pool, queue));
     } else {
       command_queues.push_back(absl::make_unique<DirectCommandQueue>(
-          std::move(queue_name), CommandCategory::kTransfer, logical_device,
-          queue));
+          std::move(queue_name), IREE_HAL_COMMAND_CATEGORY_TRANSFER,
+          logical_device, queue));
     }
   }
 
@@ -569,8 +567,8 @@ ref_ptr<ExecutableCache> VulkanDevice::CreateExecutableCache() {
 }
 
 StatusOr<ref_ptr<DescriptorSetLayout>> VulkanDevice::CreateDescriptorSetLayout(
-    DescriptorSetLayout::UsageType usage_type,
-    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings) {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateDescriptorSetLayout");
 
   absl::InlinedVector<VkDescriptorSetLayoutBinding, 4> native_bindings(
@@ -589,7 +587,7 @@ StatusOr<ref_ptr<DescriptorSetLayout>> VulkanDevice::CreateDescriptorSetLayout(
   create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   create_info.pNext = nullptr;
   create_info.flags = 0;
-  if (usage_type == DescriptorSetLayout::UsageType::kPushOnly &&
+  if (usage_type == IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY &&
       logical_device_->enabled_extensions().push_descriptors) {
     // Note that we can *only* use push descriptor sets if we set this create
     // flag. If push descriptors aren't supported we emulate them with normal
@@ -652,15 +650,15 @@ StatusOr<ref_ptr<ExecutableLayout>> VulkanDevice::CreateExecutableLayout(
 
 StatusOr<ref_ptr<DescriptorSet>> VulkanDevice::CreateDescriptorSet(
     DescriptorSetLayout* set_layout,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateDescriptorSet");
   return UnimplementedErrorBuilder(IREE_LOC)
          << "CreateDescriptorSet not yet implemented (needs timeline)";
 }
 
 StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
-    CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories) {
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories) {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateCommandBuffer");
 
   // Select the command pool to used based on the types of commands used.
@@ -668,7 +666,8 @@ StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
   // no dedicated transfer queues.
   ref_ptr<VkCommandPoolHandle> command_pool;
   if (transfer_command_pool_ &&
-      !AllBitsSet(command_categories, CommandCategory::kDispatch)) {
+      !iree_all_bits_set(command_categories,
+                         IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
     command_pool = add_ref(transfer_command_pool_);
   } else {
     command_pool = add_ref(dispatch_command_pool_);

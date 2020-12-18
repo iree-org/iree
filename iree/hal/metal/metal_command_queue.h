@@ -33,7 +33,7 @@ namespace metal {
 class MetalCommandQueue final : public CommandQueue {
  public:
   MetalCommandQueue(std::string name,
-                    CommandCategoryBitfield supported_categories,
+                    iree_hal_command_category_t supported_categories,
                     id<MTLCommandQueue> queue);
   ~MetalCommandQueue() override;
 

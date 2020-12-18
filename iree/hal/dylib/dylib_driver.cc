@@ -26,11 +26,7 @@ namespace dylib {
 namespace {
 
 DeviceInfo GetDefaultDeviceInfo() {
-  DeviceFeatureBitfield supported_features = DeviceFeature::kNone;
-  // TODO(benvanik): implement debugging/profiling features.
-  // supported_features |= DeviceFeature::kDebugging;
-  // supported_features |= DeviceFeature::kCoverage;
-  // supported_features |= DeviceFeature::kProfiling;
+  iree_hal_device_feature_t supported_features = IREE_HAL_DEVICE_FEATURE_NONE;
   DeviceInfo device_info("dylib", "Dynamic Library (dylib)",
                          supported_features);
   // TODO(benvanik): device info.
@@ -54,7 +50,8 @@ StatusOr<ref_ptr<Device>> DyLibDriver::CreateDefaultDevice() {
   return CreateDevice(0);
 }
 
-StatusOr<ref_ptr<Device>> DyLibDriver::CreateDevice(DriverDeviceID device_id) {
+StatusOr<ref_ptr<Device>> DyLibDriver::CreateDevice(
+    iree_hal_device_id_t device_id) {
   // Only one device, ignore device_id.
   auto scheduling_model = std::make_unique<host::SerialSchedulingModel>();
   return make_ref<DyLibDevice>(GetDefaultDeviceInfo(),

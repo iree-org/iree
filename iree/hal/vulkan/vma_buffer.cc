@@ -23,12 +23,12 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-VmaBuffer::VmaBuffer(VmaAllocator* allocator, MemoryTypeBitfield memory_type,
-                     MemoryAccessBitfield allowed_access,
-                     BufferUsageBitfield usage, device_size_t allocation_size,
-                     device_size_t byte_offset, device_size_t byte_length,
-                     VkBuffer buffer, VmaAllocation allocation,
-                     VmaAllocationInfo allocation_info)
+VmaBuffer::VmaBuffer(
+    VmaAllocator* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
+    iree_device_size_t allocation_size, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, VkBuffer buffer, VmaAllocation allocation,
+    VmaAllocationInfo allocation_info)
     : Buffer(allocator, memory_type, allowed_access, usage, allocation_size,
              byte_offset, byte_length),
       vma_(allocator->vma()),
@@ -45,11 +45,12 @@ VmaBuffer::~VmaBuffer() {
   vmaDestroyBuffer(vma_, buffer_, allocation_);
 }
 
-Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                           const void* pattern, device_size_t pattern_length) {
-  IREE_ASSIGN_OR_RETURN(
-      auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, byte_offset,
-                                       byte_length));
+Status VmaBuffer::FillImpl(iree_device_size_t byte_offset,
+                           iree_device_size_t byte_length, const void* pattern,
+                           iree_device_size_t pattern_length) {
+  IREE_ASSIGN_OR_RETURN(auto mapping,
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+                                           byte_offset, byte_length));
   void* data_ptr = static_cast<void*>(mapping.mutable_data());
   switch (pattern_length) {
     case 1: {
@@ -77,36 +78,37 @@ Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
   return OkStatus();
 }
 
-Status VmaBuffer::ReadDataImpl(device_size_t source_offset, void* data,
-                               device_size_t data_length) {
-  IREE_ASSIGN_OR_RETURN(
-      auto mapping,
-      MapMemory<uint8_t>(MemoryAccess::kRead, source_offset, data_length));
+Status VmaBuffer::ReadDataImpl(iree_device_size_t source_offset, void* data,
+                               iree_device_size_t data_length) {
+  IREE_ASSIGN_OR_RETURN(auto mapping,
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ,
+                                           source_offset, data_length));
   std::memcpy(data, mapping.data(), mapping.byte_length());
   return OkStatus();
 }
 
-Status VmaBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
-                                device_size_t data_length) {
+Status VmaBuffer::WriteDataImpl(iree_device_size_t target_offset,
+                                const void* data,
+                                iree_device_size_t data_length) {
   IREE_ASSIGN_OR_RETURN(auto mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
                                            target_offset, data_length));
   std::memcpy(mapping.mutable_data(), data, mapping.byte_length());
   return OkStatus();
 }
 
-Status VmaBuffer::CopyDataImpl(device_size_t target_offset,
+Status VmaBuffer::CopyDataImpl(iree_device_size_t target_offset,
                                Buffer* source_buffer,
-                               device_size_t source_offset,
-                               device_size_t data_length) {
+                               iree_device_size_t source_offset,
+                               iree_device_size_t data_length) {
   // This is pretty terrible. Let's not do this.
   // TODO(benvanik): a way for allocators to indicate transfer compat.
-  IREE_ASSIGN_OR_RETURN(auto source_mapping,
-                        source_buffer->MapMemory<uint8_t>(
-                            MemoryAccess::kRead, source_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto source_mapping, source_buffer->MapMemory<uint8_t>(
+                                                 IREE_HAL_MEMORY_ACCESS_READ,
+                                                 source_offset, data_length));
   IREE_CHECK_EQ(data_length, source_mapping.size());
   IREE_ASSIGN_OR_RETURN(auto target_mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
+                        MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
                                            target_offset, data_length));
   IREE_CHECK_EQ(data_length, target_mapping.size());
   std::memcpy(target_mapping.mutable_data(), source_mapping.data(),
@@ -115,9 +117,9 @@ Status VmaBuffer::CopyDataImpl(device_size_t target_offset,
 }
 
 Status VmaBuffer::MapMemoryImpl(MappingMode mapping_mode,
-                                MemoryAccessBitfield memory_access,
-                                device_size_t local_byte_offset,
-                                device_size_t local_byte_length,
+                                iree_hal_memory_access_t memory_access,
+                                iree_device_size_t local_byte_offset,
+                                iree_device_size_t local_byte_length,
                                 void** out_data) {
   uint8_t* data_ptr = nullptr;
   VK_RETURN_IF_ERROR(
@@ -129,7 +131,7 @@ Status VmaBuffer::MapMemoryImpl(MappingMode mapping_mode,
   // heap buffers we could reallocate them such that ASAN yells, but that
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
-  if (AnyBitSet(memory_access & MemoryAccess::kDiscard)) {
+  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
     std::memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
@@ -137,21 +139,23 @@ Status VmaBuffer::MapMemoryImpl(MappingMode mapping_mode,
   return OkStatus();
 }
 
-Status VmaBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
-                                  device_size_t local_byte_length, void* data) {
+Status VmaBuffer::UnmapMemoryImpl(iree_device_size_t local_byte_offset,
+                                  iree_device_size_t local_byte_length,
+                                  void* data) {
   vmaUnmapMemory(vma_, allocation_);
   return OkStatus();
 }
 
-Status VmaBuffer::InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                             device_size_t local_byte_length) {
+Status VmaBuffer::InvalidateMappedMemoryImpl(
+    iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
   vmaInvalidateAllocation(vma_, allocation_, local_byte_offset,
                           local_byte_length);
   return OkStatus();
 }
 
-Status VmaBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                                        device_size_t local_byte_length) {
+Status VmaBuffer::FlushMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                                        iree_device_size_t local_byte_length) {
   vmaFlushAllocation(vma_, allocation_, local_byte_offset, local_byte_length);
   return OkStatus();
 }

@@ -29,7 +29,7 @@ using ::testing::ContainerEq;
 
 class CommandBufferTest : public CtsTestBase {
  protected:
-  static constexpr device_size_t kBufferNumBytes = 16;
+  static constexpr iree_device_size_t kBufferNumBytes = 16;
 
   void SubmitAndWait(CommandQueue* command_queue,
                      CommandBuffer* command_buffer) {
@@ -45,21 +45,23 @@ class CommandBufferTest : public CtsTestBase {
 TEST_P(CommandBufferTest, Create) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kDispatch));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
-  EXPECT_TRUE((command_buffer->mode() & CommandBufferMode::kOneShot) ==
-              CommandBufferMode::kOneShot);
+  EXPECT_TRUE(
+      (command_buffer->mode() & IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) ==
+      IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT);
   EXPECT_TRUE((command_buffer->command_categories() &
-               CommandCategory::kDispatch) == CommandCategory::kDispatch);
+               IREE_HAL_COMMAND_CATEGORY_DISPATCH) ==
+              IREE_HAL_COMMAND_CATEGORY_DISPATCH);
   EXPECT_FALSE(command_buffer->is_recording());
 }
 
 TEST_P(CommandBufferTest, BeginEnd) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kDispatch));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   EXPECT_FALSE(command_buffer->is_recording());
   IREE_EXPECT_OK(command_buffer->Begin());
@@ -71,14 +73,14 @@ TEST_P(CommandBufferTest, BeginEnd) {
 TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kTransfer));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
   IREE_ASSERT_OK_AND_ASSIGN(
       auto device_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-          BufferUsage::kAll, kBufferNumBytes));
+          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_ALL, kBufferNumBytes));
 
   std::vector<uint8_t> reference_buffer(kBufferNumBytes);
 
@@ -120,7 +122,7 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   // Read back the device buffer.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto mapped_memory,
-      device_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+      device_buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ));
   IREE_EXPECT_OK(mapped_memory.Invalidate());
 
   std::vector<uint8_t> actual_data(mapped_memory.data(),
@@ -131,23 +133,24 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
 TEST_P(CommandBufferTest, CopyWholeBuffer) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kTransfer));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
   // Create a host buffer.
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto host_buffer, device_->allocator()->Allocate(
-                            MemoryType::kHostVisible | MemoryType::kHostCached |
-                                MemoryType::kDeviceVisible,
-                            BufferUsage::kAll, kBufferNumBytes));
+      auto host_buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_CACHED |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_ALL, kBufferNumBytes));
 
   // Fill the host buffer.
   uint8_t i8_val = 0x55;
-  IREE_EXPECT_OK(host_buffer->Fill8(0, kWholeBuffer, i8_val));
+  IREE_EXPECT_OK(host_buffer->Fill8(0, IREE_WHOLE_BUFFER, i8_val));
   IREE_ASSERT_OK_AND_ASSIGN(
       auto host_mapped_memory,
       // Cannot use kDiscard here given we filled in the above.
-      host_buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+      host_buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_WRITE));
   IREE_EXPECT_OK(host_mapped_memory.Flush());
 
   std::vector<uint8_t> reference_buffer(kBufferNumBytes);
@@ -157,8 +160,8 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto device_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-          BufferUsage::kAll, kBufferNumBytes));
+          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_ALL, kBufferNumBytes));
 
   // Copy the host buffer to the device buffer.
   IREE_EXPECT_OK(command_buffer->Begin());
@@ -173,7 +176,7 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   // Read back the device buffer.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto device_mapped_memory,
-      device_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+      device_buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ));
   IREE_EXPECT_OK(device_mapped_memory.Invalidate());
 
   std::vector<uint8_t> actual_data(
@@ -185,29 +188,30 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
 TEST_P(CommandBufferTest, CopySubBuffer) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto command_buffer,
-      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
-                                   CommandCategory::kTransfer));
+      device_->CreateCommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                   IREE_HAL_COMMAND_CATEGORY_TRANSFER));
   // Create a device buffer.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto device_buffer,
       device_->allocator()->Allocate(
-          MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-          BufferUsage::kAll, kBufferNumBytes));
+          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_ALL, kBufferNumBytes));
 
   // Create another host buffer with a smaller size.
   IREE_ASSERT_OK_AND_ASSIGN(
-      auto host_buffer, device_->allocator()->Allocate(
-                            MemoryType::kHostVisible | MemoryType::kHostCached |
-                                MemoryType::kDeviceVisible,
-                            BufferUsage::kAll, kBufferNumBytes / 2));
+      auto host_buffer,
+      device_->allocator()->Allocate(
+          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_CACHED |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          IREE_HAL_BUFFER_USAGE_ALL, kBufferNumBytes / 2));
 
   // Fill the host buffer.
   uint8_t i8_val = 0x88;
-  IREE_EXPECT_OK(host_buffer->Fill8(0, kWholeBuffer, i8_val));
+  IREE_EXPECT_OK(host_buffer->Fill8(0, IREE_WHOLE_BUFFER, i8_val));
   IREE_ASSERT_OK_AND_ASSIGN(
       auto host_mapped_memory,
       // Cannot use kDiscard here given we filled in the above.
-      host_buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+      host_buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_WRITE));
   IREE_EXPECT_OK(host_mapped_memory.Flush());
 
   std::vector<uint8_t> reference_buffer(kBufferNumBytes);
@@ -226,7 +230,7 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   // Read back the device buffer.
   IREE_ASSERT_OK_AND_ASSIGN(
       auto device_mapped_memory,
-      device_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+      device_buffer->MapMemory<uint8_t>(IREE_HAL_MEMORY_ACCESS_READ));
   IREE_EXPECT_OK(device_mapped_memory.Invalidate());
 
   std::vector<uint8_t> actual_data(

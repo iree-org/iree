@@ -69,14 +69,9 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(VkPhysicalDevice physical_device,
   // TODO(benvanik): more clever/sanitized device naming.
   std::string name = std::string(physical_device_properties.deviceName);
 
-  DeviceFeatureBitfield supported_features = DeviceFeature::kNone;
-  // TODO(benvanik): implement debugging/profiling features.
-  // TODO(benvanik): use props to determine if we have timing info.
-  // supported_features |= DeviceFeature::kDebugging;
-  // supported_features |= DeviceFeature::kCoverage;
-  // supported_features |= DeviceFeature::kProfiling;
+  iree_hal_device_feature_t supported_features = IREE_HAL_DEVICE_FEATURE_NONE;
   return DeviceInfo("vulkan", std::move(name), supported_features,
-                    reinterpret_cast<DriverDeviceID>(physical_device));
+                    reinterpret_cast<iree_hal_device_id_t>(physical_device));
 }
 
 }  // namespace
@@ -283,7 +278,8 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   return CreateDevice(available_devices[default_device_index_].device_id());
 }
 
-StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
+StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
+    iree_hal_device_id_t device_id) {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
 
   auto physical_device = reinterpret_cast<VkPhysicalDevice>(device_id);

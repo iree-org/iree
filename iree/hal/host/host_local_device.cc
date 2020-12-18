@@ -36,8 +36,8 @@ HostLocalDevice::~HostLocalDevice() = default;
 
 StatusOr<ref_ptr<DescriptorSetLayout>>
 HostLocalDevice::CreateDescriptorSetLayout(
-    DescriptorSetLayout::UsageType usage_type,
-    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings) {
   IREE_TRACE_SCOPE0("HostLocalDevice::CreateDescriptorSetLayout");
   return make_ref<HostDescriptorSetLayout>(usage_type, bindings);
 }
@@ -50,14 +50,14 @@ StatusOr<ref_ptr<ExecutableLayout>> HostLocalDevice::CreateExecutableLayout(
 
 StatusOr<ref_ptr<DescriptorSet>> HostLocalDevice::CreateDescriptorSet(
     DescriptorSetLayout* set_layout,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("HostLocalDevice::CreateDescriptorSet");
   return make_ref<HostDescriptorSet>(set_layout, bindings);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> HostLocalDevice::CreateCommandBuffer(
-    CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories) {
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories) {
   IREE_TRACE_SCOPE0("HostLocalDevice::CreateCommandBuffer");
   // TODO(b/140026716): conditionally enable validation.
   IREE_ASSIGN_OR_RETURN(auto impl, scheduling_model_->CreateCommandBuffer(

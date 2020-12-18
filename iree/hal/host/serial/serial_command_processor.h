@@ -33,7 +33,8 @@ namespace host {
 // Thread-compatible (as with CommandBuffer itself).
 class SerialCommandProcessor final : public CommandBuffer {
  public:
-  explicit SerialCommandProcessor(CommandCategoryBitfield command_categories);
+  explicit SerialCommandProcessor(
+      iree_hal_command_category_t command_categories);
   ~SerialCommandProcessor() override;
 
   bool is_recording() const override { return is_recording_; }
@@ -42,55 +43,56 @@ class SerialCommandProcessor final : public CommandBuffer {
   Status End() override;
 
   Status ExecutionBarrier(
-      ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) override;
+      iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
 
   Status SignalEvent(Event* event,
-                     ExecutionStageBitfield source_stage_mask) override;
+                     iree_hal_execution_stage_t source_stage_mask) override;
 
   Status ResetEvent(Event* event,
-                    ExecutionStageBitfield source_stage_mask) override;
+                    iree_hal_execution_stage_t source_stage_mask) override;
 
-  Status WaitEvents(absl::Span<Event*> events,
-                    ExecutionStageBitfield source_stage_mask,
-                    ExecutionStageBitfield target_stage_mask,
-                    absl::Span<const MemoryBarrier> memory_barriers,
-                    absl::Span<const BufferBarrier> buffer_barriers) override;
+  Status WaitEvents(
+      absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
 
-  Status FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length, const void* pattern,
+  Status FillBuffer(Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length, const void* pattern,
                     size_t pattern_length) override;
 
   Status DiscardBuffer(Buffer* buffer) override;
 
-  Status UpdateBuffer(const void* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length) override;
+  Status UpdateBuffer(const void* source_buffer,
+                      iree_device_size_t source_offset, Buffer* target_buffer,
+                      iree_device_size_t target_offset,
+                      iree_device_size_t length) override;
 
-  Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                    Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length) override;
+  Status CopyBuffer(Buffer* source_buffer, iree_device_size_t source_offset,
+                    Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length) override;
 
   Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
                        absl::Span<const uint32_t> values) override;
 
   Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) override;
 
   Status BindDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       DescriptorSet* descriptor_set,
-      absl::Span<const device_size_t> dynamic_offsets) override;
+      absl::Span<const iree_device_size_t> dynamic_offsets) override;
 
   Status Dispatch(Executable* executable, int32_t entry_point,
                   std::array<uint32_t, 3> workgroups) override;
 
   Status DispatchIndirect(Executable* executable, int32_t entry_point,
                           Buffer* workgroups_buffer,
-                          device_size_t workgroups_offset) override;
+                          iree_device_size_t workgroups_offset) override;
 
  private:
   Status DispatchGrid(Executable* executable, int32_t entry_point,
@@ -99,7 +101,8 @@ class SerialCommandProcessor final : public CommandBuffer {
   bool is_recording_ = false;
 
   PushConstantBlock push_constants_;
-  absl::InlinedVector<absl::InlinedVector<DescriptorSet::Binding, 8>, 2>
+  absl::InlinedVector<absl::InlinedVector<iree_hal_descriptor_set_binding_t, 8>,
+                      2>
       descriptor_sets_;
 };
 

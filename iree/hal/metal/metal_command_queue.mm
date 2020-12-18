@@ -24,7 +24,7 @@ namespace iree {
 namespace hal {
 namespace metal {
 
-MetalCommandQueue::MetalCommandQueue(std::string name, CommandCategoryBitfield supported_categories,
+MetalCommandQueue::MetalCommandQueue(std::string name, iree_hal_command_category_t supported_categories,
                                      id<MTLCommandQueue> queue)
     : CommandQueue(std::move(name), supported_categories), metal_handle_([queue retain]) {
   metal_handle_.label = @"IREE MetalQueue";

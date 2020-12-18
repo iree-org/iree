@@ -28,39 +28,6 @@ namespace hal {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
 class DescriptorSet : public Resource {
  public:
-  // Specifies a descriptor set binding.
-  struct Binding {
-    // The binding number of this entry and corresponds to a resource of the
-    // same binding number in the executable interface.
-    int32_t binding = 0;
-    // Buffer bound to the binding number.
-    // May be nullptr if the binding is not used by the executable.
-    Buffer* buffer;
-    // Offset, in bytes, into the buffer that the binding starts at.
-    // If the descriptor type is dynamic this will be added to the dynamic
-    // offset provided during binding.
-    device_size_t offset = 0;
-    // Length, in bytes, of the buffer that is available to the executable.
-    // This can be kWholeBuffer, however note that if the entire buffer
-    // contents are larger than supported by the device (~128MiB, usually) this
-    // will fail. If the descriptor type is dynamic this will be used for all
-    // ranges regardless of offset.
-    device_size_t length = kWholeBuffer;
-
-    std::string DebugStringShort() const {
-      return absl::StrCat("binding=", binding, ", ", buffer->DebugStringShort(),
-                          ", offset=", offset, ", length=", length);
-    }
-  };
-};
-
-struct DescriptorSetBindingFormatter {
-  void operator()(std::string* out,
-                  const DescriptorSet::Binding& binding) const {
-    out->append("<");
-    out->append(binding.DebugStringShort());
-    out->append(">");
-  }
 };
 
 }  // namespace hal

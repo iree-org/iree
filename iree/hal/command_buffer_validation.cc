@@ -45,60 +45,62 @@ class ValidatingCommandBuffer : public CommandBuffer {
   Status End() override;
 
   Status ExecutionBarrier(
-      ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) override;
+      iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
   Status SignalEvent(Event* event,
-                     ExecutionStageBitfield source_stage_mask) override;
+                     iree_hal_execution_stage_t source_stage_mask) override;
   Status ResetEvent(Event* event,
-                    ExecutionStageBitfield source_stage_mask) override;
-  Status WaitEvents(absl::Span<Event*> events,
-                    ExecutionStageBitfield source_stage_mask,
-                    ExecutionStageBitfield target_stage_mask,
-                    absl::Span<const MemoryBarrier> memory_barriers,
-                    absl::Span<const BufferBarrier> buffer_barriers) override;
-  Status FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length, const void* pattern,
+                    iree_hal_execution_stage_t source_stage_mask) override;
+  Status WaitEvents(
+      absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) override;
+  Status FillBuffer(Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length, const void* pattern,
                     size_t pattern_length) override;
   Status DiscardBuffer(Buffer* buffer) override;
-  Status UpdateBuffer(const void* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length) override;
-  Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                    Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length) override;
+  Status UpdateBuffer(const void* source_buffer,
+                      iree_device_size_t source_offset, Buffer* target_buffer,
+                      iree_device_size_t target_offset,
+                      iree_device_size_t length) override;
+  Status CopyBuffer(Buffer* source_buffer, iree_device_size_t source_offset,
+                    Buffer* target_buffer, iree_device_size_t target_offset,
+                    iree_device_size_t length) override;
   Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
                        absl::Span<const uint32_t> values) override;
   Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) override;
   Status BindDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       DescriptorSet* descriptor_set,
-      absl::Span<const device_size_t> dynamic_offsets) override;
+      absl::Span<const iree_device_size_t> dynamic_offsets) override;
   Status Dispatch(Executable* executable, int32_t entry_point,
                   std::array<uint32_t, 3> workgroups) override;
   Status DispatchIndirect(Executable* executable, int32_t entry_point,
                           Buffer* workgroups_buffer,
-                          device_size_t workgroups_offset) override;
+                          iree_device_size_t workgroups_offset) override;
 
  private:
   // Returns a failure if the queue does not support the given caps.
-  Status ValidateCategories(CommandCategoryBitfield required_categories) const;
+  Status ValidateCategories(
+      iree_hal_command_category_t required_categories) const;
   // Returns a failure if the memory type the buffer was allocated from is not
   // compatible with the given type.
   Status ValidateCompatibleMemoryType(Buffer* buffer,
-                                      MemoryTypeBitfield memory_type) const;
+                                      iree_hal_memory_type_t memory_type) const;
   // Returns a failure if the buffer memory type or usage disallows the given
   // access type.
   Status ValidateAccess(Buffer* buffer,
-                        MemoryAccessBitfield memory_access) const;
+                        iree_hal_memory_access_t memory_access) const;
   // Returns a failure if the buffer was not allocated for the given usage.
-  Status ValidateUsage(Buffer* buffer, BufferUsageBitfield usage) const;
+  Status ValidateUsage(Buffer* buffer, iree_hal_buffer_usage_t usage) const;
   // Validates that the range provided is within the given buffer.
-  Status ValidateRange(Buffer* buffer, device_size_t byte_offset,
-                       device_size_t byte_length) const;
+  Status ValidateRange(Buffer* buffer, iree_device_size_t byte_offset,
+                       iree_device_size_t byte_length) const;
 
   // Validates that the currently bound descriptor sets are valid for the given
   // executable entry point.
@@ -139,8 +141,8 @@ Status ValidatingCommandBuffer::End() {
 }
 
 Status ValidatingCommandBuffer::ValidateCategories(
-    CommandCategoryBitfield required_categories) const {
-  if (!AllBitsSet(command_categories(), required_categories)) {
+    iree_hal_command_category_t required_categories) const {
+  if (!iree_all_bits_set(command_categories(), required_categories)) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Operation requires categories "
            << CommandCategoryString(required_categories)
@@ -151,7 +153,7 @@ Status ValidatingCommandBuffer::ValidateCategories(
 }
 
 Status ValidatingCommandBuffer::ValidateCompatibleMemoryType(
-    Buffer* buffer, MemoryTypeBitfield memory_type) const {
+    Buffer* buffer, iree_hal_memory_type_t memory_type) const {
   if ((buffer->memory_type() & memory_type) != memory_type) {
     // Missing one or more bits.
     return PermissionDeniedErrorBuilder(IREE_LOC)
@@ -164,7 +166,7 @@ Status ValidatingCommandBuffer::ValidateCompatibleMemoryType(
 }
 
 Status ValidatingCommandBuffer::ValidateAccess(
-    Buffer* buffer, MemoryAccessBitfield memory_access) const {
+    Buffer* buffer, iree_hal_memory_access_t memory_access) const {
   if ((buffer->allowed_access() & memory_access) != memory_access) {
     // Bits must match exactly.
     return PermissionDeniedErrorBuilder(IREE_LOC)
@@ -177,8 +179,8 @@ Status ValidatingCommandBuffer::ValidateAccess(
 }
 
 // Returns a failure if the buffer was not allocated for the given usage.
-Status ValidatingCommandBuffer::ValidateUsage(Buffer* buffer,
-                                              BufferUsageBitfield usage) const {
+Status ValidatingCommandBuffer::ValidateUsage(
+    Buffer* buffer, iree_hal_buffer_usage_t usage) const {
   if (!allocator()->CanUseBuffer(buffer, usage)) {
     // Buffer cannot be used on the queue for the given usage.
     return PermissionDeniedErrorBuilder(IREE_LOC)
@@ -202,9 +204,9 @@ Status ValidatingCommandBuffer::ValidateUsage(Buffer* buffer,
 }
 
 // Validates that the range provided is within the given buffer.
-Status ValidatingCommandBuffer::ValidateRange(Buffer* buffer,
-                                              device_size_t byte_offset,
-                                              device_size_t byte_length) const {
+Status ValidatingCommandBuffer::ValidateRange(
+    Buffer* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) const {
   // Check if the start of the range runs off the end of the buffer.
   if (byte_offset > buffer->byte_length()) {
     return OutOfRangeErrorBuilder(IREE_LOC)
@@ -220,7 +222,7 @@ Status ValidatingCommandBuffer::ValidateRange(Buffer* buffer,
   }
 
   // Check if the end runs over the allocation.
-  device_size_t end = byte_offset + byte_length;
+  iree_device_size_t end = byte_offset + byte_length;
   if (end > buffer->byte_length()) {
     return OutOfRangeErrorBuilder(IREE_LOC)
            << "Attempted to access an address outside of the valid buffer "
@@ -234,68 +236,69 @@ Status ValidatingCommandBuffer::ValidateRange(Buffer* buffer,
 }
 
 Status ValidatingCommandBuffer::ExecutionBarrier(
-    ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_DVLOG(3) << "CommandBuffer::ExecutionBarrier(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer |
-                                          CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_ANY));
 
   return impl_->ExecutionBarrier(source_stage_mask, target_stage_mask,
                                  memory_barriers, buffer_barriers);
 }
 
 Status ValidatingCommandBuffer::SignalEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_DVLOG(3) << "CommandBuffer::SignalEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   return impl_->SignalEvent(event, source_stage_mask);
 }
 
 Status ValidatingCommandBuffer::ResetEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_DVLOG(3) << "CommandBuffer::ResetEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   return impl_->ResetEvent(event, source_stage_mask);
 }
 
 Status ValidatingCommandBuffer::WaitEvents(
-    absl::Span<Event*> events, ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_DVLOG(3) << "CommandBuffer::WaitEvents(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   return impl_->WaitEvents(events, source_stage_mask, target_stage_mask,
                            memory_barriers, buffer_barriers);
 }
 
 Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
-                                           device_size_t target_offset,
-                                           device_size_t length,
+                                           iree_device_size_t target_offset,
+                                           iree_device_size_t length,
                                            const void* pattern,
                                            size_t pattern_length) {
   IREE_DVLOG(3) << "CommandBuffer::FillBuffer(" << target_buffer->DebugString()
                 << ", " << target_offset << ", " << length << ", ??, "
                 << pattern_length << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(
+      target_buffer, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
   IREE_RETURN_IF_ERROR(
-      ValidateCompatibleMemoryType(target_buffer, MemoryType::kDeviceVisible));
-  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+      ValidateAccess(target_buffer, IREE_HAL_MEMORY_ACCESS_WRITE));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(target_buffer, IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
   // Ensure the value length is supported.
@@ -323,28 +326,30 @@ Status ValidatingCommandBuffer::DiscardBuffer(Buffer* buffer) {
   IREE_DVLOG(3) << "CommandBuffer::DiscardBuffer(" << buffer->DebugString()
                 << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
-  IREE_RETURN_IF_ERROR(
-      ValidateCompatibleMemoryType(buffer, MemoryType::kDeviceVisible));
-  IREE_RETURN_IF_ERROR(ValidateUsage(buffer, BufferUsage::kNone));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(
+      buffer, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
+  IREE_RETURN_IF_ERROR(ValidateUsage(buffer, IREE_HAL_BUFFER_USAGE_NONE));
 
   return impl_->DiscardBuffer(buffer);
 }
 
 Status ValidatingCommandBuffer::UpdateBuffer(const void* source_buffer,
-                                             device_size_t source_offset,
+                                             iree_device_size_t source_offset,
                                              Buffer* target_buffer,
-                                             device_size_t target_offset,
-                                             device_size_t length) {
+                                             iree_device_size_t target_offset,
+                                             iree_device_size_t length) {
   IREE_DVLOG(3) << "CommandBuffer::UpdateBuffer(" << source_buffer << ", "
                 << source_offset << ", " << target_buffer->DebugString() << ", "
                 << target_offset << ", " << length << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(
+      target_buffer, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
   IREE_RETURN_IF_ERROR(
-      ValidateCompatibleMemoryType(target_buffer, MemoryType::kDeviceVisible));
-  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+      ValidateAccess(target_buffer, IREE_HAL_MEMORY_ACCESS_WRITE));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(target_buffer, IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
   return impl_->UpdateBuffer(source_buffer, source_offset, target_buffer,
@@ -352,21 +357,23 @@ Status ValidatingCommandBuffer::UpdateBuffer(const void* source_buffer,
 }
 
 Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
-                                           device_size_t source_offset,
+                                           iree_device_size_t source_offset,
                                            Buffer* target_buffer,
-                                           device_size_t target_offset,
-                                           device_size_t length) {
+                                           iree_device_size_t target_offset,
+                                           iree_device_size_t length) {
   IREE_DVLOG(3) << "CommandBuffer::CopyBuffer(" << source_buffer->DebugString()
                 << ", " << source_offset << ", " << target_buffer->DebugString()
                 << ", " << target_offset << ", " << length << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
   // At least source or destination must be device-visible to enable
   // host->device, device->host, and device->device.
   // TODO(b/117338171): host->host copies.
-  if (!AnyBitSet(source_buffer->memory_type() & MemoryType::kDeviceVisible) &&
-      !AnyBitSet(target_buffer->memory_type() & MemoryType::kDeviceVisible)) {
+  if (!iree_any_bit_set(source_buffer->memory_type(),
+                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
+      !iree_any_bit_set(target_buffer->memory_type(),
+                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
     return PermissionDeniedErrorBuilder(IREE_LOC)
            << "At least one buffer must be device-visible for a copy; "
               "source_buffer="
@@ -375,10 +382,14 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
            << MemoryTypeString(target_buffer->memory_type());
   }
 
-  IREE_RETURN_IF_ERROR(ValidateAccess(source_buffer, MemoryAccess::kRead));
-  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  IREE_RETURN_IF_ERROR(ValidateUsage(source_buffer, BufferUsage::kTransfer));
-  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+  IREE_RETURN_IF_ERROR(
+      ValidateAccess(source_buffer, IREE_HAL_MEMORY_ACCESS_READ));
+  IREE_RETURN_IF_ERROR(
+      ValidateAccess(target_buffer, IREE_HAL_MEMORY_ACCESS_WRITE));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(source_buffer, IREE_HAL_BUFFER_USAGE_TRANSFER));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(target_buffer, IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(ValidateRange(source_buffer, source_offset, length));
   IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
@@ -401,7 +412,7 @@ Status ValidatingCommandBuffer::PushConstants(
                 << executable_layout->DebugString() << ", " << offset << ", "
                 << absl::StrJoin(values, ", ") << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate offset and value count with layout.
 
@@ -410,14 +421,15 @@ Status ValidatingCommandBuffer::PushConstants(
 
 Status ValidatingCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_DVLOG(3) << "CommandBuffer::PushDescriptorSet("
-                << executable_layout->DebugString() << ", " << set << ", ["
-                << absl::StrJoin(bindings, ", ",
-                                 DescriptorSetBindingFormatter())
+                << executable_layout->DebugString() << ", " << set
+                << ", ["
+                // << absl::StrJoin(bindings, ", ",
+                //                  DescriptorSetBindingFormatter())
                 << "])";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate bindings.
@@ -428,13 +440,13 @@ Status ValidatingCommandBuffer::PushDescriptorSet(
 Status ValidatingCommandBuffer::BindDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     DescriptorSet* descriptor_set,
-    absl::Span<const device_size_t> dynamic_offsets) {
+    absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_DVLOG(3) << "CommandBuffer::BindDescriptorSet("
                 << executable_layout->DebugString() << ", " << set << ", "
                 << descriptor_set->DebugString() << ", ["
                 << absl::StrJoin(dynamic_offsets, ", ") << "])";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate dynamic offsets (both count and offsets).
@@ -450,12 +462,12 @@ Status ValidatingCommandBuffer::ValidateDispatchBindings(Executable* executable,
   // TODO(benvanik): add validation by walking executable layout.
   // for (const auto& binding : bindings) {
   //   IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(binding.buffer,
-  //                                                MemoryType::kDeviceVisible))
+  //                                                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE))
   //       << "input buffer: " << MemoryAccessString(binding.access) << " "
   //       << binding.buffer->DebugStringShort();
   //   IREE_RETURN_IF_ERROR(ValidateAccess(binding.buffer, binding.access));
   //   IREE_RETURN_IF_ERROR(ValidateUsage(binding.buffer,
-  //   BufferUsage::kDispatch));
+  //   IREE_HAL_BUFFER_USAGE_DISPATCH));
   // TODO(benvanik): validate it matches the executable expectations.
   // TODO(benvanik): validate buffer contains enough data for shape+size.
   // }
@@ -472,7 +484,7 @@ Status ValidatingCommandBuffer::Dispatch(Executable* executable,
                 << ", " << entry_point << ", ["
                 << absl::StrJoin(workgroups, ", ") << "])";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
 
   return impl_->Dispatch(executable, entry_point, workgroups);
@@ -480,20 +492,21 @@ Status ValidatingCommandBuffer::Dispatch(Executable* executable,
 
 Status ValidatingCommandBuffer::DispatchIndirect(
     Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
-    device_size_t workgroups_offset) {
+    iree_device_size_t workgroups_offset) {
   IREE_DVLOG(3) << "CommandBuffer::DispatchIndirect("
                 << executable->DebugString() << ", " << entry_point << ", "
                 << workgroups_buffer->DebugString() << ", " << workgroups_offset
                 << ")";
 
-  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
-  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(workgroups_buffer,
-                                                    MemoryType::kDeviceVisible))
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(
+      workgroups_buffer, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE))
       << "input buffer: " << workgroups_buffer->DebugStringShort();
-  IREE_RETURN_IF_ERROR(ValidateAccess(workgroups_buffer, MemoryAccess::kRead));
   IREE_RETURN_IF_ERROR(
-      ValidateUsage(workgroups_buffer, BufferUsage::kDispatch));
+      ValidateAccess(workgroups_buffer, IREE_HAL_MEMORY_ACCESS_READ));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(workgroups_buffer, IREE_HAL_BUFFER_USAGE_DISPATCH));
   IREE_RETURN_IF_ERROR(ValidateRange(workgroups_buffer, workgroups_offset,
                                      sizeof(uint32_t) * 3));
 
