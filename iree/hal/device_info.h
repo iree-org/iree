@@ -57,13 +57,14 @@ class DeviceInfo {
 
   // Returns a debug string describing the device information.
   std::string DebugString() const {
-    std::string features = FormatBitfieldValue(
-        supported_features_,
-        {
-            {IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING, "kDebugging"},
-            {IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE, "kCoverage"},
-            {IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING, "kProfiling"},
-        });
+    std::string features = "TODO";
+    // FormatBitfieldValue(
+    //     supported_features_,
+    //     {
+    //         {IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING, "kDebugging"},
+    //         {IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE, "kCoverage"},
+    //         {IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING, "kProfiling"},
+    //     });
 
     return absl::StrCat("[DeviceInfo]",                              //
                         "\n  Name: ", name_,                         //

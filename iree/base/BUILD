@@ -47,7 +47,6 @@ cc_library(
     hdrs = [
         "alignment.h",
         "atomics.h",
-        "bitfield.h",
         "debugging.h",
         "math.h",
         "memory.h",
@@ -55,17 +54,6 @@ cc_library(
     ],
     deps = [
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/types:span",  # bitfield.h
-    ],
-)
-
-cc_test(
-    name = "bitfield_test",
-    srcs = ["bitfield_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )
 
