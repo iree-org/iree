@@ -651,7 +651,7 @@ struct MapLinalgOpToGlobalInvocationId
       }
     }
     if (failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
-        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+        (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromLinearizedResultShape(
              rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()), funcOp,
              getNumWorkgroupsFnAttrName(), workgroupSize[0])))) {

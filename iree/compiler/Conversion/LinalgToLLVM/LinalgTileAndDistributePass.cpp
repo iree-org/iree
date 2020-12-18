@@ -67,7 +67,7 @@ struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
     if (!funcOp ||
         failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
         !tensorResults.empty() ||
-        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+        (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
              rewriter, cast<linalg::LinalgOp>(op), funcOp,
              getNumWorkgroupsFnAttrName(),

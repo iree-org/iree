@@ -248,7 +248,7 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
 
   for (auto attr : oldFunction.getAttrs()) {
     if (attr.first != oldFunction.getTypeAttrName()) {
-      newFunction.setAttr(attr.first, attr.second);
+      newFunction->setAttr(attr.first, attr.second);
     }
   }
 

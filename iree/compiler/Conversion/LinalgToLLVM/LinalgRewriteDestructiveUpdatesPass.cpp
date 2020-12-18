@@ -78,7 +78,7 @@ static bool hasDestructiveUpdateSubTensorUses(
   // dominated by all SubTensorOp.
   if (writes.size() != 1) return false;
   // Small local dominance computation.
-  DominanceInfo domInfo(writes.front().getParentOp());
+  DominanceInfo domInfo(writes.front()->getParentOp());
   for (auto read : reads) {
     LLVM_DEBUG(llvm::dbgs() << "read: " << *read.getOperation() << "\n");
     if (!domInfo.properlyDominates(read.getOperation(), writes.front())) {

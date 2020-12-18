@@ -162,7 +162,7 @@ spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
   auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
-  if (alias) variable.setAttr("aliased", builder.getUnitAttr());
+  if (alias) variable->setAttr("aliased", builder.getUnitAttr());
   return variable;
 }
 
