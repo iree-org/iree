@@ -122,7 +122,7 @@ OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
   auto variableOp = dyn_cast_or_null<VariableOp>(
       SymbolTable::lookupNearestSymbolFrom(*this, variable()));
   if (!variableOp) return {};
-  if (variableOp.getAttr("noinline")) {
+  if (variableOp->getAttr("noinline")) {
     // Inlining of the constant has been disabled.
     return {};
   } else if (variableOp.is_mutable()) {

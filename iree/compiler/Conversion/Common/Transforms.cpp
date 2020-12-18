@@ -176,7 +176,7 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
   // Update the launch configuration.
   SmallVector<unsigned, 2> distributedLoops =
       llvm::to_vector<2>(tiledAndFusedOps->fusedLoopDims);
-  if (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+  if (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
       failed(createNumWorkgroupsFromResultShape(
           builder, fusableOps.back(), funcOp, getNumWorkgroupsFnAttrName(),
           tileSizes, distributedLoops))) {

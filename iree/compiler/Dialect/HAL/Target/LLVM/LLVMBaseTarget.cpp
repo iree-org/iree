@@ -240,7 +240,7 @@ LogicalResult LLVMBaseTargetBackend::recordDispatch(
   for (auto it : llvm::enumerate(entryPointFns)) {
     LLVM::LLVMFuncOp funcOp = it.value();
     FlatSymbolRefAttr numWorkgroupsFnAttr =
-        funcOp.getAttrOfType<FlatSymbolRefAttr>(getNumWorkgroupsFnAttrName());
+        funcOp->getAttrOfType<FlatSymbolRefAttr>(getNumWorkgroupsFnAttrName());
     if (!numWorkgroupsFnAttr) {
       return funcOp.emitError("expected llvm.num_workgroups_fn ");
     }

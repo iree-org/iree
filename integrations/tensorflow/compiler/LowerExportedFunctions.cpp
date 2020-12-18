@@ -106,7 +106,7 @@ class LowerExportedFunctionsPass
           builder.getNamedAttr(abiVersionIdent, builder.getI32IntegerAttr(1)));
 
       // Tag it as an IREE exported function.
-      func.setAttr("iree.module.export", builder.getUnitAttr());
+      func->setAttr("iree.module.export", builder.getUnitAttr());
 
       // Process per-argument attrs and generate reflection metadata.
       for (int i = 0, e = func.getNumArguments(); i < e; i++) {
@@ -150,8 +150,8 @@ class LowerExportedFunctionsPass
           sipIdent, builder.getStringAttr(functionSignature->encoded())));
 
       if (!funcReflectAttrs.empty()) {
-        func.setAttr("iree.reflection",
-                     builder.getDictionaryAttr(funcReflectAttrs));
+        func->setAttr("iree.reflection",
+                      builder.getDictionaryAttr(funcReflectAttrs));
       }
 
       // Remove its designation as a saved model export.

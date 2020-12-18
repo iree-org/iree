@@ -1246,10 +1246,10 @@ struct HALInterfaceLoadTensorOpEraser final
     // annotation is carried over if exists.
     auto phOp = rewriter.create<IREE::PlaceholderOp>(
         loadOp.getLoc(), bufferType, "interface buffer");
-    phOp.setAttr(getBindingAttrName(), loadOp.binding());
+    phOp->setAttr(getBindingAttrName(), loadOp.binding());
     StringRef attrName = getOperandResultNumAttrName();
-    if (auto operandResultNumAttr = loadOp.getAttr(attrName))
-      phOp.setAttr(attrName, operandResultNumAttr);
+    if (auto operandResultNumAttr = loadOp->getAttr(attrName))
+      phOp->setAttr(attrName, operandResultNumAttr);
     Value buffer = phOp.getResult();
 
     // If the result of the load is already mapped to a buffer, a copy is
@@ -1364,10 +1364,10 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
   // annotation is carried over if exists.
   auto phOp = builder.create<IREE::PlaceholderOp>(op.getLoc(), bufferType,
                                                   "interface buffer");
-  phOp.setAttr(getBindingAttrName(), op.binding());
+  phOp->setAttr(getBindingAttrName(), op.binding());
   StringRef attrName = getOperandResultNumAttrName();
-  if (Attribute operandResultNumAttr = op.getAttr(attrName))
-    phOp.setAttr(attrName, operandResultNumAttr);
+  if (Attribute operandResultNumAttr = op->getAttr(attrName))
+    phOp->setAttr(attrName, operandResultNumAttr);
   Value buffer = phOp;
   outputBufferMap[op] = buffer;
 

@@ -74,7 +74,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
   for (auto input : llvm::enumerate(importType.getInputs())) {
     auto inputType = input.value();
     auto inputName = importOp.getFuncArgumentName(input.index());
-    if (auto attrValue = op.getAttr(inputName)) {
+    if (auto attrValue = op->getAttr(inputName)) {
       auto flattenedAttrs = detail::rewriteAttrToOperands(
           op.getLoc(), attrValue, inputType, rewriter);
       if (!flattenedAttrs) return failure();

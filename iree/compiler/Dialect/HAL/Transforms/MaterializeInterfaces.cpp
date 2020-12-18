@@ -127,8 +127,8 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
   }
 
   if (pushConstantCount > 0) {
-    interfaceOp.setAttr("push_constants",
-                        interfaceBuilder.getI32IntegerAttr(pushConstantCount));
+    interfaceOp->setAttr("push_constants",
+                         interfaceBuilder.getI32IntegerAttr(pushConstantCount));
   }
 
   return interfaceOp;
@@ -352,7 +352,7 @@ static LogicalResult declareEntryPointOps(
           if (!thunkFuncOp.hasValue()) {
             return failure();
           }
-          dispatchEntryOp.setAttr(
+          dispatchEntryOp->setAttr(
               "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
         }
 
