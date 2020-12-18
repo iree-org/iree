@@ -429,7 +429,7 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     else
       workgroupSize = warpSize;
     // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(
+    kernelFunc->setAttr(
         spirv::getEntryPointABIAttrName(),
         spirv::getEntryPointABIAttr({workgroupSize, 1, 1}, &ctx));
     OpBuilder b(&kernelFunc.getBody());

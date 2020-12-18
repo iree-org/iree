@@ -120,10 +120,10 @@ gpu::GPUModuleOp mlir::ModelBuilder::makeGPUModule(StringRef name) {
 
 void mlir::ModelBuilder::addGPUAttr() {
   // Add module attributes required first.
-  module->setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
-                  UnitAttr::get(module->getContext()));
+  (*module)->setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
+                     UnitAttr::get(module->getContext()));
   spirv::TargetEnvAttr targetEnv = getTargetEnv(module->getContext());
-  module->setAttr(spirv::getTargetEnvAttrName(), targetEnv);
+  (*module)->setAttr(spirv::getTargetEnvAttrName(), targetEnv);
 }
 
 gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(
@@ -132,8 +132,9 @@ gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(
   auto fnType = FunctionType::get(args, results, module->getContext());
   OpBuilder b(&GPUModule.body());
   auto kernelFunc = b.create<gpu::GPUFuncOp>(loc, name, fnType);
-  kernelFunc.setAttr(gpu::GPUDialect::getKernelFuncAttrName(), b.getUnitAttr());
-  kernelFunc.setAttr(
+  kernelFunc->setAttr(gpu::GPUDialect::getKernelFuncAttrName(),
+                      b.getUnitAttr());
+  kernelFunc->setAttr(
       spirv::getEntryPointABIAttrName(),
       spirv::getEntryPointABIAttr(workgroupSize, module->getContext()));
   return kernelFunc;
@@ -289,10 +290,10 @@ void MLIRFuncOpConfig::apply(FuncOp &f) {
     attrs.push_back(ArrayAttr::get(
         {StringAttr::get("target-cpu", ctx), StringAttr::get(targetCpu, ctx)},
         ctx));
-  if (!attrs.empty()) f.setAttr("passthrough", ArrayAttr::get(attrs, ctx));
+  if (!attrs.empty()) f->setAttr("passthrough", ArrayAttr::get(attrs, ctx));
 
   if (emitCInterface)
-    f.setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));
+    f->setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));
 
   if (!declOnly)
     f.addEntryBlock();

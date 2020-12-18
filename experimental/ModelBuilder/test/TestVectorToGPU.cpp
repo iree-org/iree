@@ -101,8 +101,9 @@ void testVecAdd() {
     FuncOp kernelFunc = modelBuilder.makeFunction(
         funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
     // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(spirv::getEntryPointABIAttrName(),
-                       spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
+    kernelFunc->setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
     OpBuilder b(&kernelFunc.getBody());
     ScopedContext scope(b, kernelFunc.getLoc());
 
