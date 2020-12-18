@@ -43,9 +43,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
-    "@llvm-project//mlir:SPIRVTranslateRegistration": [
-        "MLIRSPIRVSerialization"
-    ],
     "@llvm-project//mlir:StandardToSPIRVConversions": [
         "MLIRStandardToSPIRVTransforms"
     ],
@@ -54,6 +51,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
+    "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
