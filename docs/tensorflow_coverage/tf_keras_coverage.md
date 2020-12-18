@@ -4,8 +4,8 @@ Tests of `tf.keras.layers` compiled with static shapes, dynamic shapes and train
 
 IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our
-infrastructure for benchmarking purposes.
+`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
 

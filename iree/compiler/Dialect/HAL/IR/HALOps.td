@@ -2181,7 +2181,7 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan"> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
-    DO NOT SUBMIT
+    // TODO(benvanik): add description
   }];
 
   let arguments = (ins

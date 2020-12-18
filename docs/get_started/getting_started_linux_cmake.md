@@ -109,7 +109,8 @@ $ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 
 ### LLVM Ahead-of-Time (AOT) backend
 
-To compile IREE LLVM AOT module we need to set the AOT linker path environment variable:
+To compile IREE LLVM AOT module we need to set the AOT linker path environment
+variable:
 
 ```shell
 $ export IREE_LLVMAOT_LINKER_PATH=ld.lld-10

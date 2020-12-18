@@ -171,8 +171,8 @@ $ ./bazel-bin/iree/tools/iree-benchmark-module \
   --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
 ```
 
-If you ran `applications_test.py` then you'll be able to benchmark `MobileNetV3Small`
-on `imagenet` input shapes. For example:
+If you ran `applications_test.py` then you'll be able to benchmark
+`MobileNetV3Small` on `imagenet` input shapes. For example:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \

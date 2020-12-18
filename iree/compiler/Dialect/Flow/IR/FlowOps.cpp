@@ -541,7 +541,6 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
     return failure();
   }
   if (failed(parser.parseOptionalRParen())) {
-    auto argsLoc = parser.getCurrentLocation();
     do {
       // Reserve entries in the lists.
       regionArgs.emplace_back();

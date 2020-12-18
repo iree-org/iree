@@ -275,7 +275,6 @@ static void convertTiledEntryFuncToSymbols(
   targetOp.getInnerModule().push_back(clonedFuncOp);
 
   // Strip all arguments as functions take all I/O through the interface API.
-  auto sourceFuncType = clonedFuncOp.getType();
   clonedFuncOp.setType(FunctionType::get({}, {}, clonedFuncOp.getContext()));
 
   auto *entryBlock = &clonedFuncOp.front();

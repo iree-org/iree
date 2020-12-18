@@ -68,7 +68,6 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
 //===----------------------------------------------------------------------===//
 
 Type FlowDialect::parseType(DialectAsmParser &parser) const {
-  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
   if (succeeded(parser.parseOptionalKeyword("dispatch.input"))) {
     return DispatchInputType::parse(parser);

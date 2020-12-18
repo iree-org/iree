@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLATraits.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -222,7 +223,7 @@ Value VMLAConversionTarget::getBufferOffset(
   SmallVector<Value, 4> indices(indicesType.getNumElements());
   for (int i = 0; i < indicesType.getNumElements(); ++i) {
     auto extractIndex = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, i);
-    indices[i] = rewriter.createOrFold<mlir::ExtractElementOp>(
+    indices[i] = rewriter.createOrFold<mlir::tensor::ExtractOp>(
         loc, indicesValue, ValueRange{extractIndex});
   }
   return getBufferOffset(loc, tensorValue, indices, typeConverter, rewriter);

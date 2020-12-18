@@ -62,8 +62,8 @@ $ python -m pip install tf-nightly
 
 ## Building
 
-From the *parent* directory of the IREE git repository clone, create and enter
-a build directory, such as:
+From the *parent* directory of the IREE git repository clone, create and enter a
+build directory, such as:
 
 ```shell
 $ mkdir iree-build
@@ -83,8 +83,8 @@ $ cmake --build .
 
 ## Running Python Tests
 
-We continue to assume that we are in the build directory where we made the
-build in the previous section.
+We continue to assume that we are in the build directory where we made the build
+in the previous section.
 
 To run tests for core Python bindings built with CMake:
 

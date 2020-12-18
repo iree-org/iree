@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -41,7 +42,7 @@ class ConvertFromExtent : public OpConversionPattern<FromExtentTensorOp> {
     extracted_elements.reserve(valueCount);
     for (int i = 0; i < valueCount; i++) {
       auto index = rewriter.create<ConstantIndexOp>(op.getLoc(), i);
-      Value dim = rewriter.create<ExtractElementOp>(
+      Value dim = rewriter.create<tensor::ExtractOp>(
           op.getLoc(), inputTy.getElementType(), input, index.getResult());
       if (!dim.getType().isIndex()) {
         dim = rewriter.create<IndexCastOp>(op.getLoc(), rewriter.getIndexType(),
