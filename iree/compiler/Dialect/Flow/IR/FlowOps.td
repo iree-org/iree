@@ -16,6 +16,7 @@
 #define IREE_DIALECT_FLOW_OPS
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -236,6 +237,299 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
   let hasCanonicalizer = 1;
 }
 
+def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
+    IsolatedFromAbove,
+    AttrSizedOperandSegments,
+  ]> {
+  let summary = [{a dispatch of workgroups across an n-dimension grid}];
+  let description = [{
+    Dispatches some number of workgroups across an n-dimensional grid. The
+    body region will be invoked for each workgroup with a unique
+    `flow.dispatch.workgroup.id` in the range of
+    `[0, flow.dispatch.workgroup.count)` (along each dimension).
+
+    From the outside the dispatch operation has value semantics: some tensors
+    (and optionally other primitive types) are consumed and one or more new
+    result tensors are produced. Inside each workgroup, however, the input and
+    output tensors are available for arbitrary loads and stores. In many cases
+    each workgroup will load some particular tile(s) from the input tensors and
+    store some particular tile(s) to the output tensors unique to that
+    workgroup. Though it's possible for multiple workgroups to load the same
+    regions of the input tensors behavior is undefined if multiple workgroups
+    store to the same regions of the output tensors.
+
+    Though the representation is similar to the GPU-style grid dispatch model
+    here we still have not yet allocated buffers, determined the target device
+    for execution, or even completed fully resolving shapes/types/etc. Because
+    of this it's important that the workgroup body use the
+    `flow.dispatch.workgroup.*` ops to query the workgroup ID/count/size instead
+    of hardcoding them to a particular set of values. Assume that any workgroup
+    dispatch may end up being specialized for several different target devices
+    and even several different variants for a particular target device
+    (differing workgroup sizes, etc).
+
+    Because of the general nature of the op in this dialect the workgroup count
+    provided to the `flow.dispatch.workgroups` op is in an abstract untiled
+    domain. Unlike when lowering to the HAL dialect the number of dimensions is
+    unbounded and does not yet have the workgroup size factored into it. As the
+    dispatch is lowered the workgroup count range will be converted into a 3D
+    XYZ grid space and divided up by the workgroup size chosen for particular
+    target devices.
+  }];
+
+  let arguments = (ins
+    Variadic<FLOW_Dim>:$workgroup_count,
+    Variadic<AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  // TODO(benvanik): use after https://bugs.llvm.org/show_bug.cgi?id=48478
+  // let assemblyFormat = [{
+  //   `[` $workgroup_count `]`
+  //   `(` $operands `)` `:`
+  //   functional-type($operands, $results)
+  //   attr-dict-with-keyword
+  //   `=`
+  //   custom<DispatchWorkgroupBody>(type_ref($operands),
+  //                                 type_ref($results),
+  //                                 $body)
+  // }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilderDAG<(ins
+      "ValueRange":$workgroupCount,
+      "TypeRange":$resultTypes, "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let extraClassDeclaration = [{
+    size_t getWorkgroupRank() { return workgroup_count().size(); }
+
+    FunctionType getDispatchType() {
+      return FunctionType::get(
+          llvm::to_vector<4>(llvm::map_range(
+              operands(), [](Value value) { return value.getType(); })),
+          getResultTypes(),
+          getContext());
+    }
+  }];
+
+  let verifier = [{ return verifyDispatchWorkgroupsOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the rank of the workgroup dimensions}];
+  let description = [{
+    The number of workgroup dimensions used during dispatch, bounding the
+    `flow.dispatch.workgroup.*` query functions.
+
+    ```mlir
+    %rank = flow.dispatch.workgroup.rank : index
+    ```
+  }];
+
+  let arguments = (ins);
+  let results = (outs FLOW_Dim:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+
+  let hasFolder = 1;
+}
+
+def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current workgroup in the range of
+    `[0, flow.dispatch.workgroup.count)` along each dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable, only in the flow dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = flow.dispatch.workgroup.id[0] : index
+    %y = flow.dispatch.workgroup.id[1] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs FLOW_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
+}
+
+def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable, only in the flow dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = flow.dispatch.workgroup.count[0] : index
+    %y = flow.dispatch.workgroup.count[1] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs FLOW_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
+}
+
+def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Workgroup sizes are not determined at the flow dialect level as they are
+    dependent on the target backend determined when lowering into the HAL. It's
+    still possible to use the symbolic workgroup size inside of dispatch
+    executables as a placeholder for the resolved value once in the HAL.
+
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable, only in the flow dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = flow.dispatch.workgroup.size[0] : index
+    %y = flow.dispatch.workgroup.size[1] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs FLOW_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{returns the shape of a dispatch region input/output tensor}];
+  let description = [{
+    Queries the shape of an input or output tensor of a
+    `flow.dispatch.workgroups` region. The shape may have dynamic dimensions
+    that will be resolved to runtime values.
+  }];
+
+  let arguments = (ins
+    FLOW_DispatchIO:$source
+  );
+  let results = (outs
+    Shape_RankedShape:$result
+  );
+
+  let assemblyFormat = "$source `:` type($source) `->` type($result) attr-dict";
+
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
+  let summary = [{ties a runtime shape to a dispatch I/O argument}];
+  let description = [{
+    Metadata op used to tie a runtime-computed shape with dynamic dimensions to
+    a dispatch input/output argument. All uses of the argument should use the
+    pass-through result of this op to allow for SSA-based shape resolution.
+  }];
+
+  let arguments = (ins
+    FLOW_DispatchIO:$operand,
+    Shape_RankedShape:$shape
+  );
+  let results = (outs
+    FLOW_DispatchIO:$result
+  );
+
+  // TODO(benvanik): figure out a way to make this look like shapex.tie_shape.
+  let assemblyFormat = [{
+    $operand `,` $shape attr-dict
+    `:` `(` type($operand) `,` type($shape) `)` `->` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{loads a tensor from a dispatch input placeholder}];
+  let description = [{
+    Loads an input tensor or subtensor from an input placeholder. As each
+    workgroup executes concurrently all workgroups will receive identical loaded
+    results of regions that may overlap.
+  }];
+
+  let arguments = (ins
+    FLOW_DispatchInput:$source,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source
+    ( `,` `offsets` `=` `[` $offsets^ `]` )?
+    ( `,` `sizes` `=` `[` $sizes^ `]` )?
+    ( `,` `strides` `=` `[` $strides^ `]` )?
+    `:` type($source) `->` type($result) attr-dict-with-keyword
+  }];
+}
+
+def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{stores a tensor into a dispatch output placeholder}];
+  let description = [{
+    Stores a tensor or subtensor into an output tensor placeholder. As each
+    workgroup executes concurrently behavior is undefined if more than one
+    workgroup stores into overlapping regions of the full output tensor.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    FLOW_DispatchOutput:$target,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $value `,` $target
+    ( `,` `offsets` `=` `[` $offsets^ `]` )?
+    ( `,` `sizes` `=` `[` $sizes^ `]` )?
+    ( `,` `strides` `=` `[` $strides^ `]` )?
+    `:` type($value) `->` type($target) attr-dict-with-keyword
+  }];
+}
+
 def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
   let summary = [{return from a flow.dispatch_region}];
   let description = [{
@@ -314,12 +608,11 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
     exports can reference the same internal function.
   }];
 
-  // TODO(benvanik): add a list of all used workloads.
   let arguments = (ins
     StrAttr:$sym_name,
-    // TODO(benvanik): ref into child module.
     FlatSymbolRefAttr:$function_ref,
-    OptionalAttr<FLOW_WorkloadAttr>:$workload
+    OptionalAttr<TypeAttr>:$signature,
+    OptionalAttr<IndexAttr>:$workgroup_rank
   );
 }
 
@@ -359,6 +652,53 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     bool isUsableInStream() { return true; }
     bool isStreamOnly() { return true; }
   }];
+}
+
+def FLOW_Dispatch2Op : FLOW_PureOp<"dispatch2", [
+    AttrSizedOperandSegments,
+    FLOW_StreamableOp,
+  ]> {
+  let summary = [{a dispatch of workgroups across an n-dimension grid}];
+  let description = [{
+    Dispatches workgroups across an n-dimensional grid defined by the specified
+    workgroup count. The workgroup count may be dynamic and any dimension may be
+    set to 0 to neuter the dispatch (no workgroup will execute).
+  }];
+
+  let arguments = (ins
+    Variadic<FLOW_Dim>:$workgroup_count,
+    SymbolRefAttr:$entry_point,
+    Variadic<AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilderDAG<(ins
+      "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
+      "TypeRange":$resultTypes, CArg<"ValueRange", "{}">:$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let extraClassDeclaration = [{
+    StringRef executable();
+    FunctionType getEntryPointType();
+
+    // StreamableOpInterface:
+    bool isTransfer() { return false; }
+    bool isUsableInStream() { return true; }
+    bool isStreamOnly() { return true; }
+  }];
+
+  let assemblyFormat = [{
+    $entry_point `[` $workgroup_count `]`
+    `(` $operands `)` attr-dict `:`
+    functional-type($operands, $results)
+  }];
+
+  let verifier = [{ return verifyDispatch2Op(*this); }];
 }
 
 //===----------------------------------------------------------------------===//

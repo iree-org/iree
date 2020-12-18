@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/base/signature_mangle.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"

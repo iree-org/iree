@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -38,41 +39,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-//===----------------------------------------------------------------------===//
-// Dispatch regions
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct DceDispatchRegion : public OpRewritePattern<DispatchRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(DispatchRegionOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.body().empty()) return failure();
-    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/1);
-    if (!dce.needsOptimization()) return failure();
-
-    bool newOperation = dce.needsNewOperation();
-    if (!newOperation) {
-      rewriter.startRootUpdate(op);
-      dce.optimize(rewriter);
-      rewriter.finalizeRootUpdate(op);
-    } else {
-      dce.optimize(rewriter, /*eraseOriginal=*/false);
-      rewriter.eraseOp(op);
-    }
-    return success();
-  }
-};
-
-}  // namespace
-
-void DispatchRegionOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<DceDispatchRegion>(context);
-}
 
 //===----------------------------------------------------------------------===//
 // Streams
@@ -251,6 +217,157 @@ class PropagateVariableStoreAddress
 void VariableStoreIndirectOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<PropagateVariableStoreAddress>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// Dispatch ops
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DceDispatchRegion : public OpRewritePattern<DispatchRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchRegionOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.body().empty()) return failure();
+    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/1);
+    if (!dce.needsOptimization()) return failure();
+
+    bool newOperation = dce.needsNewOperation();
+    if (!newOperation) {
+      rewriter.startRootUpdate(op);
+      dce.optimize(rewriter);
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
+}  // namespace
+
+void DispatchRegionOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<DceDispatchRegion>(context);
+}
+
+namespace {
+
+struct DceDispatchWorkgroups : public OpRewritePattern<DispatchWorkgroupsOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.body().empty()) return failure();
+    ClosureOpDce dce(op, op.body().front(),
+                     /*variadicOffset=*/op.workgroup_count().size());
+    if (!dce.needsOptimization()) return failure();
+
+    bool newOperation = dce.needsNewOperation();
+    if (!newOperation) {
+      rewriter.startRootUpdate(op);
+      dce.optimize(rewriter);
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
+}  // namespace
+
+void DispatchWorkgroupsOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): add DCE support; it's tricky here because the ClosureOpDce
+  // assumes 1:1 operands/results between the outer op and inner region, but we
+  // don't do that there.
+  // results.insert<DceDispatchWorkgroups>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.workgroup.*
+//===----------------------------------------------------------------------===//
+
+OpFoldResult DispatchWorkgroupRankOp::fold(ArrayRef<Attribute> operands) {
+  if (auto dispatchOp = this->getParentOfType<DispatchWorkgroupsOp>()) {
+    return IntegerAttr::get(IndexType::get(getContext()),
+                            APInt(64, dispatchOp.workgroup_count().size()));
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.shape
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldConstantDispatchShape : public OpRewritePattern<DispatchShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchShapeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceType = op.source().getType().cast<DispatchTensorType>();
+    if (!sourceType.hasStaticShape()) return failure();
+    auto shapeType = Shape::RankedShapeType::get(sourceType.getShape(),
+                                                 rewriter.getContext());
+    rewriter.replaceOpWithNewOp<Shape::ConstRankedShapeOp>(op, shapeType);
+    return success();
+  }
+};
+
+struct PropagateTiedDispatchShapeQuery
+    : public OpRewritePattern<DispatchShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchShapeOp op,
+                                PatternRewriter &rewriter) const override {
+    if (auto tieOp =
+            dyn_cast_or_null<DispatchTieShapeOp>(op.source().getDefiningOp())) {
+      rewriter.replaceOp(op, {tieOp.shape()});
+      return success();
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
+void DispatchShapeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldConstantDispatchShape, PropagateTiedDispatchShapeQuery>(
+      context);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.shape
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldConstantDispatchTieShape
+    : public OpRewritePattern<DispatchTieShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTieShapeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapeType = op.shape().getType().cast<Shape::RankedShapeType>();
+    if (!shapeType.isFullyStatic()) return failure();
+    rewriter.replaceOp(op, op.operand());
+    return success();
+  }
+};
+
+}  // namespace
+
+void DispatchTieShapeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldConstantDispatchTieShape>(context);
 }
 
 //===----------------------------------------------------------------------===//

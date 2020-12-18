@@ -60,6 +60,7 @@ import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
   # would have --nohome_rc). This is mainly about disabling interference from
   # interactive builds in the workspace.
   set(_bazel_startup_options "--nosystem_rc --noworkspace_rc '--bazelrc=${_bazelrc_file}' '--output_base=${_bazel_output_base}'")
+  set(_bazel_build_options "--color=yes")
 
   # And emit scripts to delegate to bazel.
   set(IREE_BAZEL_WRAPPER "${CMAKE_BINARY_DIR}/bazel")

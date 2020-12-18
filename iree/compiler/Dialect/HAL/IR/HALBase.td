@@ -256,7 +256,6 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_VMLA,
       HAL_EF_SpirV,
       HAL_EF_Metal,
-      HAL_EF_LLVM,
       HAL_EF_DyLib
     ]> {
   let returnType = "IREE::HAL::ExecutableFormat";
