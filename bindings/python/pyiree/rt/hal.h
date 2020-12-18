@@ -92,18 +92,6 @@ class HalBufferView
 
 class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
  public:
-  static HalBuffer AllocateHeapBuffer(int32_t memory_type, int32_t usage,
-                                      iree_host_size_t allocation_size) {
-    iree_hal_buffer_t* buffer = nullptr;
-    CheckApiStatus(
-        iree_hal_heap_buffer_allocate(
-            static_cast<iree_hal_memory_type_t>(memory_type),
-            static_cast<iree_hal_buffer_usage_t>(usage), allocation_size,
-            iree_allocator_system(), iree_allocator_system(), &buffer),
-        "Error allocating heap buffer");
-    return HalBuffer::CreateRetained(buffer);
-  }
-
   iree_device_size_t byte_length() const {
     return iree_hal_buffer_byte_length(raw_ptr());
   }

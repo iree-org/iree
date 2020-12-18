@@ -76,9 +76,10 @@ namespace hal {
 namespace dylib {
 
 // static
-StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(ExecutableSpec spec) {
+StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(
+    iree_const_byte_span_t executable_data) {
   auto executable = make_ref<DyLibExecutable>();
-  IREE_RETURN_IF_ERROR(executable->Initialize(spec));
+  IREE_RETURN_IF_ERROR(executable->Initialize(executable_data));
   return executable;
 }
 
@@ -101,12 +102,10 @@ DyLibExecutable::~DyLibExecutable() {
   }
 }
 
-Status DyLibExecutable::Initialize(ExecutableSpec spec) {
+Status DyLibExecutable::Initialize(iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("DyLibExecutable::Initialize");
 
   // Verify and fetch the executable flatbuffer wrapper.
-  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
-      spec.executable_data.data(), spec.executable_data.size());
   IREE_RETURN_IF_ERROR(
       iree_hal_dylib_executable_flatbuffer_verify(executable_data));
   iree_DyLibExecutableDef_table_t executable_def =

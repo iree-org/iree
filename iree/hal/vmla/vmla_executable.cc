@@ -72,23 +72,27 @@ namespace vmla {
 // static
 StatusOr<ref_ptr<VMLAExecutable>> VMLAExecutable::Load(
     iree_vm_instance_t* instance, iree_vm_module_t* vmla_module,
-    ExecutableSpec spec, bool allow_aliasing_data) {
+    iree_const_byte_span_t executable_data, bool allow_aliasing_data) {
   IREE_TRACE_SCOPE0("VMLAExecutable::Load");
   // Allocate the executable now.
   // We do this here so that if we need to clone the data we are passing that
   // to the VM loader instead of the data we may not have access to later.
-  auto executable = make_ref<VMLAExecutable>(spec, allow_aliasing_data);
+  auto executable =
+      make_ref<VMLAExecutable>(executable_data, allow_aliasing_data);
   IREE_RETURN_IF_ERROR(executable->Initialize(instance, vmla_module));
   return executable;
 }
 
-VMLAExecutable::VMLAExecutable(ExecutableSpec spec, bool allow_aliasing_data)
-    : spec_(spec) {
+VMLAExecutable::VMLAExecutable(iree_const_byte_span_t executable_data,
+                               bool allow_aliasing_data)
+    : executable_data_(executable_data) {
   if (!allow_aliasing_data) {
     // Clone data.
-    cloned_executable_data_ = {spec.executable_data.begin(),
-                               spec.executable_data.end()};
-    spec_.executable_data = absl::MakeConstSpan(cloned_executable_data_);
+    cloned_executable_data_ = {
+        executable_data.data,
+        executable_data.data + executable_data.data_length};
+    executable_data_ = iree_make_const_byte_span(
+        cloned_executable_data_.data(), cloned_executable_data_.size());
   }
 }
 
@@ -103,12 +107,10 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
   IREE_TRACE_SCOPE0("VMLAExecutable::Initialize");
 
   // Verify and fetch the executable flatbuffer wrapper.
-  iree_const_byte_span_t executable_data = iree_make_const_byte_span(
-      spec_.executable_data.data(), spec_.executable_data.size());
   IREE_RETURN_IF_ERROR(
-      iree_hal_vmla_executable_flatbuffer_verify(executable_data));
+      iree_hal_vmla_executable_flatbuffer_verify(executable_data_));
   iree_VMLAExecutableDef_table_t executable_def =
-      iree_VMLAExecutableDef_as_root(executable_data.data);
+      iree_VMLAExecutableDef_as_root(executable_data_.data);
 
   // Load bytecode module from the executable spec.
   flatbuffers_uint8_vec_t bytecode_module_vec =

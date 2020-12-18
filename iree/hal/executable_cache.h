@@ -15,13 +15,13 @@
 #ifndef IREE_HAL_EXECUTABLE_CACHE_H_
 #define IREE_HAL_EXECUTABLE_CACHE_H_
 
+#include "iree/base/api.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/executable_layout.h"
-#include "iree/hal/executable_spec.h"
 
 namespace iree {
 namespace hal {
@@ -92,7 +92,7 @@ using ExecutableCachingModeBitfield = ExecutableCachingMode;
 // executable) simultaneously.
 class ExecutableCache : public RefObject<ExecutableCache> {
  public:
-  virtual ~ExecutableCache();
+  virtual ~ExecutableCache() = default;
 
   // TODO(benvanik): status/queries (size, etc).
 
@@ -116,10 +116,10 @@ class ExecutableCache : public RefObject<ExecutableCache> {
   // PrepareExecutables method to batch and wait on the results.
   virtual StatusOr<ref_ptr<Executable>> PrepareExecutable(
       ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-      const ExecutableSpec& spec) = 0;
+      iree_const_byte_span_t executable_data) = 0;
 
  protected:
-  ExecutableCache();
+  ExecutableCache() = default;
 };
 
 }  // namespace hal

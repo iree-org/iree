@@ -53,6 +53,7 @@ class CustomModulesTest : public ::testing::Test {
         hal_driver, iree_allocator_system(), &hal_device));
     IREE_CHECK_OK(iree_hal_module_create(hal_device, iree_allocator_system(),
                                          &hal_module_));
+    hal_allocator_ = iree_hal_device_allocator(hal_device);
     iree_hal_device_release(hal_device);
     iree_hal_driver_release(hal_driver);
 
@@ -100,6 +101,7 @@ class CustomModulesTest : public ::testing::Test {
   iree_vm_module_t* bytecode_module_ = nullptr;
   iree_vm_module_t* native_module_ = nullptr;
   iree_vm_module_t* hal_module_ = nullptr;
+  iree_hal_allocator_t* hal_allocator_ = nullptr;
 };
 
 TEST_F(CustomModulesTest, ReverseAndPrint) {
@@ -145,12 +147,12 @@ TEST_F(CustomModulesTest, PrintTensor) {
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_t* buffer = nullptr;
-  IREE_ASSERT_OK(iree_hal_heap_buffer_allocate_copy(
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_HAL_BUFFER_USAGE_ALL,
-      IREE_HAL_MEMORY_ACCESS_ALL,
+  IREE_ASSERT_OK(iree_hal_allocator_wrap_buffer(
+      hal_allocator_, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      IREE_HAL_BUFFER_USAGE_ALL, IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      iree_allocator_system(), iree_allocator_system(), &buffer));
+      &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
@@ -185,12 +187,12 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_t* buffer = nullptr;
-  IREE_ASSERT_OK(iree_hal_heap_buffer_allocate_copy(
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_HAL_BUFFER_USAGE_ALL,
-      IREE_HAL_MEMORY_ACCESS_ALL,
+  IREE_ASSERT_OK(iree_hal_allocator_wrap_buffer(
+      hal_allocator_, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      IREE_HAL_BUFFER_USAGE_ALL, IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      iree_allocator_system(), iree_allocator_system(), &buffer));
+      &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;

@@ -25,7 +25,6 @@ iree_cc_library(
     "api.cc"
   DEPS
     ::hal
-    ::heap_buffer
     absl::inlined_vector
     absl::span
     absl::strings
@@ -63,28 +62,22 @@ iree_cc_library(
     "command_buffer.h"
     "command_queue.h"
     "debug_capture_manager.h"
-    "deferred_buffer.h"
     "descriptor_set.h"
     "descriptor_set_layout.h"
     "device.h"
     "device_info.h"
-    "device_placement.h"
     "driver.h"
     "event.h"
     "executable.h"
     "executable_cache.h"
     "executable_format.h"
     "executable_layout.h"
-    "executable_spec.h"
     "resource.h"
     "semaphore.h"
-    "stack_trace.h"
   SRCS
     "allocator.cc"
     "buffer.cc"
     "command_buffer.cc"
-    "deferred_buffer.cc"
-    "executable_cache.cc"
   DEPS
     absl::span
     absl::strings
@@ -105,23 +98,8 @@ iree_cc_test(
     "buffer_test.cc"
   DEPS
     ::hal
-    ::heap_buffer
     absl::span
     iree::base::status
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    deferred_buffer_test
-  SRCS
-    "deferred_buffer_test.cc"
-  DEPS
-    ::hal
-    ::heap_buffer
-    absl::memory
-    iree::hal::testing::mock_allocator
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -138,38 +116,5 @@ iree_cc_library(
     absl::strings
     iree::base::logging
     iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    device_manager
-  HDRS
-    "device_manager.h"
-  SRCS
-    "device_manager.cc"
-  DEPS
-    ::hal
-    ::heap_buffer
-    absl::span
-    absl::synchronization
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    heap_buffer
-  HDRS
-    "heap_buffer.h"
-  SRCS
-    "heap_buffer.cc"
-  DEPS
-    ::hal
-    iree::base::status
-    iree::base::tracing
-    iree::hal::host::host_buffer
   PUBLIC
 )

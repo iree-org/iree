@@ -33,7 +33,7 @@ bool DyLibExecutableCache::CanPrepareFormat(ExecutableFormat format) const {
 
 StatusOr<ref_ptr<Executable>> DyLibExecutableCache::PrepareExecutable(
     ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-    const ExecutableSpec& spec) {
+    iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("DyLibExecutableCache::PrepareExecutable");
 
   // TODO(scotttodd): Options for using in-memory files where supported, or not
@@ -43,7 +43,7 @@ StatusOr<ref_ptr<Executable>> DyLibExecutableCache::PrepareExecutable(
   //    hash data into a filename and read from / write to GetTempPath() or
   //    GetCachePath() rather than use GetTempFile().
 
-  return DyLibExecutable::Load(spec);
+  return DyLibExecutable::Load(executable_data);
 }
 
 }  // namespace dylib

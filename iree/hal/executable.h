@@ -22,33 +22,6 @@ namespace hal {
 
 class Executable : public Resource {
  public:
-  ~Executable() override = default;
-
-  // True if the executable was prepared with debugging enabled and the device
-  // and input data support debugging (symbols present, etc).
-  virtual bool supports_debugging() const = 0;
-
-  // TODO(benvanik): disassembly methods.
-
-  // TODO(benvanik): relative offset calculation:
-  //   - step once
-  //   - step over
-  //   - step out
-
-  // TODO(benvanik): create executable split on breakpoint.
-  // Executable should return when the breakpoint is hit without any future
-  // modifications to output buffers. If the breakpoint is not hit the
-  // executable should run to completion as normal.
-
-  // TODO(benvanik): retrieve coverage info.
-  // Returns a buffer containing offset -> coverage metrics. Note that depending
-  // on the device this may only contain a single coverage metric for the entire
-  // executable or some subset of the available offsets.
-
-  // TODO(benvanik): retrieve profiling info.
-
- protected:
-  Executable() = default;
 };
 
 }  // namespace hal

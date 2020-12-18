@@ -768,52 +768,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_unmap(
     iree_hal_buffer_t* buffer, iree_hal_mapped_memory_t* mapped_memory);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::HeapBuffer
-//===----------------------------------------------------------------------===//
-
-// Allocates a zeroed host heap buffer of the given size.
-// The buffer contents will be allocated with |contents_allocator| while
-// |allocator| is used for the iree_hal_buffer_t.
-//
-// Returns a buffer allocated with malloc that may not be usable by devices
-// without copies. |memory_type| should be set to
-// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
-// |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
-    iree_host_size_t allocation_size, iree_allocator_t contents_allocator,
-    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer);
-
-// Allocates a host heap buffer with a copy of the given data.
-// The buffer contents will be allocated with |contents_allocator| while
-// |allocator| is used for the iree_hal_buffer_t.
-//
-// Returns a buffer allocated with malloc that may not be usable by devices
-// without copies. |memory_type| should be set to
-// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
-// |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
-    iree_hal_memory_access_t allowed_access, iree_byte_span_t contents,
-    iree_allocator_t contents_allocator, iree_allocator_t allocator,
-    iree_hal_buffer_t** out_buffer);
-
-// Wraps an existing host heap allocation in a buffer.
-// Ownership of the host allocation remains with the caller and the memory
-// must remain valid for so long as the iree_hal_buffer_t may be in use.
-//
-// Returns a buffer allocated with malloc that may not be usable by devices
-// without copies. |memory_type| should be set to
-// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
-// |out_buffer| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t usage, iree_byte_span_t contents,
-    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer);
-
-// TODO(benvanik): add a wrap that takes an allocator just for the buffer.
-
-//===----------------------------------------------------------------------===//
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 

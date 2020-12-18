@@ -40,7 +40,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":hal",
-        ":heap_buffer",
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:ref_ptr",
@@ -80,8 +79,6 @@ cc_library(
         "allocator.cc",
         "buffer.cc",
         "command_buffer.cc",
-        "deferred_buffer.cc",
-        "executable_cache.cc",
     ],
     hdrs = [
         "allocator.h",
@@ -89,22 +86,18 @@ cc_library(
         "command_buffer.h",
         "command_queue.h",
         "debug_capture_manager.h",
-        "deferred_buffer.h",
         "descriptor_set.h",
         "descriptor_set_layout.h",
         "device.h",
         "device_info.h",
-        "device_placement.h",
         "driver.h",
         "event.h",
         "executable.h",
         "executable_cache.h",
         "executable_format.h",
         "executable_layout.h",
-        "executable_spec.h",
         "resource.h",
         "semaphore.h",
-        "stack_trace.h",
     ],
     deps = [
         "//iree/base:core_headers",
@@ -126,24 +119,10 @@ cc_test(
     ],
     deps = [
         ":hal",
-        ":heap_buffer",
         "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "deferred_buffer_test",
-    srcs = ["deferred_buffer_test.cc"],
-    deps = [
-        ":hal",
-        ":heap_buffer",
-        "//iree/hal/testing:mock_allocator",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -160,41 +139,5 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:status",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Internal device management and driver registry
-#===------------------------------------------------------------------------===#
-# TODO(benvanik): port these to C and merge into main API.
-
-cc_library(
-    name = "device_manager",
-    srcs = ["device_manager.cc"],
-    hdrs = ["device_manager.h"],
-    deps = [
-        ":hal",
-        ":heap_buffer",
-        "//iree/base:status",
-        "//iree/base:time",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Internal implementation details
-#===------------------------------------------------------------------------===#
-
-cc_library(
-    name = "heap_buffer",
-    srcs = ["heap_buffer.cc"],
-    hdrs = ["heap_buffer.h"],
-    deps = [
-        ":hal",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal/host:host_buffer",
     ],
 )

@@ -34,7 +34,7 @@ bool PipelineCache::CanPrepareFormat(ExecutableFormat format) const {
 
 StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
     ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-    const ExecutableSpec& spec) {
+    iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("PipelineCache::PrepareExecutable");
 
   // Create the executable (which may itself own many pipelines).
@@ -44,7 +44,7 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
           add_ref(logical_device_),
           /*pipeline_cache=*/VK_NULL_HANDLE,
           static_cast<PipelineExecutableLayout*>(executable_layout), mode,
-          spec));
+          executable_data));
   return executable;
 }
 

@@ -35,7 +35,6 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
-#include "iree/hal/heap_buffer.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
 #include "third_party/half/half.hpp"
@@ -931,81 +930,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_unmap(
       reinterpret_cast<MappedMemory<uint8_t>*>(mapped_memory->reserved);
   mapping->reset();
   std::memset(mapped_memory, 0, sizeof(*mapped_memory));
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// iree::hal::HeapBuffer
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
-    iree_host_size_t allocation_size, iree_allocator_t contents_allocator,
-    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate");
-  IREE_ASSERT_ARGUMENT(out_buffer);
-  *out_buffer = nullptr;
-
-  if (!allocation_size) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "allocation size must be >= 0");
-  }
-
-  auto handle = HeapBuffer::Allocate(
-      static_cast<MemoryTypeBitfield>(memory_type),
-      static_cast<BufferUsageBitfield>(usage), allocation_size);
-
-  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(
-      static_cast<Buffer*>(handle.release()));
-
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
-    iree_hal_memory_access_t allowed_access, iree_byte_span_t contents,
-    iree_allocator_t contents_allocator, iree_allocator_t allocator,
-    iree_hal_buffer_t** out_buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate_copy");
-  IREE_ASSERT_ARGUMENT(out_buffer);
-
-  *out_buffer = nullptr;
-
-  if (!contents.data || !contents.data_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no contents specified (0 length)");
-  }
-
-  auto handle = HeapBuffer::AllocateCopy(
-      static_cast<BufferUsageBitfield>(usage),
-      static_cast<MemoryAccessBitfield>(allowed_access), contents.data,
-      contents.data_length);
-
-  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t usage, iree_byte_span_t contents,
-    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_wrap");
-  IREE_ASSERT_ARGUMENT(out_buffer);
-
-  *out_buffer = nullptr;
-
-  if (!contents.data || !contents.data_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no contents specified (0 length)");
-  }
-
-  auto handle =
-      HeapBuffer::WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
-                              static_cast<MemoryAccessBitfield>(allowed_access),
-                              static_cast<BufferUsageBitfield>(usage),
-                              contents.data, contents.data_length);
-
-  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
   return iree_ok_status();
 }
 
@@ -1923,13 +1847,11 @@ iree_hal_executable_cache_prepare_executable(
   *out_executable = nullptr;
   auto* handle = reinterpret_cast<ExecutableCache*>(executable_cache);
 
-  ExecutableSpec spec;
-  spec.executable_data = {executable_data.data, executable_data.data_length};
   IREE_ASSIGN_OR_RETURN(
       auto executable,
       handle->PrepareExecutable(
           reinterpret_cast<ExecutableLayout*>(executable_layout),
-          static_cast<ExecutableCachingMode>(caching_mode), spec));
+          static_cast<ExecutableCachingMode>(caching_mode), executable_data));
 
   *out_executable =
       reinterpret_cast<iree_hal_executable_t*>(executable.release());

@@ -22,7 +22,6 @@
 #include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"
 
 namespace iree {
@@ -33,12 +32,11 @@ struct MemrefType;
 
 class DyLibExecutable final : public HostExecutable {
  public:
-  static StatusOr<ref_ptr<DyLibExecutable>> Load(ExecutableSpec spec);
+  static StatusOr<ref_ptr<DyLibExecutable>> Load(
+      iree_const_byte_span_t executable_data);
 
   DyLibExecutable();
   ~DyLibExecutable() override;
-
-  bool supports_debugging() const override { return false; }
 
   StatusOr<ref_ptr<DispatchState>> PrepareDispatch(
       const DispatchParams& params) override;
@@ -46,7 +44,7 @@ class DyLibExecutable final : public HostExecutable {
                       std::array<uint32_t, 3> workgroup_xyz) override;
 
  private:
-  Status Initialize(ExecutableSpec spec);
+  Status Initialize(iree_const_byte_span_t executable_data);
 
   absl::InlinedVector<std::string, 4> temp_file_paths_;
   std::unique_ptr<DynamicLibrary> executable_library_;
