@@ -35,11 +35,13 @@ std::vector<const char*> GetIreeLayers(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features) {
   iree_host_size_t required_count;
-  iree_hal_vulkan_get_layers(extensibility_set, features, 0, NULL,
-                             &required_count);
+  iree_hal_vulkan_query_extensibility_set(
+      features, extensibility_set, /*string_capacity=*/0,
+      /*out_string_values=*/NULL, &required_count);
   std::vector<const char*> layers(required_count);
-  iree_hal_vulkan_get_layers(extensibility_set, features, layers.size(),
-                             layers.data(), &required_count);
+  iree_hal_vulkan_query_extensibility_set(features, extensibility_set,
+                                          layers.size(), layers.data(),
+                                          &required_count);
   return layers;
 }
 
@@ -49,11 +51,13 @@ std::vector<const char*> GetIreeExtensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features) {
   iree_host_size_t required_count;
-  iree_hal_vulkan_get_extensions(extensibility_set, features, 0, NULL,
-                                 &required_count);
+  iree_hal_vulkan_query_extensibility_set(
+      features, extensibility_set, /*string_capacity=*/0,
+      /*out_string_values=*/NULL, &required_count);
   std::vector<const char*> extensions(required_count);
-  iree_hal_vulkan_get_extensions(extensibility_set, features, extensions.size(),
-                                 extensions.data(), &required_count);
+  iree_hal_vulkan_query_extensibility_set(features, extensibility_set,
+                                          extensions.size(), extensions.data(),
+                                          &required_count);
   return extensions;
 }
 
@@ -61,10 +65,12 @@ std::vector<const char*> GetIreeExtensions(
 // |vulkan_features|.
 std::vector<const char*> GetDeviceExtensions(
     iree_hal_vulkan_features_t vulkan_features) {
-  std::vector<const char*> iree_required_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_REQUIRED, vulkan_features);
-  std::vector<const char*> iree_optional_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL, vulkan_features);
+  std::vector<const char*> iree_required_extensions = GetIreeExtensions(
+      IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
+      vulkan_features);
+  std::vector<const char*> iree_optional_extensions = GetIreeExtensions(
+      IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+      vulkan_features);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
@@ -82,10 +88,10 @@ std::vector<const char*> GetDeviceExtensions(
 std::vector<const char*> GetInstanceLayers(
     iree_hal_vulkan_features_t vulkan_features) {
   // Query the layers that IREE wants / needs.
-  std::vector<const char*> required_layers =
-      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
-  std::vector<const char*> optional_layers =
-      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
+  std::vector<const char*> required_layers = GetIreeLayers(
+      IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED, vulkan_features);
+  std::vector<const char*> optional_layers = GetIreeLayers(
+      IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL, vulkan_features);
 
   // Query the layers that are available on the Vulkan ICD.
   uint32_t layer_property_count = 0;
@@ -131,10 +137,12 @@ std::vector<const char*> GetInstanceExtensions(
   SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count,
                                    sdl_extensions.data());
 
-  std::vector<const char*> iree_required_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
-  std::vector<const char*> iree_optional_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
+  std::vector<const char*> iree_required_extensions = GetIreeExtensions(
+      IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
+      vulkan_features);
+  std::vector<const char*> iree_optional_extensions = GetIreeExtensions(
+      IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL,
+      vulkan_features);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;

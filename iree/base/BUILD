@@ -47,21 +47,25 @@ cc_library(
     hdrs = [
         "alignment.h",
         "atomics.h",
-        "bitfield.h",
         "debugging.h",
         "math.h",
         "memory.h",
         "target_platform.h",
     ],
     deps = [
+        "//iree/base/internal:atomics",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/types:span",  # bitfield.h
     ],
 )
 
+cc_library(
+    name = "target_platform",
+    hdrs = ["target_platform.h"],
+)
+
 cc_test(
-    name = "bitfield_test",
-    srcs = ["bitfield_test.cc"],
+    name = "atomics_test",
+    srcs = ["atomics_test.cc"],
     deps = [
         ":core_headers",
         "//iree/testing:gtest",
@@ -402,24 +406,6 @@ cc_test(
     srcs = ["synchronization_test.cc"],
     deps = [
         ":synchronization",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "time",
-    hdrs = ["time.h"],
-    deps = [
-        ":api",
-    ],
-)
-
-cc_test(
-    name = "time_test",
-    srcs = ["time_test.cc"],
-    deps = [
-        ":time",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

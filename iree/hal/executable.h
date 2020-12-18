@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,43 +15,61 @@
 #ifndef IREE_HAL_EXECUTABLE_H_
 #define IREE_HAL_EXECUTABLE_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "iree/base/api.h"
 #include "iree/hal/resource.h"
 
-namespace iree {
-namespace hal {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-class Executable : public Resource {
- public:
-  ~Executable() override = default;
+typedef struct iree_hal_device_s iree_hal_device_t;
 
-  // True if the executable was prepared with debugging enabled and the device
-  // and input data support debugging (symbols present, etc).
-  virtual bool supports_debugging() const = 0;
+//===----------------------------------------------------------------------===//
+// iree_hal_executable_t
+//===----------------------------------------------------------------------===//
 
-  // TODO(benvanik): disassembly methods.
+// Handle to a loaded executable.
+// Loading of executables routes through an executable cache, allowing for
+// context-aware scoped caches. HAL implementations can use this to preserve
+// JIT'ed executables across processes or reuse executables across device
+// instances.
+//
+// Executables provide one or more entry points that can be dispatched via
+// iree_hal_command_buffer_dispatch. Some entry points may represent the same
+// computation but specialized in different ways such that the runtime can
+// switch strategies and choose between them per-dispatch.
+//
+//
+// Maps (roughly) to vkShaderModule + VkPipeline[].
+typedef struct iree_hal_executable_s iree_hal_executable_t;
 
-  // TODO(benvanik): relative offset calculation:
-  //   - step once
-  //   - step over
-  //   - step out
+// Retains the given |executable| for the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_executable_retain(iree_hal_executable_t* executable);
 
-  // TODO(benvanik): create executable split on breakpoint.
-  // Executable should return when the breakpoint is hit without any future
-  // modifications to output buffers. If the breakpoint is not hit the
-  // executable should run to completion as normal.
+// Releases the given |executable| from the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_executable_release(iree_hal_executable_t* executable);
 
-  // TODO(benvanik): retrieve coverage info.
-  // Returns a buffer containing offset -> coverage metrics. Note that depending
-  // on the device this may only contain a single coverage metric for the entire
-  // executable or some subset of the available offsets.
+//===----------------------------------------------------------------------===//
+// iree_hal_executable_t implementation details
+//===----------------------------------------------------------------------===//
 
-  // TODO(benvanik): retrieve profiling info.
+typedef struct {
+  // << HAL C porting in progress >>
+  IREE_API_UNSTABLE
 
- protected:
-  Executable() = default;
-};
+  void(IREE_API_PTR* destroy)(iree_hal_executable_t* executable);
+} iree_hal_executable_vtable_t;
 
-}  // namespace hal
-}  // namespace iree
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_executable_destroy(iree_hal_executable_t* executable);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_EXECUTABLE_H_

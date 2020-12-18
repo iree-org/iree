@@ -120,17 +120,10 @@ class StringsModuleTest : public ::testing::Test {
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(T), &buffer));
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
-                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
-    memcpy(mapped_memory.contents.data,
-           static_cast<const void*>(contents.data()),
-           mapped_memory.contents.data_length);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
+                                              contents.size() * sizeof(T)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(), E, iree_allocator_system(),
-        &*out_buffer_view));
+        buffer.get(), shape.data(), shape.size(), E, &*out_buffer_view));
   }
 
   void TestStringTensorToString(

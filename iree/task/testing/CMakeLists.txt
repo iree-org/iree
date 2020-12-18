@@ -16,6 +16,18 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    task_test
+  HDRS
+    "task_test.h"
+  DEPS
+    iree::task
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     test_util
   HDRS
     "test_util.h"

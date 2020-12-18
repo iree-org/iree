@@ -111,11 +111,33 @@ cc_test(
 
 cc_test(
     name = "scope_test",
-    srcs = ["scope_test.cc"],
+    srcs = [
+        "scope_test.cc",
+        "task_impl.h",
+    ],
     deps = [
         ":task",
         "//iree/base:api",
         "//iree/task/testing:test_util",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "task_tests",
+    srcs = [
+        "task_test_barrier.cc",
+        "task_test_call.cc",
+        "task_test_dispatch.cc",
+        "task_test_fence.cc",
+        "task_test_nop.cc",
+        "task_test_wait.cc",
+    ],
+    deps = [
+        ":task",
+        "//iree/base:api",
+        "//iree/task/testing:task_test",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -129,5 +151,6 @@ cc_test(
         "//iree/base:api",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
+        "@cpuinfo",
     ],
 )

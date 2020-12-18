@@ -319,6 +319,11 @@ void iree_task_executor_retain(iree_task_executor_t* executor);
 // Releases the given |executor| from the caller.
 void iree_task_executor_release(iree_task_executor_t* executor);
 
+// Acquires a fence for the given |scope| from the executor fence pool.
+iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
+                                               iree_task_scope_t* scope,
+                                               iree_task_fence_t** out_fence);
+
 // TODO(benvanik): scheduling mode mutation, compute quota control, etc.
 
 // Submits a batch of tasks for execution.
@@ -334,8 +339,8 @@ void iree_task_executor_release(iree_task_executor_t* executor);
 //
 // NOTE: it's possible for all work in the submission to complete prior to this
 // function returning.
-iree_status_t iree_task_executor_submit(iree_task_executor_t* executor,
-                                        iree_task_submission_t* submission);
+void iree_task_executor_submit(iree_task_executor_t* executor,
+                               iree_task_submission_t* submission);
 
 // Flushes any pending task batches for execution.
 //
@@ -344,7 +349,7 @@ iree_status_t iree_task_executor_submit(iree_task_executor_t* executor,
 //
 // NOTE: due to races it's possible for new work to arrive from other threads
 // after the flush has occurred but prior to this call returning.
-iree_status_t iree_task_executor_flush(iree_task_executor_t* executor);
+void iree_task_executor_flush(iree_task_executor_t* executor);
 
 // Donates the calling thread to the executor until either |wait_handle|
 // resolves or |deadline_ns| is exceeded.

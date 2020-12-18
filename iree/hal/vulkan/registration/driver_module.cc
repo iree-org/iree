@@ -14,123 +14,76 @@
 
 #include "iree/hal/vulkan/registration/driver_module.h"
 
+#include <inttypes.h>
+
 #include "absl/flags/flag.h"
 #include "iree/base/flags.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/vulkan_driver.h"
+#include "iree/hal/vulkan/api.h"
+
+#define IREE_HAL_VULKAN_1_X_DRIVER_ID 0x564C4B31u  // VLK1
 
 ABSL_FLAG(bool, vulkan_validation_layers, true,
           "Enables standard Vulkan validation layers.");
 ABSL_FLAG(bool, vulkan_debug_utils, true,
           "Enables VK_EXT_debug_utils, records markers, and logs errors.");
-ABSL_FLAG(bool, vulkan_debug_report, false,
-          "Enables VK_EXT_debug_report and logs errors.");
-ABSL_FLAG(bool, vulkan_push_descriptors, true,
-          "Enables use of vkCmdPushDescriptorSetKHR, if available.");
+
 ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
-ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
+
 ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
           "Uses timeline semaphore emulation even if native support exists.");
 
-// Vulkan Memory Allocator (VMA) flags
-#if VMA_RECORDING_ENABLED
-ABSL_FLAG(std::string, vma_recording_file, "",
-          "File path to write a CSV containing the VMA recording.");
-ABSL_FLAG(bool, vma_recording_flush_after_call, false,
-          "Flush the VMA recording file after every call (useful if "
-          "crashing/not exiting cleanly).");
-#endif  // VMA_RECORDING_ENABLED
-
-namespace iree {
-namespace hal {
-namespace vulkan {
-namespace {
-
-StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
-  IREE_TRACE_SCOPE0("CreateVulkanDriver");
-
-  // Load the Vulkan library. This will fail if the library cannot be found or
-  // does not have the expected functions.
-  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
+static iree_status_t iree_hal_vulkan_create_driver_with_flags(
+    iree_string_view_t identifier, iree_allocator_t allocator,
+    iree_hal_driver_t** out_driver) {
+  IREE_TRACE_SCOPE();
 
   // Setup driver options from flags. We do this here as we want to enable other
   // consumers that may not be using modules/command line flags to be able to
   // set their options however they want.
-  VulkanDriver::Options options;
+  iree_hal_vulkan_driver_options_t driver_options;
+  iree_hal_vulkan_driver_options_initialize(&driver_options);
 
-  // TODO: validation layers have bugs when using VK_EXT_debug_report, so if the
-  // user requested that we force them off with a warning. Prefer using
-  // VK_EXT_debug_utils when available.
-  if (absl::GetFlag(FLAGS_vulkan_debug_report) &&
-      absl::GetFlag(FLAGS_vulkan_validation_layers)) {
-    IREE_LOG(WARNING)
-        << "VK_EXT_debug_report has issues with modern validation "
-           "layers; disabling validation";
-    absl::SetFlag(&FLAGS_vulkan_validation_layers, false);
-  }
-
-  // REQUIRED: these are required extensions that must be present for IREE to
-  // work (such as those relied upon by SPIR-V kernels, etc).
-  options.device_options.extensibility_spec.required_extensions.push_back(
-      VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
-  // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
-  // This extension was deprecated in Vulkan 1.1 as its functionality was
-  // promoted to core, so we list it as optional even though we require it.
-  options.instance_extensibility.optional_extensions.push_back(
-      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-  // Timeline semaphore support is optional and will be emulated if necessary.
-  options.device_options.extensibility_spec.optional_extensions.push_back(
-      VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-  // Polyfill layer - enable if present (instead of our custom emulation).
-  options.instance_extensibility.optional_layers.push_back(
-      "VK_LAYER_KHRONOS_timeline_semaphore");
+// TODO(benvanik): make this a flag - it's useful for testing the same binary
+// against multiple versions of Vulkan.
+#if defined(IREE_PLATFORM_ANDROID)
+  // TODO(#4494): let's see when we can always enable timeline semaphores.
+  driver_options.api_version = VK_API_VERSION_1_1;
+#else
+  driver_options.api_version = VK_API_VERSION_1_2;
+#endif  // IREE_PLATFORM_ANDROID
 
   if (absl::GetFlag(FLAGS_vulkan_validation_layers)) {
-    options.instance_extensibility.optional_layers.push_back(
-        "VK_LAYER_KHRONOS_validation");
-  }
-
-  if (absl::GetFlag(FLAGS_vulkan_debug_report)) {
-    options.instance_extensibility.optional_extensions.push_back(
-        VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS;
   }
   if (absl::GetFlag(FLAGS_vulkan_debug_utils)) {
-    options.instance_extensibility.optional_extensions.push_back(
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS;
   }
 
-  if (absl::GetFlag(FLAGS_vulkan_push_descriptors)) {
-    options.device_options.extensibility_spec.optional_extensions.push_back(
-        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+  driver_options.default_device_index =
+      absl::GetFlag(FLAGS_vulkan_default_index);
+
+  if (absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+    driver_options.device_options.flags |=
+        IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION;
   }
 
-  options.default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
-  options.enable_renderdoc = absl::GetFlag(FLAGS_vulkan_renderdoc);
-  options.device_options.force_timeline_semaphore_emulation =
-      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation);
+  // Load the Vulkan library. This will fail if the library cannot be found or
+  // does not have the expected functions.
+  iree_hal_vulkan_syms_t* syms = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_syms_create_from_system_loader(allocator, &syms));
 
-#if VMA_RECORDING_ENABLED
-  options.device_options.vma_options.recording_file =
-      absl::GetFlag(FLAGS_vma_recording_file);
-  options.device_options.vma_options.recording_flush_after_call =
-      absl::GetFlag(FLAGS_vma_recording_flush_after_call);
-#endif  // VMA_RECORDING_ENABLED
+  iree_status_t status = iree_hal_vulkan_driver_create(
+      identifier, &driver_options, syms, allocator, out_driver);
 
-  // Create the driver and VkInstance.
-  return VulkanDriver::Create(options, std::move(syms));
+  iree_hal_vulkan_syms_release(syms);
+  return status;
 }
-
-}  // namespace
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
-
-#include <inttypes.h>
-
-#define IREE_HAL_VULKAN_1_X_DRIVER_ID 0x564C4B31u  // VLK1
 
 static iree_status_t iree_hal_vulkan_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
@@ -155,9 +108,13 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
                             " is provided by this factory",
                             driver_id);
   }
-  IREE_ASSIGN_OR_RETURN(auto driver, iree::hal::vulkan::CreateVulkanDriver());
-  *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
-  return iree_ok_status();
+
+  // When we expose more than one driver (different vulkan versions, etc) we
+  // can name them here:
+  iree_string_view_t identifier = iree_make_cstring_view("vulkan");
+
+  return iree_hal_vulkan_create_driver_with_flags(identifier, allocator,
+                                                  out_driver);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

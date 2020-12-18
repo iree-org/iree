@@ -59,7 +59,10 @@ void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
 iree_atomic_slist_entry_t* iree_atomic_slist_pop(iree_atomic_slist_t* list) {
   iree_slim_mutex_lock(&list->mutex);
   iree_atomic_slist_entry_t* entry = list->head;
-  list->head = entry ? entry->next : NULL;
+  if (entry != NULL) {
+    list->head = entry->next;
+    entry->next = NULL;
+  }
   iree_slim_mutex_unlock(&list->mutex);
   return entry;
 }

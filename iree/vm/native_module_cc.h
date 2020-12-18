@@ -235,12 +235,15 @@ class NativeModule {
         /*frame_cleanup_fn=*/nullptr, &callee_frame));
 
     auto* state = FromStatePointer(callee_frame->module_state);
-    IREE_RETURN_IF_ERROR(info.call(info.ptr, state, stack, call, out_result),
-                         "while invoking C++ function %s.%.*s", module->name_,
-                         (int)info.name.size, info.name.data);
+    iree_status_t status = info.call(info.ptr, state, stack, call, out_result);
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      status = iree_status_annotate_f(
+          status, "while invoking C++ function %s.%.*s", module->name_,
+          (int)info.name.size, info.name.data);
+      return status;
+    }
 
     return iree_vm_stack_function_leave(stack);
-    ;
   }
 
   const char* name_;

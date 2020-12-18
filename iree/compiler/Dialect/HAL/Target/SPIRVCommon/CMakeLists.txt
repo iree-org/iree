@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND NOT ${IREE_TARGET_BACKEND_METAL-SPIRV})
+if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}" AND
+   NOT "${IREE_TARGET_BACKEND_METAL-SPIRV}")
   return()
 endif()
 

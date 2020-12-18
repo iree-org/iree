@@ -15,67 +15,30 @@
 #ifndef IREE_HAL_VULKAN_VMA_BUFFER_H_
 #define IREE_HAL_VULKAN_VMA_BUFFER_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include "iree/hal/buffer.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-class VmaAllocator;
+// Wraps a VMA allocation in an iree_hal_buffer_t.
+// The allocation will be released back to VMA when the buffer is released.
+iree_status_t iree_hal_vulkan_vma_buffer_wrap(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    VmaAllocator vma, VkBuffer handle, VmaAllocation allocation,
+    VmaAllocationInfo allocation_info, iree_hal_buffer_t** out_buffer);
 
-// A buffer implementation representing an allocation made from within a pool of
-// a Vulkan Memory Allocator instance. See VmaAllocator for more information.
-class VmaBuffer final : public Buffer {
- public:
-  VmaBuffer(VmaAllocator* allocator, MemoryTypeBitfield memory_type,
-            MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-            device_size_t allocation_size, device_size_t byte_offset,
-            device_size_t byte_length, VkBuffer buffer,
-            VmaAllocation allocation, VmaAllocationInfo allocation_info);
-  ~VmaBuffer() override;
+// Returns the Vulkan handle backing the given |buffer|.
+// This is the entire allocated_buffer and must be offset by the buffer
+// byte_offset and byte_length when used.
+VkBuffer iree_hal_vulkan_vma_buffer_handle(iree_hal_buffer_t* buffer);
 
-  VkBuffer handle() const { return buffer_; }
-  VmaAllocation allocation() const { return allocation_; }
-  const VmaAllocationInfo& allocation_info() const { return allocation_info_; }
-
-  // Exposed so that VmaAllocator can reset access after initial mapping.
-  using Buffer::set_allowed_access;
-
- private:
-  Status FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                  const void* pattern, device_size_t pattern_length) override;
-  Status ReadDataImpl(device_size_t source_offset, void* data,
-                      device_size_t data_length) override;
-  Status WriteDataImpl(device_size_t target_offset, const void* data,
-                       device_size_t data_length) override;
-  Status CopyDataImpl(device_size_t target_offset, Buffer* source_buffer,
-                      device_size_t source_offset,
-                      device_size_t data_length) override;
-  Status MapMemoryImpl(MappingMode mapping_mode,
-                       MemoryAccessBitfield memory_access,
-                       device_size_t local_byte_offset,
-                       device_size_t local_byte_length,
-                       void** out_data) override;
-  Status UnmapMemoryImpl(device_size_t local_byte_offset,
-                         device_size_t local_byte_length, void* data) override;
-  Status InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                    device_size_t local_byte_length) override;
-  Status FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                               device_size_t local_byte_length) override;
-
-  ::VmaAllocator vma_;
-  VkBuffer buffer_;
-  VmaAllocation allocation_;
-  VmaAllocationInfo allocation_info_;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_VMA_BUFFER_H_

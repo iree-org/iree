@@ -16,6 +16,18 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    atomics
+  HDRS
+    "atomics_clang.h"
+    "atomics_gcc.h"
+    "atomics_msvc.h"
+  DEPS
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     file_handle_win32
   HDRS
     "file_handle_win32.h"

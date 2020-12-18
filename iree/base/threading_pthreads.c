@@ -67,16 +67,19 @@ static bool iree_thread_resumed_predicate(void* arg) {
 
 typedef int (*pthread_setname_np_fn_t)(pthread_t thread, const char* name);
 
+static pthread_setname_np_fn_t iree_pthread_setname_np_fn = NULL;
+static void iree_thread_try_query_setname_fn(void) {
+  iree_pthread_setname_np_fn =
+      (pthread_setname_np_fn_t)dlsym(RTLD_DEFAULT, "pthread_setname_np");
+}
+
 static int iree_thread_set_name(pthread_t handle, const char* name) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  static pthread_setname_np_fn_t pthread_setname_np_fn = NULL;
-  if (!pthread_setname_np_fn) {
-    pthread_setname_np_fn =
-        (pthread_setname_np_fn_t)dlsym(RTLD_DEFAULT, "pthread_setname_np");
-  }
+  static iree_once_flag fn_query_flag = IREE_ONCE_FLAG_INIT;
+  iree_call_once(&fn_query_flag, iree_thread_try_query_setname_fn);
   int rc;
-  if (pthread_setname_np_fn) {
-    rc = pthread_setname_np_fn(handle, name);
+  if (iree_pthread_setname_np_fn) {
+    rc = iree_pthread_setname_np_fn(handle, name);
   } else {
     rc = EINVAL;
   }
@@ -147,7 +150,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
 
   pthread_attr_t thread_attr;
   pthread_attr_init(&thread_attr);
-  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   if (params.stack_size) {
     pthread_attr_setstacksize(&thread_attr, params.stack_size);
   }
@@ -155,6 +158,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // Retain the thread for the thread itself; this way if the caller immediately
   // releases the iree_thread_t handle the thread won't explode.
   iree_thread_retain(thread);
+  *out_thread = thread;
 
   // Unfortunately we can't create the thread suspended (no API). This means
   // that we are likely to incur some thrashing here as the thread gets spun up
@@ -170,7 +174,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
   pthread_attr_destroy(&thread_attr);
   if (rc != 0) {
-    iree_allocator_free(allocator, thread);
+    iree_thread_release(thread);  // for self
+    iree_thread_release(thread);  // for caller
+    *out_thread = NULL;
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "thread creation failed with %d", rc);
@@ -184,7 +190,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
 
   IREE_TRACE_ZONE_END(z0);
-  *out_thread = thread;
   return iree_ok_status();
 }
 
@@ -192,6 +197,7 @@ static void iree_thread_delete(iree_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_thread_resume(thread);
+  pthread_join(thread->handle, NULL);
 
   iree_notification_deinitialize(&thread->suspend_barrier);
   iree_thread_override_list_deinitialize(&thread->qos_override_list);

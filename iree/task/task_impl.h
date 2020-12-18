@@ -29,6 +29,12 @@ extern "C" {
 // IREE_TASK_TYPE_NOP
 //==============================================================================
 
+// Retires a no-op task.
+// No-op tasks don't *do* anything but must still be handled like any other
+// task in the system so dependent tasks are properly scheduled.
+void iree_task_nop_retire(iree_task_nop_t* task,
+                          iree_task_submission_t* pending_submission);
+
 //==============================================================================
 // IREE_TASK_TYPE_CALL
 //==============================================================================

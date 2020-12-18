@@ -113,10 +113,29 @@ iree_cc_test(
     scope_test
   SRCS
     "scope_test.cc"
+    "task_impl.h"
   DEPS
     ::task
     iree::base::api
     iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    task_tests
+  SRCS
+    "task_test_barrier.cc"
+    "task_test_call.cc"
+    "task_test_dispatch.cc"
+    "task_test_fence.cc"
+    "task_test_nop.cc"
+    "task_test_wait.cc"
+  DEPS
+    ::task
+    iree::base::api
+    iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -128,6 +147,7 @@ iree_cc_test(
     "topology_test.cc"
   DEPS
     ::task
+    cpuinfo
     iree::base::api
     iree::testing::gtest
     iree::testing::gtest_main
