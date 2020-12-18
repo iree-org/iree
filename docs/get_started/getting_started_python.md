@@ -73,22 +73,33 @@ $ python -m pip install tf-nightly
 
 ## Building
 
+From the *parent* directory of the IREE git repository clone, create and enter a
+build directory, such as:
+
+```shell
+$ mkdir iree-build
+$ cd iree-build
+```
+
+Then build like this:
+
 ```shell
 # Also include -DIREE_BUILD_TENSORFLOW_COMPILER=ON if you want the TF compiler.
-$ cmake -G Ninja -B ../iree-build/ \
+$ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DIREE_BUILD_PYTHON_BINDINGS=ON  .
-$ cd ../iree-build/
-$ ninja
+$ cmake --build .
 ```
 
 ## Running Python Tests
 
+We continue to assume that we are in the build directory where we made the build
+in the previous section.
+
 To run tests for core Python bindings built with CMake:
 
 ```shell
-$ cd ../iree-build/
 $ ctest -L bindings/python
 ```
 
@@ -96,12 +107,13 @@ To run tests for the TensorFlow integration, which include end-to-end backend
 comparison tests:
 
 ```shell
-$ cd ../iree-build/
 # TODO: Revisit once more patches land.
 $ ctest -L integrations/tensorflow/e2e
 
 # Or run individually as:
-$ export PYTHONPATH=../iree-build/bindings/python
+$ export PYTHONPATH=$(pwd)/bindings/python
+# This is a Python 3 program. On some systems, such as Debian derivatives,
+# use 'python3' instead of 'python'.
 $ python ../iree/integrations/tensorflow/e2e/simple_arithmetic_test.py \
     --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
 ```
@@ -120,6 +132,7 @@ There is a `setup.py` in the `bindings/python` directory under the build dir.
 To install into your (hopefully isolated) virtual env:
 
 ```shell
+# See the above note about python3, and the above step setting PYTHONPATH.
 python bindings/python/setup.py install
 ```
 

@@ -92,6 +92,14 @@ module  {
 }
 
 ```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
 ### IR Dump After Inliner
 ```
 module  {
@@ -246,7 +254,27 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+    module  {
+      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+        return %0 : tensor<32x64xf32>
+      }
+    }
+  }
+  func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x64xf32> {iree.reflection = {}}) -> (tensor<32x64xf32> {iree.reflection = {}}) attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c2048 = constant 2048 : index
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegions2Pass
+```
+module  {
+  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -275,7 +303,7 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -376,7 +404,7 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {}}, %arg1: tensor<1024x
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -399,7 +427,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -422,7 +450,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -445,7 +473,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -468,7 +496,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -491,7 +519,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -514,7 +542,7 @@ module  {
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0
+    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module  {
       func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
         %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -642,6 +670,38 @@ func @dot_ex_dispatch_0() {
 func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
+  %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  return
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot_ex_dispatch_0() {
+  %c0 = constant 0 : index
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
+  return
 }
 
 ```
@@ -1824,44 +1884,60 @@ vm.module @module {
 }
 
 ```
+### IR Dump After Canonicalizer
+```
+vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+  %c32 = vm.const.i32 32 : i32
+  %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
+  %c8192 = vm.const.i32 8192 : i32
+  %c1024 = vm.const.i32 1024 : i32
+  %c64 = vm.const.i32 64 : i32
+  %c1 = vm.const.i32 1 : i32
+  %zero = vm.const.i32.zero : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+  vm.return
+}
+
+```
 ### IR Dump After Inliner
 ```
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c1024 = vm.const.i32 1024 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c1 = vm.const.i32 1 : i32
       %c32 = vm.const.i32 32 : i32
-      %zero = vm.const.i32.zero : i32
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
-      %zero_0 = vm.const.i32.zero : i32
-      %zero_1 = vm.const.i32.zero : i32
-      %ref = vm.call @vmla.interface.binding(%arg0, %zero_0, %zero_1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_2 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %zero_3 = vm.const.i32.zero : i32
-      %c1_4 = vm.const.i32 1 : i32
-      %ref_5 = vm.call @vmla.interface.binding(%arg0, %zero_3, %c1_4) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_6 = vm.call @vmla.buffer.view(%ref_5, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-      %ref_7 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
-      %c1024_8 = vm.const.i32 1024 : i32
-      %c64_9 = vm.const.i32 64 : i32
-      %c1_10 = vm.const.i32 1 : i32
-      %zero_11 = vm.const.i32.zero : i32
-      vm.call.variadic @vmla.transpose.x32(%ref_6, [%c1024_8, %c64_9], [%c1_10, %zero_11], %ref_7, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_12 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_2, [%c1, %c32, %c1024], %ref_7, [%c1, %c64, %c1024], %ref_12, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %ref_13 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      %zero_14 = vm.const.i32.zero : i32
+      %c1024 = vm.const.i32 1024 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
       %c2 = vm.const.i32 2 : i32
-      %c1_15 = vm.const.i32 1 : i32
-      vm.call.variadic @vmla.transpose.x32(%ref_12, [%c1, %c64, %c32], [%zero_14, %c2, %c1_15], %ref_13, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
-      %zero_16 = vm.const.i32.zero : i32
-      %c2_17 = vm.const.i32 2 : i32
-      %ref_18 = vm.call @vmla.interface.binding(%arg0, %zero_16, %c2_17) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-      vm.call @vmla.buffer.copy(%ref_13, %zero, %ref_18, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+      %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+      %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+      vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+      %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+      vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
       vm.return
     }
     vm.export @dot_ex_dispatch_0
@@ -2050,14 +2126,15 @@ module  {
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c1024 = vm.const.i32 1024 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c1 = vm.const.i32 1 : i32
       %c32 = vm.const.i32 32 : i32
-      %zero = vm.const.i32.zero : i32
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %c1024 = vm.const.i32 1024 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
       %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
       %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2067,7 +2144,6 @@ module  {
       %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
       vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
       %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      %c2 = vm.const.i32 2 : i32
       vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
       %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
       vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
@@ -2259,14 +2335,15 @@ module  {
 module  {
   vm.module @module {
     vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-      %c1024 = vm.const.i32 1024 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c1 = vm.const.i32 1 : i32
       %c32 = vm.const.i32 32 : i32
-      %zero = vm.const.i32.zero : i32
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
       %c8192 = vm.const.i32 8192 : i32
+      %c1024 = vm.const.i32 1024 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c2 = vm.const.i32 2 : i32
       %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
       %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
       %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
@@ -2276,7 +2353,6 @@ module  {
       %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
       vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
       %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
-      %c2 = vm.const.i32 2 : i32
       vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
       %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
       vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
@@ -3435,6 +3511,34 @@ func private @_executable_cache_initializer() -> !hal.executable_cache {
 }
 
 ```
+### IR Dump After Canonicalizer
+```
+vm.func @dot_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+  %zero = vm.const.i32.zero : i32
+  %c131072 = vm.const.i32 131072 : i32
+  %c1 = vm.const.i32 1 : i32
+  %c262144 = vm.const.i32 262144 : i32
+  %c1024 = vm.const.i32 1024 : i32
+  %c64 = vm.const.i32 64 : i32
+  %c8192 = vm.const.i32 8192 : i32
+  %c32 = vm.const.i32 32 : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c131072) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_2 = vm.call @vmla.buffer.view(%ref_1, %zero, %c262144) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+  %ref_3 = vm.call @vmla.buffer.alloc(%c262144) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.transpose.x32(%ref_2, [%c1024, %c64], [%c1, %zero], %ref_3, [%c64, %c1024]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_4 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.batch.matmul.f32f32.f32(%ref_0, [%c1, %c32, %c1024], %ref_3, [%c1, %c64, %c1024], %ref_4, [%c1, %c64, %c32]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_5 = vm.call @vmla.buffer.alloc(%c8192) : (i32) -> !vm.ref<!vmla.buffer>
+  vm.call.variadic @vmla.transpose.x32(%ref_4, [%c1, %c64, %c32], [%zero, %c2, %c1], %ref_5, [%c1, %c32, %c64]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
+  %ref_6 = vm.call @vmla.interface.binding(%arg0, %zero, %c2) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+  vm.call @vmla.buffer.copy(%ref_5, %zero, %ref_6, %zero, %c8192) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+  vm.return
+}
+
+```
 ### IR Dump After Inliner
 ```
 vm.module @linked_module {
@@ -4489,6 +4593,279 @@ vm.module @module {
     vm.return
   }
   vm.export @__init
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @__init() {
+  %0 = vm.call @_device_match_id_0_initializer() : () -> i32
+  vm.global.store.i32 %0, @_device_match_id_0 : i32
+  %ref = vm.call @_descriptor_set_layout_0_initializer() : () -> !vm.ref<!hal.descriptor_set_layout>
+  vm.global.store.ref %ref, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
+  %ref_0 = vm.call @_executable_layout_0_initializer() : () -> !vm.ref<!hal.executable_layout>
+  vm.global.store.ref %ref_0, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  %ref_1 = vm.call @_executable_cache_initializer() : () -> !vm.ref<!hal.executable_cache>
+  vm.global.store.ref %ref_1, @_executable_cache : !vm.ref<!hal.executable_cache>
+  vm.return
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+  %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+  %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+  vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+^bb1:  // pred: ^bb0
+  vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+^bb2(%1: i32):  // pred: ^bb0
+  vm.fail %1, "semaphore wait failed"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
+  %c32 = vm.const.i32 32 : i32
+  %c64 = vm.const.i32 64 : i32
+  %c50331680 = vm.const.i32 50331680 : i32
+  %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+  vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+^bb1:  // pred: ^bb0
+  %ref = vm.call @hal.buffer_view.buffer(%arg2) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_0 = vm.call @hal.buffer_view.buffer(%arg3) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_1 = vm.call @dot(%ref, %ref_0) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
+  %ref_2 = vm.call.variadic @hal.buffer_view.create(%ref_1, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+  vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
+  vm.return %ref_2 : !vm.ref<!hal.buffer_view>
+^bb2(%1: i32):  // pred: ^bb0
+  vm.fail %1, "semaphore wait failed"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
+  %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
+  %c8192 = vm.const.i32 8192 : i32
+  %c50 = vm.const.i32 50 : i32
+  %c15 = vm.const.i32 15 : i32
+  %c3 = vm.const.i32 3 : i32
+  %c1 = vm.const.i32 1 : i32
+  %zero = vm.const.i32.zero : i32
+  %c20 = vm.const.i32 20 : i32
+  %c5 = vm.const.i32 5 : i32
+  %c8 = vm.const.i32 8 : i32
+  %c4 = vm.const.i32 4 : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+  vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
+  %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%arg0, %arg1, %ref_1], [%zero, %zero, %zero], [%c131072, %c262144, %c8192]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+  %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+  vm.cond_br %_device_match_id_0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %_executable_linked_vmla = vm.global.load.ref @_executable_linked_vmla : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_vmla, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+  vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
+  vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+  vm.return %ref_1 : !vm.ref<!hal.buffer>
+^bb2:  // pred: ^bb0
+  vm.fail %c2, "unreachable location reached"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
+  %c1447906369 = vm.const.i32 1447906369 : i32
+  %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
+  %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
+  %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
+  %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+  vm.cond_br %_device_match_id_0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1447906369]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
+  %_linked_vmla_binary_vmla = vm.const.ref.rodata @_linked_vmla_binary_vmla : !vm.ref<!iree.byte_buffer>
+  %ref_1 = vm.switch.ref %0[%_linked_vmla_binary_vmla] else %null : !vm.ref<!iree.byte_buffer>
+  %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
+  vm.global.store.ref %ref_2, @_executable_linked_vmla : !vm.ref<!hal.executable>
+  vm.return %ref_0 : !vm.ref<!hal.executable_cache>
+^bb2:  // pred: ^bb0
+  vm.fail %c2, "unreachable location reached"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func private @_executable_layout_0_initializer() -> !vm.ref<!hal.executable_layout> {
+  %zero = vm.const.i32.zero : i32
+  %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
+  vm.return %ref_0 : !vm.ref<!hal.executable_layout>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
+  %c7 = vm.const.i32 7 : i32
+  %c6 = vm.const.i32 6 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call.variadic @hal.descriptor_set_layout.create(%ref, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
+  vm.return %ref_0 : !vm.ref<!hal.descriptor_set_layout>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func private @_device_match_id_0_initializer() -> i32 {
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
+  %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
+  vm.return %0 : i32
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @__init() {
+  %c1 = vm.const.i32 1 : i32
+  %c6 = vm.const.i32 6 : i32
+  %zero = vm.const.i32.zero : i32
+  %c1447906369 = vm.const.i32 1447906369 : i32
+  %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
+  %c7 = vm.const.i32 7 : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %_utf8_vmla_EC74E8E47AC10E22 = vm.const.ref.rodata @_utf8_vmla_EC74E8E47AC10E22 : !vm.ref<!iree.byte_buffer>
+  %0 = vm.call @hal.device.match.id(%ref, %_utf8_vmla_EC74E8E47AC10E22) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
+  vm.global.store.i32 %0, @_device_match_id_0 : i32
+  %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
+  vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
+  %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
+  %ref_2 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
+  vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
+  %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
+  %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+  vm.cond_br %_device_match_id_0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1447906369]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
+  %_linked_vmla_binary_vmla = vm.const.ref.rodata @_linked_vmla_binary_vmla : !vm.ref<!iree.byte_buffer>
+  %ref_6 = vm.switch.ref %1[%_linked_vmla_binary_vmla] else %null : !vm.ref<!iree.byte_buffer>
+  %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
+  vm.global.store.ref %ref_7, @_executable_linked_vmla : !vm.ref<!hal.executable>
+  vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
+  vm.return
+^bb2:  // pred: ^bb0
+  vm.fail %c2, "unreachable location reached"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %zero = vm.const.i32.zero : i32
+  %c1 = vm.const.i32 1 : i32
+  %c32 = vm.const.i32 32 : i32
+  %c64 = vm.const.i32 64 : i32
+  %c50331680 = vm.const.i32 50331680 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+  %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+  vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+^bb1:  // pred: ^bb0
+  %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_3 = vm.call @dot(%ref_1, %ref_2) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
+  %ref_4 = vm.call.variadic @hal.buffer_view.create(%ref_3, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+  vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+  %1 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+  vm.cond_br %1, ^bb2(%1 : i32), ^bb3
+^bb2(%2: i32):  // 2 preds: ^bb0, ^bb1
+  vm.fail %2, "semaphore wait failed"
+^bb3:  // pred: ^bb1
+  vm.return %ref_4 : !vm.ref<!hal.buffer_view>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
+  %c32 = vm.const.i32 32 : i32
+  %c64 = vm.const.i32 64 : i32
+  %c50331680 = vm.const.i32 50331680 : i32
+  %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+  vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+^bb1:  // pred: ^bb0
+  %ref = vm.call @hal.buffer_view.buffer(%arg2) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_0 = vm.call @hal.buffer_view.buffer(%arg3) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  %ref_1 = vm.call @dot(%ref, %ref_0) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
+  %ref_2 = vm.call.variadic @hal.buffer_view.create(%ref_1, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+  vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
+  vm.return %ref_2 : !vm.ref<!hal.buffer_view>
+^bb2(%1: i32):  // pred: ^bb0
+  vm.fail %1, "semaphore wait failed"
+}
+
+```
+### IR Dump After Canonicalizer
+```
+vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
+  %c131072 = vm.const.i32 131072 : i32
+  %c262144 = vm.const.i32 262144 : i32
+  %c8192 = vm.const.i32 8192 : i32
+  %c50 = vm.const.i32 50 : i32
+  %c15 = vm.const.i32 15 : i32
+  %c3 = vm.const.i32 3 : i32
+  %c1 = vm.const.i32 1 : i32
+  %zero = vm.const.i32.zero : i32
+  %c20 = vm.const.i32 20 : i32
+  %c5 = vm.const.i32 5 : i32
+  %c8 = vm.const.i32 8 : i32
+  %c4 = vm.const.i32 4 : i32
+  %c2 = vm.const.i32 2 : i32
+  %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+  %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+  %ref_1 = vm.call @hal.allocator.allocate(%ref_0, %c50, %c15, %c8192) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+  vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
+  %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+  vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_2, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%arg0, %arg1, %ref_1], [%zero, %zero, %zero], [%c131072, %c262144, %c8192]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+  %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+  vm.cond_br %_device_match_id_0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %_executable_linked_vmla = vm.global.load.ref @_executable_linked_vmla : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_vmla, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+  vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
+  vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+  vm.return %ref_1 : !vm.ref<!hal.buffer>
+^bb2:  // pred: ^bb0
+  vm.fail %c2, "unreachable location reached"
 }
 
 ```
