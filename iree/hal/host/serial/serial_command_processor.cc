@@ -24,8 +24,9 @@ namespace hal {
 namespace host {
 
 SerialCommandProcessor::SerialCommandProcessor(
-    CommandCategoryBitfield command_categories)
-    : CommandBuffer(CommandBufferMode::kOneShot, command_categories) {}
+    iree_hal_command_category_t command_categories)
+    : CommandBuffer(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT, command_categories) {
+}
 
 SerialCommandProcessor::~SerialCommandProcessor() = default;
 
@@ -42,42 +43,42 @@ Status SerialCommandProcessor::End() {
 }
 
 Status SerialCommandProcessor::ExecutionBarrier(
-    ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::ExecutionBarrier");
   // No-op.
   return OkStatus();
 }
 
 Status SerialCommandProcessor::SignalEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::SignalEvent");
   // No-op.
   return OkStatus();
 }
 
 Status SerialCommandProcessor::ResetEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::ResetEvent");
   // No-op.
   return OkStatus();
 }
 
 Status SerialCommandProcessor::WaitEvents(
-    absl::Span<Event*> events, ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::WaitEvents");
   // No-op.
   return OkStatus();
 }
 
 Status SerialCommandProcessor::FillBuffer(Buffer* target_buffer,
-                                          device_size_t target_offset,
-                                          device_size_t length,
+                                          iree_device_size_t target_offset,
+                                          iree_device_size_t length,
                                           const void* pattern,
                                           size_t pattern_length) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::FillBuffer");
@@ -91,10 +92,10 @@ Status SerialCommandProcessor::DiscardBuffer(Buffer* buffer) {
 }
 
 Status SerialCommandProcessor::UpdateBuffer(const void* source_buffer,
-                                            device_size_t source_offset,
+                                            iree_device_size_t source_offset,
                                             Buffer* target_buffer,
-                                            device_size_t target_offset,
-                                            device_size_t length) {
+                                            iree_device_size_t target_offset,
+                                            iree_device_size_t length) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::UpdateBuffer");
   return target_buffer->WriteData(
       target_offset, static_cast<const uint8_t*>(source_buffer) + source_offset,
@@ -102,10 +103,10 @@ Status SerialCommandProcessor::UpdateBuffer(const void* source_buffer,
 }
 
 Status SerialCommandProcessor::CopyBuffer(Buffer* source_buffer,
-                                          device_size_t source_offset,
+                                          iree_device_size_t source_offset,
                                           Buffer* target_buffer,
-                                          device_size_t target_offset,
-                                          device_size_t length) {
+                                          iree_device_size_t target_offset,
+                                          iree_device_size_t length) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::CopyBuffer");
   return target_buffer->CopyData(target_offset, source_buffer, source_offset,
                                  length);
@@ -127,9 +128,10 @@ Status SerialCommandProcessor::PushConstants(
 
 Status SerialCommandProcessor::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::PushDescriptorSet");
-  if (!AnyBitSet(command_categories() & CommandCategory::kDispatch)) {
+  if (!iree_any_bit_set(command_categories(),
+                        IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command processor does not support dispatch operations";
   }
@@ -155,9 +157,10 @@ Status SerialCommandProcessor::PushDescriptorSet(
 Status SerialCommandProcessor::BindDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     DescriptorSet* descriptor_set,
-    absl::Span<const device_size_t> dynamic_offsets) {
+    absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::BindDescriptorSet");
-  if (!AnyBitSet(command_categories() & CommandCategory::kDispatch)) {
+  if (!iree_any_bit_set(command_categories(),
+                        IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command processor does not support dispatch operations";
   }
@@ -201,7 +204,7 @@ Status SerialCommandProcessor::Dispatch(Executable* executable,
 
 Status SerialCommandProcessor::DispatchIndirect(
     Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
-    device_size_t workgroups_offset) {
+    iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::DispatchIndirect");
 
   std::array<uint32_t, 3> workgroup_count;
@@ -219,7 +222,7 @@ Status SerialCommandProcessor::DispatchGrid(
   params.workgroup_count = workgroup_count;
   params.push_constants = &push_constants_;
 
-  absl::InlinedVector<absl::Span<const DescriptorSet::Binding>, 2>
+  absl::InlinedVector<absl::Span<const iree_hal_descriptor_set_binding_t>, 2>
       descriptor_sets(descriptor_sets_.size());
   for (int i = 0; i < descriptor_sets_.size(); ++i) {
     descriptor_sets[i] = absl::MakeConstSpan(descriptor_sets_[i]);

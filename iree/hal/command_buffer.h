@@ -29,109 +29,15 @@
 namespace iree {
 namespace hal {
 
-// A bitfield specifying the mode of operation for a command buffer.
-enum class CommandBufferMode : uint32_t {
-  // Command buffer will be submitted once and never used again.
-  // This may enable in-place patching of command buffers that reduces overhead
-  // when it's known that command buffers will not be reused.
-  kOneShot = 1 << 0,
-};
-IREE_BITFIELD(CommandBufferMode);
-using CommandBufferModeBitfield = CommandBufferMode;
-std::string CommandBufferModeString(CommandBufferModeBitfield mode);
-
-// A bitfield specifying the category of commands in a command queue.
-enum class CommandCategory : uint32_t {
-  // Command is considered a transfer operation (memcpy, etc).
-  kTransfer = 1 << 0,
-  // Command is considered a dispatch operation (dispatch/execute).
-  kDispatch = 1 << 1,
-};
-IREE_BITFIELD(CommandCategory);
-using CommandCategoryBitfield = CommandCategory;
-std::string CommandCategoryString(CommandCategoryBitfield categories);
-
-// Bitfield specifying which execution stage a brarrier should start/end at.
-//
-// Maps to VkPipelineStageFlagBits.
-enum class ExecutionStage : uint32_t {
-  // Top of the pipeline when commands are initially issued by the device.
-  kCommandIssue = 1 << 0,
-  // Stage of the pipeline when dispatch parameter data is consumed.
-  kCommandProcess = 1 << 1,
-  // Stage where dispatch commands execute.
-  kDispatch = 1 << 2,
-  // Stage where transfer (copy/clear/fill/etc) commands execute.
-  kTransfer = 1 << 3,
-  // Final stage in the pipeline when commands are retired on the device.
-  kCommandRetire = 1 << 4,
-  // Pseudo-stage for read/writes by the host. Not executed on device.
-  kHost = 1 << 5,
-};
-IREE_BITFIELD(ExecutionStage);
-using ExecutionStageBitfield = ExecutionStage;
-
-// Bitfield specifying which scopes will access memory and how.
-//
-// Maps to VkAccessFlagBits.
-enum class AccessScope : uint32_t {
-  // Read access to indirect command data as part of an indirect dispatch.
-  kIndirectCommandRead = 1 << 0,
-  // Constant uniform buffer reads by the device.
-  kConstantRead = 1 << 1,
-  // Storage buffer reads by dispatch commands.
-  kDispatchRead = 1 << 2,
-  // Storage buffer writes by dispatch commands.
-  kDispatchWrite = 1 << 3,
-  // Source of a transfer operation.
-  kTransferRead = 1 << 4,
-  // Target of a transfer operation.
-  kTransferWrite = 1 << 5,
-  // Read operation by the host through mapped memory.
-  kHostRead = 1 << 6,
-  // Write operation by the host through mapped memory.
-  kHostWrite = 1 << 7,
-  // External/non-specific read.
-  kMemoryRead = 1 << 8,
-  // External/non-specific write.
-  kMemoryWrite = 1 << 9,
-};
-IREE_BITFIELD(AccessScope);
-using AccessScopeBitfield = AccessScope;
-
-// Defines a global memory barrier.
-// These are cheaper to encode than buffer-specific barriers but may cause
-// stalls and bubbles in device pipelines if applied too broadly. Prefer them
-// over equivalently large sets of buffer-specific barriers (such as when
-// completely changing execution contexts).
-//
-// Maps to VkMemoryBarrier.
-struct MemoryBarrier {
-  // All access scopes prior-to the barrier (inclusive).
-  AccessScopeBitfield source_scope;
-  // All access scopes following the barrier (inclusive).
-  AccessScopeBitfield target_scope;
-};
-
-// Defines a memory barrier that applies to a range of a specific buffer.
-// Use of these (vs. global memory barriers) provides fine-grained execution
-// ordering to device command processors and allows for more aggressive
-// reordering.
-//
-// Maps to VkBufferMemoryBarrier.
-struct BufferBarrier {
-  // All access scopes prior-to the barrier (inclusive).
-  AccessScopeBitfield source_scope;
-  // All access scopes following the barrier (inclusive).
-  AccessScopeBitfield target_scope;
-  // Buffer the barrier is restricted to.
-  // The barrier will apply to the entire physical device allocation.
-  Buffer* buffer = nullptr;
-  // Relative offset/length within |buffer| (which may itself be mapped into the
-  // device allocation at an offset).
-  device_size_t offset = 0;
-  device_size_t length = kWholeBuffer;
-};
+std::string CommandBufferModeString(iree_hal_command_buffer_mode_t mode);
+std::string CommandCategoryString(iree_hal_command_category_t categories) {
+  return "TODO";
+  // return FormatBitfieldValue(
+  //     categories, {
+  //                     {IREE_HAL_COMMAND_CATEGORY_TRANSFER, "kTransfer"},
+  //                     {IREE_HAL_COMMAND_CATEGORY_DISPATCH, "kDispatch"},
+  //                 });
+}
 
 // Asynchronous command buffer recording interface.
 // Commands are recorded by the implementation for later submission to command
@@ -164,10 +70,10 @@ class CommandBuffer : public Resource {
   virtual CommandBuffer* impl() { return this; }
 
   // Command buffer operation mode.
-  CommandBufferModeBitfield mode() const { return mode_; }
+  iree_hal_command_buffer_mode_t mode() const { return mode_; }
 
   // Command categories that may be recorded into the buffer.
-  CommandCategoryBitfield command_categories() const {
+  iree_hal_command_category_t command_categories() const {
     return command_categories_;
   }
 
@@ -196,10 +102,10 @@ class CommandBuffer : public Resource {
   // barrier. One or more memory or buffer barriers can be specified to indicate
   // between which stages or buffers the dependencies exist.
   virtual Status ExecutionBarrier(
-      ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) = 0;
+      iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) = 0;
 
   // Sets an event to the signaled state.
   // |source_stage_mask| specifies when the event is signaled.
@@ -207,7 +113,7 @@ class CommandBuffer : public Resource {
   // Events are only valid within a single command buffer. Events can only be
   // used on non-transfer queues.
   virtual Status SignalEvent(Event* event,
-                             ExecutionStageBitfield source_stage_mask) = 0;
+                             iree_hal_execution_stage_t source_stage_mask) = 0;
 
   // Resets an event to the non-signaled state.
   // |source_stage_mask| specifies when the event is unsignaled.
@@ -215,31 +121,32 @@ class CommandBuffer : public Resource {
   // Events are only valid within a single command buffer. Events can only be
   // used on non-transfer queues.
   virtual Status ResetEvent(Event* event,
-                            ExecutionStageBitfield source_stage_mask) = 0;
+                            iree_hal_execution_stage_t source_stage_mask) = 0;
 
   // Waits for one or more events to be signaled and defines a memory dependency
   // between the synchronization scope of the signal operations and the commands
   // following the wait.
   //
-  // |source_stage_mask| must include ExecutionStage::kHost for Event::Signal to
-  // be visibile.
+  // |source_stage_mask| must include IREE_HAL_EXECUTION_STAGE_HOST for
+  // Event::Signal to be visibile.
   //
   // Events are only valid within a single command buffer. Events remain
   // signaled even after waiting and must be reset to be reused. Events can only
   // be used on non-transfer queues.
   virtual Status WaitEvents(
-      absl::Span<Event*> events, ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) = 0;
+      absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+      iree_hal_execution_stage_t target_stage_mask,
+      absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+      absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) = 0;
 
   // Fills the target buffer with the given repeating value.
   // Expects that value_length is one of 1, 2, or 4 and that the offset and
   // length are aligned to the natural alignment of the value.
   // The target buffer must be compatible with the devices owned by this
-  // device queue and be allocated with BufferUsage::kTransfer.
-  virtual Status FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                            device_size_t length, const void* pattern,
+  // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
+  virtual Status FillBuffer(Buffer* target_buffer,
+                            iree_device_size_t target_offset,
+                            iree_device_size_t length, const void* pattern,
                             size_t pattern_length) = 0;
 
   // Hints to the device queue that the given buffer will not be used again.
@@ -247,7 +154,7 @@ class CommandBuffer : public Resource {
   // This is because the discard may be used to elide write backs to host memory
   // or aggressively reuse the allocation for other purposes.
   //
-  // For buffers allocated with MemoryType::kTransient this may allow
+  // For buffers allocated with IREE_HAL_MEMORY_TYPE_TRANSIENT this may allow
   // the device queue to reclaim the memory used by the buffer earlier than
   // otherwise possible.
   virtual Status DiscardBuffer(Buffer* buffer) = 0;
@@ -260,23 +167,26 @@ class CommandBuffer : public Resource {
   // The |source_buffer| may be releaed by the caller immediately after this
   // call returns.
   // The |target_buffer| must be compatible with the devices owned by this
-  // device queue and be allocated with BufferUsage::kTransfer.
+  // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
   virtual Status UpdateBuffer(const void* source_buffer,
-                              device_size_t source_offset,
+                              iree_device_size_t source_offset,
                               Buffer* target_buffer,
-                              device_size_t target_offset,
-                              device_size_t length) = 0;
+                              iree_device_size_t target_offset,
+                              iree_device_size_t length) = 0;
 
   // Copies a range of one buffer to another.
   // Both buffers must be compatible with the devices owned by this device
-  // queue and be allocated with BufferUsage::kTransfer. Though the source and
-  // target buffer may be the same the ranges must not overlap (as with memcpy).
+  // queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER. Though the
+  // source and target buffer may be the same the ranges must not overlap (as
+  // with memcpy).
   //
   // This can be used to perform device->host, host->device, and device->device
   // copies.
-  virtual Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                            Buffer* target_buffer, device_size_t target_offset,
-                            device_size_t length) = 0;
+  virtual Status CopyBuffer(Buffer* source_buffer,
+                            iree_device_size_t source_offset,
+                            Buffer* target_buffer,
+                            iree_device_size_t target_offset,
+                            iree_device_size_t length) = 0;
 
   // Pushes an inline set of constants that can be accessed by subsequent
   // dispatches using a compatible executable layout.
@@ -296,7 +206,7 @@ class CommandBuffer : public Resource {
   // constant sizes).
   virtual Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
-      absl::Span<const DescriptorSet::Binding> bindings) = 0;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) = 0;
 
   // Binds a descriptor set to the given |set| matching that used in the
   // executable layout interface.
@@ -311,7 +221,7 @@ class CommandBuffer : public Resource {
   virtual Status BindDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       DescriptorSet* descriptor_set,
-      absl::Span<const device_size_t> dynamic_offsets) = 0;
+      absl::Span<const iree_device_size_t> dynamic_offsets) = 0;
 
   // Dispatches an execution request.
   // The request may execute overlapped with any other transfer operation or
@@ -332,20 +242,20 @@ class CommandBuffer : public Resource {
   // values before performing the dispatch. This allows prior dispatches within
   // the command sequence to populate the workgroup counts.
   //
-  // The buffer must have been allocated with BufferUsage::kDispatch and be
-  // of MemoryType::kDeviceVisible.
+  // The buffer must have been allocated with IREE_HAL_BUFFER_USAGE_DISPATCH and
+  // be of IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
   virtual Status DispatchIndirect(Executable* executable, int32_t entry_point,
                                   Buffer* workgroups_buffer,
-                                  device_size_t workgroups_offset) = 0;
+                                  iree_device_size_t workgroups_offset) = 0;
 
  protected:
-  CommandBuffer(CommandBufferModeBitfield mode,
-                CommandCategoryBitfield command_categories)
+  CommandBuffer(iree_hal_command_buffer_mode_t mode,
+                iree_hal_command_category_t command_categories)
       : mode_(mode), command_categories_(command_categories) {}
 
  private:
-  const CommandBufferModeBitfield mode_;
-  const CommandCategoryBitfield command_categories_;
+  const iree_hal_command_buffer_mode_t mode_;
+  const iree_hal_command_category_t command_categories_;
 };
 
 }  // namespace hal

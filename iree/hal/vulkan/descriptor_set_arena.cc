@@ -26,15 +26,15 @@ namespace vulkan {
 
 namespace {
 
-StatusOr<VmaBuffer*> CastBuffer(Buffer* buffer) {
+StatusOr<VmaBuffer*> CastBuffer(iree_hal_buffer_t* buffer) {
   // TODO(benvanik): assert that the buffer is from the right allocator and
   // that it is compatible with our target queue family.
-  return static_cast<VmaBuffer*>(buffer->allocated_buffer());
+  return reinterpret_cast<VmaBuffer*>(iree_hal_buffer_allocated_buffer(buffer));
 }
 
 StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
-    absl::Span<const DescriptorSet::Binding> bindings, VkDescriptorSet dst_set,
-    Arena* arena) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings,
+    VkDescriptorSet dst_set, Arena* arena) {
   arena->Reset();
   auto buffer_infos =
       arena->AllocateSpan<VkDescriptorBufferInfo>(bindings.size());
@@ -46,7 +46,8 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     auto& buffer_info = buffer_infos[i];
     IREE_ASSIGN_OR_RETURN(auto buffer, CastBuffer(binding.buffer));
     buffer_info.buffer = buffer->handle();
-    buffer_info.offset = binding.buffer->byte_offset() + binding.offset;
+    buffer_info.offset =
+        iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
     // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
     // GPUs; it has the best support compared to other bitwidths. We use VMA to
     // manage GPU memory for us and VMA should already handled proper alignment
@@ -64,10 +65,10 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     // the shader is considered as out of bounds per the Vulkan spec.
     // See https://github.com/google/iree/issues/2022#issuecomment-640617234
     // for more details.
-    buffer_info.range =
-        iree_align(std::min(binding.length,
-                            binding.buffer->byte_length() - binding.offset),
-                   4);
+    buffer_info.range = iree_align(
+        std::min(binding.length,
+                 iree_hal_buffer_byte_length(binding.buffer) - binding.offset),
+        4);
 
     auto& write_info = write_infos[i];
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -118,7 +119,7 @@ DescriptorSetArena::~DescriptorSetArena() {
 
 Status DescriptorSetArena::BindDescriptorSet(
     VkCommandBuffer command_buffer, PipelineExecutableLayout* executable_layout,
-    int32_t set, absl::Span<const DescriptorSet::Binding> bindings) {
+    int32_t set, absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   // Always prefer using push descriptors when available as we can avoid the
   // additional API overhead of updating/resetting pools.
   if (logical_device_->enabled_extensions().push_descriptors) {
@@ -209,7 +210,7 @@ Status DescriptorSetArena::BindDescriptorSet(
 
 Status DescriptorSetArena::PushDescriptorSet(
     VkCommandBuffer command_buffer, PipelineExecutableLayout* executable_layout,
-    int32_t set, absl::Span<const DescriptorSet::Binding> bindings) {
+    int32_t set, absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.

@@ -63,18 +63,20 @@ class CommandQueue {
   const std::string& name() const { return name_; }
 
   // Capabilities of the command queue.
-  CommandCategoryBitfield supported_categories() const {
+  iree_hal_command_category_t supported_categories() const {
     return supported_categories_;
   }
 
   // Whether this queue may be used for transfer commands.
   bool can_transfer() const {
-    return AllBitsSet(supported_categories_, CommandCategory::kTransfer);
+    return iree_all_bits_set(supported_categories_,
+                             IREE_HAL_COMMAND_CATEGORY_TRANSFER);
   }
 
   // Whether this queue may be used for dispatch commands.
   bool can_dispatch() const {
-    return AllBitsSet(supported_categories_, CommandCategory::kDispatch);
+    return iree_all_bits_set(supported_categories_,
+                             IREE_HAL_COMMAND_CATEGORY_DISPATCH);
   }
 
   // Submits one or more command batches for execution on the queue.
@@ -96,11 +98,12 @@ class CommandQueue {
   inline Status WaitIdle() { return WaitIdle(InfiniteFuture()); }
 
  protected:
-  CommandQueue(std::string name, CommandCategoryBitfield supported_categories)
+  CommandQueue(std::string name,
+               iree_hal_command_category_t supported_categories)
       : name_(std::move(name)), supported_categories_(supported_categories) {}
 
   const std::string name_;
-  const CommandCategoryBitfield supported_categories_;
+  const iree_hal_command_category_t supported_categories_;
 };
 
 }  // namespace hal
