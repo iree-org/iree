@@ -28,7 +28,6 @@ iree_cc_library(
     absl::span
     iree::base::api
     iree::base::tracing
-    iree::hal
     iree::hal::api
     iree::vm
     iree::vm::cc
