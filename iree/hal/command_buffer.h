@@ -17,7 +17,6 @@
 
 #include <cstdint>
 
-#include "iree/base/bitfield.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/descriptor_set.h"
