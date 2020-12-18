@@ -128,7 +128,7 @@ class VkShaderModuleHandle : public RefObject<VkShaderModuleHandle> {
 StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
     PipelineExecutableLayout* executable_layout,
-    ExecutableCachingModeBitfield mode,
+    iree_hal_executable_caching_mode_t mode,
     iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("PipelineExecutable::Create");
   const auto& syms = logical_device->syms();
@@ -166,7 +166,8 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipeline_create_info.pNext = nullptr;
     pipeline_create_info.flags = 0;
-    if (!AllBitsSet(mode, ExecutableCachingMode::kAllowOptimization)) {
+    if (!iree_all_bits_set(
+            mode, IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION)) {
       pipeline_create_info.flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
     }
     if (entry_ordinal == 0) {

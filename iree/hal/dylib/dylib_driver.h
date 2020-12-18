@@ -30,7 +30,8 @@ class DyLibDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
+  StatusOr<ref_ptr<Device>> CreateDevice(
+      iree_hal_device_id_t device_id) override;
 };
 
 }  // namespace dylib

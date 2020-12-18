@@ -21,7 +21,8 @@ namespace hal {
 namespace host {
 
 InProcCommandBuffer::InProcCommandBuffer(
-    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories)
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories)
     : CommandBuffer(mode, command_categories) {}
 
 InProcCommandBuffer::~InProcCommandBuffer() { Reset(); }
@@ -40,10 +41,10 @@ Status InProcCommandBuffer::End() {
 }
 
 Status InProcCommandBuffer::ExecutionBarrier(
-    ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::ExecutionBarrier");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ExecutionBarrierCmd>());
   cmd->source_stage_mask = source_stage_mask;
@@ -54,7 +55,7 @@ Status InProcCommandBuffer::ExecutionBarrier(
 }
 
 Status InProcCommandBuffer::SignalEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::SignalEvent");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<SignalEventCmd>());
   cmd->event = event;
@@ -63,7 +64,7 @@ Status InProcCommandBuffer::SignalEvent(
 }
 
 Status InProcCommandBuffer::ResetEvent(
-    Event* event, ExecutionStageBitfield source_stage_mask) {
+    Event* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::ResetEvent");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ResetEventCmd>());
   cmd->event = event;
@@ -72,10 +73,10 @@ Status InProcCommandBuffer::ResetEvent(
 }
 
 Status InProcCommandBuffer::WaitEvents(
-    absl::Span<Event*> events, ExecutionStageBitfield source_stage_mask,
-    ExecutionStageBitfield target_stage_mask,
-    absl::Span<const MemoryBarrier> memory_barriers,
-    absl::Span<const BufferBarrier> buffer_barriers) {
+    absl::Span<Event*> events, iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
+    absl::Span<const iree_hal_buffer_barrier_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::WaitEvents");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<WaitEventsCmd>());
   cmd->events = AppendStructSpan(events);
@@ -87,8 +88,8 @@ Status InProcCommandBuffer::WaitEvents(
 }
 
 Status InProcCommandBuffer::FillBuffer(Buffer* target_buffer,
-                                       device_size_t target_offset,
-                                       device_size_t length,
+                                       iree_device_size_t target_offset,
+                                       iree_device_size_t length,
                                        const void* pattern,
                                        size_t pattern_length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::FillBuffer");
@@ -109,10 +110,10 @@ Status InProcCommandBuffer::DiscardBuffer(Buffer* buffer) {
 }
 
 Status InProcCommandBuffer::UpdateBuffer(const void* source_buffer,
-                                         device_size_t source_offset,
+                                         iree_device_size_t source_offset,
                                          Buffer* target_buffer,
-                                         device_size_t target_offset,
-                                         device_size_t length) {
+                                         iree_device_size_t target_offset,
+                                         iree_device_size_t length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::UpdateBuffer");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<UpdateBufferCmd>());
   cmd->source_buffer = AppendCmdData(source_buffer, source_offset, length);
@@ -123,10 +124,10 @@ Status InProcCommandBuffer::UpdateBuffer(const void* source_buffer,
 }
 
 Status InProcCommandBuffer::CopyBuffer(Buffer* source_buffer,
-                                       device_size_t source_offset,
+                                       iree_device_size_t source_offset,
                                        Buffer* target_buffer,
-                                       device_size_t target_offset,
-                                       device_size_t length) {
+                                       iree_device_size_t target_offset,
+                                       iree_device_size_t length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::CopyBuffer");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<CopyBufferCmd>());
   cmd->source_buffer = source_buffer;
@@ -150,7 +151,7 @@ Status InProcCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
 
 Status InProcCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
-    absl::Span<const DescriptorSet::Binding> bindings) {
+    absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::PushDescriptorSet");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushDescriptorSetCmd>());
   cmd->executable_layout = executable_layout;
@@ -162,7 +163,7 @@ Status InProcCommandBuffer::PushDescriptorSet(
 Status InProcCommandBuffer::BindDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     DescriptorSet* descriptor_set,
-    absl::Span<const device_size_t> dynamic_offsets) {
+    absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::BindDescriptorSet");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<BindDescriptorSetCmd>());
   cmd->executable_layout = executable_layout;
@@ -183,10 +184,9 @@ Status InProcCommandBuffer::Dispatch(Executable* executable,
   return OkStatus();
 }
 
-Status InProcCommandBuffer::DispatchIndirect(Executable* executable,
-                                             int32_t entry_point,
-                                             Buffer* workgroups_buffer,
-                                             device_size_t workgroups_offset) {
+Status InProcCommandBuffer::DispatchIndirect(
+    Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
+    iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::DispatchIndirect");
   IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchIndirectCmd>());
   cmd->executable = executable;
@@ -219,8 +219,8 @@ InProcCommandBuffer::CmdHeader* InProcCommandBuffer::AppendCmdHeader(
 }
 
 void* InProcCommandBuffer::AppendCmdData(const void* source_buffer,
-                                         device_size_t source_offset,
-                                         device_size_t source_length) {
+                                         iree_device_size_t source_offset,
+                                         iree_device_size_t source_length) {
   auto* cmd_list = &current_cmd_list_;
 
   uint8_t* allocated_bytes = cmd_list->arena.AllocateBytes(source_length);

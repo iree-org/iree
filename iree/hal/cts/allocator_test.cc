@@ -39,19 +39,20 @@ class AllocatorTest : public CtsTestBase {
 
 TEST_P(AllocatorTest, CanAllocate) {
   EXPECT_TRUE(allocator_->CanAllocate(
-      MemoryType::kHostLocal | MemoryType::kDeviceVisible,
-      BufferUsage::kMapping, 1024));
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_MAPPING, 1024));
   EXPECT_TRUE(allocator_->CanAllocate(
-      MemoryType::kHostVisible | MemoryType::kDeviceLocal,
-      BufferUsage::kMapping, 1024));
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      IREE_HAL_BUFFER_USAGE_MAPPING, 1024));
 
   // TODO(scotttodd): Minimum memory types and buffer usages necessary for use
   // TODO(scotttodd): Test upper limits of memory size for allocations (1GB+)?
 }
 
 TEST_P(AllocatorTest, Allocate) {
-  MemoryType memory_type = MemoryType::kHostLocal | MemoryType::kDeviceVisible;
-  BufferUsage usage = BufferUsage::kMapping;
+  MemoryType memory_type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  iree_hal_buffer_usage_t usage = IREE_HAL_BUFFER_USAGE_MAPPING;
   size_t allocation_size = 1024;
 
   IREE_ASSERT_OK_AND_ASSIGN(
@@ -66,8 +67,9 @@ TEST_P(AllocatorTest, Allocate) {
 }
 
 TEST_P(AllocatorTest, CanUseBufferLike) {
-  MemoryType memory_type = MemoryType::kHostLocal | MemoryType::kDeviceVisible;
-  BufferUsage usage = BufferUsage::kMapping;
+  MemoryType memory_type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  iree_hal_buffer_usage_t usage = IREE_HAL_BUFFER_USAGE_MAPPING;
   size_t allocation_size = 1024;
 
   IREE_ASSERT_OK_AND_ASSIGN(

@@ -28,9 +28,10 @@ namespace hal {
 // on host memory (or mapping their memory to host memory).
 class HostBuffer : public Buffer {
  public:
-  HostBuffer(Allocator* allocator, MemoryTypeBitfield memory_type,
-             MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
-             device_size_t allocation_size, void* data, bool owns_data);
+  HostBuffer(Allocator* allocator, iree_hal_memory_type_t memory_type,
+             iree_hal_memory_access_t allowed_access,
+             iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
+             void* data, bool owns_data);
 
   ~HostBuffer() override;
 
@@ -38,26 +39,29 @@ class HostBuffer : public Buffer {
   void* mutable_data() { return data_; }
 
  protected:
-  Status FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                  const void* pattern, device_size_t pattern_length) override;
-  Status ReadDataImpl(device_size_t source_offset, void* data,
-                      device_size_t data_length) override;
-  Status WriteDataImpl(device_size_t target_offset, const void* data,
-                       device_size_t data_length) override;
-  Status CopyDataImpl(device_size_t target_offset, Buffer* source_buffer,
-                      device_size_t source_offset,
-                      device_size_t data_length) override;
+  Status FillImpl(iree_device_size_t byte_offset,
+                  iree_device_size_t byte_length, const void* pattern,
+                  iree_device_size_t pattern_length) override;
+  Status ReadDataImpl(iree_device_size_t source_offset, void* data,
+                      iree_device_size_t data_length) override;
+  Status WriteDataImpl(iree_device_size_t target_offset, const void* data,
+                       iree_device_size_t data_length) override;
+  Status CopyDataImpl(iree_device_size_t target_offset, Buffer* source_buffer,
+                      iree_device_size_t source_offset,
+                      iree_device_size_t data_length) override;
   Status MapMemoryImpl(MappingMode mapping_mode,
-                       MemoryAccessBitfield memory_access,
-                       device_size_t local_byte_offset,
-                       device_size_t local_byte_length,
+                       iree_hal_memory_access_t memory_access,
+                       iree_device_size_t local_byte_offset,
+                       iree_device_size_t local_byte_length,
                        void** out_data) override;
-  Status UnmapMemoryImpl(device_size_t local_byte_offset,
-                         device_size_t local_byte_length, void* data) override;
-  Status InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                    device_size_t local_byte_length) override;
-  Status FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                               device_size_t local_byte_length) override;
+  Status UnmapMemoryImpl(iree_device_size_t local_byte_offset,
+                         iree_device_size_t local_byte_length,
+                         void* data) override;
+  Status InvalidateMappedMemoryImpl(
+      iree_device_size_t local_byte_offset,
+      iree_device_size_t local_byte_length) override;
+  Status FlushMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                               iree_device_size_t local_byte_length) override;
 
  private:
   void* data_ = nullptr;

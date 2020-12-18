@@ -171,7 +171,7 @@ void PrepareSubmitInfo(
 }  // namespace
 
 SerializingCommandQueue::SerializingCommandQueue(
-    std::string name, CommandCategoryBitfield supported_categories,
+    std::string name, iree_hal_command_category_t supported_categories,
     const ref_ptr<VkDeviceHandle>& logical_device,
     const ref_ptr<TimePointFencePool>& fence_pool, VkQueue queue)
     : CommandQueue(std::move(name), supported_categories),

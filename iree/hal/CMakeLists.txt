@@ -75,9 +75,7 @@ iree_cc_library(
     "resource.h"
     "semaphore.h"
   SRCS
-    "allocator.cc"
     "buffer.cc"
-    "command_buffer.cc"
   DEPS
     absl::span
     absl::strings

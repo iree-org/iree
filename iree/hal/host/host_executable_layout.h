@@ -25,16 +25,16 @@ namespace hal {
 class HostDescriptorSetLayout final : public DescriptorSetLayout {
  public:
   HostDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings);
+      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings);
   ~HostDescriptorSetLayout() override;
 
-  absl::Span<const DescriptorSetLayout::Binding> bindings() const {
+  absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings() const {
     return absl::MakeConstSpan(bindings_);
   }
 
  private:
-  absl::InlinedVector<DescriptorSetLayout::Binding, 4> bindings_;
+  absl::InlinedVector<iree_hal_descriptor_set_layout_binding_t, 4> bindings_;
 };
 
 class HostExecutableLayout final : public ExecutableLayout {

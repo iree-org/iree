@@ -35,7 +35,8 @@ namespace metal {
 class MetalDevice final : public Device {
  public:
   // Creates a device that retains the underlying Metal GPU device.
-  // The DriverDeviceID in |device_info| is expected to be an id<MTLDevice>.
+  // The iree_hal_device_id_t in |device_info| is expected to be an
+  // id<MTLDevice>.
   static StatusOr<ref_ptr<MetalDevice>> Create(
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       DebugCaptureManager* debug_capture_manager);
@@ -57,8 +58,9 @@ class MetalDevice final : public Device {
   ref_ptr<ExecutableCache> CreateExecutableCache() override;
 
   StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings) override;
+      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings)
+      override;
 
   StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
       absl::Span<DescriptorSetLayout* const> set_layouts,
@@ -66,11 +68,11 @@ class MetalDevice final : public Device {
 
   StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
       DescriptorSetLayout* set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) override;
 
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) override;
+      iree_hal_command_buffer_mode_t mode,
+      iree_hal_command_category_t command_categories) override;
 
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 

@@ -22,11 +22,11 @@ namespace hal {
 namespace metal {
 
 MetalArgumentBufferLayout::MetalArgumentBufferLayout(
-    DescriptorSetLayout::UsageType usage_type,
-    absl::Span<const DescriptorSetLayout::Binding> bindings)
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings)
     : usage_type_(usage_type), bindings_(bindings.begin(), bindings.end()) {}
 
-const DescriptorSetLayout::Binding*
+const iree_hal_descriptor_set_layout_binding_t*
 MetalArgumentBufferLayout::GetBindingForIndex(int index) const {
   for (const auto& binding : bindings_) {
     if (binding.binding == index) return &binding;
@@ -69,7 +69,7 @@ std::string MetalPipelineArgumentBufferLayout::DebugString() const {
 
 MetalArgumentBuffer::MetalArgumentBuffer(
     MetalArgumentBufferLayout* layout,
-    absl::Span<const DescriptorSet::Binding> resources)
+    absl::Span<const iree_hal_descriptor_set_binding_t> resources)
     : layout_(layout), resources_(resources.begin(), resources.end()) {
   layout_->AddReference();
 }

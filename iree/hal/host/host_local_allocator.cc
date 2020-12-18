@@ -31,56 +31,57 @@ HostLocalAllocator::HostLocalAllocator() = default;
 HostLocalAllocator::~HostLocalAllocator() = default;
 
 bool HostLocalAllocator::CanUseBufferLike(
-    Allocator* source_allocator, MemoryTypeBitfield memory_type,
-    BufferUsageBitfield buffer_usage,
-    BufferUsageBitfield intended_usage) const {
+    Allocator* source_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t buffer_usage,
+    iree_hal_buffer_usage_t intended_usage) const {
   // Must always have visibility to the device, which ensures we can test
   // against the host but have things work on devices with separate address
   // spaces.
-  if (!AnyBitSet(memory_type & MemoryType::kDeviceVisible)) {
+  if (!iree_any_bit_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
     return false;
   }
 
   // kHostVisible is required for mapping.
-  if (AnyBitSet(intended_usage & BufferUsage::kMapping) &&
-      !AnyBitSet(memory_type & MemoryType::kHostVisible)) {
+  if (iree_any_bit_set(intended_usage, IREE_HAL_BUFFER_USAGE_MAPPING) &&
+      !iree_any_bit_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     return false;
   }
 
   // Dispatch needs to be specified if we intend to dispatch.
-  if (AnyBitSet(intended_usage & BufferUsage::kDispatch) &&
-      !AnyBitSet(buffer_usage & BufferUsage::kDispatch)) {
+  if (iree_any_bit_set(intended_usage, IREE_HAL_BUFFER_USAGE_DISPATCH) &&
+      !iree_any_bit_set(buffer_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
     return false;
   }
 
   return true;
 }
 
-bool HostLocalAllocator::CanAllocate(MemoryTypeBitfield memory_type,
-                                     BufferUsageBitfield buffer_usage,
+bool HostLocalAllocator::CanAllocate(iree_hal_memory_type_t memory_type,
+                                     iree_hal_buffer_usage_t buffer_usage,
                                      size_t allocation_size) const {
   // Host allows everything, pretty much, so long as it is device-visible (as
   // the host is the device here).
-  return AnyBitSet(memory_type & MemoryType::kDeviceVisible);
+  return iree_any_bit_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
 }
 
 Status HostLocalAllocator::MakeCompatible(
-    MemoryTypeBitfield* memory_type, BufferUsageBitfield* buffer_usage) const {
+    iree_hal_memory_type_t* memory_type,
+    iree_hal_buffer_usage_t* buffer_usage) const {
   // Always ensure we are host-visible.
-  *memory_type |= MemoryType::kHostVisible;
+  *memory_type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
 
   // Host currently uses mapping to copy buffers, which is done a lot.
   // We could probably remove this restriction somehow.
-  *buffer_usage |= BufferUsage::kMapping;
+  *buffer_usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
 
   // TODO(b/111372612): tensorflow needs transfer too, but shouldn't.
-  *buffer_usage |= BufferUsage::kTransfer;
+  *buffer_usage |= IREE_HAL_BUFFER_USAGE_TRANSFER;
 
   return OkStatus();
 }
 
 StatusOr<ref_ptr<Buffer>> HostLocalAllocator::Allocate(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
     size_t allocation_size) {
   IREE_TRACE_SCOPE0("HostLocalAllocator::Allocate");
 
@@ -102,8 +103,8 @@ StatusOr<ref_ptr<Buffer>> HostLocalAllocator::Allocate(
   }
 
   auto buffer =
-      make_ref<HostBuffer>(this, memory_type, MemoryAccess::kAll, buffer_usage,
-                           allocation_size, malloced_data, true);
+      make_ref<HostBuffer>(this, memory_type, IREE_HAL_MEMORY_ACCESS_ALL,
+                           buffer_usage, allocation_size, malloced_data, true);
   return buffer;
 }
 

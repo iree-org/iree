@@ -311,6 +311,38 @@ typedef struct {
   iree_hal_memory_access_t access;
 } iree_hal_descriptor_set_layout_binding_t;
 
+// Describes features supported by a device.
+// These flags indicate the availability of features that may be enabled at the
+// request of the calling application. Note that certain features may disable
+// runtime optimizations or require compilation flags to ensure the required
+// metadata is present in executables.
+enum iree_hal_device_feature_e {
+  IREE_HAL_DEVICE_FEATURE_NONE = 0,
+
+  // Device supports executable debugging.
+  // When present executables *may* be compiled with
+  // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING and will have usable
+  // debugging related methods. Note that if the input executables do not have
+  // embedded debugging information they still may not be able to perform
+  // disassembly or fine-grained breakpoint insertion.
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING = 1 << 0,
+
+  // Device supports executable coverage information.
+  // When present executables *may* be compiled with
+  // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE and will produce
+  // coverage buffers during dispatch. Note that input executables must have
+  // partial embedded debug information to allow mapping back to source offsets.
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE = 1 << 1,
+
+  // Device supports executable and command queue profiling.
+  // When present executables *may* be compiled with
+  // IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING and will produce
+  // profiling buffers during dispatch. Note that input executables must have
+  // partial embedded debug information to allow mapping back to source offsets.
+  IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING = 1 << 2,
+};
+typedef uint32_t iree_hal_device_feature_t;
+
 // An identifier for executable formats used to query support.
 typedef uint32_t iree_hal_executable_format_t;
 
@@ -334,23 +366,23 @@ enum iree_hal_executable_caching_mode_e {
   // executable. This may disable certain optimizations or retain additional
   // data to allow disassembly, stepping, etc.
   //
-  // Device must support the DeviceFeature::kDebugging feature and executables
-  // must support the ExecutableFeature::kDebugging feature.
+  // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_DEBUGGING feature
+  // and executables must support the ExecutableFeature::kDebugging feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING = 1u << 3,
   // Enables Executable coverage if supported by the device and executable.
   // Depending on the optimization mode this may produce partial coverage
   // results (for example, when certain source operations were optimized away).
   //
-  // Device must support the DeviceFeature::kCoverage feature and executables
-  // must support the ExecutableFeature::kCoverage feature.
+  // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_COVERAGE feature
+  // and executables must support the ExecutableFeature::kCoverage feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE = 1u << 4,
   // Enables Executable profiling if supported by the device and executable.
   // Depending on the optimization mode this may produce partial profiling
   // results. Profiling attribution (whether to the entire executable or
   // specific operations) depends on the implementation.
   //
-  // Device must support the DeviceFeature::kProfiling feature and executables
-  // must support the ExecutableFeature::kProfiling feature.
+  // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING feature
+  // and executables must support the ExecutableFeature::kProfiling feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1u << 5,
   // Default caching mode.
   IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT =
@@ -623,7 +655,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
     char* buffer, iree_host_size_t* out_buffer_length);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Allocator
+// iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
 // Creates a host-local heap allocator that can be used when buffers are
@@ -670,9 +702,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
 //
 // The memory type of the buffer returned may differ from the requested value
 // if the device can provide more functionality; for example, if requesting
-// MemoryType::kHostVisible but the memory is really host cached you may get
-// a buffer back with MemoryType::kHostVisible | MemoryType::kHostCached. The
-// only requirement is that the buffer satisfy the required bits.
+// IREE_HAL_MEMORY_TYPE_HOST_VISIBLE but the memory is really host cached you
+// may get a buffer back with IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+// IREE_HAL_MEMORY_TYPE_HOST_CACHED. The only requirement is that the buffer
+// satisfy the required bits.
 //
 // Fails if it is not possible to allocate and satisfy all placements for the
 // requested |buffer_usage|.
@@ -695,8 +728,56 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
     iree_hal_buffer_t** out_buffer);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Buffer
+// iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
+
+// Allocated memory buffer wrapper type and utilities.
+//
+// Buffers are the basic unit of memory used by the inference system. They may
+// be allocated such that they are accessible from the host (normal C++ code
+// running on the main CPU), a particular device (such as an accelerator) or
+// family of devices, or from some mix of all of those.
+//
+// The type of memory a buffer is allocated within has implications on it's
+// performance and lifetime. For example if an application attempts to use a
+// host-allocated buffer (IREE_HAL_MEMORY_TYPE_HOST_LOCAL) on an accelerator
+// with discrete memory the accelerator may either be unable to access the
+// memory or take a non-trivial performance hit when attempting to do so
+// (involving setting up kernel mappings, doing DMA transfers, etc). Likewise,
+// trying to access a device-allocated buffer
+// (IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL) may incur similar overhead or not be
+// possible at all. This may be due to restrictions in the memory visibility,
+// address spaces, mixed endianness or pointer widths, and other weirdness.
+//
+// The memory types (defined by a bitfield of iree_hal_memory_type_t values)
+// that a particular context (host or device) may use vary from device to device
+// and must be queried by the application when allocating buffers. It's strongly
+// recommended that the most specific memory type be set as possible. For
+// example allocating a buffer with IREE_HAL_MEMORY_TYPE_HOST_COHERENT even when
+// it will never be used in a way that requires coherency may occupy address
+// space reservations or memory mapping that would otherwise not be needed.
+//
+// As buffers may sometimes not be accessible from the host the base Buffer type
+// does not allow for direct void* access and instead buffers must be either
+// manipulated using utility functions (such as ReadData or WriteData) or by
+// mapping them into a host-accessible address space via MapMemory. Buffer must
+// be unmapped before any command may use it.
+//
+// Buffers may map (roughly) 1:1 with an allocation either from the host heap or
+// a device. iree_hal_buffer_Subspan can be used to reference subspans of
+// buffers like absl::Span - though unlike absl::Span the returned Buffer holds
+// a reference to the parent buffer.
+
+// Buffer overlap testing results.
+enum iree_hal_buffer_overlap_e {
+  // No overlap between the two buffers.
+  IREE_HAL_BUFFER_OVERLAP_DISJOINT = 0,
+  // Partial overlap between the two buffers.
+  IREE_HAL_BUFFER_OVERLAP_PARTIAL,
+  // Complete overlap between the two buffers (they are the same).
+  IREE_HAL_BUFFER_OVERLAP_COMPLETE,
+};
+typedef uint8_t iree_hal_buffer_overlap_t;
 
 // Returns a reference to a subspan of the |buffer|.
 // If |byte_length| is IREE_WHOLE_BUFFER the remaining bytes in the buffer after
@@ -725,6 +806,23 @@ iree_hal_buffer_release(iree_hal_buffer_t* buffer);
 IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
 iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer);
 
+// Returns a pointer to the buffer containing the actual allocation.
+// The buffer represents a span of the allocated bytes defined by byte_offset
+// and byte_length. If the provided buffer *is* the allocated buffer then the
+// returned value will be the provided buffer pointer.
+IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
+iree_hal_buffer_allocated_buffer(const iree_hal_buffer_t* buffer);
+
+// Returns the size of the resource memory allocation in bytes.
+// This may be rounded up from the originally requested size or the ideal
+// size for the resource based on device restrictions.
+IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+iree_hal_buffer_allocation_size(const iree_hal_buffer_t* buffer);
+
+// Returns the offset in bytes of the buffer within its allocated_buffer.
+IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+iree_hal_buffer_byte_offset(const iree_hal_buffer_t* buffer);
+
 // Returns the size in bytes of the buffer.
 IREE_API_EXPORT iree_device_size_t IREE_API_CALL
 iree_hal_buffer_byte_length(const iree_hal_buffer_t* buffer);
@@ -743,12 +841,12 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 
 // Reads a block of data from the buffer at the given offset.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_read_data(
-    iree_hal_buffer_t* buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length);
 
 // Writes a block of byte data into the buffer at the given offset.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
-    iree_hal_buffer_t* buffer, iree_device_size_t target_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length);
 
 // Copies data from the provided |source_buffer| into the |target_buffer|.
@@ -768,7 +866,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_unmap(
     iree_hal_buffer_t* buffer, iree_hal_mapped_memory_t* mapped_memory);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::BufferView
+// iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
 
 // Creates a buffer view with the given |buffer|.
@@ -803,7 +901,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL
 iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the value of the given dimension.
-IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
+IREE_API_EXPORT iree_hal_dim_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t index);
 
 // Returns the dimensions of the shape in |out_shape| and its rank in
@@ -871,8 +969,35 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
     char* buffer, iree_host_size_t* out_buffer_length);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::CommandBuffer
+// iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
+
+// Asynchronous command buffer recording interface.
+// Commands are recorded by the implementation for later submission to command
+// queues.
+//
+// Buffers and synchronization objects referenced must remain valid and not be
+// modified or read while there are commands in-flight. The usual flow is to
+// populate input buffers, Dispatch using those buffers, wait on a Semaphore
+// until the buffers are guaranteed to no longer be in use, and then reuse or
+// release the buffers.
+//
+// Errors that can be recognized when operations are enqueued will be returned
+// immediately, such as invalid argument errors. Errors that can only be
+// determined at execution time will be returned on semaphores. Once a failure
+// occurs the device queue will enter an error state that invalidates all
+// operations on the device queue (as ordering is not strict and any may still
+// be in-flight). In this case the user of the device queue should treat all
+// in-flight operations as cancelled and fully reset themselves. Other device
+// queues that may be waiting on events from the device queue will also enter
+// error states. Only once a user has acknowledged and cleared the error state
+// with a Reset the queue will become usable, and otherwise all operations will
+// return errors.
+//
+// Command buffers are thread-compatible. Use multiple command buffers if trying
+// to record commands from multiple threads. Command buffers must not be mutated
+// between when they have are submitted for execution on a queue and when the
+// semaphore fires indicating the completion of their execution.
 
 // Creates a command buffer ready to begin recording, possibly reusing an
 // existing one from the |device| pool.
@@ -1026,8 +1151,13 @@ iree_hal_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::DescriptorSet
+// iree_hal_descriptor_set_t
 //===----------------------------------------------------------------------===//
+
+// Opaque handle to a descriptor set object.
+//
+// Maps to VkDescriptorSet:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
 
 // Creates a descriptor set of the given layout and bindings.
 // Descriptor sets are immutable and retain their bindings.
@@ -1046,8 +1176,13 @@ IREE_API_EXPORT void IREE_API_CALL
 iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::DescriptorSetLayout
+// iree_hal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
+
+// Opaque handle to a descriptor set layout object.
+//
+// Maps to VkDescriptorSetLayout:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
 
 // Creates a descriptor set layout with the given bindings.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1068,7 +1203,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_release(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Device
+// iree_hal_device_t
 //===----------------------------------------------------------------------===//
 
 // Retains the given |device| for the caller.
@@ -1079,16 +1214,16 @@ iree_hal_device_retain(iree_hal_device_t* device);
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_device_release(iree_hal_device_t* device);
 
-// Returns a reference to the allocator of the device that can be used for
-// allocating buffers.
-IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
-iree_hal_device_allocator(iree_hal_device_t* device);
-
 // Returns the device identifier.
 // This identifier may vary based on the runtime device type; for example, a
 // Vulkan device may return `vulkan-v1.1` or `vulkan-v1.2-spec1`.
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_hal_device_id(iree_hal_device_t* device);
+
+// Returns a reference to the allocator of the device that can be used for
+// allocating buffers.
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_device_allocator(iree_hal_device_t* device);
 
 // Submits one or more batches of work to a device queue.
 //
@@ -1140,7 +1275,7 @@ iree_hal_device_wait_semaphores_with_timeout(
     iree_duration_t timeout_ns);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Driver
+// iree_hal_driver_t
 //===----------------------------------------------------------------------===//
 
 // Retains the given |driver| for the caller.
@@ -1307,7 +1442,21 @@ iree_hal_driver_registry_try_create_by_name(
     iree_allocator_t allocator, iree_hal_driver_t** out_driver);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Executable
+// iree_hal_event_t
+//===----------------------------------------------------------------------===//
+
+// Events are used for defining synchronization scopes within command buffers.
+// An event only exists within a single CommandBuffer and must not be used
+// across command buffers from the same device or others.
+//
+// See iree_hal_command_buffer_signal_event and
+// iree_hal_command_buffer_wait_events for more info.
+//
+// Maps to VkEvent:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkEvent.html
+
+//===----------------------------------------------------------------------===//
+// iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
 // Retains the given |executable| for the caller.
@@ -1319,8 +1468,24 @@ IREE_API_EXPORT void IREE_API_CALL
 iree_hal_executable_release(iree_hal_executable_t* executable);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::ExecutableCache
+// iree_hal_executable_cache_t
 //===----------------------------------------------------------------------===//
+
+// A cache of prepared executables for a particular device.
+// Caches may be shared across multiple devices from the same driver or specific
+// to individual devices. Caches may persist prepared executables across process
+// launches or re-prepare them each run. Callers should assume that the cache is
+// a no-op and the returned Executables only live for as long as the cache does.
+//
+// The term 'cache' here is rather optimistic - it's perfectly acceptable for
+// implementations to not cache at all and return new Executables for each
+// iree_hal_executable_cache_prepare_executable called (even for the same
+// executable). Callers should expect such behavior and try to retain the
+// results of the iree_hal_executable_cache_prepare_executable calls to reduce
+// overhead in re-preparing executables.
+//
+// Thread-safe - multiple threads may prepare executables (including the *same*
+// executable) simultaneously.
 
 // Creates an executable cache using the given identifier.
 // The identifier is provided to the backing cache API as way to partition
@@ -1362,8 +1527,18 @@ iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::ExecutableLayout
+// iree_hal_executable_layout_t
 //===----------------------------------------------------------------------===//
+
+// Defines the resource binding layout used by an executable.
+//
+// Executables can share the same layout even if they do not use all of the
+// resources referenced by descriptor sets referenced by the layout. Doing so
+// allows for more efficient binding as bound descriptor sets can be reused when
+// command buffer executable bindings change.
+//
+// Maps to VkPipelineLayout:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayout.html
 
 // Creates an executable layout composed of the given descriptor set layouts.
 // The returned executable layout can be used by multiple executables with the
@@ -1383,8 +1558,38 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_release(
     iree_hal_executable_layout_t* executable_layout);
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Semaphore
+// iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
+
+// Synchronization mechanism for host->device, device->host, host->host,
+// and device->device notification. Semaphores behave like Vulkan timeline
+// semaphores (or D3D12 fences) and contain a monotonically increasing
+// uint64_t payload. They may be waited on any number of times even if they
+// have already been signaled for a particular value. They may also be waited
+// on for a particular value prior to the signal for that value.
+//
+// A semaphore is updated to its new value after all prior commands have
+// completed but the delay between completion and the host being woken varies.
+// Some implementations may coalesce semaphores to avoid spurious waking while
+// others will immediately synchronize with the host.
+//
+// One use of semaphores is for resource lifetime management: all resources used
+// by a set of submission batches must be considered live until the semaphore
+// attached to the submission has signaled.
+//
+// Another use of semaphores is device->device synchronization for setting up
+// the DAG of command buffers across queue submissions. This allows devices to
+// perform non-trivial scheduling behavior without the need to wake the host.
+//
+// Semaphores may be set to a permanently failed state by implementations when
+// errors occur during asynchronous execution. Users are expected to propagate
+// the failures and possibly reset the entire device that produced the error.
+//
+// For more information on semaphores see the following docs describing how
+// timelines are generally used (specifically in the device->host case):
+// https://www.youtube.com/watch?v=SpE--Rf516Y
+// https://www.khronos.org/assets/uploads/developers/library/2018-xdc/Vulkan-Timeline-Semaphores-Part-1_Sep18.pdf
+// https://docs.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization
 
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must

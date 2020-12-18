@@ -99,30 +99,31 @@ VmaAllocator::~VmaAllocator() {
   vmaDestroyAllocator(vma_);
 }
 
-bool VmaAllocator::CanUseBufferLike(Allocator* source_allocator,
-                                    MemoryTypeBitfield memory_type,
-                                    BufferUsageBitfield buffer_usage,
-                                    BufferUsageBitfield intended_usage) const {
+bool VmaAllocator::CanUseBufferLike(
+    Allocator* source_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t buffer_usage,
+    iree_hal_buffer_usage_t intended_usage) const {
   // TODO(benvanik): ensure there is a memory type that can satisfy the request.
   return source_allocator == this;
 }
 
-bool VmaAllocator::CanAllocate(MemoryTypeBitfield memory_type,
-                               BufferUsageBitfield buffer_usage,
+bool VmaAllocator::CanAllocate(iree_hal_memory_type_t memory_type,
+                               iree_hal_buffer_usage_t buffer_usage,
                                size_t allocation_size) const {
   // TODO(benvnik): ensure there is a memory type that can satisfy the request.
   return true;
 }
 
-Status VmaAllocator::MakeCompatible(MemoryTypeBitfield* memory_type,
-                                    BufferUsageBitfield* buffer_usage) const {
+Status VmaAllocator::MakeCompatible(
+    iree_hal_memory_type_t* memory_type,
+    iree_hal_buffer_usage_t* buffer_usage) const {
   // TODO(benvanik): mutate to match supported memory types.
   return OkStatus();
 }
 
 StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-    MemoryAccessBitfield allowed_access, size_t allocation_size,
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
+    iree_hal_memory_access_t allowed_access, size_t allocation_size,
     VmaAllocationCreateFlags flags) {
   IREE_TRACE_SCOPE0("VmaAllocator::AllocateInternal");
 
@@ -137,11 +138,11 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
   buffer_create_info.flags = 0;
   buffer_create_info.size = allocation_size;
   buffer_create_info.usage = 0;
-  if (AllBitsSet(buffer_usage, BufferUsage::kTransfer)) {
+  if (iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   }
-  if (AllBitsSet(buffer_usage, BufferUsage::kDispatch)) {
+  if (iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
@@ -158,8 +159,8 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
   allocation_create_info.memoryTypeBits = 0;  // Automatic selection.
   allocation_create_info.pool = VK_NULL_HANDLE;
   allocation_create_info.pUserData = nullptr;
-  if (AllBitsSet(memory_type, MemoryType::kDeviceLocal)) {
-    if (AllBitsSet(memory_type, MemoryType::kHostVisible)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device-local, host-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
       allocation_create_info.preferredFlags |=
@@ -171,7 +172,7 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
   } else {
-    if (AllBitsSet(memory_type, MemoryType::kDeviceVisible)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
       // Host-local, device-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
     } else {
@@ -179,18 +180,18 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
     }
   }
-  if (AllBitsSet(memory_type, MemoryType::kHostCached)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
   }
-  if (AllBitsSet(memory_type, MemoryType::kHostCoherent)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     allocation_create_info.requiredFlags |=
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (AllBitsSet(memory_type, MemoryType::kTransient)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_TRANSIENT)) {
     allocation_create_info.preferredFlags |=
         VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
   }
-  if (AllBitsSet(buffer_usage, BufferUsage::kMapping)) {
+  if (iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
@@ -207,16 +208,16 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
 }
 
 StatusOr<ref_ptr<Buffer>> VmaAllocator::Allocate(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
     size_t allocation_size) {
   IREE_TRACE_SCOPE0("VmaAllocator::Allocate");
-  return AllocateInternal(memory_type, buffer_usage, MemoryAccess::kAll,
+  return AllocateInternal(memory_type, buffer_usage, IREE_HAL_MEMORY_ACCESS_ALL,
                           allocation_size, /*flags=*/0);
 }
 
 StatusOr<ref_ptr<Buffer>> VmaAllocator::WrapMutable(
-    MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
-    BufferUsageBitfield buffer_usage, void* data, size_t data_length) {
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t buffer_usage, void* data, size_t data_length) {
   IREE_TRACE_SCOPE0("VmaAllocator::WrapMutable");
   // TODO(benvanik): import memory.
   return UnimplementedErrorBuilder(IREE_LOC)
