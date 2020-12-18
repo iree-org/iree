@@ -25,7 +25,6 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:tracing",
-        "//iree/hal",
         "//iree/hal:api",
         "//iree/vm",
         "//iree/vm:cc",
