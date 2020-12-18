@@ -41,14 +41,15 @@ bool VMLACache::CanPrepareFormat(ExecutableFormat format) const {
 
 StatusOr<ref_ptr<Executable>> VMLACache::PrepareExecutable(
     ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-    const ExecutableSpec& spec) {
+    iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("VMLACache::PrepareExecutable");
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
   IREE_ASSIGN_OR_RETURN(
       auto executable,
-      VMLAExecutable::Load(instance_, vmla_module_, spec, allow_aliasing_data));
+      VMLAExecutable::Load(instance_, vmla_module_, executable_data,
+                           allow_aliasing_data));
 
   return executable;
 }

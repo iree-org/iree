@@ -23,7 +23,6 @@
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
-#include "iree/hal/executable_spec.h"
 
 // flatcc schemas:
 #include "iree/base/flatcc.h"
@@ -46,10 +45,8 @@ class MetalKernelLibrary final : public Executable {
  public:
   static StatusOr<ref_ptr<MetalKernelLibrary>> Create(
       id<MTLDevice> device, ExecutableCachingModeBitfield mode,
-      const ExecutableSpec& spec);
+      iree_const_byte_span_t executable_data);
   ~MetalKernelLibrary() override;
-
-  bool supports_debugging() const override { return false; }
 
   // Returns the MTLFunction for the entry point with the given |ordinal|.
   StatusOr<id<MTLFunction>> GetKernelForEntryPoint(int ordinal) const;

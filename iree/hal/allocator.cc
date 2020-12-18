@@ -31,33 +31,6 @@ bool Allocator::CanUseBuffer(Buffer* buffer,
                           buffer->usage(), intended_usage);
 }
 
-StatusOr<ref_ptr<Buffer>> Allocator::AllocateConstant(
-    BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) {
-  if (AnyBitSet(source_buffer->usage() & BufferUsage::kConstant) &&
-      CanUseBuffer(source_buffer.get(), buffer_usage)) {
-    // Buffer can be used directly by the device.
-    return source_buffer;
-  }
-
-  IREE_TRACE_SCOPE0("Allocator::AllocateConstant");
-
-  // We need to map so we can copy into it.
-  buffer_usage |= BufferUsage::kMapping;
-  // It will be constant after we write it.
-  buffer_usage |= BufferUsage::kConstant;
-
-  MemoryTypeBitfield memory_type =
-      MemoryType::kDeviceLocal | MemoryType::kHostVisible;
-  IREE_ASSIGN_OR_RETURN(
-      auto device_buffer,
-      Allocate(memory_type, buffer_usage, source_buffer->byte_length()));
-  IREE_ASSIGN_OR_RETURN(auto source_mapping,
-                        source_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
-  IREE_RETURN_IF_ERROR(device_buffer->WriteData(0, source_mapping.data(),
-                                                source_mapping.byte_length()));
-  return device_buffer;
-}
-
 StatusOr<ref_ptr<Buffer>> Allocator::Wrap(MemoryTypeBitfield memory_type,
                                           BufferUsageBitfield buffer_usage,
                                           const void* data,

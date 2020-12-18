@@ -132,18 +132,6 @@ StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::Allocate(MemoryTypeBitfield memo
   return AllocateInternal(memory_type, buffer_usage, MemoryAccess::kAll, allocation_size);
 }
 
-StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::AllocateConstant(BufferUsageBitfield buffer_usage,
-                                                                 ref_ptr<Buffer> source_buffer) {
-  IREE_TRACE_SCOPE0("MetalDirectAllocator::AllocateConstant");
-  // TODO(benvanik): import memory to avoid the copy.
-  IREE_ASSIGN_OR_RETURN(
-      auto buffer, AllocateInternal(MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-                                    buffer_usage, MemoryAccess::kRead | MemoryAccess::kDiscardWrite,
-                                    source_buffer->byte_length()));
-  IREE_RETURN_IF_ERROR(buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
-  return buffer;
-}
-
 StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::WrapMutable(MemoryTypeBitfield memory_type,
                                                             MemoryAccessBitfield allowed_access,
                                                             BufferUsageBitfield buffer_usage,

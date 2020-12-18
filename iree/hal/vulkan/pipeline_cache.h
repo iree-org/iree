@@ -42,7 +42,7 @@ class PipelineCache final : public ExecutableCache {
 
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
       ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-      const ExecutableSpec& spec) override;
+      iree_const_byte_span_t executable_data) override;
 
  private:
   ref_ptr<VkDeviceHandle> logical_device_;

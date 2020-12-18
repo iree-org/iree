@@ -78,12 +78,6 @@ class Allocator : public RefObject<Allocator> {
                                              BufferUsageBitfield buffer_usage,
                                              size_t allocation_size) = 0;
 
-  // Allocates a buffer from the allocator for use as a constant value.
-  // The provided |source_buffer| may be returned if the device can use it
-  // directly and otherwise will be copied.
-  virtual StatusOr<ref_ptr<Buffer>> AllocateConstant(
-      BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer);
-
   // Wraps an existing host heap allocation in a buffer.
   // Ownership of the host allocation remains with the caller and the memory
   // must remain valid for so long as the Buffer may be in use.
