@@ -19,7 +19,6 @@
 #include <string>
 
 #include "absl/types/span.h"
-#include "iree/base/bitfield.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/hal/command_buffer.h"
