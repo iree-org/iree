@@ -12,31 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_DYLIB_EXECUTABLE_CACHE_H_
-#define IREE_HAL_DYLIB_EXECUTABLE_CACHE_H_
+#include "iree/hal/cc/resource.h"
 
-#include "iree/hal/cc/executable.h"
-#include "iree/hal/cc/executable_cache.h"
+#ifndef IREE_HAL_CC_EXECUTABLE_LAYOUT_H_
+#define IREE_HAL_CC_EXECUTABLE_LAYOUT_H_
 
 namespace iree {
 namespace hal {
-namespace dylib {
 
-class DyLibExecutableCache final : public ExecutableCache {
+// Defines the resource binding layout used by an executable.
+//
+// Executables can share the same layout even if they do not use all of the
+// resources referenced by descriptor sets referenced by the layout. Doing so
+// allows for more efficient binding as bound descriptor sets can be reused when
+// command buffer executable bindings change.
+//
+// Maps to VkPipelineLayout:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayout.html
+class ExecutableLayout : public Resource {
  public:
-  DyLibExecutableCache();
-  ~DyLibExecutableCache() override;
-
-  bool CanPrepareFormat(ExecutableFormat format) const override;
-
-  StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableLayout* executable_layout,
-      iree_hal_executable_caching_mode_t mode,
-      iree_const_byte_span_t executable_data) override;
 };
 
-}  // namespace dylib
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DYLIB_EXECUTABLE_CACHE_H_
+#endif  // IREE_HAL_CC_EXECUTABLE_LAYOUT_H_

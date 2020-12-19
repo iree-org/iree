@@ -20,7 +20,7 @@
 #include "absl/synchronization/mutex.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
-#include "iree/hal/command_queue.h"
+#include "iree/hal/cc/command_queue.h"
 #include "iree/hal/host/condvar_semaphore.h"
 
 namespace iree {

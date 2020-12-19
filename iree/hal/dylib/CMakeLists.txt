@@ -40,7 +40,7 @@ iree_cc_library(
     iree::base::flatcc
     iree::base::status
     iree::base::tracing
-    iree::hal
+    iree::hal::cc
     iree::hal::host::host_executable
     iree::hal::host::host_local_device
     iree::hal::host::serial::serial_scheduling_model

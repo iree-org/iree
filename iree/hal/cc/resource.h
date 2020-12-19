@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_RESOURCE_H_
-#define IREE_HAL_RESOURCE_H_
+#ifndef IREE_HAL_CC_RESOURCE_H_
+#define IREE_HAL_CC_RESOURCE_H_
 
 #include <ostream>
 #include <string>
@@ -49,4 +49,4 @@ inline std::ostream& operator<<(std::ostream& stream,
   return stream;
 }
 
-#endif  // IREE_HAL_RESOURCE_H_
+#endif  // IREE_HAL_CC_RESOURCE_H_

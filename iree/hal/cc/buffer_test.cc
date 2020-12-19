@@ -16,7 +16,7 @@
 // This does not test device-specific buffer implementations; see the device
 // code for associated tests.
 
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 
 #include <vector>
 

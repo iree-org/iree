@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_DYLIB_DYLIB_DRIVER_H_
 #define IREE_HAL_DYLIB_DYLIB_DRIVER_H_
 
-#include "iree/hal/driver.h"
+#include "iree/hal/cc/driver.h"
 
 namespace iree {
 namespace hal {

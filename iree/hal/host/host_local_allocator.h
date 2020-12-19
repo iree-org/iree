@@ -19,8 +19,8 @@
 #include <memory>
 
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/allocator.h"
+#include "iree/hal/cc/buffer.h"
 
 namespace iree {
 namespace hal {

@@ -35,7 +35,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_allocator.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
         "//iree/testing:gtest",
     ],
 )
@@ -45,7 +45,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_command_buffer.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
         "//iree/testing:gtest",
     ],
 )
@@ -55,7 +55,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_command_queue.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
         "//iree/testing:gtest",
     ],
 )

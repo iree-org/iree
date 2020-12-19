@@ -16,8 +16,8 @@
 #define IREE_HAL_HOST_HOST_EXECUTABLE_LAYOUT_H_
 
 #include "absl/container/inlined_vector.h"
-#include "iree/hal/descriptor_set_layout.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/cc/descriptor_set_layout.h"
+#include "iree/hal/cc/executable_layout.h"
 
 namespace iree {
 namespace hal {

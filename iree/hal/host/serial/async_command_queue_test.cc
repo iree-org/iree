@@ -23,7 +23,7 @@
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
-#include "iree/hal/command_queue.h"
+#include "iree/hal/cc/command_queue.h"
 #include "iree/hal/host/serial/serial_submission_queue.h"
 #include "iree/hal/testing/mock_command_buffer.h"
 #include "iree/hal/testing/mock_command_queue.h"
