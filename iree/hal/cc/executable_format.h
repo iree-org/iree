@@ -17,8 +17,8 @@
 // supported by debuggers/tooling will likely want to be here to ensure easier
 // referencing.
 
-#ifndef IREE_HAL_EXECUTABLE_FORMAT_H_
-#define IREE_HAL_EXECUTABLE_FORMAT_H_
+#ifndef IREE_HAL_CC_EXECUTABLE_FORMAT_H_
+#define IREE_HAL_CC_EXECUTABLE_FORMAT_H_
 
 #include <cstdint>
 
@@ -72,4 +72,4 @@ constexpr ExecutableFormat kExecutableFormatDyLib =
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_EXECUTABLE_FORMAT_H_
+#endif  // IREE_HAL_CC_EXECUTABLE_FORMAT_H_

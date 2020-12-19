@@ -31,12 +31,12 @@
 #include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
-#include "iree/hal/buffer.h"
-#include "iree/hal/command_buffer.h"
-#include "iree/hal/device.h"
-#include "iree/hal/driver.h"
+#include "iree/hal/cc/buffer.h"
+#include "iree/hal/cc/command_buffer.h"
+#include "iree/hal/cc/device.h"
+#include "iree/hal/cc/driver.h"
+#include "iree/hal/cc/semaphore.h"
 #include "iree/hal/host/host_local_allocator.h"
-#include "iree/hal/semaphore.h"
 #include "third_party/half/half.hpp"
 
 namespace iree {

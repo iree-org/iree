@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_HOST_NOP_EVENT_H_
 #define IREE_HAL_HOST_NOP_EVENT_H_
 
-#include "iree/hal/event.h"
+#include "iree/hal/cc/event.h"
 
 namespace iree {
 namespace hal {

@@ -17,7 +17,7 @@
 
 #import <Metal/Metal.h>
 
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 
 namespace iree {
 namespace hal {

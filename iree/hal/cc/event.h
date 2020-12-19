@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_COMMAND_BUFFER_VALIDATION_H_
-#define IREE_HAL_COMMAND_BUFFER_VALIDATION_H_
+#ifndef IREE_HAL_CC_EVENT_H_
+#define IREE_HAL_CC_EVENT_H_
 
-#include "iree/hal/allocator.h"
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/resource.h"
 
 namespace iree {
 namespace hal {
 
-// Wraps an existing command buffer to provide in-depth validation during
-// recording. This should be enabled whenever the command buffer is being driven
-// by unsafe code or when early and readable diagnostics are needed.
-ref_ptr<CommandBuffer> WrapCommandBufferWithValidation(
-    Allocator* allocator, ref_ptr<CommandBuffer> impl);
+// Events are used for defining synchronization scopes within CommandBuffers.
+// An event only exists within a single CommandBuffer and must not be used
+// across CommandBuffers from the same device or others.
+//
+// See CommandBuffer::SignalEvent and CommandBuffer::WaitEvents for more info.
+class Event : public Resource {
+ public:
+};
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_H_
+#endif  // IREE_HAL_CC_EVENT_H_

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_DEBUG_CAPTURE_MANAGER_H_
-#define IREE_HAL_DEBUG_CAPTURE_MANAGER_H_
+#ifndef IREE_HAL_CC_DEBUG_CAPTURE_MANAGER_H_
+#define IREE_HAL_CC_DEBUG_CAPTURE_MANAGER_H_
 
 #include "iree/base/status.h"
 
@@ -59,4 +59,4 @@ class DebugCaptureManager {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DEBUG_CAPTURE_MANAGER_H_
+#endif  // IREE_HAL_CC_DEBUG_CAPTURE_MANAGER_H_

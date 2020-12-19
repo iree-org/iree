@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_SEMAPHORE_H_
-#define IREE_HAL_SEMAPHORE_H_
+#ifndef IREE_HAL_CC_SEMAPHORE_H_
+#define IREE_HAL_CC_SEMAPHORE_H_
 
 #include <cstdint>
 
 #include "iree/base/status.h"
 #include "iree/base/time.h"
-#include "iree/hal/resource.h"
+#include "iree/hal/cc/resource.h"
 
 namespace iree {
 namespace hal {
@@ -99,4 +99,4 @@ class Semaphore : public Resource {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_SEMAPHORE_H_
+#endif  // IREE_HAL_CC_SEMAPHORE_H_

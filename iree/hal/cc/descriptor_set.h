@@ -12,28 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/resource.h"
+#include "absl/strings/str_cat.h"
+#include "iree/hal/cc/buffer.h"
+#include "iree/hal/cc/resource.h"
 
-#ifndef IREE_HAL_EXECUTABLE_LAYOUT_H_
-#define IREE_HAL_EXECUTABLE_LAYOUT_H_
+#ifndef IREE_HAL_CC_DESCRIPTOR_SET_H_
+#define IREE_HAL_CC_DESCRIPTOR_SET_H_
 
 namespace iree {
 namespace hal {
 
-// Defines the resource binding layout used by an executable.
+// Opaque handle to a descriptor set object.
 //
-// Executables can share the same layout even if they do not use all of the
-// resources referenced by descriptor sets referenced by the layout. Doing so
-// allows for more efficient binding as bound descriptor sets can be reused when
-// command buffer executable bindings change.
-//
-// Maps to VkPipelineLayout:
-// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayout.html
-class ExecutableLayout : public Resource {
+// Maps to VkDescriptorSet:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
+class DescriptorSet : public Resource {
  public:
 };
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_EXECUTABLE_LAYOUT_H_
+#endif  // IREE_HAL_CC_DESCRIPTOR_SET_H_

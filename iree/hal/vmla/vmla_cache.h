@@ -15,9 +15,9 @@
 #ifndef IREE_HAL_VMLA_VMLA_CACHE_H_
 #define IREE_HAL_VMLA_VMLA_CACHE_H_
 
-#include "iree/hal/allocator.h"
-#include "iree/hal/executable.h"
-#include "iree/hal/executable_cache.h"
+#include "iree/hal/cc/allocator.h"
+#include "iree/hal/cc/executable.h"
+#include "iree/hal/cc/executable_cache.h"
 #include "iree/vm/api.h"
 
 namespace iree {

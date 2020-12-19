@@ -18,7 +18,7 @@
 #import <Metal/Metal.h>
 
 #include "absl/synchronization/mutex.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/semaphore.h"
 
 namespace iree {
 namespace hal {

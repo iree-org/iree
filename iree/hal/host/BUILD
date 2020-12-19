@@ -28,7 +28,7 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal",
+        "//iree/hal/cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
@@ -56,7 +56,7 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )
 
@@ -65,7 +65,7 @@ cc_library(
     srcs = ["host_descriptor_set.cc"],
     hdrs = ["host_descriptor_set.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )
@@ -75,7 +75,7 @@ cc_library(
     hdrs = ["host_executable.h"],
     deps = [
         "//iree/base:status",
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )
 
@@ -85,7 +85,7 @@ cc_library(
     hdrs = ["host_executable_layout.h"],
     deps = [
         "//iree/base:core_headers",
-        "//iree/hal",
+        "//iree/hal/cc",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )
@@ -98,7 +98,7 @@ cc_library(
         ":host_buffer",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )
 
@@ -114,8 +114,8 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal",
-        "//iree/hal:command_buffer_validation",
+        "//iree/hal/cc",
+        "//iree/hal/cc:command_buffer_validation",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -131,7 +131,7 @@ cc_library(
         "//iree/base:intrusive_list",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )
 
@@ -140,7 +140,7 @@ cc_library(
     srcs = ["nop_event.cc"],
     hdrs = ["nop_event.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )
 
@@ -148,6 +148,6 @@ cc_library(
     name = "scheduling_model",
     hdrs = ["scheduling_model.h"],
     deps = [
-        "//iree/hal",
+        "//iree/hal/cc",
     ],
 )

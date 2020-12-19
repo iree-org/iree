@@ -18,8 +18,8 @@
 #include <memory>
 #include <string>
 
-#include "iree/hal/debug_capture_manager.h"
-#include "iree/hal/driver.h"
+#include "iree/hal/cc/debug_capture_manager.h"
+#include "iree/hal/cc/driver.h"
 
 namespace iree {
 namespace hal {

@@ -19,7 +19,7 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
 namespace iree {

@@ -16,8 +16,8 @@
 
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/cc/executable_format.h"
 #include "iree/hal/dylib/dylib_executable.h"
-#include "iree/hal/executable_format.h"
 
 namespace iree {
 namespace hal {

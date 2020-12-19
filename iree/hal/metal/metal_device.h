@@ -21,11 +21,11 @@
 
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/debug_capture_manager.h"
-#include "iree/hal/device.h"
-#include "iree/hal/driver.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/allocator.h"
+#include "iree/hal/cc/debug_capture_manager.h"
+#include "iree/hal/cc/device.h"
+#include "iree/hal/cc/driver.h"
+#include "iree/hal/cc/semaphore.h"
 
 namespace iree {
 namespace hal {

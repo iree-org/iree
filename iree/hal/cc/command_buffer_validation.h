@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_EXECUTABLE_H_
-#define IREE_HAL_EXECUTABLE_H_
+#ifndef IREE_HAL_CC_COMMAND_BUFFER_VALIDATION_H_
+#define IREE_HAL_CC_COMMAND_BUFFER_VALIDATION_H_
 
-#include "iree/hal/resource.h"
+#include "iree/hal/cc/allocator.h"
+#include "iree/hal/cc/command_buffer.h"
 
 namespace iree {
 namespace hal {
 
-class Executable : public Resource {
- public:
-};
+// Wraps an existing command buffer to provide in-depth validation during
+// recording. This should be enabled whenever the command buffer is being driven
+// by unsafe code or when early and readable diagnostics are needed.
+ref_ptr<CommandBuffer> WrapCommandBufferWithValidation(
+    Allocator* allocator, ref_ptr<CommandBuffer> impl);
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_EXECUTABLE_H_
+#endif  // IREE_HAL_CC_COMMAND_BUFFER_VALIDATION_H_

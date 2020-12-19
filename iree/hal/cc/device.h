@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_DEVICE_H_
-#define IREE_HAL_DEVICE_H_
+#ifndef IREE_HAL_CC_DEVICE_H_
+#define IREE_HAL_CC_DEVICE_H_
 
 #include <memory>
 
@@ -21,16 +21,16 @@
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/time.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/buffer.h"
-#include "iree/hal/command_queue.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/descriptor_set_layout.h"
-#include "iree/hal/device_info.h"
-#include "iree/hal/event.h"
-#include "iree/hal/executable_cache.h"
-#include "iree/hal/executable_layout.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/allocator.h"
+#include "iree/hal/cc/buffer.h"
+#include "iree/hal/cc/command_queue.h"
+#include "iree/hal/cc/descriptor_set.h"
+#include "iree/hal/cc/descriptor_set_layout.h"
+#include "iree/hal/cc/device_info.h"
+#include "iree/hal/cc/event.h"
+#include "iree/hal/cc/executable_cache.h"
+#include "iree/hal/cc/executable_layout.h"
+#include "iree/hal/cc/semaphore.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 // Win32 macro name conflicts:
@@ -109,7 +109,8 @@ class Device : public RefObject<Device> {
   // prior to being returned to the caller.
   virtual StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
       iree_hal_command_buffer_mode_t mode,
-      iree_hal_command_category_t command_categories) = 0;
+      iree_hal_command_category_t command_categories,
+      iree_hal_command_buffer_t** out_command_buffer) = 0;
 
   // Creates an event for recording into command buffers.
   // The returned event object is only usable with this device and events must
@@ -182,4 +183,4 @@ class Device : public RefObject<Device> {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DEVICE_H_
+#endif  // IREE_HAL_CC_DEVICE_H_
