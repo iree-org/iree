@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_ALLOCATOR_H_
-#define IREE_HAL_ALLOCATOR_H_
+#ifndef IREE_HAL_CC_ALLOCATOR_H_
+#define IREE_HAL_CC_ALLOCATOR_H_
 
 #include <cstddef>
 #include <memory>
@@ -21,7 +21,7 @@
 #include "absl/types/span.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 
 namespace iree {
 namespace hal {
@@ -142,4 +142,4 @@ StatusOr<ref_ptr<Buffer>> Allocator::WrapMutable(
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_ALLOCATOR_H_
+#endif  // IREE_HAL_CC_ALLOCATOR_H_

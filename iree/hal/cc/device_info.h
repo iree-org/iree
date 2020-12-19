@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_DEVICE_INFO_H_
-#define IREE_HAL_DEVICE_INFO_H_
+#ifndef IREE_HAL_CC_DEVICE_INFO_H_
+#define IREE_HAL_CC_DEVICE_INFO_H_
 
 #include <cstdint>
 #include <string>
@@ -82,4 +82,4 @@ class DeviceInfo {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DEVICE_INFO_H_
+#endif  // IREE_HAL_CC_DEVICE_INFO_H_

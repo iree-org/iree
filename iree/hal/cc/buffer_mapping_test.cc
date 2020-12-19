@@ -22,7 +22,7 @@
 
 #include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

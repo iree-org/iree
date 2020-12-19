@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_DRIVER_H_
-#define IREE_HAL_DRIVER_H_
+#ifndef IREE_HAL_CC_DRIVER_H_
+#define IREE_HAL_CC_DRIVER_H_
 
 #include <memory>
 #include <string>
@@ -21,9 +21,9 @@
 
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
-#include "iree/hal/debug_capture_manager.h"
-#include "iree/hal/device.h"
-#include "iree/hal/device_info.h"
+#include "iree/hal/cc/debug_capture_manager.h"
+#include "iree/hal/cc/device.h"
+#include "iree/hal/cc/device_info.h"
 
 namespace iree {
 namespace hal {
@@ -66,4 +66,4 @@ class Driver : public RefObject<Driver> {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DRIVER_H_
+#endif  // IREE_HAL_CC_DRIVER_H_

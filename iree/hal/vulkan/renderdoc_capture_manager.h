@@ -17,7 +17,7 @@
 
 #include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
-#include "iree/hal/debug_capture_manager.h"
+#include "iree/hal/cc/debug_capture_manager.h"
 #include "third_party/renderdoc_api/app/renderdoc_app.h"
 
 namespace iree {

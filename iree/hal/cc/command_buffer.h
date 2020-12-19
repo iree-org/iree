@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_COMMAND_BUFFER_H_
-#define IREE_HAL_COMMAND_BUFFER_H_
+#ifndef IREE_HAL_CC_COMMAND_BUFFER_H_
+#define IREE_HAL_CC_COMMAND_BUFFER_H_
 
 #include <cstdint>
 
 #include "iree/base/status.h"
-#include "iree/hal/buffer.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/event.h"
-#include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
-#include "iree/hal/resource.h"
+#include "iree/hal/cc/buffer.h"
+#include "iree/hal/cc/descriptor_set.h"
+#include "iree/hal/cc/event.h"
+#include "iree/hal/cc/executable.h"
+#include "iree/hal/cc/executable_layout.h"
+#include "iree/hal/cc/resource.h"
 
 namespace iree {
 namespace hal {
 
 std::string CommandBufferModeString(iree_hal_command_buffer_mode_t mode);
-std::string CommandCategoryString(iree_hal_command_category_t categories) {
+inline std::string CommandCategoryString(
+    iree_hal_command_category_t categories) {
   return "TODO";
   // return FormatBitfieldValue(
   //     categories, {
@@ -260,4 +261,4 @@ class CommandBuffer : public Resource {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_COMMAND_BUFFER_H_
+#endif  // IREE_HAL_CC_COMMAND_BUFFER_H_

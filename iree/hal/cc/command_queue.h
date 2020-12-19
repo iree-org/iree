@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_COMMAND_QUEUE_H_
-#define IREE_HAL_COMMAND_QUEUE_H_
+#ifndef IREE_HAL_CC_COMMAND_QUEUE_H_
+#define IREE_HAL_CC_COMMAND_QUEUE_H_
 
 #include <cstdint>
 #include <string>
@@ -21,8 +21,8 @@
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
-#include "iree/hal/command_buffer.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/command_buffer.h"
+#include "iree/hal/cc/semaphore.h"
 
 namespace iree {
 namespace hal {
@@ -108,4 +108,4 @@ class CommandQueue {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_COMMAND_QUEUE_H_
+#endif  // IREE_HAL_CC_COMMAND_QUEUE_H_

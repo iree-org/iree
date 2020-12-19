@@ -13,24 +13,24 @@
 // limitations under the License.
 
 #include "absl/strings/str_cat.h"
-#include "iree/hal/buffer.h"
-#include "iree/hal/resource.h"
+#include "iree/hal/cc/buffer.h"
+#include "iree/hal/cc/resource.h"
 
-#ifndef IREE_HAL_DESCRIPTOR_SET_H_
-#define IREE_HAL_DESCRIPTOR_SET_H_
+#ifndef IREE_HAL_CC_DESCRIPTOR_SET_LAYOUT_H_
+#define IREE_HAL_CC_DESCRIPTOR_SET_LAYOUT_H_
 
 namespace iree {
 namespace hal {
 
-// Opaque handle to a descriptor set object.
+// Opaque handle to a descriptor set layout object.
 //
-// Maps to VkDescriptorSet:
-// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSet.html
-class DescriptorSet : public Resource {
+// Maps to VkDescriptorSetLayout:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
+class DescriptorSetLayout : public Resource {
  public:
 };
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DESCRIPTOR_SET_H_
+#endif  // IREE_HAL_CC_DESCRIPTOR_SET_LAYOUT_H_

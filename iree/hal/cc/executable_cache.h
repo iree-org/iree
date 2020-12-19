@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_EXECUTABLE_CACHE_H_
-#define IREE_HAL_EXECUTABLE_CACHE_H_
+#ifndef IREE_HAL_CC_EXECUTABLE_CACHE_H_
+#define IREE_HAL_CC_EXECUTABLE_CACHE_H_
 
 #include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/hal/executable.h"
-#include "iree/hal/executable_format.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/cc/executable.h"
+#include "iree/hal/cc/executable_format.h"
+#include "iree/hal/cc/executable_layout.h"
 
 namespace iree {
 namespace hal {
@@ -76,4 +76,4 @@ class ExecutableCache : public RefObject<ExecutableCache> {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_EXECUTABLE_CACHE_H_
+#endif  // IREE_HAL_CC_EXECUTABLE_CACHE_H_

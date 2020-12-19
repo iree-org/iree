@@ -49,8 +49,8 @@
 // absl::Span - though unlike absl::Span the returned Buffer holds a reference
 // to the parent buffer.
 
-#ifndef IREE_HAL_BUFFER_H_
-#define IREE_HAL_BUFFER_H_
+#ifndef IREE_HAL_CC_BUFFER_H_
+#define IREE_HAL_CC_BUFFER_H_
 
 #include <cstddef>
 #include <cstdint>
@@ -62,7 +62,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/hal/resource.h"
+#include "iree/hal/cc/resource.h"
 
 namespace iree {
 namespace hal {
@@ -769,4 +769,4 @@ void MappedMemory<T>::reset() {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_BUFFER_H_
+#endif  // IREE_HAL_CC_BUFFER_H_

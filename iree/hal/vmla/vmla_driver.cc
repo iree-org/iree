@@ -17,8 +17,9 @@
 #include <memory>
 
 #include "iree/base/tracing.h"
-#include "iree/hal/device_info.h"
+#include "iree/hal/cc/device_info.h"
 #include "iree/hal/host/serial/serial_scheduling_model.h"
+#include "iree/hal/host/task_scheduling_model.h"
 #include "iree/hal/vmla/op_module.h"
 #include "iree/hal/vmla/vmla_device.h"
 

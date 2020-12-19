@@ -21,7 +21,7 @@
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/device_info.h"
+#include "iree/hal/cc/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
 

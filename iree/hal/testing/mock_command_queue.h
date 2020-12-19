@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_TESTING_MOCK_COMMAND_QUEUE_H_
 #define IREE_HAL_TESTING_MOCK_COMMAND_QUEUE_H_
 
-#include "iree/hal/command_queue.h"
+#include "iree/hal/cc/command_queue.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
