@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/command_buffer_validation.h"
+#include "iree/hal/cc/command_buffer_validation.h"
 
 #include "absl/strings/str_join.h"
 #include "iree/base/logging.h"

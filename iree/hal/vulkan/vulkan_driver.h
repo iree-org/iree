@@ -22,7 +22,7 @@
 #include <memory>
 #include <vector>
 
-#include "iree/hal/driver.h"
+#include "iree/hal/cc/driver.h"
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"

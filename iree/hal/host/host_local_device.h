@@ -17,7 +17,7 @@
 
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
-#include "iree/hal/device.h"
+#include "iree/hal/cc/device.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/host/scheduling_model.h"
 

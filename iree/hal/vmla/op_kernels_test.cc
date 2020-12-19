@@ -544,7 +544,7 @@ TEST(Transpose, 2Dimen) {
   std::vector<uint16_t> src_buffer = {1,  2,  3,
                                       4,  5,  6};
   std::vector<uint16_t> expected_dst = {1,  4,
-                                        2,  5,   
+                                        2,  5,
                                         3,  6};
   // clang-format on
   std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
@@ -565,7 +565,7 @@ TEST(Transpose, 3Dimen) {
                                        7,  8,  9,
                                       10, 11, 12};
   std::vector<uint16_t> expected_dst = {1,  4,
-                                        2,  5,   
+                                        2,  5,
                                         3,  6,
                                         7, 10,
                                         8, 11,

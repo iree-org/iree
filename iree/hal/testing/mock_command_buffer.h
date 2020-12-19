@@ -15,7 +15,7 @@
 #ifndef IREE_HAL_TESTING_MOCK_COMMAND_BUFFER_H_
 #define IREE_HAL_TESTING_MOCK_COMMAND_BUFFER_H_
 
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {

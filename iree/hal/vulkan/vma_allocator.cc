@@ -17,7 +17,7 @@
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/buffer.h"
+#include "iree/hal/cc/buffer.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_buffer.h"
 

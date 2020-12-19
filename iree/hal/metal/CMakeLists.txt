@@ -57,7 +57,7 @@ iree_cc_library(
     iree::base::status
     iree::base::time
     iree::base::tracing
-    iree::hal
+    iree::hal::cc
     iree::schemas::metal_executable_def_c_fbs
   LINKOPTS
     "-framework Foundation"

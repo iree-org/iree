@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,25 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/strings/str_cat.h"
-#include "iree/hal/buffer.h"
-#include "iree/hal/resource.h"
+#ifndef IREE_HAL_CC_EXECUTABLE_H_
+#define IREE_HAL_CC_EXECUTABLE_H_
 
-#ifndef IREE_HAL_DESCRIPTOR_SET_LAYOUT_H_
-#define IREE_HAL_DESCRIPTOR_SET_LAYOUT_H_
+#include "iree/hal/cc/resource.h"
 
 namespace iree {
 namespace hal {
 
-// Opaque handle to a descriptor set layout object.
-//
-// Maps to VkDescriptorSetLayout:
-// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
-class DescriptorSetLayout : public Resource {
+class Executable : public Resource {
  public:
 };
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_DESCRIPTOR_SET_LAYOUT_H_
+#endif  // IREE_HAL_CC_EXECUTABLE_H_

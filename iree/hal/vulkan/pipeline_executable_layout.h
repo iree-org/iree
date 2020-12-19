@@ -21,8 +21,8 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
-#include "iree/hal/descriptor_set_layout.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/cc/descriptor_set_layout.h"
+#include "iree/hal/cc/executable_layout.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 namespace iree {

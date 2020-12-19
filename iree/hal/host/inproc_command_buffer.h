@@ -18,7 +18,7 @@
 #include "iree/base/arena.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 
 namespace iree {
 namespace hal {

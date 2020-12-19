@@ -16,7 +16,7 @@
 
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/executable_format.h"
+#include "iree/hal/cc/executable_format.h"
 #include "iree/hal/metal/metal_kernel_library.h"
 
 namespace iree {
