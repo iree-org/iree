@@ -78,6 +78,7 @@ cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:TransformUtils",
