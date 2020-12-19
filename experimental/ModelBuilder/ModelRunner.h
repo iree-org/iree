@@ -76,7 +76,8 @@ class ModelRunner {
   enum class Target { CPUTarget, GPUTarget };
   // Initialize the runner with an OwningModuleRef, typically constructed with
   // a ModelBiulder.
-  ModelRunner(mlir::OwningModuleRef &m, Target t = Target::CPUTarget)
+  ModelRunner(mlir::OwningOpRef<mlir::ModuleOp> &m,
+              Target t = Target::CPUTarget)
       : module(m), target(t) {}
 
   // Get the underlying ModuleOp.
@@ -95,7 +96,7 @@ class ModelRunner {
       llvm::ArrayRef<std::pair<std::string, void *>> extra_symbols = None);
 
   // Reference to the compiled module.
-  mlir::OwningModuleRef &module;
+  mlir::OwningOpRef<mlir::ModuleOp> &module;
 
   // Indirect invocation where the caller sets up the proper indirect pointers
   // and passes a void** `args` parameter.

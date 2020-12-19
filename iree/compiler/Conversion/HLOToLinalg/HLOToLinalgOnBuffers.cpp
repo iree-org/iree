@@ -538,8 +538,7 @@ LogicalResult ConvOpConversion::apply(
         loc,
         /*resultTensorTypes=*/ArrayRef<Type>{},
         /*inputs=*/inputBuffers,
-        /*outputs=*/resultBuffers, /*intTensors*/ ValueRange{}, indexingMaps,
-        loopAttributeTypes,
+        /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
           Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
@@ -1001,8 +1000,7 @@ LogicalResult ReduceOpConversion::apply(
   }
   auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
       loc, /*resultTensorTypes=*/resultTypes, /*inputs=*/inputs,
-      /*outputBuffers=*/resultBuffers, /*initTensors*/ ValueRange{},
-      indexingMaps,
+      /*outputBuffers=*/resultBuffers, indexingMaps,
       getParallelAndReductionIterators(nInputRank, reductionDims.size()));
 
   rewriter.inlineRegionBefore(reduceOp.body(), linalgOp.region(),
@@ -1070,7 +1068,8 @@ struct LinalgOpOnTensorConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
-    SmallVector<Value, 2> opArgs(inputBuffers.begin(), inputBuffers.end());
+    inputBuffers = inputBuffers.drop_back(op.getNumResults());
+    SmallVector<Value, 2> opArgs = llvm::to_vector<2>(inputBuffers);
     opArgs.append(resultBuffers.begin(), resultBuffers.end());
 
     // Create a new op with the same traits as the original

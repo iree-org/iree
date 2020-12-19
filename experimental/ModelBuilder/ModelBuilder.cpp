@@ -210,9 +210,9 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   AffineExpr i, j;
   bindDims(&ctx, i, j);
   // in-place with explicit bias broacast
-  StructuredIndexed o2(O2), bias(biasValueArg), o3Type(outputTensorType);
+  StructuredIndexed o2(O2), bias(biasValueArg);
   return linalg_generic_pointwise(fusedBiasTanh, o2({i, j}), bias({j}),
-                                  o3Type({i, j}))
+                                  o2({i, j}))
       ->getResult(0);
 }
 

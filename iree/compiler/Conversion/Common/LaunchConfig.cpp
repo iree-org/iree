@@ -136,11 +136,11 @@ LogicalResult propogateRootOperationLaunchConfig(
   //   producer and consumer must match for the parallel loops.
   for (auto dependence :
        dependenceGraph.getDependentOperations(rootOperation)) {
-    unsigned viewIndex = dependence.indexingOpView.operandIndex;
+    unsigned viewIndex = dependence.indexingOpView->getOperandNumber();
     AffineMap indexingMap = rootOperation.getIndexingMap(viewIndex);
     linalg::LinalgOp fusedOp =
-        cast<linalg::LinalgOp>(dependence.dependentOpView.op);
-    unsigned fusedViewIndex = dependence.dependentOpView.operandIndex;
+        cast<linalg::LinalgOp>(dependence.dependentOpView->getOwner());
+    unsigned fusedViewIndex = dependence.dependentOpView->getOperandNumber();
     AffineMap fusedIndexingMap = fusedOp.getIndexingMap(fusedViewIndex);
     if (indexingMap.getNumResults() < numOuterParallel ||
         fusedIndexingMap.getNumResults() < numOuterParallel ||
@@ -160,7 +160,7 @@ LogicalResult propogateRootOperationLaunchConfig(
   // operation. To propogate that information, just use the same key as the root
   // operation.
   for (auto dependence : dependences) {
-    config.setSameConfig(rootOperation, dependence.dependentOpView.op);
+    config.setSameConfig(rootOperation, dependence.dependentOpView->getOwner());
   }
   return success();
 }
