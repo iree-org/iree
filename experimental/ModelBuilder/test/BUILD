@@ -121,6 +121,7 @@ cc_binary(
     srcs = ["TestMatMulVulkan.cpp"],
     deps = [
         "//experimental/ModelBuilder",
+        "@llvm-project//mlir:SPIRVTransforms",
         "//experimental/ModelBuilder:ModelRunner",
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
         "//iree/compiler/Conversion/CodegenUtils",
@@ -159,6 +160,7 @@ cc_binary(
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
+        "@llvm-project//mlir:SPIRVTransforms",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "@llvm-project//llvm:Support",
@@ -204,6 +206,7 @@ cc_binary(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorOps",

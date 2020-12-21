@@ -64,6 +64,7 @@ iree_cc_library(
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRSPIRV
+    MLIRSPIRVConversion
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRStandard

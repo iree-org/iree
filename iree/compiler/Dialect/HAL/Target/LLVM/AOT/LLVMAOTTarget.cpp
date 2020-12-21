@@ -65,7 +65,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     }
 
     llvm::Triple targetTriple(options_.targetTriple);
-    targetOp.getInnerModule().setAttr(
+    targetOp.getInnerModule()->setAttr(
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 

@@ -30,7 +30,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -43,8 +43,8 @@
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -101,8 +101,9 @@ void testVecAdd() {
     FuncOp kernelFunc = modelBuilder.makeFunction(
         funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
     // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(spirv::getEntryPointABIAttrName(),
-                       spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
+    kernelFunc->setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
     OpBuilder b(&kernelFunc.getBody());
     ScopedContext scope(b, kernelFunc.getLoc());
 

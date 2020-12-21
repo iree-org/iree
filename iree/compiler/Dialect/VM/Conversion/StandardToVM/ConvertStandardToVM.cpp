@@ -123,9 +123,9 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
         sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
     for (auto retainAttrName : retainedAttributes) {
       StringRef attrName(retainAttrName);
-      Attribute attr = srcOp.getAttr(attrName);
+      Attribute attr = srcOp->getAttr(attrName);
       if (attr) {
-        newFuncOp.setAttr(attrName, attr);
+        newFuncOp->setAttr(attrName, attr);
       }
     }
 
@@ -139,7 +139,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Also add an export for the "raw" form of this function, which operates
     // on low level VM types and does no verification. A later pass will
     // materialize high level API-friendly wrappers.
-    if (auto exportAttr = srcOp.getAttr("iree.module.export")) {
+    if (auto exportAttr = srcOp->getAttr("iree.module.export")) {
       StringRef exportName = newFuncOp.getName();
       if (auto exportStrAttr = exportAttr.dyn_cast<StringAttr>()) {
         exportName = exportStrAttr.getValue();

@@ -34,10 +34,10 @@
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/ConvertVectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -162,7 +162,7 @@ spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
   auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
-  if (alias) variable.setAttr("aliased", builder.getUnitAttr());
+  if (alias) variable->setAttr("aliased", builder.getUnitAttr());
   return variable;
 }
 

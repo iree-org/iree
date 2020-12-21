@@ -122,7 +122,7 @@ OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
   auto variableOp = dyn_cast_or_null<VariableOp>(
       SymbolTable::lookupNearestSymbolFrom(*this, variable()));
   if (!variableOp) return {};
-  if (variableOp.getAttr("noinline")) {
+  if (variableOp->getAttr("noinline")) {
     // Inlining of the constant has been disabled.
     return {};
   } else if (variableOp.is_mutable()) {
@@ -294,7 +294,7 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult DispatchWorkgroupRankOp::fold(ArrayRef<Attribute> operands) {
-  if (auto dispatchOp = this->getParentOfType<DispatchWorkgroupsOp>()) {
+  if (auto dispatchOp = (*this)->getParentOfType<DispatchWorkgroupsOp>()) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             APInt(64, dispatchOp.workgroup_count().size()));
   }

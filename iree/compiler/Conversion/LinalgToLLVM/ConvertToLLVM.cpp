@@ -212,7 +212,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     llvm::DenseMap<Operation *, IREE::HAL::InterfaceBindingOp> bufferBindingMap;
     for (auto bufferOp : bufferOps) {
       auto symbol = SymbolTable::lookupNearestSymbolFrom(
-          bufferOp, bufferOp.getAttrOfType<SymbolRefAttr>("binding"));
+          bufferOp, bufferOp->getAttrOfType<SymbolRefAttr>("binding"));
       bufferBindingMap[bufferOp] = cast<IREE::HAL::InterfaceBindingOp>(symbol);
     }
 

@@ -62,6 +62,7 @@ cc_library(
     ],
     deps = [
         ":LLVMTargetOptions",
+        "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
