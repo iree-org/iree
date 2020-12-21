@@ -133,6 +133,7 @@ endforeach()
 # Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
@@ -158,6 +159,7 @@ endforeach()
 # Set IREE_TARGET_BACKEND_* based on configuration
 foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 

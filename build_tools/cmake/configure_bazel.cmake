@@ -134,13 +134,16 @@ endfunction()
 #     the "/" with "_".
 function(iree_add_bazel_invocation)
   cmake_parse_arguments(ARG
-    ""
+    "ALL"
     "INVOCATION_TARGET"
     "BAZEL_TARGETS;EXECUTABLE_PATHS"
     ${ARGN}
   )
-
-  add_custom_target(${ARG_INVOCATION_TARGET}
+  set(_all_option)
+  if(${ARG_ALL})
+    set(_all_option "ALL")
+  endif()
+  add_custom_target(${ARG_INVOCATION_TARGET} ${_all_option}
     USES_TERMINAL
     COMMAND ${CMAKE_COMMAND} -E echo
         "Starting bazel build of targets '${ARG_BAZEL_TARGETS}'"
