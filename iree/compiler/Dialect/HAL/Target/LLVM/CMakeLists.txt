@@ -50,6 +50,7 @@ iree_cc_library(
     "LLVMIRPasses.cpp"
   DEPS
     ::LLVMTargetOptions
+    LLVMAnalysis
     LLVMCore
     LLVMPasses
     LLVMSupport
