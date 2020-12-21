@@ -22,9 +22,9 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FileSystem.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
