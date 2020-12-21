@@ -25,33 +25,50 @@ namespace iree_compiler {
 
 namespace {
 
-// Taken over from StandardToVM.
-// We need to replace the Op depending on the operand.
-// We could start with a conversion for IREE::VM::AddI32Op
-template <typename SrcOpTy, typename DstOpTy>
-class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+// Convert operations which only have operands
+template <typename SrcOpTy>
+class OperandOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
-  BinaryArithmeticOpConversion(MLIRContext *context, StringRef funcName)
+  OperandOpConversion(MLIRContext *context, StringRef funcName)
       : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
 
  private:
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<Value> operands,
+      SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::Adaptor srcAdapter(operands);
-
     StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args =
-        rewriter.getArrayAttr({IntegerAttr::get(rewriter.getIndexType(), 0),
-                               IntegerAttr::get(rewriter.getIndexType(), 1)});
+    ArrayAttr args;
     ArrayAttr templateArgs;
-    ValueRange dstOperands{srcAdapter.lhs(), srcAdapter.rhs()};
 
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
-                                         callee, args, templateArgs,
-                                         dstOperands);
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+template <typename SrcOpTy>
+class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  ConstOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args = ArrayAttr::get({op.value()}, op.getContext());
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+                                               templateArgs, operands);
 
     return success();
   }
@@ -63,9 +80,17 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
-  patterns.insert<
-      BinaryArithmeticOpConversion<IREE::VM::AddI32Op, mlir::emitc::CallOp>>(
-      context, "vm_add_i32");
+  // Arithmetic
+  patterns.insert<OperandOpConversion<IREE::VM::AddI32Op>>(context,
+                                                           "vm_add_i32");
+
+  // Compare
+  patterns.insert<OperandOpConversion<IREE::VM::CmpNEI32Op>>(context,
+                                                             "vm_cmp_ne_i32");
+
+  // Const
+  patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context,
+                                                           "vm_const_i32");
 }
 
 namespace IREE {
@@ -89,7 +114,15 @@ class ConvertVMToEmitCPass
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
+
+    // Arithmetic
     target.addIllegalOp<IREE::VM::AddI32Op>();
+
+    // Compare
+    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
+
+    // Const
+    target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
