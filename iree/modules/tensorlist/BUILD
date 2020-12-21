@@ -20,6 +20,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+""",
+    inline = True,
+)
+
 iree_bytecode_module(
     name = "tensorlist_test_module",
     src = "tensorlist_test.mlir",
@@ -48,6 +55,13 @@ cc_test(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
 
 cc_library(

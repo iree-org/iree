@@ -21,6 +21,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+""",
+    inline = True,
+)
+
 cc_embed_data(
     name = "all_bytecode_modules_cc",
     srcs = [
@@ -65,4 +72,11 @@ iree_bytecode_module(
     src = "list_ops.mlir",
     cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

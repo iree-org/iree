@@ -23,6 +23,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+""",
+    inline = True,
+)
+
 CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
 
 iree_lit_test_suite(
@@ -47,4 +54,11 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     driver = "vmla",
     target_backend = "vmla",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

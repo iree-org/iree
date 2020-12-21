@@ -115,7 +115,7 @@ set(IREE_ALL_HAL_DRIVERS
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
   # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
-  if(ANDROID)
+  if(ANDROID OR NOT ${IREE_ENABLE_MLIR})
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
   endif()
 
@@ -508,11 +508,7 @@ add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
-
-if(${IREE_ENABLE_MLIR})
-  # The VM requires LLVM to build its op definitions.
-  add_subdirectory(iree/vm)
-endif()
+add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)

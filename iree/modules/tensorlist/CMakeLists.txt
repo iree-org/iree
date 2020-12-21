@@ -14,6 +14,8 @@
 
 iree_add_all_subdirs()
 
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+
 iree_bytecode_module(
   NAME
     tensorlist_test_module
@@ -49,6 +51,8 @@ iree_cc_test(
     iree::vm::bytecode_module
     iree::vm::cc
 )
+
+endif()
 
 iree_cc_library(
   NAME

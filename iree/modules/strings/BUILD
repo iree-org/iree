@@ -31,6 +31,13 @@ cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+""",
+    inline = True,
+)
+
 cc_test(
     name = "strings_module_test",
     srcs = ["strings_module_test.cc"],
@@ -58,4 +65,11 @@ iree_bytecode_module(
     src = "strings_module_test.mlir",
     cc_namespace = "iree::strings_module_test",
     flags = ["-iree-mlir-to-vm-bytecode-module"],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

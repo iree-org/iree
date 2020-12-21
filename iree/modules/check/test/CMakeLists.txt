@@ -14,6 +14,8 @@
 
 iree_add_all_subdirs()
 
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
@@ -43,3 +45,5 @@ iree_check_test_suite(
   RUNNER_ARGS
     "--expect_failure"
 )
+
+endif()
