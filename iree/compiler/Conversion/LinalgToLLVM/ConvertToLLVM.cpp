@@ -143,8 +143,8 @@ class ConvertWorkgroupInfoOpPattern : public ConvertToLLVMPattern {
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto newFuncOp = cast<LLVM::LLVMFuncOp>(rewriter.getBlock()->getParentOp());
-    auto xyzTy =
-        LLVM::LLVMType::getInt32Ty(rewriter.getContext()).getPointerTo();
+    auto xyzTy = LLVM::LLVMPointerType::get(
+        LLVM::LLVMType::getInt32Ty(rewriter.getContext()));
     auto xyzArgument = newFuncOp.getArgument(ArgIndex);
     auto dimIndex = rewriter.createOrFold<LLVM::ConstantOp>(
         op->getLoc(), LLVM::LLVMType::getInt64Ty(rewriter.getContext()),
@@ -246,7 +246,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                              .dyn_cast<LLVM::LLVMType>();
       if (!elementType) return failure();
       inputStructPtrs.push_back(
-          elementType.getPointerTo(memrefType.getMemorySpace()));
+          LLVM::LLVMPointerType::get(elementType, memrefType.getMemorySpace()));
     }
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
@@ -255,9 +255,11 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // clang-format on
     MLIRContext *context = rewriter.getContext();
     auto packedBuffersArgsTy =
-        LLVM::LLVMType::getInt8PtrTy(context).getPointerTo();
-    auto pushConstantArgTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
-    auto xyzTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
+        LLVM::LLVMPointerType::get(LLVM::LLVMType::getInt8PtrTy(context));
+    auto pushConstantArgTy =
+        LLVM::LLVMPointerType::get(LLVM::LLVMType::getInt32Ty(context));
+    auto xyzTy =
+        LLVM::LLVMPointerType::get(LLVM::LLVMType::getInt32Ty(context));
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
     signatureConverter.addInputs(xyzTy);  // workgroup_id
@@ -294,8 +296,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // descriptors.
     Value packedBuffersArgsPtr = builder.create<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMType::getStructTy(builder.getContext(), inputStructPtrs)
-            .getPointerTo(),
+        LLVM::LLVMPointerType::get(
+            LLVM::LLVMType::getStructTy(builder.getContext(), inputStructPtrs)),
         newFuncOp.getArgument(0));
     Value packedBuffersArgs =
         builder.create<LLVM::LoadOp>(loc, packedBuffersArgsPtr);
