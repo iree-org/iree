@@ -59,11 +59,11 @@ COMMIT_OPTIONS = {
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument("--llvm",
+  parser.add_argument("--llvm_path",
                       help="Path to the LLVM sources "
                       "(defaults to third_party/llvm-project)",
                       default=None)
-  parser.add_argument("--llvm_bazel",
+  parser.add_argument("--llvm_bazel_path",
                       help="Path to the LLVM Bazel BUILD files"
                       "(defaults to third_party/llvm-bazel)",
                       default=None)
@@ -74,7 +74,7 @@ def parse_arguments():
             f" {LATEST_MATCHING_COMMIT} and {INTEGRATE_COMMIT} are equivalent"
             " for this repository."),
       default=LATEST_MATCHING_COMMIT)
-  parser.add_argument("--tensorflow",
+  parser.add_argument("--tensorflow_path",
                       help="Path to the tensorflow sources "
                       "(default to third_party/tensorflow)",
                       default=None)
@@ -99,48 +99,51 @@ def parse_arguments():
     args.repo = utils.find_git_toplevel()
 
   # Set some defaults.
-  if not args.tensorflow:
-    args.tensorflow = os.path.join(args.repo, "third_party", "tensorflow")
-  if not args.llvm:
-    args.llvm = os.path.join(args.repo, "third_party", "llvm-project")
-  if not args.llvm_bazel:
-    args.llvm_bazel = os.path.join(args.repo, "third_party", "llvm-bazel")
+  if not args.tensorflow_path:
+    args.tensorflow_path = os.path.join(args.repo, "third_party", "tensorflow")
+  if not args.llvm_path:
+    args.llvm_path = os.path.join(args.repo, "third_party", "llvm-project")
+  if not args.llvm_bazel_path:
+    args.llvm_bazel_path = os.path.join(args.repo, "third_party", "llvm-bazel")
 
   return args
 
 
 def main(args):
   print("IREE handy-dandy-LLVM-submodule-updater at your service...")
-  print("  IREE Path :", args.repo)
-  print("  LLVM Path :", args.llvm)
-  print("  TensorFlow Path :", args.tensorflow)
-  print("  LLVM Bazel Path :", args.llvm_bazel)
-  current_llvm_commit = get_commit(args.llvm)
-  current_tensorflow_commit = get_commit(args.tensorflow)
+  print(f"  IREE Path: {args.repo}")
+  print(f"  LLVM Path: {args.llvm_path}")
+  print(f"  LLVM Bazel Path: {args.llvm_bazel_path}")
+  print(f"  TensorFlow Path: {args.tensorflow_path}")
 
-  print("Current Commits: llvm =", current_llvm_commit, "tensorflow =",
-        current_tensorflow_commit)
+  current_llvm_commit = get_commit(args.llvm_path)
+  print("Current Commits:")
+  print(f"  llvm = {current_llvm_commit}")
+  print(f"  llvm_bazel = {get_commit(args.llvm_bazel_path)}")
+  print(f"  tensorflow = {get_commit(args.tensorflow_path)}")
 
   # Update TensorFlow
-  new_tf_commit = find_new_tf_commit(args.tensorflow, current_llvm_commit,
+  new_tf_commit = find_new_tf_commit(args.tensorflow_path, current_llvm_commit,
                                      args.tensorflow_commit)
   print("\n*** Updating TensorFlow to", new_tf_commit, "***")
-  utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow)
-  stage_path(args.repo, args.tensorflow)
+  utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow_path)
+  stage_path(args.repo, args.tensorflow_path)
 
   validate_tf_commit(current_llvm_commit,
-                     args.tensorflow,
+                     args.tensorflow_path,
                      exit_on_failure=args.validate)
 
-  new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel,
+  # Update LLVM-Bazel
+  new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel_path,
                                                      current_llvm_commit,
                                                      args.llvm_bazel_commit)
-  print("\n*** Updating LLVM Bazel to", new_llvm_bazel_commit, "***")
-  utils.execute(["git", "checkout", new_llvm_bazel_commit], cwd=args.llvm_bazel)
-  stage_path(args.repo, args.llvm_bazel)
+  print(f"\n*** Updating LLVM Bazel to {new_llvm_bazel_commit} ***")
+  utils.execute(["git", "checkout", new_llvm_bazel_commit],
+                cwd=args.llvm_bazel_path)
+  stage_path(args.repo, args.llvm_bazel_path)
 
   validate_llvm_bazel_commit(current_llvm_commit,
-                             args.llvm_bazel,
+                             args.llvm_bazel_path,
                              exit_on_failure=args.validate)
 
   # Export SUBMODULE_VERSIONS.
@@ -206,7 +209,7 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
   if tf_commit == REMOTE_HEAD_COMMIT:
     return get_commit(tensorflow_path, "origin/master")
 
-  # Find commits where the number of occurences of the given LLVM commit hash
+  # Find commits where the number of occurrences of the given LLVM commit hash
   # changes. In normal cases, there should be at most two commits that match
   # this:
   # 1. The commit that first introduced the new hash in the TF workspace file.
@@ -215,12 +218,13 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
       [
           "git",
           "log",
-          # Only follow the first parent of a merge commit. We don't want to go off
-          # to some random PR.
+          # Only follow the first parent of a merge commit. We don't want to go
+          # off to some random PR.
           "--first-parent",
           # Just print the commit hash
           "--format=%H",
-          # Look for commits where the number of occurences of llvm_commit changed.
+          # Look for commits where the number of occurrences of llvm_commit
+          # changed.
           # https://git-scm.com/docs/git-log#Documentation/git-log.txt--Sltstringgt
           "-S",
           llvm_commit,
