@@ -48,13 +48,11 @@ py_repositories()
 # bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
 http_archive(
     name = "bazel_toolchains",
-    # Workaround for b/150158570. This patch needs to be updated if the bazel_toolchains version is updated.
-    patches = ["//build_tools/bazel:bazel_toolchains.patch"],
-    sha256 = "6d54b26a58457f9fca2e54f053402061ffe73e3b909b8f6bf6dedb2a3db093ea",
-    strip_prefix = "bazel-toolchains-3.3.2",
+    sha256 = "8c9728dc1bb3e8356b344088dfd10038984be74e1c8d6e92dbb05f21cabbb8e4",
+    strip_prefix = "bazel-toolchains-3.7.1",
     urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
     ],
 )
 

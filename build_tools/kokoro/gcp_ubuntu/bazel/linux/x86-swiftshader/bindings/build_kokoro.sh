@@ -32,7 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/bazel-python@sha256:6a1cee37fa2148a9c6c58273f6e02ca2ac89af0b4908962f1b8fe3ffbb6bd476 \
+  gcr.io/iree-oss/bazel-python@sha256:4f36a4d2a52cf7b694d251358f0750c8bd0ec87a7a27bbe4e4dfd4aa41a616f3 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/bindings/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
