@@ -25,13 +25,13 @@ namespace iree_compiler {
 
 namespace {
 
-// Convert operations which only have operands
+// Convert operations which don't have attributes
 template <typename SrcOpTy>
-class OperandOpConversion : public OpConversionPattern<SrcOpTy> {
+class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
-  OperandOpConversion(MLIRContext *context, StringRef funcName)
+  NoAttributeOpConversion(MLIRContext *context, StringRef funcName)
       : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
 
  private:
@@ -81,12 +81,12 @@ class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
   // Arithmetic
-  patterns.insert<OperandOpConversion<IREE::VM::AddI32Op>>(context,
-                                                           "vm_add_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
+                                                               "vm_add_i32");
 
   // Compare
-  patterns.insert<OperandOpConversion<IREE::VM::CmpNEI32Op>>(context,
-                                                             "vm_cmp_ne_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::CmpNEI32Op>>(
+      context, "vm_cmp_ne_i32");
 
   // Const
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context,
