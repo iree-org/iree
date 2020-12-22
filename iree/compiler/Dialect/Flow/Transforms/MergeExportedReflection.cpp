@@ -73,15 +73,16 @@ class MergeExportedReflectionPass
     // have been promoted to inputs but they should still be tagged correctly).
     auto fPartialIdent = builder.getIdentifier("f_partial");
     for (int i = 0, e = func.getNumArguments(); i < e; ++i) {
-      MutableDictionaryAttr l(
+      DictionaryAttr l(
           func.getArgAttrOfType<DictionaryAttr>(i, reflectionIdent));
-      if (failed(addItem(l.get(fPartialIdent), "argument", i))) {
+      if (l && failed(addItem(l.get(fPartialIdent), "argument", i))) {
         return;
       }
-      l.remove(fPartialIdent);
-      auto updatedReflection = l.getDictionary(&getContext());
-      if (updatedReflection) {
-        func.setArgAttr(i, reflectionIdent, updatedReflection);
+      NamedAttrList lAttrList(l);
+      lAttrList.erase(fPartialIdent);
+      if (!lAttrList.empty()) {
+        func.setArgAttr(i, reflectionIdent,
+                        lAttrList.getDictionary(&getContext()));
       } else {
         func.removeArgAttr(i, reflectionIdent);
       }
@@ -89,15 +90,16 @@ class MergeExportedReflectionPass
 
     // Results.
     for (int i = 0, e = func.getNumResults(); i < e; ++i) {
-      MutableDictionaryAttr l(
+      DictionaryAttr l(
           func.getResultAttrOfType<DictionaryAttr>(i, reflectionIdent));
-      if (failed(addItem(l.get(fPartialIdent), "result", i))) {
+      if (l && failed(addItem(l.get(fPartialIdent), "result", i))) {
         return;
       }
-      l.remove(fPartialIdent);
-      auto updatedReflection = l.getDictionary(&getContext());
-      if (updatedReflection) {
-        func.setResultAttr(i, reflectionIdent, updatedReflection);
+      NamedAttrList lAttrList(l);
+      lAttrList.erase(fPartialIdent);
+      if (!lAttrList.empty()) {
+        func.setResultAttr(i, reflectionIdent,
+                           lAttrList.getDictionary(&getContext()));
       } else {
         func.removeResultAttr(i, reflectionIdent);
       }
@@ -109,8 +111,7 @@ class MergeExportedReflectionPass
     SignatureBuilder functionSignature;
     functionSignature.Span(inputsAccum, 'I');
     functionSignature.Span(resultsAccum, 'R');
-    MutableDictionaryAttr l(
-        func->getAttrOfType<DictionaryAttr>(reflectionIdent));
+    NamedAttrList l(func->getAttrOfType<DictionaryAttr>(reflectionIdent));
     l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
     l.set(fVersionIdent, builder.getStringAttr("1"));
     func->setAttr(reflectionIdent, l.getDictionary(&getContext()));

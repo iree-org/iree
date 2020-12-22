@@ -5,6 +5,7 @@
 module {
   func @element_wise() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 2] : tensor<2x2xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x2xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0
@@ -12,8 +13,9 @@ module {
     %2 = linalg.generic {
        indexing_maps = [#map0, #map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0, %1 : tensor<2x2xf32>, tensor<2x2xf32>) {
-    ^bb0(%arg3: f32, %arg4: f32):       // no predecessors
+     ins(%0, %1 : tensor<2x2xf32>, tensor<2x2xf32>)
+    outs(%shape : tensor<2x2xf32>) {
+    ^bb0(%arg3: f32, %arg4: f32, %s: f32):       // no predecessors
       %3 = addf %arg3, %arg4 : f32
       linalg.yield %3 : f32
     } -> tensor<2x2xf32>
@@ -52,13 +54,15 @@ module {
 module {
   func @indexed_generic() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 2] : tensor<2x2xi32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x2xi32>
     %1 = linalg.indexed_generic {
        indexing_maps = [#map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0 : tensor<2x2xi32>) {
-    ^bb0(%arg2: index, %arg3: index, %arg4: i32):       // no predecessors
+     ins(%0 : tensor<2x2xi32>)
+    outs(%shape : tensor<2x2xi32>) {
+    ^bb0(%arg2: index, %arg3: index, %arg4: i32, %s: i32):       // no predecessors
       %2 = index_cast %arg2 : index to i32
       %3 = index_cast %arg3 : index to i32
       %4 = addi %arg4, %2 : i32
@@ -103,6 +107,7 @@ module {
 module {
   func @reshape_arg_result() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[5, 5] : tensor<5x5xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<5xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0
@@ -112,8 +117,9 @@ module {
     %4 = linalg.generic {
        indexing_maps = [#map1, #map2, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%2, %3 : tensor<5x1xf32>, tensor<1x5xf32>) {
-         ^bb0(%arg3: f32, %arg4: f32):       // no predecessors
+     ins(%2, %3 : tensor<5x1xf32>, tensor<1x5xf32>)
+    outs(%shape : tensor<5x5xf32>) {
+         ^bb0(%arg3: f32, %arg4: f32, %s: f32):       // no predecessors
            %5 = addf %arg3, %arg4 : f32
            linalg.yield %5 : f32
          } -> tensor<5x5xf32>
@@ -180,13 +186,15 @@ module {
 module {
   func @store_value_twice() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 4] : tensor<2x4xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x4xf32>
     %1 = linalg.generic {
        indexing_maps = [#map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0 : tensor<2x4xf32>) {
-    ^bb0(%arg0: f32):  // no predecessors
+     ins(%0 : tensor<2x4xf32>)
+    outs(%shape : tensor<2x4xf32>) {
+    ^bb0(%arg0: f32, %s: f32):  // no predecessors
       %2 = tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
@@ -224,13 +232,15 @@ module {
 module {
   func @store_reshape_src_and_result_0() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 4] : tensor<2x4xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x4xf32>
     %1 = linalg.generic {
        indexing_maps = [#map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0 : tensor<2x4xf32>) {
-    ^bb0(%arg0: f32):  // no predecessors
+     ins(%0 : tensor<2x4xf32>)
+    outs(%shape : tensor<2x4xf32>) {
+    ^bb0(%arg0: f32, %s: f32):  // no predecessors
       %2 = tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
@@ -272,13 +282,15 @@ module {
 module {
   func @store_reshape_src_and_result_1() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 4] : tensor<2x4xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x4xf32>
     %1 = linalg.generic {
        indexing_maps = [#map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0 : tensor<2x4xf32>) {
-    ^bb0(%arg0: f32):  // no predecessors
+     ins(%0 : tensor<2x4xf32>)
+    outs(%shape : tensor<2x4xf32>) {
+    ^bb0(%arg0: f32, %s: f32):  // no predecessors
       %2 = tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
@@ -320,13 +332,15 @@ module {
 module {
   func @store_reshape_src_and_result_2() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[2, 4] : tensor<2x4xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<2x4xf32>
     %1 = linalg.generic {
        indexing_maps = [#map0, #map0],
        iterator_types = ["parallel", "parallel"]}
-    ins(%0 : tensor<2x4xf32>) {
-    ^bb0(%arg0: f32):  // no predecessors
+     ins(%0 : tensor<2x4xf32>)
+    outs(%shape : tensor<2x4xf32>) {
+    ^bb0(%arg0: f32, %s: f32):  // no predecessors
       %2 = tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
@@ -378,6 +392,7 @@ module {
 module {
   func @edge_detect_sobel_operator_ex_dispatch_3() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[128, 128] : tensor<128x128xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<1x128x128x1xf32>
     %1 = linalg.tensor_reshape %0 [#map0, #map1]
@@ -387,8 +402,9 @@ module {
     %3 = linalg.generic {
        indexing_maps = [#map2, #map2, #map2],
        iterator_types = ["parallel", "parallel"]}
-    ins(%1, %2 : tensor<128x128xf32>, tensor<128x128xf32>) {
-    ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+     ins(%1, %2 : tensor<128x128xf32>, tensor<128x128xf32>)
+    outs(%shape: tensor<128x128xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32, %s: f32):  // no predecessors
       %5 = mulf %arg0, %arg1 : f32
       linalg.yield %5 : f32
     } -> tensor<128x128xf32>
@@ -426,14 +442,16 @@ module {
   func @generic_reshape_reshape() {
     %c0 = constant 0 : index
     %cst = constant 0.000000e+00 : f32
+    %shape = linalg.init_tensor[1000] : tensor<1000xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       {operand_result_index = 0 : i32} : tensor<1x1x1x1000xf32>
     %1 = linalg.tensor_reshape %0 [#map0]
       : tensor<1x1x1x1000xf32> into tensor<1000xf32>
     %2 = linalg.generic {
        indexing_maps = [#map1, #map1], iterator_types = ["parallel"]}
-    ins(%1 : tensor<1000xf32>) {
-    ^bb0(%arg0: f32):  // no predecessors
+     ins(%1 : tensor<1000xf32>)
+    outs(%shape : tensor<1000xf32>) {
+    ^bb0(%arg0: f32, %s: f32):  // no predecessors
       %5 = addf %arg0, %cst : f32
       linalg.yield %5 : f32
     } -> tensor<1000xf32>
@@ -479,6 +497,7 @@ module {
 module {
   func @matmul_add() {
     %c0 = constant 0 : index
+    %shape = linalg.init_tensor[32, 64] : tensor<32x64xf32>
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
       : tensor<32x48xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0
@@ -490,8 +509,9 @@ module {
     %4 = linalg.generic {
       indexing_maps = [#map0, #map0, #map0],
       iterator_types = ["parallel", "parallel"]}
-      ins(%2, %3 : tensor<32x64xf32>, tensor<32x64xf32>) {
-        ^bb0(%arg0: f32, %arg1: f32):
+       ins(%2, %3 : tensor<32x64xf32>, tensor<32x64xf32>)
+      outs(%shape : tensor<32x64xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32, %s: f32):
           %5 = addf %arg0, %arg1 : f32
           linalg.yield %5 : f32
       } -> tensor<32x64xf32>
