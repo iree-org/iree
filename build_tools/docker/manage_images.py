@@ -52,11 +52,6 @@ DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 IMAGES_TO_DEPENDENCIES = {
     'base': [],
     'bazel': ['base', 'util'],
-    'bazel-python': ['bazel'],
-    'bazel-tensorflow': ['bazel-python'],
-    'bazel-tensorflow-nvidia': ['bazel-tensorflow-vulkan'],
-    'bazel-tensorflow-swiftshader': ['bazel-tensorflow-vulkan', 'swiftshader'],
-    'bazel-tensorflow-vulkan': ['bazel-tensorflow', 'vulkan'],
     'cmake': ['base', 'util'],
     'cmake-android': ['cmake', 'util'],
     'cmake-python': ['cmake'],
