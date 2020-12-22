@@ -82,10 +82,10 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
           "unable to promote ops with multiple fusable dependences");
     }
     auto dependence = dependences.front();
-    unsigned producerIdx = dependence.dependentOpView.operandIndex;
+    unsigned producerIdx = dependence.dependentOpView->getOperandNumber();
     linalg::LinalgOp consumer =
-        cast<linalg::LinalgOp>(dependence.indexingOpView.op);
-    unsigned consumerIdx = dependence.indexingOpView.operandIndex;
+        cast<linalg::LinalgOp>(dependence.indexingOpView->getOwner());
+    unsigned consumerIdx = dependence.indexingOpView->getOperandNumber();
     Value consumerView = consumer.getShapedOperand(consumerIdx);
     Value promotedView = nullptr;
 
