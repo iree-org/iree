@@ -164,27 +164,23 @@ class BufferConstraintsAdaptor {
 class BufferBarrierType {
  public:
   static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-            BufferType::get(context),
-            IndexType::get(context),
-            IndexType::get(context),
-        },
-        context);
+    return TupleType::get(context, {
+                                       IntegerType::get(context, 32),
+                                       IntegerType::get(context, 32),
+                                       BufferType::get(context),
+                                       IndexType::get(context),
+                                       IndexType::get(context),
+                                   });
   }
 };
 
 class MemoryBarrierType {
  public:
   static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-        },
-        context);
+    return TupleType::get(context, {
+                                       IntegerType::get(context, 32),
+                                       IntegerType::get(context, 32),
+                                   });
   }
 };
 

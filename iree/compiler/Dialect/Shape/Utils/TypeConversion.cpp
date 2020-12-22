@@ -80,7 +80,7 @@ LogicalResult TypeExpander::expandFunctionSignature(FuncOp funcOp,
 
   // Update function.
   auto newFuncType =
-      FunctionType::get(argTypes, resultTypes, funcOp.getContext());
+      FunctionType::get(funcOp.getContext(), argTypes, resultTypes);
   funcOp.setType(newFuncType);
   funcOp.setAllArgAttrs(argAttrs);
   funcOp.setAllResultAttrs(resultAttrs);

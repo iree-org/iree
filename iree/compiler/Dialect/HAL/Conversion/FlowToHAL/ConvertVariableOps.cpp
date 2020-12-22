@@ -35,8 +35,8 @@ static FuncOp createInitializerFromImmediate(
     IREE::Flow::VariableOp variableOp, ElementsAttr immediateElements,
     ConversionPatternRewriter &rewriter) {
   auto loc = variableOp.getLoc();
-  auto initializerType = FunctionType::get({}, {immediateElements.getType()},
-                                           rewriter.getContext());
+  auto initializerType = FunctionType::get(rewriter.getContext(), {},
+                                           {immediateElements.getType()});
   // TODO(b/145839814): It is presently possible to collide with user
   // provided symbols and it seems like it shouldn't be.
   auto uniqueName = (Twine("__") + variableOp.getName() + "_initializer").str();

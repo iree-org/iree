@@ -220,8 +220,8 @@ class LegalizeInputTypesPass
 
       auto newFuncOp =
           cast<FuncOp>(moduleBuilder.cloneWithoutRegions(*oldFuncOp));
-      newFuncOp.setType(FunctionType::get(signature.getConvertedTypes(),
-                                          convertedResults, &getContext()));
+      newFuncOp.setType(FunctionType::get(
+          &getContext(), signature.getConvertedTypes(), convertedResults));
 
       BlockAndValueMapping mapping;
       if (failed(convertRegion(oldFuncOp.getBody(), newFuncOp.getBody(),

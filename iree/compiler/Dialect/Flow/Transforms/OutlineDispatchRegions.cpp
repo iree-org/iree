@@ -120,7 +120,7 @@ FuncOp createRegionFunction(Location loc, StringRef functionName,
 
   // Clone region into the function body.
   auto functionType =
-      FunctionType::get(operandTypes, resultTypes, region.getContext());
+      FunctionType::get(region.getContext(), operandTypes, resultTypes);
   auto funcOp = FuncOp::create(loc, functionName, functionType);
   BlockAndValueMapping mapping;
   region.cloneInto(&funcOp.getBody(), mapping);
