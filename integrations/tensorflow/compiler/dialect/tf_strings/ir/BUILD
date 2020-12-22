@@ -73,7 +73,6 @@ cc_library(
         ":op_interface_gen",
         ":ops",
         ":ops_gen",
-        "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_flow_to_hal",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],

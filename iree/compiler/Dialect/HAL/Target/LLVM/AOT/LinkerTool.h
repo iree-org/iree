@@ -21,6 +21,8 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Support/LogicalResult.h"
 

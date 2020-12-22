@@ -58,7 +58,7 @@ struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
   LogicalResult matchAndRewrite(FuncOp entryPointFn,
                                 PatternRewriter &rewriter) const override {
     if (!isEntryPoint(entryPointFn) ||
-        entryPointFn.getAttr(getNumWorkgroupsFnAttrName()))
+        entryPointFn->getAttr(getNumWorkgroupsFnAttrName()))
       return failure();
     Region &body = entryPointFn.getBody();
     if (!llvm::hasSingleElement(body)) {
@@ -81,8 +81,8 @@ struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
       if (!operand.getType().isa<ShapedType>()) continue;
       if (auto definingOp =
               operand.getDefiningOp<IREE::HAL::InterfaceLoadTensorOp>()) {
-        definingOp.setAttr(getOperandResultNumAttrName(),
-                           rewriter.getI32IntegerAttr(shapedTypes.size()));
+        definingOp->setAttr(getOperandResultNumAttrName(),
+                            rewriter.getI32IntegerAttr(shapedTypes.size()));
       }
       shapedTypes.push_back(operand.getType().cast<ShapedType>());
     }
@@ -94,8 +94,8 @@ struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
       for (auto &use : result.getUses()) {
         if (auto storeOp =
                 dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(use.getOwner())) {
-          storeOp.setAttr(getOperandResultNumAttrName(),
-                          rewriter.getI32IntegerAttr(shapedTypes.size()));
+          storeOp->setAttr(getOperandResultNumAttrName(),
+                           rewriter.getI32IntegerAttr(shapedTypes.size()));
         }
       }
       shapedTypes.push_back(result.getType().cast<ShapedType>());
@@ -111,8 +111,8 @@ struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
         entryPointFn.getLoc(), entryPointFn.getName().str() + kNumWorkgroupsStr,
         rewriter.getFunctionType(argTypes, {indexType, indexType, indexType}));
     numWorkgroupsFn.setVisibility(FuncOp::Visibility::Private);
-    entryPointFn.setAttr(getNumWorkgroupsFnAttrName(),
-                         rewriter.getSymbolRefAttr(numWorkgroupsFn));
+    entryPointFn->setAttr(getNumWorkgroupsFnAttrName(),
+                          rewriter.getSymbolRefAttr(numWorkgroupsFn));
     rewriter.updateRootInPlace(entryPointFn, []() {});
     return success();
   }

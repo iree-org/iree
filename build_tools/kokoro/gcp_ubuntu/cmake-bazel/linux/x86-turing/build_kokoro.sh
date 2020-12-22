@@ -32,7 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:1351b5befd1bc4b89fc6f203754a05accff204579f122ec1123e86ed7e2bd319 \
+  gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:8c2b5247f202dbd32051a78cec0228ea102d38075fd212c2ce01d498fbd5d322 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

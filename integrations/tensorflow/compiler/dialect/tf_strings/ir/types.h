@@ -26,7 +26,7 @@
 #include "mlir/IR/Types.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 class TFStringsType : public Type {
@@ -43,7 +43,7 @@ class StringType
 };
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_TYPES_H_

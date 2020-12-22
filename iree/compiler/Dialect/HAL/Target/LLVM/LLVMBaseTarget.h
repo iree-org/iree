@@ -23,7 +23,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Base target for LLVM ahead-of-time (AOT) and just-in-time (JIT) backends.
+// Base target for LLVM backends.
+// TODO(scotttodd): fold into LLVMAOTTarget now that LLVMJITTarget is gone
 class LLVMBaseTargetBackend : public TargetBackend {
  public:
   explicit LLVMBaseTargetBackend(LLVMTargetOptions options);

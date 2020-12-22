@@ -60,21 +60,22 @@ gentbl(
 )
 
 cc_library(
-    name = "convert_flow_to_hal",
+    name = "convert_tf_tensorlist_to_tensorlist",
     srcs = [
-        "convert_flow_to_hal.cc",
+        "convert_tf_tensorlist_to_tensorlist.cc",
     ],
     hdrs = [
-        "convert_flow_to_hal.h",
+        "convert_tf_tensorlist_to_tensorlist.h",
     ],
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir",
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Utils",
+        "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
+        "//integrations/tensorflow/compiler/dialect/utils:conversion_utils",
         "//iree/compiler/Dialect/Modules/TensorList/IR",
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],

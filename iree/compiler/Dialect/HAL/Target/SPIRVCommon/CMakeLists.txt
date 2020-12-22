@@ -29,8 +29,8 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRSPIRV
+    MLIRSPIRVConversion
     MLIRSPIRVSerialization
-    MLIRSPIRVTransforms
     MLIRSupport
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common

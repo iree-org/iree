@@ -954,7 +954,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 }
 
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
-  p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
+  p << op.getOperationName() << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
       llvm::zip(op.segment_sizes(), op.segment_types()), p,

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/base/signature_mangle.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -33,8 +34,8 @@ class MergeExportedReflectionPass
     Identifier reflectionIdent = builder.getIdentifier("iree.reflection");
 
     // Only process exported functions.
-    if (!func.getAttr("iree.module.export")) return;
-    if (func.getAttr("iree.abi.none")) return;
+    if (!func->getAttr("iree.module.export")) return;
+    if (func->getAttr("iree.abi.none")) return;
 
     // Accumulate input and results into these.
     std::string inputsAccum;
@@ -112,7 +113,7 @@ class MergeExportedReflectionPass
         func->getAttrOfType<DictionaryAttr>(reflectionIdent));
     l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
     l.set(fVersionIdent, builder.getStringAttr("1"));
-    func.setAttr(reflectionIdent, l.getDictionary(&getContext()));
+    func->setAttr(reflectionIdent, l.getDictionary(&getContext()));
   }
 };
 

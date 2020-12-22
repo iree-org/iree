@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"

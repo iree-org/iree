@@ -34,6 +34,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

@@ -21,13 +21,15 @@ package(
 cc_library(
     name = "Conversion",
     srcs = [
-        "ConvertHALToVM.cpp",
+        "ConversionPatterns.cpp",
     ],
     hdrs = [
-        "ConvertHALToVM.h",
+        "ConversionPatterns.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Conversion",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/Modules/TensorList/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//mlir:Pass",

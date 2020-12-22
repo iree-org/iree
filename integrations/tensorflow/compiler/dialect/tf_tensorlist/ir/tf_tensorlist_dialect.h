@@ -20,7 +20,7 @@
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_tensorlist {
 
 class TFTensorListDialect : public Dialect {
@@ -32,7 +32,7 @@ class TFTensorListDialect : public Dialect {
 };
 
 }  // namespace tf_tensorlist
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // TENSORFLOW_COMPILER_MLIR_TENSORFLOW_IR_tf_tensorlist_H_

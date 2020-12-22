@@ -246,8 +246,8 @@ class IdentifyConstantPoolsPass
         moduleBuilder.getFunctionType({}, {variableOp.type()}));
     initializerFunc.setPrivate();
     variableOp.removeAttr("initial_value");
-    variableOp.setAttr("initializer",
-                       moduleBuilder.getSymbolRefAttr(initializerFunc));
+    variableOp->setAttr("initializer",
+                        moduleBuilder.getSymbolRefAttr(initializerFunc));
 
     // Emit a constant load that will later on be turned into a runtime buffer
     // reference.

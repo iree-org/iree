@@ -114,7 +114,7 @@ struct CmpIOpConversion
         srcOp.getLoc(), predicate, operands[0], operands[1], dst,
         TypeAttr::get(inputType.getElementType()));
     if (forceUnsigned) {
-      newOp.setAttr("force_unsigned", UnitAttr::get(rewriter.getContext()));
+      newOp->setAttr("force_unsigned", UnitAttr::get(rewriter.getContext()));
     }
     rewriter.replaceOp(srcOp, newOp.dst());
     return success();

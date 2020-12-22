@@ -19,10 +19,7 @@ set(SPECIAL_CASES
 )
 
 set(TFLITE_FAILING
-    "broadcasting_test.py"
     "concat_test.py"
-    "dynamic_mlp_relu_test.py"
-    "dynamic_mlp_test.py"
     "einsum_dynamic_test.py"
     "einsum_static_test.py"
     "einsum_vector_test.py"
@@ -30,8 +27,6 @@ set(TFLITE_FAILING
     "gather_test.py"
     "image_resize_test.py"
     "mandelbrot_test.py"
-    "matrix_ops_dynamic_test.py"
-    "quantization_dyn_test.py"
     "resource_ops_test.py"
     "ring_buffer_test.py"
     "scatter_update_test.py"

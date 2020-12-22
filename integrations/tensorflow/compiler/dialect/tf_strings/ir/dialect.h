@@ -20,7 +20,7 @@
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/op_interface.h.inc"
@@ -36,7 +36,7 @@ class TFStringsDialect : public Dialect {
 };
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_DIALECT_H_

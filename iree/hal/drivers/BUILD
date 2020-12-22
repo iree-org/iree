@@ -28,7 +28,6 @@ cc_library(
     ] + [
         # TODO(*): select() and only pull in based on build configuration.
         "//iree/hal/dylib/registration",
-        "//iree/hal/llvmjit/registration",
         "//iree/hal/vmla/registration",
         "//iree/hal/vulkan/registration",
     ] + select({

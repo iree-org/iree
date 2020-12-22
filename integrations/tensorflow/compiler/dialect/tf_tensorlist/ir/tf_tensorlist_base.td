@@ -31,10 +31,10 @@ def TFTensorList_Dialect : Dialect {
     This allows representing the TensorList construct with greater fidelity.
   }];
 
-  let cppNamespace = "::mlir::iree_compiler::tf_tensorlist";
+  let cppNamespace = "::mlir::iree_integrations::tf_tensorlist";
 }
 
 def TFTensorList_TensorList :
-    Type<CPred<"$_self.isa<mlir::iree_compiler::tf_tensorlist::TensorListType>()">, "list">;
+    Type<CPred<"$_self.isa<mlir::iree_integrations::tf_tensorlist::TensorListType>()">, "list">;
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TF_TENSORLIST_IR_TF_TENSORLIST_BASE_TD

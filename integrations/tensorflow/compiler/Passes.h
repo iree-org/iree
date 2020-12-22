@@ -15,12 +15,14 @@
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_COMPILER_PASSES_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_COMPILER_PASSES_H_
 
+#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_strings_to_strings.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_tensorlist_to_tensorlist.h"
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 //===----------------------------------------------------------------------===//
@@ -82,12 +84,14 @@ inline void registerAllPasses() {
   createStripFunctionMetadataPass();
   createVerifyFullyConvertedPass();
 
-  tf_tensorlist::createConvertTFToTFTensorListPass();
   tf_strings::createConvertTFToTFStringsPass();
+  tf_strings::createConvertTFStringsToStringsPass();
+  tf_tensorlist::createConvertTFTensorListToTensorListPass();
+  tf_tensorlist::createConvertTFToTFTensorListPass();
 }
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_PASSES_H_

@@ -4,7 +4,7 @@ vm.module @add_module {
     %1 = vm.add.i32 %0, %0 : i32
     vm.return %1 : i32
   }
-  vm.export @add_1
+  vm.export @add
 
   vm.func @add_call(%arg0: i32) -> i32 {
     %0 = vm.call @add(%arg0, %arg0) : (i32, i32) -> i32
