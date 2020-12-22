@@ -115,8 +115,10 @@ struct GatherV2OpLowering : public OpRewritePattern<TF::GatherV2Op> {
 
     auto result_ty = op.getType().cast<ShapedType>();
     rewriter.replaceOpWithNewOp<tf_strings::GatherOp>(
-      op, RankedTensorType::get(result_ty.getShape(), tf_strings::StringType::get(op.getContext())),
-      tensor, op.indices());
+        op,
+        RankedTensorType::get(result_ty.getShape(),
+                              tf_strings::StringType::get(op.getContext())),
+        tensor, op.indices());
 
     return success();
   }

@@ -63,7 +63,6 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(print_ids, self._modules)
 
-
   def test_gather(self):
 
     def gather(module):
