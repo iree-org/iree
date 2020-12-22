@@ -701,7 +701,7 @@ void DispatchWorkgroupSizeOp::getAsmResultNames(
 template <typename T>
 static LogicalResult verifyDispatchWorkgroupInfoOp(T op) {
   size_t dimCount = 0;
-  if (auto dispatchOp = op.template getParentOfType<DispatchWorkgroupsOp>()) {
+  if (auto dispatchOp = op->template getParentOfType<DispatchWorkgroupsOp>()) {
     dimCount = dispatchOp.workgroup_count().size();
   }
   uint64_t dimension = op.dimension().getZExtValue();
