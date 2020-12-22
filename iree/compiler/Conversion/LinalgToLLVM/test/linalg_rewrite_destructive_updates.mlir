@@ -26,7 +26,7 @@ func @tile_from_tensor_load() {
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32>
   // Compute.
   //      CHECK:     %[[RES:.*]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<1x3xf32>, tensor<3x1xf32>)
-  // CHECK-SAME:                       init(%[[OUT]] : tensor<1x1xf32>)
+  // CHECK-SAME:                       outs(%[[OUT]] : tensor<1x1xf32>)
   // Inplace update (assume only parallel loops have been tiled).
   //      CHECK:     hal.interface.store.tensor.tile %[[RES]], @legacy_io::@ret0, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32>
@@ -36,7 +36,7 @@ func @tile_from_tensor_load() {
       %8 = subtensor %1[0, %arg2] [3, 1] [1, 1] : tensor<3x4xf32> to tensor<3x1xf32>
       %9 = subtensor %arg3[%arg0, %arg2] [1, 1] [1, 1] : tensor<2x4xf32> to tensor<1x1xf32>
       %10 = linalg.matmul ins(%7, %8 : tensor<1x3xf32>, tensor<3x1xf32>)
-                         init(%9 : tensor<1x1xf32>)
+                         outs(%9 : tensor<1x1xf32>)
         -> tensor<1x1xf32>
       // This op is the destructive update we seek to eliminate.
       %11 = subtensor_insert %10 into %arg3[%arg0, %arg2] [%c1, %c1] [%c1, %c1] :
@@ -93,13 +93,13 @@ func @tile_from_pointwise_lhs() {
   //      CHECK:     %[[RHS:.*]] = hal.interface.load.tensor.tile @legacy_io::@TENSOR_RHS, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [0, %[[J]]], sizes = [3, 1], strides = [1, 1] : tensor<3x1xf32>
   // Compute.
-  //      CHECK:     %[[LHS2:.*]] = linalg.generic {{.*}} ins(%[[LHS]] : tensor<1x3xf32>) {
+  //      CHECK:     %[[LHS2:.*]] = linalg.generic {{.*}} ins(%[[LHS]] : tensor<1x3xf32>)
   // TODO: should we reorder this load?
   //      CHECK:     %[[OUT:.*]] = hal.interface.load.tensor.tile @legacy_io::@TENSOR_INIT, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32>
   // Compute.
   //      CHECK:     %[[RES:.*]] = linalg.matmul ins(%[[LHS2]], %[[RHS]] : tensor<1x3xf32>, tensor<3x1xf32>)
-  // CHECK-SAME:                       init(%[[OUT]] : tensor<1x1xf32>)
+  // CHECK-SAME:                       outs(%[[OUT]] : tensor<1x1xf32>)
   // Inplace update (assume only parallel loops have been tiled).
   //      CHECK:     hal.interface.store.tensor.tile %[[RES]], @legacy_io::@ret0, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32>
@@ -107,14 +107,15 @@ func @tile_from_pointwise_lhs() {
     %7 = scf.for %arg2 = %4 to %c4 step %c4 iter_args(%arg3 = %arg1) -> (tensor<2x4xf32>) {
       %8 = subtensor %1[%arg0, 0] [1, 3] [1, 1] : tensor<2x3xf32> to tensor<1x3xf32>
       %9 = subtensor %2[0, %arg2] [3, 1] [1, 1] : tensor<3x4xf32> to tensor<3x1xf32>
-      %10 = linalg.generic #trait ins(%8 : tensor<1x3xf32>) {
-      ^bb0(%arg4: f32):
+      %shape = linalg.init_tensor [1, 3] : tensor<1x3xf32>
+      %10 = linalg.generic #trait ins(%8 : tensor<1x3xf32>) outs(%shape : tensor<1x3xf32>) {
+      ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
       } -> tensor<1x3xf32>
 
       %11 = subtensor %arg3[%arg0, %arg2] [1, 1] [1, 1] : tensor<2x4xf32> to tensor<1x1xf32>
       %13 = linalg.matmul ins(%10, %9 : tensor<1x3xf32>, tensor<3x1xf32>)
-                         init(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
+                         outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
 
       // This op is the destructive update we seek to eliminate.
       %14 = subtensor_insert %13 into %arg3[%arg0, %arg2] [%c1, %c1] [%c1, %c1] :
@@ -145,14 +146,14 @@ func @tile_from_pointwise_lhs() {
   iterator_types = ["parallel", "parallel"]
 }
 
-// CHECK-LABEL: func @tile_from_pointwise_init
-func @tile_from_pointwise_init() {
+// CHECK-LABEL: func @tile_from_pointwise_outs
+func @tile_from_pointwise_outs() {
   %c0 = constant 0 : index
   %c2 = constant 2 : index
   %c4 = constant 4 : index
   %c1 = constant 1 : index
   // This is the `out` operand that gets through a pointwise generic and becomes
-  // the init operand of linalg.matmul. After tiling and fusion this is a
+  // the outs operand of linalg.matmul. After tiling and fusion this is a
   // subtensor of the value produced by linalg.generic.
   %0 = hal.interface.load.tensor @legacy_io::@TENSOR_INIT, offset = %c0
     {operand_result_index = 0 : i32} : tensor<2x4xf32>
@@ -163,8 +164,9 @@ func @tile_from_pointwise_init() {
 
   // This op is left over and should be DCE'ed but its result is currently used
   // for a destructive update.
-  %3 = linalg.generic #trait ins(%0 : tensor<2x4xf32>) {
-  ^bb0(%arg0: f32):
+  %shape = linalg.init_tensor [2, 4] : tensor<2x4xf32>
+  %3 = linalg.generic #trait ins(%0 : tensor<2x4xf32>) outs(%shape : tensor<2x4xf32>) {
+  ^bb0(%arg0: f32, %s: f32):
     linalg.yield %arg0 : f32
   } -> tensor<2x4xf32>
 
@@ -181,9 +183,9 @@ func @tile_from_pointwise_init() {
   //      CHECK:     %[[OUT:.*]] = hal.interface.load.tensor.tile @legacy_io::@TENSOR_INIT, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32>
   // Compute.
-  //      CHECK:     %[[OUT2:.*]] = linalg.generic {{.*}} ins(%[[OUT]] : tensor<1x1xf32>) {
+  //      CHECK:     %[[OUT2:.*]] = linalg.generic {{.*}} ins(%[[OUT]] : tensor<1x1xf32>)
   //      CHECK:     %[[RES:.*]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<1x3xf32>, tensor<3x1xf32>)
-  // CHECK-SAME:                       init(%[[OUT2]] : tensor<1x1xf32>)
+  // CHECK-SAME:                       outs(%[[OUT2]] : tensor<1x1xf32>)
   // Inplace update (assume only parallel loops have been tiled).
   //      CHECK:     hal.interface.store.tensor.tile %[[RES]], @legacy_io::@ret0, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32>
@@ -192,12 +194,12 @@ func @tile_from_pointwise_init() {
       %8 = subtensor %1[%arg0, 0] [1, 3] [1, 1] : tensor<2x3xf32> to tensor<1x3xf32>
       %9 = subtensor %2[0, %arg2] [3, 1] [1, 1] : tensor<3x4xf32> to tensor<3x1xf32>
       %10 = subtensor %0[%arg0, %arg2] [1, 1] [1, 1] : tensor<2x4xf32> to tensor<1x1xf32>
-      %11 = linalg.generic #trait ins(%10 : tensor<1x1xf32>) {
-      ^bb0(%arg4: f32):
+      %11 = linalg.generic #trait ins(%10 : tensor<1x1xf32>) outs(%10 : tensor<1x1xf32>) {
+      ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
       } -> tensor<1x1xf32>
       %13 = linalg.matmul ins(%8, %9 : tensor<1x3xf32>, tensor<3x1xf32>)
-                         init(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
+                         outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
       // This op is the destructive update we seek to eliminate.
       %14 = subtensor_insert %13 into %arg3[%arg0, %arg2] [%c1, %c1] [%c1, %c1] :
         tensor<1x1xf32> into tensor<2x4xf32>

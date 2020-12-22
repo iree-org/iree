@@ -28,7 +28,7 @@ func @tile_from_tensor_load() {
       // CHECK: alloc() : memref<1x1xf32>
       // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32, #[[$DYN_MAP]]>, memref<1x1xf32>
       // CHECK: linalg.matmul ins(%{{.*}}, %{{.*}} : memref<1x3xf32, #[[$DYN_MAP]]>, memref<3x1xf32, #[[$DYN_MAP]]>) outs(%{{.*}} : memref<1x1xf32>)
-      %5 = linalg.matmul ins(%2, %3 : tensor<1x3xf32>, tensor<3x1xf32>) init(%4 : tensor<1x1xf32>)  -> tensor<1x1xf32>
+      %5 = linalg.matmul ins(%2, %3 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%4 : tensor<1x1xf32>)  -> tensor<1x1xf32>
 
       // CHECK: subview %{{.*}}[%{{.*}}, %{{.*}}] [1, 1] [1, 1] : memref<?x?xf32> to memref<1x1xf32, #[[$DYN_MAP]]>
       // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32>, memref<1x1xf32, #[[$DYN_MAP]]>
@@ -72,10 +72,14 @@ func @tile_from_pointwise_lhs() {
       %2 = hal.interface.load.tensor.tile @legacy_io::@TENSOR_LHS, base_offset = %c0, offsets = [%arg0, 0], sizes = [1, 3], strides = [1, 1] : tensor<1x3xf32>
       %3 = hal.interface.load.tensor.tile @legacy_io::@TENSOR_RHS, base_offset = %c0, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : tensor<3x1xf32>
 
+      %shape = linalg.init_tensor [1, 3] : tensor<1x3xf32>
+
       // CHECK: alloc() : memref<1x3xf32>
       // CHECK: linalg.generic {{.*}}ins(%{{.*}} : memref<1x3xf32, #[[$DYN_MAP]]>) outs(%{{.*}} : memref<1x3xf32>)
-      %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<1x3xf32>) {
-      ^bb0(%arg2: f32):  // no predecessors
+      %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+       ins(%2 : tensor<1x3xf32>)
+      outs(%shape : tensor<1x3xf32>) {
+      ^bb0(%arg2: f32, %s: f32):  // no predecessors
         linalg.yield %arg2 : f32
       } -> tensor<1x3xf32>
 
@@ -84,7 +88,7 @@ func @tile_from_pointwise_lhs() {
       // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32, #[[$DYN_MAP]]>, memref<1x1xf32>
       // CHECK: linalg.matmul ins(%{{.*}}, %{{.*}} : memref<1x3xf32>, memref<3x1xf32, #[[$DYN_MAP]]>) outs(%{{.*}} : memref<1x1xf32>)
       %5 = hal.interface.load.tensor.tile @legacy_io::@TENSOR_INIT, base_offset = %c0, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32>
-      %6 = linalg.matmul ins(%4, %3 : tensor<1x3xf32>, tensor<3x1xf32>) init(%5 : tensor<1x1xf32>)  -> tensor<1x1xf32>
+      %6 = linalg.matmul ins(%4, %3 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%5 : tensor<1x1xf32>)  -> tensor<1x1xf32>
 
       // CHECK: subview %{{.*}}[%{{.*}}, %{{.*}}] [1, 1] [1, 1] : memref<?x?xf32> to memref<1x1xf32, #[[$DYN_MAP]]>
       // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32>, memref<1x1xf32, #[[$DYN_MAP]]>
@@ -107,8 +111,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 
 // CHECK: #[[$DYN_MAP:.*]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 
-// CHECK-LABEL: tile_from_pointwise_init
-func @tile_from_pointwise_init() {
+// CHECK-LABEL: tile_from_pointwise_outs
+func @tile_from_pointwise_outs() {
   %c0 = constant 0 : index
   %c2 = constant 2 : index
   %c4 = constant 4 : index
@@ -130,20 +134,21 @@ func @tile_from_pointwise_init() {
       %3 = hal.interface.load.tensor.tile @legacy_io::@TENSOR_RHS, base_offset = %c0, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : tensor<3x1xf32>
       %4 = hal.interface.load.tensor.tile @legacy_io::@TENSOR_INIT, base_offset = %c0, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32>
 
-      // CHECK: alloc() : memref<1x1xf32>
-      // CHECK: linalg.generic {{.*}}ins(%{{.*}} : memref<1x1xf32, #[[$DYN_MAP]]>) outs(%{{.*}} : memref<1x1xf32>)
-      %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<1x1xf32>) {
-      ^bb0(%arg2: f32):  // no predecessors
+      %shape = linalg.init_tensor [1, 1] : tensor<1x1xf32>
+      // CHECK: %[[ALLOC:.*]] = alloc() : memref<1x1xf32>
+      // CHECK: linalg.generic {{.*}}ins(%{{.*}} : memref<1x1xf32, #[[$DYN_MAP]]>) outs(%[[ALLOC]] : memref<1x1xf32>)
+      %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+        ins(%4 : tensor<1x1xf32>)
+       outs(%shape : tensor<1x1xf32>) {
+      ^bb0(%arg2: f32, %s: f32):  // no predecessors
         linalg.yield %arg2 : f32
       } -> tensor<1x1xf32>
 
-      // CHECK: alloc() : memref<1x1xf32>
-      // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32>, memref<1x1xf32>
-      // CHECK: linalg.matmul ins(%{{.*}}, %{{.*}} : memref<1x3xf32, #[[$DYN_MAP]]>, memref<3x1xf32, #[[$DYN_MAP]]>) outs(%{{.*}} : memref<1x1xf32>)
-      %6 = linalg.matmul ins(%2, %3 : tensor<1x3xf32>, tensor<3x1xf32>) init(%5 : tensor<1x1xf32>)  -> tensor<1x1xf32>
+      // CHECK: linalg.matmul ins(%{{.*}}, %{{.*}} : memref<1x3xf32, #[[$DYN_MAP]]>, memref<3x1xf32, #[[$DYN_MAP]]>) outs(%[[ALLOC]] : memref<1x1xf32>)
+      %6 = linalg.matmul ins(%2, %3 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%5 : tensor<1x1xf32>)  -> tensor<1x1xf32>
 
       // CHECK: subview %{{.*}}[%{{.*}}, %{{.*}}] [1, 1] [1, 1] : memref<?x?xf32> to memref<1x1xf32, #[[$DYN_MAP]]>
-      // CHECK: linalg.copy(%{{.*}}, %{{.*}}) : memref<1x1xf32>, memref<1x1xf32, #[[$DYN_MAP]]>
+      // CHECK: linalg.copy(%[[ALLOC]], %{{.*}}) : memref<1x1xf32>, memref<1x1xf32, #[[$DYN_MAP]]>
       hal.interface.store.tensor.tile %6, @legacy_io::@ret0, base_offset = %c0, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32>
     }
   }

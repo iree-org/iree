@@ -272,6 +272,8 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
       return failure();
     auto loc = op.getLoc();
+    auto memrefType = op.getShapedType().template dyn_cast<MemRefType>();
+    if (!memrefType) return failure();
     auto vecType = op.getVectorType();
     if (vecType.getRank() != 2) return failure();
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
@@ -290,11 +292,11 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     for (auto i : op.indices())
       remappedIndices.push_back(rewriter.getRemappedValue(i));
     Value ptr = spirv::getElementPtr(
-        SPIRVOpLowering<OpTy>::typeConverter, op.getMemRefType(),
-        rewriter.getRemappedValue(op.memref()), remappedIndices, loc, rewriter);
+        SPIRVOpLowering<OpTy>::typeConverter, memrefType,
+        rewriter.getRemappedValue(op.source()), remappedIndices, loc, rewriter);
     int64_t offset = 0;
     SmallVector<int64_t, 2> strides;
-    getStridesAndOffset(op.getMemRefType(), strides, offset);
+    getStridesAndOffset(memrefType, strides, offset);
     auto stride = strides[0];
     if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
     auto int32Type = rewriter.getI32Type();
