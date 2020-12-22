@@ -538,8 +538,7 @@ LogicalResult ConvOpConversion::apply(
         loc,
         /*resultTensorTypes=*/ArrayRef<Type>{},
         /*inputs=*/inputBuffers,
-        /*outputs=*/resultBuffers, /*intTensors*/ ValueRange{}, indexingMaps,
-        loopAttributeTypes,
+        /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
           Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
@@ -1001,8 +1000,7 @@ LogicalResult ReduceOpConversion::apply(
   }
   auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
       loc, /*resultTensorTypes=*/resultTypes, /*inputs=*/inputs,
-      /*outputBuffers=*/resultBuffers, /*initTensors*/ ValueRange{},
-      indexingMaps,
+      /*outputBuffers=*/resultBuffers, indexingMaps,
       getParallelAndReductionIterators(nInputRank, reductionDims.size()));
 
   rewriter.inlineRegionBefore(reduceOp.body(), linalgOp.region(),
@@ -1070,7 +1068,8 @@ struct LinalgOpOnTensorConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
-    SmallVector<Value, 2> opArgs(inputBuffers.begin(), inputBuffers.end());
+    inputBuffers = inputBuffers.drop_back(op.getNumResults());
+    SmallVector<Value, 2> opArgs = llvm::to_vector<2>(inputBuffers);
     opArgs.append(resultBuffers.begin(), resultBuffers.end());
 
     // Create a new op with the same traits as the original
@@ -1152,6 +1151,27 @@ struct TensorReshapeOpConversion
                                       bufferForResult);
     }
     rewriter.replaceOp(reshapeOp, bufferForResult);
+    return success();
+  }
+
+ private:
+  TensorToBufferMap const &resultTensorToBufferMap;
+};
+
+struct InitTensorOpConversion
+    : public OpConversionPattern<linalg::InitTensorOp> {
+  InitTensorOpConversion(MLIRContext *context,
+                         TensorToBufferMap const &resultTensorToBufferMap,
+                         PatternBenefit benefit = 1)
+      : OpConversionPattern<linalg::InitTensorOp>(context, benefit),
+        resultTensorToBufferMap(resultTensorToBufferMap) {}
+
+  LogicalResult matchAndRewrite(
+      linalg::InitTensorOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    Value outputBuffer = resultTensorToBufferMap.lookup(op.result());
+    if (!outputBuffer) return failure();
+    rewriter.replaceOp(op, outputBuffer);
     return success();
   }
 
@@ -1394,6 +1414,15 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }
+    if (auto linalgOp = tensor.getDefiningOp<linalg::LinalgOp>()) {
+      for (auto en : llvm::enumerate(linalgOp.getOperation()->getResults())) {
+        if (en.value() != tensor) continue;
+        tensor = linalgOp.getOutputs()[en.index()];
+        break;
+      }
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
+      continue;
+    }
     break;
   }
   return success();
@@ -1431,13 +1460,15 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns.insert<
-      ConvOpConversion, ConcatenateOpConversion,
-      DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
-      DotGeneralOpConversion, LinalgOpOnTensorConversion<linalg::GenericOp>,
-      LinalgOpOnTensorConversion<linalg::IndexedGenericOp>, PadOpConversion,
-      ReduceOpConversion, ReduceWindowOpConversion, SliceOpConversion,
-      TensorReshapeOpConversion>(context, resultTensorToBufferMap);
+  patterns
+      .insert<ConvOpConversion, ConcatenateOpConversion,
+              DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
+              DotGeneralOpConversion, InitTensorOpConversion,
+              LinalgOpOnTensorConversion<linalg::GenericOp>,
+              LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+              PadOpConversion, ReduceOpConversion, ReduceWindowOpConversion,
+              SliceOpConversion, TensorReshapeOpConversion>(
+          context, resultTensorToBufferMap);
   // Reduce region operation conversions.
   patterns.insert<ReduceRegionXLAOpConversion<mhlo::AddOp>,
                   ReduceRegionXLAOpConversion<mhlo::MinOp>,
@@ -1485,8 +1516,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
         if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
           return linalgOp.hasBufferSemantics();
         }
-        // The other Linalg ops (like linalg.yield) are okay.
-        return true;
+        return !isa<linalg::InitTensorOp>(op);
       }));
   // Let the rest fall through.
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
