@@ -21,13 +21,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
-""",
-    inline = True,
-)
-
 iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
@@ -48,11 +41,4 @@ iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
     runner_args = ["--expect_failure"],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

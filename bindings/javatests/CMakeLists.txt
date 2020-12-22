@@ -12,4 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if (NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+
 add_subdirectory(com/google/iree)

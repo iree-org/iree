@@ -31,7 +31,7 @@ include(CMakeParseArguments)
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test)
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 
@@ -108,7 +108,7 @@ endfunction()
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test_suite)
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 

@@ -24,13 +24,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
-""",
-    inline = True,
-)
-
 iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
@@ -41,11 +34,4 @@ iree_lit_test_suite(
         "//iree/tools:iree-translate",
     ],
     tags = ["hostonly"],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

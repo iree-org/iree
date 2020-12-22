@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if(${IREE_BUILD_COMPILER})
   iree_bytecode_module(
     NAME
       simple_mul_bytecode_module
