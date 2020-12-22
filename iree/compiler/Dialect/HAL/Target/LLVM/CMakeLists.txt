@@ -20,24 +20,34 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LLVMBaseTarget
+    LLVM
   HDRS
-    "LLVMBaseTarget.h"
+    "LLVMAOTTarget.h"
   SRCS
-    "LLVMBaseTarget.cpp"
+    "LLVMAOTTarget.cpp"
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
+    ::LinkerTool
+    LLVMAArch64AsmParser
+    LLVMAArch64CodeGen
+    LLVMARMAsmParser
+    LLVMARMCodeGen
+    LLVMCore
+    LLVMRISCVAsmParser
+    LLVMRISCVCodeGen
     LLVMSupport
-    MLIRAffine
+    LLVMX86AsmParser
+    LLVMX86CodeGen
     MLIRLLVMIR
-    MLIRLinalg
-    MLIRSCF
-    MLIRVector
+    MLIRTargetLLVMIR
+    iree::base::flatcc
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Utils
+    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
 
@@ -71,5 +81,30 @@ iree_cc_library(
     LLVMPasses
     LLVMSupport
     LLVMTarget
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LinkerTool
+  HDRS
+    "LinkerTool.h"
+  SRCS
+    "LinkerTool.cpp"
+  DEPS
+    iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LinkerTool_hdrs
+  HDRS
+    "LinkerTool.h"
+  DEPS
+    ::LLVMTargetOptions
+    LLVMCore
+    LLVMSupport
+    MLIRSupport
   PUBLIC
 )

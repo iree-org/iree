@@ -13,8 +13,8 @@
 // limitations under the License.
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LINKERTOOL_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LINKERTOOL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_
 
 #include <string>
 
@@ -22,9 +22,9 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FileSystem.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -119,4 +119,4 @@ class LinkerTool {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LINKERTOOL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_

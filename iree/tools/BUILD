@@ -158,7 +158,7 @@ cc_library(
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
+        "//iree/compiler/Dialect/HAL/Target/LLVM",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],
