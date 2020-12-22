@@ -228,7 +228,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // A map from binding ops to their corresponding function argument indices.
     llvm::DenseMap<Operation *, unsigned> bindingArgMap;
     llvm::SmallVector<MemRefType, 4> inputMemRefTypes;
-    llvm::SmallVector<LLVM::LLVMType, 4> inputStructPtrs;
+    llvm::SmallVector<Type, 4> inputStructPtrs;
     unsigned argIndex = 0;
     for (auto bufferOp : bufferOps) {
       auto binding = bufferBindingMap[bufferOp];
@@ -243,9 +243,10 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
 
       auto memrefType = bufferOp.getType().dyn_cast_or_null<MemRefType>();
       inputMemRefTypes.push_back(memrefType);
-      auto elementType = typeConverter->convertType(memrefType.getElementType())
-                             .dyn_cast<LLVM::LLVMType>();
-      if (!elementType) return failure();
+      auto elementType =
+          typeConverter->convertType(memrefType.getElementType());
+      if (!elementType || !LLVM::isCompatibleType(elementType))
+        return failure();
       inputStructPtrs.push_back(
           LLVM::LLVMPointerType::get(elementType, memrefType.getMemorySpace()));
     }
