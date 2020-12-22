@@ -17,9 +17,6 @@
 #ifdef IREE_HAVE_LLVMAOT_TARGET
 #include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTarget.h"
 #endif
-#ifdef IREE_HAVE_LLVMIR_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/IR/LLVMIRTarget.h"
-#endif
 #ifdef IREE_HAVE_VMLA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
 #endif
@@ -42,10 +39,6 @@ void registerHALTargetBackends() {
 
 #ifdef IREE_HAVE_LLVMAOT_TARGET
     IREE::HAL::registerLLVMAOTTargetBackends(
-        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_LLVMIR_TARGET
-    IREE::HAL::registerLLVMIRTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
 #endif
 #ifdef IREE_HAVE_VMLA_TARGET

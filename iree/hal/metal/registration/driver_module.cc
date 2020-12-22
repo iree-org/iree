@@ -25,7 +25,7 @@ ABSL_FLAG(
     std::string, metal_capture_to_file, "",
     "Full path to store the GPU trace file (empty means capture to Xcode)");
 
-#define IREE_HAL_METAL_DRIVER_ID_1 0x4D544C31u  // MTL1
+#define IREE_HAL_METAL_DRIVER_ID 0x4D544C31u  // MTL1
 
 static iree_status_t iree_hal_metal_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,

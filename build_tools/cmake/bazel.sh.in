@@ -14,4 +14,4 @@
 # limitations under the License.
 
 cd "@_bazel_src_root@"
-exec '@IREE_BAZEL_EXECUTABLE@' @_bazel_startup_options@ "$@"
+exec '@IREE_BAZEL_EXECUTABLE@' @_bazel_startup_options@ "$@" @_bazel_build_options@

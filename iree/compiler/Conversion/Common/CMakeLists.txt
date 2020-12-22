@@ -36,8 +36,6 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
-    MLIRSPIRV
-    MLIRSPIRVTransforms
     MLIRStandard
     MLIRTransforms
     MLIRVector

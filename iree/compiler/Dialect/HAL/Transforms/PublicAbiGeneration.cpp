@@ -381,7 +381,7 @@ LogicalResult generateAbiFunctions(FuncOp funcOp, StringRef exportName,
 }
 
 Optional<StringRef> getFuncOpExportName(FuncOp op) {
-  auto exportAttr = op.getAttr("iree.module.export");
+  auto exportAttr = op->getAttr("iree.module.export");
   if (!exportAttr) return llvm::None;
 
   if (exportAttr.isa<UnitAttr>()) {
@@ -402,21 +402,21 @@ class PublicABIGenerationPass
     for (auto &op : getOperation().getBody()->getOperations()) {
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
         // Skip functions we generate.
-        if (funcOp.getAttr("iree.abi.stub")) continue;
+        if (funcOp->getAttr("iree.abi.stub")) continue;
 
         // Any function marked for export, we redirect to export with a
         // '$raw' suffix and then generate ABI wrappers with the original name.
         Optional<StringRef> exportName = getFuncOpExportName(funcOp);
         if (!exportName) continue;
-        auto reflection = funcOp.getAttr("iree.reflection")
+        auto reflection = funcOp->getAttr("iree.reflection")
                               .dyn_cast_or_null<DictionaryAttr>();
         if (!reflection) continue;
 
         // Rename and remove reflection (it will go on the ABI entry point).
-        funcOp.setAttr("iree.module.export",
-                       StringAttr::get((*exportName + "$raw").str(), ctx));
+        funcOp->setAttr("iree.module.export",
+                        StringAttr::get((*exportName + "$raw").str(), ctx));
         funcOp.removeAttr("iree.reflection");
-        funcOp.setAttr("noinline", UnitAttr::get(ctx));
+        funcOp->setAttr("noinline", UnitAttr::get(ctx));
 
         if (reflection) {
           if (failed(generateAbiFunctions(funcOp, *exportName, reflection))) {

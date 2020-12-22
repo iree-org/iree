@@ -2178,6 +2178,33 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   }];
 }
 
+def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan"> {
+  let summary = [{returns an alias to a subspan of interface binding data}];
+  let description = [{
+    // TODO(benvanik): add description
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$byte_offset,
+    Optional<HAL_DeviceSize>:$byte_length
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
+    attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
+  }];
+}
+
 def HAL_InterfaceLoadTensorOp : HAL_PureOp<"interface.load.tensor"> {
   let summary = [{loads a tensor from an executable IO binding}];
   let description = [{

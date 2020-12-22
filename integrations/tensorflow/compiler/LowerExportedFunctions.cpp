@@ -29,7 +29,7 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 using ::iree::SipSignatureMangler;
@@ -64,7 +64,7 @@ class LowerExportedFunctionsPass
     : public PassWrapper<LowerExportedFunctionsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect,
+    registry.insert<iree_compiler::IREE::Flow::FlowDialect,
                     mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
@@ -106,7 +106,7 @@ class LowerExportedFunctionsPass
           builder.getNamedAttr(abiVersionIdent, builder.getI32IntegerAttr(1)));
 
       // Tag it as an IREE exported function.
-      func.setAttr("iree.module.export", builder.getUnitAttr());
+      func->setAttr("iree.module.export", builder.getUnitAttr());
 
       // Process per-argument attrs and generate reflection metadata.
       for (int i = 0, e = func.getNumArguments(); i < e; i++) {
@@ -150,8 +150,8 @@ class LowerExportedFunctionsPass
           sipIdent, builder.getStringAttr(functionSignature->encoded())));
 
       if (!funcReflectAttrs.empty()) {
-        func.setAttr("iree.reflection",
-                     builder.getDictionaryAttr(funcReflectAttrs));
+        func->setAttr("iree.reflection",
+                      builder.getDictionaryAttr(funcReflectAttrs));
       }
 
       // Remove its designation as a saved model export.
@@ -173,5 +173,5 @@ static PassRegistration<LowerExportedFunctionsPass> pass(
     "Lower tf_saved_model exported functions to ones with IREE SIP metadata");
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

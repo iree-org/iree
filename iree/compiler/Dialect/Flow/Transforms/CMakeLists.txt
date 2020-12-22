@@ -32,11 +32,13 @@ iree_cc_library(
     "HoistUnstreamableOps.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyDispatchRegions2.cpp"
+    "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
     "MaterializeExportedReflection.cpp"
     "MergeExportedReflection.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineLargeConstantsPass.cpp"
+    "OutlineDispatchRegions2.cpp"
+    "OutlineLargeConstants.cpp"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "RematerializeDispatchConstants.cpp"
@@ -50,6 +52,7 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle

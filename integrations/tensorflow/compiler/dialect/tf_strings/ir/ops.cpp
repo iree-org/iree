@@ -29,7 +29,7 @@
 #undef GET_OP_CLASSES
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace tf_strings {
 
 void ToStringOp::build(OpBuilder& builder, OperationState& tblgen_state,
@@ -54,5 +54,5 @@ void StringTensorToStringOp::build(OpBuilder& builder,
 }
 
 }  // namespace tf_strings
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

@@ -15,6 +15,7 @@
 #include <limits>
 
 #include "iree/base/signature_mangle.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -127,8 +128,8 @@ class MaterializeExportedReflectionPass
     auto builder = Builder(&getContext());
 
     // Only process exported functions that are not marked to omit an abi.
-    if (!func.getAttr("iree.module.export")) return;
-    if (func.getAttr("iree.abi.none")) return;
+    if (!func->getAttr("iree.module.export")) return;
+    if (func->getAttr("iree.abi.none")) return;
 
     // Arguments.
     for (int i = 0, e = funcType.getNumInputs(); i < e; ++i) {

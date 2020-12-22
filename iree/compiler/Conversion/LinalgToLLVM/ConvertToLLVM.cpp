@@ -212,7 +212,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     llvm::DenseMap<Operation *, IREE::HAL::InterfaceBindingOp> bufferBindingMap;
     for (auto bufferOp : bufferOps) {
       auto symbol = SymbolTable::lookupNearestSymbolFrom(
-          bufferOp, bufferOp.getAttrOfType<SymbolRefAttr>("binding"));
+          bufferOp, bufferOp->getAttrOfType<SymbolRefAttr>("binding"));
       bufferBindingMap[bufferOp] = cast<IREE::HAL::InterfaceBindingOp>(symbol);
     }
 
@@ -287,7 +287,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                 newFuncOp.end());
     rewriter.applySignatureConversion(&newFuncOp.getBody(), signatureConverter);
 
-    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()),
+                                           rewriter.getListener());
 
     // Cast and unpack input packed_buffer_arguments and construct memref
     // descriptors.
@@ -437,8 +438,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
-    "LLVMIR "
-    "dialect",
+    "LLVMIR dialect",
     [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler

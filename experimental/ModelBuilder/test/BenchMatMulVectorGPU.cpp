@@ -31,9 +31,9 @@
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
@@ -429,7 +429,7 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     else
       workgroupSize = warpSize;
     // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(
+    kernelFunc->setAttr(
         spirv::getEntryPointABIAttrName(),
         spirv::getEntryPointABIAttr({workgroupSize, 1, 1}, &ctx));
     OpBuilder b(&kernelFunc.getBody());

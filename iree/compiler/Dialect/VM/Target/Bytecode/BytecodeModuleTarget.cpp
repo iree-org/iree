@@ -391,7 +391,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
   // TODO(benvanik): move these to exports (or remove entirely).
   iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef = 0;
   if (auto reflectionAttrs =
-          funcOp.getAttrOfType<DictionaryAttr>("iree.reflection")) {
+          funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
     SmallVector<iree_vm_ReflectionAttrDef_ref_t, 4> reflectionAttrRefs;
     for (auto reflectionAttr : reflectionAttrs) {
       auto key = reflectionAttr.first.strref();

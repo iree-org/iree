@@ -38,6 +38,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
@@ -1004,7 +1005,8 @@ LogicalResult ReduceOpConversion::apply(
       indexingMaps,
       getParallelAndReductionIterators(nInputRank, reductionDims.size()));
 
-  linalgOp.region().takeBody(reduceOp.body());
+  rewriter.inlineRegionBefore(reduceOp.body(), linalgOp.region(),
+                              linalgOp.region().end());
   {
     OpBuilder::InsertionGuard regionGuard(rewriter);
 
@@ -1088,7 +1090,7 @@ struct LinalgOpOnTensorConversion
     unsigned numIndices =
         op.region().begin()->getNumArguments() - numTensorOperands;
     auto &region = linalgBufferOp.region();
-    region.takeBody(op.region());
+    rewriter.inlineRegionBefore(op.region(), region, region.end());
     // Need to convert the signature to take extra arguments for the return
     // type.
     TypeConverter::SignatureConversion signatureConverter(numIndices +
@@ -1159,24 +1161,24 @@ struct TensorReshapeOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// std.extract_element op conversion.
+// tensor.extract op conversion.
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// A pattern to replace ExtractElementOp with LoadOp. Typically, this comes
+/// A pattern to replace tensor::ExtractOp with LoadOp. Typically, this comes
 /// from indirect access in Linalg ops on tensors, eg, TorchIndexSelectOp. The
 /// pattern expects other patterns to convert the operand to MemRefType.
 struct ExtractElementOpPattern final
-    : public OpConversionPattern<ExtractElementOp> {
-  using OpConversionPattern<ExtractElementOp>::OpConversionPattern;
+    : public OpConversionPattern<tensor::ExtractOp> {
+  using OpConversionPattern<tensor::ExtractOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      ExtractElementOp op, ArrayRef<Value> operands,
+      tensor::ExtractOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (!operands[0].getType().isa<MemRefType>()) {
       return op.emitError("expected operands[0] to be a MemRefType");
     }
-    ExtractElementOpAdaptor adaptor(operands);
+    tensor::ExtractOp::Adaptor adaptor(operands);
     rewriter.replaceOpWithNewOp<LoadOp>(op, operands[0], adaptor.indices());
     return success();
   }
@@ -1244,10 +1246,10 @@ struct HALInterfaceLoadTensorOpEraser final
     // annotation is carried over if exists.
     auto phOp = rewriter.create<IREE::PlaceholderOp>(
         loadOp.getLoc(), bufferType, "interface buffer");
-    phOp.setAttr(getBindingAttrName(), loadOp.binding());
+    phOp->setAttr(getBindingAttrName(), loadOp.binding());
     StringRef attrName = getOperandResultNumAttrName();
-    if (auto operandResultNumAttr = loadOp.getAttr(attrName))
-      phOp.setAttr(attrName, operandResultNumAttr);
+    if (auto operandResultNumAttr = loadOp->getAttr(attrName))
+      phOp->setAttr(attrName, operandResultNumAttr);
     Value buffer = phOp.getResult();
 
     // If the result of the load is already mapped to a buffer, a copy is
@@ -1362,10 +1364,10 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
   // annotation is carried over if exists.
   auto phOp = builder.create<IREE::PlaceholderOp>(op.getLoc(), bufferType,
                                                   "interface buffer");
-  phOp.setAttr(getBindingAttrName(), op.binding());
+  phOp->setAttr(getBindingAttrName(), op.binding());
   StringRef attrName = getOperandResultNumAttrName();
-  if (Attribute operandResultNumAttr = op.getAttr(attrName))
-    phOp.setAttr(attrName, operandResultNumAttr);
+  if (Attribute operandResultNumAttr = op->getAttr(attrName))
+    phOp->setAttr(attrName, operandResultNumAttr);
   Value buffer = phOp;
   outputBufferMap[op] = buffer;
 
@@ -1469,7 +1471,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
-                      IREE::HAL::InterfaceStoreTensorOp, ExtractElementOp>();
+                      IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

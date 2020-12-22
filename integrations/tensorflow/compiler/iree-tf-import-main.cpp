@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
 
-  iree_compiler::TF::buildTFImportPassPipeline(pm);
+  iree_integrations::TF::buildTFImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
     llvm::errs()
         << "Running iree-tf-import pass pipeline failed (see diagnostics)\n";

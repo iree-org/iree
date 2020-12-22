@@ -112,7 +112,7 @@ cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SDBM",
         "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRVConversions",
@@ -154,13 +154,11 @@ cc_library(
     hdrs = ["init_targets.h"],
     local_defines = [
         "IREE_HAVE_LLVMAOT_TARGET",
-        "IREE_HAVE_LLVMIR_TARGET",
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
-        "//iree/compiler/Dialect/HAL/Target/LLVM/IR:LLVMIR",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],

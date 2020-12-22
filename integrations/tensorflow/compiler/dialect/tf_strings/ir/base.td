@@ -23,7 +23,7 @@ include "mlir/IR/OpBase.td"
 
 def TFStrings_Dialect : Dialect {
   let name = "tf_strings";
-  let cppNamespace = "::mlir::iree_compiler::tf_strings";
+  let cppNamespace = "::mlir::iree_integrations::tf_strings";
   let summary = [{
     A strings dialect for simplifying tensorflow string operations.
   }];

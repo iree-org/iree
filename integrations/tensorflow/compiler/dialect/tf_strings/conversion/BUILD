@@ -25,27 +25,28 @@ package(
 cc_library(
     name = "conversion",
     deps = [
-        ":convert_flow_to_hal",
+        ":convert_tf_strings_to_strings",
         ":convert_tf_to_tf_strings",
     ],
 )
 
 cc_library(
-    name = "convert_flow_to_hal",
+    name = "convert_tf_strings_to_strings",
     srcs = [
-        "convert_flow_to_hal.cc",
+        "convert_tf_strings_to_strings.cc",
     ],
     hdrs = [
-        "convert_flow_to_hal.h",
+        "convert_tf_strings_to_strings.h",
     ],
     deps = [
+        "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/IREE/IR",
+        "//integrations/tensorflow/compiler/dialect/utils:conversion_utils",
         "//iree/compiler/Dialect/Modules/Strings/IR",
         "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -81,10 +82,9 @@ cc_library(
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
+        "//integrations/tensorflow/compiler/dialect/utils:conversion_utils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",

@@ -712,10 +712,7 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
       raise ValueError("Passing both args and kwargs is not supported by "
                        "_TfLiteFunctionWrapper")
 
-    # Set up and run the function.
-    self._interpreter.allocate_tensors()
-
-    if len(args):
+    if len(args) == 1 and isinstance(args[0], list):
       # Specifically to get TFLite to work with keras models that take a list of
       # inputs instead of a sequence of args as their inputs, because it decides
       # to change the input signature but it still technically works if you
@@ -723,12 +720,27 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
       if len(args) == 1 and isinstance(args[0], list):
         args = args[0]
 
+    # Tell TFLite what the shapes of the input tensors are before allocation.
+    if args:
+      for arg, detail in zip(args, self._interpreter.get_input_details()):
+        self._interpreter.resize_tensor_input(detail["index"], arg.shape)
+    else:
+      for detail in self._interpreter.get_input_details():
+        self._interpreter.resize_tensor_input(detail["index"],
+                                              kwargs[detail["name"]].shape)
+
+    # Allocate the (potentially dynamic) tensors.
+    self._interpreter.allocate_tensors()
+
+    # Copy the input data into the allocated tensors.
+    if args:
       for arg, detail in zip(args, self._interpreter.get_input_details()):
         self._interpreter.set_tensor(detail["index"], arg)
     else:
       for detail in self._interpreter.get_input_details():
         self._interpreter.set_tensor(detail["index"], kwargs[detail["name"]])
 
+    # Execute the function.
     self._interpreter.invoke()
 
     # Extract the outputs from the TFLite interpreter.

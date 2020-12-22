@@ -264,7 +264,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
       if (namedAttr.first != impl::getTypeAttrName() &&
           namedAttr.first != SymbolTable::getSymbolAttrName() &&
           namedAttr.first != getNumWorkgroupsFnAttrName())
-        newFn.setAttr(namedAttr.first, namedAttr.second);
+        newFn->setAttr(namedAttr.first, namedAttr.second);
     }
     // Need special handling for the number of workgroups function.
     if (FuncOp numWorkgroupsFn =
@@ -273,8 +273,8 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
           builder.create<FuncOp>(loc, newFnName.str() + "__num_workgroups__",
                                  numWorkgroupsFn.getType());
       newNumWorkgroupsFn.setVisibility(FuncOp::Visibility::Private);
-      newFn.setAttr(getNumWorkgroupsFnAttrName(),
-                    builder.getSymbolRefAttr(newNumWorkgroupsFn));
+      newFn->setAttr(getNumWorkgroupsFnAttrName(),
+                     builder.getSymbolRefAttr(newNumWorkgroupsFn));
       LLVM_DEBUG({
         llvm::dbgs() << "Added func @" << newNumWorkgroupsFn.getName()
                      << " as num workgroups fn for func @" << newFn.getName()
@@ -304,8 +304,8 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   for (const std::string &kernel : splitKernels) {
     entryPoints.emplace_back(builder.getStringAttr(kernel));
   }
-  moduleOp.setAttr(getEntryPointScheduleAttrName(),
-                   builder.getArrayAttr(entryPoints));
+  moduleOp->setAttr(getEntryPointScheduleAttrName(),
+                    builder.getArrayAttr(entryPoints));
 
   if (FuncOp numWorkgroupsFn =
           getNumWorkgroupsFn(oldFn, getNumWorkgroupsFnAttrName())) {

@@ -30,7 +30,7 @@ class MarkPublicSymbolsExportedPass
   void runOnOperation() override {
     for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
       if (funcOp.isPublic()) {
-        funcOp.setAttr("iree.module.export", UnitAttr::get(&getContext()));
+        funcOp->setAttr("iree.module.export", UnitAttr::get(&getContext()));
       }
     }
   }

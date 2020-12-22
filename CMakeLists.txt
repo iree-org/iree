@@ -106,7 +106,6 @@ endif()
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
   DyLib
-  LLVM
   Metal
   VMLA
   Vulkan
@@ -114,10 +113,6 @@ set(IREE_ALL_HAL_DRIVERS
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-  # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
-  if(ANDROID OR NOT ${IREE_ENABLE_MLIR})
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
-  endif()
 
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
@@ -138,13 +133,13 @@ endforeach()
 # Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
-  LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
@@ -164,6 +159,7 @@ endforeach()
 # Set IREE_TARGET_BACKEND_* based on configuration
 foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
@@ -254,7 +250,7 @@ include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
-include(iree_multipy)
+include(iree_python)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
@@ -474,10 +470,7 @@ if(${IREE_BUILD_TESTS})
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
-  # NOTE: The multipy defaults come from pybind's configuration and must come
-  # after. This should be pulled in locally at some point.
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  iree_multipy_configure()
 endif()
 
 if(${IREE_TARGET_BACKEND_METAL-SPIRV})
@@ -540,10 +533,6 @@ endif()
 
 if(${IREE_ENABLE_TENSORFLOW})
   add_subdirectory(integrations/tensorflow)
-endif()
-
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  iree_complete_py_extension_link_options()
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

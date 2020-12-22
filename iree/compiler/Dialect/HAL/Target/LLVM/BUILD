@@ -22,7 +22,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} AND NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
+if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
   return()
 endif()
 """,
@@ -62,6 +62,7 @@ cc_library(
     ],
     deps = [
         ":LLVMTargetOptions",
+        "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",

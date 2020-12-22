@@ -15,7 +15,7 @@
 # This image provides the Vulkan SDK. Requires a child image to provide
 # a Vulkan ICD.
 
-FROM gcr.io/iree-oss/cmake-bazel-tensorflow@sha256:41963cf49ecd8873d2349f9f9b3a0af86471614a4ba6916b3be5bbaff5e28b3b AS final
+FROM gcr.io/iree-oss/cmake-bazel-tensorflow@sha256:832f7ed4f485d7b17cb5f1f0ae758e9564343c029ddc1e51506e438d8fa21cc9 AS final
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 

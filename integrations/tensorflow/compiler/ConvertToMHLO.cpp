@@ -30,7 +30,7 @@
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace iree_integrations {
 namespace TF {
 
 // This is a customized version of the TF to XLA lowering in:
@@ -153,5 +153,5 @@ static PassRegistration<ConvertToMHLOPass> pass(
     "Converts from TensorFlow to the XLA MHLO dialect");
 
 }  // namespace TF
-}  // namespace iree_compiler
+}  // namespace iree_integrations
 }  // namespace mlir

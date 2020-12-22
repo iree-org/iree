@@ -287,10 +287,10 @@ IREE::PlaceholderOp createPlaceholderOp(OpBuilder &b, Location loc,
   // annotation is carried over if exists.
   auto phOp =
       b.create<IREE::PlaceholderOp>(loc, bufferType, "interface buffer");
-  phOp.setAttr(getBindingAttrName(), getBinding(op));
+  phOp->setAttr(getBindingAttrName(), getBinding(op));
   StringRef attrName = getOperandResultNumAttrName();
   if (auto operandResultNumAttr = op->getAttr(attrName)) {
-    phOp.setAttr(attrName, operandResultNumAttr);
+    phOp->setAttr(attrName, operandResultNumAttr);
   }
 
   return phOp;

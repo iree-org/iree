@@ -31,6 +31,13 @@ static llvm::cl::opt<bool> clEnableLinalgOnTensors(
         "Enable use of Linalg on tensors for dispatch region creation"),
     llvm::cl::init(false));
 
+// TODO(benvanik): change to a pipeline option.
+static llvm::cl::opt<bool> clTraceDispatchTensors(
+    "iree-flow-trace-dispatch-tensors2",
+    llvm::cl::desc(
+        "Trace runtime input/output tensors for each dispatch function"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -184,6 +191,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // executables. This separates sequencer functions performing dispatches from
   // dispatchees.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -194,11 +202,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
+  // Inject tracing that logs both input and output tensors from all dispatches.
+  // We do this after deduping so that the executable names match later stages.
+  if (clTraceDispatchTensors) {
+    passManager.addNestedPass<FuncOp>(createInjectDispatchTracingPass());
+  }
+
   // Convert any leftover ops outside of dispatch regions to flow ops.
   passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
-
-  // Assign attributes and negotiate each executable's ABI signature.
-  // passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.

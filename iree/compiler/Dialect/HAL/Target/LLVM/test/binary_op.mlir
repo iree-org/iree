@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
     workload = 4 : index
@@ -11,7 +11,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @binary_op_linked_llvm_ir
+// CHECK-LABEL: hal.executable @binary_op_linked_llvm_aot
 // CHECK-DAG:   hal.executable.binary attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = 1280071245 : i32} {
+// CHECK-SAME:     format = 1145850178 : i32} {

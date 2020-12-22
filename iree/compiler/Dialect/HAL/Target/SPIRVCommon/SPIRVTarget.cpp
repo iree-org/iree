@@ -19,8 +19,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -58,7 +57,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
   // Attach SPIR-V target environment to the target's ModuleOp.
   // If we had multiple target environments we would generate one target op
   // per environment, with each setting its own environment attribute.
-  innerModuleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+  innerModuleOp->setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
 }
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
@@ -84,7 +83,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
       assert(llvm::hasSingleElement(spvModuleOps));
       spvModuleOp = *spvModuleOps.begin();
-      entryPointScheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+      entryPointScheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
           iree_compiler::getEntryPointScheduleAttrName());
       break;
     }
@@ -136,7 +135,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     spirv::FuncOp spvFuncOp = it.value();
 
     FlatSymbolRefAttr numWorkgroupsFnAttr =
-        spvFuncOp.getAttrOfType<FlatSymbolRefAttr>(
+        spvFuncOp->template getAttrOfType<FlatSymbolRefAttr>(
             getNumWorkgroupsFnAttrName());
     if (!numWorkgroupsFnAttr) {
       return spvFuncOp.emitError(
@@ -199,7 +198,7 @@ std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     if (matchPattern(executableTargetOp.target_backend_filter(),
                      filter_pattern())) {
       ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
-      assert(!innerModuleOp.getAttr(
+      assert(!innerModuleOp->getAttr(
           iree_compiler::getEntryPointScheduleAttrName()));
       auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
       assert(llvm::hasSingleElement(spvModuleOps));
