@@ -888,7 +888,7 @@ StringRef DispatchOp::executable() { return entry_point().getRootReference(); }
 
 FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});
-  return FunctionType::get(argTypes, getResultTypes(), getContext());
+  return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
 //===----------------------------------------------------------------------===//
@@ -922,7 +922,7 @@ StringRef Dispatch2Op::executable() { return entry_point().getRootReference(); }
 
 FunctionType Dispatch2Op::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});
-  return FunctionType::get(argTypes, getResultTypes(), getContext());
+  return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
 static LogicalResult verifyDispatch2Op(Dispatch2Op op) {

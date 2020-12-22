@@ -808,91 +808,91 @@ static Attribute constFoldConversionOp(Type resultType,
 
 OpFoldResult TruncI32I8Op::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
 OpFoldResult TruncI32I16Op::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
 OpFoldResult TruncI64I8Op::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
 OpFoldResult TruncI64I16Op::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
 OpFoldResult TruncI64I32Op::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(32); });
 }
 
 OpFoldResult ExtI8I32SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(8).sext(32); });
 }
 
 OpFoldResult ExtI8I32UOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
 OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(16).sext(32); });
 }
 
 OpFoldResult ExtI16I32UOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(32, getContext()), operands,
+      IntegerType::get(getContext(), 32), operands,
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
 OpFoldResult ExtI8I64SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.trunc(8).sext(64); });
 }
 
 OpFoldResult ExtI8I64UOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.trunc(8).zext(64); });
 }
 
 OpFoldResult ExtI16I64SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.trunc(16).sext(64); });
 }
 
 OpFoldResult ExtI16I64UOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.trunc(16).zext(64); });
 }
 
 OpFoldResult ExtI32I64SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.sext(64); });
 }
 
 OpFoldResult ExtI32I64UOp::fold(ArrayRef<Attribute> operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(64, getContext()), operands,
+      IntegerType::get(getContext(), 64), operands,
       [&](const APInt &a) { return a.zext(64); });
 }
 
