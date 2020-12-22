@@ -23,12 +23,6 @@ ALL_TARGET_BACKENDS_AND_DRIVERS = [
     ("dylib-llvm-aot", "dylib"),
 ]
 
-def is_darwin_x86():
-    return select({
-        "@bazel_tools//src/conditions:darwin_x86_64": True,
-        "//conditions:default": False,
-    })
-
 def iree_check_test(
         name,
         src,
@@ -104,9 +98,6 @@ def iree_check_single_backend_test_suite(
           is treated specially and will also apply to the test suite itself.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
-    if compatible_with == "darwin":
-        if is_darwin_x86():
-          return
     tests = []
     for src in srcs:
         test_name = "_".join([name, src])

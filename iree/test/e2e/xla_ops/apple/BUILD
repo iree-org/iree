@@ -1,0 +1,67 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_metal-spirv_metal",
+    srcs = [
+        "abs.mlir",
+        "add.mlir",
+        "broadcast.mlir",
+        "broadcast_add.mlir",
+        "broadcast_in_dim.mlir",
+        "clamp.mlir",
+        "compare.mlir",
+        "constant.mlir",
+        "convert.mlir",
+        "cosine.mlir",
+        "divide.mlir",
+        "exponential.mlir",
+        "gather.mlir",
+        "log.mlir",
+        "log_plus_one.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "multiply.mlir",
+        "negate.mlir",
+        "remainder.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sine.mlir",
+        "slice.mlir",
+        "sqrt.mlir",
+        "subtract.mlir",
+        "tanh.mlir",
+        "torch_index_select.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    driver = "metal",
+    target_backend = "metal-spirv",
+)
+
+test_suite(
+    name = "check",
+    tests = [
+        ":check_metal-spirv_metal",
+    ],
+)

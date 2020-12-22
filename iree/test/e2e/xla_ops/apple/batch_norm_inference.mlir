@@ -1,0 +1,1 @@
+../batch_norm_inference.mlir
