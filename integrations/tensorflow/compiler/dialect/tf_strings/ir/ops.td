@@ -44,6 +44,36 @@ def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
     OpBuilderDAG<(ins "Value":$value)>];
 }
 
+def TFStrings_GatherOp : Op<TFStrings_Dialect, "gather"> {
+  let summary = [{gathers all the strings from a Tensor by index}];
+  let description = [{
+    Gathers all the strings from a Tensor by ID.
+  }];
+
+  let arguments = (ins TFStrings_StringTensor:$dict,
+                  TFStrings_ValueTensor:$ids);
+
+  let results = (outs
+    TFStrings_StringTensor:$result
+  );
+}
+
+def TFStrings_ConcatOp : Op<TFStrings_Dialect, "concat"> {
+  let summary = [{
+  concatenates the strings in the tensor along the last dimension
+  }];
+
+  let description = [{
+    Concatenates the strings in the tensor along the last dimension.
+  }];
+
+  let arguments = (ins TFStrings_StringTensor:$value);
+
+  let results = (outs
+    TFStrings_StringTensor:$result
+  );
+}
+
 def TFStrings_ToStringTensorOp : TFStrings_Op<"to_string_tensor"> {
   let summary = "Converts a tensor of values to a tensor of strings.";
   let description = [{

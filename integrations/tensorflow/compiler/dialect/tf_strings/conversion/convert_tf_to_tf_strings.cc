@@ -23,6 +23,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -85,6 +86,42 @@ struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {
   }
 };
 
+struct GatherV2OpLowering : public OpRewritePattern<TF::GatherV2Op> {
+  using OpRewritePattern<TF::GatherV2Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TF::GatherV2Op op,
+                                PatternRewriter &rewriter) const override {
+    auto tensor = op.params();
+    auto tensor_ty = tensor.getType().dyn_cast<RankedTensorType>();
+    if (!tensor_ty || !tensor_ty.getElementType().isa<TF::StringType>()) {
+      return failure();
+    }
+
+    DenseIntElementsAttr axis;
+    if (!matchPattern(op.axis(), m_Constant(&axis))) {
+      return failure();
+    }
+
+    if (axis.getType().cast<ShapedType>().getRank() != 0) {
+      return failure();
+    }
+
+    auto axis_value = axis.getValue<IntegerAttr>({});
+    auto axis_int = axis_value.getValue().getZExtValue();
+
+    if (axis_int != tensor_ty.getRank() - 1) {
+      return failure();
+    }
+
+    auto result_ty = op.getType().cast<ShapedType>();
+    rewriter.replaceOpWithNewOp<tf_strings::GatherOp>(
+      op, RankedTensorType::get(result_ty.getShape(), tf_strings::StringType::get(op.getContext())),
+      tensor, op.indices());
+
+    return success();
+  }
+};
+
 class ConvertTFToTFStringsPass
     : public ConversionPass<ConvertTFToTFStringsPass, StringTypeConverter> {
  public:
@@ -108,6 +145,7 @@ class ConvertTFToTFStringsPass
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns) {
   populateWithGenerated(ctx, patterns);
+  patterns.insert<GatherV2OpLowering>(ctx);
   patterns.insert<StringFormatOpLowering>(ctx);
 }
 

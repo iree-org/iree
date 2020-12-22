@@ -29,6 +29,9 @@ void populateStringsToHALPatterns(MLIRContext *context,
   patterns.insert<HALOpConversion<IREE::Strings::ToStringTensorOp,
                                   IREE::Strings::ToStringTensorOp>>(
       context, typeConverter);
+  patterns.insert<HALOpConversion<IREE::Strings::GatherOp,
+                                  IREE::Strings::GatherOp>>(
+      context, typeConverter);
 }
 
 void populateStringsToVMPatterns(MLIRContext *context,
