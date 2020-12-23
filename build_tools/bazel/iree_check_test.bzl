@@ -70,11 +70,6 @@ def iree_check_test(
         **kwargs
     )
 
-def remove_prefix(text, prefix):
-    if text.startswith(prefix):
-        return text[len(prefix):]
-    return text
-
 def iree_check_single_backend_test_suite(
         name,
         srcs,
@@ -83,7 +78,6 @@ def iree_check_single_backend_test_suite(
         compiler_flags = [],
         runner_args = [],
         tags = [],
-        compatible_with = [],
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
 
@@ -105,8 +99,7 @@ def iree_check_single_backend_test_suite(
     """
     tests = []
     for src in srcs:
-        base_src = remove_prefix(src, "//iree/test/e2e/xla_ops:")
-        test_name = "_".join([name, base_src])
+        test_name = "_".join([name, src])
         iree_check_test(
             name = test_name,
             src = src,

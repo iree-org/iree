@@ -340,8 +340,6 @@ build:windows --config=msvc
 ###############################################################################
 # disable metal stuff for non Darwin platforms
 ###############################################################################
-build:non_darwin --deleted_packages=//iree/hal/metal,\
-//iree/hal/metal/registration,\
-//iree/compiler/Dialect/HAL/Target/MetalSPIRV,\
-//iree/test/e2e/xla_ops/apple
+build:non_darwin --deleted_packages=//iree/hal/metal,//iree/hal/metal/registration
+build:non_darwin --test_tag_filters="-driver=metal"
 ###############################################################################

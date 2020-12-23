@@ -156,20 +156,14 @@ cc_library(
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
-    ] + select({
-        "@bazel_tools//src/conditions:darwin": ["IREE_HAVE_METALSPIRV_TARGET"],
-        "@bazel_tools//src/conditions:darwin_x86_64": ["IREE_HAVE_METALSPIRV_TARGET"],
-        "//conditions:default": [],
-    }),
+        "IREE_HAVE_METALSPIRV_TARGET",
+    ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target/LLVM",
+        "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ] + select({
-        "@bazel_tools//src/conditions:darwin": ["//iree/compiler/Dialect/HAL/Target/MetalSPIRV"],
-        "@bazel_tools//src/conditions:darwin_x86_64": ["//iree/compiler/Dialect/HAL/Target/MetalSPIRV"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 cc_library(
