@@ -123,8 +123,8 @@ class ConvImg2ColMatmulConversion : public OpRewritePattern<linalg::ConvOp> {
 
     rewriter.create<linalg::GenericOp>(
         loc, /*resultTensorTypes=*/ArrayRef<Type>{},
-        /*inputs=*/op.input(), /*outputs=*/result,
-        /*intTensors*/ ValueRange{}, indexingMaps, loopAttributeTypes,
+        /*inputs=*/op.input(), /*outputs=*/result, indexingMaps,
+        loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });

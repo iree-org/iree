@@ -126,7 +126,8 @@ bool OpDispatchPolicy::isDispatchable(Operation *op) {
 }
 
 bool OpDispatchPolicy::isIdentityMetadata(Operation *op) {
-  return isa<Shape::TieShapeOp, Shape::MakeRankedShapeOp>(op);
+  return isa<linalg::InitTensorOp, Shape::TieShapeOp, Shape::MakeRankedShapeOp>(
+      op);
 }
 
 bool OpDispatchPolicy::isViewModificationOp(Operation *op) {
