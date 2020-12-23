@@ -79,21 +79,23 @@ func @constant_capture(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
   %0 = flow.dispatch.region[%c200 : index]
     (%arg1 = %arg0 : tensor<10x20xf32>, %arg2 = %cst_0 : tensor<10x20xf32>,
      %arg3 = %cst_1 : tensor<10xf32>, %arg4 = %cst : f32) -> tensor<10x20xf32> {
-    %1 = linalg.generic
+    %1 = linalg.init_tensor [10, 20] : tensor<10x20xf32>
+    %2 = linalg.generic
       {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
        iterator_types = ["parallel", "parallel"]}
       ins(%arg1, %arg2, %arg3
-        : tensor<10x20xf32>, tensor<10x20xf32>, tensor<10xf32>) {
-    ^bb0(%arg5: f32, %arg6: f32, %arg7: f32):  // no predecessors
-      %2 = addf %arg5, %arg4 : f32
-      %3 = mulf %2, %arg6 : f32
-      %4 = addf %3, %arg7 : f32
-      linalg.yield %4 : f32
+        : tensor<10x20xf32>, tensor<10x20xf32>, tensor<10xf32>)
+      outs(%1 : tensor<10x20xf32>) {
+    ^bb0(%arg5: f32, %arg6: f32, %arg7: f32, %arg8: f32):  // no predecessors
+      %3 = addf %arg5, %arg4 : f32
+      %4 = mulf %3, %arg6 : f32
+      %5 = addf %4, %arg7 : f32
+      linalg.yield %5 : f32
     } -> tensor<10x20xf32>
-    flow.return %1 : tensor<10x20xf32>
+    flow.return %2 : tensor<10x20xf32>
   }
   return %0 : tensor<10x20xf32>
 }
@@ -112,9 +114,10 @@ func @constant_capture(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
 //  CHECK-SAME:       ins(%[[ARG1]], %[[CST_1]], %[[ARG2]]
 //  CHECK-SAME:       ) {
 //       CHECK:     ^{{[a-zA-Z0-9_]+}}(
-//  CHECK-SAME:         %[[ARG3:.[a-zA-Z0-9_]+]]: f32
-//  CHECK-SAME:         %[[ARG4:.[a-zA-Z0-9_]+]]: f32
-//  CHECK-SAME:         %[[ARG5:.[a-zA-Z0-9_]+]]: f32)
+//  CHECK-SAME:         %[[ARG3:.[a-zA-Z0-9_]+]]: f32,
+//  CHECK-SAME:         %[[ARG4:.[a-zA-Z0-9_]+]]: f32,
+//  CHECK-SAME:         %[[ARG5:.[a-zA-Z0-9_]+]]: f32,
+//  CHECK-SAME:         %[[ARG6:.[a-zA-Z0-9_]+]]: f32)
 //       CHECK:         %[[T0:.+]] = addf %[[ARG3]], %[[CST_0]]
 //       CHECK:         %[[T1:.+]] = mulf %[[T0]], %[[ARG4]]
 //       CHECK:         %[[T2:.+]] = addf %[[T1]], %[[ARG5]]

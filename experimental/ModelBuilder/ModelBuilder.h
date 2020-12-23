@@ -45,14 +45,15 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 
-#include "mlir/Dialect/Affine/EDSC/Intrinsics.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/EDSC/Builders.h"
-#include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
-#include "mlir/Dialect/SCF/EDSC/Builders.h"
-#include "mlir/Dialect/SCF/EDSC/Intrinsics.h"
-#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
-#include "mlir/Dialect/Vector/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Affine/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/GPU/GPUDialect.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Linalg/EDSC/Builders.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Linalg/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/SCF/EDSC/Builders.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/SCF/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Vector/EDSC/Intrinsics.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 using edsc::ScopedContext;
@@ -138,7 +139,7 @@ class ModelBuilder : public OpBuilder {
   static void registerAllDialects();
 
   // Return a reference to the underlying module.
-  OwningModuleRef &getModuleRef() { return module; }
+  OwningOpRef<ModuleOp> &getModuleRef() { return module; }
 
   // Build an MLIR FuncOp that will be callable after JIT compilation occured.
   // `config` is a convenience class provided to simplify the configuration of
