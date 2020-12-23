@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_TIMELINE_SEMAPHORE_H_
 #define IREE_HAL_VULKAN_NATIVE_TIMELINE_SEMAPHORE_H_
 
+// clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/semaphore.h"

@@ -15,7 +15,7 @@
 #include "iree/tools/init_targets.h"
 
 #ifdef IREE_HAVE_LLVMAOT_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
 #endif
 #ifdef IREE_HAVE_VMLA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"

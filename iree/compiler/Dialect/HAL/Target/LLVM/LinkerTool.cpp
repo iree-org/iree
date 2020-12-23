@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LinkerTool.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 
 #define DEBUG_TYPE "llvmaot-linker"
 

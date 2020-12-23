@@ -95,7 +95,7 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
 IntegerAttr getElementTypeAttr(Type type) {
   auto elementType = getElementTypeValue(type);
   if (!elementType) return {};
-  return IntegerAttr::get(IntegerType::get(32, type.getContext()),
+  return IntegerAttr::get(IntegerType::get(type.getContext(), 32),
                           elementType.getValue());
 }
 

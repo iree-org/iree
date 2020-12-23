@@ -240,7 +240,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
   }
 
   auto functionType =
-      FunctionType::get(argTypes, resultTypes, result->getContext());
+      FunctionType::get(result->getContext(), argTypes, resultTypes);
   result->addAttribute(mlir::impl::getTypeAttrName(),
                        TypeAttr::get(functionType));
 
@@ -752,7 +752,7 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseOptionalAttrDict(result->attributes)) ||
       failed(parser.parseColonType(type)) ||
       failed(parser.resolveOperand(index,
-                                   IntegerType::get(32, result->getContext()),
+                                   IntegerType::get(result->getContext(), 32),
                                    result->operands)) ||
       failed(parser.resolveOperand(defaultValue, type, result->operands)) ||
       failed(parser.resolveOperands(values, type, result->operands)) ||
@@ -1057,7 +1057,7 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
     return failure();
   }
 
-  Type operandType = IntegerType::get(32, result->getContext());
+  Type operandType = IntegerType::get(result->getContext(), 32);
   if (failed(parser.resolveOperand(condition, operandType, result->operands)) ||
       failed(parser.resolveOperand(status, operandType, result->operands))) {
     return failure();

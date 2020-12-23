@@ -17,6 +17,13 @@
 
 #include <stdint.h>
 
+// arithmetic
 inline int32_t vm_add_i32(int32_t a, int32_t b) { return a + b; }
+
+// compare
+inline int32_t vm_cmp_ne_i32(int32_t a, int32_t b) { return a != b ? 1 : 0; }
+
+// const
+inline int32_t vm_const_i32(int32_t a) { return a; }
 
 #endif  // IREE_VM_C_FUNCS_H_

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -29,26 +29,36 @@ endif()
 )
 
 cc_library(
-    name = "LLVMBaseTarget",
+    name = "LLVM",
     srcs = [
-        "LLVMBaseTarget.cpp",
+        "LLVMAOTTarget.cpp",
     ],
     hdrs = [
-        "LLVMBaseTarget.h",
+        "LLVMAOTTarget.h",
     ],
     deps = [
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
+        ":LinkerTool",
+        "//iree/base:flatcc",
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
+        "//iree/compiler/Utils",
+        "//iree/schemas:dylib_executable_def_c_fbs",
+        "@llvm-project//llvm:AArch64AsmParser",
+        "@llvm-project//llvm:AArch64CodeGen",
+        "@llvm-project//llvm:ARMAsmParser",
+        "@llvm-project//llvm:ARMCodeGen",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:RISCVAsmParser",
+        "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//llvm:X86AsmParser",
+        "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//mlir:LLVMDialect",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
 
@@ -84,5 +94,23 @@ cc_library(
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
+    ],
+)
+
+cc_library(
+    name = "LinkerTool",
+    srcs = ["LinkerTool.cpp"],
+    hdrs = ["LinkerTool.h"],
+    deps = platform_trampoline_deps("LinkerTools", "compiler/Dialect/HAL/Target/LLVM"),
+)
+
+cc_library(
+    name = "LinkerTool_hdrs",
+    hdrs = ["LinkerTool.h"],
+    deps = [
+        ":LLVMTargetOptions",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
     ],
 )

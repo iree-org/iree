@@ -101,7 +101,7 @@ class OutlineLargeConstantsPass
       // By the time we've outlined things here we are sure we want them
       // outlined even if the user runs an arbitrary number of passes between
       // now and when we may use that information (HAL constant pooling, etc).
-      variableOp.setAttr("noinline", moduleBuilder.getUnitAttr());
+      variableOp->setAttr("noinline", moduleBuilder.getUnitAttr());
     }
 
     // Replace all of the constants with lookups for the new variables.
