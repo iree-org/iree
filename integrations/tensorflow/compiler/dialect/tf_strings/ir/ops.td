@@ -45,13 +45,13 @@ def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
 }
 
 def TFStrings_GatherOp : Op<TFStrings_Dialect, "gather"> {
-  let summary = [{gathers all the strings from a Tensor by index}];
+  let summary = "Gathers all the strings from a Tensor by index of the last dimension.";
   let description = [{
     Gathers all the strings from a Tensor by ID.
   }];
 
   let arguments = (ins TFStrings_StringTensor:$dict,
-                  TFStrings_ValueTensor:$ids);
+                  TFStrings_ValueTensor:$indices);
 
   let results = (outs
     TFStrings_StringTensor:$result
@@ -59,9 +59,7 @@ def TFStrings_GatherOp : Op<TFStrings_Dialect, "gather"> {
 }
 
 def TFStrings_ConcatOp : Op<TFStrings_Dialect, "concat"> {
-  let summary = [{
-  concatenates the strings in the tensor along the last dimension
-  }];
+  let summary = "Concatenates the strings in the tensor along the last dimension.";
 
   let description = [{
     Concatenates the strings in the tensor along the last dimension.
