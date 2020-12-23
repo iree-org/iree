@@ -15,7 +15,6 @@
 #ifndef IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 #define IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 
-// NOTE: ensure our vulkan headers are used (as we define VK_NO_PROTOTYPES).
 // clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
