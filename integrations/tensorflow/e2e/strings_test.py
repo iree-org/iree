@@ -66,7 +66,8 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
   def test_gather(self):
 
     def gather(module):
-      string_values = np.asarray([ord(c) for c in string.printable], dtype=np.int32)
+      string_values = np.asarray([ord(c) for c in string.printable],
+                                 dtype=np.int32)
       input_indices = np.asarray([12, 10, 29, 21, 10, 34], dtype=np.int32)
       module.gather(string_values, input_indices)
 
