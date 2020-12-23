@@ -11,38 +11,25 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMBASETARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMBASETARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMAOTTARGET_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMAOTTARGET_H_
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Base target for LLVM backends.
-// TODO(scotttodd): fold into LLVMAOTTarget now that LLVMJITTarget is gone
-class LLVMBaseTargetBackend : public TargetBackend {
- public:
-  explicit LLVMBaseTargetBackend(LLVMTargetOptions options);
-
-  void buildTranslationPassPipeline(OpPassManager &passManager) override;
-
-  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override;
-
-  LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
-                               DeviceSwitchRewriter &switchRewriter) override;
-
- protected:
-  LLVMTargetOptions options_;
-};
+// Registers the LLVM Ahead-Of-Time (AOT) target backends.
+void registerLLVMAOTTargetBackends(
+    std::function<LLVMTargetOptions()> queryOptions);
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMBASETARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMAOTTARGET_H_

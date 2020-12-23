@@ -94,7 +94,7 @@ LogicalResult AddVulkanLaunchWrapper::declareVulkanLaunchFunc(Location loc) {
   vulkanLaunchTypes.insert(vulkanLaunchTypes.end(), args.begin(), args.end());
 
   // Declare vulkan launch function.
-  auto type = FunctionType::get(vulkanLaunchTypes, {}, loc->getContext());
+  auto type = FunctionType::get(loc->getContext(), vulkanLaunchTypes, {});
   FuncOp vkLaunch = builder.create<FuncOp>(loc, kVulkanLaunch, type);
   vkLaunch.setPrivate();
   return success();
@@ -144,7 +144,7 @@ void AddVulkanLaunchWrapper::convertGpuLaunchFunc(
   std::vector<char> binary;
   if (failed(createBinaryShader(module, binary))) return signalPassFailure();
 
-  FunctionType ft = FunctionType::get(args, {}, ctx);
+  FunctionType ft = FunctionType::get(ctx, args, {});
   std::string name = std::string(entryPoint.fn()) + "_wrapper";
   auto function = FuncOp::create(loc, name, ft);
   module.push_back(function);

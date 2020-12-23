@@ -11,25 +11,33 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGET_H_
-
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM Ahead-Of-Time (AOT) target backends.
-void registerLLVMAOTTargetBackends(
-    std::function<LLVMTargetOptions()> queryOptions);
+// TODO(benvanik): add other platforms:
+// createMacLinkerTool using ld64.lld
+// createWasmLinkerTool wasm-ld
+
+std::unique_ptr<LinkerTool> createUnixLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+std::unique_ptr<LinkerTool> createWindowsLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+
+// static
+std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
+  if (targetTriple.isOSWindows() || targetTriple.isWindowsMSVCEnvironment()) {
+    return createWindowsLinkerTool(targetTriple, targetOptions);
+  }
+  return createUnixLinkerTool(targetTriple, targetOptions);
+}
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGET_H_

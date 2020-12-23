@@ -127,7 +127,7 @@ static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
     operandTypes.push_back(indexType);
   }
   auto functionType =
-      FunctionType::get(operandTypes, /*results=*/{}, region.getContext());
+      FunctionType::get(region.getContext(), operandTypes, /*results=*/{});
 
   // Clone region into the function body.
   auto funcOp = FuncOp::create(loc, functionName, functionType);
@@ -191,10 +191,10 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   }
 
   // Create the executable with the region cloned into it.
-  auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
+  auto parentFuncOp = regionOp->getParentOfType<FuncOp>();
   auto executableOp = createExecutable(
       regionOp.getLoc(), namePrefix, {workgroupFuncOp},
-      parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
+      parentFuncOp->getParentOfType<ModuleOp>(), dispatchableFuncOps);
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 

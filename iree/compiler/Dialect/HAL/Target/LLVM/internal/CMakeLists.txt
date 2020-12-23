@@ -12,24 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = ["layering_check"],
-    licenses = ["notice"],  # Apache 2.0
-)
+iree_add_all_subdirs()
 
-cc_library(
-    name = "LinkerTools_internal",
-    srcs = [
-        "LinkerTools.cpp",
-        "UnixLinkerTool.cpp",
-        "WindowsLinkerTool.cpp",
-    ],
-    deps = [
-        "//iree/base:core_headers",
-        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LinkerTool_hdrs",
-        "@llvm-project//llvm:Core",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Support",
-    ],
+iree_cc_library(
+  NAME
+    LinkerTools_internal
+  SRCS
+    "LinkerTools.cpp"
+    "UnixLinkerTool.cpp"
+    "WindowsLinkerTool.cpp"
+  DEPS
+    LLVMCore
+    LLVMSupport
+    MLIRSupport
+    iree::base::core_headers
+    iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs
+  PUBLIC
 )

@@ -158,7 +158,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
 
   // Functions take all I/O through the interface API.
   auto sourceFuncType = clonedFuncOp.getType();
-  auto thunkFuncType = FunctionType::get({}, {}, clonedFuncOp.getContext());
+  auto thunkFuncType = FunctionType::get(clonedFuncOp.getContext(), {}, {});
   auto thunkFuncOp = FuncOp::create(clonedFuncOp.getLoc(),
                                     clonedFuncOp.getName(), thunkFuncType);
   clonedFuncOp.setName((clonedFuncOp.getName() + "_impl").str());
@@ -275,7 +275,7 @@ static void convertTiledEntryFuncToSymbols(
   targetOp.getInnerModule().push_back(clonedFuncOp);
 
   // Strip all arguments as functions take all I/O through the interface API.
-  clonedFuncOp.setType(FunctionType::get({}, {}, clonedFuncOp.getContext()));
+  clonedFuncOp.setType(FunctionType::get(clonedFuncOp.getContext(), {}, {}));
 
   auto *entryBlock = &clonedFuncOp.front();
   OpBuilder entryBuilder = OpBuilder::atBlockBegin(entryBlock);

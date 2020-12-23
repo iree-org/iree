@@ -47,7 +47,7 @@ mlir::ModelBuilder::ModelBuilder()
       module(mlir::ModuleOp::create(mlir::UnknownLoc::get(&ctx))),
       symbolTable(*module),
       loc(module->getLoc()),
-      i8(IntegerType::get(8, &ctx)),
+      i8(IntegerType::get(&ctx, 8)),
       f32(FloatType::getF32(&ctx)),
       f64(FloatType::getF64(&ctx)) {
   ctx.getOrLoadDialect<AffineDialect>();
@@ -78,7 +78,7 @@ Value mlir::ModelBuilder::constant_index(int64_t v) {
 FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
                                         ArrayRef<Type> args,
                                         MLIRFuncOpConfig config) {
-  FunctionType ft = FunctionType::get(args, results, &ctx);
+  FunctionType ft = FunctionType::get(&ctx, args, results);
   auto function = FuncOp::create(loc, name, ft);
   config.apply(function);
   module->push_back(function);
@@ -87,7 +87,7 @@ FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
 FuncOp mlir::ModelBuilder::makeFunction(
     std::function<std::string(FunctionType)> nameBuilder,
     ArrayRef<Type> results, ArrayRef<Type> args, MLIRFuncOpConfig config) {
-  FunctionType ft = FunctionType::get(args, results, &ctx);
+  FunctionType ft = FunctionType::get(&ctx, args, results);
   return makeFunction(nameBuilder(ft), results, args, config);
 }
 
@@ -129,7 +129,7 @@ void mlir::ModelBuilder::addGPUAttr() {
 gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(
     StringRef name, gpu::GPUModuleOp GPUModule, ArrayRef<int32_t> workgroupSize,
     ArrayRef<Type> args, ArrayRef<Type> results) {
-  auto fnType = FunctionType::get(args, results, module->getContext());
+  auto fnType = FunctionType::get(module->getContext(), args, results);
   OpBuilder b(&GPUModule.body());
   auto kernelFunc = b.create<gpu::GPUFuncOp>(loc, name, fnType);
   kernelFunc->setAttr(gpu::GPUDialect::getKernelFuncAttrName(),
@@ -250,8 +250,8 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
     builder.setInsertionPointToStart(module.getBody());
     calleeFunc = builder.create<FuncOp>(
         module.getLoc(), functionName,
-        FunctionType::get(SmallVector<Type, 4>(values.getTypes()), returnTypes,
-                          builder.getContext()));
+        FunctionType::get(builder.getContext(), values.getTypes(),
+                          returnTypes));
     calleeFunc.setPrivate();
   }
   return std_call(calleeFunc, values);

@@ -52,8 +52,8 @@ static LogicalResult insertInterfacesToEntryPoints(mlir::ModuleOp moduleOp) {
     auto interfaceType = IREE::VMLA::InterfaceType::get(moduleOp.getContext());
     auto indexType = IndexType::get(moduleOp.getContext());
     auto newType =
-        FunctionType::get({interfaceType, indexType, indexType, indexType}, {},
-                          moduleOp.getContext());
+        FunctionType::get(moduleOp.getContext(),
+                          {interfaceType, indexType, indexType, indexType}, {});
     funcOp.setType(newType);
     funcOp.front().addArguments(
         {interfaceType, indexType, indexType, indexType});

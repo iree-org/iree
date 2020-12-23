@@ -312,10 +312,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
     FunctionType getDispatchType() {
       return FunctionType::get(
+          getContext(),
           llvm::to_vector<4>(llvm::map_range(
               operands(), [](Value value) { return value.getType(); })),
-          getResultTypes(),
-          getContext());
+          getResultTypes());
     }
   }];
 
