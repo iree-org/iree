@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_H_
 #define IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_H_
 
+// clang-format off
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/vulkan/handle_util.h"

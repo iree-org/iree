@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_PIPELINE_CACHE_H_
 #define IREE_HAL_VULKAN_PIPELINE_CACHE_H_
 
+// clang-format off
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/executable.h"

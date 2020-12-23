@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_VULKAN_DYNAMIC_SYMBOLS_H_
 
+// clang-format off
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include <cstdint>
 #include <functional>

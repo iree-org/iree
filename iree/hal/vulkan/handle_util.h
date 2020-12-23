@@ -24,7 +24,9 @@
 #ifndef IREE_HAL_VULKAN_HANDLE_UTIL_H_
 #define IREE_HAL_VULKAN_HANDLE_UTIL_H_
 
+// clang-format off
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include "absl/synchronization/mutex.h"
 #include "iree/base/ref_ptr.h"
