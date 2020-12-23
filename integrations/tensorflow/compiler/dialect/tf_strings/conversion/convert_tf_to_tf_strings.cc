@@ -92,8 +92,8 @@ struct GatherV2OpLowering : public OpRewritePattern<TF::GatherV2Op> {
   LogicalResult matchAndRewrite(TF::GatherV2Op op,
                                 PatternRewriter &rewriter) const override {
     auto tensor = op.params();
-    auto tensor_ty = tensor.getType().dyn_cast<RankedTensorType>();
-    if (!tensor_ty || !tensor_ty.getElementType().isa<TF::StringType>()) {
+    auto tensorTy = tensor.getType().dyn_cast<RankedTensorType>();
+    if (!tensorTy || !tensorTy.getElementType().isa<TF::StringType>()) {
       return failure();
     }
 
@@ -106,17 +106,17 @@ struct GatherV2OpLowering : public OpRewritePattern<TF::GatherV2Op> {
       return failure();
     }
 
-    auto axis_value = axis.getValue<IntegerAttr>({});
-    auto axis_int = axis_value.getValue().getZExtValue();
+    auto axisValue = axis.getValue<IntegerAttr>({});
+    auto axisInt = axisValue.getValue().getZExtValue();
 
-    if (axis_int != tensor_ty.getRank() - 1) {
+    if (axisInt != tensorTy.getRank() - 1) {
       return failure();
     }
 
-    auto result_ty = op.getType().cast<ShapedType>();
+    auto resultTy = op.getType().cast<ShapedType>();
     rewriter.replaceOpWithNewOp<tf_strings::GatherOp>(
         op,
-        RankedTensorType::get(result_ty.getShape(),
+        RankedTensorType::get(resultTy.getShape(),
                               tf_strings::StringType::get(op.getContext())),
         tensor, op.indices());
 

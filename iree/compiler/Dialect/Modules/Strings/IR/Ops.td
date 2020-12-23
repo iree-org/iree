@@ -94,7 +94,7 @@ def STRINGS_StringTensorToStringOp : Op<STRINGS_Dialect, "string_tensor_to_strin
 }
 
 def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
-  let summary = "Gathers all the strings from a Tensor by id.";
+  let summary = "Gathers all the strings from a Tensor by index.";
   let description = [{
     Gathers all the strings from a Tensor by index values along the final axis.
   }];

@@ -45,9 +45,9 @@ def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
 }
 
 def TFStrings_GatherOp : Op<TFStrings_Dialect, "gather"> {
-  let summary = "Gathers all the strings from a Tensor by index of the last dimension.";
+  let summary = "Gathers all the strings from by index.";
   let description = [{
-    Gathers all the strings from a Tensor by ID.
+    Gathers all the strings from a Tensor using the index of the last dimension.
   }];
 
   let arguments = (ins TFStrings_StringTensor:$dict,
