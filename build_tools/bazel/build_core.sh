@@ -46,7 +46,7 @@ declare -a test_env_args=(
 )
 
 declare -a default_build_tag_filters=("-nokokoro")
-declare -a default_test_tag_filters=("-nokokoro", "-driver=metal")
+declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
 
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
@@ -79,6 +79,7 @@ bazel \
   --nosystem_rc --nohome_rc --noworkspace_rc \
   --bazelrc=build_tools/bazel/iree.bazelrc \
   query \
+    --config=non_darwin \
     //iree/... + //build_tools/... | \
       xargs bazel \
         --nosystem_rc --nohome_rc --noworkspace_rc \
