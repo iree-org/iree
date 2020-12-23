@@ -17,7 +17,7 @@
 #ifndef IREE_HAL_VULKAN_API_H_
 #define IREE_HAL_VULKAN_API_H_
 
-// clang-format off
+// clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
