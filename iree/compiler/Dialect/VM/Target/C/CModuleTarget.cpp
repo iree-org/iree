@@ -15,8 +15,12 @@
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
 #include "emitc/Target/Cpp.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -213,23 +217,73 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
-LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
-                                 llvm::raw_ostream &output) {
-  auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
-  if (moduleOps.empty()) {
-    return outerModuleOp.emitError()
-           << "outer module does not contain a vm.module op";
-  }
-  auto moduleOp = *moduleOps.begin();
+// Adapted from BytecodeModuleTarget and extended by C specific passes
+static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
+  bool optimize = true;
+  bool stripDebugOps = true;
 
+  OwningRewritePatternList patterns;
+  ConversionTarget target(*moduleOp.getContext());
+  target.addLegalDialect<IREE::VM::VMDialect>();
+  target.addLegalOp<IREE::DoNotOptimizeOp>();
+
+  // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
-  PassManager passManager(context);
+  for (auto *op : context->getRegisteredOperations()) {
+    // Non-serializable ops must be removed prior to serialization.
+    if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
+      op->getCanonicalizationPatterns(patterns, context);
+      target.setOpAction(OperationName(op->name, context),
+                         ConversionTarget::LegalizationAction::Illegal);
+    }
 
+    // Debug ops must not be present when stripping.
+    // TODO(benvanik): add RemoveDisabledDebugOp pattern.
+    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() && stripDebugOps) {
+      target.setOpAction(OperationName(op->name, context),
+                         ConversionTarget::LegalizationAction::Illegal);
+    }
+  }
+
+  if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
+    return moduleOp.emitError() << "unable to fully apply conversion to module";
+  }
+
+  PassManager passManager(context);
+  mlir::applyPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
+
+  if (optimize) {
+    // TODO(benvanik): does this run until it quiesces?
+    modulePasses.addPass(mlir::createInlinerPass());
+    modulePasses.addPass(mlir::createCSEPass());
+    modulePasses.addPass(mlir::createCanonicalizerPass());
+  }
+
+  modulePasses.addPass(createDropCompilerHintsPass());
+
+  // Mark up the module with ordinals for each top-level op (func, etc).
+  // This will make it easier to correlate the MLIR textual output to the
+  // binary output.
+  // We don't want any more modifications after this point as they could
+  // invalidate the ordinals.
+  modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
+
+  // C target specific passes
   modulePasses.addPass(createConvertVMToEmitCPass());
 
-  if (failed(passManager.run(outerModuleOp))) {
-    return failure();
+  if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
+    return moduleOp.emitError() << "failed during transform passes";
+  }
+
+  return success();
+}
+
+LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
+                                 llvm::raw_ostream &output) {
+  if (failed(canonicalizeModule(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to canonicalize vm.module to a serializable form";
   }
 
   auto printInclude = [&output](std::string include) {
@@ -246,33 +300,40 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   printInclude("iree/vm/c_funcs.h");
   output << "\n";
 
-  for (auto moduleOp : moduleOps) {
-    printModuleComment(moduleOp, output);
+  printModuleComment(moduleOp, output);
 
-    mlir::emitc::CppEmitter emitter(output);
-    mlir::emitc::CppEmitter::Scope scope(emitter);
+  mlir::emitc::CppEmitter emitter(output);
+  mlir::emitc::CppEmitter::Scope scope(emitter);
 
-    // translate functions
-    for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-      if (failed(translateFunctionToC(emitter, moduleOp, funcOp, output))) {
-        return failure();
-      }
-
-      output << "\n";
+  // translate functions
+  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+    if (failed(translateFunctionToC(emitter, moduleOp, funcOp, output))) {
+      return failure();
     }
+
+    output << "\n";
   }
 
   printSeparatingComment(output);
 
-  for (auto moduleOp : moduleOps) {
-    printModuleComment(moduleOp, output);
+  printModuleComment(moduleOp, output);
 
-    // generate module descriptors
-    if (failed(buildModuleDescriptors(moduleOp, output))) {
-      return failure();
-    }
+  // generate module descriptors
+  if (failed(buildModuleDescriptors(moduleOp, output))) {
+    return failure();
   }
+
   return success();
+}
+
+LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
+                                 llvm::raw_ostream &output) {
+  auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
+  if (moduleOps.empty()) {
+    return outerModuleOp.emitError()
+           << "outer module does not contain a vm.module op";
+  }
+  return translateModuleToC(*moduleOps.begin(), output);
 }
 
 }  // namespace VM

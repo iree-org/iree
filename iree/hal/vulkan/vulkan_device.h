@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 #define IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 
+// clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include <functional>
 #include <memory>
