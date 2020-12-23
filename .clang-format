@@ -16,13 +16,3 @@
 # mostly LLVM style (for naming/etc) but the Google formatting (because internal
 # tooling has... issues).
 BasedOnStyle: Google
-
-# Some includes have specific inclusion order requirements. To prevent
-# clang-format from breaking things when bucketing headers into categories we
-# override the behavior here for those well-known headers.
-IncludeCategories:
-  # We override VK_NO_PROTOTYPES so we don't pull in auto-imported symbols and
-  # this must always sort above any header (ours or otherwise) that may
-  # transitively #include <vulkan/vulkan.h>.
-  - Regex:           'iree/hal/vulkan/vulkan_headers.h'
-    Priority:        -1

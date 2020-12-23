@@ -15,7 +15,9 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 
+// clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
