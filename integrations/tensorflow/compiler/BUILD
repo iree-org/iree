@@ -54,6 +54,7 @@ cc_library(
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo:chlo_legalize_to_hlo",

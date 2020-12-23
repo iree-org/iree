@@ -122,7 +122,7 @@ class VectorTransferReadConversion
         loc, rewriter.getIndexType(), rewriter.getStringAttr("x"));
     Value index = rewriter.create<AddIOp>(loc, threadIndex, indices.back());
     indices.back() = index;
-    Value newOp = rewriter.create<LoadOp>(loc, op.memref(), indices);
+    Value newOp = rewriter.create<LoadOp>(loc, op.source(), indices);
     rewriter.replaceOp(op, ValueRange(newOp));
     return success();
   }
@@ -210,12 +210,12 @@ class VectorTransferReadToLoad
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
-        op.getMemRefType().getElementType() !=
+        op.getShapedType().getElementType() !=
             op.getVectorType().getElementType()) {
       return failure();
     }
     auto loc = op.getLoc();
-    Value newOp = rewriter.create<LoadOp>(loc, op.memref(), op.indices());
+    Value newOp = rewriter.create<LoadOp>(loc, op.source(), op.indices());
     newOp =
         rewriter.create<vector::BroadcastOp>(loc, op.getVectorType(), newOp);
     rewriter.replaceOp(op, newOp);
@@ -233,7 +233,7 @@ class VectorTransferWriteToStore
   LogicalResult matchAndRewrite(vector::TransferWriteOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
-        op.getMemRefType().getElementType() !=
+        op.getShapedType().getElementType() !=
             op.getVectorType().getElementType()) {
       return failure();
     }
@@ -241,7 +241,7 @@ class VectorTransferWriteToStore
     SmallVector<int64_t, 2> zero(op.getVectorType().getRank(), 0);
     Value scalarValue =
         rewriter.create<vector::ExtractOp>(loc, op.vector(), zero);
-    rewriter.create<StoreOp>(loc, scalarValue, op.memref(), op.indices());
+    rewriter.create<StoreOp>(loc, scalarValue, op.source(), op.indices());
     rewriter.eraseOp(op);
     return success();
   }

@@ -81,9 +81,9 @@ func @tensorUnrankedArg(%arg0 : tensor<*xi64>) -> tensor<*xi64> {
 
 // -----
 func @tensorUnrankedValue(%arg0 : tensor<4xi64>) -> tensor<4xi64> {
-  // expected-error@+1 {{'std.tensor_cast' op unable to legalize operation types}}
-  %0 = tensor_cast %arg0 : tensor<4xi64> to tensor<*xi64>
-  %1 = tensor_cast %0 : tensor<*xi64> to tensor<4xi64>
+  // expected-error@+1 {{'tensor.cast' op unable to legalize operation types}}
+  %0 = tensor.cast %arg0 : tensor<4xi64> to tensor<*xi64>
+  %1 = tensor.cast %0 : tensor<*xi64> to tensor<4xi64>
   return %1 : tensor<4xi64>
 }
 
@@ -112,6 +112,6 @@ func @compareI64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) 
 
 func @tensor(%A: tensor<2x3xf32>, %B: tensor<3x4xf32>, %C: tensor<2x4xf32>)  -> tensor<2x4xf32> attributes { iree.module.export } {
   %E = linalg.matmul ins(%A, %B: tensor<2x3xf32>, tensor<3x4xf32>)
-                    init(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
+                    outs(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
   return %E : tensor<2x4xf32>
 }

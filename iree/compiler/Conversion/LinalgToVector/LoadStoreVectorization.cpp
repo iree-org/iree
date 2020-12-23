@@ -202,8 +202,7 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
         genericOp.getLoc(), genericOp.getResultTypes(),
         /*inputs=*/newArgsRef.take_front(genericOp.getNumInputs()),
         /*outputBuffers*/ newArgsRef.take_back(genericOp.getNumOutputs()),
-        /*initTensors*/ ValueRange{}, genericOp.indexing_mapsAttr(),
-        genericOp.iterator_types(),
+        genericOp.indexing_mapsAttr(), genericOp.iterator_types(),
         /*doc=*/nullptr,
         /*library_call=*/nullptr, genericOp.sparseAttr());
 

@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::Shape::IR
     tensorflow::mlir_hlo
   PUBLIC
 )
