@@ -80,6 +80,9 @@ void populateTFStringsToStringsPatterns(MLIRContext *context,
   patterns.insert<OpConversion<tf_strings::ToStringTensorOp,
                                iree_compiler::IREE::Strings::ToStringTensorOp>>(
       context);
+  patterns.insert<OpConversion<tf_strings::GatherOp,
+                               iree_compiler::IREE::Strings::GatherOp>>(
+      context);
   patterns.insert<
       OpConversion<tf_strings::StringTensorToStringOp,
                    iree_compiler::IREE::Strings::StringTensorToStringOp>>(

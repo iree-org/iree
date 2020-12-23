@@ -36,3 +36,11 @@ func @printv2.tensor.f32(%arg0: tensor<5xf32>) {
   return
 }
 
+// CHECK-LABEL: func @gatherv2
+func @gatherv2(%arg0: tensor<5x!tf.string>, %arg1: tensor<3xi32>) {
+  %0 = "tf.Const"() {device = "", value = dense<0> : tensor<i32>} : () -> tensor<i32>
+
+  // CHECK-DAG: [[VAL0:%.+]] = "tf_strings.gather"(%arg0, %arg1)
+  %1 = "tf.GatherV2"(%arg0, %arg1, %0) {batch_dims = 0 : i64, device = ""} : (tensor<5x!tf.string>, tensor<3xi32>, tensor<i32>) -> tensor<3x!tf.string>
+  return
+}
