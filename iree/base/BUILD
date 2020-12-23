@@ -480,7 +480,6 @@ cc_library(
         "wait_handle_win32.c",
     ],
     hdrs = ["wait_handle.h"],
-    copts = ["-Wno-return-type"],
     deps = [
         ":api",
         ":core_headers",
