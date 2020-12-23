@@ -38,7 +38,9 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
 
 iree_cc_test(
   NAME
@@ -74,5 +76,3 @@ iree_bytecode_module(
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )
-
-endif()

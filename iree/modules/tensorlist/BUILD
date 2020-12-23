@@ -21,9 +21,28 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "native_module",
+    srcs = ["native_module.cc"],
+    hdrs = ["native_module.h"],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "//iree/hal:api",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:cc",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
 iree_cmake_extra_content(
     content = """
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
 """,
     inline = True,
 )
@@ -54,30 +73,6 @@ cc_test(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
-)
-
-cc_library(
-    name = "native_module",
-    srcs = ["native_module.cc"],
-    hdrs = ["native_module.h"],
-    deps = [
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/hal:api",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
     ],
 )

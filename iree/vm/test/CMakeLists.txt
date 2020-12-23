@@ -14,7 +14,9 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
 
 iree_cc_embed_data(
   NAME
@@ -86,5 +88,3 @@ iree_bytecode_module(
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
-
-endif()
