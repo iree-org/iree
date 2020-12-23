@@ -37,8 +37,8 @@ class StringsModule(tf.Module):
       tf.TensorSpec((None,), dtype=tf.int32),
       tf.TensorSpec((None,), dtype=tf.int32),
   ])
-  def gather(self, wp, ids):
-    tf.print(tf.gather(tf.as_string(wp), ids))
+  def gather(self, string_values, indices):
+    tf.print(tf.gather(tf.as_string(string_values), indices))
 
 #  @tf.function(input_signature=[
 #      tf.TensorSpec((None, None), dtype=tf.int32),
@@ -66,9 +66,9 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
   def test_gather(self):
 
     def gather(module):
-      wordparts = np.asarray([ord(c) for c in string.printable], dtype=np.int32)
-      input_ids = np.asarray([12, 10, 29, 21, 10, 34], dtype=np.int32)
-      module.gather(wordparts, input_ids)
+      string_values = np.asarray([ord(c) for c in string.printable], dtype=np.int32)
+      input_indices = np.asarray([12, 10, 29, 21, 10, 34], dtype=np.int32)
+      module.gather(string_values, input_indices)
 
     self.compare_backends(gather, self._modules)
 
