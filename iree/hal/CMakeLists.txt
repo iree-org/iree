@@ -19,10 +19,43 @@ iree_cc_library(
     api
   HDRS
     "api.h"
-    "api_detail.h"
   SRCS
-    "api.c"
-    "api.cc"
+    "allocator.c"
+    "allocator.h"
+    "allocator_heap.c"
+    "buffer.c"
+    "buffer.h"
+    "buffer_heap.c"
+    "buffer_view.c"
+    "buffer_view.cc"
+    "buffer_view.h"
+    "command_buffer.c"
+    "command_buffer.h"
+    "command_buffer_validation.c"
+    "descriptor_set.c"
+    "descriptor_set.h"
+    "descriptor_set_layout.c"
+    "descriptor_set_layout.h"
+    "detail.h"
+    "device.c"
+    "device.h"
+    "driver.c"
+    "driver.h"
+    "driver_registry.c"
+    "driver_registry.h"
+    "event.c"
+    "event.h"
+    "executable.c"
+    "executable.h"
+    "executable_cache.c"
+    "executable_cache.h"
+    "executable_layout.c"
+    "executable_layout.h"
+    "resource.h"
+    "semaphore.c"
+    "semaphore.h"
+    "string_util.cc"
+    "string_util.h"
   DEPS
     absl::inlined_vector
     absl::span
@@ -33,16 +66,14 @@ iree_cc_library(
     iree::base::synchronization
     iree::base::threading
     iree::base::tracing
-    iree::hal::cc
-    iree::hal::host::host_local_allocator
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    api_string_util_test
+    string_util_test
   SRCS
-    "api_string_util_test.cc"
+    "string_util_test.cc"
   DEPS
     ::api
     absl::inlined_vector
