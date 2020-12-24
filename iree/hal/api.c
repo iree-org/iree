@@ -19,22 +19,6 @@
 #include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-// Copies the string bytes into the target buffer and returns the number of
-// characters copied. Does not include a NUL terminator.
-// TODO(benvanik): move to a more general function and share with devices.
-static iree_host_size_t iree_string_view_append_to_buffer(
-    iree_string_view_t source_value, iree_string_view_t* target_value,
-    char* buffer) {
-  memcpy(buffer, source_value.data, source_value.size);
-  target_value->data = buffer;
-  target_value->size = source_value.size;
-  return source_value.size;
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t
 //===----------------------------------------------------------------------===//
 
