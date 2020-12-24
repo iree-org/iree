@@ -22,6 +22,8 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -46,6 +48,29 @@ namespace {
 //===----------------------------------------------------------------------===//
 // mhlo.torch_index_select conversion patterns.
 //===----------------------------------------------------------------------===//
+
+static Value getOutputTensor(OpBuilder &builder, Location loc, Value opResult) {
+  ShapedType outputType = opResult.getType().cast<ShapedType>();
+  if (outputType.hasStaticShape()) {
+    return builder.create<linalg::InitTensorOp>(loc, outputType.getShape(),
+                                                outputType.getElementType());
+  }
+  // Check for tie-shape operations for the result to get the shape of the
+  // output.
+  SmallVector<Value, 4> dynamicSizes;
+  for (Operation *user : opResult.getUsers()) {
+    auto tieShapeOp = dyn_cast<Shape::TieShapeOp>(user);
+    if (!tieShapeOp) continue;
+    auto makeShapeOp =
+        tieShapeOp.shape().getDefiningOp<Shape::MakeRankedShapeOp>();
+    if (!makeShapeOp) continue;
+    dynamicSizes = llvm::to_vector<4>(makeShapeOp.dynamic_dimensions());
+    break;
+  }
+  if (outputType.getNumDynamicDims() != dynamicSizes.size()) return nullptr;
+  return builder.create<linalg::InitTensorOp>(
+      loc, dynamicSizes, outputType.getShape(), outputType.getElementType());
+}
 
 namespace {
 
@@ -79,11 +104,13 @@ struct TorchIndexSelectOpConversion
         AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
     indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
     SmallVector<StringRef, 3> loopTypes(rank, getParallelIteratorTypeName());
+    ShapedType outputType = op.getResult().getType().cast<ShapedType>();
+    Value initOp = getOutputTensor(rewriter, loc, op.getResult());
+    if (!initOp) return failure();
     auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
         loc, /*resultTensors=*/ArrayRef<Type>{op.getResult().getType()},
         /*inputs=*/adaptor.index(),
-        /*outputBuffers=*/ArrayRef<Value>{}, /*initTensors=*/ValueRange{},
-        indexingMaps, loopTypes);
+        /*outputBuffers=*/initOp, indexingMaps, loopTypes);
 
     SmallVector<Type, 4> bodyArgTypes, opResultTypes;
     SmallVector<Value, 2> linalgOpArgs = {adaptor.index()};
@@ -96,6 +123,7 @@ struct TorchIndexSelectOpConversion
           blockArgs.getType().cast<ShapedType>().getElementType());
     }
     block->addArguments(bodyArgTypes);
+    block->addArguments(outputType.getElementType());
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(block);
 
@@ -123,7 +151,7 @@ struct TorchIndexSelectOpConversion
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect>();
+    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect, ShapeDialect>();
   }
 
   void runOnFunction() override {
@@ -131,10 +159,6 @@ struct ConvertHLOToLinalgOnTensorsPass
     populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);
 
     ConversionTarget target(getContext());
-    // Allow constant to appear in Linalg op regions.
-    target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) -> bool {
-      return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
-    });
     // Don't convert the body of reduction ops.
     target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
