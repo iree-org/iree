@@ -12,37 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/dylib/registration/driver_module.h"
+#include "iree/hal/vmla/registration/driver_module.h"
 
 #include <inttypes.h>
 
-#include "absl/flags/flag.h"
-#include "iree/hal/local/loaders/legacy_library_loader.h"
+#include "iree/hal/local/loaders/vmla_module_loader.h"
 #include "iree/hal/local/task_driver.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
-// By having a single iree/hal/local/registration that then has the loaders
-// added to it based on compilation settings we can have a single set of flags
-// for everything. We can also have API helper methods that register the driver
-// using an existing executor so that we can entirely externalize the task
-// system configuration from the HAL.
 
-ABSL_FLAG(int, dylib_worker_count, 0,
-          "Specified number of workers to use or 0 for automatic.");
-ABSL_FLAG(int, dylib_max_worker_count, 16,
-          "Maximum number of task system workers to use.");
+#define IREE_HAL_VMLA_DRIVER_ID 0x564D4C41u  // VMLA
 
-#define IREE_HAL_DYLIB_DRIVER_ID 0x58444C4Cu  // XDLL
-
-static iree_status_t iree_hal_dylib_driver_factory_enumerate(
+static iree_status_t iree_hal_vmla_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
   static const iree_hal_driver_info_t driver_infos[1] = {
       {
-          /*.driver_id=*/IREE_HAL_DYLIB_DRIVER_ID,
-          /*.driver_name=*/iree_make_cstring_view("dylib"),
-          /*.full_name=*/
-          iree_make_cstring_view("AOT compiled dynamic libraries"),
+          .driver_id = IREE_HAL_VMLA_DRIVER_ID,
+          .driver_name = iree_string_view_literal("vmla"),
+          .full_name =
+              iree_string_view_literal("Reference backend (deprecated)"),
       },
   };
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
@@ -50,10 +39,10 @@ static iree_status_t iree_hal_dylib_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_dylib_driver_factory_try_create(
+static iree_status_t iree_hal_vmla_driver_factory_try_create(
     void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
     iree_hal_driver_t** out_driver) {
-  if (driver_id != IREE_HAL_DYLIB_DRIVER_ID) {
+  if (driver_id != IREE_HAL_VMLA_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "no driver with ID %016" PRIu64
                             " is provided by this factory",
@@ -63,21 +52,21 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 
-  iree_hal_executable_loader_t* dylib_loader = NULL;
-  iree_status_t status =
-      iree_hal_legacy_library_loader_create(allocator, &dylib_loader);
-  iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
+  iree_vm_instance_t* instance = NULL;
+  iree_status_t status = iree_vm_instance_create(allocator, &instance);
 
+  iree_hal_executable_loader_t* vmla_loader = NULL;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_vmla_module_loader_create(instance, allocator, &vmla_loader);
+  }
+  iree_hal_executable_loader_t* loaders[1] = {vmla_loader};
+
+  // NOTE: VMLA doesn't tile so we don't really need many workers - having
+  // multiple does make it easier to test overlapping execution, though.
   iree_task_topology_t* topology = NULL;
   if (iree_status_is_ok(status)) {
-    if (absl::GetFlag(FLAGS_dylib_worker_count) > 0) {
-      status = iree_task_topology_from_group_count(
-          absl::GetFlag(FLAGS_dylib_worker_count), allocator, &topology);
-    } else {
-      status = iree_task_topology_from_unique_l2_cache_groups(
-          /*max_group_count=*/absl::GetFlag(FLAGS_dylib_max_worker_count),
-          allocator, &topology);
-    }
+    status = iree_task_topology_from_group_count(4, allocator, &topology);
   }
 
   iree_task_executor_t* executor = NULL;
@@ -88,22 +77,23 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        iree_make_cstring_view("dylib"), &default_params, executor,
+        iree_make_cstring_view("vmla"), &default_params, executor,
         IREE_ARRAYSIZE(loaders), loaders, allocator, out_driver);
   }
 
   iree_task_executor_release(executor);
   iree_task_topology_free(topology);
-  iree_hal_executable_loader_release(dylib_loader);
+  iree_hal_executable_loader_release(vmla_loader);
+  iree_vm_instance_release(instance);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_dylib_driver_module_register(iree_hal_driver_registry_t* registry) {
+iree_hal_vmla_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       /*self=*/NULL,
-      iree_hal_dylib_driver_factory_enumerate,
-      iree_hal_dylib_driver_factory_try_create,
+      iree_hal_vmla_driver_factory_enumerate,
+      iree_hal_vmla_driver_factory_try_create,
   };
   return iree_hal_driver_registry_register_factory(registry, &factory);
 }

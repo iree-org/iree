@@ -20,6 +20,12 @@
 static const iree_hal_executable_layout_vtable_t
     iree_hal_local_executable_layout_vtable;
 
+iree_hal_local_executable_layout_t* iree_hal_local_executable_layout_cast(
+    iree_hal_executable_layout_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_local_executable_layout_vtable);
+  return (iree_hal_local_executable_layout_t*)base_value;
+}
+
 iree_status_t iree_hal_local_executable_layout_create(
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
@@ -87,7 +93,7 @@ iree_status_t iree_hal_local_executable_layout_create(
 static void iree_hal_local_executable_layout_destroy(
     iree_hal_executable_layout_t* base_layout) {
   iree_hal_local_executable_layout_t* layout =
-      (iree_hal_local_executable_layout_t*)base_layout;
+      iree_hal_local_executable_layout_cast(base_layout);
   iree_allocator_t host_allocator = layout->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -97,11 +103,6 @@ static void iree_hal_local_executable_layout_destroy(
   iree_allocator_free(host_allocator, layout);
 
   IREE_TRACE_ZONE_END(z0);
-}
-
-iree_hal_local_executable_layout_t* iree_hal_local_executable_layout_cast(
-    iree_hal_executable_layout_t* base_value) {
-  return (iree_hal_local_executable_layout_t*)base_value;
 }
 
 static const iree_hal_executable_layout_vtable_t
