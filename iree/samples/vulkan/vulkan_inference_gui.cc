@@ -282,11 +282,11 @@ int iree::IreeMain(int argc, char** argv) {
 
   // Create wait and signal semaphores for async execution.
   vm::ref<iree_hal_semaphore_t> wait_semaphore;
-  IREE_CHECK_OK(iree_hal_semaphore_create(
-      iree_vk_device, 0ull, iree_allocator_system(), &wait_semaphore));
+  IREE_CHECK_OK(
+      iree_hal_semaphore_create(iree_vk_device, 0ull, &wait_semaphore));
   vm::ref<iree_hal_semaphore_t> signal_semaphore;
-  IREE_CHECK_OK(iree_hal_semaphore_create(
-      iree_vk_device, 0ull, iree_allocator_system(), &signal_semaphore));
+  IREE_CHECK_OK(
+      iree_hal_semaphore_create(iree_vk_device, 0ull, &signal_semaphore));
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -392,12 +392,10 @@ int iree::IreeMain(int argc, char** argv) {
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
         IREE_CHECK_OK(iree_hal_buffer_view_create(
             input0_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
-            IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
-            &input0_buffer_view));
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_create(
             input1_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
-            IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
-            &input1_buffer_view));
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, &input1_buffer_view));
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
         // Marshal inputs through a VM variant list.
@@ -449,14 +447,9 @@ int iree::IreeMain(int argc, char** argv) {
         auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
             iree_vm_list_get_ref_deref(outputs.get(), 0,
                                        iree_hal_buffer_view_get_descriptor()));
-        auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
-        iree_hal_mapped_memory_t mapped_memory;
-        IREE_CHECK_OK(iree_hal_buffer_map(output_buffer,
-                                          IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                          IREE_WHOLE_BUFFER, &mapped_memory));
-        memcpy(&latest_output, mapped_memory.contents.data,
-               mapped_memory.contents.data_length);
-        iree_hal_buffer_unmap(output_buffer, &mapped_memory);
+        IREE_CHECK_OK(iree_hal_buffer_read_data(
+            iree_hal_buffer_view_buffer(output_buffer_view), 0, latest_output,
+            sizeof(latest_output)));
 
         dirty = false;
       }
