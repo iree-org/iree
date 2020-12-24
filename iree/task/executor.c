@@ -530,75 +530,87 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Check for incoming submissions and move their posted tasks into our
-  // local lists. Any of the tasks here are ready to execute immediately and
-  // ones we should be able to distribute to workers without delay. The
-  // waiting tasks are to the best of the caller's knowledge not ready yet.
-  //
-  // Note that we only do this once per coordination; that's so we don't
-  // starve if submissions come in faster than we can schedule them.
-  // Coordination will run again when workers become idle and will pick up
-  // any changes then.
-  //
-  // As we schedule tasks we may spawn new ones (like a dispatch -> many
-  // dispatch slices) and we keep track of those here. By doing a pass through
-  // all ready tasks and only then merging in the new submission we get
-  // breadth-first traversal of task graphs even if they originate from
-  // various places and have no relation - hopefully leading to better average
-  // latency.
-  iree_task_submission_t pending_submission;
-  iree_task_submission_initialize_from_lifo_slist(
-      &executor->incoming_ready_slist, &pending_submission);
-  iree_task_list_append_from_fifo_slist(&pending_submission.waiting_list,
-                                        &executor->incoming_waiting_slist);
+  // We may be adding tasks/waiting/etc on each pass through coordination - to
+  // ensure we completely drain the incoming queues and satisfied waits we loop
+  // until there's nothing left to coordinate.
+  bool schedule_dirty = true;
+  do {
+    // Check for incoming submissions and move their posted tasks into our
+    // local lists. Any of the tasks here are ready to execute immediately and
+    // ones we should be able to distribute to workers without delay. The
+    // waiting tasks are to the best of the caller's knowledge not ready yet.
+    //
+    // Note that we only do this once per coordination; that's so we don't
+    // starve if submissions come in faster than we can schedule them.
+    // Coordination will run again when workers become idle and will pick up
+    // any changes then.
+    //
+    // As we schedule tasks we may spawn new ones (like a dispatch -> many
+    // dispatch slices) and we keep track of those here. By doing a pass through
+    // all ready tasks and only then merging in the new submission we get
+    // breadth-first traversal of task graphs even if they originate from
+    // various places and have no relation - hopefully leading to better average
+    // latency.
+    iree_task_submission_t pending_submission;
+    iree_task_submission_initialize_from_lifo_slist(
+        &executor->incoming_ready_slist, &pending_submission);
+    iree_task_list_append_from_fifo_slist(&pending_submission.waiting_list,
+                                          &executor->incoming_waiting_slist);
 
-  // Scratch coordinator submission batch used during scheduling to batch up
-  // all tasks that will be posted to each worker. We could stash this on the
-  // executor but given that which thread is playing the role of the coordinator
-  // is random it's better to ensure that these bytes never incur a cache miss
-  // by making them live here in the stack of the chosen thread.
-  iree_task_post_batch_t* post_batch =
-      iree_alloca(sizeof(iree_task_post_batch_t) +
-                  executor->worker_count * sizeof(iree_task_list_t));
-  iree_task_post_batch_initialize(executor, current_worker, post_batch);
+    // Scratch coordinator submission batch used during scheduling to batch up
+    // all tasks that will be posted to each worker. We could stash this on the
+    // executor but given that which thread is playing the role of the
+    // coordinator is random it's better to ensure that these bytes never incur
+    // a cache miss by making them live here in the stack of the chosen thread.
+    iree_task_post_batch_t* post_batch =
+        iree_alloca(sizeof(iree_task_post_batch_t) +
+                    executor->worker_count * sizeof(iree_task_list_t));
+    iree_task_post_batch_initialize(executor, current_worker, post_batch);
 
-  // Poll the waiting tasks to see if any have resolved. This dramatically
-  // cuts latency in cases where the wait handle completes prior to us
-  // entering the real wait. When we have semaphores sequencing back-to-back
-  // work this ensures that we pack in future dispatch work earlier vs.
-  // waiting for a full thread hop.
-  //
-  // If any waits have resolved then they'll be moved to the ready list here
-  // and then get processed FIFO with the tasks that were ready in the
-  // request.
-  iree_task_executor_poll_waiting_tasks(executor, &pending_submission);
+    // Poll the waiting tasks to see if any have resolved. This dramatically
+    // cuts latency in cases where the wait handle completes prior to us
+    // entering the real wait. When we have semaphores sequencing back-to-back
+    // work this ensures that we pack in future dispatch work earlier vs.
+    // waiting for a full thread hop.
+    //
+    // If any waits have resolved then they'll be moved to the ready list here
+    // and then get processed FIFO with the tasks that were ready in the
+    // request.
+    iree_task_executor_poll_waiting_tasks(executor, &pending_submission);
 
-  // Schedule all ready tasks in this batch. Some may complete inline (such
-  // as ready barriers with all their dependencies resolved) while others may
-  // be scheduled on workers via the post batch.
-  iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
-                                          post_batch);
+    // Schedule all ready tasks in this batch. Some may complete inline (such
+    // as ready barriers with all their dependencies resolved) while others may
+    // be scheduled on workers via the post batch.
+    iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
+                                            post_batch);
 
-  // Merge any newly waiting tasks into the global wait list.
-  iree_task_executor_merge_wait_list(executor,
-                                     &pending_submission.waiting_list);
+    // Merge any newly waiting tasks into the global wait list.
+    iree_task_executor_merge_wait_list(executor,
+                                       &pending_submission.waiting_list);
 
-  // Post all new work to workers; they may wake and begin executing
-  // immediately. Returns whether this worker has new tasks for it to work on.
-  bool did_post = iree_task_post_batch_submit(post_batch);
-  if (!did_post && speculative) {
-    // No work was found; wait on one or more of our wait handles.
-    // This will block the calling thread but that's fine as they were going
-    // to wait anyway and were just speculatively seeing if there was work first
-    // by requesting coordination. If work completes here we'll catch it on
-    // the poll next loop around.
-    iree_task_executor_wait_any_task(executor, current_worker,
-                                     &pending_submission);
-  }
+    // Post all new work to workers; they may wake and begin executing
+    // immediately. Returns whether this worker has new tasks for it to work on.
+    bool did_post = iree_task_post_batch_submit(post_batch);
+    if (!did_post && speculative) {
+      // No work was found; wait on one or more of our wait handles.
+      // This will block the calling thread but that's fine as they were going
+      // to wait anyway and were just speculatively seeing if there was work
+      // first by requesting coordination. If work completes here we'll catch it
+      // on the poll next loop around.
+      iree_task_executor_wait_any_task(executor, current_worker,
+                                       &pending_submission);
+    }
 
-  // Merge any new work into the submission list for future coordinators to
-  // deal with - we don't want the possibility of starvation by looping on this.
-  iree_task_executor_merge_submission(executor, &pending_submission);
+    // Merge any new work into the submission list for future coordinators to
+    // deal with - we don't want the possibility of starvation by looping on
+    // this.
+    if (!iree_task_submission_is_empty(&pending_submission)) {
+      iree_task_executor_merge_submission(executor, &pending_submission);
+      schedule_dirty = true;
+    } else {
+      schedule_dirty = false;
+    }
+  } while (schedule_dirty);
 
   iree_slim_mutex_unlock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_END(z0);

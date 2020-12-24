@@ -97,7 +97,8 @@ iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
 
 // Signals the |semaphore| with a failure. The |status| will be returned from
 // iree_hal_semaphore_query and iree_hal_semaphore_signal for the lifetime
-// of the semaphore.
+// of the semaphore. Ownership of the status transfers to the semaphore and
+// callers must clone it if they wish to retain it.
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
 
