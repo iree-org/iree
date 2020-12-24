@@ -29,33 +29,3 @@ cc_library(
         "//iree/hal/drivers",
     ],
 )
-
-cc_library(
-    name = "mock_allocator",
-    testonly = True,
-    hdrs = ["mock_allocator.h"],
-    deps = [
-        "//iree/hal/cc",
-        "//iree/testing:gtest",
-    ],
-)
-
-cc_library(
-    name = "mock_command_buffer",
-    testonly = True,
-    hdrs = ["mock_command_buffer.h"],
-    deps = [
-        "//iree/hal/cc",
-        "//iree/testing:gtest",
-    ],
-)
-
-cc_library(
-    name = "mock_command_queue",
-    testonly = True,
-    hdrs = ["mock_command_queue.h"],
-    deps = [
-        "//iree/hal/cc",
-        "//iree/testing:gtest",
-    ],
-)
