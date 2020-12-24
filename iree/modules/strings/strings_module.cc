@@ -138,10 +138,10 @@ class StringsModuleState final {
     size_t tensor_size = element_size * num_elements;
     iree_hal_buffer_t* hal_buffer =
         iree_hal_buffer_view_buffer(hal_buffer_view.get());
-    iree_hal_mapped_memory_t tensor_mapping;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                            /*byte_offset=*/0, tensor_size, &tensor_mapping));
+    iree_hal_buffer_mapping_t tensor_mapping;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, tensor_size, &tensor_mapping));
 
     iree_hal_element_type_t type =
         iree_hal_buffer_view_element_type(hal_buffer_view.get());
@@ -195,7 +195,7 @@ class StringsModuleState final {
     }
 
     // Unmap used buffer.
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&tensor_mapping));
 
     // Place into iree_string_views.
     std::vector<iree_string_view_t> string_views;
@@ -237,10 +237,10 @@ class StringsModuleState final {
     size_t element_size = iree_hal_buffer_view_element_size(ids.get());
     size_t tensor_size = element_size * num_elements;
     iree_hal_buffer_t* hal_buffer = iree_hal_buffer_view_buffer(ids.get());
-    iree_hal_mapped_memory_t tensor_mapping;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                            /*byte_offset=*/0, tensor_size, &tensor_mapping));
+    iree_hal_buffer_mapping_t tensor_mapping;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, tensor_size, &tensor_mapping));
     iree_string_view_t str;
     const auto& contents = tensor_mapping.contents;
     std::vector<iree_string_view_t> string_views;
@@ -255,7 +255,7 @@ class StringsModuleState final {
     }
 
     // Unmap used buffer.
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&tensor_mapping));
 
     strings_string_tensor_t* string_tensor;
     IREE_RETURN_IF_ERROR(strings_string_tensor_create(
@@ -309,7 +309,7 @@ class StringsModuleState final {
   iree_allocator_t allocator_ = iree_allocator_system();
 
   template <typename T>
-  void GenerateStringsByType(iree_hal_mapped_memory_t tensor_mapping,
+  void GenerateStringsByType(iree_hal_buffer_mapping_t tensor_mapping,
                              std::vector<std::string>& strings) {
     const auto& contents = tensor_mapping.contents;
     for (const T *p = (const T*)contents.data,

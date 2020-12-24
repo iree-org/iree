@@ -171,14 +171,15 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Read back the results and ensure we got the right values.
   IREE_LOG(INFO) << "Reading back results...";
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map(ret_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                     IREE_WHOLE_BUFFER, &mapped_memory));
+  iree_hal_buffer_mapping_t mapped_memory;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(ret_buffer,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                           IREE_WHOLE_BUFFER, &mapped_memory));
   ASSERT_THAT(absl::Span<const float>(
                   reinterpret_cast<const float*>(mapped_memory.contents.data),
                   mapped_memory.contents.data_length / sizeof(float)),
               ::testing::ElementsAreArray({8.0f, 8.0f, 8.0f, 8.0f}));
-  IREE_ASSERT_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapped_memory));
   IREE_LOG(INFO) << "Results match!";
 
   inputs.reset();

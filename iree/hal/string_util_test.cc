@@ -390,8 +390,9 @@ struct Allocator final
   // used.
   static StatusOr<Allocator> CreateHostLocal() {
     Allocator allocator;
-    iree_status_t status = iree_hal_allocator_create_host_local(
-        iree_allocator_system(), &allocator);
+    iree_status_t status =
+        iree_hal_allocator_create_heap(iree_make_cstring_view("host_local"),
+                                       iree_allocator_system(), &allocator);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(allocator);
   }
@@ -432,8 +433,7 @@ struct BufferView final
                                      iree_hal_element_type_t element_type) {
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_create(
-        buffer, shape.data(), shape.size(), element_type,
-        iree_allocator_system(), &buffer_view);
+        buffer, shape.data(), shape.size(), element_type, &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }

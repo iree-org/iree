@@ -152,7 +152,7 @@ TEST_F(CustomModulesTest, PrintTensor) {
       IREE_HAL_BUFFER_USAGE_ALL, IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      &buffer));
+      iree_allocator_null(), &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
@@ -192,7 +192,7 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
       IREE_HAL_BUFFER_USAGE_ALL, IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      &buffer));
+      iree_allocator_null(), &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;

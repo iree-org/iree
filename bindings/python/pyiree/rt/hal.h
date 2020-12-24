@@ -109,7 +109,7 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
         IREE_HAL_ELEMENT_TYPE_NONE, element_size * 8);
     CheckApiStatus(
         iree_hal_buffer_view_create(raw_ptr(), shape.s.data(), shape.s.size(),
-                                    element_type, iree_allocator_system(), &bv),
+                                    element_type, &bv),
         "Error creating buffer view");
     return HalBufferView::CreateRetained(bv);
   }

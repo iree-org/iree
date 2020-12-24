@@ -182,13 +182,13 @@ class CheckModuleState final {
     iree_hal_element_type_t element_type =
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t mapped_memory;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         buf, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, IREE_WHOLE_BUFFER, &mapped_memory));
     IREE_RETURN_IF_ERROR(
         ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
-    iree_hal_buffer_unmap(buf, &mapped_memory);
+    iree_hal_buffer_unmap_range(&mapped_memory);
     return OkStatus();
   }
 
@@ -212,13 +212,13 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(rhs);
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
-    iree_hal_mapped_memory_t lhs_mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t lhs_mapped_memory;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
-    iree_hal_mapped_memory_t rhs_mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t rhs_mapped_memory;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
 
@@ -226,8 +226,8 @@ class CheckModuleState final {
     bool shape_eq = lhs_shape == rhs_shape;
     bool contents_eq =
         EqByteSpan(lhs_mapped_memory.contents, rhs_mapped_memory.contents);
-    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
-    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
+    iree_hal_buffer_unmap_range(&lhs_mapped_memory);
+    iree_hal_buffer_unmap_range(&rhs_mapped_memory);
 
     if (!element_types_eq || !shape_eq || !contents_eq) {
       std::ostringstream os;
@@ -281,13 +281,13 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(rhs);
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
-    iree_hal_mapped_memory_t lhs_mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t lhs_mapped_memory;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
-    iree_hal_mapped_memory_t rhs_mapped_memory;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t rhs_mapped_memory;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
 
@@ -301,8 +301,8 @@ class CheckModuleState final {
           AlmostEqByteSpan(lhs_mapped_memory.contents,
                            rhs_mapped_memory.contents, lhs_element_type));
     }
-    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
-    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
+    iree_hal_buffer_unmap_range(&lhs_mapped_memory);
+    iree_hal_buffer_unmap_range(&rhs_mapped_memory);
 
     if (!element_types_eq || !shape_eq || !contents_could_be_almost_eq) {
       std::ostringstream os;

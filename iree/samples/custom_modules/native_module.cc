@@ -141,8 +141,9 @@ class CustomModuleState final {
 
     // Setup a host-local allocator we can use because this sample doesn't have
     // a real device allocator.
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_create_host_local(
-        allocator_, &host_local_allocator_));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_allocator_create_heap(iree_make_cstring_view("host_local"),
+                                       allocator_, &host_local_allocator_));
 
     return OkStatus();
   }
