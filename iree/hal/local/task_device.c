@@ -82,8 +82,6 @@ static iree_status_t iree_hal_task_device_check_params(
   return iree_ok_status();
 }
 
-static const iree_hal_device_vtable_t iree_hal_task_device_vtable;
-
 iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
     iree_task_executor_t* executor, iree_host_size_t loader_count,
@@ -161,7 +159,7 @@ iree_status_t iree_hal_task_device_create(
 }
 
 static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
-  iree_hal_task_device_t* device = (iree_hal_task_device_t*)base_device;
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -183,7 +181,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
 
 static iree_string_view_t iree_hal_task_device_id(
     iree_hal_device_t* base_device) {
-  iree_hal_task_device_t* device = (iree_hal_task_device_t*)base_device;
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return device->identifier;
 }
 
@@ -203,7 +201,7 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_command_buffer_t** out_command_buffer) {
-  iree_hal_task_device_t* device = (iree_hal_task_device_t*)base_device;
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   // TODO(benvanik): prevent the need for taking a scope here. We need it to
   // construct the tasks as we record but unfortunately then that means we would
   // need to know which queue we'd be submitting against ahead of time.
@@ -283,7 +281,7 @@ static iree_status_t iree_hal_task_device_queue_submit(
     iree_hal_device_t* base_device,
     iree_hal_command_category_t command_categories, uint64_t queue_affinity,
     iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
-  iree_hal_task_device_t* device = (iree_hal_task_device_t*)base_device;
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   iree_host_size_t queue_index =
       iree_hal_device_select_queue(device, command_categories, queue_affinity);
   return iree_hal_task_queue_submit(&device->queues[queue_index], batch_count,
@@ -310,7 +308,7 @@ static iree_status_t iree_hal_task_device_wait_semaphores_with_timeout(
 
 static iree_status_t iree_hal_task_device_wait_idle_with_deadline(
     iree_hal_device_t* base_device, iree_time_t deadline_ns) {
-  iree_hal_task_device_t* device = (iree_hal_task_device_t*)base_device;
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < device->queue_count; ++i) {

@@ -33,6 +33,12 @@ typedef struct {
 
 static const iree_hal_driver_vtable_t iree_hal_task_driver_vtable;
 
+static iree_hal_task_driver_t* iree_hal_task_driver_cast(
+    iree_hal_driver_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_driver_vtable);
+  return (iree_hal_task_driver_t*)base_value;
+}
+
 iree_status_t iree_hal_task_driver_create(
     iree_string_view_t identifier,
     const iree_hal_task_device_params_t* default_params,
@@ -82,7 +88,7 @@ iree_status_t iree_hal_task_driver_create(
 }
 
 static void iree_hal_task_driver_destroy(iree_hal_driver_t* base_driver) {
-  iree_hal_task_driver_t* driver = (iree_hal_task_driver_t*)base_driver;
+  iree_hal_task_driver_t* driver = iree_hal_task_driver_cast(base_driver);
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -114,7 +120,7 @@ static iree_status_t iree_hal_task_driver_query_available_devices(
 static iree_status_t iree_hal_task_driver_create_device(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_allocator_t allocator, iree_hal_device_t** out_device) {
-  iree_hal_task_driver_t* driver = (iree_hal_task_driver_t*)base_driver;
+  iree_hal_task_driver_t* driver = iree_hal_task_driver_cast(base_driver);
   return iree_hal_task_device_create(
       driver->identifier, &driver->default_params, driver->executor,
       driver->loader_count, driver->loaders, allocator, out_device);

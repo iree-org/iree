@@ -166,8 +166,9 @@ typedef struct {
 static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable;
 
 static iree_hal_task_semaphore_t* iree_hal_task_semaphore_cast(
-    iree_hal_semaphore_t* base_semaphore) {
-  return (iree_hal_task_semaphore_t*)base_semaphore;
+    iree_hal_semaphore_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_semaphore_vtable);
+  return (iree_hal_task_semaphore_t*)base_value;
 }
 
 iree_status_t iree_hal_task_semaphore_create(
