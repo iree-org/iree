@@ -27,6 +27,12 @@ typedef struct {
 static const iree_hal_executable_cache_vtable_t
     iree_hal_local_executable_cache_vtable;
 
+static iree_hal_local_executable_cache_t* iree_hal_local_executable_cache_cast(
+    iree_hal_executable_cache_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_local_executable_cache_vtable);
+  return (iree_hal_local_executable_cache_t*)base_value;
+}
+
 iree_status_t iree_hal_local_executable_cache_create(
     iree_string_view_t identifier, iree_host_size_t loader_count,
     iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator,
@@ -67,7 +73,7 @@ iree_status_t iree_hal_local_executable_cache_create(
 static void iree_hal_local_executable_cache_destroy(
     iree_hal_executable_cache_t* base_executable_cache) {
   iree_hal_local_executable_cache_t* executable_cache =
-      (iree_hal_local_executable_cache_t*)base_executable_cache;
+      iree_hal_local_executable_cache_cast(base_executable_cache);
   iree_allocator_t host_allocator = executable_cache->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -83,7 +89,7 @@ static bool iree_hal_local_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_format_t format) {
   iree_hal_local_executable_cache_t* executable_cache =
-      (iree_hal_local_executable_cache_t*)base_executable_cache;
+      iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
     if (iree_hal_executable_loader_query_support(
             executable_cache->loaders[i], format,
@@ -101,7 +107,7 @@ static iree_status_t iree_hal_local_executable_cache_prepare_executable(
     iree_const_byte_span_t executable_data,
     iree_hal_executable_t** out_executable) {
   iree_hal_local_executable_cache_t* executable_cache =
-      (iree_hal_local_executable_cache_t*)base_executable_cache;
+      iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
     // TODO(benvanik): pass executable format through from the HAL.
     // if (iree_hal_executable_loader_query_support(

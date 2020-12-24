@@ -99,6 +99,12 @@ typedef struct {
 static const iree_hal_command_buffer_vtable_t
     iree_hal_task_command_buffer_vtable;
 
+static iree_hal_task_command_buffer_t* iree_hal_task_command_buffer_cast(
+    iree_hal_command_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_command_buffer_vtable);
+  return (iree_hal_task_command_buffer_t*)base_value;
+}
+
 iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_device_t* device, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
@@ -157,7 +163,7 @@ static void iree_hal_task_command_buffer_reset(
 static void iree_hal_task_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator =
       iree_hal_device_host_allocator(command_buffer->device);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -383,7 +389,7 @@ static iree_status_t iree_hal_task_command_buffer_execution_barrier(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   // TODO(benvanik): actual DAG construction. Right now we are just doing simple
   // global barriers each time and forcing a join-fork point.
@@ -475,7 +481,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   iree_hal_cmd_fill_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
@@ -524,7 +530,7 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   iree_host_size_t total_cmd_size =
       sizeof(iree_hal_cmd_update_buffer_t) + length;
@@ -583,7 +589,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   iree_hal_cmd_copy_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
@@ -613,7 +619,7 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   if (IREE_UNLIKELY(offset + values_length >=
                     IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT)) {
@@ -639,7 +645,7 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   if (IREE_UNLIKELY(set >= IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -740,7 +746,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
     iree_hal_cmd_dispatch_t** out_cmd) {
   iree_hal_task_command_buffer_t* command_buffer =
-      (iree_hal_task_command_buffer_t*)base_command_buffer;
+      iree_hal_task_command_buffer_cast(base_command_buffer);
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);

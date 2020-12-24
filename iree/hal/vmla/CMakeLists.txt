@@ -73,39 +73,3 @@ iree_cc_library(
     iree::vm::cc
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    vmla
-  HDRS
-    "vmla_cache.h"
-    "vmla_device.h"
-    "vmla_driver.h"
-    "vmla_executable.h"
-  SRCS
-    "vmla_cache.cc"
-    "vmla_device.cc"
-    "vmla_driver.cc"
-    "vmla_executable.cc"
-  DEPS
-    ::op_module
-    absl::inlined_vector
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::api
-    iree::base::core_headers
-    iree::base::flatcc
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::tracing
-    iree::hal::cc
-    iree::hal::host::host_buffer
-    iree::hal::host::host_executable
-    iree::hal::host::host_local_device
-    iree::hal::host::serial::serial_scheduling_model
-    iree::schemas::vmla_executable_def_c_fbs
-    iree::vm
-    iree::vm::bytecode_module
-  PUBLIC
-)

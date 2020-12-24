@@ -16,7 +16,18 @@
 
 #include "iree/base/tracing.h"
 
+typedef struct {
+  iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
+} iree_hal_task_event_t;
+
 static const iree_hal_event_vtable_t iree_hal_task_event_vtable;
+
+static iree_hal_task_event_t* iree_hal_task_event_cast(
+    iree_hal_event_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_event_vtable);
+  return (iree_hal_task_event_t*)base_value;
+}
 
 iree_status_t iree_hal_task_event_create(iree_allocator_t host_allocator,
                                          iree_hal_event_t** out_event) {
@@ -38,7 +49,7 @@ iree_status_t iree_hal_task_event_create(iree_allocator_t host_allocator,
 }
 
 static void iree_hal_task_event_destroy(iree_hal_event_t* base_event) {
-  iree_hal_task_event_t* event = (iree_hal_task_event_t*)base_event;
+  iree_hal_task_event_t* event = iree_hal_task_event_cast(base_event);
   iree_allocator_t host_allocator = event->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 

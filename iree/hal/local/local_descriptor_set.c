@@ -19,6 +19,12 @@
 static const iree_hal_descriptor_set_vtable_t
     iree_hal_local_descriptor_set_vtable;
 
+iree_hal_local_descriptor_set_t* iree_hal_local_descriptor_set_cast(
+    iree_hal_descriptor_set_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_local_descriptor_set_vtable);
+  return (iree_hal_local_descriptor_set_t*)base_value;
+}
+
 iree_status_t iree_hal_local_descriptor_set_create(
     iree_hal_descriptor_set_layout_t* base_layout,
     iree_host_size_t binding_count,
@@ -61,7 +67,7 @@ iree_status_t iree_hal_local_descriptor_set_create(
 static void iree_hal_local_descriptor_set_destroy(
     iree_hal_descriptor_set_t* base_descriptor_set) {
   iree_hal_local_descriptor_set_t* descriptor_set =
-      (iree_hal_local_descriptor_set_t*)base_descriptor_set;
+      iree_hal_local_descriptor_set_cast(base_descriptor_set);
   iree_allocator_t host_allocator = descriptor_set->layout->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -73,11 +79,6 @@ static void iree_hal_local_descriptor_set_destroy(
   iree_allocator_free(host_allocator, descriptor_set);
 
   IREE_TRACE_ZONE_END(z0);
-}
-
-iree_hal_local_descriptor_set_t* iree_hal_local_descriptor_set_cast(
-    iree_hal_descriptor_set_t* base_value) {
-  return (iree_hal_local_descriptor_set_t*)base_value;
 }
 
 static const iree_hal_descriptor_set_vtable_t

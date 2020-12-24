@@ -12,21 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_LOCAL_TASK_EVENT_H_
-#define IREE_HAL_LOCAL_TASK_EVENT_H_
+#ifndef IREE_HAL_LOCAL_LOADERS_SYSTEM_LIBRARY_LOADER_H_
+#define IREE_HAL_LOCAL_LOADERS_SYSTEM_LIBRARY_LOADER_H_
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/hal/api.h"
+#include "iree/hal/local/executable_loader.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-iree_status_t iree_hal_task_event_create(iree_allocator_t host_allocator,
-                                         iree_hal_event_t** out_event);
+// Creates an executable loader that can load files from platform-supported
+// dynamic libraries (such as .dylib on darwin, .so on linux, .dll on windows).
+iree_status_t iree_hal_system_library_loader_create(
+    iree_allocator_t host_allocator,
+    iree_hal_executable_loader_t** out_executable_loader);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_TASK_EVENT_H_
+#endif  // IREE_HAL_LOCAL_LOADERS_SYSTEM_LIBRARY_LOADER_H_
