@@ -32,7 +32,7 @@ include(CMakeParseArguments)
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 
@@ -180,7 +180,7 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_single_backend_test_suite)
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 
@@ -249,7 +249,7 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_test_suite)
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 

@@ -501,11 +501,7 @@ add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
-
-if(${IREE_ENABLE_MLIR})
-  # The VM requires LLVM to build its op definitions.
-  add_subdirectory(iree/vm)
-endif()
+add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)

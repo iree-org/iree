@@ -1,3 +1,4 @@
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
@@ -29,6 +30,15 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_test(
