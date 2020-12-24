@@ -17,6 +17,9 @@ include "mlir/Dialect/StandardOps/IR/Ops.td"
 include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.td"
 include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.td"
 
+def : Pat<(TF_IdentityOp TF_StrTensor:$value),
+           (replaceWithValue $value)>;
+
 def : Pat<(TF_PrintV2Op TF_Str:$value, $unused1, $unused2),
           (TFStrings_PrintOp $value)>;
 

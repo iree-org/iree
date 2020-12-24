@@ -72,6 +72,12 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
+  // Lowering module specific TF behavior to intermediate dialects.
+  //----------------------------------------------------------------------------
+  pm.addPass(tf_strings::createConvertTFToTFStringsPass());
+  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
+
+  //----------------------------------------------------------------------------
   // Legalize to XLA
   //----------------------------------------------------------------------------
   pm.addPass(createConvertToMHLOPass());
@@ -93,11 +99,8 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
-  // Lowering module specific TF behavior to custom dialects.
+  // Lowering intermediate dialects to module specific dialects.
   //----------------------------------------------------------------------------
-  pm.addPass(tf_strings::createConvertTFToTFStringsPass());
-  pm.addPass(tf_tensorlist::createConvertTFToTFTensorListPass());
-  pm.addPass(createCanonicalizerPass());
   pm.addPass(tf_strings::createConvertTFStringsToStringsPass());
   pm.addPass(tf_tensorlist::createConvertTFTensorListToTensorListPass());
 

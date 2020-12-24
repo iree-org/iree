@@ -35,3 +35,12 @@ func @string_tensor_to_string(%arg0 : tensor<!tf_strings.string>) -> !tf_strings
   // CHECK: return [[VAL0]]
   return %0 : !tf_strings.string
 }
+
+// CHECK-LABEL: @gather
+func @gather(%arg0: tensor<5x!tf_strings.string>, %arg1: tensor<3xi32>) -> tensor<3x!tf_strings.string> {
+  // CHECK-DAG: [[VAL0:%.+]] = "strings.gather"(%arg0, %arg1)
+  %0 = "tf_strings.gather"(%arg0, %arg1) : (tensor<5x!tf_strings.string>, tensor<3xi32>) -> tensor<3x!tf_strings.string>
+
+  // CHECK: return [[VAL0]]
+  return %0 : tensor<3x!tf_strings.string>
+}
