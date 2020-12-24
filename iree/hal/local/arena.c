@@ -62,8 +62,12 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
     // case we may end up allocating a block when perhaps we didn't need to but
     // that's fine - it's just one block and the contention means there's likely
     // to be a need for more anyway.
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        block_pool->block_allocator, block_pool->total_block_size, &block));
+    uint8_t* block_base = NULL;
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(block_pool->block_allocator,
+                                               block_pool->total_block_size,
+                                               (void**)&block_base));
+    block = (iree_arena_block_t*)(block_base + (block_pool->total_block_size -
+                                                sizeof(iree_arena_block_t)));
   }
 
   block->next = NULL;
@@ -174,7 +178,7 @@ static iree_status_t iree_arena_allocate_thunk(void* self,
 iree_allocator_t iree_arena_allocator(iree_arena_allocator_t* arena) {
   iree_allocator_t v = {
       .self = arena,
-      .alloc = (iree_allocator_alloc_fn_t)iree_arena_allocate,
+      .alloc = (iree_allocator_alloc_fn_t)iree_arena_allocate_thunk,
       .free = NULL,
   };
   return v;

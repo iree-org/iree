@@ -281,11 +281,11 @@ TEST_P(SemaphoreTest, SubmitAndSignal) {
 }
 
 TEST_P(SemaphoreTest, SubmitWithWait) {
+  // Empty command buffer.
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
-
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
@@ -294,11 +294,11 @@ TEST_P(SemaphoreTest, SubmitWithWait) {
   iree_hal_semaphore_t* wait_semaphore;
   iree_hal_semaphore_t* signal_semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore));
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 100ull, &signal_semaphore));
   iree_hal_semaphore_t* wait_semaphore_ptrs[] = {wait_semaphore};
   iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
   uint64_t wait_payload_values[] = {1ull};
-  uint64_t signal_payload_values[] = {1ull};
+  uint64_t signal_payload_values[] = {101ull};
   submission_batch.wait_semaphores.count = IREE_ARRAYSIZE(wait_semaphore_ptrs);
   submission_batch.wait_semaphores.semaphores = wait_semaphore_ptrs;
   submission_batch.wait_semaphores.payload_values = wait_payload_values;
@@ -317,12 +317,12 @@ TEST_P(SemaphoreTest, SubmitWithWait) {
   // Work shouldn't start until the wait semaphore reaches its payload value.
   uint64_t value;
   IREE_ASSERT_OK(iree_hal_semaphore_query(signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
+  EXPECT_EQ(100ull, value);
 
   // Signal the wait semaphore, work should begin and complete.
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1ull));
   IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
-      signal_semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
+      signal_semaphore, 101ull, IREE_TIME_INFINITE_FUTURE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);

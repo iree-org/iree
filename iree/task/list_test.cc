@@ -175,6 +175,8 @@ TEST(TaskListTest, Erase) {
 
   iree_task_list_erase(&list, NULL, task1);
   EXPECT_TRUE(iree_task_list_is_empty(&list));
+  EXPECT_EQ(NULL, iree_task_list_front(&list));
+  EXPECT_EQ(NULL, iree_task_list_back(&list));
 }
 
 TEST(TaskListTest, PrependEmpty) {
