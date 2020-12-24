@@ -20,7 +20,6 @@
 #include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cc/allocator.h"
-#include "iree/hal/cc/command_buffer_validation.h"
 #include "iree/hal/metal/dispatch_time_util.h"
 #include "iree/hal/metal/metal_capture_manager.h"
 #include "iree/hal/metal/metal_command_buffer.h"
@@ -126,7 +125,6 @@ StatusOr<ref_ptr<CommandBuffer>> MetalDevice::CreateCommandBuffer(
     id<MTLCommandBuffer> cmdbuf = [static_cast<MetalCommandQueue*>(common_queue_)->handle()
         commandBufferWithUnretainedReferences];
     command_buffer = MetalCommandBuffer::Create(mode, command_categories, cmdbuf);
-    // TODO: WrapCommandBufferWithValidation(allocator(), std::move(impl));
     return command_buffer;
   }
 }
