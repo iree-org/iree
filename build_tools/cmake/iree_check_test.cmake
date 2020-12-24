@@ -103,7 +103,7 @@ function(iree_check_test)
   add_dependencies(
     "${_NAME}"
     "${_MODULE_TARGET_NAME}"
-    iree_modules_check_iree-check-module
+    iree_tools_iree-check-module
   )
 
   iree_package_ns(_PACKAGE_NS)
@@ -123,7 +123,7 @@ function(iree_check_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_modules_check_iree-check-module>"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_tools_iree-check-module>"
         "--driver=${_RULE_DRIVER}"
         "${_ANDROID_REL_DIR}/${_MODULE_FILE_NAME}"
         ${_RULE_RUNNER_ARGS}
@@ -145,7 +145,7 @@ function(iree_check_test)
         "${_TEST_NAME}"
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-        "$<TARGET_FILE:iree_modules_check_iree-check-module>"
+        "$<TARGET_FILE:iree_tools_iree-check-module>"
         "--driver=${_RULE_DRIVER}"
         "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
         ${_RULE_RUNNER_ARGS}
