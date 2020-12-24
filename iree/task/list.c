@@ -107,8 +107,9 @@ iree_task_t* iree_task_list_pop_front(iree_task_list_t* list) {
 void iree_task_list_erase(iree_task_list_t* list, iree_task_t* prev_task,
                           iree_task_t* task) {
   if (task == list->head) {
-    // Removing head.
+    // Removing head (which may _also_ be the tail).
     list->head = task->next_task;
+    if (list->tail == task) list->tail = task->next_task;
   } else if (task == list->tail) {
     // Removing tail.
     list->tail = prev_task;
