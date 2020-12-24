@@ -161,6 +161,8 @@ static inline bool iree_atomic_compare_exchange_strong_int64_impl(
   }
 }
 
+#define iree_atomic_thread_fence(order) MemoryBarrier()
+
 //==============================================================================
 // C11 atomics using Clang builtins
 //==============================================================================
@@ -206,6 +208,8 @@ typedef _Atomic int64_t iree_atomic_int64_t;
                                                order_succ, order_fail)    \
   __c11_atomic_compare_exchange_weak((object), (expected), (desired),     \
                                      (order_succ), (order_fail))
+
+#define iree_atomic_thread_fence(order) __c11_atomic_thread_fence(order)
 
 //==============================================================================
 // Atomics for GCC (compatible with both C and C++)
@@ -268,6 +272,8 @@ typedef int64_t iree_atomic_int64_t;
                                                order_succ, order_fail)    \
   __atomic_compare_exchange_n(object, expected, desired, /*weak=*/true,   \
                               (order_succ), (order_fail))
+
+#define iree_atomic_thread_fence(order) __atomic_thread_fence(order)
 
 //==============================================================================
 // Unsupported architecture
