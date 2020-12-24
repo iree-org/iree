@@ -169,7 +169,6 @@ cc_library(
         "//iree/base:time",
         "//iree/base:tracing",
         "//iree/hal/cc",
-        "//iree/hal/cc:command_buffer_validation",
         "//iree/schemas:spirv_executable_def_c_fbs",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",

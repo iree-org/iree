@@ -72,19 +72,3 @@ cc_test(
         "@com_google_absl//absl/types:span",
     ],
 )
-
-#===------------------------------------------------------------------------===#
-# Debugging utilities and tools
-#===------------------------------------------------------------------------===#
-
-cc_library(
-    name = "command_buffer_validation",
-    srcs = ["command_buffer_validation.cc"],
-    hdrs = ["command_buffer_validation.h"],
-    deps = [
-        ":cc",
-        "//iree/base:logging",
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-    ],
-)
