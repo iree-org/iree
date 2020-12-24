@@ -94,17 +94,11 @@ class CheckTest : public ::testing::Test {
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(int32_t), &buffer));
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
-                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
-    memcpy(mapped_memory.contents.data,
-           static_cast<const void*>(contents.data()),
-           mapped_memory.contents.data_length);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_write_data(
+        buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_SINT_32,
-        iree_allocator_system(), &*out_buffer_view));
+        &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(absl::Span<const float> contents,
@@ -122,18 +116,11 @@ class CheckTest : public ::testing::Test {
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
-                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
-    memcpy(mapped_memory.contents.data,
-           static_cast<const void*>(contents.data()),
-           mapped_memory.contents.data_length);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
+                                              contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
-        &*out_buffer_view));
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(absl::Span<const double> contents,
@@ -151,18 +138,11 @@ class CheckTest : public ::testing::Test {
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(double), &buffer));
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
-                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
-    memcpy(mapped_memory.contents.data,
-           static_cast<const void*>(contents.data()),
-           mapped_memory.contents.data_length);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_write_data(
+        buffer.get(), 0, contents.data(), contents.size() * sizeof(double)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_64, iree_allocator_system(),
-        &*out_buffer_view));
+        IREE_HAL_ELEMENT_TYPE_FLOAT_64, &*out_buffer_view));
   }
 
   Status Invoke(absl::string_view function_name) {
