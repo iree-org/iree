@@ -1,0 +1,138 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "iree/hal/local/local_executable_cache.h"
+
+#include "iree/base/tracing.h"
+
+typedef struct {
+  iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
+  iree_string_view_t identifier;
+  iree_host_size_t loader_count;
+  iree_hal_executable_loader_t* loaders[];
+} iree_hal_local_executable_cache_t;
+
+static const iree_hal_executable_cache_vtable_t
+    iree_hal_local_executable_cache_vtable;
+
+iree_status_t iree_hal_local_executable_cache_create(
+    iree_string_view_t identifier, iree_host_size_t loader_count,
+    iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator,
+    iree_hal_executable_cache_t** out_executable_cache) {
+  IREE_ASSERT_ARGUMENT(!loader_count || loaders);
+  IREE_ASSERT_ARGUMENT(out_executable_cache);
+  *out_executable_cache = NULL;
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_local_executable_cache_t* executable_cache = NULL;
+  iree_host_size_t total_size =
+      sizeof(*executable_cache) +
+      loader_count * sizeof(*executable_cache->loaders) + identifier.size;
+  iree_status_t status = iree_allocator_malloc(host_allocator, total_size,
+                                               (void**)&executable_cache);
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_local_executable_cache_vtable,
+                                 &executable_cache->resource);
+    executable_cache->host_allocator = host_allocator;
+    iree_string_view_append_to_buffer(
+        identifier, &executable_cache->identifier,
+        (char*)executable_cache + total_size - identifier.size);
+
+    executable_cache->loader_count = loader_count;
+    for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
+      executable_cache->loaders[i] = loaders[i];
+      iree_hal_executable_loader_retain(executable_cache->loaders[i]);
+    }
+
+    *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static void iree_hal_local_executable_cache_destroy(
+    iree_hal_executable_cache_t* base_executable_cache) {
+  iree_hal_local_executable_cache_t* executable_cache =
+      (iree_hal_local_executable_cache_t*)base_executable_cache;
+  iree_allocator_t host_allocator = executable_cache->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
+    iree_hal_executable_loader_release(executable_cache->loaders[i]);
+  }
+  iree_allocator_free(host_allocator, executable_cache);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static bool iree_hal_local_executable_cache_can_prepare_format(
+    iree_hal_executable_cache_t* base_executable_cache,
+    iree_hal_executable_format_t format) {
+  iree_hal_local_executable_cache_t* executable_cache =
+      (iree_hal_local_executable_cache_t*)base_executable_cache;
+  for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
+    if (iree_hal_executable_loader_query_support(
+            executable_cache->loaders[i], format,
+            IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_local_executable_cache_prepare_executable(
+    iree_hal_executable_cache_t* base_executable_cache,
+    iree_hal_executable_layout_t* executable_layout,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_hal_executable_t** out_executable) {
+  iree_hal_local_executable_cache_t* executable_cache =
+      (iree_hal_local_executable_cache_t*)base_executable_cache;
+  for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
+    // TODO(benvanik): pass executable format through from the HAL.
+    // if (iree_hal_executable_loader_query_support(
+    //         executable_cache->loaders[i], executable_format,
+    //         IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT)) {
+    //   return iree_hal_executable_loader_try_load(
+    //       executable_cache->loaders[i], executable_layout,
+    //       executable_format, caching_mode, executable_data,
+    //       out_executable);
+    // }
+    iree_status_t status = iree_hal_executable_loader_try_load(
+        executable_cache->loaders[i], executable_layout,
+        /*executable_format=*/0, caching_mode, executable_data, out_executable);
+    if (iree_status_is_ok(status)) {
+      // Executable was successfully loaded.
+      return status;
+    } else if (!iree_status_is_cancelled(status)) {
+      // Error beyond just the try failing due to unsupported formats.
+      return status;
+    }
+  }
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "no executable loader registered for the given file format");
+}
+
+static const iree_hal_executable_cache_vtable_t
+    iree_hal_local_executable_cache_vtable = {
+        .destroy = iree_hal_local_executable_cache_destroy,
+        .can_prepare_format =
+            iree_hal_local_executable_cache_can_prepare_format,
+        .prepare_executable =
+            iree_hal_local_executable_cache_prepare_executable,
+};
