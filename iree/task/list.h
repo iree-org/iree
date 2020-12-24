@@ -51,7 +51,8 @@ void iree_task_list_initialize(iree_task_list_t* out_list);
 void iree_task_list_move(iree_task_list_t* list, iree_task_list_t* out_list);
 
 // Discards a task list; should be used for failure cleanup during list
-// construction to ensure intrusive pointers are reset.
+// construction to ensure intrusive pointers are reset. List is immediately
+// reusable as if it had been initialized.
 void iree_task_list_discard(iree_task_list_t* list);
 
 // Returns true if the list is empty.
