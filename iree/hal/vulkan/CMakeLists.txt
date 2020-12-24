@@ -164,7 +164,6 @@ iree_cc_library(
     iree::base::time
     iree::base::tracing
     iree::hal::cc
-    iree::hal::cc::command_buffer_validation
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )

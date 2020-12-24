@@ -25,7 +25,6 @@
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cc/command_buffer_validation.h"
 #include "iree/hal/cc/command_queue.h"
 #include "iree/hal/cc/semaphore.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
@@ -687,11 +686,9 @@ StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
         *logical_device_, &allocate_info, &command_buffer));
   }
 
-  // TODO(b/140026716): conditionally enable validation.
-  auto impl = make_ref<DirectCommandBuffer>(
-      mode, command_categories, add_ref(descriptor_pool_cache_),
-      add_ref(command_pool), command_buffer);
-  return WrapCommandBufferWithValidation(allocator(), std::move(impl));
+  return make_ref<DirectCommandBuffer>(mode, command_categories,
+                                       add_ref(descriptor_pool_cache_),
+                                       add_ref(command_pool), command_buffer);
 }
 
 StatusOr<ref_ptr<Event>> VulkanDevice::CreateEvent() {
