@@ -62,18 +62,3 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
-
-iree_cc_library(
-  NAME
-    command_buffer_validation
-  HDRS
-    "command_buffer_validation.h"
-  SRCS
-    "command_buffer_validation.cc"
-  DEPS
-    ::cc
-    absl::strings
-    iree::base::logging
-    iree::base::status
-  PUBLIC
-)
