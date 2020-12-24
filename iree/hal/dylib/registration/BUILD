@@ -38,8 +38,8 @@ cc_library(
     ],
     deps = [
         "//iree/base:flags",
-        "//iree/base:status",
         "//iree/hal:api",
-        "//iree/hal/dylib",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:legacy_library_loader",
     ],
 )

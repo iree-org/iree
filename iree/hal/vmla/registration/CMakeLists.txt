@@ -22,12 +22,10 @@ iree_cc_library(
   HDRS
     "driver_module.h"
   SRCS
-    "driver_module.cc"
+    "driver_module.c"
   DEPS
-    iree::base::flags
-    iree::base::status
     iree::hal::api
-    iree::hal::vmla
+    iree::hal::local::loaders::vmla_module_loader
   DEFINES
     "IREE_HAL_HAVE_VMLA_DRIVER_MODULE=1"
   PUBLIC

@@ -27,9 +27,9 @@ iree_cc_library(
     "driver_module.cc"
   DEPS
     iree::base::flags
-    iree::base::status
     iree::hal::api
-    iree::hal::dylib
+    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::task_driver
   DEFINES
     "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
   PUBLIC
