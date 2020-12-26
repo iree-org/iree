@@ -135,7 +135,7 @@ function(iree_check_test)
       _ENVIRONMENT_VARS
         TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
         TEST_DATA=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}
-        TEST_EXECUTABLE=$<TARGET_FILE:iree_modules_check_iree-check-module>
+        TEST_EXECUTABLE=$<TARGET_FILE:iree_tools_iree-check-module>
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
     iree_add_test_environment_properties(${_TEST_NAME})
