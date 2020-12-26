@@ -49,6 +49,28 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-check-module",
+    testonly = True,
+    srcs = ["iree-check-module-main.cc"],
+    deps = [
+        "//iree/modules/check:native_module",
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:file_io",
+        "//iree/base:flags",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/testing:gtest",
+        "//iree/tools/utils:vm_util",
+        "//iree/vm:bytecode_module",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
