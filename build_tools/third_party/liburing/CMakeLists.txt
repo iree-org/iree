@@ -12,8 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# NOTE: not all projects require a cmake build. If you are adding a directory
-# that is only expected to build with bazel (such as something depending on
-# TensorFlow) you can ignore cmake.
-#
-iree_add_all_subdirs()
+set(LIBURING_ROOT "${IREE_ROOT_DIR}/third_party/liburing/src/")
+
+external_cc_library(
+  PACKAGE
+    liburing
+  NAME
+    liburing
+  ROOT
+    ${LIBURING_ROOT}
+  INCLUDES
+    ${LIBURING_ROOT}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/default_config/src/include
+  SRCS
+    "queue.c"
+    "register.c"
+    "setup.c"
+    "syscall.c"
+    "syscall.h"
+  HDRS
+    "include/liburing.h"
+    "include/liburing/barrier.h"
+    "include/liburing/io_uring.h"
+)
