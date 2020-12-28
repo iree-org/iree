@@ -216,12 +216,12 @@ module {
 
 // CHECK-LABEL: func @store_value_twice
 //   CHECK-DAG:   %[[T0:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32}
-//       CHECK:   %[[T1:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
-//       CHECK:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
+//   CHECK-DAG:   %[[T1:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
+//   CHECK-DAG:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[T2]] :
-//  CHECK-SAME:     outs(%[[T0]] :
-//       CHECK:   linalg.copy(%[[T0]], %[[T1]])
+//  CHECK-SAME:     outs(%[[T1]] :
+//       CHECK:   linalg.copy(%[[T1]], %[[T0]])
 
 // -----
 
@@ -263,14 +263,14 @@ module {
 }
 
 // CHECK-LABEL: func @store_reshape_src_and_result_0
-//       CHECK:   %[[T0:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
-//       CHECK:   %[[T1:.*]] = linalg.reshape %[[T0]]
-//       CHECK:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32}
-//       CHECK:   %[[T3:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
+//  CHECK-DAG:   %[[T0:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32}
+//  CHECK-DAG:   %[[T1:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
+//  CHECK-DAG:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[T3]] :
-//  CHECK-SAME:     outs(%[[T1]] :
-//       CHECK:   linalg.copy(%[[T1]], %[[T2]])
+//  CHECK-SAME:     ins(%[[T2]] :
+//  CHECK-SAME:     outs(%[[T0]] :
+//       CHECK:   %[[T3:.*]] = linalg.reshape %[[T0]]
+//       CHECK:   linalg.copy(%[[T3]], %[[T1]])
 //       CHECK:   return
 
 // -----
@@ -316,11 +316,11 @@ module {
 //   CHECK-DAG:   %[[T0:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32}
 //   CHECK-DAG:   %[[T1:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
 //   CHECK-DAG:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
+//   CHECK-DAG:   %[[T3:.*]] = linalg.reshape %[[T1]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[T2]] :
-//  CHECK-SAME:     outs(%[[T0]] :
-//       CHECK:   %[[T3:.*]] = linalg.reshape %[[T0]]
-//       CHECK:   linalg.copy(%[[T3]], %[[T1]])
+//  CHECK-SAME:     outs(%[[T3]] :
+//       CHECK:   linalg.copy(%[[T3]], %[[T0]])
 //       CHECK:   return
 
 // -----
@@ -372,15 +372,15 @@ module {
 
 // CHECK-LABEL: func @store_reshape_src_and_result_2
 //   CHECK-DAG:   %[[T0:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 1 : i32}
-//       CHECK:   %[[T1:.*]] = linalg.reshape %[[T0]]
-//   CHECK-DAG:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
-//   CHECK-DAG:   %[[T3:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret2, operand_result_index = 3 : i32}
+//   CHECK-DAG:   %[[T1:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
+//   CHECK-DAG:   %[[T2:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret2, operand_result_index = 3 : i32}
+//   CHECK-DAG:   %[[T3:.*]] = linalg.reshape %[[T2]]
 //   CHECK-DAG:   %[[T4:.*]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
 //       CHECK:   linalg.generic
-//  CHECK-SAME:   ins(%[[T4]] :
-//  CHECK-SAME:   outs(%[[T1]] :
-//       CHECK:   linalg.copy(%[[T0]], %[[T2]])
-//       CHECK:   linalg.copy(%[[T0]], %[[T3]])
+//  CHECK-SAME:     ins(%[[T4]] :
+//  CHECK-SAME:     outs(%[[T3]] :
+//       CHECK:   linalg.copy(%[[T2]], %[[T0]])
+//       CHECK:   linalg.copy(%[[T2]], %[[T1]])
 //       CHECK:   return
 
 // -----
@@ -476,20 +476,20 @@ module {
 }
 
 // CHECK-LABEL: func @generic_reshape_reshape
+//       CHECK:   %[[RET1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
+//       CHECK:   %[[RET1_RESHAPE0:.+]] = linalg.reshape %[[RET1]]
+//  CHECK-SAME:     memref<1x1000xf32> into memref<1x1x1x1000xf32>
+//       CHECK:   %[[RET1_RESHAPE1:.+]] = linalg.reshape %[[RET1_RESHAPE0]]
+//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1000xf32>
 //       CHECK:   %[[RET0:.+]] = iree.placeholder
 //  CHECK-SAME:     binding = @legacy_io::@ret0, operand_result_index = 1 : i32
-//       CHECK:   %[[RET0_RESHAPE:.+]] = linalg.reshape %[[RET0]]
-//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1000xf32>
-//       CHECK:   %[[RET1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1, operand_result_index = 2 : i32}
 //       CHECK:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32}
 //       CHECK:   %[[ARG0_RESHAPE:.+]] = linalg.reshape %[[ARG0]]
 //  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1000xf32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0_RESHAPE]] :
-//  CHECK-SAME:     outs(%[[RET0_RESHAPE]] :
-//       CHECK:   %[[RET0_RESHAPE2:.+]] = linalg.reshape %[[RET0]]
-//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1x1000xf32>
-//       CHECK:   linalg.copy(%[[RET0_RESHAPE2]], %[[RET1]])
+//  CHECK-SAME:     outs(%[[RET1_RESHAPE1]] :
+//       CHECK:   linalg.copy(%[[RET1_RESHAPE0]], %[[RET0]])
 
 // -----
 
@@ -542,4 +542,3 @@ module {
 //  CHECK-SAME:     ) outs(%[[RET0]]
 //  CHECK-SAME:     )
 //       CHECK:   return
-
