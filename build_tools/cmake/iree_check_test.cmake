@@ -32,10 +32,12 @@ include(CMakeParseArguments)
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
+  # When *not* cross compiling, respect the IREE_BUILD_COMPILER option.
+  # Cross compilation uses its own "IREE_HOST_BUILD_COMPILER" option.
   if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
     return()
   endif()
@@ -180,9 +182,13 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_single_backend_test_suite)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
+
+  # Note: we could check IREE_BUILD_COMPILER here, but cross compilation makes
+  # that a little tricky. Instead, we let iree_check_test handle the checks,
+  # meaning this function may run some configuration but generate no targets.
 
   cmake_parse_arguments(
     _RULE
@@ -249,7 +255,7 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_test_suite)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
