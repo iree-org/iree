@@ -52,8 +52,8 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0}
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] :
-//  CHECK-SAME:     outs(%[[RET0]] :
-//       CHECK:   linalg.copy(%[[RET0]], %[[RET1]])
+//  CHECK-SAME:     outs(%[[RET1]] :
+//       CHECK:   linalg.copy(%[[RET1]], %[[RET0]])
 
 // -----
 
