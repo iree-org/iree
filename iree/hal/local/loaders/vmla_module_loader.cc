@@ -17,7 +17,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/vmla/op_module.h"
+#include "iree/modules/vmla/op_module.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/context.h"
 #include "iree/vm/module.h"

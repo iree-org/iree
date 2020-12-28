@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
-#define IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
+#ifndef IREE_MODULES_VMLA_OP_KERNELS_GENERIC_H_
+#define IREE_MODULES_VMLA_OP_KERNELS_GENERIC_H_
 
 #include <algorithm>
 #include <cmath>
@@ -1167,4 +1167,4 @@ Status PoolingMax::Execute(absl::Span<const T> src_buffer,
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
+#endif  // IREE_MODULES_VMLA_OP_KERNELS_GENERIC_H_
