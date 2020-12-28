@@ -55,7 +55,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -68,7 +68,7 @@ iree_cc_library(
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRStandard
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRSupport
     MLIRTransforms
     MLIRVector
