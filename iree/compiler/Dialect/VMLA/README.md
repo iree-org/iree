@@ -33,9 +33,9 @@ TLDR:
     [VMLAToVM](/iree/compiler/Dialect/VMLA/Conversion/VMLAToVM/).
 5.  Add the runtime C++ kernel thunk to
     [vmla_module.cc](/iree/hal/vmla/vmla_module.cc).
-6.  Declare the kernel in [op_kernels.h](/iree/hal/vmla/op_kernels.h) and add a
+6.  Declare the kernel in [op_kernels.h](/iree/modules/vmla/op_kernels.h) and add a
     reference implementation in
-    [op_kernels_generic.h](/iree/hal/vmla/op_kernels_generic.h).
+    [op_kernels_generic.h](/iree/modules/vmla/op_kernels_generic.h).
 
 ### Declaring the Op
 
@@ -139,7 +139,7 @@ There are some helpers such as `IREE_VMLA_BINARY_OP` that match the equivalents
 in the tablegen file such that if your op can usually be just a single line.
 
 The thunks in this file just call one of the kernels defined in the
-[op_kernels.h](/iree/hal/vmla/op_kernels.h) file. These kernels are designed to
+[op_kernels.h](/iree/modules/vmla/op_kernels.h) file. These kernels are designed to
 be standalone from the VM code and take effectively just pointers and lists of
 values. The job of the `vmla_module.cc` thunk is to unwrap the VM arguments and
 pass them to these functions.
@@ -153,7 +153,7 @@ conversion. This ensures that we can optimize things on the compiler-side
 instead of forcing the runtime to deal with things.
 
 Finally, implement the kernel in
-[op_kernels_generic.h](/iree/hal/vmla/op_kernels_generic.h). Try to keep it
+[op_kernels_generic.h](/iree/modules/vmla/op_kernels_generic.h). Try to keep it
 simple and readable. These are reference kernels and don't need to be fast,
 however all of our tests use them and as such they shouldn't be so slow as to
 prevent tests from running in a reasonable time. Use your judgement or be
@@ -161,7 +161,7 @@ willing to have someone file a bug telling you to make them faster if they are
 terribly slow :)
 
 Tests for the kernels can be added to
-[op_kernels_test.cc](/iree/hal/vmla/op_kernels_test.cc). The thunks in
+[op_kernels_test.cc](/iree/modules/vmla/op_kernels_test.cc). The thunks in
 `vmla_module.cc` are best tested via end-to-end tests using `iree-run-mlir` as
 what you really want to ensure is that the compiler is emitting calls that match
 the runtime side and the only way to do this is to actually compile and run.
