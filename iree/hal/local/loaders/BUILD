@@ -15,6 +15,8 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -55,7 +57,6 @@ cc_library(
     ],
 )
 
-
 iree_cmake_extra_content(
     content = """
 if(${IREE_HAL_DRIVER_VMLA})
@@ -76,7 +77,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:api",
         "//iree/hal/local",
-        "//iree/hal/vmla:op_module",
+        "//iree/modules/vmla:op_module",
         "//iree/schemas:vmla_executable_def_c_fbs",
         "//iree/vm",
         "//iree/vm:bytecode_module",

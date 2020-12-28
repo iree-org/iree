@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/vmla/op_kernels.h"
+#include "iree/modules/vmla/op_kernels.h"
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"

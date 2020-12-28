@@ -52,6 +52,8 @@ iree_cc_library(
   PUBLIC
 )
 
+if(${IREE_HAL_DRIVER_VMLA})
+
 iree_cc_library(
   NAME
     vmla_module_loader
@@ -65,7 +67,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::api
     iree::hal::local
-    iree::hal::vmla::op_module
+    iree::modules::vmla::op_module
     iree::schemas::vmla_executable_def_c_fbs
     iree::vm
     iree::vm::bytecode_module
@@ -73,3 +75,5 @@ iree_cc_library(
     "IREE_HAL_HAVE_VMLA_MODULE_LOADER=1"
   PUBLIC
 )
+
+endif()
