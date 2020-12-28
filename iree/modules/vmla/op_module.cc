@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/vmla/op_module.h"
+#include "iree/modules/vmla/op_module.h"
 
 #include <cstdint>
 
 #include "absl/types/span.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/vmla/op_kernels.h"
+#include "iree/modules/vmla/op_kernels.h"
 #include "iree/vm/module_abi_packing.h"
 
 //===----------------------------------------------------------------------===//
@@ -157,16 +157,16 @@ Status Interface::SetConstants(absl::Span<const uint32_t> values) {
 }
 
 StatusOr<const Interface::Binding> Interface::GetBinding(
-    int32_t set, int32_t binding) const {
-  if (set < 0 || set > kMaxSets || binding < 0 || binding > kMaxBindings) {
+    uint32_t set, uint32_t binding) const {
+  if (set >= kMaxSets || binding >= kMaxBindings) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Invalid binding set=" << set << ", binding=" << binding;
   }
   return bindings_[set][binding];
 }
 
-Status Interface::SetBinding(int32_t set, int32_t binding, Binding value) {
-  if (set < 0 || set > kMaxSets || binding < 0 || binding > kMaxBindings) {
+Status Interface::SetBinding(uint32_t set, uint32_t binding, Binding value) {
+  if (set >= kMaxSets || binding >= kMaxBindings) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Invalid binding set=" << set << ", binding=" << binding;
   }
@@ -205,7 +205,7 @@ class VMLAModuleState final {
   }
 
   StatusOr<vm::ref<Buffer>> InterfaceBinding(vm::ref<Interface> interface,
-                                             int32_t set, int32_t binding) {
+                                             uint32_t set, uint32_t binding) {
     IREE_TRACE_SCOPE0("VMLAModuleState::InterfaceBinding");
     IREE_ASSIGN_OR_RETURN(const auto& value,
                           interface->GetBinding(set, binding));

@@ -31,8 +31,8 @@
 // semantics as reference and platform-specific versions can be implemented
 // as needed.
 
-#ifndef IREE_HAL_VMLA_OP_KERNELS_FFT_H_
-#define IREE_HAL_VMLA_OP_KERNELS_FFT_H_
+#ifndef IREE_MODULES_VMLA_OP_KERNELS_FFT_H_
+#define IREE_MODULES_VMLA_OP_KERNELS_FFT_H_
 
 #include "absl/types/span.h"
 #include "iree/base/logging.h"
@@ -86,4 +86,4 @@ struct Fft {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_VMLA_OP_KERNELS_FFT_H_
+#endif  // IREE_MODULES_VMLA_OP_KERNELS_FFT_H_
