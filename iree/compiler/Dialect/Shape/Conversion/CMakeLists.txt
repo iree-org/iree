@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRPass
     MLIRShape
     MLIRStandard
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
   PUBLIC
