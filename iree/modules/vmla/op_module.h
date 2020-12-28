@@ -16,8 +16,8 @@
 // linked into the same library, because of this we can avoid the C shims and
 // directly use C++ types.
 
-#ifndef IREE_HAL_VMLA_OP_MODULE_H_
-#define IREE_HAL_VMLA_OP_MODULE_H_
+#ifndef IREE_MODULES_VMLA_OP_MODULE_H_
+#define IREE_MODULES_VMLA_OP_MODULE_H_
 
 #include <cstdint>
 
@@ -115,10 +115,10 @@ class Interface final : public RefObject<Interface> {
   Status SetConstants(absl::Span<const uint32_t> values);
 
   // Gets the binding within a set. Note that the buffer may be null.
-  StatusOr<const Binding> GetBinding(int32_t set, int32_t binding) const;
+  StatusOr<const Binding> GetBinding(uint32_t set, uint32_t binding) const;
 
   // Sets a binding within a set to the given buffer value (possibly null).
-  Status SetBinding(int32_t set, int32_t binding, Binding value);
+  Status SetBinding(uint32_t set, uint32_t binding, Binding value);
 
  private:
   std::array<uint32_t, kMaxConstants> constants_;
@@ -136,4 +136,4 @@ Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module);
 IREE_VM_DECLARE_TYPE_ADAPTERS(Buffer, iree::hal::vmla::Buffer);
 IREE_VM_DECLARE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
 
-#endif  // IREE_HAL_VMLA_OP_MODULE_H_
+#endif  // IREE_MODULES_VMLA_OP_MODULE_H_

@@ -14,71 +14,8 @@
 
 # A VMLA (VM-based Linear Algebra) runtime HAL backend.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_HAL_DRIVER_VMLA})
-  return()
-endif()
-""",
-)
-
-cc_library(
-    name = "op_kernels",
-    hdrs = ["op_kernels.h"],
-    textual_hdrs = [
-        # TODO(benvanik): SIMD variants.
-        "op_kernels_generic.h",
-        "op_kernels_ruy.h",
-        "op_kernels_fft.h",
-    ],
-    deps = [
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/types:span",
-        "@com_google_ruy//ruy",
-        "@com_google_ruy//ruy:context",
-        "@pffft",
-    ],
-)
-
-cc_test(
-    name = "op_kernels_test",
-    srcs = ["op_kernels_test.cc"],
-    deps = [
-        ":op_kernels",
-        "//iree/base:core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "op_module",
-    srcs = ["op_module.cc"],
-    hdrs = ["op_module.h"],
-    deps = [
-        ":op_kernels",
-        "//iree/base:api",
-        "//iree/base:core_headers",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/vm",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/types:span",
-    ],
 )
