@@ -207,7 +207,7 @@ build:rbe --jobs=150
 # These flags must be adapted to work with toolchain containers other than
 # rbe-ubuntu16-04
 # References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in
-# WORKSPACE
+# WORKSPACE.bazel
 build:rbe --host_javabase=@rbe_default//java:jdk
 build:rbe --javabase=@rbe_default//java:jdk
 build:rbe --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
