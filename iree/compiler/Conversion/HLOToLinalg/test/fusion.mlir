@@ -162,7 +162,7 @@ module {
     %6 = linalg.generic
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d0, d2)>,
-			affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
        iterator_types = ["parallel", "parallel", "parallel"]}
       ins(%3, %4 : tensor<384x4x32xf32>, tensor<384x4x32xf32>)
       outs(%5 : tensor<4x384x32xf32>) {
