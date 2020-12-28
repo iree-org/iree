@@ -12,12 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "native_module",
+    srcs = ["native_module.cc"],
+    hdrs = ["native_module.h"],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "//iree/hal:api",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:cc",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 iree_bytecode_module(
@@ -46,23 +73,6 @@ cc_test(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "native_module",
-    srcs = ["native_module.cc"],
-    hdrs = ["native_module.h"],
-    deps = [
-        "//iree/base:api",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/hal:api",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
     ],
 )

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
@@ -19,6 +20,15 @@ package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_embed_data(

@@ -45,7 +45,6 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
-option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -72,7 +71,18 @@ else()
   option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 endif()
 
-if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
+#-------------------------------------------------------------------------------
+# Experimental project flags
+#-------------------------------------------------------------------------------
+
+option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
+option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+
+#-------------------------------------------------------------------------------
+# Derived flags based on primary options
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -323,7 +333,7 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
   # experimental model builder uses vulkan runner.
-  if(${IREE_BUILD_EXPERIMENTAL})
+  if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
     set(MLIR_VULKAN_RUNNER_ENABLED ON)
   endif()
 
@@ -497,11 +507,7 @@ add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
-
-if(${IREE_ENABLE_MLIR})
-  # The VM requires LLVM to build its op definitions.
-  add_subdirectory(iree/vm)
-endif()
+add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
@@ -527,8 +533,19 @@ if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL})
-  add_subdirectory(experimental)
+if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
+  add_subdirectory(experimental/ModelBuilder)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
+  # NOTE: Currently liburing is only used by the experimental remoting
+  # support, so keeping it scoped here. If this broadens, then include along
+  # with other dependencies as normal.
+  if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    message(STATUS "Enabling liburing")
+    add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
+  endif()
+  add_subdirectory(experimental/remoting)
 endif()
 
 if(${IREE_ENABLE_TENSORFLOW})

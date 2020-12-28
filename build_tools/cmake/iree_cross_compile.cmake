@@ -87,7 +87,6 @@ function(iree_create_configuration CONFIG_NAME)
   iree_to_bool(_CONFIG_BUILD_DEBUGGER "${IREE_${CONFIG_NAME}_BUILD_DEBUGGER}")
   iree_to_bool(_CONFIG_BUILD_PYTHON_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_PYTHON_BINDINGS}")
   iree_to_bool(_CONFIG_BUILD_JAVA_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_JAVA_BINDINGS}")
-  iree_to_bool(_CONFIG_BUILD_EXPERIMENTAL "${IREE_${CONFIG_NAME}_BUILD_EXPERIMENTAL}")
   iree_to_bool(_CONFIG_BUILD_TENSORFLOW_COMPILER "${IREE_${CONFIG_NAME}_BUILD_TENSORFLOW_COMPILER}")
 
   # Escape semicolons in the targets list so that CMake doesn't expand them to
