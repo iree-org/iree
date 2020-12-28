@@ -45,7 +45,7 @@ iree_cc_library(
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRSupport
     MLIRTransforms
     MLIRVector
