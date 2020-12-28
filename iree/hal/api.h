@@ -483,7 +483,7 @@ enum iree_hal_wait_mode_e {
 };
 typedef uint8_t iree_hal_wait_mode_t;
 
-// LINT.IfChange(element_type)
+// Keep these in sync with iree/compiler/Dialect/HAL/IR/HALTypes.cpp
 
 enum iree_hal_numerical_type_e {
   IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00u,
@@ -535,8 +535,6 @@ enum iree_hal_element_type_e {
 };
 typedef uint32_t iree_hal_element_type_t;
 // clang-format on
-
-// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
 
 // A dimension within a shape.
 typedef int32_t iree_hal_dim_t;

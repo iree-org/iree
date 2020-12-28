@@ -28,6 +28,7 @@ iree_lit_test_suite(
         ["*.cpp"],
         exclude = [
             "Bench*",
+            "TestMNISTJIT*",
         ],
     ),
     data = [

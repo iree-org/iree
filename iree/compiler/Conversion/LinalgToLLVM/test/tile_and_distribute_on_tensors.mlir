@@ -36,6 +36,6 @@ func @tensor() -> tensor<2x4xf32> {
   // CHECK-NEXT:   }
   // CHECK-NEXT:   scf.yield %{{.*}} : tensor<2x4xf32>
   %E = linalg.matmul ins(%A, %B: tensor<2x3xf32>, tensor<3x4xf32>)
-                    init(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
+                    outs(%C: tensor<2x4xf32>) -> tensor<2x4xf32>
   return %E : tensor<2x4xf32>
 }

@@ -74,7 +74,8 @@ function(iree_create_configuration CONFIG_NAME)
   # when useful.
   add_custom_target(iree_prepare_${CONFIG_NAME}_dir DEPENDS ${_CONFIG_BINARY_ROOT})
 
-  # LINT.IfChange(iree_cross_compile_options)
+  # Compile options. keep these in sync with the root CMakeLists.txt and the
+  # invoke options below.
   iree_to_bool(_CONFIG_ENABLE_RUNTIME_TRACING "${IREE_${CONFIG_NAME}_ENABLE_RUNTIME_TRACING}")
   iree_to_bool(_CONFIG_ENABLE_MLIR "${IREE_${CONFIG_NAME}_ENABLE_MLIR}")
   iree_to_bool(_CONFIG_ENABLE_EMITC "${IREE_${CONFIG_NAME}_ENABLE_EMITC}")
@@ -92,10 +93,6 @@ function(iree_create_configuration CONFIG_NAME)
   # spaces.
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_HAL_DRIVERS_TO_BUILD "${IREE_HAL_DRIVERS_TO_BUILD}")
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_TARGET_BACKENDS_TO_BUILD "${IREE_TARGET_BACKENDS_TO_BUILD}")
-  # LINT.ThenChange(
-  #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
-  #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
-  # )
 
   message(STATUS "C compiler for ${CONFIG_NAME} build: ${_CONFIG_C_COMPILER}")
   message(STATUS "C++ compiler for ${CONFIG_NAME} build: ${_CONFIG_CXX_COMPILER}")
@@ -107,7 +104,8 @@ function(iree_create_configuration CONFIG_NAME)
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
         -DCMAKE_C_COMPILER="${_CONFIG_C_COMPILER}"
         -DCMAKE_CXX_COMPILER="${_CONFIG_CXX_COMPILER}"
-        # LINT.IfChange(iree_cross_compile_invoke)
+        # Invoke options. Keep these in sync with the root CMakeLists.txt and
+        # the compile options above
         -DIREE_ENABLE_RUNTIME_TRACING=${_CONFIG_ENABLE_RUNTIME_TRACING}
         -DIREE_ENABLE_MLIR=${_CONFIG_ENABLE_MLIR}
         -DIREE_ENABLE_EMITC=${_CONFIG_ENABLE_EMITC}
@@ -120,10 +118,7 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_JAVA_BINDINGS=${_CONFIG_BUILD_JAVA_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
         -DIREE_BUILD_TENSORFLOW_COMPILER=${_CONFIG_BUILD_TENSORFLOW_COMPILER}
-        # LINT.ThenChange(
-        #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
-        #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
-        # )
+
         -DIREE_HAL_DRIVERS_TO_BUILD="${_CONFIG_HAL_DRIVERS_TO_BUILD}"
         -DIREE_TARGET_BACKENDS_TO_BUILD="${_CONFIG_TARGET_BACKENDS_TO_BUILD}"
         -DIREE_ENABLE_ASAN=${IREE_ENABLE_ASAN}

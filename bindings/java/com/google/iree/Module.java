@@ -38,7 +38,7 @@ final class Module {
 
   /**
    * Creates a VM module from a flatbuffer. The input ByteBuffer must be direct, and acceptable
-   * schemas for the flatbuffer are available at https://github.com/google/iree/tree/main/iree/schemas.
+   * schemas for the flatbuffer are available at iree/schemas
    */
   public Module(ByteBuffer flatbufferData) throws Exception {
     nativeAddress = nativeNew();

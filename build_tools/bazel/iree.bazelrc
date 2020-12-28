@@ -83,12 +83,13 @@ build:generic_clang --per_file_copt=external/.*@-w
 # Would need to then make all the --copt below duplicated with --host_copt.
 build:generic_clang --host_copt=-w
 
-# LINT.IfChange(clang_diagnostics)
 # Set clang diagnostics. These largely match the set of warnings used within
 # Google. They have not been audited super carefully by the IREE team but are
 # generally thought to be a good set and consistency with those used internally
 # is very useful when importing. If you feel that some of these should be
 # different, please raise an issue!
+
+# Please keep these in sync with build_tools/cmake/iree_copts.cmake
 
 build:generic_clang --copt=-Wall
 
@@ -143,7 +144,6 @@ build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wno-unused-variable
 build:generic_clang --copt=-Wvla
-# LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/cmake/iree_copts.cmake:clang_diagnostics)
 
 ###############################################################################
 # Options for building with address sanitizer.
@@ -207,7 +207,7 @@ build:rbe --jobs=150
 # These flags must be adapted to work with toolchain containers other than
 # rbe-ubuntu16-04
 # References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in
-# WORKSPACE
+# WORKSPACE.bazel
 build:rbe --host_javabase=@rbe_default//java:jdk
 build:rbe --javabase=@rbe_default//java:jdk
 build:rbe --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8

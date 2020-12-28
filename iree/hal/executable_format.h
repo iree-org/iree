@@ -34,7 +34,7 @@ constexpr ExecutableFormat MakeExecutableFormatID(char const four_cc[5]) {
          four_cc[3];
 }
 
-// LINT.IfChange(fourcc)
+// Keep these in sync with iree/compiler/Dialect/HAL/IR/HALBase.td
 
 // Undefined (or unknown). The format may be derived from the executable
 // contents (such as file magic bytes).
@@ -50,30 +50,24 @@ constexpr ExecutableFormat kExecutableFormatIreeBytecode =
     MakeExecutableFormatID("IREE");
 
 // IREE VMLA executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/main/iree/schemas/vmla_executable_def.fbs
-// schema.
+// iree/schemas/vmla_executable_def.fbs schema.
 constexpr ExecutableFormat kExecutableFormatVMLA =
     MakeExecutableFormatID("VMLA");
 
 // SPIR-V executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/main/iree/schemas/spirv_executable_def.fbs
-// schema.
+// iree/schemas/spirv_executable_def.fbs schema.
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
 // Metal executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/main/iree/schemas/metal_executable_def.fbs
-// schema.
+// iree/schemas/metal_executable_def.fbs schema.
 constexpr ExecutableFormat kExecutableFormatMetal =
     MakeExecutableFormatID("MTLE");
 
 // Dynamic Library (dylib) executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/main/iree/schemas/dylib_executable_def.fbs
-// schema
+// iree/schemas/dylib_executable_def.fbs schema
 constexpr ExecutableFormat kExecutableFormatDyLib =
     MakeExecutableFormatID("DLIB");
-
-// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal
 }  // namespace iree

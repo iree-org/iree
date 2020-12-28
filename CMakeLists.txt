@@ -33,7 +33,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Project component configuration
 #-------------------------------------------------------------------------------
 
-# LINT.IfChange(iree_options)
+# Make sure to also update these options in
+# build_tools/cmake/iree_cross_compile.cmake
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
@@ -69,11 +70,6 @@ if(${IREE_ENABLE_TENSORFLOW})
 else()
   option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 endif()
-
-# LINT.ThenChange(
-#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
-#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
-# )
 
 #-------------------------------------------------------------------------------
 # Experimental project flags

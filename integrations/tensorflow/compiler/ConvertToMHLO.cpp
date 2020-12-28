@@ -18,6 +18,7 @@
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -92,7 +93,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalOp<mlir::CallOp>();
-    target.addLegalOp<mlir::TensorCastOp>();
+    target.addLegalOp<mlir::tensor::CastOp>();
 
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
