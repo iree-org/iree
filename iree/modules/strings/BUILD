@@ -65,8 +65,8 @@ cc_test(
 
 iree_bytecode_module(
     name = "strings_module_test_module",
+    testonly = True,
     src = "strings_module_test.mlir",
     cc_namespace = "iree::strings_module_test",
     flags = ["-iree-mlir-to-vm-bytecode-module"],
-    testonly = True,
 )

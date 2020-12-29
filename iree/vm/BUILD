@@ -256,10 +256,10 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
+    testonly = True,
     src = "bytecode_module_benchmark.mlir",
     cc_namespace = "iree::vm",
     flags = ["-iree-vm-ir-to-bytecode-module"],
-    testonly = True,
 )
 
 cc_test(
@@ -275,10 +275,10 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_module_size_benchmark_module",
+    testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     cc_namespace = "iree::vm",
     flags = ["-iree-vm-ir-to-bytecode-module"],
-    testonly = True,
 )
 
 iree_cmake_extra_content(

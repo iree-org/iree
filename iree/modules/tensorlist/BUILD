@@ -49,10 +49,10 @@ endif()
 
 iree_bytecode_module(
     name = "tensorlist_test_module",
+    testonly = True,
     src = "tensorlist_test.mlir",
     cc_namespace = "iree::modules::tensorlist",
     flags = ["-iree-mlir-to-vm-bytecode-module"],
-    testonly = True,
 )
 
 cc_test(
