@@ -1,0 +1,60 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+SPIRV_SOURCES = [
+    "spirv_cfg.cpp",
+    "spirv_cpp.cpp",
+    "spirv_cross.cpp",
+    "spirv_cross_c.cpp",
+    "spirv_cross_parsed_ir.cpp",
+    "spirv_cross_util.cpp",
+    "spirv_glsl.cpp",
+    "spirv_hlsl.cpp",
+    "spirv_msl.cpp",
+    "spirv_parser.cpp",
+    "spirv_reflect.cpp",
+]
+
+SPIRV_HEADERS = [
+    "GLSL.std.450.h",
+    "spirv.h",
+    "spirv.hpp",
+    "spirv_cfg.hpp",
+    "spirv_common.hpp",
+    "spirv_cpp.hpp",
+    "spirv_cross.hpp",
+    "spirv_cross_c.h",
+    "spirv_cross_containers.hpp",
+    "spirv_cross_error_handling.hpp",
+    "spirv_cross_parsed_ir.hpp",
+    "spirv_cross_util.hpp",
+    "spirv_glsl.hpp",
+    "spirv_hlsl.hpp",
+    "spirv_msl.hpp",
+    "spirv_parser.hpp",
+    "spirv_reflect.hpp",
+]
+
+CLI_SOURCES = ["main.cpp"]
+
+cc_library(
+    name = "spirv_cross_lib_real",
+    srcs = SPIRV_SOURCES,
+    hdrs = SPIRV_HEADERS,
+)
+
+cc_library(
+    name = "spirv_cross_lib",
+    hdrs = SPIRV_HEADERS,
+    deps = [":spirv_cross_lib_real"],
+    include_prefix = "third_party/spirv_cross",
+)
+
+cc_binary(
+    name = "spriv_cross",
+    srcs = CLI_SOURCES,
+    deps = ["spirv_cross"],
+)
