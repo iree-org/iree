@@ -92,12 +92,14 @@ set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG
-    # LINT.IfChange(clang_diagnostics)
     # Set clang diagnostics. These largely match the set of warnings used within
     # Google. They have not been audited super carefully by the IREE team but
     # are generally thought to be a good set and consistency with those used
     # internally is very useful when importing. If you feel that some of these
     # should be different, please raise an issue!
+
+    # Please keep these in sync with build_tools/bazel/iree.bazelrc
+
     "-Wall"
 
     # Disable warnings we don't care about or that generally have a low
@@ -150,7 +152,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wthread-safety-beta"
     "-Wunused-comparison"
     "-Wvla"
-    # LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/bazel/iree.bazelrc:clang_diagnostics)
 
     # Turn off some additional warnings (CMake only)
     "-Wno-strict-prototypes"

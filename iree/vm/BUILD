@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
@@ -212,6 +213,13 @@ cc_library(
 #     ],
 # )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+""",
+    inline = True,
+)
+
 cc_test(
     name = "bytecode_module_test",
     srcs = [
@@ -269,6 +277,13 @@ iree_bytecode_module(
     src = "bytecode_module_size_benchmark.mlir",
     cc_namespace = "iree::vm",
     flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
 
 #===------------------------------------------------------------------------===#

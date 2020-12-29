@@ -128,13 +128,14 @@ function(iree_cc_library)
         ${IREE_DEFAULT_COPTS}
         ${_RULE_COPTS}
     )
-
-    target_link_libraries(${_NAME}
-      PUBLIC
-        ${_RULE_DEPS}
+    target_link_options(${_NAME}
       PRIVATE
         ${IREE_DEFAULT_LINKOPTS}
         ${_RULE_LINKOPTS}
+    )
+    target_link_libraries(${_NAME}
+      PUBLIC
+        ${_RULE_DEPS}
     )
 
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
@@ -168,11 +169,14 @@ function(iree_cc_library)
         ${IREE_DEFAULT_COPTS}
         ${_RULE_COPTS}
     )
-    target_link_libraries(${_NAME}
+    target_link_options(${_NAME}
       INTERFACE
         ${IREE_DEFAULT_LINKOPTS}
-        ${_RULE_DEPS}
         ${_RULE_LINKOPTS}
+    )
+    target_link_libraries(${_NAME}
+      INTERFACE
+        ${_RULE_DEPS}
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
     target_compile_definitions(${_NAME}

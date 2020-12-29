@@ -209,8 +209,7 @@ static LogicalResult getConfigForCooperativeMatmul(
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
   ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType =
-      op.output_buffers().front().getType().cast<ShapedType>();
+  ShapedType outputType = op.outputs().front().getType().cast<ShapedType>();
 
   auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
@@ -349,7 +348,7 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
                                            TileSizesListType &tileSizes,
                                            LaunchConfigInfo &config) {
   auto inputType = op.getInput(1).getType().cast<MemRefType>();
-  auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
+  auto outputType = op.getOutputBufferTypes()[0].cast<MemRefType>();
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 

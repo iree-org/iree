@@ -188,12 +188,13 @@ class ProcessTransferRead final
       ConversionPatternRewriter &rewriter) const override {
     if (!memrefUsageAnalysis.transferConvert(read)) return failure();
     vector::TransferReadOp::Adaptor adaptor(operands);
-    Value memref = adaptor.memref();
+    Value memref = adaptor.source();
+    auto memrefType = memref.getType().dyn_cast<MemRefType>();
+    if (!memrefType) return failure();
     Location loc = read.getLoc();
     Optional<unsigned> vecMemrefElemSize =
-        getBitWidth(memref.getType().cast<MemRefType>().getElementType());
-    Optional<unsigned> readElemSize =
-        getBitWidth(read.getMemRefType().getElementType());
+        getBitWidth(memrefType.getElementType());
+    Optional<unsigned> readElemSize = getBitWidth(memrefType.getElementType());
     Optional<unsigned> readVecSize = getBitWidth(read.getVectorType());
     if (!vecMemrefElemSize || !readElemSize || !readVecSize) return failure();
     unsigned ratio = *vecMemrefElemSize / *readElemSize;
@@ -204,7 +205,7 @@ class ProcessTransferRead final
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
     if (*vecMemrefElemSize == *readVecSize) {
-      Type elemType = memref.getType().cast<MemRefType>().getElementType();
+      Type elemType = memrefType.getElementType();
       Value newLoad = rewriter.create<LoadOp>(loc, elemType, memref, indices);
       Type serializedVecType =
           VectorType::get(read.getVectorType().getNumElements(),
@@ -233,12 +234,13 @@ class ProcessTransferWrite final
       ConversionPatternRewriter &rewriter) const override {
     if (!memrefUsageAnalysis.transferConvert(write)) return failure();
     vector::TransferWriteOp::Adaptor adaptor(operands);
-    Value memref = adaptor.memref();
+    Value memref = adaptor.source();
+    auto memrefType = memref.getType().dyn_cast<MemRefType>();
+    if (!memrefType) return failure();
     Location loc = write.getLoc();
     Optional<unsigned> vecMemrefElemSize =
-        getBitWidth(memref.getType().cast<MemRefType>().getElementType());
-    Optional<unsigned> writeElemSize =
-        getBitWidth(write.getMemRefType().getElementType());
+        getBitWidth(memrefType.getElementType());
+    Optional<unsigned> writeElemSize = getBitWidth(memrefType.getElementType());
     Optional<unsigned> writeVecSize = getBitWidth(write.getVectorType());
     if (!vecMemrefElemSize || !writeElemSize || !writeVecSize) return failure();
     unsigned ratio = *vecMemrefElemSize / *writeElemSize;
@@ -254,7 +256,7 @@ class ProcessTransferWrite final
       Value data = rewriter.create<vector::ShapeCastOp>(loc, serializedVecType,
                                                         adaptor.vector());
       data = rewriter.create<vector::BitCastOp>(
-          loc, memref.getType().cast<MemRefType>().getElementType(), data);
+          loc, memrefType.getElementType(), data);
       rewriter.create<StoreOp>(loc, data, memref, indices);
     } else {
       rewriter.create<vector::TransferWriteOp>(loc, adaptor.vector(), memref,

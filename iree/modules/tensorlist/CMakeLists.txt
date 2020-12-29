@@ -14,6 +14,30 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    native_module
+  HDRS
+    "native_module.h"
+  SRCS
+    "native_module.cc"
+  DEPS
+    absl::inlined_vector
+    absl::span
+    iree::base::api
+    iree::base::ref_ptr
+    iree::base::status
+    iree::hal::api
+    iree::modules::hal
+    iree::vm
+    iree::vm::cc
+  PUBLIC
+)
+
+if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+  return()
+endif()
+
 iree_bytecode_module(
   NAME
     tensorlist_test_module
@@ -48,24 +72,4 @@ iree_cc_test(
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
-)
-
-iree_cc_library(
-  NAME
-    native_module
-  HDRS
-    "native_module.h"
-  SRCS
-    "native_module.cc"
-  DEPS
-    absl::inlined_vector
-    absl::span
-    iree::base::api
-    iree::base::ref_ptr
-    iree::base::status
-    iree::hal::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::cc
-  PUBLIC
 )

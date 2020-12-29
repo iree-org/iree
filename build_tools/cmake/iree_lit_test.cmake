@@ -35,6 +35,14 @@ function(iree_lit_test)
     return()
   endif()
 
+  # When *not* cross compiling, respect the IREE_BUILD_COMPILER option.
+  # Cross compilation uses its own "IREE_HOST_BUILD_COMPILER" option.
+  # Note: lit tests are not *required* to be "compiler" tests, but we only use
+  # them for compiler tests in practice.
+  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -111,6 +119,10 @@ function(iree_lit_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
+
+  # Note: we could check IREE_BUILD_COMPILER here, but cross compilation makes
+  # that a little tricky. Instead, we let iree_check_test handle the checks,
+  # meaning this function may run some configuration but generate no targets.
 
   cmake_parse_arguments(
     _RULE
