@@ -30,6 +30,8 @@ def write_platform(bazelrc):
   if platform.system() == "Windows":
     platform_config = "windows"
   print("build --config={}".format(platform_config), file=bazelrc)
+  if not (platform.system() == "Darwin"):
+    print("common --config={}".format("non_darwin"), file=bazelrc)
 
 
 def write_python_bin(bazelrc):
