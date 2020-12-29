@@ -162,9 +162,9 @@ def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
 
 
 def update_rbe_reference(digest: str, dry_run: bool = False):
-  print('Updating WORKSPACE.bazel file for rbe-toolchain')
+  print('Updating WORKSPACE file for rbe-toolchain')
   digest_updates = 0
-  for line in fileinput.input(files=['WORKSPACE.bazel'], inplace=True):
+  for line in fileinput.input(files=['WORKSPACE'], inplace=True):
     if line.strip().startswith('digest ='):
       digest_updates += 1
       if dry_run:
@@ -176,8 +176,8 @@ def update_rbe_reference(digest: str, dry_run: bool = False):
 
   if digest_updates > 1:
     raise RuntimeError(
-        "There is more than one instance of 'digest =' in the WORKSPACE.bazel "
-        " file. This means that more than just the 'rbe_toolchain' digest was "
+        "There is more than one instance of 'digest =' in the WORKSPACE file. "
+        "This means that more than just the 'rbe_toolchain' digest was "
         "overwritten, and the file should be restored.")
 
 

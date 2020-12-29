@@ -132,7 +132,7 @@ maybe(
     llvm_configure,
     name = "llvm-project",
     src_path = "third_party/llvm-project",
-    src_workspace = "@iree_core//:WORKSPACE.bazel",
+    src_workspace = "@iree_core//:WORKSPACE",
 )
 ###############################################################################
 
