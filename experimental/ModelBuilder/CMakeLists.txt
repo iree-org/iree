@@ -69,7 +69,7 @@ iree_cc_library(
     LLVMSupport
     MLIRExecutionEngine
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRGPUToVulkanTransforms
     MLIRSPIRVTransforms
     MLIRIR
@@ -78,7 +78,7 @@ iree_cc_library(
     MLIRPass
     MLIRSPIRV
     MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRTargetLLVMIR
     MLIRTransformUtils
     MLIRVector

@@ -15,7 +15,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
