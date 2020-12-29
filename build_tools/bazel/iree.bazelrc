@@ -338,3 +338,8 @@ build:msvc --config=msvc2019
 build:windows --config=msvc
 
 ###############################################################################
+# disable metal stuff for non Darwin platforms
+###############################################################################
+common:non_darwin --deleted_packages=//iree/hal/metal,//iree/hal/metal/registration
+build:non_darwin --test_tag_filters="-driver=metal"
+###############################################################################

@@ -19,7 +19,6 @@
 # See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -27,56 +26,50 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-iree_check_single_backend_test_suite(
-  NAME
-    check_metal-spirv_metal
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "exponential.mlir"
-    "gather.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    metal-spirv
-  DRIVER
-    metal
-)
-""",
-)
-
 iree_check_single_backend_test_suite(
     name = "check_vmla_vmla",
     srcs = glob(["*.mlir"]),
     driver = "vmla",
     target_backend = "vmla",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_metal-spirv_metal",
+    srcs = [
+        "abs.mlir",
+        "add.mlir",
+        "broadcast.mlir",
+        "broadcast_add.mlir",
+        "broadcast_in_dim.mlir",
+        "clamp.mlir",
+        "compare.mlir",
+        "constant.mlir",
+        "convert.mlir",
+        "cosine.mlir",
+        "divide.mlir",
+        "exponential.mlir",
+        "gather.mlir",
+        "log.mlir",
+        "log_plus_one.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "multiply.mlir",
+        "negate.mlir",
+        "remainder.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sine.mlir",
+        "slice.mlir",
+        "sqrt.mlir",
+        "subtract.mlir",
+        "tanh.mlir",
+        "torch_index_select.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    driver = "metal",
+    target_backend = "metal-spirv",
 )
 
 iree_check_single_backend_test_suite(
@@ -184,6 +177,7 @@ test_suite(
     name = "check",
     tests = [
         ":check_dylib-llvm-aot_dylib",
+        ":check_metal-spirv_metal",
         ":check_vmla_vmla",
         ":check_vulkan-spirv_vulkan",
     ],
