@@ -173,7 +173,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRLLVMIR
       MLIRLinalg
       MLIRLinalgToLLVM
-      MLIRLinalgToSPIRVTransforms
+      MLIRLinalgToSPIRV
       MLIRLinalgTransforms
       MLIRQuant
       MLIRSCF
