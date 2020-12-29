@@ -269,7 +269,7 @@ module attributes {
 //  PROMOTE-DAG:  %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //  PROMOTE-DAG:  %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //  PROMOTE-DAG:  %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
-//  PROMOTE-DAG:  %[[C0:.+]] = constant 0
+//  PROMOTE-DAG:  %[[C0:.+]] = constant 0 : index
 //  PROMOTE-DAG:  %[[C2:.+]] = constant 2
 //  PROMOTE-DAG:  %[[C16:.+]] = constant 16
 //  PROMOTE-DAG:  %[[C32:.+]] = constant 32

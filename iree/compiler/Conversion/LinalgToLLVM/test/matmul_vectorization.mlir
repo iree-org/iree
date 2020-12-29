@@ -9,7 +9,7 @@ func @matmul_128x128x128(%arg0 : memref<128x128xf32>, %arg1: memref<128x128xf32>
 // CHECK-SAME: (%[[ARG0:.+]]: memref<128x128xf32>, %[[ARG1:.+]]: memref<128x128xf32>, %[[ARG2:.+]]: memref<128x128xf32>)
 // CHECK-DaG: %[[WORKGROUP_TILE_X:.+]] = hal.interface.workgroup.id[0] : index
 // CHECK-DAG: %[[WORKGROUP_TILE_Y:.+]] = hal.interface.workgroup.id[1] : index
-// CHECK-DAG: %[[START:.+]] = constant 0
+// CHECK-DAG: %[[START:.+]] = constant 0 : index
 // CHECK-DAG: %[[WORGKROUP_SIZE:.+]] = constant 64
 // CHECK-DAG: %[[VECTOR_SIZE:.+]] = constant 4
 // CHECK-DAG: %[[L1_SIZE:.+]] = constant 32
