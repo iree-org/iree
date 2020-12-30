@@ -621,40 +621,6 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 //===----------------------------------------------------------------------===//
 
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
-    FLOW_StreamableOp,
-  ]> {
-  let summary = [{a dispatch to an outlined dispatch region}];
-  let description = [{
-    Dispatches a workload to the specified executable function.
-  }];
-
-  let arguments = (ins
-    SymbolRefAttr:$entry_point,
-    FLOW_Workload:$workload,
-    Variadic<AnyType>:$operands
-  );
-  let results = (outs
-    Variadic<AnyType>:$results
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilderDAG<(ins "DispatchEntryOp":$entryPoint, "Value":$workload,
-      "ArrayRef<Type>":$results, CArg<"ValueRange", "{}">:$operands)>,
-  ];
-
-  let extraClassDeclaration = [{
-    StringRef executable();
-    FunctionType getEntryPointType();
-
-    // StreamableOpInterface:
-    bool isTransfer() { return false; }
-    bool isUsableInStream() { return true; }
-    bool isStreamOnly() { return true; }
-  }];
-}
-
-def FLOW_Dispatch2Op : FLOW_PureOp<"dispatch2", [
     AttrSizedOperandSegments,
     FLOW_StreamableOp,
   ]> {
@@ -698,7 +664,7 @@ def FLOW_Dispatch2Op : FLOW_PureOp<"dispatch2", [
     functional-type($operands, $results)
   }];
 
-  let verifier = [{ return verifyDispatch2Op(*this); }];
+  let verifier = [{ return verifyDispatchOp(*this); }];
 }
 
 //===----------------------------------------------------------------------===//

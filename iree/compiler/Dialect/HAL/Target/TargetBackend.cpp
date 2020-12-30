@@ -102,7 +102,7 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
 
 std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupSize(
     Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
     OpBuilder &builder) {
   // When no workgroup size is specified we just assume [1,1,1].
   // This yields a workgroup count that models the extents of the workload.
@@ -115,7 +115,7 @@ std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupSize(
 
 std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
     Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
     OpBuilder &builder) {
   auto workgroupSize = calculateDispatchWorkgroupSize(
       loc, executableOp, entryPointOp, workload, builder);
@@ -123,54 +123,75 @@ std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
 }
 
 std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
-    Location loc, Value workload, const std::array<Value, 3> &workgroupSize,
-    OpBuilder &builder) {
+    Location loc, ValueRange workload,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
   std::array<Value, 3> result;
+
   auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-  for (int i = 0; i < 3; ++i) {
-    // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto rounded = builder.createOrFold<mlir::SubIOp>(
-        loc,
-        builder.createOrFold<mlir::AddIOp>(loc, workload, workgroupSize[i]),
-        constantOne);
-    auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
-        loc, rounded, workgroupSize[i]);
-    result[i] = workgroupCountI;
+  if (workload.size() <= 3) {
+    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup size.
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      Value workloadI = i < workload.size() ? workload[i] : constantOne;
+      workloadI = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSize[i]),
+          constantOne);
+      result[i] = builder.createOrFold<UnsignedDivIOp>(loc, workloadI,
+                                                       workgroupSize[i]);
+    }
+  } else {
+    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
+    Value flatWorkload = constantOne;
+    for (auto workloadI : workload) {
+      flatWorkload = builder.createOrFold<MulIOp>(loc, flatWorkload, workloadI);
+    }
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      auto rounded = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, flatWorkload,
+                                             workgroupSize[i]),
+          constantOne);
+      auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
+          loc, rounded, workgroupSize[i]);
+      result[i] = workgroupCountI;
 
-    // Multiply back out and subtract from invocations.
-    workload = builder.createOrFold<SubIOp>(
-        loc, workload,
-        builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
-
-    // Ensure > 0.
-    auto workloadGreaterZero =
-        builder.create<CmpIOp>(loc, CmpIPredicate::sge, workload, constantOne);
-    workload = builder.create<SelectOp>(loc, workloadGreaterZero, workload,
-                                        constantOne);
+      // Multiply back out and subtract from invocations.
+      flatWorkload = builder.createOrFold<SubIOp>(
+          loc, flatWorkload,
+          builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
+    }
   }
+
   return result;
 }
 
 LogicalResult TargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
     DeviceSwitchRewriter &switchRewriter) {
+  SmallVector<Value, 4> regionArgs;
+  regionArgs.push_back(dispatchState.commandBuffer);
+  for (auto dim : dispatchState.workgroupCount) {
+    regionArgs.push_back(dim);
+  }
   auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
-      {
-          dispatchState.workload,
-          dispatchState.commandBuffer,
-      });
+      regionArgs);
   auto &entryBlock = region->front();
-  auto workload = entryBlock.getArgument(0);
-  auto commandBuffer = entryBlock.getArgument(1);
+  auto commandBuffer = entryBlock.getArgument(0);
+  SmallVector<Value, 3> originalWorkgroupCount;
+  for (int i = 0; i < dispatchState.workgroupCount.size(); ++i) {
+    originalWorkgroupCount.push_back(entryBlock.getArgument(1 + i));
+  }
 
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
-  auto workgroupCount = calculateDispatchWorkgroupCount(
-      loc, dispatchState.executableOp, dispatchState.entryPointOp, workload,
-      builder);
+  auto remappedWorkgroupCount = calculateDispatchWorkgroupCount(
+      loc, dispatchState.executableOp, dispatchState.entryPointOp,
+      originalWorkgroupCount, builder);
   builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-      loc, commandBuffer, dispatchState.entryPointOp, workgroupCount[0],
-      workgroupCount[1], workgroupCount[2]);
+      loc, commandBuffer, dispatchState.entryPointOp, remappedWorkgroupCount[0],
+      remappedWorkgroupCount[1], remappedWorkgroupCount[2]);
 
   builder.create<IREE::HAL::ReturnOp>(loc);
   return success();

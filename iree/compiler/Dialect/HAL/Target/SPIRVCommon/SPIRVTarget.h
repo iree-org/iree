@@ -44,13 +44,13 @@ class SPIRVTargetBackend : public TargetBackend {
   // Finds the spv.ExecutionMode operation to get the workgroup size from.
   std::array<Value, 3> calculateDispatchWorkgroupSize(
       Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
       OpBuilder &builder) override;
 
  private:
   std::array<Value, 3> calculateDispatchWorkgroupSize(
       Location loc, spirv::ModuleOp spvModuleOp, StringRef entryPointName,
-      Value workload, OpBuilder &builder);
+      ValueRange workload, OpBuilder &builder);
 
   SPIRVCodegenOptions spvCodeGenOptions_;
 };

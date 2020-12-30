@@ -81,7 +81,7 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   }
 
   // Create the dispatch op to the executable function.
-  auto dispatchOp = builder.create<Dispatch2Op>(
+  auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, regionOp.workgroup_count(),
       regionOp.getResultTypes(), newOperands);
 
