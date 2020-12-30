@@ -187,8 +187,6 @@ TEST(TaskListTest, PrependEmpty) {
 
   auto task0 = AcquireNopTask(pool, scope, 0);
   auto task1 = AcquireNopTask(pool, scope, 1);
-  auto task2 = AcquireNopTask(pool, scope, 2);
-  auto task3 = AcquireNopTask(pool, scope, 3);
 
   iree_task_list_push_back(&list_a, task0);
   iree_task_list_push_back(&list_a, task1);

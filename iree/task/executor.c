@@ -673,9 +673,6 @@ iree_task_t* iree_task_executor_try_steal_task(
     iree_task_queue_t* local_task_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const int worker_count = executor->worker_count;
-  iree_task_worker_t* workers = executor->workers;
-
   // Limit the workers we will steal from to the ones that are currently live
   // and not idle.
   iree_task_affinity_set_t victim_mask =
