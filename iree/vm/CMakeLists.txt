@@ -177,7 +177,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if(${IREE_BUILD_COMPILER})
 
 iree_cc_test(
   NAME
@@ -222,6 +222,7 @@ iree_bytecode_module(
     "iree::vm"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
+  TESTONLY
   PUBLIC
 )
 
@@ -246,6 +247,7 @@ iree_bytecode_module(
     "iree::vm"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
+  TESTONLY
   PUBLIC
 )
 

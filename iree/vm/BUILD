@@ -215,7 +215,7 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_BUILD_COMPILER} AND ${IREE_BUILD_TESTS})
+if(${IREE_BUILD_COMPILER})
 """,
     inline = True,
 )
@@ -256,6 +256,7 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
+    testonly = True,
     src = "bytecode_module_benchmark.mlir",
     cc_namespace = "iree::vm",
     flags = ["-iree-vm-ir-to-bytecode-module"],
@@ -274,6 +275,7 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_module_size_benchmark_module",
+    testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     cc_namespace = "iree::vm",
     flags = ["-iree-vm-ir-to-bytecode-module"],

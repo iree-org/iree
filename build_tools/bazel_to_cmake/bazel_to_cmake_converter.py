@@ -460,12 +460,14 @@ class BuildFileFunctions(object):
                            src,
                            flags=["-iree-mlir-to-vm-bytecode-module"],
                            translate_tool="//iree/tools:iree-translate",
-                           cc_namespace=None):
+                           cc_namespace=None,
+                           testonly=False):
     name_block = self._convert_name_block(name)
     src_block = self._convert_src_block(src)
     namespace_block = self._convert_cc_namespace_block(cc_namespace)
     translate_tool_block = self._convert_translate_tool_block(translate_tool)
     flags_block = self._convert_string_list_block("FLAGS", flags)
+    testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
@@ -473,6 +475,7 @@ class BuildFileFunctions(object):
                             f"{namespace_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
+                            f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
   def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
