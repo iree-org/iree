@@ -22,7 +22,7 @@ iree_lit_test_suite(
     "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
-        iree::tools::iree-check-module
+    iree::tools::iree-check-module
     iree::tools::iree-translate
   LABELS
     "hostonly"
