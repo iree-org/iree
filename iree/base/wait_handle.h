@@ -200,7 +200,7 @@ void iree_wait_set_free(iree_wait_set_t* set);
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle);
 
-// Erases a wait handle from the set.
+// Erases a single instance of a wait handle from the set.
 // Decrements the reference count; if the same handle was inserted multiple
 // times then the it may still remain in the set after an erase!
 void iree_wait_set_erase(iree_wait_set_t* set, iree_wait_handle_t handle);

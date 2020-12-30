@@ -223,4 +223,29 @@ TEST(PRNG, Xoroshiro128) {
             iree_prng_xoroshiro128starstar_next_uint64(&state));
 }
 
+TEST(PRNG, MiniLcg128) {
+  iree_prng_minilcg128_state_t state;
+
+  iree_prng_minilcg128_initialize(/*seed=*/0ull, &state);
+  EXPECT_EQ(111u, iree_prng_minilcg128_next_uint8(&state));
+  for (int i = 0; i < 100; ++i) {
+    iree_prng_minilcg128_next_uint8(&state);
+  }
+  EXPECT_EQ(212u, iree_prng_minilcg128_next_uint8(&state));
+
+  iree_prng_minilcg128_initialize(/*seed=*/1ull, &state);
+  EXPECT_EQ(198u, iree_prng_minilcg128_next_uint8(&state));
+  for (int i = 0; i < 100; ++i) {
+    iree_prng_minilcg128_next_uint8(&state);
+  }
+  EXPECT_EQ(135u, iree_prng_minilcg128_next_uint8(&state));
+
+  iree_prng_minilcg128_initialize(/*seed=*/UINT64_MAX, &state);
+  EXPECT_EQ(12u, iree_prng_minilcg128_next_uint8(&state));
+  for (int i = 0; i < 100; ++i) {
+    iree_prng_minilcg128_next_uint8(&state);
+  }
+  EXPECT_EQ(229u, iree_prng_minilcg128_next_uint8(&state));
+}
+
 }  // namespace
