@@ -216,6 +216,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
                                DeviceSwitchRewriter &switchRewriter) override {
+    // TODO(#4140): remove this legacy path when linalg-on-tensors is used.
+    // In the linalg-on-tensors world where we are performing the tiling logic
+    // in the flow dialect we don't even really need the ability to override
+    // dispatch recording at all - just a way to allow targets to map workgroup
+    // counts from the N-dimensional flow workgroup counts to the 3D hal counts.
+    if (dispatchState.workgroupCount.size() == 3) {
+      return TargetBackend::recordDispatch(loc, dispatchState, switchRewriter);
+    }
+
     IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
     ModuleOp llvmIRModuleOp;
     for (auto executableTargetOp :
@@ -240,7 +249,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto *region = switchRewriter.addConditionRegion(
         IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
         {
-            dispatchState.workload,
+            dispatchState.workgroupCount[0],
             dispatchState.commandBuffer,
         });
     auto &entryBlock = region->front();

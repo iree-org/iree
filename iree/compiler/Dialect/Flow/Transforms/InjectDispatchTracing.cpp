@@ -41,7 +41,7 @@ class InjectDispatchTracingPass
   InjectDispatchTracingPass() = default;
 
   void runOnOperation() override {
-    for (auto dispatchOp : getOperation().getOps<Dispatch2Op>()) {
+    for (auto dispatchOp : getOperation().getOps<DispatchOp>()) {
       std::string entryPointName =
           dispatchOp.entry_point().getRootReference().str();
       for (FlatSymbolRefAttr nestedRef :
