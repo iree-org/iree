@@ -23,8 +23,6 @@ def iree_bytecode_module(
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
-        visibility = None,
-        testonly = False,
         **kwargs):
     native.genrule(
         name = name,
@@ -43,7 +41,6 @@ def iree_bytecode_module(
         tools = [translate_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
-        testonly = testonly,
         **kwargs
     )
 
@@ -57,6 +54,6 @@ def iree_bytecode_module(
             cc_file_output = "%s.cc" % (name),
             h_file_output = "%s.h" % (name),
             cpp_namespace = cc_namespace,
-            visibility = visibility,
             flatten = True,
+            **kwargs
         )
