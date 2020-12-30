@@ -29,6 +29,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -422,6 +423,24 @@ static LogicalResult declareTargetOps(TargetOptions targetOptions,
   return success();
 }
 
+namespace {
+
+template <typename SrcOp, typename DstOp>
+class ConverterDispatchWorkgroupInfoPattern final
+    : public OpRewritePattern<SrcOp> {
+ public:
+  using OpRewritePattern<SrcOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(SrcOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
+                                       op.dimensionAttr());
+    return success();
+  }
+};
+
+}  // namespace
+
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
@@ -447,25 +466,42 @@ class MaterializeInterfacesPass
       // Create the op that will contain the translated executables.
       OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
-      auto exectuableOp = builder.create<IREE::HAL::ExecutableOp>(
+      auto executableOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
-      exectuableOp.setPrivate();
+      executableOp.setPrivate();
 
       // Add IO ops to define the bindings and how parameters are passed.
-      auto interfaceOp = declareInterfaceIO(sourceOp, exectuableOp);
+      auto interfaceOp = declareInterfaceIO(sourceOp, executableOp);
       if (!interfaceOp.hasValue()) {
         return signalPassFailure();
       }
 
       // Embed the hal.executable.target ops for each source.
-      if (failed(declareTargetOps(targetOptions_, sourceOp, exectuableOp))) {
+      if (failed(declareTargetOps(targetOptions_, sourceOp, executableOp))) {
         return signalPassFailure();
       }
 
       // Annotate the entry points.
       // TODO(benvanik): allow entry points to use different interfaces.
-      if (failed(declareEntryPointOps(sourceOp, exectuableOp,
+      if (failed(declareEntryPointOps(sourceOp, executableOp,
                                       interfaceOp.getValue()))) {
+        return signalPassFailure();
+      }
+
+      // Convert interface-related flow.dispatch.* ops to their hal.* versions.
+      OwningRewritePatternList patterns;
+      patterns.insert<ConverterDispatchWorkgroupInfoPattern<
+                          IREE::Flow::DispatchWorkgroupIDOp,
+                          IREE::HAL::InterfaceWorkgroupIDOp>,
+                      ConverterDispatchWorkgroupInfoPattern<
+                          IREE::Flow::DispatchWorkgroupCountOp,
+                          IREE::HAL::InterfaceWorkgroupCountOp>,
+                      ConverterDispatchWorkgroupInfoPattern<
+                          IREE::Flow::DispatchWorkgroupSizeOp,
+                          IREE::HAL::InterfaceWorkgroupSizeOp>>(
+          executableOp.getContext());
+      if (failed(applyPatternsAndFoldGreedily(executableOp,
+                                              std::move(patterns)))) {
         return signalPassFailure();
       }
 
