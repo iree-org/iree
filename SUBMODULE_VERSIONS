@@ -4,13 +4,8 @@ daff5fead3fbe22c6fc58310ca3f49caf117f185 third_party/benchmark
 4fb0ff7069bd88ee85902f4d0bb62794e5f6d021 third_party/flatcc
 b1fbd33c06cdb0024c67733c6fdec2009d17b384 third_party/googletest
 76a21602d84dd4b1a119523954df0c1686d1a4d6 third_party/llvm-bazel
-<<<<<<< HEAD
 d553243fe4b5e1992c07aff7b54b16160a4d5e97 third_party/llvm-project
 a438d3b2e9e2e4699b94787b7fb6e8b45d4e92c6 third_party/mlir-emitc
-=======
-6883042528d0338b776bb2316e58999650e94892 third_party/llvm-project
-55801f03f9cc69abfcf8b508a873f702c11b3b5f third_party/mlir-emitc
->>>>>>> 4110f3daae21078bf885a618e6789033684a675a
 74d7261be17cf659d5930d4830609406bd7553e3 third_party/pffft
 d8c7ee00a687ac369e62e2032514a93a9b413502 third_party/pybind11
 d79362c24fd70eab3196672273dbfd8f0dd6124c third_party/ruy
