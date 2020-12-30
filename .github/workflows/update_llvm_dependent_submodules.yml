@@ -42,7 +42,7 @@ jobs:
           echo "LLVM_SHA=$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
           echo "TF_SHA=$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
           echo "LLVM_BAZEL_SHA=$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
-          echo "MLIR_HLO_SHA=$(git submodule status third_party/mlir_hlo | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
+          echo "MLIR_HLO_SHA=$(git submodule status third_party/mlir-hlo | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v3
         with:
