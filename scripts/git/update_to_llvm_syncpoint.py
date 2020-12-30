@@ -16,18 +16,19 @@
 # pylint: disable=missing-docstring
 """Updates LLVM-dependent submodules based on the current LLVM commit.
 
-Updates the third_party/llvm-bazel and third_party/tensorflow submodules to
-commits that match the LLVM commit in third_party/llvm-project submodule. We
-have special conditions around these submodules since they are synced as part of
-the integration of LLVM into Google's source repository. See
+Updates the third_party/llvm-bazel, third_party/tensorflow, and
+third_party/mlir-hlo submodules to commits that match the LLVM commit in the
+third_party/llvm-project submodule. We have special conditions around these
+submodules since they are synced as part of the integration of LLVM into
+Google's source repository. See
 https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py
 
   By default, this will update llvm-bazel to the tag corresponding to the
-  current LLVM commit and update TensorFlow to the most recent commit that has a
-  matching LLVM commit.
+  current LLVM commit and update TensorFlow and MLIR-HLO to the most recent
+  commit that has a matching LLVM commit.
 """
 
 import argparse
@@ -54,6 +55,11 @@ COMMIT_OPTIONS = {
     LATEST_MATCHING_COMMIT_OPTION:
         "Update to the most recent commit with a matching version of LLVM",
 }
+
+TF_WORKSPACE_FILEPATH = "tensorflow/workspace.bzl"
+TF_WORKSPACE_LLVM_COMMIT_REGEXP = re.compile(
+    r"""\s*LLVM_COMMIT\s*=\s*"(.+)"\s*""", flags=re.MULTILINE)
+MLIR_HLO_LLVM_VERSION_FILEPATH = "build_tools/llvm_version.txt"
 
 
 def parse_arguments():
@@ -86,6 +92,15 @@ def parse_arguments():
                       help=("Update TensorFlow to this rev, or a named option:"
                             f" {COMMIT_OPTIONS}"),
                       default=LATEST_MATCHING_COMMIT_OPTION)
+  parser.add_argument("--mlir_hlo_path",
+                      help="Path to the tensorflow sources "
+                      "(default to third_party/tensorflow)",
+                      default=None)
+  parser.add_argument("--mlir_hlo_rev",
+                      "--mlir_hlo_commit",
+                      help=("Update mlir-hlo to this rev, or a named option:"
+                            f" {COMMIT_OPTIONS}"),
+                      default=LATEST_MATCHING_COMMIT_OPTION)
   parser.add_argument(
       "--validate",
       help="Validate that the selected commits all match the LLVM commit",
@@ -101,12 +116,14 @@ def parse_arguments():
     args.repo = utils.find_git_toplevel()
 
   # Set some defaults.
-  if not args.tensorflow_path:
-    args.tensorflow_path = os.path.join(args.repo, "third_party", "tensorflow")
   if not args.llvm_path:
     args.llvm_path = os.path.join(args.repo, "third_party", "llvm-project")
   if not args.llvm_bazel_path:
     args.llvm_bazel_path = os.path.join(args.repo, "third_party", "llvm-bazel")
+  if not args.tensorflow_path:
+    args.tensorflow_path = os.path.join(args.repo, "third_party", "tensorflow")
+  if not args.mlir_hlo_path:
+    args.mlir_hlo_path = os.path.join(args.repo, "third_party", "mlir-hlo")
 
   return args
 
@@ -117,25 +134,17 @@ def main(args):
   print(f"  LLVM Path: {args.llvm_path}")
   print(f"  LLVM Bazel Path: {args.llvm_bazel_path}")
   print(f"  TensorFlow Path: {args.tensorflow_path}")
+  print(f"  MLIR-HLO Path: {args.tensorflow_path}")
 
   current_llvm_commit = parse_rev(args.llvm_path, "HEAD")
   current_llvm_bazel_commit = parse_rev(args.llvm_bazel_path, "HEAD")
   current_tf_commit = parse_rev(args.tensorflow_path, "HEAD")
+  current_mlir_hlo_commit = parse_rev(args.mlir_hlo_path, "HEAD")
   print("Current Commits:")
   print(f"  llvm = {current_llvm_commit}")
   print(f"  llvm_bazel = {current_llvm_bazel_commit}")
   print(f"  tensorflow = {current_tf_commit}")
-
-  # Update TensorFlow
-  new_tf_commit = find_new_tf_commit(args.tensorflow_path, current_llvm_commit,
-                                     args.tensorflow_rev)
-  print("\n*** Updating TensorFlow to", new_tf_commit, "***")
-  utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow_path)
-  stage_path(args.repo, args.tensorflow_path)
-
-  validate_tf_commit(current_llvm_commit,
-                     args.tensorflow_path,
-                     exit_on_failure=args.validate)
+  print(f"  mlir-hlo = {current_mlir_hlo_commit}")
 
   # Update LLVM-Bazel
   new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel_path,
@@ -149,6 +158,32 @@ def main(args):
   validate_llvm_bazel_commit(current_llvm_commit,
                              args.llvm_bazel_path,
                              exit_on_failure=args.validate)
+
+  # Update TensorFlow
+  new_tf_commit = find_new_commit_from_version_file(args.tensorflow_path,
+                                                    TF_WORKSPACE_FILEPATH,
+                                                    current_llvm_commit,
+                                                    args.tensorflow_rev)
+  print("\n*** Updating TensorFlow to", new_tf_commit, "***")
+  utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow_path)
+  stage_path(args.repo, args.tensorflow_path)
+
+  validate_tf_commit(current_llvm_commit,
+                     args.tensorflow_path,
+                     exit_on_failure=args.validate)
+
+  # Update MLIR-HLO
+  new_mlir_hlo_commit = find_new_commit_from_version_file(
+      args.mlir_hlo_path, MLIR_HLO_LLVM_VERSION_FILEPATH, current_llvm_commit,
+      args.mlir_hlo_rev)
+  print("\n*** Updating MLIR-HLO to", new_mlir_hlo_commit, "***")
+  utils.execute(["git", "checkout", new_mlir_hlo_commit],
+                cwd=args.mlir_hlo_path)
+  stage_path(args.repo, args.mlir_hlo_path)
+
+  validate_mlir_hlo_commit(current_llvm_commit,
+                           args.mlir_hlo_path,
+                           exit_on_failure=args.validate)
 
   # Export SUBMODULE_VERSIONS.
   print()  # Add line break.
@@ -201,24 +236,17 @@ def find_llvm_bazel_llvm_commit(llvm_bazel_path):
       cwd=llvm_bazel_path).stdout.split()[0].lstrip("+-")
 
 
-def find_new_tf_commit(tensorflow_path, llvm_commit, tf_rev):
-  utils.execute(["git", "fetch"], cwd=tensorflow_path)
+def find_llvm_commit_changes_to_file(repo_path,
+                                     filepath,
+                                     llvm_commit,
+                                     branch="origin/master"):
+  """Finds commits where the occurrence of the given LLVM commit hash changes.
 
-  if tf_rev not in COMMIT_OPTIONS:
-    return parse_rev(tensorflow_path, tf_rev)
-
-  if tf_rev == KEEP_COMMIT_OPTION:
-    return parse_rev(tensorflow_path, "HEAD")
-
-  if tf_rev == REMOTE_HEAD_COMMIT_OPTION:
-    return parse_rev(tensorflow_path, "origin/master")
-
-  # Find commits where the number of occurrences of the given LLVM commit hash
-  # changes. In normal cases, there should be at most two commits that match
-  # this:
-  # 1. The commit that first introduced the new hash in the TF workspace file.
-  # 2. The commit that changed it to a new hash afterwards.
-  tf_integrate_commit_options = utils.execute(
+  In normal cases, there should be at most two commits that match this:
+    1. The commit that first introduced the new hash in the file.
+    2. The commit that changed it to a new hash afterwards.
+  """
+  commits = utils.execute(
       [
           "git",
           "log",
@@ -232,34 +260,57 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_rev):
           # https://git-scm.com/docs/git-log#Documentation/git-log.txt--Sltstringgt
           "-S",
           llvm_commit,
-          # Search along the master branch
-          "origin/master",
-          # Only look in the TF workspace file where the llvm_commit is recorded
+          # Search along the appropriate branch
+          branch,
+          # Only look in the specified file where the llvm_commit is recorded
           "--",
-          "tensorflow/workspace.bzl"
+          filepath,
       ],
       capture_output=True,
-      cwd=tensorflow_path).stdout.split()
-  if len(tf_integrate_commit_options) > 2:
+      cwd=repo_path).stdout.split()
+
+  if len(commits) > 2:
     raise RuntimeError(
-        f"Expected one or two TF commits to involve LLVM commit {llvm_commit},"
-        f" but got {len(tf_integrate_commit_options)}")
+        f"Expected one or two commits in {repo_path} {branch} {filepath} to "
+        f" involve LLVM commit {llvm_commit}, but got {len(commits)}")
 
-  if not tf_integrate_commit_options:
+  if not commits:
     raise RuntimeError(
-        f"TF does not have any references to LLVM commit {llvm_commit}."
-        " Maybe TF export is behind?")
+        f"{repo_path} {branch} {filepath} does not have any references to LLVM"
+        f" commit {llvm_commit}. Maybe  export is behind?")
 
-  if tf_rev == INTEGRATE_COMMIT_OPTION:
-    return tf_integrate_commit_options[-1]
+  return commits
 
-  assert tf_rev == LATEST_MATCHING_COMMIT_OPTION
-  if len(tf_integrate_commit_options) == 1:
+
+def find_new_commit_from_version_file(repo_path,
+                                      version_filepath,
+                                      llvm_commit,
+                                      rev,
+                                      branch="origin/master"):
+  utils.execute(["git", "fetch"], cwd=repo_path)
+
+  if rev not in COMMIT_OPTIONS:
+    return parse_rev(repo_path, rev)
+
+  if rev == KEEP_COMMIT_OPTION:
+    return parse_rev(repo_path, "HEAD")
+
+  if rev == REMOTE_HEAD_COMMIT_OPTION:
+    return parse_rev(repo_path, branch)
+
+  commit_options = find_llvm_commit_changes_to_file(repo_path, version_filepath,
+                                                    llvm_commit)
+
+  if rev == INTEGRATE_COMMIT_OPTION:
+    return commit_options[-1]
+
+  assert rev == LATEST_MATCHING_COMMIT_OPTION
+  if len(commit_options) == 1:
     # There hasn't been a subsequent integrate, use remote head.
-    return parse_rev(tensorflow_path, "origin/master")
+    return parse_rev(repo_path, branch)
 
   # Use the commit one before the one that changed away from this LLVM version.
-  return parse_rev(tensorflow_path, f"{tf_integrate_commit_options[0]}^")
+  return parse_rev(repo_path, f"{commit_options[0]}^")
 
 
 def validate_tf_commit(llvm_commit, tensorflow_path, exit_on_failure=True):
@@ -277,18 +328,35 @@ def find_tensorflow_llvm_commit(tensorflow_path):
   # TensorFlow keeps its commit in workspace.bzl on a line like:
   # LLVM_COMMIT = "..."
   # Yeah. This is how we do it.
-  workspace_path = os.path.join(tensorflow_path, "tensorflow", "workspace.bzl")
-  pattern_text = r"""\s*LLVM_COMMIT\s*=\s*"(.+)"\s*"""
-  pattern = re.compile(pattern_text, flags=re.MULTILINE)
+  workspace_path = os.path.join(tensorflow_path, TF_WORKSPACE_FILEPATH)
+
   for line in open(workspace_path, "r", encoding="UTF-8"):
-    m = re.match(pattern, line)
+    m = re.match(TF_WORKSPACE_LLVM_COMMIT_REGEXP, line)
     if m:
       return m.group(1)
 
   print(f"ERROR: Could not find LLVM commit in {workspace_path}.")
   print("Please file a bug)")
-  print("Expected pattern match for:", pattern_text)
+  print("Expected pattern match for:", TF_WORKSPACE_LLVM_COMMIT_REGEXP.pattern)
   sys.exit(1)
+
+
+def validate_mlir_hlo_commit(llvm_commit, mlir_hlo_path, exit_on_failure=True):
+  mlir_hlo_llvm_commit = find_mlir_hlo_llvm_commit(mlir_hlo_path)
+
+  matches = mlir_hlo_llvm_commit == llvm_commit
+  if not matches:
+    print("WARNING: LLVM commit in mlir-hlo does not match that in IREE"
+          f" ({mlir_hlo_llvm_commit} vs {llvm_commit})")
+    if exit_on_failure:
+      sys.exit(1)
+
+
+def find_mlir_hlo_llvm_commit(mlir_hlo_path):
+  llvm_version_file_path = os.path.join(mlir_hlo_path,
+                                        MLIR_HLO_LLVM_VERSION_FILEPATH)
+  with open(llvm_version_file_path, "r", encoding="UTF-8") as f:
+    return f.read().strip()
 
 
 def stage_path(repo_path, to_stage):
