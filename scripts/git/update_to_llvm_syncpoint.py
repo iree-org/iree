@@ -68,9 +68,9 @@ def parse_arguments():
                       "(defaults to third_party/llvm-bazel)",
                       default=None)
   parser.add_argument(
-      "--llvm_bazel_ref",
+      "--llvm_bazel_rev",
       "--llvm_bazel_commit",
-      help=("Update llvm-bazel to this git ref, or a named option:"
+      help=("Update llvm-bazel to this git rev, or a named option:"
             f" {COMMIT_OPTIONS}."
             f" {LATEST_MATCHING_COMMIT_OPTION} and {INTEGRATE_COMMIT_OPTION}"
             " are equivalentfor this repository."),
@@ -79,11 +79,11 @@ def parse_arguments():
                       help="Path to the tensorflow sources "
                       "(default to third_party/tensorflow)",
                       default=None)
-  parser.add_argument("--tensorflow_ref",
-                      "--tf_ref",
+  parser.add_argument("--tensorflow_rev",
+                      "--tf_rev",
                       "--tensorflow_commit",
                       "--tf_commit",
-                      help=("Update TensorFlow to this ref, or a named option:"
+                      help=("Update TensorFlow to this rev, or a named option:"
                             f" {COMMIT_OPTIONS}"),
                       default=LATEST_MATCHING_COMMIT_OPTION)
   parser.add_argument(
@@ -128,7 +128,7 @@ def main(args):
 
   # Update TensorFlow
   new_tf_commit = find_new_tf_commit(args.tensorflow_path, current_llvm_commit,
-                                     args.tensorflow_ref)
+                                     args.tensorflow_rev)
   print("\n*** Updating TensorFlow to", new_tf_commit, "***")
   utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow_path)
   stage_path(args.repo, args.tensorflow_path)
@@ -140,7 +140,7 @@ def main(args):
   # Update LLVM-Bazel
   new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel_path,
                                                      current_llvm_commit,
-                                                     args.llvm_bazel_ref)
+                                                     args.llvm_bazel_rev)
   print(f"\n*** Updating LLVM Bazel to {new_llvm_bazel_commit} ***")
   utils.execute(["git", "checkout", new_llvm_bazel_commit],
                 cwd=args.llvm_bazel_path)
@@ -162,22 +162,22 @@ def parse_rev(path, rev):
                        capture_output=True).stdout.strip()
 
 
-def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_ref):
+def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_rev):
   # Explicitly force-fetch tags. Tags in llvm-bazel are not guaranteed to be
   # stable.
   utils.execute(["git", "fetch", "--tags", "--force"], cwd=llvm_bazel_path)
 
-  if llvm_bazel_ref not in COMMIT_OPTIONS:
-    return parse_rev(llvm_bazel_path, llvm_bazel_ref)
+  if llvm_bazel_rev not in COMMIT_OPTIONS:
+    return parse_rev(llvm_bazel_path, llvm_bazel_rev)
 
-  if llvm_bazel_ref == KEEP_COMMIT_OPTION:
+  if llvm_bazel_rev == KEEP_COMMIT_OPTION:
     return parse_rev(llvm_bazel_path, "HEAD")
 
-  if llvm_bazel_ref == REMOTE_HEAD_COMMIT_OPTION:
+  if llvm_bazel_rev == REMOTE_HEAD_COMMIT_OPTION:
     return parse_rev(llvm_bazel_path, "origin/main")
 
-  if (llvm_bazel_ref == INTEGRATE_COMMIT_OPTION or
-      llvm_bazel_ref == LATEST_MATCHING_COMMIT_OPTION):
+  if (llvm_bazel_rev == INTEGRATE_COMMIT_OPTION or
+      llvm_bazel_rev == LATEST_MATCHING_COMMIT_OPTION):
     return parse_rev(llvm_bazel_path, f"llvm-project-{llvm_commit}")
 
 
