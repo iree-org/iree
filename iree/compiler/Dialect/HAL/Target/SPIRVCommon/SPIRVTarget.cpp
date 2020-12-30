@@ -68,6 +68,15 @@ void SPIRVTargetBackend::buildTranslationPassPipeline(
 LogicalResult SPIRVTargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
     DeviceSwitchRewriter &switchRewriter) {
+  // TODO(#4140): remove this legacy path when linalg-on-tensors is used.
+  // In the linalg-on-tensors world where we are performing the tiling logic
+  // in the flow dialect we don't even really need the ability to override
+  // dispatch recording at all - just a way to allow targets to map workgroup
+  // counts from the N-dimensional flow workgroup counts to the 3D hal counts.
+  if (dispatchState.workgroupCount.size() == 3) {
+    return TargetBackend::recordDispatch(loc, dispatchState, switchRewriter);
+  }
+
   // Multiple entry points might be generated for a single dispatch function.
   // Under such circumstances, we will have a special attribute indicating the
   // schedule of the split entry points. Try to see if we can find such
@@ -118,7 +127,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
-          dispatchState.workload,
+          dispatchState.workgroupCount[0],
           dispatchState.commandBuffer,
       });
 
@@ -188,7 +197,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
 // query independently so that we don't need to lookup the value here.
 std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
     OpBuilder &builder) {
   // TODO(ravishankarm): possibly emit different recordDispatch logic if the
   // workgroup sizes differ among targets.
@@ -212,7 +221,7 @@ std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
 
 std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     Location loc, spirv::ModuleOp spvModuleOp, StringRef entryPointName,
-    Value workload, OpBuilder &builder) {
+    ValueRange workload, OpBuilder &builder) {
   std::array<Value, 3> workgroupSize;
   for (auto executionModeOp :
        spvModuleOp.getBlock().getOps<spirv::ExecutionModeOp>()) {

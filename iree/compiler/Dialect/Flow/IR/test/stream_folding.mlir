@@ -21,10 +21,10 @@ func @fragmentDedupCaptures(%arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf
   // CHECK: flow.ex.stream.fragment(%arg1 = %[[CST]] : index, %arg2 = %[[A0]] : tensor<4xf32>)
   %0:2 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %cst : index, %arg3 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
     // Both referreants of the constant should use the deduped arg.
-    // CHECK: flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1 : index]
-    // CHECK: flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1 : index]
-    %1 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1 : index](%arg3) : (tensor<4xf32>) -> tensor<4xf32>
-    %2 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg2 : index](%1) : (tensor<4xf32>) -> tensor<4xf32>
+    // CHECK: flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1]
+    // CHECK: flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1]
+    %1 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1] (%arg3) : (tensor<4xf32>) -> tensor<4xf32>
+    %2 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg2] (%1) : (tensor<4xf32>) -> tensor<4xf32>
     flow.return %2, %2 : tensor<4xf32>, tensor<4xf32>
   }
   return %0#0, %0#1 : tensor<4xf32>, tensor<4xf32>

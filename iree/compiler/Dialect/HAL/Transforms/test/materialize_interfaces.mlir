@@ -199,3 +199,44 @@ flow.executable @dynamic_tiled_dispatch {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: hal.executable @workgroup_infos
+//  CHECK-NEXT: hal.interface @legacy_io {
+//  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: }
+flow.executable @workgroup_infos {
+  // CHECK-NEXT: hal.executable.target @vmla, filter="vmla" {
+  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-SAME:     interface = @legacy_io,
+  // CHECK-SAME:     ordinal = 0 : i32,
+  // CHECK-SAME:     signature = (!flow.dispatch.input<8x4xf32>, !flow.dispatch.output<4x8xf32>) -> ()
+  // CHECK-SAME:   }
+  flow.dispatch.entry @entry attributes {
+    signature = (tensor<8x4xf32>) -> tensor<4x8xf32>,
+    workgroup_rank = 2 : index
+  }
+  // CHECK-NEXT: module  {
+  module  {
+    // CHECK-NEXT: func @entry() {
+    func @entry(%arg: !flow.dispatch.input<8x4xf32>, %ret: !flow.dispatch.output<4x8xf32>) {
+      // CHECK-DAG: %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
+      %id_x = flow.dispatch.workgroup.id[0] : index
+      // CHECK-DAG: %[[WORKGROUP_ID_Y:.+]] = hal.interface.workgroup.id[1] : index
+      %id_y = flow.dispatch.workgroup.id[1] : index
+      // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = hal.interface.workgroup.count[0] : index
+      %count_x = flow.dispatch.workgroup.count[0] : index
+      // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = hal.interface.workgroup.count[1] : index
+      %count_y = flow.dispatch.workgroup.count[1] : index
+      // CHECK-DAG: %[[WORKGROUP_SIZE_X:.+]] = hal.interface.workgroup.size[0] : index
+      %size_x = flow.dispatch.workgroup.size[0] : index
+      // CHECK-DAG: %[[WORKGROUP_SIZE_Y:.+]] = hal.interface.workgroup.size[1] : index
+      %size_y = flow.dispatch.workgroup.size[1] : index
+      // CHECK-NEXT: "test.sink"(%[[WORKGROUP_ID_X]], %[[WORKGROUP_ID_Y]], %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]], %[[WORKGROUP_SIZE_X]], %[[WORKGROUP_SIZE_Y]])
+      "test.sink"(%id_x, %id_y, %count_x, %count_y, %size_x, %size_y) : (index, index, index, index, index, index) -> ()
+      return
+    }
+  }
+}

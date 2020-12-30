@@ -818,87 +818,10 @@ static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
 // flow.dispatch
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseDispatchOp(OpAsmParser &parser,
-                                   OperationState *result) {
-  SymbolRefAttr entryPointAttr;
-  if (failed(parser.parseAttribute(entryPointAttr, "entry_point",
-                                   result->attributes))) {
-    return failure();
-  }
-
-  OpAsmParser::OperandType workloadArg;
-  Type workloadArgType;
-  if (failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(workloadArg)) ||
-      failed(parser.parseColonType(workloadArgType)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperand(workloadArg, workloadArgType,
-                                   result->operands))) {
-    return failure();
-  }
-
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  FunctionType entryPointType;
-  if (failed(
-          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(entryPointType)) ||
-      failed(
-          parser.addTypesToList(entryPointType.getResults(), result->types)) ||
-      failed(parser.resolveOperands(operands, entryPointType.getInputs(),
-                                    parser.getNameLoc(), result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
-  p << op.getOperationName() << ' ';
-  p.printAttributeWithoutType(op.entry_point());
-  p << "[";
-  p.printOperand(op.workload());
-  p << " : ";
-  p.printType(op.workload().getType());
-  p << "](";
-  p.printOperands(op.operands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"entry_point"});
-  p << " : ";
-  p.printType(op.getEntryPointType());
-}
-
 void DispatchOp::build(OpBuilder &builder, OperationState &state,
-                       DispatchEntryOp entryPoint, Value workload,
-                       ArrayRef<Type> results, ValueRange operands) {
-  state.addOperands({workload});
-  state.addOperands(operands);
-  // Construct Executable::Entry nested reference.
-  StringRef executableOpSymName =
-      entryPoint->getParentOp()
-          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-          .getValue();
-  state.addAttribute(
-      "entry_point",
-      builder.getSymbolRefAttr(executableOpSymName,
-                               {builder.getSymbolRefAttr(entryPoint)}));
-  state.addTypes(results);
-}
-
-StringRef DispatchOp::executable() { return entry_point().getRootReference(); }
-
-FunctionType DispatchOp::getEntryPointType() {
-  SmallVector<Type, 8> argTypes(operand_type_range{operands()});
-  return FunctionType::get(getContext(), argTypes, getResultTypes());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch2
-//===----------------------------------------------------------------------===//
-
-void Dispatch2Op::build(OpBuilder &builder, OperationState &state,
-                        DispatchEntryOp entryPoint, ValueRange workgroupCount,
-                        TypeRange results, ValueRange operands,
-                        ArrayRef<NamedAttribute> attributes) {
+                       DispatchEntryOp entryPoint, ValueRange workgroupCount,
+                       TypeRange results, ValueRange operands,
+                       ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
       entryPoint->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
@@ -918,14 +841,14 @@ void Dispatch2Op::build(OpBuilder &builder, OperationState &state,
                                 static_cast<int32_t>(operands.size())}));
 }
 
-StringRef Dispatch2Op::executable() { return entry_point().getRootReference(); }
+StringRef DispatchOp::executable() { return entry_point().getRootReference(); }
 
-FunctionType Dispatch2Op::getEntryPointType() {
+FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});
   return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
-static LogicalResult verifyDispatch2Op(Dispatch2Op op) {
+static LogicalResult verifyDispatchOp(DispatchOp op) {
   if (op.workgroup_count().empty()) {
     return op.emitOpError() << "at least one workgroup dimension is required";
   }

@@ -78,7 +78,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
 
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), entryPointOp, regionOp.workload(),
+      regionOp.getLoc(), entryPointOp, ValueRange{regionOp.workload()},
       outlinedFuncOp.getType().getResults(), newArgs);
 
   if (traceDispatchTensors) {

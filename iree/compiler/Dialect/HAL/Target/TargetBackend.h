@@ -192,9 +192,9 @@ class TargetBackend {
     // SSA value of the loaded hal.executable_layout reference.
     Value executableLayout;
 
-    // SSA value of the total workload of the dispatch. See `flow.dispatch` for
-    // more information on how this is calculated.
-    Value workload;
+    // SSA values of the workgroup count of the dispatch. See `flow.dispatch`
+    // for more information on how this is calculated.
+    SmallVector<Value, 3> workgroupCount;
 
     // A base offset within the push constants array that all new push constants
     // must follow. Note that backend-specific push constants must have been
@@ -232,9 +232,10 @@ class TargetBackend {
   // beginning at offset |dispatchState.basePushConstantOffset|. Note that the
   // push constants must have been declared by `extractInterface`.
   //
-  // The provided |dispatchState.workload| can be used to derive the workgroup
-  // counts for dispatch using `calculateDispatchWorkgroupCounts` (or other
-  // logic).
+  // The provided |dispatchState.workgroupCount| can be used to access the
+  // workgroup count values for dispatch as provided on the original
+  // flow.dispatch op. These arbitrarily-ranked dimensions need to be adapted
+  // into the target-dependent 3-D XYZ grid space.
   //
   // |dispatchState.operands| and |dispatchState.results| can be used to access
   // the buffers allocated in case additional command buffer operations are
@@ -340,22 +341,22 @@ class TargetBackend {
   // for a single workgroup.
   virtual std::array<Value, 3> calculateDispatchWorkgroupSize(
       Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
       OpBuilder &builder);
 
   // Calculates the workgroup count (x, y, z) for dispatching to the given
-  // |entryPointOp|. The provided |workload| is the total number of invocations
-  // required as calculated by the generic workload logic (basically, number of
-  // output elements in tensors).
+  // |entryPointOp|. The provided N-dimensional |workload| is the total number
+  // of invocations required as calculated by the generic workload logic
+  // (basically, number of output elements in tensors).
   virtual std::array<Value, 3> calculateDispatchWorkgroupCount(
       Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
       OpBuilder &builder);
-  // Calculates the workgroup count (x, y, z) given the total |workload| and
-  // specific |workgroupSize|.
+  // Calculates the workgroup count (x, y, z) given the total N-dimensional
+  // |workload| and specific |workgroupSize|.
   std::array<Value, 3> calculateDispatchWorkgroupCount(
-      Location loc, Value workload, const std::array<Value, 3> &workgroupSize,
-      OpBuilder &builder);
+      Location loc, ValueRange workload,
+      const std::array<Value, 3> &workgroupSize, OpBuilder &builder);
 };
 
 }  // namespace HAL

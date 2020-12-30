@@ -9,7 +9,7 @@ func @dceOperandsAndResults(%arg0 : tensor<?xf32>) -> (tensor<?xf32>) {
   // CHECK: %[[DR0:.+]] = addf %[[CA1]], %[[CA1]]
   // CHECK: flow.return %[[DR0]] : tensor<?xf32>
   %ret0, %ret1 = flow.dispatch.region[%workload : index](
-      %i0 = %arg0 : tensor<?xf32>, %i1 = %arg0 : tensor<?xf32>, %i2 = %arg0 : tensor<?xf32>) 
+      %i0 = %arg0 : tensor<?xf32>, %i1 = %arg0 : tensor<?xf32>, %i2 = %arg0 : tensor<?xf32>)
       -> (tensor<?xf32>, tensor<?xf32>) {
     %1 = addf %i0, %i1 : tensor<?xf32>
     flow.return %1, %i2 : tensor<?xf32>, tensor<?xf32>
