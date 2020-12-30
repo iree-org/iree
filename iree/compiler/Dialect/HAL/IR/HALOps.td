@@ -2352,6 +2352,10 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
       }
       return names;
     }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
   }];
 }
 
@@ -2426,6 +2430,10 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
       }
       return names;
     }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
   }];
 }
 //===----------------------------------------------------------------------===//
