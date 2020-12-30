@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     VMLAToVM
   HDRS
-    "ConvertVMLAToVM.h"
+    ConvertVMLAToVM.h
   SRCS
-    "ConvertVMLAToVM.cpp"
+    ConvertVMLAToVM.cpp
   DEPS
     MLIRIR
     MLIRPass

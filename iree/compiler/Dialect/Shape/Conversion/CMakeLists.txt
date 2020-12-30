@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     ConvertShapeToShapex
   SRCS
-    "ConvertShapeToShapex.cpp"
+    ConvertShapeToShapex.cpp
   DEPS
     MLIRDialect
     MLIRIR
@@ -35,7 +35,7 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
-    "Passes.h"
+    Passes.h
   DEPS
     ::ConvertShapeToShapex
     MLIRPass

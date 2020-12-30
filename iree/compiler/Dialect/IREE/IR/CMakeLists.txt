@@ -19,16 +19,16 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "IREEDialect.h"
-    "IREEOps.h"
-    "IREEOps.h.inc"
-    "IREETraits.h"
-    "IREETypes.h"
+    IREEDialect.h
+    IREEOps.h
+    IREEOps.h.inc
+    IREETraits.h
+    IREETypes.h
   SRCS
-    "IREEDialect.cpp"
-    "IREEOps.cpp"
-    "IREEOps.cpp.inc"
-    "IREETypes.cpp"
+    IREEDialect.cpp
+    IREEOps.cpp
+    IREEOps.cpp.inc
+    IREETypes.cpp
   DEPS
     LLVMSupport
     MLIRIR
@@ -43,7 +43,7 @@ iree_tablegen_library(
   NAME
     IREEOpsGen
   TD_FILE
-    "IREEOps.td"
+    IREEOps.td
   OUTS
     -gen-op-decls IREEOps.h.inc
     -gen-op-defs IREEOps.cpp.inc
@@ -53,7 +53,7 @@ iree_tablegen_doc(
   NAME
     IREEDialectDocGen
   TD_FILE
-    "IREEOps.td"
+    IREEOps.td
   OUTS
     -gen-dialect-doc IREEDialect.md
 )

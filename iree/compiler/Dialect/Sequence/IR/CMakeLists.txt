@@ -19,19 +19,19 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "SequenceDialect.h"
-    "SequenceEnums.h.inc"
-    "SequenceOpInterface.h.inc"
-    "SequenceOps.h"
-    "SequenceOps.h.inc"
-    "SequenceTypes.h"
+    SequenceDialect.h
+    SequenceEnums.h.inc
+    SequenceOpInterface.h.inc
+    SequenceOps.h
+    SequenceOps.h.inc
+    SequenceTypes.h
   SRCS
-    "SequenceDialect.cpp"
-    "SequenceEnums.cpp.inc"
-    "SequenceOpInterface.cpp.inc"
-    "SequenceOps.cpp"
-    "SequenceOps.cpp.inc"
-    "SequenceTypes.cpp"
+    SequenceDialect.cpp
+    SequenceEnums.cpp.inc
+    SequenceOpInterface.cpp.inc
+    SequenceOps.cpp
+    SequenceOps.cpp.inc
+    SequenceTypes.cpp
   DEPS
     LLVMSupport
     MLIRIR
@@ -45,7 +45,7 @@ iree_tablegen_library(
   NAME
     SequenceEnumsGen
   TD_FILE
-    "SequenceBase.td"
+    SequenceBase.td
   OUTS
     -gen-enum-decls SequenceEnums.h.inc
     -gen-enum-defs SequenceEnums.cpp.inc
@@ -55,7 +55,7 @@ iree_tablegen_library(
   NAME
     SequenceOpInterfaceGen
   TD_FILE
-    "SequenceBase.td"
+    SequenceBase.td
   OUTS
     -gen-op-interface-decls SequenceOpInterface.h.inc
     -gen-op-interface-defs SequenceOpInterface.cpp.inc
@@ -65,7 +65,7 @@ iree_tablegen_library(
   NAME
     SequenceOpsGen
   TD_FILE
-    "SequenceOps.td"
+    SequenceOps.td
   OUTS
     -gen-op-decls SequenceOps.h.inc
     -gen-op-defs SequenceOps.cpp.inc
@@ -75,7 +75,7 @@ iree_tablegen_doc(
   NAME
     SequenceDialectDocGen
   TD_FILE
-    "SequenceOps.td"
+    SequenceOps.td
   OUTS
     -gen-dialect-doc SequenceDialect.md
 )

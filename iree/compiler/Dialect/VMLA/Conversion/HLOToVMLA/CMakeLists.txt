@@ -18,11 +18,11 @@ iree_cc_library(
   NAME
     HLOToVMLA
   HDRS
-    "ConvertHLOToVMLA.h"
+    ConvertHLOToVMLA.h
   SRCS
-    "ConvertConvOps.cpp"
-    "ConvertHLOToVMLA.cpp"
-    "ConvertReductionOps.cpp"
+    ConvertConvOps.cpp
+    ConvertHLOToVMLA.cpp
+    ConvertReductionOps.cpp
   DEPS
     LLVMSupport
     MLIRIR

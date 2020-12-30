@@ -18,13 +18,13 @@ iree_bytecode_module(
   NAME
     simple_embedding_test_bytecode_module
   SRC
-    "simple_embedding_test.mlir"
+    simple_embedding_test.mlir
   CC_NAMESPACE
-    "iree::samples"
+    iree::samples
   FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmla"
-    "-iree-hal-target-backends=vulkan-spirv"
+    -iree-mlir-to-vm-bytecode-module
+    -iree-hal-target-backends=vmla
+    -iree-hal-target-backends=vulkan-spirv
   PUBLIC
 )
 
@@ -32,7 +32,7 @@ iree_cc_test(
   NAME
     simple_embedding_test
   SRCS
-    "simple_embedding_test.cc"
+    simple_embedding_test.cc
   DATA
     iree::tools::sanitizer_suppressions.txt
   DEPS

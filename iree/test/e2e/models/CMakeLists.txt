@@ -21,20 +21,20 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    ${_GLOB_X_MLIR}
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
   LABELS
-    "hostonly"
-    "optonly"
+    hostonly
+    optonly
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_vmla_vmla
   SRCS
-    "bert_encoder_unrolled_fake_weights.mlir"
+    bert_encoder_unrolled_fake_weights.mlir
   TARGET_BACKEND
     vmla
   DRIVER

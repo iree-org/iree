@@ -19,13 +19,13 @@ iree_cc_embed_data(
   NAME
     tensorlist_imports
   SRCS
-    "tensorlist.imports.mlir"
+    tensorlist.imports.mlir
   CC_FILE_OUTPUT
-    "tensorlist.imports.cc"
+    tensorlist.imports.cc
   H_FILE_OUTPUT
-    "tensorlist.imports.h"
+    tensorlist.imports.h
   CPP_NAMESPACE
-    "mlir::iree_compiler::IREE::TensorList"
+    mlir::iree_compiler::IREE::TensorList
   FLATTEN
   PUBLIC
 )

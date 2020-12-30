@@ -18,12 +18,12 @@ flatbuffer_c_library(
   NAME
     bytecode_module_def_c_fbs
   SRCS
-    "bytecode_module_def.fbs"
+    bytecode_module_def.fbs
   FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
+    --reader
+    --builder
+    --verifier
+    --json
   PUBLIC
 )
 
@@ -31,12 +31,12 @@ flatbuffer_c_library(
   NAME
     dylib_executable_def_c_fbs
   SRCS
-    "dylib_executable_def.fbs"
+    dylib_executable_def.fbs
   FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
+    --reader
+    --builder
+    --verifier
+    --json
   PUBLIC
 )
 
@@ -44,12 +44,12 @@ flatbuffer_c_library(
   NAME
     metal_executable_def_c_fbs
   SRCS
-    "metal_executable_def.fbs"
+    metal_executable_def.fbs
   FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
+    --reader
+    --builder
+    --verifier
+    --json
   PUBLIC
 )
 
@@ -57,12 +57,12 @@ flatbuffer_c_library(
   NAME
     spirv_executable_def_c_fbs
   SRCS
-    "spirv_executable_def.fbs"
+    spirv_executable_def.fbs
   FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
+    --reader
+    --builder
+    --verifier
+    --json
   PUBLIC
 )
 
@@ -70,11 +70,11 @@ flatbuffer_c_library(
   NAME
     vmla_executable_def_c_fbs
   SRCS
-    "vmla_executable_def.fbs"
+    vmla_executable_def.fbs
   FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
+    --reader
+    --builder
+    --verifier
+    --json
   PUBLIC
 )

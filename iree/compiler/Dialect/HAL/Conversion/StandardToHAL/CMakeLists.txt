@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     StandardToHAL
   HDRS
-    "ConvertStandardToHAL.h"
+    ConvertStandardToHAL.h
   SRCS
-    "ConvertStandardToHAL.cpp"
-    "ConvertStructuralOps.cpp"
+    ConvertStandardToHAL.cpp
+    ConvertStructuralOps.cpp
   DEPS
     LLVMSupport
     MLIRIR

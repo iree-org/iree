@@ -18,11 +18,11 @@ iree_cc_library(
   NAME
     Analysis
   HDRS
-    "Dispatchability.h"
-    "TestPasses.h"
+    Dispatchability.h
+    TestPasses.h
   SRCS
-    "Dispatchability.cpp"
-    "DispatchabilityTest.cpp"
+    Dispatchability.cpp
+    DispatchabilityTest.cpp
   DEPS
     LLVMSupport
     MLIRIR

@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     driver_registry
   HDRS
-    "driver_registry.h"
+    driver_registry.h
   DEPS
     iree::hal::api
     iree::hal::drivers
@@ -30,7 +30,7 @@ iree_cc_library(
   NAME
     mock_allocator
   HDRS
-    "mock_allocator.h"
+    mock_allocator.h
   DEPS
     iree::hal
     iree::testing::gtest
@@ -42,7 +42,7 @@ iree_cc_library(
   NAME
     mock_command_buffer
   HDRS
-    "mock_command_buffer.h"
+    mock_command_buffer.h
   DEPS
     iree::hal
     iree::testing::gtest
@@ -54,7 +54,7 @@ iree_cc_library(
   NAME
     mock_command_queue
   HDRS
-    "mock_command_queue.h"
+    mock_command_queue.h
   DEPS
     iree::hal
     iree::testing::gtest

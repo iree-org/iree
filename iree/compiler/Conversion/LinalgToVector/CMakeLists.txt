@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     LinalgToVector
   HDRS
-    "Passes.h"
+    Passes.h
   SRCS
-    "LoadStoreVectorization.cpp"
-    "VectorizeConv.cpp"
+    LoadStoreVectorization.cpp
+    VectorizeConv.cpp
   DEPS
     LLVMSupport
     MLIRIR

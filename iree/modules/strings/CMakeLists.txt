@@ -18,12 +18,12 @@ iree_cc_library(
   NAME
     strings_module
   HDRS
-    "api.h"
-    "api_detail.h"
-    "strings_module.h"
+    api.h
+    api_detail.h
+    strings_module.h
   SRCS
-    "api.cc"
-    "strings_module.cc"
+    api.cc
+    strings_module.cc
   DEPS
     absl::inlined_vector
     absl::span
@@ -46,7 +46,7 @@ iree_cc_test(
   NAME
     strings_module_test
   SRCS
-    "strings_module_test.cc"
+    strings_module_test.cc
   DEPS
     ::strings_module
     ::strings_module_test_module_cc
@@ -69,11 +69,11 @@ iree_bytecode_module(
   NAME
     strings_module_test_module
   SRC
-    "strings_module_test.mlir"
+    strings_module_test.mlir
   CC_NAMESPACE
-    "iree::strings_module_test"
+    iree::strings_module_test
   FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
+    -iree-mlir-to-vm-bytecode-module
   TESTONLY
   PUBLIC
 )

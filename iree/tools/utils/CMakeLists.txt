@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     vm_util
   HDRS
-    "vm_util.h"
+    vm_util.h
   SRCS
-    "vm_util.cc"
+    vm_util.cc
   DEPS
     absl::span
     absl::strings
@@ -39,7 +39,7 @@ iree_cc_test(
   NAME
     vm_util_test
   SRCS
-    "vm_util_test.cc"
+    vm_util_test.cc
   DEPS
     ::vm_util
     absl::strings

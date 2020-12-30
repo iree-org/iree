@@ -22,9 +22,9 @@ iree_cc_library(
   NAME
     LLVM
   HDRS
-    "LLVMAOTTarget.h"
+    LLVMAOTTarget.h
   SRCS
-    "LLVMAOTTarget.cpp"
+    LLVMAOTTarget.cpp
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
@@ -55,9 +55,9 @@ iree_cc_library(
   NAME
     LLVMIRPasses
   HDRS
-    "LLVMIRPasses.h"
+    LLVMIRPasses.h
   SRCS
-    "LLVMIRPasses.cpp"
+    LLVMIRPasses.cpp
   DEPS
     ::LLVMTargetOptions
     LLVMAnalysis
@@ -73,9 +73,9 @@ iree_cc_library(
   NAME
     LLVMTargetOptions
   HDRS
-    "LLVMTargetOptions.h"
+    LLVMTargetOptions.h
   SRCS
-    "LLVMTargetOptions.cpp"
+    LLVMTargetOptions.cpp
   DEPS
     LLVMMC
     LLVMPasses
@@ -88,9 +88,9 @@ iree_cc_library(
   NAME
     LinkerTool
   HDRS
-    "LinkerTool.h"
+    LinkerTool.h
   SRCS
-    "LinkerTool.cpp"
+    LinkerTool.cpp
   DEPS
     iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
   PUBLIC
@@ -100,7 +100,7 @@ iree_cc_library(
   NAME
     LinkerTool_hdrs
   HDRS
-    "LinkerTool.h"
+    LinkerTool.h
   DEPS
     ::LLVMTargetOptions
     LLVMCore

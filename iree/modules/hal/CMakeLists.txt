@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     hal
   HDRS
-    "hal_module.h"
+    hal_module.h
   SRCS
-    "hal_module.cc"
+    hal_module.cc
   DEPS
     absl::core_headers
     absl::inlined_vector

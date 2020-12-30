@@ -18,24 +18,24 @@ iree_check_single_backend_test_suite(
   NAME
     check_llvm-aot-conv_img2col
   SRCS
-    "conv.mlir"
+    conv.mlir
   TARGET_BACKEND
     dylib-llvm-aot
   DRIVER
     dylib
   COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
+    -iree-codegen-linalg-to-llvm-conv-img2col-conversion=true
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-aot-exponential_fast
   SRCS
-    "exponential.mlir"
+    exponential.mlir
   TARGET_BACKEND
     dylib-llvm-aot
   DRIVER
     dylib
   COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
+    -iree-codegen-linalg-to-llvm-fast-exp=true
 )

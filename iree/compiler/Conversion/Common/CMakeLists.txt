@@ -18,16 +18,16 @@ iree_cc_library(
   NAME
     Common
   HDRS
-    "Attributes.h"
-    "LaunchConfig.h"
-    "Passes.h"
-    "Transforms.h"
+    Attributes.h
+    LaunchConfig.h
+    Passes.h
+    Transforms.h
   SRCS
-    "DeclareNumWorkgroupsFnPass.cpp"
-    "LaunchConfig.cpp"
-    "LegalizeNumWorkgroupsFnPass.cpp"
-    "Transforms.cpp"
-    "VectorTransferOptimization.cpp"
+    DeclareNumWorkgroupsFnPass.cpp
+    LaunchConfig.cpp
+    LegalizeNumWorkgroupsFnPass.cpp
+    Transforms.cpp
+    VectorTransferOptimization.cpp
   DEPS
     LLVMSupport
     MLIRGPU

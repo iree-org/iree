@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     HLOToLinalgOnTensors
   HDRS
-    "HLOToLinalgOnTensorPasses.h"
+    HLOToLinalgOnTensorPasses.h
   SRCS
-    "FusionOfTensorOps.cpp"
-    "HLOToLinalgOnTensors.cpp"
+    FusionOfTensorOps.cpp
+    HLOToLinalgOnTensors.cpp
   DEPS
     MLIRAffine
     MLIRIR
@@ -43,11 +43,11 @@ iree_cc_library(
   NAME
     HLOToLinalg
   HDRS
-    "Passes.h"
+    Passes.h
   SRCS
-    "HLOToLinalgOnBuffers.cpp"
-    "Passes.cpp"
-    "ResolveShapeOps.cpp"
+    HLOToLinalgOnBuffers.cpp
+    Passes.cpp
+    ResolveShapeOps.cpp
   DEPS
     ::HLOToLinalgOnTensors
     LLVMSupport

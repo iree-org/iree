@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     VMLAShapeBuilder
   HDRS
-    "VMLAShapeBuilder.h"
+    VMLAShapeBuilder.h
   SRCS
-    "VMLAShapeBuilder.cpp"
+    VMLAShapeBuilder.cpp
   DEPS
     LLVMSupport
     MLIRIR

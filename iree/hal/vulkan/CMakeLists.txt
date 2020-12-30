@@ -22,9 +22,9 @@ iree_cc_library(
   NAME
     api
   HDRS
-    "api.h"
+    api.h
   SRCS
-    "api.cc"
+    api.cc
   DEPS
     ::utils
     ::vulkan
@@ -38,22 +38,22 @@ iree_cc_library(
   NAME
     utils
   HDRS
-    "debug_reporter.h"
-    "dynamic_symbol_tables.h"
-    "dynamic_symbols.h"
-    "extensibility_util.h"
-    "handle_util.h"
-    "renderdoc_capture_manager.h"
-    "status_util.h"
-    "timepoint_util.h"
-    "vulkan_headers.h"
+    debug_reporter.h
+    dynamic_symbol_tables.h
+    dynamic_symbols.h
+    extensibility_util.h
+    handle_util.h
+    renderdoc_capture_manager.h
+    status_util.h
+    timepoint_util.h
+    vulkan_headers.h
   SRCS
-    "debug_reporter.cc"
-    "dynamic_symbols.cc"
-    "extensibility_util.cc"
-    "renderdoc_capture_manager.cc"
-    "status_util.cc"
-    "timepoint_util.cc"
+    debug_reporter.cc
+    dynamic_symbols.cc
+    extensibility_util.cc
+    renderdoc_capture_manager.cc
+    status_util.cc
+    timepoint_util.cc
   DEPS
     Vulkan::Headers
     absl::core_headers
@@ -78,26 +78,26 @@ iree_cc_test(
   NAME
     dynamic_symbols_test
   SRCS
-    "dynamic_symbols_test.cc"
+    dynamic_symbols_test.cc
   DEPS
     ::utils
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
-    "driver=vulkan"
+    driver=vulkan
 )
 
 iree_cc_library(
   NAME
     vma_allocator
   HDRS
-    "vma_allocator.h"
-    "vma_buffer.h"
+    vma_allocator.h
+    vma_buffer.h
   SRCS
-    "internal_vk_mem_alloc.cc"
-    "internal_vk_mem_alloc.h"
-    "vma_allocator.cc"
-    "vma_buffer.cc"
+    internal_vk_mem_alloc.cc
+    internal_vk_mem_alloc.h
+    vma_allocator.cc
+    vma_buffer.cc
   DEPS
     ::utils
     absl::flat_hash_map
@@ -116,35 +116,35 @@ iree_cc_library(
   NAME
     vulkan
   HDRS
-    "descriptor_pool_cache.h"
-    "descriptor_set_arena.h"
-    "direct_command_buffer.h"
-    "direct_command_queue.h"
-    "emulated_timeline_semaphore.h"
-    "native_descriptor_set.h"
-    "native_event.h"
-    "native_timeline_semaphore.h"
-    "pipeline_cache.h"
-    "pipeline_executable.h"
-    "pipeline_executable_layout.h"
-    "serializing_command_queue.h"
-    "vulkan_device.h"
-    "vulkan_driver.h"
+    descriptor_pool_cache.h
+    descriptor_set_arena.h
+    direct_command_buffer.h
+    direct_command_queue.h
+    emulated_timeline_semaphore.h
+    native_descriptor_set.h
+    native_event.h
+    native_timeline_semaphore.h
+    pipeline_cache.h
+    pipeline_executable.h
+    pipeline_executable_layout.h
+    serializing_command_queue.h
+    vulkan_device.h
+    vulkan_driver.h
   SRCS
-    "descriptor_pool_cache.cc"
-    "descriptor_set_arena.cc"
-    "direct_command_buffer.cc"
-    "direct_command_queue.cc"
-    "emulated_timeline_semaphore.cc"
-    "native_descriptor_set.cc"
-    "native_event.cc"
-    "native_timeline_semaphore.cc"
-    "pipeline_cache.cc"
-    "pipeline_executable.cc"
-    "pipeline_executable_layout.cc"
-    "serializing_command_queue.cc"
-    "vulkan_device.cc"
-    "vulkan_driver.cc"
+    descriptor_pool_cache.cc
+    descriptor_set_arena.cc
+    direct_command_buffer.cc
+    direct_command_queue.cc
+    emulated_timeline_semaphore.cc
+    native_descriptor_set.cc
+    native_event.cc
+    native_timeline_semaphore.cc
+    pipeline_cache.cc
+    pipeline_executable.cc
+    pipeline_executable_layout.cc
+    serializing_command_queue.cc
+    vulkan_device.cc
+    vulkan_driver.cc
   DEPS
     ::utils
     ::vma_allocator

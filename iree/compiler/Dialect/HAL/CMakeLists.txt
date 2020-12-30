@@ -18,13 +18,13 @@ iree_cc_embed_data(
   NAME
     hal_imports
   SRCS
-    "hal.imports.mlir"
+    hal.imports.mlir
   CC_FILE_OUTPUT
-    "hal.imports.cc"
+    hal.imports.cc
   H_FILE_OUTPUT
-    "hal.imports.h"
+    hal.imports.h
   CPP_NAMESPACE
-    "mlir::iree_compiler"
+    mlir::iree_compiler
   FLATTEN
   PUBLIC
 )

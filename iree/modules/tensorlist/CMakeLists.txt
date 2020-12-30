@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     native_module
   HDRS
-    "native_module.h"
+    native_module.h
   SRCS
-    "native_module.cc"
+    native_module.cc
   DEPS
     absl::inlined_vector
     absl::span
@@ -42,11 +42,11 @@ iree_bytecode_module(
   NAME
     tensorlist_test_module
   SRC
-    "tensorlist_test.mlir"
+    tensorlist_test.mlir
   CC_NAMESPACE
-    "iree::modules::tensorlist"
+    iree::modules::tensorlist
   FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
+    -iree-mlir-to-vm-bytecode-module
   TESTONLY
   PUBLIC
 )
@@ -55,7 +55,7 @@ iree_cc_test(
   NAME
     tensorlist_test
   SRCS
-    "tensorlist_test.cc"
+    tensorlist_test.cc
   DEPS
     ::native_module
     ::tensorlist_test_module_cc

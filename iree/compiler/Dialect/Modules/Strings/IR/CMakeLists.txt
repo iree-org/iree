@@ -19,12 +19,12 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "Ops.h"
-    "Ops.h.inc"
-    "Types.h"
+    Ops.h
+    Ops.h.inc
+    Types.h
   SRCS
-    "Ops.cc"
-    "Ops.cc.inc"
+    Ops.cc
+    Ops.cc.inc
   DEPS
     LLVMSupport
     MLIRIR
@@ -43,9 +43,9 @@ iree_cc_library(
   NAME
     Dialect
   HDRS
-    "Dialect.h"
+    Dialect.h
   SRCS
-    "Dialect.cc"
+    Dialect.cc
   DEPS
     ::IR
     LLVMSupport
@@ -66,7 +66,7 @@ iree_tablegen_library(
   NAME
     Ops_gen
   TD_FILE
-    "Ops.td"
+    Ops.td
   OUTS
     -gen-op-decls Ops.h.inc
     -gen-op-defs Ops.cc.inc
@@ -76,7 +76,7 @@ iree_tablegen_doc(
   NAME
     DialectDocGen
   TD_FILE
-    "Ops.td"
+    Ops.td
   OUTS
     -gen-dialect-doc StringsDialect.md
 )

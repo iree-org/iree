@@ -18,14 +18,14 @@ iree_cc_library(
   NAME
     Analysis
   HDRS
-    "RegisterAllocation.h"
-    "TestPasses.h"
-    "ValueLiveness.h"
+    RegisterAllocation.h
+    TestPasses.h
+    ValueLiveness.h
   SRCS
-    "RegisterAllocation.cpp"
-    "RegisterAllocationTest.cpp"
-    "ValueLiveness.cpp"
-    "ValueLivenessTest.cpp"
+    RegisterAllocation.cpp
+    RegisterAllocationTest.cpp
+    ValueLiveness.cpp
+    ValueLivenessTest.cpp
   DEPS
     LLVMSupport
     MLIRAnalysis

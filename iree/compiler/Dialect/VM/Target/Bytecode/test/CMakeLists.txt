@@ -19,7 +19,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    ${_GLOB_X_MLIR}
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-translate

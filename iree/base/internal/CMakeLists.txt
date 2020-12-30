@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     file_handle_win32
   HDRS
-    "file_handle_win32.h"
+    file_handle_win32.h
   SRCS
-    "file_handle_win32.cc"
+    file_handle_win32.cc
   DEPS
     absl::memory
     absl::strings
@@ -33,8 +33,8 @@ iree_cc_library(
   NAME
     file_io_internal
   SRCS
-    "file_io_posix.cc"
-    "file_io_win32.cc"
+    file_io_posix.cc
+    file_io_win32.cc
   DEPS
     ::file_handle_win32
     absl::memory
@@ -51,8 +51,8 @@ iree_cc_library(
   NAME
     file_mapping_internal
   SRCS
-    "file_mapping_posix.cc"
-    "file_mapping_win32.cc"
+    file_mapping_posix.cc
+    file_mapping_win32.cc
   DEPS
     ::file_handle_win32
     absl::memory
@@ -67,9 +67,9 @@ iree_cc_library(
   NAME
     ostringstream
   HDRS
-    "ostringstream.h"
+    ostringstream.h
   SRCS
-    "ostringstream.cc"
+    ostringstream.cc
   PUBLIC
 )
 
@@ -77,13 +77,13 @@ iree_cc_library(
   NAME
     status_internal
   HDRS
-    "status.h"
-    "status_builder.h"
-    "statusor.h"
+    status.h
+    status_builder.h
+    statusor.h
   SRCS
-    "status.cc"
-    "status_builder.cc"
-    "statusor.cc"
+    status.cc
+    status_builder.cc
+    statusor.cc
   DEPS
     ::ostringstream
     absl::core_headers

@@ -22,11 +22,11 @@ iree_cc_library(
   NAME
     op_kernels
   HDRS
-    "op_kernels.h"
+    op_kernels.h
   TEXTUAL_HDRS
-    "op_kernels_fft.h"
-    "op_kernels_generic.h"
-    "op_kernels_ruy.h"
+    op_kernels_fft.h
+    op_kernels_generic.h
+    op_kernels_ruy.h
   DEPS
     absl::algorithm
     absl::core_headers
@@ -45,7 +45,7 @@ iree_cc_test(
   NAME
     op_kernels_test
   SRCS
-    "op_kernels_test.cc"
+    op_kernels_test.cc
   DEPS
     ::op_kernels
     absl::inlined_vector
@@ -58,9 +58,9 @@ iree_cc_library(
   NAME
     op_module
   HDRS
-    "op_module.h"
+    op_module.h
   SRCS
-    "op_module.cc"
+    op_module.cc
   DEPS
     ::op_kernels
     absl::span
@@ -78,15 +78,15 @@ iree_cc_library(
   NAME
     vmla
   HDRS
-    "vmla_cache.h"
-    "vmla_device.h"
-    "vmla_driver.h"
-    "vmla_executable.h"
+    vmla_cache.h
+    vmla_device.h
+    vmla_driver.h
+    vmla_executable.h
   SRCS
-    "vmla_cache.cc"
-    "vmla_device.cc"
-    "vmla_driver.cc"
-    "vmla_executable.cc"
+    vmla_cache.cc
+    vmla_device.cc
+    vmla_driver.cc
+    vmla_executable.cc
   DEPS
     ::op_module
     absl::inlined_vector

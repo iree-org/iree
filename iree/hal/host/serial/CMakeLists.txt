@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     async_command_queue
   HDRS
-    "async_command_queue.h"
+    async_command_queue.h
   SRCS
-    "async_command_queue.cc"
+    async_command_queue.cc
   DEPS
     absl::core_headers
     absl::synchronization
@@ -35,7 +35,7 @@ iree_cc_test(
   NAME
     async_command_queue_test
   SRCS
-    "async_command_queue_test.cc"
+    async_command_queue_test.cc
   DEPS
     ::async_command_queue
     absl::memory
@@ -53,9 +53,9 @@ iree_cc_library(
   NAME
     serial_command_processor
   HDRS
-    "serial_command_processor.h"
+    serial_command_processor.h
   SRCS
-    "serial_command_processor.cc"
+    serial_command_processor.cc
   DEPS
     absl::inlined_vector
     iree::base::status
@@ -71,9 +71,9 @@ iree_cc_library(
   NAME
     serial_scheduling_model
   HDRS
-    "serial_scheduling_model.h"
+    serial_scheduling_model.h
   SRCS
-    "serial_scheduling_model.cc"
+    serial_scheduling_model.cc
   DEPS
     ::async_command_queue
     ::serial_command_processor
@@ -93,9 +93,9 @@ iree_cc_library(
   NAME
     serial_submission_queue
   HDRS
-    "serial_submission_queue.h"
+    serial_submission_queue.h
   SRCS
-    "serial_submission_queue.cc"
+    serial_submission_queue.cc
   DEPS
     absl::core_headers
     absl::inlined_vector

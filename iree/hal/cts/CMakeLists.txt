@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     cts_test_base
   HDRS
-    "cts_test_base.h"
+    cts_test_base.h
   DATA
     iree::tools::sanitizer_suppressions.txt
   DEPS
@@ -35,7 +35,7 @@ iree_cc_test(
   NAME
     allocator_test
   SRCS
-    "allocator_test.cc"
+    allocator_test.cc
   DEPS
     ::cts_test_base
     iree::base::status
@@ -48,7 +48,7 @@ iree_cc_test(
   NAME
     buffer_test
   SRCS
-    "buffer_test.cc"
+    buffer_test.cc
   DEPS
     ::cts_test_base
     iree::base::status
@@ -61,7 +61,7 @@ iree_cc_test(
   NAME
     command_buffer_test
   SRCS
-    "command_buffer_test.cc"
+    command_buffer_test.cc
   DEPS
     ::cts_test_base
     iree::base::status
@@ -74,7 +74,7 @@ iree_cc_test(
   NAME
     command_queue_test
   SRCS
-    "command_queue_test.cc"
+    command_queue_test.cc
   DEPS
     ::cts_test_base
     iree::base::status
@@ -87,7 +87,7 @@ iree_cc_test(
   NAME
     driver_test
   SRCS
-    "driver_test.cc"
+    driver_test.cc
   DEPS
     ::cts_test_base
     iree::hal::testing::driver_registry
@@ -99,7 +99,7 @@ iree_cc_test(
   NAME
     semaphore_test
   SRCS
-    "semaphore_test.cc"
+    semaphore_test.cc
   DEPS
     ::cts_test_base
     iree::hal::testing::driver_registry

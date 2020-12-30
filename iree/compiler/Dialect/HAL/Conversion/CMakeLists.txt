@@ -18,12 +18,12 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
-    "ConversionDialectInterface.h"
-    "ConversionTarget.h"
-    "TypeConverter.h"
+    ConversionDialectInterface.h
+    ConversionTarget.h
+    TypeConverter.h
   SRCS
-    "ConversionTarget.cpp"
-    "TypeConverter.cpp"
+    ConversionTarget.cpp
+    TypeConverter.cpp
   DEPS
     MLIRIR
     MLIRStandard
@@ -39,7 +39,7 @@ iree_cc_library(
   NAME
     Passes
   HDRS
-    "Passes.h"
+    Passes.h
   DEPS
     MLIRPass
     iree::compiler::Dialect::HAL::Conversion::HALToVM

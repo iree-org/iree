@@ -18,19 +18,19 @@ iree_cc_library(
   NAME
     LinalgToLLVM
   HDRS
-    "KernelDispatch.h"
-    "Passes.h"
+    KernelDispatch.h
+    Passes.h
   SRCS
-    "ConvImg2ColMatmulConversion.cpp"
-    "ConvertToLLVM.cpp"
-    "KernelDispatch.cpp"
-    "LinalgBufferizePass.cpp"
-    "LinalgRewriteDestructiveUpdatesPass.cpp"
-    "LinalgTileAndDistributeOnTensorsPass.cpp"
-    "LinalgTileAndDistributePass.cpp"
-    "LinalgTileAndVectorizePass.cpp"
-    "Passes.cpp"
-    "PlanConvLoopOrder.cpp"
+    ConvImg2ColMatmulConversion.cpp
+    ConvertToLLVM.cpp
+    KernelDispatch.cpp
+    LinalgBufferizePass.cpp
+    LinalgRewriteDestructiveUpdatesPass.cpp
+    LinalgTileAndDistributeOnTensorsPass.cpp
+    LinalgTileAndDistributePass.cpp
+    LinalgTileAndVectorizePass.cpp
+    Passes.cpp
+    PlanConvLoopOrder.cpp
   DEPS
     LLVMSupport
     MLIRAffineToStandard

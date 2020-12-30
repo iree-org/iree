@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    "Passes.h"
+    Passes.h
   SRCS
-    "DropCompilerHints.cpp"
+    DropCompilerHints.cpp
   DEPS
     MLIRIR
     MLIRPass

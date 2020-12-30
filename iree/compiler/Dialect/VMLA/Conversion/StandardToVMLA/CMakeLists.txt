@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     StandardToVMLA
   HDRS
-    "ConvertStandardToVMLA.h"
+    ConvertStandardToVMLA.h
   SRCS
-    "ConvertStandardToVMLA.cpp"
+    ConvertStandardToVMLA.cpp
   DEPS
     MLIRIR
     MLIRPass

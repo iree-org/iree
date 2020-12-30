@@ -18,11 +18,11 @@ iree_cc_library(
   NAME
     Target
   HDRS
-    "TargetBackend.h"
-    "TargetRegistry.h"
+    TargetBackend.h
+    TargetRegistry.h
   SRCS
-    "TargetBackend.cpp"
-    "TargetRegistry.cpp"
+    TargetBackend.cpp
+    TargetRegistry.cpp
   DEPS
     LLVMSupport
     MLIRIR

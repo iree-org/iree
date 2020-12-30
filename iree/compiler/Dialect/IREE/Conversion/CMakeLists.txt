@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     PreserveCompilerHints
   HDRS
-    "PreserveCompilerHints.h"
+    PreserveCompilerHints.h
   SRCS
-    "PreserveCompilerHints.cpp"
+    PreserveCompilerHints.cpp
   DEPS
     MLIRIR
     MLIRTransforms

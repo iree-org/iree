@@ -19,7 +19,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmla_vmla
   SRCS
-    "${_GLOB_X_MLIR}"
+    ${_GLOB_X_MLIR}
   TARGET_BACKEND
     vmla
   DRIVER
@@ -30,9 +30,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
-    "gather_add.mlir"
-    "matmul_add.mlir"
-    "slice_add.mlir"
+    gather_add.mlir
+    matmul_add.mlir
+    slice_add.mlir
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
@@ -43,9 +43,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_dylib-llvm-aot_dylib
   SRCS
-    "gather_add.mlir"
-    "matmul_add.mlir"
-    "slice_add.mlir"
+    gather_add.mlir
+    matmul_add.mlir
+    slice_add.mlir
   TARGET_BACKEND
     dylib-llvm-aot
   DRIVER

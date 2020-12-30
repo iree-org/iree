@@ -20,9 +20,9 @@ iree_cc_library(
   NAME
     registration
   HDRS
-    "driver_module.h"
+    driver_module.h
   SRCS
-    "driver_module.cc"
+    driver_module.cc
   DEPS
     absl::flags
     iree::base::flags
@@ -32,7 +32,7 @@ iree_cc_library(
     iree::hal::vulkan
     iree::hal::vulkan::utils
   DEFINES
-    "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"
+    IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1
   PUBLIC
 )
 

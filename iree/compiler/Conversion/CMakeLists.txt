@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     init_conversions
   HDRS
-    "init_conversions.h"
+    init_conversions.h
   DEPS
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM

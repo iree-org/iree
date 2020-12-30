@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     HALToVMLA
   HDRS
-    "ConvertHALToVMLA.h"
+    ConvertHALToVMLA.h
   SRCS
-    "ConvertHALToVMLA.cpp"
+    ConvertHALToVMLA.cpp
   DEPS
     MLIRIR
     MLIRPass

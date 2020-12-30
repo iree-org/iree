@@ -22,13 +22,13 @@ iree_bytecode_module(
   NAME
     custom_modules_test_module
   SRC
-    "custom_modules_test.mlir"
+    custom_modules_test.mlir
   CC_NAMESPACE
-    "iree::samples::custom_modules"
+    iree::samples::custom_modules
   TRANSLATE_TOOL
     iree_samples_custom_modules_dialect_custom-translate
   FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
+    -iree-mlir-to-vm-bytecode-module
   PUBLIC
 )
 
@@ -36,7 +36,7 @@ iree_cc_test(
   NAME
     custom_modules_test
   SRCS
-    "custom_modules_test.cc"
+    custom_modules_test.cc
   DEPS
     ::custom_modules_test_module_cc
     ::native_module
@@ -58,9 +58,9 @@ iree_cc_library(
   NAME
     native_module
   HDRS
-    "native_module.h"
+    native_module.h
   SRCS
-    "native_module.cc"
+    native_module.cc
   DEPS
     iree::base::api
     iree::hal::api
