@@ -38,20 +38,20 @@ import sys
 import submodule_versions
 import utils
 
-REMOTE_HEAD_COMMIT = "REMOTE"
-KEEP_COMMIT = "KEEP"
-INTEGRATE_COMMIT = "INTEGRATE"
-LATEST_MATCHING_COMMIT = "LATEST_MATCH"
+REMOTE_HEAD_COMMIT_OPTION = "REMOTE"
+KEEP_COMMIT_OPTION = "KEEP"
+INTEGRATE_COMMIT_OPTION = "INTEGRATE"
+LATEST_MATCHING_COMMIT_OPTION = "LATEST_MATCH"
 
 COMMIT_OPTIONS = {
-    REMOTE_HEAD_COMMIT:
+    REMOTE_HEAD_COMMIT_OPTION:
         "Update to the HEAD commit on the remote repository default branch",
-    KEEP_COMMIT:
+    KEEP_COMMIT_OPTION:
         "Do not modify the current commit",
-    INTEGRATE_COMMIT:
+    INTEGRATE_COMMIT_OPTION:
         "Update to the commit where the current version of LLVM was first "
         "integrated",
-    LATEST_MATCHING_COMMIT:
+    LATEST_MATCHING_COMMIT_OPTION:
         "Update to the most recent commit with a matching version of LLVM",
 }
 
@@ -68,22 +68,24 @@ def parse_arguments():
                       "(defaults to third_party/llvm-bazel)",
                       default=None)
   parser.add_argument(
+      "--llvm_bazel_rev",
       "--llvm_bazel_commit",
-      help=("Update llvm-bazel to this commit, or a named option:"
+      help=("Update llvm-bazel to this git rev, or a named option:"
             f" {COMMIT_OPTIONS}."
-            f" {LATEST_MATCHING_COMMIT} and {INTEGRATE_COMMIT} are equivalent"
-            " for this repository."),
-      default=LATEST_MATCHING_COMMIT)
+            f" {LATEST_MATCHING_COMMIT_OPTION} and {INTEGRATE_COMMIT_OPTION}"
+            " are equivalentfor this repository."),
+      default=LATEST_MATCHING_COMMIT_OPTION)
   parser.add_argument("--tensorflow_path",
                       help="Path to the tensorflow sources "
                       "(default to third_party/tensorflow)",
                       default=None)
-  parser.add_argument(
-      "--tensorflow_commit",
-      "--tf_commit",
-      help=("Update TensorFlow to this commit, or a named option:"
-            f" {COMMIT_OPTIONS}"),
-      default=LATEST_MATCHING_COMMIT)
+  parser.add_argument("--tensorflow_rev",
+                      "--tf_rev",
+                      "--tensorflow_commit",
+                      "--tf_commit",
+                      help=("Update TensorFlow to this rev, or a named option:"
+                            f" {COMMIT_OPTIONS}"),
+                      default=LATEST_MATCHING_COMMIT_OPTION)
   parser.add_argument(
       "--validate",
       help="Validate that the selected commits all match the LLVM commit",
@@ -116,15 +118,17 @@ def main(args):
   print(f"  LLVM Bazel Path: {args.llvm_bazel_path}")
   print(f"  TensorFlow Path: {args.tensorflow_path}")
 
-  current_llvm_commit = get_commit(args.llvm_path)
+  current_llvm_commit = parse_rev(args.llvm_path, "HEAD")
+  current_llvm_bazel_commit = parse_rev(args.llvm_bazel_path, "HEAD")
+  current_tf_commit = parse_rev(args.tensorflow_path, "HEAD")
   print("Current Commits:")
   print(f"  llvm = {current_llvm_commit}")
-  print(f"  llvm_bazel = {get_commit(args.llvm_bazel_path)}")
-  print(f"  tensorflow = {get_commit(args.tensorflow_path)}")
+  print(f"  llvm_bazel = {current_llvm_bazel_commit}")
+  print(f"  tensorflow = {current_tf_commit}")
 
   # Update TensorFlow
   new_tf_commit = find_new_tf_commit(args.tensorflow_path, current_llvm_commit,
-                                     args.tensorflow_commit)
+                                     args.tensorflow_rev)
   print("\n*** Updating TensorFlow to", new_tf_commit, "***")
   utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow_path)
   stage_path(args.repo, args.tensorflow_path)
@@ -136,7 +140,7 @@ def main(args):
   # Update LLVM-Bazel
   new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel_path,
                                                      current_llvm_commit,
-                                                     args.llvm_bazel_commit)
+                                                     args.llvm_bazel_rev)
   print(f"\n*** Updating LLVM Bazel to {new_llvm_bazel_commit} ***")
   utils.execute(["git", "checkout", new_llvm_bazel_commit],
                 cwd=args.llvm_bazel_path)
@@ -151,30 +155,30 @@ def main(args):
   submodule_versions.export_versions(args.repo)
 
 
-def get_commit(path, rev="HEAD"):
+def parse_rev(path, rev):
   return utils.execute(["git", "rev-parse", rev],
                        cwd=path,
                        silent=True,
                        capture_output=True).stdout.strip()
 
 
-def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_commit):
+def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_rev):
   # Explicitly force-fetch tags. Tags in llvm-bazel are not guaranteed to be
   # stable.
   utils.execute(["git", "fetch", "--tags", "--force"], cwd=llvm_bazel_path)
 
-  if llvm_bazel_commit not in COMMIT_OPTIONS:
-    return get_commit(llvm_bazel_path, rev=llvm_bazel_commit)
+  if llvm_bazel_rev not in COMMIT_OPTIONS:
+    return parse_rev(llvm_bazel_path, llvm_bazel_rev)
 
-  if llvm_bazel_commit == KEEP_COMMIT:
-    return get_commit(llvm_bazel_path)
+  if llvm_bazel_rev == KEEP_COMMIT_OPTION:
+    return parse_rev(llvm_bazel_path, "HEAD")
 
-  if llvm_bazel_commit == REMOTE_HEAD_COMMIT:
-    return get_commit(llvm_bazel_path, "origin/main")
+  if llvm_bazel_rev == REMOTE_HEAD_COMMIT_OPTION:
+    return parse_rev(llvm_bazel_path, "origin/main")
 
-  if (llvm_bazel_commit == INTEGRATE_COMMIT or
-      llvm_bazel_commit == LATEST_MATCHING_COMMIT):
-    return get_commit(llvm_bazel_path, f"llvm-project-{llvm_commit}")
+  if (llvm_bazel_rev == INTEGRATE_COMMIT_OPTION or
+      llvm_bazel_rev == LATEST_MATCHING_COMMIT_OPTION):
+    return parse_rev(llvm_bazel_path, f"llvm-project-{llvm_commit}")
 
 
 def validate_llvm_bazel_commit(llvm_commit,
@@ -197,24 +201,24 @@ def find_llvm_bazel_llvm_commit(llvm_bazel_path):
       cwd=llvm_bazel_path).stdout.split()[0].lstrip("+-")
 
 
-def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
+def find_new_tf_commit(tensorflow_path, llvm_commit, tf_rev):
   utils.execute(["git", "fetch"], cwd=tensorflow_path)
 
-  if tf_commit not in COMMIT_OPTIONS:
-    return get_commit(tensorflow_path, rev=tf_commit)
+  if tf_rev not in COMMIT_OPTIONS:
+    return parse_rev(tensorflow_path, tf_rev)
 
-  if tf_commit == KEEP_COMMIT:
-    return get_commit(tensorflow_path)
+  if tf_rev == KEEP_COMMIT_OPTION:
+    return parse_rev(tensorflow_path, "HEAD")
 
-  if tf_commit == REMOTE_HEAD_COMMIT:
-    return get_commit(tensorflow_path, "origin/master")
+  if tf_rev == REMOTE_HEAD_COMMIT_OPTION:
+    return parse_rev(tensorflow_path, "origin/master")
 
   # Find commits where the number of occurrences of the given LLVM commit hash
   # changes. In normal cases, there should be at most two commits that match
   # this:
   # 1. The commit that first introduced the new hash in the TF workspace file.
   # 2. The commit that changed it to a new hash afterwards.
-  tf_integrate_commits = utils.execute(
+  tf_integrate_commit_options = utils.execute(
       [
           "git",
           "log",
@@ -236,26 +240,26 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
       ],
       capture_output=True,
       cwd=tensorflow_path).stdout.split()
-  if len(tf_integrate_commits) > 2:
+  if len(tf_integrate_commit_options) > 2:
     raise RuntimeError(
         f"Expected one or two TF commits to involve LLVM commit {llvm_commit},"
-        f" but got {len(tf_integrate_commits)}")
+        f" but got {len(tf_integrate_commit_options)}")
 
-  if not tf_integrate_commits:
+  if not tf_integrate_commit_options:
     raise RuntimeError(
         f"TF does not have any references to LLVM commit {llvm_commit}."
         " Maybe TF export is behind?")
 
-  if tf_commit == INTEGRATE_COMMIT:
-    return tf_integrate_commits[-1]
+  if tf_rev == INTEGRATE_COMMIT_OPTION:
+    return tf_integrate_commit_options[-1]
 
-  assert tf_commit == LATEST_MATCHING_COMMIT
-  if len(tf_integrate_commits) == 1:
+  assert tf_rev == LATEST_MATCHING_COMMIT_OPTION
+  if len(tf_integrate_commit_options) == 1:
     # There hasn't been a subsequent integrate, use remote head.
-    return get_commit(tensorflow_path, "origin/master")
+    return parse_rev(tensorflow_path, "origin/master")
 
   # Use the commit one before the one that changed away from this LLVM version.
-  return get_commit(tensorflow_path, rev=f"{tf_integrate_commits[0]}^")
+  return parse_rev(tensorflow_path, f"{tf_integrate_commit_options[0]}^")
 
 
 def validate_tf_commit(llvm_commit, tensorflow_path, exit_on_failure=True):
