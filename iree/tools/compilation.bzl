@@ -23,7 +23,9 @@ def iree_bytecode_module(
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
-        visibility = None):
+        visibility = None,
+        testonly = False,
+        **kwargs):
     native.genrule(
         name = name,
         srcs = [src],
@@ -41,6 +43,8 @@ def iree_bytecode_module(
         tools = [translate_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
+        testonly = testonly,
+        **kwargs
     )
 
     # Embed the module for use in C++. This avoids the need for file IO in
