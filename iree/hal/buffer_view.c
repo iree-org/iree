@@ -52,7 +52,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
       host_allocator,
       sizeof(*buffer_view) + sizeof(iree_hal_dim_t) * shape_rank,
       (void**)&buffer_view);
-  if (iree_status_is_ok(buffer_view)) {
+  if (iree_status_is_ok(status)) {
     iree_atomic_ref_count_init(&buffer_view->ref_count);
     buffer_view->buffer = buffer;
     iree_hal_buffer_retain(buffer_view->buffer);
@@ -112,11 +112,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
       buffer_view->buffer, start_offset, subview_length, &subview_buffer));
 
-  iree_status_t result =
+  iree_status_t status =
       iree_hal_buffer_view_create(subview_buffer, lengths, lengths_count,
                                   buffer_view->element_type, out_buffer_view);
   iree_hal_buffer_release(subview_buffer);
-  return result;
+  return status;
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(

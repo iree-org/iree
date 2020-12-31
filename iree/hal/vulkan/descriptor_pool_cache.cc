@@ -48,8 +48,8 @@ Status DescriptorSetGroup::Reset() {
   return OkStatus();
 }
 
-DescriptorPoolCache::DescriptorPoolCache(ref_ptr<VkDeviceHandle> logical_device)
-    : logical_device_(std::move(logical_device)) {}
+DescriptorPoolCache::DescriptorPoolCache(VkDeviceHandle* logical_device)
+    : logical_device_(logical_device) {}
 
 StatusOr<DescriptorPool> DescriptorPoolCache::AcquireDescriptorPool(
     VkDescriptorType descriptor_type, int max_descriptor_count) {
@@ -74,8 +74,9 @@ StatusOr<DescriptorPool> DescriptorPoolCache::AcquireDescriptorPool(
   descriptor_pool.handle = VK_NULL_HANDLE;
 
   VK_RETURN_IF_ERROR(syms().vkCreateDescriptorPool(
-      *logical_device_, &create_info, logical_device_->allocator(),
-      &descriptor_pool.handle));
+                         *logical_device_, &create_info,
+                         logical_device_->allocator(), &descriptor_pool.handle),
+                     "vkCreateDescriptorPool");
 
   return descriptor_pool;
 }
@@ -89,7 +90,8 @@ Status DescriptorPoolCache::ReleaseDescriptorPools(
     // this leads to better errors when using the validation layers as we'll
     // throw if there are in-flight command buffers using the sets in the pool.
     VK_RETURN_IF_ERROR(syms().vkResetDescriptorPool(*logical_device_,
-                                                    descriptor_pool.handle, 0));
+                                                    descriptor_pool.handle, 0),
+                       "vkResetDescriptorPool");
 
     // TODO(benvanik): release to cache.
     syms().vkDestroyDescriptorPool(*logical_device_, descriptor_pool.handle,

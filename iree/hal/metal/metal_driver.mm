@@ -69,11 +69,9 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create(const MetalDriverOptions& opt
   }
 }
 
-MetalDriver::MetalDriver(std::vector<DeviceInfo> devices,
-                         std::unique_ptr<DebugCaptureManager> debug_capture_manager)
+MetalDriver::MetalDriver(std::vector<DeviceInfo> devices)
     : Driver("metal"),
-      devices_(std::move(devices)),
-      debug_capture_manager_(std::move(debug_capture_manager)) {
+      devices_(std::move(devices)) {
   // Retain all the retained Metal GPU devices.
   for (const auto& device : devices_) {
     [(__bridge id<MTLDevice>)device.device_id() retain];
@@ -109,7 +107,7 @@ StatusOr<ref_ptr<Device>> MetalDriver::CreateDevice(iree_hal_device_id_t device_
 
   for (const DeviceInfo& info : devices_) {
     if (info.device_id() == device_id) {
-      return MetalDevice::Create(add_ref(this), info, debug_capture_manager_.get());
+      return MetalDevice::Create(add_ref(this), info);
     }
   }
   return InvalidArgumentErrorBuilder(IREE_LOC) << "unknown driver device id: " << device_id;

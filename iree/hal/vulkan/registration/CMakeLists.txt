@@ -25,12 +25,12 @@ iree_cc_library(
     "driver_module.cc"
   DEPS
     absl::flags
+    iree::base::core_headers
     iree::base::flags
     iree::base::status
     iree::base::tracing
     iree::hal::api
     iree::hal::vulkan
-    iree::hal::vulkan::utils
   DEFINES
     "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"
   PUBLIC

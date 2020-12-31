@@ -17,7 +17,9 @@
 
 #import <Metal/Metal.h>
 
-#include "iree/hal/cc/buffer.h"
+#include "iree/hal/api.h"
+
+id<MTLBuffer> iree_hal_metal_buffer_handle(iree_hal_buffer_t* base_buffer);
 
 namespace iree {
 namespace hal {
@@ -30,14 +32,6 @@ class MetalBuffer final : public Buffer {
  public:
   // Creates a MetalBuffer instance with retaining the given id<MTLBuffer>.
   static StatusOr<ref_ptr<MetalBuffer>> Create(
-      MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
-      iree_device_size_t allocation_size, iree_device_size_t byte_offset,
-      iree_device_size_t byte_length, id<MTLBuffer> buffer,
-      id<MTLCommandQueue> transfer_queue);
-
-  // Creates a MetalBuffer instance without retaining the given id<MTLBuffer>.
-  static StatusOr<ref_ptr<MetalBuffer>> CreateUnretained(
       MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage,
       iree_device_size_t allocation_size, iree_device_size_t byte_offset,

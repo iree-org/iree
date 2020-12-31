@@ -168,9 +168,8 @@ int iree::IreeMain(int argc, char** argv) {
   // Setup Vulkan
   iree_hal_vulkan_features_t iree_vulkan_features =
       static_cast<iree_hal_vulkan_features_t>(
-          IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
-          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+          IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS |
+          IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
   std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
@@ -281,8 +280,7 @@ int iree::IreeMain(int argc, char** argv) {
   iree_hal_vulkan_driver_options_t options;
   options.api_version = VK_API_VERSION_1_0;
   options.features = static_cast<iree_hal_vulkan_features_t>(
-      IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-      IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+      IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
   IREE_CHECK_OK(iree_hal_vulkan_driver_create_using_instance(
       options, iree_vk_syms, g_Instance, &iree_vk_driver));
   // Create a device sharing our VkDevice and queue. This makes capturing with

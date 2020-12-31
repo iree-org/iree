@@ -12,32 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
-#define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
+#ifndef IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_LAYOUT_H_
+#define IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_LAYOUT_H_
 
 #include "iree/hal/api.h"
-#include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a command buffer that directly records into a VkCommandBuffer.
-iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
+// Creates a native Vulkan VkDescriptorSetLayout object.
+iree_status_t iree_hal_vulkan_native_descriptor_set_layout_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    iree::hal::vulkan::VkCommandPoolHandle* command_pool,
-    iree_hal_command_buffer_mode_t mode,
-    iree_hal_command_category_t command_categories,
-    iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
-    iree_hal_command_buffer_t** out_command_buffer);
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
-// Returns the native Vulkan VkCommandBuffer handle.
-VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
-    iree_hal_command_buffer_t* command_buffer);
+// Returns the native Vulkan VkDescriptorSetLayout handle.
+VkDescriptorSetLayout iree_hal_vulkan_native_descriptor_set_layout_handle(
+    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
+#endif  // IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_LAYOUT_H_
