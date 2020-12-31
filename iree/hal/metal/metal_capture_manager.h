@@ -20,7 +20,6 @@
 #import <Metal/Metal.h>
 
 #include "iree/base/status.h"
-#include "iree/hal/cc/debug_capture_manager.h"
 
 namespace iree {
 namespace hal {

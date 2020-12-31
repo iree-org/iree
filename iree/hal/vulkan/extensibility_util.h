@@ -12,89 +12,89 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Utilities for working with layers and extensions.
-
 #ifndef IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 #define IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include <vector>
-
-#include "absl/types/span.h"
-#include "iree/base/status.h"
+#include "iree/base/arena.h"
+#include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+// A list of NUL-terminated strings (so they can be passed directly to Vulkan).
+typedef struct {
+  iree_host_size_t count;
+  const char** values;
+} iree_hal_vulkan_string_list_t;
 
-// Describes required and optional extensibility points.
-struct ExtensibilitySpec {
-  // A list of required and optional layers.
-  std::vector<const char*> required_layers;
-  std::vector<const char*> optional_layers;
+// Populates |out_enabled_layers| with all layers that are both available in the
+// implementation and |required_layers| and |optional_layers| lists.
+// |out_enabled_layers| must have capacity at least the sum of
+// |required_layers|.count and |optional_layer|.count.
+// Returns failure if any |required_layers| are unavailable.
+iree_status_t iree_hal_vulkan_match_available_instance_layers(
+    const iree::hal::vulkan::DynamicSymbols* syms,
+    const iree_hal_vulkan_string_list_t* required_layers,
+    const iree_hal_vulkan_string_list_t* optional_layers, iree::Arena* arena,
+    iree_hal_vulkan_string_list_t* out_enabled_layers);
 
-  // A list of required and optional extensions.
-  // Prefer using the _EXTENSION_NAME macros to make tracking easier (such as
-  // 'VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME').
-  std::vector<const char*> required_extensions;
-  std::vector<const char*> optional_extensions;
-};
+// Populates |out_enabled_extensions| with all extensions that are both
+// available in the implementation and |required_extensions| and
+// |optional_extensions| lists. |out_enabled_extensions| must have capacity at
+// least the sum of |required_extensions|.count and |optional_extensions|.count.
+// Returns failure if any |required_extensions| are unavailable.
+iree_status_t iree_hal_vulkan_match_available_instance_extensions(
+    const iree::hal::vulkan::DynamicSymbols* syms,
+    const iree_hal_vulkan_string_list_t* required_extensions,
+    const iree_hal_vulkan_string_list_t* optional_extensions,
+    iree::Arena* arena, iree_hal_vulkan_string_list_t* out_enabled_extensions);
 
-// Returns a list of layer names available for instances.
-// Fails if any required_layers are unavailable.
-StatusOr<std::vector<const char*>> MatchAvailableInstanceLayers(
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms);
-
-// Returns a list of extension names available for instances.
-// Fails if any required_extensions are unavailable.
-StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms);
-
-// Returns a list of extension names available for the given |physical_device|.
-// Fails if any required_extensions are unavailable.
-StatusOr<std::vector<const char*>> MatchAvailableDeviceExtensions(
+// Populates |out_enabled_extensions| with all extensions that are both
+// available in the implementation and |required_extensions| and
+// |optional_extensions| lists. |out_enabled_extensions| must have capacity at
+// least the sum of |required_extensions|.count and |optional_extensions|.count.
+// Returns failure if any |required_extensions| are unavailable.
+iree_status_t iree_hal_vulkan_match_available_device_extensions(
+    const iree::hal::vulkan::DynamicSymbols* syms,
     VkPhysicalDevice physical_device,
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms);
+    const iree_hal_vulkan_string_list_t* required_extensions,
+    const iree_hal_vulkan_string_list_t* optional_extensions,
+    iree::Arena* arena, iree_hal_vulkan_string_list_t* out_enabled_extensions);
 
 // Bits for enabled instance extensions.
 // We must use this to query support instead of just detecting symbol names as
 // ICDs will resolve the functions sometimes even if they don't support the
 // extension (or we didn't ask for it to be enabled).
-struct InstanceExtensions {
-  // VK_EXT_debug_report is enabled and a callback is regsitered.
-  // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/chap44.html#VK_EXT_debug_report
-  bool debug_report : 1;
-
+typedef struct {
   // VK_EXT_debug_utils is enabled and a debug messenger is registered.
   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/chap44.html#VK_EXT_debug_utils
   bool debug_utils : 1;
-};
+} iree_hal_vulkan_instance_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.
-InstanceExtensions PopulateEnabledInstanceExtensions(
-    absl::Span<const char* const> extension_names);
+iree_hal_vulkan_instance_extensions_t
+iree_hal_vulkan_populate_enabled_instance_extensions(
+    const iree_hal_vulkan_string_list_t* enabled_extension);
 
 // Bits for enabled device extensions.
 // We must use this to query support instead of just detecting symbol names as
 // ICDs will resolve the functions sometimes even if they don't support the
 // extension (or we didn't ask for it to be enabled).
-struct DeviceExtensions {
+typedef struct {
   // VK_KHR_push_descriptor is enabled and vkCmdPushDescriptorSetKHR is valid.
   bool push_descriptors : 1;
   // VK_KHR_timeline_semaphore is enabled.
   bool timeline_semaphore : 1;
-};
+} iree_hal_vulkan_device_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.
-DeviceExtensions PopulateEnabledDeviceExtensions(
-    absl::Span<const char* const> extension_names);
+iree_hal_vulkan_device_extensions_t
+iree_hal_vulkan_populate_enabled_device_extensions(
+    const iree_hal_vulkan_string_list_t* enabled_extension);
 
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+// Returns a bitfield with the extensions that are (likely) available on the
+// device symbols. This is less reliable than setting the bits directly when
+// the known set of extensions is available.
+iree_hal_vulkan_device_extensions_t
+iree_hal_vulkan_infer_enabled_device_extensions(
+    const iree::hal::vulkan::DynamicSymbols* device_syms);
 
 #endif  // IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
