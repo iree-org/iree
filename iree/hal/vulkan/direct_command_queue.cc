@@ -16,11 +16,9 @@
 
 #include <cstdint>
 
-#include "iree/base/memory.h"
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
-#include "iree/hal/vulkan/native_timeline_semaphore.h"
+#include "iree/hal/vulkan/native_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
 
 namespace iree {
@@ -28,20 +26,15 @@ namespace hal {
 namespace vulkan {
 
 DirectCommandQueue::DirectCommandQueue(
-    std::string name, iree_hal_command_category_t supported_categories,
-    const ref_ptr<VkDeviceHandle>& logical_device, VkQueue queue)
-    : CommandQueue(std::move(name), supported_categories),
-      logical_device_(add_ref(logical_device)),
-      queue_(queue) {}
+    VkDeviceHandle* logical_device, std::string name,
+    iree_hal_command_category_t supported_categories, VkQueue queue)
+    : CommandQueue(logical_device, std::move(name), supported_categories,
+                   queue) {}
 
-DirectCommandQueue::~DirectCommandQueue() {
-  IREE_TRACE_SCOPE0("DirectCommandQueue::dtor");
-  absl::MutexLock lock(&queue_mutex_);
-  syms()->vkQueueWaitIdle(queue_);
-}
+DirectCommandQueue::~DirectCommandQueue() = default;
 
-Status DirectCommandQueue::TranslateBatchInfo(
-    const SubmissionBatch& batch, VkSubmitInfo* submit_info,
+iree_status_t DirectCommandQueue::TranslateBatchInfo(
+    const iree_hal_submission_batch_t* batch, VkSubmitInfo* submit_info,
     VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
@@ -50,39 +43,33 @@ Status DirectCommandQueue::TranslateBatchInfo(
       VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
   auto wait_semaphore_handles =
-      arena->AllocateSpan<VkSemaphore>(batch.wait_semaphores.size());
+      arena->AllocateSpan<VkSemaphore>(batch->wait_semaphores.count);
   auto wait_semaphore_values =
-      arena->AllocateSpan<uint64_t>(batch.wait_semaphores.size());
+      arena->AllocateSpan<uint64_t>(batch->wait_semaphores.count);
   auto wait_dst_stage_masks =
-      arena->AllocateSpan<VkPipelineStageFlags>(batch.wait_semaphores.size());
-  for (int i = 0; i < batch.wait_semaphores.size(); ++i) {
-    const auto& wait_point = batch.wait_semaphores[i];
-    const auto* semaphore =
-        static_cast<NativeTimelineSemaphore*>(wait_point.semaphore);
-    wait_semaphore_handles[i] = semaphore->handle();
-    wait_semaphore_values[i] = wait_point.value;
+      arena->AllocateSpan<VkPipelineStageFlags>(batch->wait_semaphores.count);
+  for (iree_host_size_t i = 0; i < batch->wait_semaphores.count; ++i) {
+    wait_semaphore_handles[i] = iree_hal_vulkan_native_semaphore_handle(
+        batch->wait_semaphores.semaphores[i]);
+    wait_semaphore_values[i] = batch->wait_semaphores.payload_values[i];
     wait_dst_stage_masks[i] = dst_stage_mask;
   }
 
   auto signal_semaphore_handles =
-      arena->AllocateSpan<VkSemaphore>(batch.signal_semaphores.size());
+      arena->AllocateSpan<VkSemaphore>(batch->signal_semaphores.count);
   auto signal_semaphore_values =
-      arena->AllocateSpan<uint64_t>(batch.signal_semaphores.size());
-  for (int i = 0; i < batch.signal_semaphores.size(); ++i) {
-    const auto& signal_point = batch.signal_semaphores[i];
-    const auto* semaphore =
-        static_cast<NativeTimelineSemaphore*>(signal_point.semaphore);
-    signal_semaphore_handles[i] = semaphore->handle();
-    signal_semaphore_values[i] = signal_point.value;
+      arena->AllocateSpan<uint64_t>(batch->signal_semaphores.count);
+  for (iree_host_size_t i = 0; i < batch->signal_semaphores.count; ++i) {
+    signal_semaphore_handles[i] = iree_hal_vulkan_native_semaphore_handle(
+        batch->signal_semaphores.semaphores[i]);
+    signal_semaphore_values[i] = batch->signal_semaphores.payload_values[i];
   }
 
   auto command_buffer_handles =
-      arena->AllocateSpan<VkCommandBuffer>(batch.command_buffers.size());
-  for (int i = 0; i < batch.command_buffers.size(); ++i) {
-    const auto& command_buffer = batch.command_buffers[i];
-    auto* direct_command_buffer =
-        static_cast<DirectCommandBuffer*>(command_buffer->impl());
-    command_buffer_handles[i] = direct_command_buffer->handle();
+      arena->AllocateSpan<VkCommandBuffer>(batch->command_buffer_count);
+  for (iree_host_size_t i = 0; i < batch->command_buffer_count; ++i) {
+    command_buffer_handles[i] =
+        iree_hal_vulkan_direct_command_buffer_handle(batch->command_buffers[i]);
   }
 
   submit_info->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -111,39 +98,43 @@ Status DirectCommandQueue::TranslateBatchInfo(
   return OkStatus();
 }
 
-Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
+iree_status_t DirectCommandQueue::Submit(
+    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
   IREE_TRACE_SCOPE0("DirectCommandQueue::Submit");
 
   // Map the submission batches to VkSubmitInfos.
   // Note that we must keep all arrays referenced alive until submission
   // completes and since there are a bunch of them we use an arena.
   Arena arena(4 * 1024);
-  auto submit_infos = arena.AllocateSpan<VkSubmitInfo>(batches.size());
+  auto submit_infos = arena.AllocateSpan<VkSubmitInfo>(batch_count);
   auto timeline_submit_infos =
-      arena.AllocateSpan<VkTimelineSemaphoreSubmitInfo>(batches.size());
-  for (int i = 0; i < batches.size(); ++i) {
-    IREE_RETURN_IF_ERROR(TranslateBatchInfo(batches[i], &submit_infos[i],
+      arena.AllocateSpan<VkTimelineSemaphoreSubmitInfo>(batch_count);
+  for (int i = 0; i < batch_count; ++i) {
+    IREE_RETURN_IF_ERROR(TranslateBatchInfo(&batches[i], &submit_infos[i],
                                             &timeline_submit_infos[i], &arena));
   }
 
-  {
-    absl::MutexLock lock(&queue_mutex_);
-    VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
-        queue_, static_cast<uint32_t>(submit_infos.size()), submit_infos.data(),
-        VK_NULL_HANDLE));
-  }
+  iree_slim_mutex_lock(&queue_mutex_);
+  iree_status_t status = VkResultToStatus(
+      syms()->vkQueueSubmit(queue_, static_cast<uint32_t>(submit_infos.size()),
+                            submit_infos.data(), VK_NULL_HANDLE),
+      IREE_LOC);
+  iree_slim_mutex_unlock(&queue_mutex_);
+  IREE_RETURN_IF_ERROR(status);
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
-Status DirectCommandQueue::WaitIdle(Time deadline_ns) {
-  if (deadline_ns == InfiniteFuture()) {
+iree_status_t DirectCommandQueue::WaitIdle(iree_time_t deadline_ns) {
+  if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).
     IREE_TRACE_SCOPE0("DirectCommandQueue::WaitIdle#vkQueueWaitIdle");
-    absl::MutexLock lock(&queue_mutex_);
-    VK_RETURN_IF_ERROR(syms()->vkQueueWaitIdle(queue_));
-    return OkStatus();
+    iree_slim_mutex_lock(&queue_mutex_);
+    iree_status_t status =
+        VkResultToStatus(syms()->vkQueueWaitIdle(queue_), IREE_LOC);
+    iree_slim_mutex_unlock(&queue_mutex_);
+    return status;
   }
 
   IREE_TRACE_SCOPE0("DirectCommandQueue::WaitIdle#Fence");
@@ -157,44 +148,48 @@ Status DirectCommandQueue::WaitIdle(Time deadline_ns) {
   VkFence fence = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(syms()->vkCreateFence(
       *logical_device_, &create_info, logical_device_->allocator(), &fence));
-  auto fence_cleanup = MakeCleanup([this, fence]() {
-    syms()->vkDestroyFence(*logical_device_, fence,
-                           logical_device_->allocator());
-  });
 
   uint64_t timeout_ns;
-  if (deadline_ns == InfinitePast()) {
+  if (deadline_ns == IREE_TIME_INFINITE_PAST) {
     // Do not wait.
     timeout_ns = 0;
-  } else if (deadline_ns == InfiniteFuture()) {
+  } else if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     // Wait forever.
     timeout_ns = UINT64_MAX;
   } else {
     // Convert to relative time in nanoseconds.
-    // The implementation may not wait with this granularity (like, by 10000x).
-    Time now_ns = Now();
+    // The implementation may not wait with this granularity (like by 10000x).
+    iree_time_t now_ns = iree_time_now();
     if (deadline_ns < now_ns) {
-      return DeadlineExceededErrorBuilder(IREE_LOC) << "Deadline in the past";
+      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
     }
-    timeout_ns = static_cast<uint64_t>(deadline_ns - now_ns);
+    timeout_ns = (uint64_t)(deadline_ns - now_ns);
   }
 
-  {
-    absl::MutexLock lock(&queue_mutex_);
-    VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(queue_, 0, nullptr, fence));
+  iree_slim_mutex_lock(&queue_mutex_);
+  iree_status_t status = VkResultToStatus(
+      syms()->vkQueueSubmit(queue_, 0, nullptr, fence), IREE_LOC);
+  iree_slim_mutex_unlock(&queue_mutex_);
+
+  if (iree_status_is_ok(status)) {
+    VkResult result = syms()->vkWaitForFences(*logical_device_, 1, &fence,
+                                              VK_TRUE, timeout_ns);
+    switch (result) {
+      case VK_SUCCESS:
+        status = iree_ok_status();
+        break;
+      case VK_TIMEOUT:
+        status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+        break;
+      default:
+        status = VkResultToStatus(result, IREE_LOC);
+        break;
+    }
   }
 
-  VkResult result =
-      syms()->vkWaitForFences(*logical_device_, 1, &fence, VK_TRUE, timeout_ns);
-  switch (result) {
-    case VK_SUCCESS:
-      return OkStatus();
-    case VK_TIMEOUT:
-      return DeadlineExceededErrorBuilder(IREE_LOC)
-             << "Deadline exceeded waiting for idle";
-    default:
-      return VkResultToStatus(result, IREE_LOC);
-  }
+  syms()->vkDestroyFence(*logical_device_, fence, logical_device_->allocator());
+
+  return status;
 }
 
 }  // namespace vulkan

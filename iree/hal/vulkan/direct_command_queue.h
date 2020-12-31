@@ -15,21 +15,8 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include <cstdint>
-#include <string>
-
-#include "absl/base/thread_annotations.h"
-#include "absl/synchronization/mutex.h"
 #include "iree/base/arena.h"
-#include "iree/base/status.h"
-#include "iree/base/time.h"
-#include "iree/hal/cc/command_queue.h"
-#include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/command_queue.h"
 
 namespace iree {
 namespace hal {
@@ -38,31 +25,20 @@ namespace vulkan {
 // Command queue implementation directly maps to VkQueue.
 class DirectCommandQueue final : public CommandQueue {
  public:
-  DirectCommandQueue(std::string name,
+  DirectCommandQueue(VkDeviceHandle* logical_device, std::string name,
                      iree_hal_command_category_t supported_categories,
-                     const ref_ptr<VkDeviceHandle>& logical_device,
                      VkQueue queue);
   ~DirectCommandQueue() override;
 
-  const ref_ptr<DynamicSymbols>& syms() const {
-    return logical_device_->syms();
-  }
+  iree_status_t Submit(iree_host_size_t batch_count,
+                       const iree_hal_submission_batch_t* batches) override;
 
-  Status Submit(absl::Span<const SubmissionBatch> batches) override;
-
-  Status WaitIdle(Time deadline_ns) override;
+  iree_status_t WaitIdle(iree_time_t deadline_ns) override;
 
  private:
-  Status TranslateBatchInfo(const SubmissionBatch& batch,
-                            VkSubmitInfo* submit_info,
-                            VkTimelineSemaphoreSubmitInfo* timeline_submit_info,
-                            Arena* arena);
-
-  ref_ptr<VkDeviceHandle> logical_device_;
-
-  // VkQueue needs to be externally synchronized.
-  mutable absl::Mutex queue_mutex_;
-  VkQueue queue_ ABSL_GUARDED_BY(queue_mutex_);
+  iree_status_t TranslateBatchInfo(
+      const iree_hal_submission_batch_t* batch, VkSubmitInfo* submit_info,
+      VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena);
 };
 
 }  // namespace vulkan

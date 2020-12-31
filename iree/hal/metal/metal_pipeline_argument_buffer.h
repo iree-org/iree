@@ -41,8 +41,6 @@ class MetalArgumentBufferLayout final : public DescriptorSetLayout {
   absl::Span<const Binding> bindings() const { return bindings_; }
   const Binding* GetBindingForIndex(int index) const;
 
-  std::string DebugString() const override;
-
  private:
   UsageType usage_type_;
   absl::InlinedVector<Binding, 8> bindings_;
@@ -58,8 +56,6 @@ class MetalPipelineArgumentBufferLayout final : public ExecutableLayout {
   absl::Span<MetalArgumentBufferLayout* const> set_layouts() const {
     return set_layouts_;
   }
-
-  std::string DebugString() const override;
 
  private:
   absl::InlinedVector<MetalArgumentBufferLayout*, 2> set_layouts_;

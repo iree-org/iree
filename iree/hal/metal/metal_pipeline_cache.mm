@@ -16,18 +16,21 @@
 
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cc/executable_format.h"
+#include "iree/hal/api.h"
 #include "iree/hal/metal/metal_kernel_library.h"
 
 namespace iree {
 namespace hal {
 namespace metal {
 
+static const iree_hal_executable_format_t kExecutableFormatMetal =
+    iree_hal_make_executable_format("MTLE");
+
 MetalPipelineCache::MetalPipelineCache(id<MTLDevice> device) : metal_device_([device retain]) {}
 
 MetalPipelineCache::~MetalPipelineCache() { [metal_device_ release]; }
 
-bool MetalPipelineCache::CanPrepareFormat(ExecutableFormat format) const {
+bool MetalPipelineCache::CanPrepareFormat(iree_hal_executable_format_t format) const {
   return format == kExecutableFormatMetal;
 }
 

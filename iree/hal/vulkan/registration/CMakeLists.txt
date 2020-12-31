@@ -30,7 +30,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::api
     iree::hal::vulkan
-    iree::hal::vulkan::utils
   DEFINES
     "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"
   PUBLIC

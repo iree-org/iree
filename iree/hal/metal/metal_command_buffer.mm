@@ -54,18 +54,6 @@ MetalCommandBuffer::~MetalCommandBuffer() {
   [metal_handle_ release];
 }
 
-StatusOr<MetalBuffer*> MetalCommandBuffer::CastBuffer(Buffer* buffer) const {
-  // TODO(benvanik): assert that the buffer is from the right allocator and
-  // that it is compatible with our target queue family.
-  return static_cast<MetalBuffer*>(buffer->allocated_buffer());
-}
-
-StatusOr<MetalBuffer*> MetalCommandBuffer::CastBuffer(iree_hal_buffer_t* buffer) const {
-  // TODO(benvanik): assert that the buffer is from the right allocator and
-  // that it is compatible with our target queue family.
-  return reinterpret_cast<MetalBuffer*>(iree_hal_buffer_allocated_buffer(buffer));
-}
-
 id<MTLBlitCommandEncoder> MetalCommandBuffer::GetOrBeginBlitEncoder() {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::GetOrBeginBlitEncoder");
 
@@ -155,17 +143,17 @@ Status MetalCommandBuffer::ExecutionBarrier(iree_hal_execution_stage_t source_st
   return OkStatus();
 }
 
-Status MetalCommandBuffer::SignalEvent(Event* event, iree_hal_execution_stage_t source_stage_mask) {
+Status MetalCommandBuffer::SignalEvent(iree_hal_event_t* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::SignalEvent");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::SignalEvent";
 }
 
-Status MetalCommandBuffer::ResetEvent(Event* event, iree_hal_execution_stage_t source_stage_mask) {
+Status MetalCommandBuffer::ResetEvent(iree_hal_event_t* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::ResetEvent");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::ResetEvent";
 }
 
-Status MetalCommandBuffer::WaitEvents(absl::Span<Event*> events,
+Status MetalCommandBuffer::WaitEvents(absl::Span<iree_hal_event_t*> events,
                                       iree_hal_execution_stage_t source_stage_mask,
                                       iree_hal_execution_stage_t target_stage_mask,
                                       absl::Span<const iree_hal_memory_barrier_t> memory_barriers,
@@ -174,13 +162,13 @@ Status MetalCommandBuffer::WaitEvents(absl::Span<Event*> events,
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::WaitEvents";
 }
 
-Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, iree_device_size_t target_offset,
+Status MetalCommandBuffer::FillBuffer(iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
                                       iree_device_size_t length, const void* pattern,
                                       size_t pattern_length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::FillBuffer");
-  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+  id<MTLBuffer> target_device_buffer = iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
 
-  target_offset += target_buffer->byte_offset();
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
   // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
   // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS." Although iOS/tvOS is more relaxed on
@@ -207,29 +195,29 @@ Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, iree_device_size_t 
   return OkStatus();
 }
 
-Status MetalCommandBuffer::DiscardBuffer(Buffer* buffer) {
+Status MetalCommandBuffer::DiscardBuffer(iree_hal_buffer_t* buffer) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::DiscardBuffer");
   // This is a hint. Nothing to do for Metal.
   return OkStatus();
 }
 
 Status MetalCommandBuffer::UpdateBuffer(const void* source_buffer, iree_device_size_t source_offset,
-                                        Buffer* target_buffer, iree_device_size_t target_offset,
+                                        iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
                                         iree_device_size_t length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::UpdateBuffer");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::UpdateBuffer";
 }
 
-Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, iree_device_size_t source_offset,
-                                      Buffer* target_buffer, iree_device_size_t target_offset,
+Status MetalCommandBuffer::CopyBuffer(iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+                                      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
                                       iree_device_size_t length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::CopyBuffer");
 
-  IREE_ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
-  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+  id<MTLBuffer> source_device_buffer = iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(source_buffer));
+  id<MTLBuffer> target_device_buffer = iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
 
-  source_offset += source_buffer->byte_offset();
-  target_offset += target_buffer->byte_offset();
+  source_offset += iree_hal_buffer_byte_offset(source_buffer);
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
   // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
   // offset must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS. Although iOS/tvOS
@@ -248,13 +236,13 @@ Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, iree_device_size_t 
   return OkStatus();
 }
 
-Status MetalCommandBuffer::PushConstants(ExecutableLayout* executable_layout, size_t offset,
+Status MetalCommandBuffer::PushConstants(iree_hal_executable_layout_t* executable_layout, size_t offset,
                                          absl::Span<const uint32_t> values) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::PushConstants");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::PushConstants";
 }
 
-Status MetalCommandBuffer::PushDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
+Status MetalCommandBuffer::PushDescriptorSet(iree_hal_executable_layout_t* executable_layout, int32_t set,
                                              absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::PushDescriptorSet");
   if (set != 0) {
@@ -266,8 +254,8 @@ Status MetalCommandBuffer::PushDescriptorSet(ExecutableLayout* executable_layout
   return OkStatus();
 }
 
-Status MetalCommandBuffer::BindDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
-                                             DescriptorSet* descriptor_set,
+Status MetalCommandBuffer::BindDescriptorSet(iree_hal_executable_layout_t* executable_layout, int32_t set,
+                                             iree_hal_descriptor_set_t* descriptor_set,
                                              absl::Span<const iree_device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::BindDescriptorSet");
   if (set != 0) {
@@ -282,7 +270,7 @@ Status MetalCommandBuffer::BindDescriptorSet(ExecutableLayout* executable_layout
   return OkStatus();
 }
 
-Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
+Status MetalCommandBuffer::Dispatch(iree_hal_executable_t* executable, int32_t entry_point,
                                     std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::Dispatch");
   IREE_DVLOG(2) << "MetalCommandBuffer::Dispatch";
@@ -299,7 +287,6 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   // TODO(antiagainst): only update the PSO for the current executable.
   for (const auto& pso_kv : pipeline_state_objects_) {
     const auto* pipeline_layout = static_cast<MetalPipelineArgumentBufferLayout*>(pso_kv.first);
-    IREE_DVLOG(3) << "Current pipeline layout: " << pipeline_layout->DebugString();
 
     const auto& pso = pso_kv.second;
     if (pso.push_states.size() > 1) {
@@ -317,7 +304,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
 
     IREE_DVLOG(3) << "Encoding push descriptors..";
     for (const auto& push_kv : pso.push_states) {
-      int32_t set_number = push_kv.first;
+      uint32_t set_number = push_kv.first;
       const PipelineStateObject::PushState& push_state = push_kv.second;
       IREE_DVLOG(3) << " For set #" << set_number;
 
@@ -345,7 +332,6 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
       [argument_encoder setArgumentBuffer:argument_buffer offset:0];
 
       for (const auto& resource_binding : push_state.resource_bindings) {
-        IREE_DVLOG(3) << "  Resource @[" << resource_binding.DebugStringShort() << "]";
 
         if (resource_binding.length != IREE_WHOLE_BUFFER &&
             resource_binding.length != resource_binding.buffer->allocation_size()) {
@@ -353,8 +339,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
                  << "MetalCommandBuffer::Dispatch with sub-buffer";
         }
 
-        IREE_ASSIGN_OR_RETURN(auto buffer, CastBuffer(resource_binding.buffer));
-        [argument_encoder setBuffer:buffer->handle()
+        [argument_encoder setBuffer:iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(resource_binding.buffer))
                              offset:resource_binding.offset
                             atIndex:resource_binding.binding];
 
@@ -383,8 +368,8 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   return OkStatus();
 }
 
-Status MetalCommandBuffer::DispatchIndirect(Executable* executable, int32_t entry_point,
-                                            Buffer* workgroups_buffer,
+Status MetalCommandBuffer::DispatchIndirect(iree_hal_executable_t* executable, int32_t entry_point,
+                                            iree_hal_buffer_t* workgroups_buffer,
                                             iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::DispatchIndirect");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::DispatchIndirect";

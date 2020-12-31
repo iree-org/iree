@@ -12,32 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
-#define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
+#ifndef IREE_HAL_VULKAN_NOP_EXECUTABLE_CACHE_H_
+#define IREE_HAL_VULKAN_NOP_EXECUTABLE_CACHE_H_
 
 #include "iree/hal/api.h"
-#include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a command buffer that directly records into a VkCommandBuffer.
-iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
+// Creates a no-op executable cache that does not cache at all.
+// This is useful to isolate pipeline caching behavior and verify compilation
+// behavior.
+iree_status_t iree_hal_vulkan_nop_executable_cache_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    iree::hal::vulkan::VkCommandPoolHandle* command_pool,
-    iree_hal_command_buffer_mode_t mode,
-    iree_hal_command_category_t command_categories,
-    iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
-    iree_hal_command_buffer_t** out_command_buffer);
-
-// Returns the native Vulkan VkCommandBuffer handle.
-VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
-    iree_hal_command_buffer_t* command_buffer);
+    iree_string_view_t identifier,
+    iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
+#endif  // IREE_HAL_VULKAN_NOP_EXECUTABLE_CACHE_H_

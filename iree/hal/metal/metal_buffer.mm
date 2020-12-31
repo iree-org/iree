@@ -18,23 +18,14 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/metal/metal_direct_allocator.h"
 
+id<MTLBuffer> iree_hal_metal_buffer_handle(iree_hal_buffer_t* base_buffer);
+
 namespace iree {
 namespace hal {
 namespace metal {
 
 // static
 StatusOr<ref_ptr<MetalBuffer>> MetalBuffer::Create(
-    MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length, id<MTLBuffer> buffer,
-    id<MTLCommandQueue> transfer_queue) {
-  IREE_TRACE_SCOPE0("MetalBuffer::Create");
-  return assign_ref(new MetalBuffer(allocator, memory_type, allowed_access, usage, allocation_size,
-                                    byte_offset, byte_length, [buffer retain], transfer_queue));
-}
-
-// static
-StatusOr<ref_ptr<MetalBuffer>> MetalBuffer::CreateUnretained(
     MetalDirectAllocator* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access, iree_hal_buffer_usage_t usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_offset, iree_device_size_t byte_length, id<MTLBuffer> buffer,

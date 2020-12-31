@@ -20,11 +20,9 @@
 #include "iree/base/api.h"
 #include "iree/base/memory.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cc/command_buffer.h"
-#include "iree/hal/cc/command_queue.h"
-#include "iree/hal/cc/semaphore.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
-#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
+#include "iree/hal/vulkan/emulated_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
 
 namespace iree {
@@ -39,199 +37,195 @@ namespace {
 // batch is ready to be submitted to GPU.
 // |wait_semaphores| and |signal_semaphores| will be filled with the binary
 // `VkSemaphores` on success.
-StatusOr<bool> TryToPrepareSemaphores(
+iree_status_t TryToPrepareSemaphores(
     const absl::InlinedVector<SemaphoreValue, 4>& batch_wait_semaphores,
     const absl::InlinedVector<SemaphoreValue, 4>& batch_signal_semaphores,
     const ref_ptr<TimePointFence>& batch_fence,
     absl::InlinedVector<VkSemaphore, 4>* wait_semaphores,
-    absl::InlinedVector<VkSemaphore, 4>* signal_semaphores) {
+    absl::InlinedVector<VkSemaphore, 4>* signal_semaphores,
+    bool* out_ready_to_submit) {
   IREE_TRACE_SCOPE0("TryToPrepareSemaphores");
-  IREE_DVLOG(3) << "TryToPrepareSemaphores";
+  *out_ready_to_submit = false;
 
   wait_semaphores->clear();
   for (const auto& timeline_semaphore : batch_wait_semaphores) {
-    IREE_DVLOG(3) << "Preparing binary VkSemaphore for timeline semaphore "
-                  << timeline_semaphore.semaphore << "..";
     // Query first to progress this timeline semaphore to the furthest.
-    IREE_ASSIGN_OR_RETURN(auto signaled_value,
-                          timeline_semaphore.semaphore->Query());
+    uint64_t signaled_value = 0;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_semaphore_query(timeline_semaphore.first, &signaled_value));
 
     // If it's already signaled to a value greater than we require here,
     // we can just ignore this semaphore now.
-    if (signaled_value >= timeline_semaphore.value) {
-      IREE_DVLOG(3) << "..already signaled past; ignoring";
+    if (signaled_value >= timeline_semaphore.second) {
       continue;
     }
 
-    // SerializingCommandQueue only works with EmulatedTimelineSemaphore.
-    auto* emulated_semaphore =
-        static_cast<EmulatedTimelineSemaphore*>(timeline_semaphore.semaphore);
-
     // Otherwise try to get a binary semaphore for this time point so that
     // we can wait on.
-    VkSemaphore binary_semaphore = emulated_semaphore->GetWaitSemaphore(
-        timeline_semaphore.value, batch_fence);
+    // TODO(antiagainst): if this fails we need to cancel.
+    VkSemaphore wait_semaphore = VK_NULL_HANDLE;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_emulated_semaphore_acquire_wait_handle(
+        timeline_semaphore.first, timeline_semaphore.second, batch_fence,
+        &wait_semaphore));
+    wait_semaphores->push_back(wait_semaphore);
 
-    if (binary_semaphore == VK_NULL_HANDLE) {
+    if (wait_semaphore == VK_NULL_HANDLE) {
       // We cannot wait on this time point yet: there are no previous semaphores
-      // submitted to the GPU  that can signal a value greater than what's
+      // submitted to the GPU that can signal a value greater than what's
       // desired here.
 
       // Cancel the wait so others may make progress.
-      for (VkSemaphore semaphore : *wait_semaphores) {
+      // TODO(antiagainst): if any of these fail we need to cancel.
+      for (iree_host_size_t i = 0; i < batch_wait_semaphores.size(); ++i) {
+        if (!wait_semaphores->at(i)) break;
         IREE_RETURN_IF_ERROR(
-            emulated_semaphore->CancelWaitSemaphore(semaphore));
+            iree_hal_vulkan_emulated_semaphore_cancel_wait_handle(
+                batch_wait_semaphores[i].first, wait_semaphores->at(i)));
       }
 
       // This batch cannot be submitted to GPU yet.
-      return false;
+      return iree_ok_status();
     }
-    IREE_DVLOG(3) << "..acqiured binary VkSemaphore " << binary_semaphore;
-
-    wait_semaphores->push_back(binary_semaphore);
   }
 
   // We've collected all necessary binary semaphores for each timeline we need
   // to wait on. Now prepare binary semaphores for signaling.
   signal_semaphores->clear();
   for (const auto& timeline_semaphore : batch_signal_semaphores) {
-    IREE_DVLOG(3) << "Preparing binary VkSemaphore for timeline semaphore "
-                  << timeline_semaphore.semaphore << "..";
     // SerializingCommandQueue only works with EmulatedTimelineSemaphore.
-    auto* emulated_semaphore =
-        static_cast<EmulatedTimelineSemaphore*>(timeline_semaphore.semaphore);
-
-    IREE_ASSIGN_OR_RETURN(auto binary_semaphore,
-                          emulated_semaphore->GetSignalSemaphore(
-                              timeline_semaphore.value, batch_fence));
-    signal_semaphores->push_back(binary_semaphore);
-    IREE_DVLOG(3) << "..acqiured binary VkSemaphore " << binary_semaphore;
+    VkSemaphore signal_semaphore = VK_NULL_HANDLE;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_emulated_semaphore_acquire_signal_handle(
+            timeline_semaphore.first, timeline_semaphore.second, batch_fence,
+            &signal_semaphore));
+    signal_semaphores->push_back(signal_semaphore);
   }
 
   // Good to submit!
-  IREE_DVLOG(3) << "Succeeded in preparing binary VkSemaphores for submission";
-  return true;
+  *out_ready_to_submit = true;
+  return iree_ok_status();
 }
 
 // Prepares `VkSubmitInfo` to submit the given list of |command_buffers| that
 // waiting on |wait_semaphores| and signalling |signal_semaphores|. Necessary
 // structures are allocated from |arena| and the result `VkSubmitInfo` is
 // written to |submit_info|.
-void PrepareSubmitInfo(
-    const absl::InlinedVector<VkSemaphore, 4>& wait_semaphores,
-    absl::Span<CommandBuffer* const> command_buffers,
-    const absl::InlinedVector<VkSemaphore, 4>& signal_semaphores,
-    VkSubmitInfo* submit_info, Arena* arena) {
-  IREE_TRACE_SCOPE0("PrepareSubmitInfo");
-
+void PrepareSubmitInfo(absl::Span<const VkSemaphore> wait_semaphore_handles,
+                       absl::Span<const VkCommandBuffer> command_buffer_handles,
+                       absl::Span<const VkSemaphore> signal_semaphore_handles,
+                       VkSubmitInfo* submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
   // the pseudo-stage of VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT.
-  VkPipelineStageFlags dst_stage_mask =
-      VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-  auto wait_semaphore_handles =
-      arena->AllocateSpan<VkSemaphore>(wait_semaphores.size());
   auto wait_dst_stage_masks =
-      arena->AllocateSpan<VkPipelineStageFlags>(wait_semaphores.size());
-  for (size_t i = 0, e = wait_semaphores.size(); i < e; ++i) {
-    wait_semaphore_handles[i] = wait_semaphores[i];
-    wait_dst_stage_masks[i] = dst_stage_mask;
+      arena->AllocateSpan<VkPipelineStageFlags>(wait_semaphore_handles.size());
+  for (size_t i = 0, e = wait_semaphore_handles.size(); i < e; ++i) {
+    wait_dst_stage_masks[i] =
+        VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
   }
 
-  auto signal_semaphore_handles =
-      arena->AllocateSpan<VkSemaphore>(signal_semaphores.size());
-  for (size_t i = 0, e = signal_semaphores.size(); i < e; ++i) {
-    signal_semaphore_handles[i] = signal_semaphores[i];
+  // NOTE: this code does some very weird things - the handles we take in as
+  // args are mutated in-place after this function is called so we can't
+  // reference them here. If we were going to preserve this code post-Vulkan 1.2
+  // then we'd really want to rework all of this to properly use the arena from
+  // the start instead of all this InlinedVector tomfoolery.
+  auto wait_semaphores =
+      arena->AllocateSpan<VkSemaphore>(wait_semaphore_handles.size());
+  for (size_t i = 0, e = wait_semaphore_handles.size(); i < e; ++i) {
+    wait_semaphores[i] = wait_semaphore_handles[i];
   }
-
-  auto command_buffer_handles =
-      arena->AllocateSpan<VkCommandBuffer>(command_buffers.size());
-  for (size_t i = 0, e = command_buffers.size(); i < e; ++i) {
-    const auto& command_buffer = command_buffers[i];
-    auto* direct_command_buffer =
-        static_cast<DirectCommandBuffer*>(command_buffer->impl());
-    command_buffer_handles[i] = direct_command_buffer->handle();
+  auto command_buffers =
+      arena->AllocateSpan<VkCommandBuffer>(command_buffer_handles.size());
+  for (size_t i = 0, e = command_buffer_handles.size(); i < e; ++i) {
+    command_buffers[i] = command_buffer_handles[i];
+  }
+  auto signal_semaphores =
+      arena->AllocateSpan<VkSemaphore>(signal_semaphore_handles.size());
+  for (size_t i = 0, e = signal_semaphore_handles.size(); i < e; ++i) {
+    signal_semaphores[i] = signal_semaphore_handles[i];
   }
 
   submit_info->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info->pNext = nullptr;
   submit_info->waitSemaphoreCount =
-      static_cast<uint32_t>(wait_semaphore_handles.size());
-  submit_info->pWaitSemaphores = wait_semaphore_handles.data();
+      static_cast<uint32_t>(wait_semaphores.size());
+  submit_info->pWaitSemaphores = wait_semaphores.data();
   submit_info->pWaitDstStageMask = wait_dst_stage_masks.data();
   submit_info->commandBufferCount =
-      static_cast<uint32_t>(command_buffer_handles.size());
-  submit_info->pCommandBuffers = command_buffer_handles.data();
+      static_cast<uint32_t>(command_buffers.size());
+  submit_info->pCommandBuffers = command_buffers.data();
   submit_info->signalSemaphoreCount =
-      static_cast<uint32_t>(signal_semaphore_handles.size());
-  submit_info->pSignalSemaphores = signal_semaphore_handles.data();
+      static_cast<uint32_t>(signal_semaphores.size());
+  submit_info->pSignalSemaphores = signal_semaphores.data();
 }
 
 }  // namespace
 
 SerializingCommandQueue::SerializingCommandQueue(
-    std::string name, iree_hal_command_category_t supported_categories,
-    const ref_ptr<VkDeviceHandle>& logical_device,
-    const ref_ptr<TimePointFencePool>& fence_pool, VkQueue queue)
-    : CommandQueue(std::move(name), supported_categories),
-      logical_device_(add_ref(logical_device)),
-      fence_pool_(add_ref(fence_pool)),
-      queue_(queue) {}
+    VkDeviceHandle* logical_device, std::string name,
+    iree_hal_command_category_t supported_categories, VkQueue queue,
+    TimePointFencePool* fence_pool)
+    : CommandQueue(logical_device, std::move(name), supported_categories,
+                   queue),
+      fence_pool_(fence_pool) {}
 
-SerializingCommandQueue::~SerializingCommandQueue() {
-  IREE_TRACE_SCOPE0("SerializingCommandQueue::dtor");
-  absl::MutexLock lock(&mutex_);
-  syms()->vkQueueWaitIdle(queue_);
-}
+SerializingCommandQueue::~SerializingCommandQueue() = default;
 
-Status SerializingCommandQueue::Submit(
-    absl::Span<const SubmissionBatch> batches) {
+iree_status_t SerializingCommandQueue::Submit(
+    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
   IREE_TRACE_SCOPE0("SerializingCommandQueue::Submit");
-  IREE_DVLOG(2) << "SerializingCommandQueue::Submit";
 
-  absl::MutexLock lock(&mutex_);
-  for (size_t i = 0; i < batches.size(); ++i) {
+  IntrusiveList<std::unique_ptr<FencedSubmission>> new_submissions;
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
+    const iree_hal_submission_batch_t* batch = &batches[i];
+
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
-    IREE_ASSIGN_OR_RETURN(auto fence, fence_pool_->Acquire());
     auto submission = std::make_unique<FencedSubmission>();
-    submission->batch = PendingBatch{
-        {batches[i].wait_semaphores.begin(), batches[i].wait_semaphores.end()},
-        {batches[i].command_buffers.begin(), batches[i].command_buffers.end()},
-        {batches[i].signal_semaphores.begin(),
-         batches[i].signal_semaphores.end()}};
-    submission->fence = std::move(fence);
-    deferred_submissions_.push_back(std::move(submission));
+    IREE_ASSIGN_OR_RETURN(submission->fence, fence_pool_->Acquire());
+
+    submission->wait_semaphores.resize(batch->wait_semaphores.count);
+    for (iree_host_size_t j = 0; j < batch->wait_semaphores.count; ++j) {
+      submission->wait_semaphores[j] = {
+          batch->wait_semaphores.semaphores[j],
+          batch->wait_semaphores.payload_values[j]};
+    }
+
+    submission->command_buffers.resize(batch->command_buffer_count);
+    for (iree_host_size_t j = 0; j < batch->command_buffer_count; ++j) {
+      submission->command_buffers[j] =
+          iree_hal_vulkan_direct_command_buffer_handle(
+              batch->command_buffers[j]);
+    }
+
+    submission->signal_semaphores.resize(batch->signal_semaphores.count);
+    for (iree_host_size_t j = 0; j < batch->signal_semaphores.count; ++j) {
+      submission->signal_semaphores[j] = {
+          batch->signal_semaphores.semaphores[j],
+          batch->signal_semaphores.payload_values[j]};
+    }
+
+    new_submissions.push_back(std::move(submission));
   }
 
-  return ProcessDeferredSubmissions().status();
+  iree_slim_mutex_lock(&queue_mutex_);
+  deferred_submissions_.merge_from(&new_submissions);
+  iree_status_t status = ProcessDeferredSubmissions();
+  iree_slim_mutex_unlock(&queue_mutex_);
+  return status;
 }
 
-StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
+iree_status_t SerializingCommandQueue::ProcessDeferredSubmissions(
+    bool* out_work_submitted) {
   IREE_TRACE_SCOPE0("SerializingCommandQueue::ProcessDeferredSubmissions");
-  IREE_DVLOG(2) << "SerializingCommandQueue::ProcessDeferredSubmissions";
-
-  // Prepare `VkSubmitInfo`s for all submissions we are able to submit.
-
-  // Note that we must keep all arrays referenced alive until submission
-  // completes and since there are a bunch of them we use an arena.
-  Arena arena(4 * 1024);
-
-  absl::InlinedVector<VkSubmitInfo, 4> submit_infos;
-  absl::InlinedVector<VkFence, 4> submit_fences;
-
-  absl::InlinedVector<VkSemaphore, 4> wait_semaphores;
-  absl::InlinedVector<VkSemaphore, 4> signal_semaphores;
-
-  // A list of submissions that still needs to be deferred.
-  IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
+  if (out_work_submitted) *out_work_submitted = false;
 
   // We need to return all remaining submissions back to the queue to avoid
   // dropping work.
+  IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
   auto submission_cleanup = MakeCleanup([this, &remaining_submissions]() {
 // Disable thread-safety-analysis as it doesn't understand this lambda.
-//   - This entire function is ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+//   - This entire function is ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_)
 //   - This Cleanup object is destroyed when it drops out of scope
 //   - The mutex is always held when executing this function
 #ifdef __clang__
@@ -242,51 +236,40 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
       deferred_submissions_.push_back(
           remaining_submissions.take(remaining_submissions.front()));
     }
-
-    IREE_DVLOG(2) << deferred_submissions_.size()
-                  << " deferred submissions still remaining";
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
   });
 
+  Arena arena(4 * 1024);
+  absl::InlinedVector<VkSubmitInfo, 4> submit_infos;
+  absl::InlinedVector<VkFence, 4> submit_fences;
   while (!deferred_submissions_.empty()) {
-    IREE_DVLOG(2) << "Looking at deferred submission with timepoint fence "
-                  << deferred_submissions_.front()->fence.get() << "..";
-
-    wait_semaphores.clear();
-    signal_semaphores.clear();
-
     FencedSubmission* submission = deferred_submissions_.front();
-    const PendingBatch& batch = submission->batch;
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    IREE_ASSIGN_OR_RETURN(
-        bool ready_to_submit,
-        TryToPrepareSemaphores(batch.wait_semaphores, batch.signal_semaphores,
-                               fence, &wait_semaphores, &signal_semaphores));
-
+    absl::InlinedVector<VkSemaphore, 4> wait_semaphores;
+    absl::InlinedVector<VkSemaphore, 4> signal_semaphores;
+    bool ready_to_submit = false;
+    IREE_RETURN_IF_ERROR(TryToPrepareSemaphores(
+        submission->wait_semaphores, submission->signal_semaphores, fence,
+        &wait_semaphores, &signal_semaphores, &ready_to_submit));
     if (ready_to_submit) {
       submit_infos.emplace_back();
-      PrepareSubmitInfo(wait_semaphores, batch.command_buffers,
+      PrepareSubmitInfo(wait_semaphores, submission->command_buffers,
                         signal_semaphores, &submit_infos.back(), &arena);
 
       submit_fences.push_back(fence->value());
       pending_fences_.emplace_back(std::move(fence));
       deferred_submissions_.pop_front();
-      IREE_DVLOG(2) << "..ready to submit";
     } else {
       // We need to defer the submission until later.
       remaining_submissions.push_back(deferred_submissions_.take(submission));
-      IREE_DVLOG(2) << "..not ready to submit";
     }
   }
-
-  if (submit_infos.empty()) return false;
-
-  auto infos = arena.AllocateSpan<VkSubmitInfo>(submit_infos.size());
-  for (size_t i = 0, e = submit_infos.size(); i < e; ++i) {
-    infos[i] = submit_infos[i];
+  if (submit_infos.empty()) {
+    if (out_work_submitted) *out_work_submitted = false;
+    return iree_ok_status();
   }
 
   // Note: We might be able to batch the submission but it involves non-trivial
@@ -296,68 +279,78 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
         queue_, /*submitCount=*/1, &submit_infos[i], submit_fences[i]));
   }
 
-  IREE_DVLOG(2) << "Released " << submit_infos.size()
-                << " deferred submissions";
-
-  return true;
+  if (out_work_submitted) *out_work_submitted = true;
+  return iree_ok_status();
 }
 
-Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
-  absl::MutexLock lock(&mutex_);
-  IREE_DVLOG(2) << "SerializingCommandQueue::WaitIdle";
+iree_status_t SerializingCommandQueue::WaitIdle(iree_time_t deadline_ns) {
+  iree_status_t status = iree_ok_status();
 
-  if (deadline_ns == InfiniteFuture()) {
+  if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     IREE_TRACE_SCOPE0("SerializingCommandQueue::WaitIdle#vkQueueWaitIdle");
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).
 
+    iree_slim_mutex_lock(&queue_mutex_);
+
     // Complete all pending work on the queue.
-    VK_RETURN_IF_ERROR(syms()->vkQueueWaitIdle(queue_));
+    status = VkResultToStatus(syms()->vkQueueWaitIdle(queue_), IREE_LOC);
+    if (!iree_status_is_ok(status)) {
+      iree_slim_mutex_unlock(&queue_mutex_);
+      return status;
+    }
     pending_fences_.clear();
 
     // Submit and complete all deferred work.
     while (!deferred_submissions_.empty()) {
-      IREE_ASSIGN_OR_RETURN(bool work_submitted, ProcessDeferredSubmissions());
+      bool work_submitted = false;
+      status = ProcessDeferredSubmissions(&work_submitted);
+      if (!iree_status_is_ok(status)) break;
       if (work_submitted) {
-        VK_RETURN_IF_ERROR(syms()->vkQueueWaitIdle(queue_));
+        status = VkResultToStatus(syms()->vkQueueWaitIdle(queue_), IREE_LOC);
+        if (!iree_status_is_ok(status)) break;
         pending_fences_.clear();
       }
     }
 
-    return OkStatus();
+    iree_slim_mutex_unlock(&queue_mutex_);
+    return status;
   }
 
   IREE_TRACE_SCOPE0("SerializingCommandQueue::WaitIdle#Fence");
 
   // Keep trying to submit more workload to the GPU until reaching the deadline.
+  iree_slim_mutex_lock(&queue_mutex_);
   do {
-    IREE_RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
+    status = ProcessDeferredSubmissions();
+    bool has_deferred_submissions = !deferred_submissions_.empty();
+    absl::InlinedVector<VkFence, 8> fence_handles(pending_fences_.size());
+    for (size_t i = 0; i < pending_fences_.size(); ++i) {
+      fence_handles[i] = pending_fences_[i]->value();
+    }
+    if (!iree_status_is_ok(status)) {
+      break;  // unable to process submissions
+    } else if (!has_deferred_submissions && fence_handles.empty()) {
+      break;  // no more work - idle achieved
+    }
 
     uint64_t timeout_ns;
-    if (deadline_ns == InfiniteFuture()) {
+    if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
       timeout_ns = UINT64_MAX;
-    } else if (deadline_ns == InfinitePast()) {
+    } else if (deadline_ns == IREE_TIME_INFINITE_PAST) {
       timeout_ns = 0;
     } else {
       // Convert to relative time in nanoseconds.
-      // The implementation may not wait with this granularity (like, by
-      // 10000x).
-      Duration relative_ns = deadline_ns - Now();
-      if (relative_ns < ZeroDuration()) {
-        return DeadlineExceededErrorBuilder(IREE_LOC)
-               << "Deadline exceeded waiting for idle";
+      // The implementation may not wait with this granularity (like by 10000x).
+      iree_time_t now_ns = iree_time_now();
+      if (deadline_ns < now_ns) {
+        return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
-      timeout_ns = static_cast<uint64_t>(relative_ns);
+      timeout_ns = (uint64_t)(deadline_ns - now_ns);
     }
-
-    if (pending_fences_.empty()) continue;
-
-    std::vector<VkFence> fences;
-    fences.reserve(pending_fences_.size());
-    for (const auto& fence : pending_fences_) fences.push_back(fence->value());
-
     VkResult result = syms()->vkWaitForFences(
-        *logical_device_, static_cast<uint32_t>(fences.size()), fences.data(),
+        *logical_device_, static_cast<uint32_t>(fence_handles.size()),
+        fence_handles.data(),
         /*waitAll=*/VK_TRUE, timeout_ns);
 
     switch (result) {
@@ -365,56 +358,62 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
         pending_fences_.clear();
         break;
       case VK_TIMEOUT:
-        return DeadlineExceededErrorBuilder(IREE_LOC)
-               << "Deadline exceeded waiting for idle";
+        status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+        break;
       default:
-        return VkResultToStatus(result, IREE_LOC);
+        status = VkResultToStatus(result, IREE_LOC);
+        break;
     }
     // As long as there is submitted or deferred work still pending.
-  } while (!pending_fences_.empty() || !deferred_submissions_.empty());
-
-  return OkStatus();
+  } while (iree_status_is_ok(status));
+  iree_slim_mutex_unlock(&queue_mutex_);
+  return status;
 }
 
-Status SerializingCommandQueue::AdvanceQueueSubmission() {
-  absl::MutexLock lock(&mutex_);
+iree_status_t SerializingCommandQueue::AdvanceQueueSubmission() {
   // The returned value just indicates whether there were newly ready
   // submissions gotten submitted to the GPU. Other callers might be
   // interested in that information but for this API we just want to advance
   // queue submisison if possible. So we ignore it here.
-  IREE_ASSIGN_OR_RETURN(std::ignore, ProcessDeferredSubmissions());
-  return OkStatus();
+  iree_slim_mutex_lock(&queue_mutex_);
+  iree_status_t status = ProcessDeferredSubmissions();
+  iree_slim_mutex_unlock(&queue_mutex_);
+  return status;
 }
 
 void SerializingCommandQueue::AbortQueueSubmission() {
-  absl::MutexLock lock(&mutex_);
+  iree_slim_mutex_lock(&queue_mutex_);
 
   // We have fences in deferred_submissions_ but they are not submitted to GPU
   // yet so we don't need to reset.
   deferred_submissions_.clear();
 
-  std::vector<VkFence> fences;
-  fences.reserve(pending_fences_.size());
-  for (const auto& fence : pending_fences_) fences.push_back(fence->value());
+  absl::InlinedVector<VkFence, 8> fence_handles(pending_fences_.size());
+  for (size_t i = 0; i < pending_fences_.size(); ++i) {
+    fence_handles[i] = pending_fences_[i]->value();
+  }
 
   syms()->vkWaitForFences(*logical_device_,
-                          static_cast<uint32_t>(fences.size()), fences.data(),
+                          static_cast<uint32_t>(fence_handles.size()),
+                          fence_handles.data(),
                           /*waitAll=*/VK_TRUE, /*timeout=*/UINT64_MAX);
+
   // Clear the list. Fences will be automatically returned back to the queue
   // after refcount reaches 0.
   pending_fences_.clear();
+
+  iree_slim_mutex_unlock(&queue_mutex_);
 }
 
 void SerializingCommandQueue::SignalFences(absl::Span<VkFence> fences) {
-  auto span_contains = [&fences](VkFence fence) {
+  const auto span_contains = [fences](VkFence fence) {
     for (VkFence f : fences) {
       if (f == fence) return true;
     }
     return false;
   };
 
-  absl::MutexLock lock(&mutex_);
-
+  iree_slim_mutex_lock(&queue_mutex_);
   auto it = pending_fences_.begin();
   while (it != pending_fences_.end()) {
     if (span_contains((*it)->value())) {
@@ -423,6 +422,7 @@ void SerializingCommandQueue::SignalFences(absl::Span<VkFence> fences) {
       ++it;
     }
   }
+  iree_slim_mutex_unlock(&queue_mutex_);
 }
 
 }  // namespace vulkan
