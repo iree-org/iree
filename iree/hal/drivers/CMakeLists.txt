@@ -28,6 +28,11 @@ if(${IREE_HAL_DRIVER_VULKAN})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::registration)
 endif()
 
+if(APPLE)
+  find_library(Metal Metal)
+  find_library(Foundation Foundation)
+endif()
+
 iree_cc_library(
   NAME
     drivers
@@ -39,5 +44,7 @@ iree_cc_library(
     iree::base::api
     iree::base::tracing
     ${IREE_HAL_DRIVER_MODULES}
+    $<$<PLATFORM_ID:Darwin>:${Metal}>
+    $<$<PLATFORM_ID:Darwin>:${Foundation}>
   PUBLIC
 )
