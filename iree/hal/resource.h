@@ -20,6 +20,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/atomics.h"
+#include "iree/base/debugging.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,24 @@ static inline void iree_hal_resource_initialize(
   iree_atomic_ref_count_init(&out_resource->ref_count);
   out_resource->vtable = vtable;
 }
+
+// Returns true if the |resource| has the given |vtable| type.
+// This is *not* a way to ensure that an instance is of a specific type but
+// instead that it has a compatible vtable. This is because LTO may very rarely
+// dedupe identical vtables and cause the pointer comparison to succeed even if
+// the spellings of the types differs.
+static inline bool iree_hal_resource_is(const void* resource,
+                                        const void* vtable) {
+  return resource ? ((const iree_hal_resource_t*)resource)->vtable == vtable
+                  : false;
+}
+
+// Asserts (**DEBUG ONLY**) that the |resource| has the given |vtable| type.
+// This is only useful to check for programmer error and may have false
+// positives - do not rely on it for handling untrusted user input.
+#define IREE_HAL_ASSERT_TYPE(resource, vtable)             \
+  IREE_ASSERT_TRUE(iree_hal_resource_is(resource, vtable), \
+                   "type does not match expected " #vtable)
 
 #ifdef __cplusplus
 }  // extern "C"

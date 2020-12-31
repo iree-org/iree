@@ -29,46 +29,115 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Types and Enums
+// iree_hal_vulkan_device_t extensibility util
 //===----------------------------------------------------------------------===//
 
-// Describes the type of a set of Vulkan extensions.
-typedef enum {
-  IREE_HAL_VULKAN_REQUIRED_BIT = 1 << 0,
-  IREE_HAL_VULKAN_INSTANCE_BIT = 1 << 1,
-
-  // A set of required instance extension names.
-  IREE_HAL_VULKAN_INSTANCE_REQUIRED =
-      IREE_HAL_VULKAN_INSTANCE_BIT | IREE_HAL_VULKAN_REQUIRED_BIT,
-  // A set of optional instance extension names.
-  IREE_HAL_VULKAN_INSTANCE_OPTIONAL = IREE_HAL_VULKAN_INSTANCE_BIT,
-  // A set of required device extension names.
-  IREE_HAL_VULKAN_DEVICE_REQUIRED = IREE_HAL_VULKAN_REQUIRED_BIT,
-  // A set of optional device extension names.
-  IREE_HAL_VULKAN_DEVICE_OPTIONAL = 0,
-} iree_hal_vulkan_extensibility_set_t;
-
+// TODO(benvanik): replace with feature list (easier to version).
 // Bitfield that defines sets of Vulkan features.
-typedef enum {
-  // Use VK_LAYER_KHRONOS_standard_validation.
-  IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS = 1 << 0,
+enum iree_hal_vulkan_feature_e {
+  // Use VK_LAYER_KHRONOS_standard_validation to validate Vulkan API usage.
+  // Has a significant performance penalty and is *not* a security mechanism.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1 << 0,
 
   // Use VK_EXT_debug_utils, record markers, and log errors.
-  IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS = 1 << 1,
+  IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS = 1 << 1,
+};
+typedef uint64_t iree_hal_vulkan_features_t;
 
-  // Use vkCmdPushDescriptorSetKHR.
-  IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS = 1 << 2,
-} iree_hal_vulkan_features_t;
+// Describes the type of a set of Vulkan extensions.
+enum iree_hal_vulkan_extensibility_set_e {
+  // A set of required instance layer names. These must all be enabled on
+  // the VkInstance for IREE to function.
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED = 0,
 
-// Vulkan driver creation options.
-typedef struct {
-  // Vulkan version that will be requested, e.g. `VK_API_VERSION_1_0`.
-  // Driver creation will fail if the required version is not available.
-  uint32_t api_version;
+  // A set of optional instance layer names. If omitted fallbacks may be
+  // used or debugging features may not be available.
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL = 1,
 
-  // Vulkan features to request.
-  iree_hal_vulkan_features_t features;
-} iree_hal_vulkan_driver_options_t;
+  // A set of required instance extension names. These must all be enabled on
+  // the VkInstance for IREE to function.
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED = 2,
+
+  // A set of optional instance extension names. If omitted fallbacks may be
+  // used or debugging features may not be available.
+  IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL = 3,
+
+  // A set of required device extension names. These must all be enabled on
+  // the VkDevice for IREE to function.
+  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED = 4,
+
+  // A set of optional device extension names. If omitted fallbacks may be
+  // used or debugging features may not be available.
+  IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL = 5,
+
+  IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT,
+};
+typedef uint32_t iree_hal_vulkan_extensibility_set_t;
+
+// Queries the names of the Vulkan layers and extensions used for a given set of
+// IREE |requested_features|. All devices used by IREE must have the required
+// layers and extensions as defined by these sets. Optional layers and
+// extensions will be used when needed and otherwise have fallbacks for when
+// they are not available.
+//
+// Instance extensions should be enabled on VkInstances passed to
+// |iree_hal_vulkan_driver_create_using_instance| and device extensions should
+// be enabled on VkDevices passed to |iree_hal_vulkan_driver_wrap_device|.
+//
+// |string_capacity| defines the number of elements available in
+// |out_string_values| and |out_string_count| will be set with the actual number
+// of strings returned. If |string_capacity| is too small then
+// IREE_STATUS_OUT_OF_RANGE will be returned with the required capacity in
+// |out_string_count|. To only query the required capacity then
+// |out_string_values| may be passed as NULL.
+//
+// The returned strings originate from the _EXTENSION_NAME Vulkan macros
+// (such as 'VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME') and have a
+// lifetime matching whatever module they are defined in.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_vulkan_query_extensibility_set(
+    iree_hal_vulkan_features_t requested_features,
+    iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
+    const char** out_string_values, iree_host_size_t* out_string_count);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_syms_t
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_vulkan_syms_s iree_hal_vulkan_syms_t;
+
+// Loads Vulkan functions by invoking |vkGetInstanceProcAddr|.
+//
+// |vkGetInstanceProcAddr| can be obtained in whatever way suites the calling
+// application, such as via `dlsym` or `GetProcAddress` when dynamically
+// loading Vulkan, or `reinterpret_cast<void*>(&vkGetInstanceProcAddr)` when
+// statically linking Vulkan.
+//
+// |out_syms| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
+    void* vkGetInstanceProcAddr_fn, iree_allocator_t host_allocator,
+    iree_hal_vulkan_syms_t** out_syms);
+
+// Loads Vulkan functions from the Vulkan loader.
+// This will look for a Vulkan loader on the system (like libvulkan.so) and
+// dlsym the functions from that.
+//
+// |out_syms| must be released by the caller with iree_hal_vulkan_syms_release.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_vulkan_syms_create_from_system_loader(
+    iree_allocator_t host_allocator, iree_hal_vulkan_syms_t** out_syms);
+
+// Retains the given |syms| for the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms);
+
+// Releases the given |syms| from the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_device_t
+//===----------------------------------------------------------------------===//
 
 // A set of queues within a specific queue family on a VkDevice.
 typedef struct {
@@ -80,114 +149,24 @@ typedef struct {
   uint64_t queue_indices;
 } iree_hal_vulkan_queue_set_t;
 
-typedef struct iree_hal_vulkan_syms iree_hal_vulkan_syms_t;
+// TODO(benvanik): replace with flag list (easier to version).
+enum iree_hal_vulkan_device_flag_e {
+  // Uses timeline semaphore emulation even if native support exists.
+  // May be removed in future versions when timeline semaphores can be assumed
+  // present on all platforms (looking at you, Android ಠ_ಠ).
+  IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION = 1 << 0,
+};
+typedef uint64_t iree_hal_vulkan_device_flags_t;
 
-//===----------------------------------------------------------------------===//
-// iree::hal::vulkan::DynamicSymbols
-//===----------------------------------------------------------------------===//
+typedef struct {
+  // Flags controlling device behavior.
+  iree_hal_vulkan_device_flags_t flags;
+} iree_hal_vulkan_device_options_t;
 
-// Loads Vulkan functions by invoking |vkGetInstanceProcAddr|.
-//
-// |vkGetInstanceProcAddr| can be obtained in whatever way suites the calling
-// application, such as via `dlsym` or `GetProcAddress` when dynamically
-// loading Vulkan, or `reinterpret_cast<void*>(&vkGetInstanceProcAddr)` when
-// statically linking Vulkan.
-//
-// |out_syms| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
-    void* vkGetInstanceProcAddr_fn, iree_hal_vulkan_syms_t** out_syms);
+IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_device_options_initialize(
+    iree_hal_vulkan_device_options_t* out_options);
 
-// Loads Vulkan functions from the Vulkan loader.
-// This will look for a Vulkan loader on the system (like libvulkan.so) and
-// dlsym the functions from that.
-//
-// |out_syms| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_syms_create_from_system_loader(
-    iree_hal_vulkan_syms_t** out_syms);
-
-// Releases the given |syms| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
-
-//===----------------------------------------------------------------------===//
-// iree::hal::vulkan Extensibility Util
-//===----------------------------------------------------------------------===//
-
-// Gets the names of the Vulkan extensions used for a given set of |features|.
-//
-// Instance extensions should be enabled on VkInstances passed to
-// |iree_hal_vulkan_driver_create_using_instance| and device extensions should
-// be enabled on VkDevices passed to |iree_hal_vulkan_driver_wrap_device|.
-//
-// |extensions_capacity| defines the number of elements available in
-// |out_extensions| and |out_extensions_count| will be set with the actual
-// number of extensions returned. If |extensions_capacity| is too small
-// IREE_STATUS_OUT_OF_RANGE will be returned with the required capacity in
-// |out_extensions_count|. To only query the required capacity |out_extensions|
-// may be passed as nullptr.
-//
-// Extension string lifetime is tied to the loader shared object or instance,
-// depending on where they came from.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
-    iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
-    const char** out_extensions, iree_host_size_t* out_extensions_count);
-
-// Gets the names of the Vulkan layers used for a given set of |features|.
-//
-// Instance layers should be enabled on VkInstances passed to
-// |iree_hal_vulkan_driver_create_using_instance|. Device layers are deprecated
-// and unsupported here.
-//
-// |layers_capacity| defines the number of elements available in |out_layers|
-// and |out_layers_count| will be set with the actual number of layers returned.
-// If |layers_capacity| is too small IREE_STATUS_OUT_OF_RANGE will be returned
-// with the required capacity in |out_layers_count|. To only query the required
-// capacity |out_layers| may be passed as nullptr.
-//
-// Layer string lifetime is tied to the loader shared object or instance,
-// depending on where they came from.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
-    iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_features_t features, iree_host_size_t layers_capacity,
-    const char** out_layers, iree_host_size_t* out_layers_count);
-
-//===----------------------------------------------------------------------===//
-// iree::hal::vulkan::VulkanDriver
-//===----------------------------------------------------------------------===//
-
-// TODO(scotttodd): Allow applications to provide their own allocators here
-
-// Creates a Vulkan HAL driver that manages its own VkInstance.
-//
-// |out_driver| must be released by the caller (see |iree_hal_driver_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
-    iree_hal_vulkan_driver_options_t options, iree_hal_vulkan_syms_t* syms,
-    iree_hal_driver_t** out_driver);
-
-// Creates a Vulkan HAL driver that shares an existing VkInstance.
-//
-// |instance| is expected to have been created with all extensions returned by
-// |iree_hal_vulkan_get_extensions| and IREE_HAL_VULKAN_INSTANCE_REQUIRED using
-// |options| enabled.
-//
-// |instance| must remain valid for the life of |out_driver| and |out_driver|
-// itself must be released by the caller (see |iree_hal_driver_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_using_instance(
-    iree_hal_vulkan_driver_options_t options, iree_hal_vulkan_syms_t* syms,
-    VkInstance instance, iree_hal_driver_t** out_driver);
-
-// Creates the default Vulkan HAL device using |driver| that manages its own
-// VkPhysicalDevice/VkDevice.
-//
-// |out_device| must be released by the caller (see |iree_hal_device_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
-                                             iree_hal_device_t** out_device);
-
-// Creates a Vulkan HAL device using |driver| that wraps an existing VkDevice.
+// Creates a Vulkan HAL device that wraps an existing VkDevice.
 //
 // HAL devices created in this way may share Vulkan resources and synchronize
 // within the same physical VkPhysicalDevice and logical VkDevice directly.
@@ -196,6 +175,9 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // returned by |iree_hal_vulkan_get_extensions| and
 // IREE_HAL_VULKAN_DEVICE_REQUIRED using the features provided during driver
 // creation.
+//
+// |instance_syms| must have at least the instance-specific functions resolved
+// and device symbols will be queried from |logical_device| as needed.
 //
 // The device will schedule commands against the queues in
 // |compute_queue_set| and (if set) |transfer_queue_set|.
@@ -210,14 +192,74 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // |compute_queue_set|, if they are available.
 // Similarly, dedicated transfer queues (no compute or graphics) are preferred
 // within |transfer_queue_set|.
-// The queues may be the same.
+// The queue sets can be the same.
 //
 // |out_device| must be released by the caller (see |iree_hal_device_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
-    iree_hal_driver_t* driver, VkPhysicalDevice physical_device,
-    VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
-    iree_hal_vulkan_queue_set_t transfer_queue_set,
-    iree_hal_device_t** out_device);
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_wrap_device(
+    iree_string_view_t identifier,
+    const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
+    VkPhysicalDevice physical_device, VkDevice logical_device,
+    const iree_hal_vulkan_queue_set_t* compute_queue_set,
+    const iree_hal_vulkan_queue_set_t* transfer_queue_set,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_driver_t
+//===----------------------------------------------------------------------===//
+
+// Vulkan driver creation options.
+typedef struct {
+  // Vulkan version that will be requested, e.g. `VK_API_VERSION_1_0`.
+  // Driver creation will fail if the required version is not available.
+  uint32_t api_version;
+
+  // IREE features used to configure the VkInstance and VkDevices created using
+  // it. These are used to populate the active Vulkan layers and extensions when
+  // the instance and its devices are created.
+  iree_hal_vulkan_features_t requested_features;
+
+  // TODO(benvanik): remove this single setting - it would be nice instead to
+  // pass a list to force device enumeration/matrix expansion or omit entirely
+  // to have auto-discovered options based on capabilities. Right now this
+  // forces all devices - even if from different vendors - to have the same
+  // options.
+  // Options to use for all devices created by the driver.
+  iree_hal_vulkan_device_options_t device_options;
+
+  // TODO(benvanik): change to something more canonically vulkan (like
+  // VkPhysicalDeviceProperties::deviceID).
+  // Index of the default Vulkan device to use within the list of available
+  // devices. Devices are discovered via vkEnumeratePhysicalDevices then
+  // considered "available" if compatible with the |requested_features|.
+  int default_device_index;
+} iree_hal_vulkan_driver_options_t;
+
+IREE_API_EXPORT void IREE_API_CALL iree_hal_vulkan_driver_options_initialize(
+    iree_hal_vulkan_driver_options_t* out_options);
+
+// Creates a Vulkan HAL driver that manages its own VkInstance.
+//
+// |out_driver| must be released by the caller (see |iree_hal_driver_release|).
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
+    iree_string_view_t identifier,
+    const iree_hal_vulkan_driver_options_t* options,
+    iree_hal_vulkan_syms_t* syms, iree_allocator_t host_allocator,
+    iree_hal_driver_t** out_driver);
+
+// Creates a Vulkan HAL driver that shares an existing VkInstance.
+//
+// |instance| is expected to have been created with all extensions returned by
+// the instance-specific |iree_hal_vulkan_query_extensibility_set| queries.
+//
+// |instance| must remain valid for the life of |out_driver| and |out_driver|
+// itself must be released by the caller (see |iree_hal_driver_release|).
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_vulkan_driver_create_using_instance(
+    iree_string_view_t identifier,
+    const iree_hal_vulkan_driver_options_t* options,
+    iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
 #ifdef __cplusplus
 }  // extern "C"

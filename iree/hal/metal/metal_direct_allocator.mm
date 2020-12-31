@@ -93,19 +93,6 @@ bool MetalDirectAllocator::CanUseBufferLike(Allocator* source_allocator,
   return source_allocator == this;
 }
 
-bool MetalDirectAllocator::CanAllocate(iree_hal_memory_type_t memory_type,
-                                       iree_hal_buffer_usage_t buffer_usage,
-                                       size_t allocation_size) const {
-  // TODO(benvanik): ensure there is a memory type that can satisfy the request.
-  return true;
-}
-
-Status MetalDirectAllocator::MakeCompatible(iree_hal_memory_type_t* memory_type,
-                                            iree_hal_buffer_usage_t* buffer_usage) const {
-  // TODO(benvanik): mutate to match supported memory types.
-  return OkStatus();
-}
-
 StatusOr<ref_ptr<MetalBuffer>> MetalDirectAllocator::AllocateInternal(
     iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
     iree_hal_memory_access_t allowed_access, size_t allocation_size) {
@@ -120,7 +107,7 @@ StatusOr<ref_ptr<MetalBuffer>> MetalDirectAllocator::AllocateInternal(
   id<MTLBuffer> metal_buffer = [metal_device_ newBufferWithLength:allocation_size
                                                           options:resource_options];  // retained
 
-  return MetalBuffer::CreateUnretained(
+  return MetalBuffer::Create(
       this, memory_type, allowed_access, buffer_usage, allocation_size, /*byte_offset=*/0,
       /*byte_length=*/allocation_size, metal_buffer, metal_transfer_queue_);
 }
@@ -130,14 +117,6 @@ StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::Allocate(iree_hal_memory_type_t 
                                                          size_t allocation_size) {
   IREE_TRACE_SCOPE0("MetalDirectAllocator::Allocate");
   return AllocateInternal(memory_type, buffer_usage, IREE_HAL_MEMORY_ACCESS_ALL, allocation_size);
-}
-
-StatusOr<ref_ptr<Buffer>> MetalDirectAllocator::WrapMutable(iree_hal_memory_type_t memory_type,
-                                                            iree_hal_memory_access_t allowed_access,
-                                                            iree_hal_buffer_usage_t buffer_usage,
-                                                            void* data, size_t data_length) {
-  IREE_TRACE_SCOPE0("MetalDirectAllocator::WrapMutable");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalDirectAllocator::WrapMutable";
 }
 
 }  // namespace metal

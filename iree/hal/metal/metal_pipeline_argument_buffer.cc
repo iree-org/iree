@@ -34,16 +34,6 @@ MetalArgumentBufferLayout::GetBindingForIndex(int index) const {
   return nullptr;
 }
 
-std::string MetalArgumentBufferLayout::DebugString() const {
-  std::vector<std::string> binding_strings;
-  binding_strings.reserve(bindings_.size());
-  for (const auto& binding : bindings_) {
-    binding_strings.push_back(
-        absl::StrCat("[", binding.DebugStringShort(), "]"));
-  }
-  return absl::StrCat("bindings=[", absl::StrJoin(binding_strings, ", "), "]");
-}
-
 MetalPipelineArgumentBufferLayout::MetalPipelineArgumentBufferLayout(
     absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants)
     : set_layouts_(set_layouts.size()), push_constants_(push_constants) {
@@ -55,16 +45,6 @@ MetalPipelineArgumentBufferLayout::MetalPipelineArgumentBufferLayout(
 
 MetalPipelineArgumentBufferLayout::~MetalPipelineArgumentBufferLayout() {
   for (auto* layout : set_layouts_) layout->ReleaseReference();
-}
-
-std::string MetalPipelineArgumentBufferLayout::DebugString() const {
-  std::vector<std::string> set_strings;
-  set_strings.reserve(set_layouts_.size());
-  for (int i = 0; i < set_layouts_.size(); ++i) {
-    set_strings.push_back(
-        absl::StrCat("{set=", i, ", ", set_layouts_[i]->DebugString(), "}"));
-  }
-  return absl::StrCat("sets={", absl::StrJoin(set_strings, "; "), "}");
 }
 
 MetalArgumentBuffer::MetalArgumentBuffer(

@@ -18,7 +18,6 @@
 #include <memory>
 #include <string>
 
-#include "iree/hal/cc/debug_capture_manager.h"
 #include "iree/hal/cc/driver.h"
 
 namespace iree {
@@ -51,12 +50,9 @@ class MetalDriver final : public Driver {
       iree_hal_device_id_t device_id) override;
 
  private:
-  MetalDriver(std::vector<DeviceInfo> devices,
-              std::unique_ptr<DebugCaptureManager> debug_capture_manager);
+  MetalDriver(std::vector<DeviceInfo> devices);
 
   std::vector<DeviceInfo> devices_;
-
-  std::unique_ptr<DebugCaptureManager> debug_capture_manager_;
 };
 
 }  // namespace metal
