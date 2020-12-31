@@ -361,7 +361,7 @@ module  {
     %11 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
     %12 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
     %13 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%5 : index](%8, %9, %6, %10, %11, %7, %12, %13) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%5] (%8, %9, %6, %10, %11, %7, %12, %13) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %15 = shapex.tie_shape %14, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     return %15, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   }
@@ -400,7 +400,7 @@ module  {
     %11 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
     %12 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
     %13 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%5 : index](%8, %9, %6, %10, %11, %7, %12, %13) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%5] (%8, %9, %6, %10, %11, %7, %12, %13) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %15 = shapex.tie_shape %14, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     return %15, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   }
@@ -420,7 +420,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
   %8 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
   %9 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3 : index](%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3] (%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -454,7 +454,7 @@ module  {
     %7 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
     %8 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
     %9 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-    %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3 : index](%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3] (%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %11 = shapex.tie_shape %10, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     return %11, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   }
@@ -474,7 +474,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
   %8 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
   %9 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3 : index](%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3] (%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -493,7 +493,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
   %8 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
   %9 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3 : index](%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3] (%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -512,7 +512,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.ranked_dim %arg3[1] : !shapex.ranked_shape<[?,?]> -> index
   %8 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
   %9 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3 : index](%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%3] (%1, %0, %4, %6, %7, %5, %8, %9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -531,7 +531,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.make_ranked_shape %4, %5 : (index, index) -> !shapex.ranked_shape<[?,?]>
   %8 = shapex.tie_shape %arg2, %arg3 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   %9 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%6 : index](%4, %5, %8, %3, %2, %9, %1, %0) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%6] (%4, %5, %8, %3, %2, %9, %1, %0) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -550,7 +550,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
   %7 = shapex.make_ranked_shape %4, %5 : (index, index) -> !shapex.ranked_shape<[?,?]>
   %8 = shapex.tie_shape %arg2, %arg3 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   %9 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%6 : index](%4, %5, %8, %3, %2, %9, %1, %0) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %10 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%6] (%4, %5, %8, %3, %2, %9, %1, %0) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %11 = shapex.tie_shape %10, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %11, %7 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
 }
@@ -579,7 +579,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
     %17 = shapex.make_ranked_shape %arg17, %arg18 : (index, index) -> !shapex.ranked_shape<[?,?]>
     %18 = shapex.tie_shape %arg4, %15 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     %19 = shapex.tie_shape %arg7, %16 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-    %20 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %18, %arg13, %arg14, %19, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %20 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %18, %arg13, %arg14, %19, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %21 = shapex.tie_shape %20, %17 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     flow.return %21 : tensor<?x?xf32>
   }
@@ -608,7 +608,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
     %15 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
     %16 = shapex.tie_shape %arg4, %13 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     %17 = shapex.tie_shape %arg7, %14 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-    %18 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %16, %arg13, %arg14, %17, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %18 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %16, %arg13, %arg14, %17, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %19 = shapex.tie_shape %18, %15 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     flow.return %19 : tensor<?x?xf32>
   }
@@ -633,7 +633,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>, %arg2: ten
     %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
     %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+    %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
     %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     flow.return %15 : tensor<?x?xf32>
   }
@@ -673,7 +673,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -714,7 +714,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg13, %arg14, %13, %arg15, %arg16) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -754,7 +754,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -794,7 +794,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -834,7 +834,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -874,7 +874,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -914,7 +914,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -980,7 +980,7 @@ module  {
       %11 = shapex.make_ranked_shape %arg11, %arg12 : (index, index) -> !shapex.ranked_shape<[?,?]>
       %12 = shapex.tie_shape %arg4, %9 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       %13 = shapex.tie_shape %arg7, %10 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
-      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10 : index](%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+      %14 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg10] (%arg11, %arg12, %12, %arg5, %arg6, %13, %arg8, %arg9) : (index, index, tensor<?x?xf32>, index, index, tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
       %15 = shapex.tie_shape %14, %11 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
       flow.return %15 : tensor<?x?xf32>
     }
@@ -3215,9 +3215,9 @@ module  {
     %sz_5 = hal.allocator.compute_size %allocator_4, shape = [%4, %5], element_type = 50331680
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg2, %c0, %sz_1), 1 = (%arg0, %c0, %sz_3), 2 = (%buffer, %c0, %sz_5)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg4 = %6 : index, %arg5 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg4 = %cmd : !hal.command_buffer, %arg5 = %6 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg5, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg4, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3265,9 +3265,9 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
   %sz_5 = hal.allocator.compute_size %allocator_4, shape = [%6, %7], element_type = 50331680
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %sz_1), 1 = (%arg0, %c0, %sz_3), 2 = (%buffer, %c0, %sz_5)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %8 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %8 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg7, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg6, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3309,9 +3309,9 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
   %14 = muli %13, %arg5 : index
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %10), 1 = (%arg0, %c0, %12), 2 = (%buffer, %c0, %14)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg7, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg6, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3346,9 +3346,9 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
   %9 = muli %1, %arg2 : index
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg7, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg6, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3439,9 +3439,9 @@ module  {
     %9 = muli %1, %arg2 : index
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg7, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg6, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3557,9 +3557,9 @@ module  {
     %9 = muli %1, %arg2 : index
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg7, @linked_vmla::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg6, @linked_vmla::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3675,11 +3675,11 @@ module  {
     %9 = muli %1, %arg2 : index
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
       %c1 = constant 1 : index
-      %10 = hal.command_buffer.device %arg7 : !hal.device
+      %10 = hal.command_buffer.device %arg6 : !hal.device
       %exe = hal.executable.lookup %10, @linked_vmla : !hal.executable
-      hal.command_buffer.dispatch %arg7, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch %arg6, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3739,11 +3739,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
   %9 = muli %1, %arg2 : index
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
     %c1 = constant 1 : index
-    %10 = hal.command_buffer.device %arg7 : !hal.device
+    %10 = hal.command_buffer.device %arg6 : !hal.device
     %exe = hal.executable.lookup %10, @linked_vmla : !hal.executable
-    hal.command_buffer.dispatch %arg7, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch %arg6, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3778,11 +3778,11 @@ func @dot(%arg0: !hal.buffer, %arg1: index, %arg2: index, %arg3: !hal.buffer, %a
   %9 = muli %1, %arg2 : index
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg3, %c0, %8), 1 = (%arg0, %c0, %9), 2 = (%buffer, %c0, %2)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
     %c1 = constant 1 : index
-    %10 = hal.command_buffer.device %arg7 : !hal.device
+    %10 = hal.command_buffer.device %arg6 : !hal.device
     %exe = hal.executable.lookup %10, @linked_vmla : !hal.executable
-    hal.command_buffer.dispatch %arg7, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch %arg6, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3964,11 +3964,11 @@ module  {
     %10 = muli %1, %arg2 : index
     hal.command_buffer.push_descriptor_set %cmd, %3, set=0, bindings=[0 = (%arg3, %c0, %9), 1 = (%arg0, %c0, %10), 2 = (%buffer, %c0, %2)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg6 = %0 : index, %arg7 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg6 = %cmd : !hal.command_buffer, %arg7 = %0 : index) {
       %c1 = constant 1 : index
-      %11 = hal.command_buffer.device %arg7 : !hal.device
+      %11 = hal.command_buffer.device %arg6 : !hal.device
       %12 = hal.variable.load @_executable_linked_vmla : !hal.executable
-      hal.command_buffer.dispatch %arg7, %12, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch %arg6, %12, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>

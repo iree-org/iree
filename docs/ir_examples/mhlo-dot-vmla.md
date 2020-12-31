@@ -264,7 +264,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -284,7 +284,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -294,7 +294,7 @@ module  {
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -313,7 +313,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -323,7 +323,7 @@ module  {
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -332,7 +332,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -341,7 +341,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -350,7 +350,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -359,7 +359,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048 : index](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -369,7 +369,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
   %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -381,7 +381,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
   %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -393,7 +393,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
   %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -415,7 +415,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -438,7 +438,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -461,7 +461,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -484,7 +484,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -507,7 +507,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -530,7 +530,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -553,7 +553,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -596,7 +596,7 @@ module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
     %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2 : index](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -2522,9 +2522,9 @@ module  {
     %sz_10 = hal.allocator.compute_size %allocator_9, shape = [%c32_7, %c64_8], element_type = 50331680
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_2), 1 = (%arg1, %c0, %sz_6), 2 = (%buffer, %c0, %sz_10)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2564,9 +2564,9 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %sz_10 = hal.allocator.compute_size %allocator_9, shape = [%c32_7, %c64_8], element_type = 50331680
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_2), 1 = (%arg1, %c0, %sz_6), 2 = (%buffer, %c0, %sz_10)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2593,9 +2593,9 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2622,9 +2622,9 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2697,9 +2697,9 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2795,9 +2795,9 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @linked_vmla::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg2, @linked_vmla::@vmla::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2893,11 +2893,11 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1 = constant 1 : index
-      %0 = hal.command_buffer.device %arg3 : !hal.device
+      %0 = hal.command_buffer.device %arg2 : !hal.device
       %exe = hal.executable.lookup %0, @linked_vmla : !hal.executable
-      hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2947,11 +2947,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1 = constant 1 : index
-    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %0 = hal.command_buffer.device %arg2 : !hal.device
     %exe = hal.executable.lookup %0, @linked_vmla : !hal.executable
-    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -2978,11 +2978,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1 = constant 1 : index
-    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %0 = hal.command_buffer.device %arg2 : !hal.device
     %exe = hal.executable.lookup %0, @linked_vmla : !hal.executable
-    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -3142,11 +3142,11 @@ module  {
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"vmla">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"vmla">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1 = constant 1 : index
-      %1 = hal.command_buffer.device %arg3 : !hal.device
+      %1 = hal.command_buffer.device %arg2 : !hal.device
       %2 = hal.variable.load @_executable_linked_vmla : !hal.executable
-      hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch %arg2, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
