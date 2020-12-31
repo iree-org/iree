@@ -382,7 +382,7 @@ iree_string_view_append_to_buffer(iree_string_view_t source_value,
 #if !defined(IREE_STATUS_MODE)
 #ifdef NDEBUG
 // Release mode: just source location.
-#define IREE_STATUS_MODE 1
+#define IREE_STATUS_MODE 2
 #else
 // Debug mode: annotations and stack traces.
 #define IREE_STATUS_MODE 3

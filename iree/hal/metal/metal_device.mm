@@ -19,7 +19,6 @@
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cc/allocator.h"
 #include "iree/hal/metal/dispatch_time_util.h"
 #include "iree/hal/metal/metal_capture_manager.h"
 #include "iree/hal/metal/metal_command_buffer.h"
@@ -83,40 +82,37 @@ MetalDevice::~MetalDevice() {
   [metal_handle_ release];
 }
 
-std::string MetalDevice::DebugString() const {
-  return absl::StrCat(Device::DebugString(),         //
-                      "\n[MetalDevice]",             //
-                      "\n    - Dispatch Queues: 1",  //
-                      "\n    - Transfer Queues: 1");
-}
-
-ref_ptr<ExecutableCache> MetalDevice::CreateExecutableCache() {
+Status MetalDevice::CreateExecutableCache(iree_string_view_t identifier,
+      iree_hal_executable_cache_t** out_executable_cache) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateExecutableCache");
   return make_ref<MetalPipelineCache>(metal_handle_);
 }
 
-StatusOr<ref_ptr<DescriptorSetLayout>> MetalDevice::CreateDescriptorSetLayout(
+Status MetalDevice::CreateDescriptorSetLayout(
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
-    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings) {
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSetLayout");
   return make_ref<MetalArgumentBufferLayout>(usage_type, bindings);
 }
 
-StatusOr<ref_ptr<ExecutableLayout>> MetalDevice::CreateExecutableLayout(
-    absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
+Status MetalDevice::CreateExecutableLayout(
+    absl::Span<iree_hal_descriptor_set_layout_t*> set_layouts, size_t push_constants, iree_hal_executable_layout_t** out_executable_layout) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateExecutableLayout");
   return make_ref<MetalPipelineArgumentBufferLayout>(set_layouts, push_constants);
 }
 
-StatusOr<ref_ptr<DescriptorSet>> MetalDevice::CreateDescriptorSet(
-    DescriptorSetLayout* set_layout, absl::Span<const iree_hal_descriptor_set_binding_t> bindings) {
+Status MetalDevice::CreateDescriptorSet(
+    iree_hal_descriptor_set_layout_t* set_layout, absl::Span<const iree_hal_descriptor_set_binding_t> bindings,
+    iree_hal_descriptor_set_t** out_descriptor_set) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSet");
   return make_ref<MetalArgumentBuffer>(static_cast<MetalArgumentBufferLayout*>(set_layout),
                                        bindings);
 }
 
-StatusOr<ref_ptr<CommandBuffer>> MetalDevice::CreateCommandBuffer(
-    iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t command_categories) {
+Status MetalDevice::CreateCommandBuffer(
+    iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t command_categories,
+      iree_hal_command_buffer_t** out_command_buffer) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateCommandBuffer");
   @autoreleasepool {
     StatusOr<ref_ptr<CommandBuffer>> command_buffer;
@@ -129,18 +125,18 @@ StatusOr<ref_ptr<CommandBuffer>> MetalDevice::CreateCommandBuffer(
   }
 }
 
-StatusOr<ref_ptr<Event>> MetalDevice::CreateEvent() {
+Status MetalDevice::CreateEvent(iree_hal_event_t** out_event) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateEvent");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalDevice::CreateEvent";
 }
 
-StatusOr<ref_ptr<Semaphore>> MetalDevice::CreateSemaphore(uint64_t initial_value) {
+Status MetalDevice::CreateSemaphore(uint64_t initial_value, iree_hal_semaphore_t** out_semaphore) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateSemaphore");
   return MetalSharedEvent::Create(metal_handle_, event_listener_, initial_value);
 }
 
-Status MetalDevice::WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                      Time deadline_ns) {
+Status MetalDevice::WaitAllSemaphores(const iree_hal_semaphore_list_t* semaphore_list,
+                                      iree_time_t deadline_ns) {
   IREE_TRACE_SCOPE0("MetalDevice::WaitAllSemaphores");
   // Go through all MetalSharedEvents and wait on each of them given we need all of them to be
   // signaled anyway.
@@ -151,8 +147,8 @@ Status MetalDevice::WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphore
   return OkStatus();
 }
 
-StatusOr<int> MetalDevice::WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                            Time deadline_ns) {
+StatusOr<int> MetalDevice::WaitAnySemaphore(const iree_hal_semaphore_list_t* semaphore_list,
+                                            iree_time_t deadline_ns) {
   IREE_TRACE_SCOPE0("MetalDevice::WaitAnySemaphore");
 
   if (semaphores.empty()) {
@@ -204,7 +200,7 @@ StatusOr<int> MetalDevice::WaitAnySemaphore(absl::Span<const SemaphoreValue> sem
   return signaled_index;
 }
 
-Status MetalDevice::WaitIdle(Time deadline_ns) {
+Status MetalDevice::WaitIdle(iree_time_t deadline_ns) {
   IREE_TRACE_SCOPE0("MetalDevice::WaitIdle");
   return UnimplementedErrorBuilder(IREE_LOC) << "MetalDevice::WaitIdle";
 }

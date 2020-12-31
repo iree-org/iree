@@ -12,31 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_VULKAN_ENUMLATED_TIMELINE_SEMAPHORE_H_
-#define IREE_HAL_VULKAN_ENUMLATED_TIMELINE_SEMAPHORE_H_
+#ifndef IREE_HAL_VULKAN_ENUMLATED_SEMAPHORE_H_
+#define IREE_HAL_VULKAN_ENUMLATED_SEMAPHORE_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include <atomic>
-#include <vector>
-
-#include "absl/base/thread_annotations.h"
-#include "absl/container/inlined_vector.h"
-#include "absl/synchronization/mutex.h"
-#include "iree/base/intrusive_list.h"
-#include "iree/base/ref_ptr.h"
-#include "iree/base/status.h"
-#include "iree/hal/cc/semaphore.h"
+#include "iree/hal/api.h"
+#include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/timepoint_util.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// A timeline semaphore emulated via `VkFence`s and binary `VkSemaphore`s.
+// Creates a timeline semaphore emulated via `VkFence`s and binary
+// `VkSemaphore`s.
 //
 // Vulkan provides several explicit synchronization primitives: fences,
 // (binary/timeline) semaphores, events, pipeline barriers, and render passes.
@@ -126,111 +115,51 @@ namespace vulkan {
 // synchronization primitives. So this should not be treated as a full
 // emulation of the Vulkan spec and thus does not substitute
 // Vulkan-ExtensionLayer.
-class EmulatedTimelineSemaphore final : public Semaphore {
- public:
-  // Creates a timeline semaphore with the given |initial_value|.
-  static StatusOr<ref_ptr<Semaphore>> Create(
-      ref_ptr<VkDeviceHandle> logical_device,
-      std::function<Status(Semaphore*)> on_semaphore_signal,
-      std::function<void(Semaphore*)> on_semaphore_failure,
-      std::function<void(absl::Span<VkFence>)> on_fence_signal,
-      ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value);
+iree_status_t iree_hal_vulkan_emulated_semaphore_create(
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree::hal::vulkan::TimePointSemaphorePool* semaphore_pool,
+    iree_host_size_t command_queue_count,
+    iree::hal::vulkan::CommandQueue** command_queues, uint64_t initial_value,
+    iree_hal_semaphore_t** out_semaphore);
 
-  EmulatedTimelineSemaphore(
-      ref_ptr<VkDeviceHandle> logical_device,
-      std::function<Status(Semaphore*)> on_semaphore_signal,
-      std::function<void(Semaphore*)> on_semaphore_failure,
-      std::function<void(absl::Span<VkFence>)> on_fence_signal,
-      ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value);
+// Acquires a binary semaphore for waiting on the timeline to advance to the
+// given |value|. The semaphore returned won't be waited by anyone else.
+// |wait_fence| is the fence associated with the queue submission that waiting
+// on this semaphore.
+//
+// Returns VK_NULL_HANDLE if there are no available semaphores for the given
+// |value|.
+iree_status_t iree_hal_vulkan_emulated_semaphore_acquire_wait_handle(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    const iree::ref_ptr<iree::hal::vulkan::TimePointFence>& wait_fence,
+    VkSemaphore* out_handle);
 
-  ~EmulatedTimelineSemaphore() override;
+// Cancels the waiting attempt on the given binary |semaphore|. This allows
+// the |semaphore| to be waited by others.
+iree_status_t iree_hal_vulkan_emulated_semaphore_cancel_wait_handle(
+    iree_hal_semaphore_t* semaphore, VkSemaphore handle);
 
-  StatusOr<uint64_t> Query() override;
+// Acquires a binary semaphore for signaling the timeline to the given |value|.
+// |value| must be smaller than the current timeline value. |signal_fence| is
+// the fence associated with the queue submission that signals this semaphore.
+iree_status_t iree_hal_vulkan_emulated_semaphore_acquire_signal_handle(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    const iree::ref_ptr<iree::hal::vulkan::TimePointFence>& signal_fence,
+    VkSemaphore* out_handle);
 
-  Status Signal(uint64_t value) override;
+// Performs a multi-wait on one or more semaphores.
+// By default this is an all-wait but |wait_flags| may contain
+// VK_SEMAPHORE_WAIT_ANY_BIT to change to an any-wait.
+//
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before
+// |deadline_ns| elapses.
+iree_status_t iree_hal_vulkan_emulated_semaphore_multi_wait(
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns,
+    VkSemaphoreWaitFlags wait_flags);
 
-  Status Wait(uint64_t value, Time deadline_ns) override;
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
-  void Fail(Status status) override;
-
-  // Gets a binary semaphore for waiting on the timeline to advance to the given
-  // |value|. The semaphore returned won't be waited by anyone else. Returns
-  // VK_NULL_HANDLE if no available semaphores for the given |value|.
-  // |wait_fence| is the fence associated with the queue submission that waiting
-  // on this semaphore.
-  VkSemaphore GetWaitSemaphore(uint64_t value,
-                               const ref_ptr<TimePointFence>& wait_fence);
-
-  // Cancels the waiting attempt on the given binary |semaphore|. This allows
-  // the |semaphore| to be waited by others.
-  Status CancelWaitSemaphore(VkSemaphore semaphore);
-
-  // Gets a binary semaphore for signaling the timeline to the given |value|.
-  // |value| must be smaller than the current timeline value. |signal_fence| is
-  // the fence associated with the queue submission that signals this semaphore.
-  StatusOr<VkSemaphore> GetSignalSemaphore(
-      uint64_t value, const ref_ptr<TimePointFence>& signal_fence);
-
- private:
-  // Tries to advance the timeline to the given |to_upper_value| without
-  // blocking and returns whether the |to_upper_value| is reached.
-  StatusOr<bool> TryToAdvanceTimeline(uint64_t to_upper_value)
-      ABSL_LOCKS_EXCLUDED(mutex_);
-  // Similar to the above, but also returns the fences that are known to have
-  // already signaled via |signaled_fences|.
-  StatusOr<bool> TryToAdvanceTimeline(
-      uint64_t to_upper_value, absl::InlinedVector<VkFence, 4>* signaled_fences)
-      ABSL_LOCKS_EXCLUDED(mutex_);
-
-  std::atomic<uint64_t> signaled_value_;
-
-  ref_ptr<VkDeviceHandle> logical_device_;
-
-  // Callback to inform that this timeline semaphore has signaled a new value.
-  std::function<Status(Semaphore*)> on_semaphore_signal_;
-
-  // Callback to inform that this timeline semaphore has encountered a failure.
-  std::function<void(Semaphore*)> on_semaphore_failure_;
-
-  // Callback to inform that the given fences have signaled.
-  std::function<void(absl::Span<VkFence>)> on_fence_signal_;
-
-  ref_ptr<TimePointSemaphorePool> semaphore_pool_;
-
-  mutable absl::Mutex mutex_;
-
-  // A list of outstanding semaphores used to emulate time points.
-  //
-  // The life time of each semaphore is in one of the following state:
-  //
-  // * Unused state: value = UINT64_MAX, signal/wait fence = nullptr. This is
-  //   the state of the semaphore when it's initially acquired from the pool and
-  //   not put in the queue for emulating a time point yet.
-  // * Pending state: signaled value < value < UINT64_MAX, signal fence =
-  //   <some-fence>, wait fence == nullptr. This is the state of the semaphore
-  //   when it's put into the GPU queue for emulating a time point.
-  // * Pending and waiting state: signaled value < value < UINT64_MAX, signal
-  //   fence = <some-fence>, wait fence == <some-fence>. This is the state of
-  //   the semaphore when it's put into the GPU queue for emulating a time
-  //   point and there is another queue submission waiting on it in GPU.
-  // * Signaled and not ever waited state: value <= signaled value, singal/wait
-  //   fence = nullptr. This is the state of the semaphore when we know it's
-  //   already signaled on GPU and there is no waiters for it.
-  // * Signaled and waiting state: value <= signaled value, signal fence =
-  //   nullptr, wait fence = <some-fence>. This is the state of the semaphore
-  //   when we know it's already signaled on GPU and there is still one queue
-  //   submission on GPU is waiting for it.
-  IntrusiveList<TimePointSemaphore> outstanding_semaphores_
-      ABSL_GUARDED_BY(mutex_);
-
-  // NOTE: We only need to access this status (and thus take the lock) when we
-  // want to either signal failure or query the status in the case of the
-  // semaphore being set to UINT64_MAX.
-  Status status_ ABSL_GUARDED_BY(mutex_);
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
-
-#endif  // IREE_HAL_VULKAN_ENUMLATED_TIMELINE_SEMAPHORE_H_
+#endif  // IREE_HAL_VULKAN_ENUMLATED_SEMAPHORE_H_

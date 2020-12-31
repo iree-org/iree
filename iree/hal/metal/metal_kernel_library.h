@@ -21,7 +21,6 @@
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
-#include "iree/hal/cc/executable.h"
 #include "iree/hal/cc/executable_cache.h"
 
 // flatcc schemas:

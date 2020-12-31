@@ -300,12 +300,12 @@ namespace vulkan {
   DEV_PFN(OPTIONAL, vkSignalSemaphore)                                  \
   DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)                               \
                                                                         \
-  INS_PFN(OPTIONAL, vkCreateDebugReportCallbackEXT)                     \
+  INS_PFN(EXCLUDED, vkCreateDebugReportCallbackEXT)                     \
   INS_PFN(OPTIONAL, vkCreateDebugUtilsMessengerEXT)                     \
   INS_PFN(EXCLUDED, vkCreateDisplayPlaneSurfaceKHR)                     \
   INS_PFN(EXCLUDED, vkCreateHeadlessSurfaceEXT)                         \
   INS_PFN(EXCLUDED, vkDebugReportMessageEXT)                            \
-  INS_PFN(OPTIONAL, vkDestroyDebugReportCallbackEXT)                    \
+  INS_PFN(EXCLUDED, vkDestroyDebugReportCallbackEXT)                    \
   INS_PFN(OPTIONAL, vkDestroyDebugUtilsMessengerEXT)                    \
   INS_PFN(REQUIRED, vkDestroyInstance)                                  \
   INS_PFN(EXCLUDED, vkDestroySurfaceKHR)                                \
