@@ -40,7 +40,6 @@ cc_test(
     ],
 )
 
-
 cc_library(
     name = "native_module",
     testonly = True,

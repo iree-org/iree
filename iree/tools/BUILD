@@ -53,7 +53,6 @@ cc_binary(
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
     deps = [
-        "//iree/modules/check:native_module",
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:file_io",
@@ -61,6 +60,7 @@ cc_binary(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/drivers",
+        "//iree/modules/check:native_module",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools/utils:vm_util",
