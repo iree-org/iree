@@ -30,8 +30,5 @@ cc_library(
         "//iree/hal/dylib/registration",
         "//iree/hal/vmla/registration",
         "//iree/hal/vulkan/registration",
-    ] + select({
-        "@bazel_tools//src/conditions:darwin": ["//iree/hal/metal/registration"],
-        "//conditions:default": [],
-    }),
+    ],
 )

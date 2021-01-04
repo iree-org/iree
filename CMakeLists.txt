@@ -115,7 +115,6 @@ endif()
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
   DyLib
-  Metal
   VMLA
   Vulkan
 )
@@ -126,9 +125,6 @@ if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
-  else()
-    # And Metal isn't available on non-Apple platforms for sure.
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Metal)
   endif()
 endif()
 message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
