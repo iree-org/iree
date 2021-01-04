@@ -20,10 +20,6 @@
 #include "iree/hal/dylib/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_DYLIB_DRIVER_MODULE
 
-#if defined(IREE_HAL_HAVE_METAL_DRIVER_MODULE)
-#include "iree/hal/metal/registration/driver_module.h"
-#endif  // IREE_HAL_HAVE_METAL_DRIVER_MODULE
-
 #if defined(IREE_HAL_HAVE_VMLA_DRIVER_MODULE)
 #include "iree/hal/vmla/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VMLA_DRIVER_MODULE
@@ -40,11 +36,6 @@ iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_dylib_driver_module_register(registry));
 #endif  // IREE_HAL_HAVE_DYLIB_DRIVER_MODULE
-
-#if defined(IREE_HAL_HAVE_METAL_DRIVER_MODULE)
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_driver_module_register(registry));
-#endif  // IREE_HAL_HAVE_METAL_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_VMLA_DRIVER_MODULE)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
