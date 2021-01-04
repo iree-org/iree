@@ -108,7 +108,7 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
   // Generate a builder call if all of the elements are buildable.
   let builderCall = !if(!eq(AreTupleElementsBuildable<elements>.ret, 0),
     "", "$_builder.getTupleType({" #
-        StrJoin<!foreach(t, elements, t.type.builderCall)>.result # "})"
+        !interleave(!foreach(t, elements, t.type.builderCall), ", ") # "})"
   );
 }
 
@@ -172,7 +172,7 @@ class AnyPtrOf<list<Type> types> :
               "$_self",
               "$_self.cast<IREE::PtrType>().getTargetType()",
               type.predicate>)>,
-    ]>, StrJoin<!foreach(type, types, type.description), " or ">.result> {
+    ]>, !interleave(!foreach(type, types, type.description), " or ")> {
   string builderCall = "";
 }
 
