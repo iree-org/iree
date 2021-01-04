@@ -28,15 +28,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_metal-spirv_metal
-  TARGET_BACKEND
-    "metal-spirv"
-  DRIVER
-    "metal"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vulkan-spirv_vulkan
   TARGET_BACKEND
     "vulkan-spirv"
