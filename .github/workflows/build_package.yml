@@ -2,9 +2,6 @@ name: Build and package
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - cidev
 
 jobs:
   mondo-build:
