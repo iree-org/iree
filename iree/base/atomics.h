@@ -222,7 +222,7 @@ typedef int64_t iree_atomic_int64_t;
 #endif
 
 #define iree_atomic_load_auto(object, order)                       \
-  __atomic_load_ptr(object, order) __extension__({                 \
+  __extension__({                                                  \
     __iree_auto_type __atomic_load_ptr = (object);                 \
     __typeof__(*__atomic_load_ptr) __atomic_load_tmp;              \
     __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (order)); \
