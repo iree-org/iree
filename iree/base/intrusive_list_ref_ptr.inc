@@ -80,6 +80,7 @@ class IntrusiveListRefPtrBase
   using IteratorT = IntrusiveListRefPtrIterator<T, kOffset, true>;
   using ReverseIteratorT = IntrusiveListRefPtrIterator<T, kOffset, false>;
   using base_list = IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>;
+  using self_type = IntrusiveListRefPtrBase<T, kOffset>;
 
   IntrusiveListRefPtrBase() = default;
 
@@ -89,6 +90,10 @@ class IntrusiveListRefPtrBase
   using base_list::contains;
   bool contains(const ref_ptr<T>& value) const {
     return base_list::contains(value.get());
+  }
+
+  inline void merge_from(self_type* other_list) {
+    return base_list::merge_from(static_cast<base_list*>(other_list));
   }
 
   using base_list::clear;
