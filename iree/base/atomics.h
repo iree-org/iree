@@ -99,19 +99,11 @@ typedef struct {
   InterlockedXor((volatile LONG*)object, operand)
 #define iree_atomic_exchange_int32(object, desired, order) \
   InterlockedExchange((volatile LONG*)object, desired)
-static inline bool iree_atomic_compare_exchange_strong_int32(
-    volatile iree_atomic_int32_t* object, int32_t* expected, int32_t desired,
-    iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
-  int32_t expected_value = *expected;
-  int32_t old_value = InterlockedCompareExchange((volatile LONG*)object,
-                                                 desired, expected_value);
-  if (old_value == expected_value) {
-    return true;
-  } else {
-    *expected = old_value;
-    return false;
-  }
-}
+#define iree_atomic_compare_exchange_strong_int32(object, expected, desired, \
+                                                  order_succ, order_fail)    \
+  iree_atomic_compare_exchange_strong_int32_impl(                            \
+      (volatile iree_atomic_int32_t*)(object), (int32_t*)(expected),         \
+      (int32_t)(desired), (order_succ), (order_fail))
 #define iree_atomic_compare_exchange_weak_int32 \
   iree_atomic_compare_exchange_strong_int32
 
@@ -131,7 +123,31 @@ static inline bool iree_atomic_compare_exchange_strong_int32(
   InterlockedXor64((volatile LONG64*)object, operand)
 #define iree_atomic_exchange_int64(object, desired, order) \
   InterlockedExchange64((volatile LONG64*)object, desired)
-static inline bool iree_atomic_compare_exchange_strong_int64(
+#define iree_atomic_compare_exchange_strong_int64(object, expected, desired, \
+                                                  order_succ, order_fail)    \
+  iree_atomic_compare_exchange_strong_int64_impl(                            \
+      (volatile iree_atomic_int64_t*)(object), (int64_t*)(expected),         \
+      (int64_t)(desired), (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak_int64 \
+  iree_atomic_compare_exchange_strong_int64
+
+#define iree_atomic_thread_fence(order) MemoryBarrier()
+
+static inline bool iree_atomic_compare_exchange_strong_int32_impl(
+    volatile iree_atomic_int32_t* object, int32_t* expected, int32_t desired,
+    iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
+  int32_t expected_value = *expected;
+  int32_t old_value = InterlockedCompareExchange((volatile LONG*)object,
+                                                 desired, expected_value);
+  if (old_value == expected_value) {
+    return true;
+  } else {
+    *expected = old_value;
+    return false;
+  }
+}
+
+static inline bool iree_atomic_compare_exchange_strong_int64_impl(
     volatile iree_atomic_int64_t* object, int64_t* expected, int64_t desired,
     iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
   int64_t expected_value = *expected;
@@ -144,8 +160,6 @@ static inline bool iree_atomic_compare_exchange_strong_int64(
     return false;
   }
 }
-#define iree_atomic_compare_exchange_weak_int64 \
-  iree_atomic_compare_exchange_strong_int64
 
 //==============================================================================
 // C11 atomics using Clang builtins
