@@ -37,7 +37,7 @@ def CUSTOM_Message : DialectType<
     CUSTOM_Dialect,
     CPred<"$_self.isa<IREE::Custom::MessageType>()">,
     "message"> {
-  let typeDescription = [{
+  let description = [{
     A string message that can be printed. These types will be reference counted
     at runtime and must derive from iree_vm_ref_t but otherwise can be whatever
     the dialect wants.

@@ -54,7 +54,7 @@ def SEQUENCE_AnySequenceType : DialectType<
     SEQUENCE_Dialect,
     CPred<"$_self.isa<Sequence::SequenceType>()">,
     "of"> {
-  let typeDescription = [{
+  let description = [{
     Any type of sequence.
   }];
   let builderCall = "$_builder.getType<Sequence::SequenceType>()";

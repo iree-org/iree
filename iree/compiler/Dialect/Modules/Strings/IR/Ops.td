@@ -40,7 +40,7 @@ def STRINGS_String : DialectType<
     STRINGS_Dialect,
     CPred<"$_self.isa<IREE::Strings::StringType>()">,
     "string"> {
-  let typeDescription = [{
+  let description = [{
     A string type containing a standard ASCII string.
   }];
 }
@@ -49,7 +49,7 @@ def STRINGS_StringTensor : DialectType<
     STRINGS_Dialect,
     CPred<"$_self.isa<IREE::Strings::StringTensorType>()">,
     "string_tensor"> {
-  let typeDescription = [{
+  let description = [{
     A tensor of string types.
   }];
 }

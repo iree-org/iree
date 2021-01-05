@@ -83,7 +83,7 @@ def VMLA_Buffer : DialectType<
     VMLA_Dialect,
     CPred<"$_self.isa<IREE::VMLA::BufferType>()">,
     "buffer"> {
-  let typeDescription = [{
+  let description = [{
     A lightweight unshaped byte buffer.
   }];
   let builderCall = "$_builder.getType<IREE::VMLA::BufferType>()";
@@ -93,7 +93,7 @@ def VMLA_Interface : DialectType<
     VMLA_Dialect,
     CPred<"$_self.isa<IREE::VMLA::InterfaceType>()">,
     "interface"> {
-  let typeDescription = [{
+  let description = [{
     Binding and parameter interface (derived from `hal.interface`).
   }];
 

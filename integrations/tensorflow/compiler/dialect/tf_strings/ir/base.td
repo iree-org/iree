@@ -37,7 +37,7 @@ def TFStrings_String : DialectType<
     TFStrings_Dialect,
     CPred<"$_self.isa<tf_strings::StringType>()">,
     "string"> {
-  let typeDescription = [{
+  let description = [{
     String type representation.
   }];
 }
