@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle
+    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion
