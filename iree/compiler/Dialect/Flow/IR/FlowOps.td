@@ -240,6 +240,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     IsolatedFromAbove,
     AttrSizedOperandSegments,
+    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">
   ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
@@ -366,6 +367,12 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs FLOW_Dim:$result);
 
+  let builders = [
+    OpBuilderDAG<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
   let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
@@ -391,6 +398,12 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs FLOW_Dim:$result);
 
+  let builders = [
+    OpBuilderDAG<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
   let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
