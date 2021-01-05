@@ -89,7 +89,7 @@ jobs:
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
           package_dir="./iree-install/python_packages/iree_compiler"
-          export CIBW_BEFORE_BUILD="rm -f ./build-iree/CMakeCache.txt && \
+          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
             python ./main_checkout/build_tools/cmake/cmake_configure_ci.py \
             -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
@@ -113,7 +113,7 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           package_dir="./iree-install/python_packages/iree_rt"
-          export CIBW_BEFORE_BUILD="rm -f ./build-iree/CMakeCache.txt && \
+          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
             python ./main_checkout/build_tools/cmake/cmake_configure_ci.py \
             -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
