@@ -35,7 +35,10 @@ jobs:
         experimental: [false]
         include:
           - os: macos-latest
-            build_package: [compiler, runtime]
+            build_package: compiler
+            experimental: true
+          - os: macos-latest
+            build_package: runtime
             experimental: true
 
     env:
