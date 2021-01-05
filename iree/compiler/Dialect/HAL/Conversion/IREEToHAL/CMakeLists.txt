@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     IREEToHAL
   HDRS
-    ConvertIREEToHAL.h
+    "ConvertIREEToHAL.h"
   SRCS
-    ConvertIREEToHAL.cpp
+    "ConvertIREEToHAL.cpp"
   DEPS
     MLIRIR
     MLIRStandard

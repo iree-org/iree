@@ -37,20 +37,31 @@ def _expand_cmake_var(var):
   return "${" + var + "}"
 
 
-def _convert_string_arg_block(name, value):
+def _convert_string_arg_block(name, value, quote=False):
   #  NAME
   #    "value"
   if value is None:
     return ""
-  return f'  {name}\n    {value}\n'
+  if quote:
+    return f'  {name}\n    "{value}"\n'
+  else:
+    return f"  {name}\n    {value}\n"
 
 
-def _convert_string_list_block(name, values):
+def _convert_string_list_block(name, values, quote=False, sort=False):
   # Note this deliberately distinguishes between an empty list (argument
   # explicitly specified) and None (argument left as default).
   if values is None:
     return ""
-  values_list = "\n".join([f"    {v}" for v in values])
+
+  if sort:
+    values = sorted(values)
+
+  if quote:
+    values_list = "\n".join([f'    "{v}"' for v in values])
+  else:
+    values_list = "\n".join([f"    {v}" for v in values])
+
   return f"  {name}\n{values_list}\n"
 
 
@@ -77,12 +88,6 @@ def _convert_translate_tool_block(translate_tool):
   return _convert_string_arg_block("TRANSLATE_TOOL", translate_tool)
 
 
-def _convert_sorted_string_list_block(list_name, values):
-  if values is not None:
-    values = sorted(values)
-  return _convert_string_list_block(list_name, values)
-
-
 def _convert_srcs_block(srcs):
   if srcs is None:
     return ""
@@ -90,11 +95,13 @@ def _convert_srcs_block(srcs):
   srcs = [src for src in srcs if src not in generated_srcs]
   sets = []
   if srcs:
-    sets.append(_convert_sorted_string_list_block("SRCS", srcs))
+    sets.append(_convert_string_list_block("SRCS", srcs, sort=True, quote=True))
   if generated_srcs:
     sets.append(
-        _convert_sorted_string_list_block("GENERATED_SRCS",
-                                          [src[1:] for src in generated_srcs]))
+        _convert_string_list_block("GENERATED_SRCS",
+                                   [src[1:] for src in generated_srcs],
+                                   sort=True,
+                                   quote=True))
   return "\n".join(sets)
 
 
@@ -106,7 +113,7 @@ def _convert_td_file_block(td_file):
     # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
     td_file = td_file.replace("//iree", "${IREE_ROOT_DIR}/iree")
     td_file = td_file.replace(":", "/")
-  return _convert_string_arg_block("TD_FILE", td_file)
+  return _convert_string_arg_block("TD_FILE", td_file, quote=True)
 
 
 def _convert_tbl_outs_block(tbl_outs):
@@ -163,7 +170,7 @@ def _convert_target_list_block(list_name, targets):
   # Remove Falsey (None and empty string) values
   targets = filter(None, targets)
 
-  return _convert_sorted_string_list_block(list_name, targets)
+  return _convert_string_list_block(list_name, targets, sort=True)
 
 
 class BuildFileFunctions(object):
@@ -284,13 +291,15 @@ class BuildFileFunctions(object):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name)
-    hdrs_block = _convert_sorted_string_list_block("HDRS", hdrs)
-    textual_hdrs_block = _convert_sorted_string_list_block(
-        "TEXTUAL_HDRS", textual_hdrs)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True, quote=True)
+    textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
+                                                    textual_hdrs,
+                                                    sort=True,
+                                                    quote=True)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
-    defines_block = _convert_string_list_block("DEFINES", defines)
+    defines_block = _convert_string_list_block("DEFINES", defines, quote=True)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_cc_library(\n"
@@ -313,11 +322,11 @@ class BuildFileFunctions(object):
               tags=None,
               **kwargs):
     name_block = _convert_string_arg_block("NAME", name)
-    hdrs_block = _convert_sorted_string_list_block("HDRS", hdrs)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True, quote=True)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
-    labels_block = _convert_string_list_block("LABELS", tags)
+    labels_block = _convert_string_list_block("LABELS", tags, quote=True)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -374,11 +383,15 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name)
     srcs_block = _convert_srcs_block(srcs)
     cc_file_output_block = _convert_string_arg_block("CC_FILE_OUTPUT",
-                                                     cc_file_output)
+                                                     cc_file_output,
+                                                     quote=True)
     h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
-                                                    h_file_output)
+                                                    h_file_output,
+                                                    quote=True)
     testonly_block = _convert_option_block("TESTONLY", testonly)
-    namespace_block = _convert_string_arg_block("CPP_NAMESPACE", cpp_namespace)
+    namespace_block = _convert_string_arg_block("CPP_NAMESPACE",
+                                                cpp_namespace,
+                                                quote=True)
     flatten_block = _convert_option_block("FLATTEN", flatten)
 
     self.converter.body += (f"iree_cc_embed_data(\n"
@@ -408,10 +421,12 @@ class BuildFileFunctions(object):
                            cc_namespace=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name)
-    src_block = _convert_string_arg_block("SRC", src)
-    namespace_block = _convert_string_arg_block("CC_NAMESPACE", cc_namespace)
+    src_block = _convert_string_arg_block("SRC", src, quote=True)
+    namespace_block = _convert_string_arg_block("CC_NAMESPACE",
+                                                cc_namespace,
+                                                quote=True)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
-    flags_block = _convert_string_list_block("FLAGS", flags)
+    flags_block = _convert_string_list_block("FLAGS", flags, quote=True)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_bytecode_module(\n"
@@ -426,7 +441,9 @@ class BuildFileFunctions(object):
   def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
     name_block = _convert_string_arg_block("NAME", name)
     srcs_block = _convert_srcs_block(srcs)
-    flatcc_args_block = _convert_string_list_block("FLATCC_ARGS", flatcc_args)
+    flatcc_args_block = _convert_string_list_block("FLATCC_ARGS",
+                                                   flatcc_args,
+                                                   quote=True)
 
     self.converter.body += (f"flatbuffer_c_library(\n"
                             f"{name_block}"
@@ -479,7 +496,7 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
-    labels_block = _convert_string_list_block("LABELS", tags)
+    labels_block = _convert_string_list_block("LABELS", tags, quote=True)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
@@ -504,9 +521,12 @@ class BuildFileFunctions(object):
                                                      target_backend)
     driver_block = _convert_string_arg_block("DRIVER", driver)
     compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
-                                                      compiler_flags)
-    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
-    labels_block = _convert_string_list_block("LABELS", tags)
+                                                      compiler_flags,
+                                                      quote=True)
+    runner_args_block = _convert_string_list_block("RUNNER_ARGS",
+                                                   runner_args,
+                                                   quote=True)
+    labels_block = _convert_string_list_block("LABELS", tags, quote=True)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -539,8 +559,10 @@ class BuildFileFunctions(object):
     drivers_block = _convert_string_list_block("DRIVERS", drivers)
     compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
                                                       compiler_flags)
-    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
-    labels_block = _convert_string_list_block("LABELS", tags)
+    runner_args_block = _convert_string_list_block("RUNNER_ARGS",
+                                                   runner_args,
+                                                   quote=True)
+    labels_block = _convert_string_list_block("LABELS", tags, quote=True)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"

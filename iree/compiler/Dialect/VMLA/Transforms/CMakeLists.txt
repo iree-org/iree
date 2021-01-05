@@ -18,12 +18,12 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    Passes.h
+    "Passes.h"
   SRCS
-    Conversion.cpp
-    Passes.cpp
-    PreConversionLowering.cpp
-    UnrollReductions.cpp
+    "Conversion.cpp"
+    "Passes.cpp"
+    "PreConversionLowering.cpp"
+    "UnrollReductions.cpp"
   DEPS
     LLVMSupport
     MLIRIR

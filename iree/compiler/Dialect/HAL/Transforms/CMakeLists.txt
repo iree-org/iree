@@ -18,23 +18,23 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    Passes.h
+    "Passes.h"
   SRCS
-    ConvertToHAL.cpp
-    IdentifyConstantPools.cpp
-    InlineDeviceSwitches.cpp
-    LinkExecutables.cpp
-    MaterializeConstantPoolBuffers.cpp
-    MaterializeInterfaces.cpp
-    MaterializeResourceCaches.cpp
-    MemoizeDeviceQueries.cpp
-    PackConstantPoolStorage.cpp
-    Passes.cpp
-    PropagateConstantWorkgroupInfo.cpp
-    PublicAbiGeneration.cpp
-    ResolveEntryPointOrdinals.cpp
-    SerializeExecutables.cpp
-    TranslateExecutables.cpp
+    "ConvertToHAL.cpp"
+    "IdentifyConstantPools.cpp"
+    "InlineDeviceSwitches.cpp"
+    "LinkExecutables.cpp"
+    "MaterializeConstantPoolBuffers.cpp"
+    "MaterializeInterfaces.cpp"
+    "MaterializeResourceCaches.cpp"
+    "MemoizeDeviceQueries.cpp"
+    "PackConstantPoolStorage.cpp"
+    "Passes.cpp"
+    "PropagateConstantWorkgroupInfo.cpp"
+    "PublicAbiGeneration.cpp"
+    "ResolveEntryPointOrdinals.cpp"
+    "SerializeExecutables.cpp"
+    "TranslateExecutables.cpp"
   DEPS
     LLVMSupport
     MLIRIR

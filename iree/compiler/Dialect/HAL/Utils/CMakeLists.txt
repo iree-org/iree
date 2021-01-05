@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    DeviceSwitchBuilder.h
-    TypeUtils.h
+    "DeviceSwitchBuilder.h"
+    "TypeUtils.h"
   SRCS
-    TypeUtils.cpp
+    "TypeUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR

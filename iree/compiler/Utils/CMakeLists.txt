@@ -18,12 +18,12 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    FlatbufferUtils.h
-    GraphUtils.h
-    PatternUtils.h
+    "FlatbufferUtils.h"
+    "GraphUtils.h"
+    "PatternUtils.h"
   SRCS
-    FlatbufferUtils.cpp
-    GraphUtils.cpp
+    "FlatbufferUtils.cpp"
+    "GraphUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR

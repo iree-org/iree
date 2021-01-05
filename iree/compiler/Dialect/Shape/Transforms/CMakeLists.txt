@@ -18,17 +18,17 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    Passes.h
-    Patterns.h
+    "Passes.h"
+    "Patterns.h"
   SRCS
-    CleanupPlaceholdersPass.cpp
-    ConvertHLOToShapeDialectPass.cpp
-    ConvertShapeToStandard.cpp
-    FunctionSignatureExpansionPass.cpp
-    HoistShapeCalculationsPass.cpp
-    MaterializeShapeCalculations.cpp
-    MaterializeShapeCalculationsPass.cpp
-    TieDynamicShapesPass.cpp
+    "CleanupPlaceholdersPass.cpp"
+    "ConvertHLOToShapeDialectPass.cpp"
+    "ConvertShapeToStandard.cpp"
+    "FunctionSignatureExpansionPass.cpp"
+    "HoistShapeCalculationsPass.cpp"
+    "MaterializeShapeCalculations.cpp"
+    "MaterializeShapeCalculationsPass.cpp"
+    "TieDynamicShapesPass.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis

@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     TypeConversion
   HDRS
-    TypeConversion.h
+    "TypeConversion.h"
   SRCS
-    TypeConversion.cpp
+    "TypeConversion.cpp"
   DEPS
     MLIRIR
     MLIRStandard

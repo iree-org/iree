@@ -22,15 +22,15 @@ iree_cc_library(
   NAME
     registration
   HDRS
-    driver_module.h
+    "driver_module.h"
   SRCS
-    driver_module.cc
+    "driver_module.cc"
   DEPS
     iree::base::flags
     iree::base::status
     iree::hal::api
     iree::hal::dylib
   DEFINES
-    IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1
+    "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
   PUBLIC
 )

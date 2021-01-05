@@ -19,23 +19,23 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    VMDialect.h
-    VMEnums.h.inc
-    VMFuncEncoder.h
-    VMOpInterface.h.inc
-    VMOps.h
-    VMOps.h.inc
-    VMTraits.h
-    VMTypes.h
+    "VMDialect.h"
+    "VMEnums.h.inc"
+    "VMFuncEncoder.h"
+    "VMOpInterface.h.inc"
+    "VMOps.h"
+    "VMOps.h.inc"
+    "VMTraits.h"
+    "VMTypes.h"
   SRCS
-    VMDialect.cpp
-    VMEnums.cpp.inc
-    VMOpEncoder.cpp.inc
-    VMOpFolders.cpp
-    VMOpInterface.cpp.inc
-    VMOps.cpp
-    VMOps.cpp.inc
-    VMTypes.cpp
+    "VMDialect.cpp"
+    "VMEnums.cpp.inc"
+    "VMOpEncoder.cpp.inc"
+    "VMOpFolders.cpp"
+    "VMOpInterface.cpp.inc"
+    "VMOps.cpp"
+    "VMOps.cpp.inc"
+    "VMTypes.cpp"
   DEPS
     LLVMSupport
     MLIRControlFlowInterfaces
@@ -53,7 +53,7 @@ iree_tablegen_library(
   NAME
     VMEnumsGen
   TD_FILE
-    VMBase.td
+    "VMBase.td"
   OUTS
     -gen-enum-decls VMEnums.h.inc
     -gen-enum-defs VMEnums.cpp.inc
@@ -63,7 +63,7 @@ iree_tablegen_library(
   NAME
     VMOpsGen
   TD_FILE
-    VMOps.td
+    "VMOps.td"
   OUTS
     -gen-op-decls VMOps.h.inc
     -gen-op-defs VMOps.cpp.inc
@@ -73,7 +73,7 @@ iree_tablegen_library(
   NAME
     VMOpEncoderGen
   TD_FILE
-    VMOps.td
+    "VMOps.td"
   OUTS
     -gen-iree-vm-op-encoder-defs VMOpEncoder.cpp.inc
   TBLGEN
@@ -84,7 +84,7 @@ iree_tablegen_library(
   NAME
     VMOpInterfaceGen
   TD_FILE
-    VMBase.td
+    "VMBase.td"
   OUTS
     -gen-op-interface-decls VMOpInterface.h.inc
     -gen-op-interface-defs VMOpInterface.cpp.inc
@@ -94,7 +94,7 @@ iree_tablegen_doc(
   NAME
     VMDialectDocGen
   TD_FILE
-    VMOps.td
+    "VMOps.td"
   OUTS
     -gen-dialect-doc VMDialect.md
 )

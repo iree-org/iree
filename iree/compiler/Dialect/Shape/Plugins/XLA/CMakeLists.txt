@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     XlaHloShapeBuilder
   HDRS
-    XlaHloShapeBuilder.h
+    "XlaHloShapeBuilder.h"
   SRCS
-    XlaHloShapeBuilder.cpp
+    "XlaHloShapeBuilder.cpp"
   DEPS
     LLVMSupport
     MLIRIR

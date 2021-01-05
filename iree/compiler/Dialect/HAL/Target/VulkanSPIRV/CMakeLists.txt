@@ -22,9 +22,9 @@ iree_cc_library(
   NAME
     VulkanSPIRV
   HDRS
-    VulkanSPIRVTarget.h
+    "VulkanSPIRVTarget.h"
   SRCS
-    VulkanSPIRVTarget.cpp
+    "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
     MLIRAffine

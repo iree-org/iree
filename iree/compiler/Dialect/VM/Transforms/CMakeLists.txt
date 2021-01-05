@@ -18,15 +18,15 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    Passes.h
+    "Passes.h"
   SRCS
-    Conversion.cpp
-    GlobalInitialization.cpp
-    HoistInlinedRodata.cpp
-    MarkPublicSymbolsExported.cpp
-    OrdinalAllocation.cpp
-    Passes.cpp
-    SinkDefiningOps.cpp
+    "Conversion.cpp"
+    "GlobalInitialization.cpp"
+    "HoistInlinedRodata.cpp"
+    "MarkPublicSymbolsExported.cpp"
+    "OrdinalAllocation.cpp"
+    "Passes.cpp"
+    "SinkDefiningOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR

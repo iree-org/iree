@@ -19,21 +19,21 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    HALOps.h
-    HALTypes.h
+    "HALOps.h"
+    "HALTypes.h"
   TEXTUAL_HDRS
-    HALEnums.cpp.inc
-    HALEnums.h.inc
-    HALOpInterface.cpp.inc
-    HALOpInterface.h.inc
-    HALOps.cpp.inc
-    HALOps.h.inc
-    HALStructs.cpp.inc
-    HALStructs.h.inc
+    "HALEnums.cpp.inc"
+    "HALEnums.h.inc"
+    "HALOpInterface.cpp.inc"
+    "HALOpInterface.h.inc"
+    "HALOps.cpp.inc"
+    "HALOps.h.inc"
+    "HALStructs.cpp.inc"
+    "HALStructs.h.inc"
   SRCS
-    HALOpFolders.cpp
-    HALOps.cpp
-    HALTypes.cpp
+    "HALOpFolders.cpp"
+    "HALOps.cpp"
+    "HALTypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -50,9 +50,9 @@ iree_cc_library(
   NAME
     HALDialect
   HDRS
-    HALDialect.h
+    "HALDialect.h"
   SRCS
-    HALDialect.cpp
+    "HALDialect.cpp"
   DEPS
     ::IR
     LLVMSupport
@@ -72,7 +72,7 @@ iree_tablegen_library(
   NAME
     HALOpsGen
   TD_FILE
-    HALOps.td
+    "HALOps.td"
   OUTS
     -gen-op-decls HALOps.h.inc
     -gen-op-defs HALOps.cpp.inc
@@ -82,7 +82,7 @@ iree_tablegen_library(
   NAME
     HALStructsGen
   TD_FILE
-    HALBase.td
+    "HALBase.td"
   OUTS
     -gen-iree-struct-attr-decls HALStructs.h.inc
     -gen-iree-struct-attr-defs HALStructs.cpp.inc
@@ -94,7 +94,7 @@ iree_tablegen_library(
   NAME
     HALTypesGen
   TD_FILE
-    HALBase.td
+    "HALBase.td"
   OUTS
     -gen-enum-decls HALEnums.h.inc
     -gen-enum-defs HALEnums.cpp.inc
@@ -106,7 +106,7 @@ iree_tablegen_doc(
   NAME
     HALDialectDocGen
   TD_FILE
-    HALOps.td
+    "HALOps.td"
   OUTS
     -gen-dialect-doc HALDialect.md
 )

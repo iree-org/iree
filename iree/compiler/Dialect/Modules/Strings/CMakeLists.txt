@@ -18,13 +18,13 @@ iree_cc_embed_data(
   NAME
     strings_imports
   SRCS
-    strings.imports.mlir
+    "strings.imports.mlir"
   CC_FILE_OUTPUT
-    strings.imports.cc
+    "strings.imports.cc"
   H_FILE_OUTPUT
-    strings.imports.h
+    "strings.imports.h"
   CPP_NAMESPACE
-    mlir::iree_compiler::IREE::Strings
+    "mlir::iree_compiler::IREE::Strings"
   FLATTEN
   PUBLIC
 )

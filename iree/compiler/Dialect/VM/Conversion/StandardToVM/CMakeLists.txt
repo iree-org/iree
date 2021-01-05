@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     StandardToVM
   HDRS
-    ConvertStandardToVM.h
+    "ConvertStandardToVM.h"
   SRCS
-    ConvertStandardToVM.cpp
-    ConvertStandardToVMTest.cpp
+    "ConvertStandardToVM.cpp"
+    "ConvertStandardToVMTest.cpp"
   DEPS
     MLIRIR
     MLIRPass

@@ -18,11 +18,11 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
-    ConversionTarget.h
-    TypeConverter.h
+    "ConversionTarget.h"
+    "TypeConverter.h"
   SRCS
-    ConversionTarget.cpp
-    TypeConverter.cpp
+    "ConversionTarget.cpp"
+    "TypeConverter.cpp"
   DEPS
     MLIRIR
     MLIRStandard

@@ -19,27 +19,27 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    ${_GLOB_X_MLIR}
+    "${_GLOB_X_MLIR}"
   DATA
     iree::modules::check::iree-check-module
     iree::tools::IreeFileCheck
     iree::tools::iree-translate
   LABELS
-    hostonly
+    "hostonly"
 )
 
 iree_check_test_suite(
   NAME
     check
   SRCS
-    success.mlir
+    "success.mlir"
 )
 
 iree_check_test_suite(
   NAME
     check_failure
   SRCS
-    failure.mlir
+    "failure.mlir"
   RUNNER_ARGS
-    --expect_failure
+    "--expect_failure"
 )

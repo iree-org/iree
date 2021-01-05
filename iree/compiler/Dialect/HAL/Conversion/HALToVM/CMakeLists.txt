@@ -18,20 +18,20 @@ iree_cc_library(
   NAME
     HALToVM
   HDRS
-    ConvertHALToVM.h
+    "ConvertHALToVM.h"
   SRCS
-    ConvertAllocatorOps.cpp
-    ConvertBufferOps.cpp
-    ConvertBufferViewOps.cpp
-    ConvertCommandBufferOps.cpp
-    ConvertConstantOps.cpp
-    ConvertControlFlowOps.cpp
-    ConvertDeviceOps.cpp
-    ConvertExecutableOps.cpp
-    ConvertExperimentalOps.cpp
-    ConvertHALToVM.cpp
-    ConvertSemaphoreOps.cpp
-    ConvertVariableOps.cpp
+    "ConvertAllocatorOps.cpp"
+    "ConvertBufferOps.cpp"
+    "ConvertBufferViewOps.cpp"
+    "ConvertCommandBufferOps.cpp"
+    "ConvertConstantOps.cpp"
+    "ConvertControlFlowOps.cpp"
+    "ConvertDeviceOps.cpp"
+    "ConvertExecutableOps.cpp"
+    "ConvertExperimentalOps.cpp"
+    "ConvertHALToVM.cpp"
+    "ConvertSemaphoreOps.cpp"
+    "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR

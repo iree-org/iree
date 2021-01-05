@@ -19,20 +19,20 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    Builders.h
-    ShapeDialect.h
-    ShapeInterface.h
-    ShapeOps.h
-    ShapeOps.h.inc
-    ShapeTypes.h
+    "Builders.h"
+    "ShapeDialect.h"
+    "ShapeInterface.h"
+    "ShapeOps.h"
+    "ShapeOps.h.inc"
+    "ShapeTypes.h"
   SRCS
-    Builders.cpp
-    Folders.cpp
-    ShapeDialect.cpp
-    ShapeInterface.cpp
-    ShapeOps.cpp
-    ShapeOps.cpp.inc
-    ShapeTypes.cpp
+    "Builders.cpp"
+    "Folders.cpp"
+    "ShapeDialect.cpp"
+    "ShapeInterface.cpp"
+    "ShapeOps.cpp"
+    "ShapeOps.cpp.inc"
+    "ShapeTypes.cpp"
   DEPS
     LLVMSupport
     MLIRControlFlowInterfaces
@@ -53,7 +53,7 @@ iree_tablegen_library(
   NAME
     ShapeOpsGen
   TD_FILE
-    ShapeOps.td
+    "ShapeOps.td"
   OUTS
     -gen-op-decls ShapeOps.h.inc
     -gen-op-defs ShapeOps.cpp.inc
@@ -63,7 +63,7 @@ iree_tablegen_doc(
   NAME
     ShapeDialectDocGen
   TD_FILE
-    ShapeOps.td
+    "ShapeOps.td"
   OUTS
     -gen-dialect-doc ShapeDialect.md
 )

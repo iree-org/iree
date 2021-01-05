@@ -19,11 +19,11 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    CheckOps.h
-    CheckOps.h.inc
+    "CheckOps.h"
+    "CheckOps.h.inc"
   SRCS
-    CheckOps.cpp
-    CheckOps.cpp.inc
+    "CheckOps.cpp"
+    "CheckOps.cpp.inc"
   DEPS
     MLIRIR
     MLIRStandard
@@ -35,9 +35,9 @@ iree_cc_library(
   NAME
     CheckDialect
   HDRS
-    CheckDialect.h
+    "CheckDialect.h"
   SRCS
-    CheckDialect.cpp
+    "CheckDialect.cpp"
   DEPS
     ::IR
     MLIRIR
@@ -54,7 +54,7 @@ iree_tablegen_library(
   NAME
     check_ops_gen
   TD_FILE
-    CheckOps.td
+    "CheckOps.td"
   OUTS
     -gen-op-decls CheckOps.h.inc
     -gen-op-defs CheckOps.cpp.inc
@@ -64,7 +64,7 @@ iree_tablegen_doc(
   NAME
     CheckDialectDocGen
   TD_FILE
-    CheckOps.td
+    "CheckOps.td"
   OUTS
     -gen-dialect-doc CheckDialect.md
 )

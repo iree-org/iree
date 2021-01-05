@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     HALToHAL
   HDRS
-    ConvertHALToHAL.h
+    "ConvertHALToHAL.h"
   SRCS
-    ConvertConstantOps.cpp
-    ConvertHALToHAL.cpp
+    "ConvertConstantOps.cpp"
+    "ConvertHALToHAL.cpp"
   DEPS
     LLVMSupport
     MLIRIR

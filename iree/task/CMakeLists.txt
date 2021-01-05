@@ -18,31 +18,31 @@ iree_cc_library(
   NAME
     task
   HDRS
-    affinity_set.h
-    executor.h
-    list.h
-    pool.h
-    queue.h
-    scope.h
-    submission.h
-    task.h
-    topology.h
-    tuning.h
+    "affinity_set.h"
+    "executor.h"
+    "list.h"
+    "pool.h"
+    "queue.h"
+    "scope.h"
+    "submission.h"
+    "task.h"
+    "topology.h"
+    "tuning.h"
   SRCS
-    executor.c
-    executor_impl.h
-    list.c
-    pool.c
-    post_batch.c
-    post_batch.h
-    queue.c
-    scope.c
-    submission.c
-    task.c
-    task_impl.h
-    topology.c
-    worker.c
-    worker.h
+    "executor.c"
+    "executor_impl.h"
+    "list.c"
+    "pool.c"
+    "post_batch.c"
+    "post_batch.h"
+    "queue.c"
+    "scope.c"
+    "submission.c"
+    "task.c"
+    "task_impl.h"
+    "topology.c"
+    "worker.c"
+    "worker.h"
   DEPS
     cpuinfo
     iree::base::api
@@ -59,7 +59,7 @@ iree_cc_test(
   NAME
     executor_test
   SRCS
-    executor_test.cc
+    "executor_test.cc"
   DEPS
     ::task
     iree::base::api
@@ -73,7 +73,7 @@ iree_cc_test(
   NAME
     list_test
   SRCS
-    list_test.cc
+    "list_test.cc"
   DEPS
     ::task
     iree::base::api
@@ -86,7 +86,7 @@ iree_cc_test(
   NAME
     pool_test
   SRCS
-    pool_test.cc
+    "pool_test.cc"
   DEPS
     ::task
     iree::base::api
@@ -99,7 +99,7 @@ iree_cc_test(
   NAME
     queue_test
   SRCS
-    queue_test.cc
+    "queue_test.cc"
   DEPS
     ::task
     iree::base::api
@@ -112,7 +112,7 @@ iree_cc_test(
   NAME
     scope_test
   SRCS
-    scope_test.cc
+    "scope_test.cc"
   DEPS
     ::task
     iree::base::api
@@ -125,7 +125,7 @@ iree_cc_test(
   NAME
     topology_test
   SRCS
-    topology_test.cc
+    "topology_test.cc"
   DEPS
     ::task
     iree::base::api

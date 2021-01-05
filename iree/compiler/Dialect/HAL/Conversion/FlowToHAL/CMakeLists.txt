@@ -18,13 +18,13 @@ iree_cc_library(
   NAME
     FlowToHAL
   HDRS
-    ConvertFlowToHAL.h
+    "ConvertFlowToHAL.h"
   SRCS
-    ConvertFlowToHAL.cpp
-    ConvertShapeQueryOps.cpp
-    ConvertStreamOps.cpp
-    ConvertTensorOps.cpp
-    ConvertVariableOps.cpp
+    "ConvertFlowToHAL.cpp"
+    "ConvertShapeQueryOps.cpp"
+    "ConvertStreamOps.cpp"
+    "ConvertTensorOps.cpp"
+    "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR

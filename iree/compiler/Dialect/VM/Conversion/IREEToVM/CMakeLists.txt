@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     IREEToVM
   HDRS
-    ConvertIREEToVM.h
+    "ConvertIREEToVM.h"
   SRCS
-    ConvertIREEToVM.cpp
+    "ConvertIREEToVM.cpp"
   DEPS
     MLIRIR
     MLIRPass

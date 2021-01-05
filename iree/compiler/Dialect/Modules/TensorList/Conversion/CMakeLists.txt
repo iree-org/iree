@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
-    ConversionPatterns.h
+    "ConversionPatterns.h"
   SRCS
-    ConversionPatterns.cpp
+    "ConversionPatterns.cpp"
   DEPS
     MLIRPass
     MLIRTransforms

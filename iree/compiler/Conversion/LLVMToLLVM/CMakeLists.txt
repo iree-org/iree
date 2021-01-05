@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     LLVMToLLVM
   HDRS
-    Passes.h
+    "Passes.h"
   SRCS
-    FastExpConversion.cpp
+    "FastExpConversion.cpp"
   DEPS
     LLVMSupport
     MLIRIR

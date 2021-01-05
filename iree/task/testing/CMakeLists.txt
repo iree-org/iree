@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     test_util
   HDRS
-    test_util.h
+    "test_util.h"
   DEPS
     iree::task
     iree::testing::gtest

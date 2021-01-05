@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     HLOToFlow
   HDRS
-    ConvertHLOToFlow.h
+    "ConvertHLOToFlow.h"
   SRCS
-    ConvertHLOToFlow.cpp
+    "ConvertHLOToFlow.cpp"
   DEPS
     MLIRIR
     MLIRPass

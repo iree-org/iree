@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     vm
   HDRS
-    api.h
+    "api.h"
   DEPS
     ::impl
     iree::base::api
@@ -29,9 +29,9 @@ iree_cc_library(
   NAME
     cc
   HDRS
-    module_abi_packing.h
-    native_module_cc.h
-    ref_cc.h
+    "module_abi_packing.h"
+    "native_module_cc.h"
+    "ref_cc.h"
   DEPS
     ::vm
     absl::core_headers
@@ -49,27 +49,27 @@ iree_cc_library(
   NAME
     impl
   HDRS
-    builtin_types.h
-    context.h
-    instance.h
-    invocation.h
-    list.h
-    module.h
-    native_module.h
-    ref.h
-    stack.h
-    type_def.h
-    value.h
+    "builtin_types.h"
+    "context.h"
+    "instance.h"
+    "invocation.h"
+    "list.h"
+    "module.h"
+    "native_module.h"
+    "ref.h"
+    "stack.h"
+    "type_def.h"
+    "value.h"
   SRCS
-    builtin_types.c
-    context.c
-    instance.c
-    invocation.c
-    list.c
-    module.c
-    native_module.c
-    ref.c
-    stack.c
+    "builtin_types.c"
+    "context.c"
+    "instance.c"
+    "invocation.c"
+    "list.c"
+    "module.c"
+    "native_module.c"
+    "ref.c"
+    "stack.c"
   DEPS
     iree::base::api
     iree::base::core_headers
@@ -81,7 +81,7 @@ iree_cc_test(
   NAME
     list_test
   SRCS
-    list_test.cc
+    "list_test.cc"
   DEPS
     ::impl
     iree::base::api
@@ -94,7 +94,7 @@ iree_cc_test(
   NAME
     native_module_test
   SRCS
-    native_module_test.cc
+    "native_module_test.cc"
   DEPS
     ::cc
     ::impl
@@ -109,7 +109,7 @@ iree_cc_library(
   NAME
     native_module_test_hdrs
   HDRS
-    native_module_test.h
+    "native_module_test.h"
   DEPS
     ::impl
     iree::base::api
@@ -120,7 +120,7 @@ iree_cc_test(
   NAME
     native_module_benchmark
   SRCS
-    native_module_benchmark.cc
+    "native_module_benchmark.cc"
   DEPS
     ::impl
     ::native_module_test_hdrs
@@ -134,7 +134,7 @@ iree_cc_test(
   NAME
     ref_test
   SRCS
-    ref_test.cc
+    "ref_test.cc"
   DEPS
     ::impl
     iree::base::api
@@ -147,7 +147,7 @@ iree_cc_test(
   NAME
     stack_test
   SRCS
-    stack_test.cc
+    "stack_test.cc"
   DEPS
     ::impl
     iree::base::api
@@ -160,13 +160,13 @@ iree_cc_library(
   NAME
     bytecode_module
   HDRS
-    bytecode_module.h
+    "bytecode_module.h"
   SRCS
-    bytecode_dispatch.c
-    bytecode_dispatch_util.h
-    bytecode_module.c
-    bytecode_module_impl.h
-    generated/bytecode_op_table.h
+    "bytecode_dispatch.c"
+    "bytecode_dispatch_util.h"
+    "bytecode_module.c"
+    "bytecode_module_impl.h"
+    "generated/bytecode_op_table.h"
   DEPS
     ::vm
     iree::base::api
@@ -183,8 +183,8 @@ iree_cc_test(
   NAME
     bytecode_module_test
   SRCS
-    bytecode_dispatch_test.cc
-    bytecode_module_test.cc
+    "bytecode_dispatch_test.cc"
+    "bytecode_module_test.cc"
   DEPS
     ::bytecode_module
     ::vm
@@ -200,7 +200,7 @@ iree_cc_test(
   NAME
     bytecode_module_benchmark
   SRCS
-    bytecode_module_benchmark.cc
+    "bytecode_module_benchmark.cc"
   DEPS
     ::bytecode_module
     ::bytecode_module_benchmark_module_cc
@@ -217,11 +217,11 @@ iree_bytecode_module(
   NAME
     bytecode_module_benchmark_module
   SRC
-    bytecode_module_benchmark.mlir
+    "bytecode_module_benchmark.mlir"
   CC_NAMESPACE
-    iree::vm
+    "iree::vm"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   TESTONLY
   PUBLIC
 )
@@ -230,7 +230,7 @@ iree_cc_test(
   NAME
     bytecode_module_size_benchmark
   SRCS
-    bytecode_module_size_benchmark.cc
+    "bytecode_module_size_benchmark.cc"
   DEPS
     ::bytecode_module
     ::bytecode_module_size_benchmark_module_cc
@@ -242,11 +242,11 @@ iree_bytecode_module(
   NAME
     bytecode_module_size_benchmark_module
   SRC
-    bytecode_module_size_benchmark.mlir
+    "bytecode_module_size_benchmark.mlir"
   CC_NAMESPACE
-    iree::vm
+    "iree::vm"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   TESTONLY
   PUBLIC
 )
@@ -257,6 +257,6 @@ iree_cc_library(
   NAME
     c_funcs
   HDRS
-    c_funcs.h
+    "c_funcs.h"
   PUBLIC
 )

@@ -22,17 +22,17 @@ iree_cc_embed_data(
   NAME
     all_bytecode_modules_cc
   GENERATED_SRCS
-    arithmetic_ops.module
-    arithmetic_ops_i64.module
-    comparison_ops.module
-    control_flow_ops.module
-    list_ops.module
+    "arithmetic_ops.module"
+    "arithmetic_ops_i64.module"
+    "comparison_ops.module"
+    "control_flow_ops.module"
+    "list_ops.module"
   CC_FILE_OUTPUT
-    all_bytecode_modules.cc
+    "all_bytecode_modules.cc"
   H_FILE_OUTPUT
-    all_bytecode_modules.h
+    "all_bytecode_modules.h"
   CPP_NAMESPACE
-    iree::vm::test
+    "iree::vm::test"
   FLATTEN
   PUBLIC
 )
@@ -41,9 +41,9 @@ iree_bytecode_module(
   NAME
     arithmetic_ops
   SRC
-    arithmetic_ops.mlir
+    "arithmetic_ops.mlir"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -51,9 +51,9 @@ iree_bytecode_module(
   NAME
     arithmetic_ops_i64
   SRC
-    arithmetic_ops_i64.mlir
+    "arithmetic_ops_i64.mlir"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -61,9 +61,9 @@ iree_bytecode_module(
   NAME
     comparison_ops
   SRC
-    comparison_ops.mlir
+    "comparison_ops.mlir"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -71,9 +71,9 @@ iree_bytecode_module(
   NAME
     control_flow_ops
   SRC
-    control_flow_ops.mlir
+    "control_flow_ops.mlir"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -81,10 +81,10 @@ iree_bytecode_module(
   NAME
     list_ops
   SRC
-    list_ops.mlir
+    "list_ops.mlir"
   CC_NAMESPACE
-    iree::vm::test
+    "iree::vm::test"
   FLAGS
-    -iree-vm-ir-to-bytecode-module
+    "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )

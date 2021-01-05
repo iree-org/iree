@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     HLOToHLO
   HDRS
-    Passes.h
+    "Passes.h"
   SRCS
-    DecomposeHLOClamp.cpp
-    DemoteF32ToF16.cpp
+    "DecomposeHLOClamp.cpp"
+    "DemoteF32ToF16.cpp"
   DEPS
     LLVMSupport
     MLIRIR

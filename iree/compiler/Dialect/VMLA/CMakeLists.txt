@@ -18,13 +18,13 @@ iree_cc_embed_data(
   NAME
     vmla_imports
   SRCS
-    vmla.imports.mlir
+    "vmla.imports.mlir"
   CC_FILE_OUTPUT
-    vmla.imports.cc
+    "vmla.imports.cc"
   H_FILE_OUTPUT
-    vmla.imports.h
+    "vmla.imports.h"
   CPP_NAMESPACE
-    mlir::iree_compiler
+    "mlir::iree_compiler"
   FLATTEN
   PUBLIC
 )

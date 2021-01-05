@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     CodeGenOptionUtils
   HDRS
-    CodeGenOptionUtils.h
+    "CodeGenOptionUtils.h"
   SRCS
-    CodeGenOptionUtils.cpp
+    "CodeGenOptionUtils.cpp"
   DEPS
     LLVMSupport
   PUBLIC
@@ -30,24 +30,24 @@ iree_cc_library(
   NAME
     LinalgToSPIRV
   HDRS
-    CooperativeMatrixAnalysis.h
-    KernelDispatchUtils.h
-    MemorySpace.h
-    Passes.h
-    Utils.h
+    "CooperativeMatrixAnalysis.h"
+    "KernelDispatchUtils.h"
+    "MemorySpace.h"
+    "Passes.h"
+    "Utils.h"
   SRCS
-    ConvertToGPUPass.cpp
-    ConvertToSPIRVPass.cpp
-    CooperativeMatrixAnalysis.cpp
-    FoldGPUProcessorIDUses.cpp
-    KernelDispatchUtils.cpp
-    LinalgTileAndFusePass.cpp
-    MatMulVectorizationTest.cpp
-    Passes.cpp
-    SplitDispatchFunctionPass.cpp
-    Utils.cpp
-    VectorToGPUPass.cpp
-    VectorizeMemref.cpp
+    "ConvertToGPUPass.cpp"
+    "ConvertToSPIRVPass.cpp"
+    "CooperativeMatrixAnalysis.cpp"
+    "FoldGPUProcessorIDUses.cpp"
+    "KernelDispatchUtils.cpp"
+    "LinalgTileAndFusePass.cpp"
+    "MatMulVectorizationTest.cpp"
+    "Passes.cpp"
+    "SplitDispatchFunctionPass.cpp"
+    "Utils.cpp"
+    "VectorToGPUPass.cpp"
+    "VectorizeMemref.cpp"
   DEPS
     ::CodeGenOptionUtils
     LLVMSupport

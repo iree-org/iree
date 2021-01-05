@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     StandardToFlow
   HDRS
-    ConvertStandardToFlow.h
+    "ConvertStandardToFlow.h"
   SRCS
-    ConvertStandardToFlow.cpp
+    "ConvertStandardToFlow.cpp"
   DEPS
     MLIRIR
     MLIRPass

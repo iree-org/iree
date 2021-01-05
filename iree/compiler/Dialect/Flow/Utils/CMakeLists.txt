@@ -18,11 +18,11 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    DispatchUtils.h
-    WorkloadUtils.h
+    "DispatchUtils.h"
+    "WorkloadUtils.h"
   SRCS
-    DispatchUtils.cpp
-    WorkloadUtils.cpp
+    "DispatchUtils.cpp"
+    "WorkloadUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR

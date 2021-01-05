@@ -19,19 +19,19 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    VMLAEnums.h.inc
-    VMLAOpInterface.h.inc
-    VMLAOps.h
-    VMLAOps.h.inc
-    VMLATraits.h
-    VMLATypes.h
+    "VMLAEnums.h.inc"
+    "VMLAOpInterface.h.inc"
+    "VMLAOps.h"
+    "VMLAOps.h.inc"
+    "VMLATraits.h"
+    "VMLATypes.h"
   TEXTUAL_HDRS
-    VMLAOps.cpp.inc
+    "VMLAOps.cpp.inc"
   SRCS
-    VMLAEnums.cpp.inc
-    VMLAOpInterface.cpp.inc
-    VMLAOps.cpp
-    VMLATypes.cpp
+    "VMLAEnums.cpp.inc"
+    "VMLAOpInterface.cpp.inc"
+    "VMLAOps.cpp"
+    "VMLATypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -50,9 +50,9 @@ iree_cc_library(
   NAME
     VMLADialect
   HDRS
-    VMLADialect.h
+    "VMLADialect.h"
   SRCS
-    VMLADialect.cpp
+    "VMLADialect.cpp"
   DEPS
     ::IR
     LLVMSupport
@@ -71,7 +71,7 @@ iree_tablegen_library(
   NAME
     VMLAEnumsGen
   TD_FILE
-    VMLABase.td
+    "VMLABase.td"
   OUTS
     -gen-enum-decls VMLAEnums.h.inc
     -gen-enum-defs VMLAEnums.cpp.inc
@@ -81,7 +81,7 @@ iree_tablegen_library(
   NAME
     VMLAOpsGen
   TD_FILE
-    VMLAOps.td
+    "VMLAOps.td"
   OUTS
     -gen-op-decls VMLAOps.h.inc
     -gen-op-defs VMLAOps.cpp.inc
@@ -91,7 +91,7 @@ iree_tablegen_library(
   NAME
     VMLAOpInterfaceGen
   TD_FILE
-    VMLABase.td
+    "VMLABase.td"
   OUTS
     -gen-op-interface-decls VMLAOpInterface.h.inc
     -gen-op-interface-defs VMLAOpInterface.cpp.inc
@@ -101,7 +101,7 @@ iree_tablegen_doc(
   NAME
     VMLADialecDocGen
   TD_FILE
-    VMLAOps.td
+    "VMLAOps.td"
   OUTS
     -gen-dialect-doc VMLADialect.md
 )

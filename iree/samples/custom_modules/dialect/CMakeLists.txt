@@ -19,13 +19,13 @@ iree_cc_library(
   NAME
     dialect
   HDRS
-    conversion_patterns.h
-    custom_dialect.h
-    custom_ops.h.inc
+    "conversion_patterns.h"
+    "custom_dialect.h"
+    "custom_ops.h.inc"
   SRCS
-    conversion_patterns.cc
-    custom_dialect.cc
-    custom_ops.cc.inc
+    "conversion_patterns.cc"
+    "custom_dialect.cc"
+    "custom_ops.cc.inc"
   DEPS
     ::custom_imports
     LLVMSupport
@@ -45,7 +45,7 @@ iree_tablegen_library(
   NAME
     custom_ops_gen
   TD_FILE
-    custom_ops.td
+    "custom_ops.td"
   OUTS
     -gen-op-decls custom_ops.h.inc
     -gen-op-defs custom_ops.cc.inc
@@ -55,13 +55,13 @@ iree_cc_embed_data(
   NAME
     custom_imports
   SRCS
-    custom.imports.mlir
+    "custom.imports.mlir"
   CC_FILE_OUTPUT
-    custom.imports.cc
+    "custom.imports.cc"
   H_FILE_OUTPUT
-    custom.imports.h
+    "custom.imports.h"
   CPP_NAMESPACE
-    mlir::iree_compiler::IREE::Custom
+    "mlir::iree_compiler::IREE::Custom"
   FLATTEN
   PUBLIC
 )
@@ -70,7 +70,7 @@ iree_cc_library(
   NAME
     init_dialect
   HDRS
-    init_dialect.h
+    "init_dialect.h"
   DEPS
     ::dialect
     MLIRIR
@@ -83,7 +83,7 @@ iree_cc_binary(
   OUT
     custom-opt
   SRCS
-    custom-opt-main.cc
+    "custom-opt-main.cc"
   DEPS
     ::init_dialect
     LLVMSupport
@@ -100,7 +100,7 @@ iree_cc_binary(
   OUT
     custom-translate
   SRCS
-    custom-translate-main.cc
+    "custom-translate-main.cc"
   DEPS
     ::init_dialect
     LLVMSupport

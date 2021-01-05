@@ -19,7 +19,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    ${_GLOB_X_MLIR}
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module
@@ -27,18 +27,18 @@ iree_lit_test_suite(
     iree::tools::iree-run-module
     iree::tools::iree-translate
   LABELS
-    hostonly
+    "hostonly"
 )
 
 iree_lit_test_suite(
   NAME
     benchmark_flags
   SRCS
-    benchmark_flags.txt
+    "benchmark_flags.txt"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module
     iree::tools::iree-translate
   LABELS
-    hostonly
+    "hostonly"
 )

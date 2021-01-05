@@ -22,15 +22,15 @@ iree_cc_library(
   NAME
     dylib
   HDRS
-    dylib_device.h
-    dylib_driver.h
-    dylib_executable.h
-    dylib_executable_cache.h
+    "dylib_device.h"
+    "dylib_driver.h"
+    "dylib_executable.h"
+    "dylib_executable_cache.h"
   SRCS
-    dylib_device.cc
-    dylib_driver.cc
-    dylib_executable.cc
-    dylib_executable_cache.cc
+    "dylib_device.cc"
+    "dylib_driver.cc"
+    "dylib_executable.cc"
+    "dylib_executable_cache.cc"
   DEPS
     absl::inlined_vector
     absl::span

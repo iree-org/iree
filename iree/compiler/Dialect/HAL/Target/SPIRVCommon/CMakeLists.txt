@@ -22,9 +22,9 @@ iree_cc_library(
   NAME
     SPIRVCommon
   HDRS
-    SPIRVTarget.h
+    "SPIRVTarget.h"
   SRCS
-    SPIRVTarget.cpp
+    "SPIRVTarget.cpp"
   DEPS
     LLVMSupport
     MLIRIR

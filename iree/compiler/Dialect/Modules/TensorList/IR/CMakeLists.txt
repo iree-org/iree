@@ -19,14 +19,14 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    TensorListOps.h
-    TensorListOps.h.inc
-    TensorListTypes.h
+    "TensorListOps.h"
+    "TensorListOps.h.inc"
+    "TensorListTypes.h"
   TEXTUAL_HDRS
-    TensorListOps.cpp.inc
+    "TensorListOps.cpp.inc"
   SRCS
-    TensorListOps.cpp
-    TensorListTypes.cpp
+    "TensorListOps.cpp"
+    "TensorListTypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -43,9 +43,9 @@ iree_cc_library(
   NAME
     TensorListDialect
   HDRS
-    TensorListDialect.h
+    "TensorListDialect.h"
   SRCS
-    TensorListDialect.cpp
+    "TensorListDialect.cpp"
   DEPS
     ::IR
     LLVMSupport
@@ -65,7 +65,7 @@ iree_tablegen_library(
   NAME
     TensorListOpsGen
   TD_FILE
-    TensorListOps.td
+    "TensorListOps.td"
   OUTS
     -gen-op-decls TensorListOps.h.inc
     -gen-op-defs TensorListOps.cpp.inc
@@ -75,7 +75,7 @@ iree_tablegen_doc(
   NAME
     TensorListDialectDocGen
   TD_FILE
-    TensorListOps.td
+    "TensorListOps.td"
   OUTS
     -gen-dialect-doc TensorListDialect.md
 )

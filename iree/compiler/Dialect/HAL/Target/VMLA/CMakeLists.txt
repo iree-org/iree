@@ -22,9 +22,9 @@ iree_cc_library(
   NAME
     VMLA
   HDRS
-    VMLATarget.h
+    "VMLATarget.h"
   SRCS
-    VMLATarget.cpp
+    "VMLATarget.cpp"
   DEPS
     LLVMSupport
     MLIRIR

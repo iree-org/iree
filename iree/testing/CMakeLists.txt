@@ -18,7 +18,7 @@ iree_cc_library(
   NAME
     benchmark_main
   SRCS
-    benchmark_main.cc
+    "benchmark_main.cc"
   DEPS
     benchmark
     iree::base::flags
@@ -30,8 +30,8 @@ iree_cc_library(
   NAME
     gtest
   HDRS
-    gtest.h
-    status_matchers.h
+    "gtest.h"
+    "status_matchers.h"
   DEPS
     absl::optional
     absl::strings
@@ -46,7 +46,7 @@ iree_cc_library(
   NAME
     gtest_main
   SRCS
-    gtest_main.cc
+    "gtest_main.cc"
   DEPS
     ::gtest
     gmock

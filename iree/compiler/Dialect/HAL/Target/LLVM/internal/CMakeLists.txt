@@ -18,9 +18,9 @@ iree_cc_library(
   NAME
     LinkerTools_internal
   SRCS
-    LinkerTools.cpp
-    UnixLinkerTool.cpp
-    WindowsLinkerTool.cpp
+    "LinkerTools.cpp"
+    "UnixLinkerTool.cpp"
+    "WindowsLinkerTool.cpp"
   DEPS
     LLVMCore
     LLVMSupport

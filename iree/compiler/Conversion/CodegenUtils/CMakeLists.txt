@@ -18,17 +18,17 @@ iree_cc_library(
   NAME
     CodegenUtils
   HDRS
-    ForOpCanonicalization.h
-    FunctionUtils.h
-    GetNumWorkgroups.h
-    MarkerUtils.h
-    MatmulCodegenStrategy.h
+    "ForOpCanonicalization.h"
+    "FunctionUtils.h"
+    "GetNumWorkgroups.h"
+    "MarkerUtils.h"
+    "MatmulCodegenStrategy.h"
   SRCS
-    ForOpCanonicalization.cpp
-    FunctionUtils.cpp
-    GetNumWorkgroups.cpp
-    MarkerUtils.cpp
-    MatmulCodegenStrategy.cpp
+    "ForOpCanonicalization.cpp"
+    "FunctionUtils.cpp"
+    "GetNumWorkgroups.cpp"
+    "MarkerUtils.cpp"
+    "MatmulCodegenStrategy.cpp"
   DEPS
     LLVMSupport
     MLIRAffine

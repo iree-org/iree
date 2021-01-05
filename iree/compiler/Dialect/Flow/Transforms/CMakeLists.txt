@@ -18,31 +18,31 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    DispatchConfig.h
-    Passes.h
+    "DispatchConfig.h"
+    "Passes.h"
   SRCS
-    CreateBenchmarkFuncs.cpp
-    DeduplicateExecutables.cpp
-    DispatchConfig.cpp
-    DispatchabilityAnalysis.cpp
-    FlattenTuplesInCFG.cpp
-    FoldCompatibleDispatchRegions.cpp
-    FormStreams.cpp
-    HLOToHLOPreprocessing.cpp
-    HoistUnstreamableOps.cpp
-    IdentifyDispatchRegions.cpp
-    IdentifyDispatchRegions2.cpp
-    InjectDispatchTracing.cpp
-    LegalizeInputTypes.cpp
-    MaterializeExportedReflection.cpp
-    MergeExportedReflection.cpp
-    OutlineDispatchRegions.cpp
-    OutlineDispatchRegions2.cpp
-    OutlineLargeConstants.cpp
-    Passes.cpp
-    PrePostPartitioningConversion.cpp
-    RematerializeDispatchConstants.cpp
-    StripAndSplatConstantVariables.cpp
+    "CreateBenchmarkFuncs.cpp"
+    "DeduplicateExecutables.cpp"
+    "DispatchConfig.cpp"
+    "DispatchabilityAnalysis.cpp"
+    "FlattenTuplesInCFG.cpp"
+    "FoldCompatibleDispatchRegions.cpp"
+    "FormStreams.cpp"
+    "HLOToHLOPreprocessing.cpp"
+    "HoistUnstreamableOps.cpp"
+    "IdentifyDispatchRegions.cpp"
+    "IdentifyDispatchRegions2.cpp"
+    "InjectDispatchTracing.cpp"
+    "LegalizeInputTypes.cpp"
+    "MaterializeExportedReflection.cpp"
+    "MergeExportedReflection.cpp"
+    "OutlineDispatchRegions.cpp"
+    "OutlineDispatchRegions2.cpp"
+    "OutlineLargeConstants.cpp"
+    "Passes.cpp"
+    "PrePostPartitioningConversion.cpp"
+    "RematerializeDispatchConstants.cpp"
+    "StripAndSplatConstantVariables.cpp"
   DEPS
     LLVMSupport
     MLIRIR

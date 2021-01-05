@@ -18,13 +18,13 @@ iree_cc_embed_data(
   NAME
     check_imports
   SRCS
-    check.imports.mlir
+    "check.imports.mlir"
   CC_FILE_OUTPUT
-    check.imports.cc
+    "check.imports.cc"
   H_FILE_OUTPUT
-    check.imports.h
+    "check.imports.h"
   CPP_NAMESPACE
-    mlir::iree_compiler::IREE::Check
+    "mlir::iree_compiler::IREE::Check"
   FLATTEN
   PUBLIC
 )

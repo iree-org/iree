@@ -18,16 +18,16 @@ iree_cc_library(
   NAME
     Bytecode
   HDRS
-    BytecodeModuleTarget.h
-    TranslationFlags.h
+    "BytecodeModuleTarget.h"
+    "TranslationFlags.h"
   SRCS
-    BytecodeEncoder.cpp
-    BytecodeEncoder.h
-    BytecodeModuleTarget.cpp
-    ConstantEncoder.cpp
-    ConstantEncoder.h
-    TranslationFlags.cpp
-    TranslationRegistration.cpp
+    "BytecodeEncoder.cpp"
+    "BytecodeEncoder.h"
+    "BytecodeModuleTarget.cpp"
+    "ConstantEncoder.cpp"
+    "ConstantEncoder.h"
+    "TranslationFlags.cpp"
+    "TranslationRegistration.cpp"
   DEPS
     LLVMSupport
     MLIRIR
