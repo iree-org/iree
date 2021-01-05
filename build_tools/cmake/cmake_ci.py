@@ -101,6 +101,58 @@ def use_tool_path(toolname, varname=None):
 ### Detect cmake.
 use_cmake = use_tool_path('cmake') or 'cmake'
 cmake_command_prefix = [use_cmake]
+cmake_environ = os.environ
+
+def cmake_commandline(args):
+  return cmake_command_prefix + args
+
+
+### On Windows, we need to make sure to wrap any cmake invocation to populate
+### vcvars. In order to do this robustly, we have to get another tool. Because,
+### why wouldn't we?
+### So we install vswhere if needed. Then we create a temporary batch file
+### that calls vcvarsall.bat and prints the resulting environment (because for
+### the life of me, I could not figure out the god-forsaken quoting incantation
+### to do a "cmd /c ... & ..."), capture the environment and use it in any
+### calls to cmake. Awesome.
+if is_windows:
+
+  def compute_vcvars_environ():
+    if os.environ.get('VCINSTALLDIR'):
+      report('Appear to be running with vcvars set. Not resetting.')
+    use_vswhere = use_tool_path('vswhere')
+    if not use_vswhere:
+      report('vswhere not found. attempting to install it.')
+      subprocess.check_call(['choco', 'install', 'vswhere'])
+    use_vswhere = use_tool_path('vswhere')
+    if not use_vswhere:
+      report('Still could not find vswhere after attempting to install it')
+    vs_install_path = subprocess.check_output(
+        ['vswhere', '-property', 'installationPath']).decode('utf-8').strip()
+    report('Found visual studio installation:', vs_install_path)
+    vcvars_all = os.path.join(vs_install_path, 'VC', 'Auxiliary', 'Build',
+                              'vcvarsall.bat')
+    vcvars_arch = get_setting('VCVARS_ARCH', 'x64')
+    with tempfile.NamedTemporaryFile(mode='wt', delete=False, suffix='.cmd') as f:
+      f.write('@echo off\n')
+      f.write(f'call "{vcvars_all}" {vcvars_arch} > NUL\n')
+      f.write('set\n')
+    try:
+      env_vars = subprocess.check_output(
+          ["cmd", "/c", f.name]).decode('utf-8').splitlines()
+    finally:
+      os.unlink(f.name)
+
+    cmake_environ = {}
+    for env_line in env_vars:
+      name, value = env_line.split('=', maxsplit=1)
+      cmake_environ[name] = value
+    if 'VCINSTALLDIR' not in cmake_environ:
+      report('vcvars environment did not include VCINSTALLDIR:\n',
+          cmake_environ)
+    return cmake_environ
+
+  cmake_environ = compute_vcvars_environ()
 
 
 def invoke_generate():
@@ -176,17 +228,17 @@ def invoke_generate():
 
   # Detect other build tools.
   use_ccache = use_tool_path('ccache')
-  if use_ccache:
+  if not is_windows and use_ccache:
     report(f'Using ccache {use_ccache}')
     cmake_args.append(f'-DCMAKE_CXX_COMPILER_LAUNCHER={use_ccache}')
 
   # Clang
   use_clang = use_tool_path('clang')
-  if use_clang:
+  if not is_windows and use_clang:
     report(f'Using clang {use_clang}')
     cmake_args.append(f'-DCMAKE_C_COMPILER={use_clang}')
   use_clangcpp = use_tool_path('clang++', 'CLANGCPP')
-  if use_clangcpp:
+  if not is_windows and use_clangcpp:
     report(f'Using clang++ {use_clangcpp}')
     cmake_args.append(f'-DCMAKE_CXX_COMPILER={use_clangcpp}')
 
@@ -198,7 +250,7 @@ def invoke_generate():
 
   cmake_args.extend(sys.argv[1:])
   report(f'Running cmake (generate): {" ".join(cmake_args)}')
-  subprocess.check_call(cmake_command_prefix + cmake_args)
+  subprocess.check_call(cmake_commandline(cmake_args), env=cmake_environ)
 
 
 # Select which mode.
@@ -206,4 +258,4 @@ if mode == 'generate':
   invoke_generate()
 else:
   # Just pass-through.
-  subprocess.check_call(cmake_command_prefix + sys.argv[1:])
+  subprocess.check_call(cmake_commandline(sys.argv[1:]), env=cmake_environ)

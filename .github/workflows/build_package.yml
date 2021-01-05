@@ -30,14 +30,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04]
+        os: [ubuntu-18.04, macos-latest, windows-2019]
         python_package: [compiler, runtime]
         experimental: [false]
-        # include:
-        #   - os: macos-latest
-        #     experimental: true
-        #   - os: windows-2019
-        #     experimental: true
+        include:
+          - os: macos-latest
+            experimental: true
+          - os: windows-2019
+            experimental: true
 
     env:
       CIBW_BUILD_VERBOSITY: 1
@@ -87,6 +87,8 @@ jobs:
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
+          # TODO: Find a cross-platform way to invoke install/strip (it does
+          # not exist on Windows).
           export CIBW_BUILD="cp38-*"
           package_dir="./iree-install/python_packages/iree_compiler"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
@@ -98,7 +100,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install/strip"
+              --build ./iree-build --target install"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
@@ -113,6 +115,8 @@ jobs:
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
+          # TODO: Find a cross-platform way to invoke install/strip (it does
+          # not exist on Windows).
           package_dir="./iree-install/python_packages/iree_rt"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
@@ -123,7 +127,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install/strip"
+              --build ./iree-build --target install"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
