@@ -52,6 +52,6 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Build Native Release Packages
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"package_suffix": "-snapshot", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
