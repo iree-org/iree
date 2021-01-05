@@ -28,6 +28,7 @@ if sys.platform == 'win32' and sys.maxsize.bit_length() == 31:
   sys.exit(-1)
 
 import importlib
+import json
 import os
 import platform
 import subprocess
