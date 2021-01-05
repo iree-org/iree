@@ -147,4 +147,3 @@ jobs:
         with:
           release_id: ${{ github.event.inputs.release_id }}
           assets_path: ./wheelhouse/*.whl
-
