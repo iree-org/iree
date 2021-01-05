@@ -70,6 +70,8 @@ iree_cc_library(
     MLIRStandard
     MLIRStandardToSPIRV
     MLIRSupport
+    MLIRTosa
+    MLIRTosaToLinalg
     MLIRTransforms
     MLIRVector
     MLIRVectorToSPIRV

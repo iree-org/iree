@@ -20,6 +20,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 
@@ -37,7 +38,8 @@ bool isOpOfKnownDialect(Operation *op) {
          dialectNamespace == linalg::LinalgDialect::getDialectNamespace() ||
          dialectNamespace == mhlo::MhloDialect::getDialectNamespace() ||
          dialectNamespace == mlir::StandardOpsDialect::getDialectNamespace() ||
-         dialectNamespace == ShapeDialect::getDialectNamespace();
+         dialectNamespace == ShapeDialect::getDialectNamespace() ||
+         dialectNamespace == tosa::TosaDialect::getDialectNamespace();
 }
 
 namespace {

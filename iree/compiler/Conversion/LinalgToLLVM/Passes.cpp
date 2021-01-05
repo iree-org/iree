@@ -21,6 +21,7 @@
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -105,6 +106,9 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       Shape::createMaterializeShapeCalculationsPass());
   passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+
+  // TOSA -> Linalg on tensors.
+  tosa::addTosaToLinalgOnTensorsPasses(passManager);
 
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {

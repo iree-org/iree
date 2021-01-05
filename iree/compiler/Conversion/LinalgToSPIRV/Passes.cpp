@@ -32,6 +32,7 @@
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
+#include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -226,6 +227,15 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
   pm.addNestedPass<FuncOp>(Shape::createMaterializeShapeCalculationsPass());
   pm.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+
+  //===--------------------------------------------------------------------===//
+  // Convert TOSA ops to Linalg ops with buffer semantics.
+  //
+  // Post-conditions:
+  //   - All TOSA ops are converted.
+  //   - All Linalg ops are operating on buffers.
+  //===--------------------------------------------------------------------===//
+  tosa::addTosaToLinalgOnTensorsPasses(pm);
 
   //===--------------------------------------------------------------------===//
   // Convert XLA HLO ops to Linalg ops with buffer semantics.

@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRStandard
+    MLIRTosa
     MLIRSupport
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
