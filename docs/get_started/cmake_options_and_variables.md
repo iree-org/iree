@@ -60,9 +60,13 @@ Builds the IREE python bindings. Defaults to `OFF`.
 
 Builds the IREE java bindings. Defaults to `OFF`.
 
-#### `IREE_BUILD_EXPERIMENTAL`:BOOL
+#### `IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER`:BOOL
 
-Builds experimental projects. Defaults to `OFF`.
+Builds the experimental model builder component. Defaults to `OFF`.
+
+#### `IREE_BUILD_EXPERIMENTAL_REMOTING`:BOOL
+
+Builds experimental remoting component. Defaults to `OFF`.
 
 #### `IREE_HAL_DRIVERS_TO_BUILD`:STRING
 
