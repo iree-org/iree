@@ -108,7 +108,7 @@ jobs:
       # directory between runs. Most of the build will be incremental.
       # We save a little bit of time by disabling the compiler build.
       - name: Build runtime wheels
-        if: "contains(matrix.python_package, 'compiler')"
+        if: "contains(matrix.python_package, 'runtime')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
