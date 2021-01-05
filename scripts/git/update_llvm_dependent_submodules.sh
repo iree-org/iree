@@ -75,6 +75,6 @@ if [[ -z "$(which gh)" ]]; then
   exit 1
 fi
 
-# Workaround https://github.com/cli/cli/issues/1820
-GITHUB_USERNAME="$(gh config get -h github.com user)"
-gh pr create --base="${BASE_BRANCH?}" --head="${GITHUB_USERNAME?}:${PR_BRANCH?}" --title="${TITLE?}" --body="${BODY?}"
+# Extract the GitHub owner of the fork from either an ssh or https GitHub URL.
+FORK_NAME="$(git remote get-url ${FORK_REMOTE?} | sed 's|.*[/:]\([A-Za-z]*\)/iree\(.git\)\?|\1|')"
+gh pr create --base="${BASE_BRANCH?}" --head="${FORK_NAME?}:${PR_BRANCH?}" --title="${TITLE?}" --body="${BODY?}"

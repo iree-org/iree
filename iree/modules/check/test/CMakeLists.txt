@@ -21,8 +21,8 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::modules::check::iree-check-module
     iree::tools::IreeFileCheck
+    iree::tools::iree-check-module
     iree::tools::iree-translate
   LABELS
     "hostonly"

@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,26 +19,21 @@ import os
 from setuptools import setup, find_namespace_packages, Extension
 import sysconfig
 
-# Make this setup position independent and make it not conflict with
-# parallel scripts.
-this_dir = os.path.abspath(os.path.dirname(__file__))
-setup_dir = os.path.join(this_dir, "setupbuild", "runtime")
-os.makedirs(setup_dir, exist_ok=True)
-os.chdir(setup_dir)
 
+README = """# IREE Python Runtime Components
 
-def read(fname):
-  return open(os.path.join(this_dir, fname), "rt").read()
-
+This package provides an API for running compiled IREE binaries and interfacing
+with the hardware-abstraction-layer.
+"""
 
 setup(
-    name="google-iree-runtime",
-    version="@IREE_PYTHON_VERSION@",
+    name="iree-runtime@IREE_RELEASE_PACKAGE_SUFFIX@",
+    version="@IREE_RELEASE_VERSION@",
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache",
     description="IREE Python Runtime Components",
-    long_description=read("pyiree/rt/README.md"),
+    long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/google/iree",
     classifiers=[
@@ -50,10 +43,7 @@ setup(
         "Development Status :: 3 - Alpha",
     ],
     python_requires=">=3.6",
-    package_dir={"": this_dir},
-    packages=find_namespace_packages(where=this_dir,
-                                     include=["pyiree.rt", "pyiree.rt.*"],
-                                     exclude=["*.CMakeFiles"]),
+    packages=find_namespace_packages(include=["pyiree.rt", "pyiree.rt.*"]),
     ext_modules=[
         Extension(name="pyiree.rt.binding", sources=[]),
     ],

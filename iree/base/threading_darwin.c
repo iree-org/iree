@@ -52,7 +52,6 @@ static void iree_thread_set_name(const char* name) {
   pthread_setname_np(name);
   IREE_TRACE_SET_THREAD_NAME(name);
   IREE_TRACE_ZONE_END(z0);
-  return rc;
 }
 
 static void* iree_thread_start_routine(void* param) {

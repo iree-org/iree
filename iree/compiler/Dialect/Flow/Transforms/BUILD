@@ -50,6 +50,7 @@ cc_library(
     ],
     deps = [
         "//iree/base:signature_mangle",
+        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/Conversion",
