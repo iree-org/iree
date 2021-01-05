@@ -130,6 +130,9 @@ setup(
     package_data={
         "pyiree.tools.core": [f"iree-translate{exe_suffix}",],
     },
-    cmdclass={'bdist_wheel': bdist_wheel},
+    cmdclass={
+      'bdist_wheel': bdist_wheel,
+      'install': platlib_install,
+    },
     zip_safe=False,  # This package is fine but not zipping is more versatile.
 )
