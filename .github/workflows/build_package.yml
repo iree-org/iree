@@ -30,16 +30,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04, windows-2019]
+        os: [ubuntu-18.04, windows-2019, macos-latest]
         build_package: [compiler, runtime]
         experimental: [false]
-        include:
-          - os: macos-latest
-            build_package: compiler
-            experimental: true
-          - os: macos-latest
-            build_package: runtime
-            experimental: true
+        # Add experimental one off combinations below:
+        # include:
+        #   - os: macos-latest
+        #     build_package: compiler
+        #     experimental: true
 
     env:
       CIBW_BUILD_VERBOSITY: 1
