@@ -18,7 +18,6 @@ jobs:
 
       - name: Compute version
         run: |
-          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
           package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
           tag_name="snapshot-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
