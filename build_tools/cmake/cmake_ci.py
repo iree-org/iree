@@ -197,7 +197,12 @@ def invoke_generate():
   cmake_args = [
       f'-S{repo_root}',
       f'-DPython3_EXECUTABLE:FILEPATH={sys.executable}',
+      # The old python package settings should not be needed, but since there
+      # can be configuration races between packages that use both mechanisms,
+      # be explicit.
+      f'-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}',
       f'-DPython3_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
+      f'-DPYTHON_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
       f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or "-dev"}',
       f'-DIREE_RELEASE_VERSION:STRING={version_info.get("package-version") or "0.0.1a1"}',
       f'-DIREE_RELEASE_REVISION:STRING={version_info.get("iree-revision") or "HEAD"}',
@@ -223,6 +228,7 @@ def invoke_generate():
 
   if python_library:
     cmake_args.append(f'-DPython3_LIBRARY:PATH={python_library}')
+    cmake_args.append(f'-DPYTHON_LIBRARY:PATH={python_library}')
 
   ### Detect generator.
   if use_tool_path('ninja'):
