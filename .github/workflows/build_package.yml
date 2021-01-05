@@ -24,19 +24,18 @@ on:
 
 jobs:
   build_core:
-    name: "${{ matrix.os }} :: Build ${{ matrix.python_package }} Package"
+    name: "${{ matrix.os }} :: Build ${{ matrix.build_package }} Package"
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04, macos-latest, windows-2019]
-        python_package: [compiler, runtime]
+        os: [ubuntu-18.04, windows-2019]
+        build_package: [compiler, runtime]
         experimental: [false]
         include:
           - os: macos-latest
-            experimental: true
-          - os: windows-2019
+            build_package: [compiler, runtime]
             experimental: true
 
     env:
@@ -83,7 +82,7 @@ jobs:
       # time by not building IREE's runtime, but it is small compared to
       # the compiler build.
       - name: Build compiler wheels
-        if: "contains(matrix.python_package, 'compiler')"
+        if: "contains(matrix.build_package, 'compiler')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -111,7 +110,7 @@ jobs:
       # directory between runs. Most of the build will be incremental.
       # We save a little bit of time by disabling the compiler build.
       - name: Build runtime wheels
-        if: "contains(matrix.python_package, 'runtime')"
+        if: "contains(matrix.build_package, 'runtime')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
