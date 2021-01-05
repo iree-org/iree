@@ -50,7 +50,10 @@ objc_library(
         "metal_pipeline_cache.mm",
         "metal_shared_event.mm",
     ],
-    sdk_frameworks = ["Metal"],
+    sdk_frameworks = [
+        "Foundation",
+        "Metal",
+    ],
     deps = [
         "//iree/base:arena",
         "//iree/base:file_io",
