@@ -34,8 +34,5 @@ def run_sub_setup(name):
   print("")
 
 
-run_sub_setup("setup_compiler")
-run_sub_setup("setup_runtime")
-run_sub_setup("setup_tools_core")
 if os.path.exists(os.path.join(this_dir, "pyiree/tools/tf")):
   run_sub_setup("setup_tools_tf")

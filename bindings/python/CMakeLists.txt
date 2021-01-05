@@ -21,9 +21,6 @@ set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 # TODO: Make the version configurable.
 set(IREE_PYTHON_VERSION "0.1a1")
 configure_file(setup.py setup.py COPYONLY)
-configure_file(setup_compiler.py.in setup_compiler.py)
-configure_file(setup_runtime.py.in setup_runtime.py)
-configure_file(setup_tools_core.py.in setup_tools_core.py)
 configure_file(setup_tools_tf.py.in setup_tools_tf.py)
 
 # Namespace packages.

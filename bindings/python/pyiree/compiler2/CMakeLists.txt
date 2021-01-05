@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
-
 iree_py_library(
   NAME
     compiler2
@@ -25,4 +22,25 @@ iree_py_library(
     "tflite.py"
     "tools.py"
     "xla.py"
+)
+
+# Installation.
+configure_file(setup.py.in setup.py)
+
+set(_install_component IreePythonCompiler)
+set(_install_package_dir "${CMAKE_INSTALL_PREFIX}/python_packages/iree_compiler")
+set(_install_destination "${_install_package_dir}/pyiree/compiler2")
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+  COMPONENT ${_install_component}
+  DESTINATION "${_install_package_dir}"
+)
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+  COMPONENT ${_install_component}
+  DESTINATION "${_install_destination}"
+  FILES_MATCHING
+    PATTERN "*.py"
 )

@@ -519,16 +519,18 @@ elseif(${IREE_ENABLE_MLIR})
   add_subdirectory(iree/compiler/Dialect/VM/Tools)
 endif()
 
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  add_subdirectory(bindings/python)
-endif()
-
 if(${IREE_BUILD_JAVA_BINDINGS})
   add_subdirectory(bindings/java)
   add_subdirectory(bindings/javatests)
 endif()
 
 add_subdirectory(iree/tools)
+
+# Order constraint: The python bindings install tools targets from iree/tools
+# and must come after it.
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(bindings/python)
+endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)

@@ -26,3 +26,22 @@ if(${IREE_BUILD_COMPILER})
     TO_EXE_NAME iree-translate
   )
 endif()
+
+# Installation.
+set(_install_component IreePythonCompiler)
+set(_install_package_dir "${CMAKE_INSTALL_PREFIX}/python_packages/iree_compiler")
+set(_install_destination "${_install_package_dir}/pyiree/tools/core")
+
+install(
+  TARGETS iree_tools_iree-translate
+  COMPONENT ${_install_component}
+  DESTINATION "${_install_destination}"
+)
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+  COMPONENT ${_install_component}
+  DESTINATION "${_install_destination}"
+  FILES_MATCHING
+    PATTERN "*.py"
+)
