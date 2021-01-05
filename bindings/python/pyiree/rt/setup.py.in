@@ -27,8 +27,8 @@ with the hardware-abstraction-layer.
 """
 
 setup(
-    name="iree-runtime@IREE_PYTHON_PACKAGE_SUFFIX@",
-    version="@IREE_PYTHON_VERSION@",
+    name="iree-runtime@IREE_RELEASE_PACKAGE_SUFFIX@",
+    version="@IREE_RELEASE_VERSION@",
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache",

@@ -103,6 +103,7 @@ use_cmake = use_tool_path('cmake') or 'cmake'
 cmake_command_prefix = [use_cmake]
 cmake_environ = os.environ
 
+
 def cmake_commandline(args):
   return cmake_command_prefix + args
 
@@ -133,13 +134,14 @@ if is_windows:
     vcvars_all = os.path.join(vs_install_path, 'VC', 'Auxiliary', 'Build',
                               'vcvarsall.bat')
     vcvars_arch = get_setting('VCVARS_ARCH', 'x64')
-    with tempfile.NamedTemporaryFile(mode='wt', delete=False, suffix='.cmd') as f:
+    with tempfile.NamedTemporaryFile(mode='wt', delete=False,
+                                     suffix='.cmd') as f:
       f.write('@echo off\n')
       f.write(f'call "{vcvars_all}" {vcvars_arch} > NUL\n')
       f.write('set\n')
     try:
-      env_vars = subprocess.check_output(
-          ["cmd", "/c", f.name]).decode('utf-8').splitlines()
+      env_vars = subprocess.check_output(["cmd", "/c",
+                                          f.name]).decode('utf-8').splitlines()
     finally:
       os.unlink(f.name)
 
@@ -149,7 +151,7 @@ if is_windows:
       cmake_environ[name] = value
     if 'VCINSTALLDIR' not in cmake_environ:
       report('vcvars environment did not include VCINSTALLDIR:\n',
-          cmake_environ)
+             cmake_environ)
     return cmake_environ
 
   cmake_environ = compute_vcvars_environ()
@@ -196,6 +198,9 @@ def invoke_generate():
       f'-S{repo_root}',
       f'-DPython3_EXECUTABLE:FILEPATH={sys.executable}',
       f'-DPython3_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
+      f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or "-dev"}',
+      f'-DIREE_RELEASE_VERSION:STRING={version_info.get("package-version") or "0.0.1a1"}',
+      f'-DIREE_RELEASE_REVISION:STRING={version_info.get("iree-revision") or "HEAD"}',
   ]
 
   ### HACK: Add a Python3_LIBRARY because cmake needs it, but it legitimately

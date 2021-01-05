@@ -12,22 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
-
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
-
-# Generated setup scripts.
-configure_file(setup.py setup.py COPYONLY)
-configure_file(setup_tools_tf.py.in setup_tools_tf.py)
-
-# Namespace packages.
-add_subdirectory(pyiree/rt)
-
-if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler2)
-add_subdirectory(pyiree/tools/core)
-endif()
-
-# Tests.
-add_subdirectory(tests)
+PACKAGE_SUFFIX = "@IREE_RELEASE_PACKAGE_SUFFIX@"
+VERSION = "@IREE_RELEASE_VERSION@"
+REVISION = "@IREE_RELEASE_REVISION@"
