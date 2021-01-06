@@ -24,32 +24,8 @@ iree_py_library(
     "xla.py"
 )
 
-# Installation.
-configure_file(setup.py.in setup.py)
-configure_file(version.py.in version.py)
-
-set(_install_component IreePythonCompiler)
-set(_install_package_dir "${CMAKE_INSTALL_PREFIX}/python_packages/iree_compiler")
-set(_install_destination "${_install_package_dir}/pyiree/compiler2")
-
-install(
-  FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_package_dir}"
-)
-
-install(
-  FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/version.py
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_destination}"
-)
-
-install(
-  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_destination}"
-  FILES_MATCHING
-    PATTERN "*.py"
+iree_py_install_package(
+  COMPONENT IreePythonPackage-compiler
+  PACKAGE_NAME iree_compiler
+  MODULE_PATH pyiree/compiler2
 )

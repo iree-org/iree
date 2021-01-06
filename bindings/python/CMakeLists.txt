@@ -17,10 +17,6 @@ set(NUMPY_DEPS "")
 set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
-# Generated setup scripts.
-configure_file(setup.py setup.py COPYONLY)
-configure_file(setup_tools_tf.py.in setup_tools_tf.py)
-
 # Namespace packages.
 add_subdirectory(pyiree/rt)
 

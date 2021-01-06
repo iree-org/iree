@@ -18,6 +18,85 @@ include(CMakeParseArguments)
 # Main user rules
 ###############################################################################
 
+# Declares that the current source directory is part of a python package
+# that will:
+#   - Will create an install target install-COMPONENT (global, not package
+#     scoped)
+#   - Be installed under python_packages/PACKAGE_NAME
+#   - Have a local path of MODULE_PATH (i.e. namespace package path)
+#   - Process a setup.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
+#   - Process a version.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
+# Will set parent scope variables:
+#   - PY_INSTALL_COMPONENT: Install component. Echoed back from the argument
+#     for easier addition after this call.
+#   - PY_INSTALL_PACKAGES_DIR: The python_packages/PACKAGE_NAME path
+#   - PY_INSTALL_MODULE_DIR: The path to the module directory under
+#     INSTALL_PACKAGES_DIR.
+#
+# Add any built deps to DEPS (you will need to add install actions to them
+# after).
+#
+# Any python files in the source directory will be automatically installed
+# (recursive).
+#
+# Also adds a *-stripped target which strips any binaries that are
+# present.
+function(iree_py_install_package)
+  cmake_parse_arguments(ARG
+    "AUGMENT_EXISTING_PACKAGE"
+    "COMPONENT;PACKAGE_NAME;MODULE_PATH"
+    "DEPS"
+    ${ARGN})
+  set(_install_component ${ARG_COMPONENT})
+  set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
+  set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
+
+  if(NOT ${ARG_AUGMENT_EXISTING_PACKAGE})
+    configure_file(setup.py.in setup.py)
+    install(
+      FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+      COMPONENT ${_install_component}
+      DESTINATION "${_install_packages_dir}"
+    )
+    configure_file(version.py.in version.py)
+    install(
+      FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/version.py
+      COMPONENT ${_install_component}
+      DESTINATION "${_install_module_dir}"
+    )
+
+    set(_target_name install-${_install_component})
+    set(_component_option -DCMAKE_INSTALL_COMPONENT="${ARG_COMPONENT}")
+    add_custom_target(${_target_name}
+      DEPENDS ${ARG_DEPS}
+      COMMAND "${CMAKE_COMMAND}"
+              ${_component_option}
+              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
+      USES_TERMINAL)
+    add_custom_target(${_target_name}-stripped
+      DEPENDS ${ARG_DEPS}
+      COMMAND "${CMAKE_COMMAND}"
+              ${_component_option}
+              -DCMAKE_INSTALL_DO_STRIP=1
+              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
+      USES_TERMINAL)
+  endif()
+
+  install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    COMPONENT ${_install_component}
+    DESTINATION "${_install_module_dir}"
+    FILES_MATCHING
+      PATTERN "*.py"
+  )
+
+  set(PY_INSTALL_COMPONENT ${_install_component} PARENT_SCOPE)
+  set(PY_INSTALL_PACKAGES_DIR "${_install_packages_dir}" PARENT_SCOPE)
+  set(PY_INSTALL_MODULE_DIR "${_install_module_dir}" PARENT_SCOPE)
+endfunction()
+
 # iree_pyext_module()
 #
 # Builds a native python module (.so/.dylib/.pyd).

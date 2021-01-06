@@ -32,6 +32,17 @@ function(iree_configure_bazel)
   set(_bazel_output_base "${CMAKE_BINARY_DIR}/bazel-out")
   set(_bazel_src_root "${CMAKE_SOURCE_DIR}")
 
+  # Configure comilation mode.
+  set(_bazel_compilation_mode_opt "")
+  set(_bazel_strip_opt "")
+  if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    message(STATUS "Enabling bazel release mode")
+    set(_bazel_compilation_mode_opt "build --compilation_mode=opt")
+    # Note: Bazel --strip is not strip.
+    # https://docs.bazel.build/versions/master/user-manual.html#flag--strip
+    set(_bazel_strip_opt "build --linkopt=-Wl,--strip-all")
+  endif()
+
   # Use the utility to emit _bazelrc_file configuration options.
   set(_bazelrc_file "${CMAKE_BINARY_DIR}/bazelrc")
   if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
@@ -53,6 +64,8 @@ build --progress_report_interval=30
 build --python_path='${Python3_EXECUTABLE}'
 build --action_env CC='${CMAKE_C_COMPILER}'
 build --action_env CXX='${CMAKE_CXX_COMPILER}'
+${_bazel_compilation_mode_opt}
+${_bazel_strip_opt}
 import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
 ")
 

@@ -90,39 +90,16 @@ iree_py_test(
     "vm_test.py"
 )
 
-
-# Installation.
-configure_file(setup.py.in setup.py)
-configure_file(version.py.in version.py)
-
-set(_install_component IreePythonRt)
-set(_install_package_dir "${CMAKE_INSTALL_PREFIX}/python_packages/iree_rt")
-set(_install_destination "${_install_package_dir}/pyiree/rt")
-
-install(
-  FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_package_dir}"
-)
-
-install(
-  FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/version.py
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_destination}"
+iree_py_install_package(
+  COMPONENT IreePythonPackage-rt
+  PACKAGE_NAME iree_rt
+  MODULE_PATH pyiree/rt
+  DEPS
+    bindings_python_pyiree_rt_PyExtRt
 )
 
 install(
   TARGETS bindings_python_pyiree_rt_PyExtRt
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_destination}"
-)
-
-install(
-  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-  COMPONENT ${_install_component}
-  DESTINATION "${_install_destination}"
-  FILES_MATCHING
-    PATTERN "*.py"
+  COMPONENT ${PY_INSTALL_COMPONENT}
+  DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )
