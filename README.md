@@ -33,6 +33,45 @@ of feedback on any [communication channels](#communication-channels)!
 
 ## Getting Started
 
+### Quick Start using Python
+
+Install from IREE's [releases](https://github.com/google/iree/releases) into a
+[venv](https://docs.python.org/3/library/venv.html):
+
+```bash
+$ python -m venv ~/.scratch
+$ source ~/.scratch/bin/activate
+$ python -m pip install iree-compiler-snapshot iree-runtime-snapshot -f https://github.com/google/iree/releases
+```
+
+Compile and run a program:
+
+```python
+import numpy as np
+from pyiree import rt
+from pyiree.compiler2 import compile_str
+
+SIMPLE_MUL_ASM = """
+func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+      attributes { iree.module.export } {
+    %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+    return %0 : tensor<4xf32>
+}
+"""
+
+binary = compile_str(SIMPLE_MUL_ASM, target_backends=["vmla"])
+vm_module = rt.VmModule.from_flatbuffer(binary)
+config = rt.Config("vmla")
+ctx = rt.SystemContext(config=config)
+ctx.add_module(vm_module)
+
+arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+ctx.modules.module["simple_mul"](arg0, arg1)
+```
+
+### Building from Source
+
 For development, IREE supports both Bazel and CMake on Windows and Linux. We are
 working on enabling macOS support. For deployment, IREE aims to additionally
 cover Android and iOS.
