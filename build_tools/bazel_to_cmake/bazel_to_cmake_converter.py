@@ -348,7 +348,6 @@ class BuildFileFunctions(object):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
-    out_block = _convert_string_arg_block("OUT", name)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
@@ -356,7 +355,6 @@ class BuildFileFunctions(object):
 
     self.converter.body += (f"iree_cc_binary(\n"
                             f"{name_block}"
-                            f"{out_block}"
                             f"{srcs_block}"
                             f"{data_block}"
                             f"{deps_block}"

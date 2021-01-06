@@ -20,6 +20,7 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target (see Usage below)
+# OUT: OUTPUT_NAME for the target. Defaults to NAME.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -46,8 +47,6 @@ include(CMakeParseArguments)
 # iree_cc_binary(
 #   NAME
 #     awesome_tool
-#   OUT
-#     awesome-tool
 #   SRCS
 #     "awesome-tool-main.cc"
 #   DEPS
