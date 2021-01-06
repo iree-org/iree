@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_HAL_DRIVER_VULKAN} OR NOT ${IREE_BUILD_SAMPLES})
+if(NOT "${IREE_HAL_DRIVER_VULKAN}" OR NOT "${IREE_BUILD_SAMPLES}")
   return()
 endif()
 
