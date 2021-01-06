@@ -406,7 +406,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary(
   NAME
     synchronization_benchmark
   SRCS
@@ -415,6 +415,16 @@ iree_cc_test(
     ::synchronization
     benchmark
     iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_run_binary_test(
+  NAME
+    synchronization_benchmark_test
+  TEST_BINARY
+    ::synchronization_benchmark
+  ARGS
+    "--benchmark_min_time=0"
 )
 
 iree_cc_test(

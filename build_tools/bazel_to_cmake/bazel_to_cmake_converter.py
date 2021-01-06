@@ -130,6 +130,9 @@ def _convert_tblgen_block(tblgen):
 
 
 def _convert_target(target):
+  """Returns a list of targets that correspond to the specified Bazel target.
+  Note that this must be a list because some targets have a one to many mapping.
+  """
   if target.startswith(":") and target.endswith(("_gen", "Gen")):
     # Files created by gentbl have to be included as source and header files
     # and not as a dependency. Adding these targets to the dependencies list,
@@ -153,6 +156,19 @@ def _convert_target(target):
     target = target.replace("/", "::")  # iree::base::api
     target = [target]
   return target
+
+
+def _convert_single_target(target):
+  replacement_targets = _convert_target(target)
+  if len(replacement_targets) != 1:
+    raise RuntimeError(f"Expected single target replacement for {target},"
+                       f" but got multiple: {replacement_targets}")
+  return replacement_targets[0]
+
+
+def _convert_single_target_block(name, target):
+  mapped_target = _convert_single_target(target)
+  return _convert_string_arg_block(name, mapped_target, quote=False)
 
 
 def _convert_target_list_block(list_name, targets):
@@ -557,6 +573,20 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
+                            f")\n\n")
+
+  def run_binary_test(self, name, test_binary, args=None, data=None):
+    if data is not None:
+      self._convert_unimplemented_function("iree_run_binary_test",
+                                           name + " has data")
+
+    name_block = _convert_string_arg_block("NAME", name)
+    test_binary_block = _convert_single_target_block("TEST_BINARY", test_binary)
+    args_block = _convert_string_list_block("ARGS", args)
+    self.converter.body += (f"iree_run_binary_test(\n"
+                            f"{name_block}"
+                            f"{args_block}"
+                            f"{test_binary_block}"
                             f")\n\n")
 
   def iree_cmake_extra_content(self, content, inline=False):

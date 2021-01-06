@@ -196,7 +196,7 @@ iree_cc_test(
     iree::vm::test::all_bytecode_modules_cc
 )
 
-iree_cc_test(
+iree_cc_binary(
   NAME
     bytecode_module_benchmark
   SRCS
@@ -211,6 +211,16 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_run_binary_test(
+  NAME
+    "bytecode_module_benchmark_test"
+  ARGS
+    "--benchmark_min_time=0"
+  TEST_BINARY
+    ::bytecode_module_benchmark
 )
 
 iree_bytecode_module(
