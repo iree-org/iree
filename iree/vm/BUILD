@@ -14,6 +14,7 @@
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -238,8 +239,9 @@ cc_test(
     ],
 )
 
-cc_test(
+cc_binary(
     name = "bytecode_module_benchmark",
+    testonly = True,
     srcs = ["bytecode_module_benchmark.cc"],
     deps = [
         ":bytecode_module",
@@ -252,6 +254,12 @@ cc_test(
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
     ],
+)
+
+run_binary_test(
+    name = "bytecode_module_benchmark_test",
+    args = ["--benchmark_min_time=0"],
+    test_binary = ":bytecode_module_benchmark",
 )
 
 iree_bytecode_module(
