@@ -25,39 +25,3 @@ iree_cc_library(
   TESTONLY
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    mock_allocator
-  HDRS
-    "mock_allocator.h"
-  DEPS
-    iree::hal::cc
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    mock_command_buffer
-  HDRS
-    "mock_command_buffer.h"
-  DEPS
-    iree::hal::cc
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    mock_command_queue
-  HDRS
-    "mock_command_queue.h"
-  DEPS
-    iree::hal::cc
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
-)
