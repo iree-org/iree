@@ -63,11 +63,11 @@ function(iree_run_binary_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "/" _PACKAGE_PATH "${_PACKAGE_NS}")
+  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
-  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _TEST_BINARY_TARGET "${_RULE_TEST_BINARY}")
-  string(REPLACE "::" "_" _TEST_BINARY_EXECUTABLE "${_TEST_BINARY_TARGET}")
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _TEST_BINARY_TARGET ${_RULE_TEST_BINARY})
+  string(REPLACE "::" "_" _TEST_BINARY_EXECUTABLE ${_TEST_BINARY_TARGET})
 
   if(ANDROID)
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -81,16 +81,16 @@ function(iree_run_binary_test)
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
         "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_EXECUTABLE}>"
-        "${_RULE_ARGS}"
+        ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
     # with the expectation of the run_android_test.{sh|bat|ps1} script.
     set(
       _ENVIRONMENT_VARS
-        TEST_ANDROID_ABS_DIR="${_ANDROID_ABS_DIR}"
-        TEST_EXECUTABLE="$<TARGET_FILE:${_TEST_BINARY_EXECUTABLE}>"
-        TEST_TMPDIR="${_ANDROID_ABS_DIR}/test_tmpdir"
+        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
+        TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_EXECUTABLE}>
+        TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else()
@@ -107,5 +107,5 @@ function(iree_run_binary_test)
   endif()
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_TEST_NAME} PROPERTY LABELS ${_RULE_LABELS})
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
