@@ -70,8 +70,6 @@ function(iree_run_binary_test)
   string(REPLACE "::" "_" _TEST_BINARY_EXECUTABLE ${_TEST_BINARY_TARGET})
 
   if(ANDROID)
-    # TODO(gcmn): Fix this on android
-    return()
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
@@ -82,7 +80,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/${_NAME}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_EXECUTABLE}>"
         ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
