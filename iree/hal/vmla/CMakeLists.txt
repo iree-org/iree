@@ -20,7 +20,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "op_kernels"
+    op_kernels
   HDRS
     "op_kernels.h"
   TEXTUAL_HDRS
@@ -28,55 +28,55 @@ iree_cc_library(
     "op_kernels_generic.h"
     "op_kernels_ruy.h"
   DEPS
-    "absl::algorithm"
-    "absl::core_headers"
-    "absl::flat_hash_set"
-    "absl::inlined_vector"
-    "absl::memory"
-    "absl::span"
-    "iree::base::status"
-    "iree::base::tracing"
-    "pffft"
-    "ruy"
+    absl::algorithm
+    absl::core_headers
+    absl::flat_hash_set
+    absl::inlined_vector
+    absl::memory
+    absl::span
+    iree::base::status
+    iree::base::tracing
+    pffft
+    ruy
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    "op_kernels_test"
+    op_kernels_test
   SRCS
     "op_kernels_test.cc"
   DEPS
-    "::op_kernels"
-    "absl::inlined_vector"
-    "iree::base::core_headers"
-    "iree::testing::gtest"
-    "iree::testing::gtest_main"
+    ::op_kernels
+    absl::inlined_vector
+    iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
   NAME
-    "op_module"
+    op_module
   HDRS
     "op_module.h"
   SRCS
     "op_module.cc"
   DEPS
-    "::op_kernels"
-    "absl::span"
-    "iree::base::api"
-    "iree::base::core_headers"
-    "iree::base::ref_ptr"
-    "iree::base::status"
-    "iree::base::tracing"
-    "iree::vm"
-    "iree::vm::cc"
+    ::op_kernels
+    absl::span
+    iree::base::api
+    iree::base::core_headers
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::vm
+    iree::vm::cc
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "vmla"
+    vmla
   HDRS
     "vmla_cache.h"
     "vmla_device.h"
@@ -88,24 +88,24 @@ iree_cc_library(
     "vmla_driver.cc"
     "vmla_executable.cc"
   DEPS
-    "::op_module"
-    "absl::inlined_vector"
-    "absl::memory"
-    "absl::span"
-    "absl::strings"
-    "iree::base::api"
-    "iree::base::core_headers"
-    "iree::base::flatcc"
-    "iree::base::ref_ptr"
-    "iree::base::status"
-    "iree::base::tracing"
-    "iree::hal"
-    "iree::hal::host::host_buffer"
-    "iree::hal::host::host_executable"
-    "iree::hal::host::host_local_device"
-    "iree::hal::host::serial::serial_scheduling_model"
-    "iree::schemas::vmla_executable_def_c_fbs"
-    "iree::vm"
-    "iree::vm::bytecode_module"
+    ::op_module
+    absl::inlined_vector
+    absl::memory
+    absl::span
+    absl::strings
+    iree::base::api
+    iree::base::core_headers
+    iree::base::flatcc
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::hal
+    iree::hal::host::host_buffer
+    iree::hal::host::host_executable
+    iree::hal::host::host_local_device
+    iree::hal::host::serial::serial_scheduling_model
+    iree::schemas::vmla_executable_def_c_fbs
+    iree::vm
+    iree::vm::bytecode_module
   PUBLIC
 )

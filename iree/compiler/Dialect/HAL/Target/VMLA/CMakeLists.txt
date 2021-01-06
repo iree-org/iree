@@ -20,26 +20,26 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "VMLA"
+    VMLA
   HDRS
     "VMLATarget.h"
   SRCS
     "VMLATarget.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRSupport"
-    "iree::base::flatcc"
-    "iree::compiler::Dialect::Flow::IR"
-    "iree::compiler::Dialect::HAL::Target"
-    "iree::compiler::Dialect::VM::Conversion"
-    "iree::compiler::Dialect::VM::IR"
-    "iree::compiler::Dialect::VM::Target::Bytecode"
-    "iree::compiler::Dialect::VM::Transforms"
-    "iree::compiler::Dialect::VMLA::IR::VMLADialect"
-    "iree::compiler::Dialect::VMLA::Transforms"
-    "iree::compiler::Utils"
-    "iree::schemas::vmla_executable_def_c_fbs"
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    iree::base::flatcc
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
+    iree::compiler::Dialect::VMLA::Transforms
+    iree::compiler::Utils
+    iree::schemas::vmla_executable_def_c_fbs
   PUBLIC
 )

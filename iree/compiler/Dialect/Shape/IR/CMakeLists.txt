@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "Builders.h"
     "ShapeDialect.h"
@@ -34,24 +34,24 @@ iree_cc_library(
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRControlFlowInterfaces"
-    "MLIRIR"
-    "MLIRInferTypeOpInterface"
-    "MLIRParser"
-    "MLIRSideEffectInterfaces"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "MLIRViewLikeInterface"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Utils"
+    LLVMSupport
+    MLIRControlFlowInterfaces
+    MLIRIR
+    MLIRInferTypeOpInterface
+    MLIRParser
+    MLIRSideEffectInterfaces
+    MLIRStandard
+    MLIRSupport
+    MLIRTransforms
+    MLIRViewLikeInterface
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "ShapeOpsGen"
+    ShapeOpsGen
   TD_FILE
     "ShapeOps.td"
   OUTS
@@ -61,7 +61,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    "ShapeDialectDocGen"
+    ShapeDialectDocGen
   TD_FILE
     "ShapeOps.td"
   OUTS

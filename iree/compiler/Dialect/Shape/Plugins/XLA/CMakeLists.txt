@@ -16,15 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "XlaHloShapeBuilder"
+    XlaHloShapeBuilder
   HDRS
     "XlaHloShapeBuilder.h"
   SRCS
     "XlaHloShapeBuilder.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "iree::compiler::Dialect::Shape::IR"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRIR
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )

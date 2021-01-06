@@ -16,21 +16,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "native_module"
+    native_module
   HDRS
     "native_module.h"
   SRCS
     "native_module.cc"
   DEPS
-    "absl::inlined_vector"
-    "absl::span"
-    "iree::base::api"
-    "iree::base::ref_ptr"
-    "iree::base::status"
-    "iree::hal::api"
-    "iree::modules::hal"
-    "iree::vm"
-    "iree::vm::cc"
+    absl::inlined_vector
+    absl::span
+    iree::base::api
+    iree::base::ref_ptr
+    iree::base::status
+    iree::hal::api
+    iree::modules::hal
+    iree::vm
+    iree::vm::cc
   PUBLIC
 )
 
@@ -40,7 +40,7 @@ endif()
 
 iree_bytecode_module(
   NAME
-    "tensorlist_test_module"
+    tensorlist_test_module
   SRC
     "tensorlist_test.mlir"
   CC_NAMESPACE
@@ -53,24 +53,24 @@ iree_bytecode_module(
 
 iree_cc_test(
   NAME
-    "tensorlist_test"
+    tensorlist_test
   SRCS
     "tensorlist_test.cc"
   DEPS
-    "::native_module"
-    "::tensorlist_test_module_cc"
-    "absl::core_headers"
-    "absl::inlined_vector"
-    "absl::span"
-    "absl::strings"
-    "iree::base::api"
-    "iree::base::logging"
-    "iree::hal::api"
-    "iree::hal::vmla::registration"
-    "iree::modules::hal"
-    "iree::testing::gtest"
-    "iree::testing::gtest_main"
-    "iree::vm"
-    "iree::vm::bytecode_module"
-    "iree::vm::cc"
+    ::native_module
+    ::tensorlist_test_module_cc
+    absl::core_headers
+    absl::inlined_vector
+    absl::span
+    absl::strings
+    iree::base::api
+    iree::base::logging
+    iree::hal::api
+    iree::hal::vmla::registration
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
 )

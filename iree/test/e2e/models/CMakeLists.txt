@@ -19,12 +19,12 @@ file(GLOB _GLOB_BERT_ENCODER_UNROLLED_FAKE_WEIGHTS_MLIR LIST_DIRECTORIES false R
 list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_BERT_ENCODER_UNROLLED_FAKE_WEIGHTS_MLIR})
 iree_lit_test_suite(
   NAME
-    "lit"
+    lit
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    "iree::tools::IreeFileCheck"
-    "iree::tools::iree-run-mlir"
+    iree::tools::IreeFileCheck
+    iree::tools::iree-run-mlir
   LABELS
     "hostonly"
     "optonly"
@@ -32,7 +32,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_vmla_vmla"
+    check_vmla_vmla
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
   TARGET_BACKEND

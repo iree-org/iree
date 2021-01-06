@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "IREEDialect.h"
     "IREEOps.h"
@@ -30,18 +30,18 @@ iree_cc_library(
     "IREEOps.cpp.inc"
     "IREETypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRSideEffectInterfaces"
-    "MLIRStandard"
-    "MLIRSupport"
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRSideEffectInterfaces
+    MLIRStandard
+    MLIRSupport
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "IREEOpsGen"
+    IREEOpsGen
   TD_FILE
     "IREEOps.td"
   OUTS
@@ -51,7 +51,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    "IREEDialectDocGen"
+    IREEDialectDocGen
   TD_FILE
     "IREEOps.td"
   OUTS

@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Common"
+    Common
   HDRS
     "Attributes.h"
     "LaunchConfig.h"
@@ -29,20 +29,20 @@ iree_cc_library(
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRGPU"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRLinalgTransforms"
-    "MLIRPass"
-    "MLIRSCFToStandard"
-    "MLIRStandard"
-    "MLIRTransforms"
-    "MLIRVector"
-    "iree::compiler::Conversion::CodegenUtils"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRGPU
+    MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRSCFToStandard
+    MLIRStandard
+    MLIRTransforms
+    MLIRVector
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )

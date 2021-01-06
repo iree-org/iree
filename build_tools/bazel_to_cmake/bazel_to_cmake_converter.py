@@ -85,7 +85,9 @@ def _convert_translate_tool_block(translate_tool):
                                           "_")  # iree/custom_custom-translate
   translate_tool = translate_tool.replace("/",
                                           "_")  # iree_custom_custom-translate
-  return _convert_string_arg_block("TRANSLATE_TOOL", translate_tool)
+  return _convert_string_arg_block("TRANSLATE_TOOL",
+                                   translate_tool,
+                                   quote=False)
 
 
 def _convert_srcs_block(srcs):
@@ -169,7 +171,7 @@ def _convert_target_list_block(list_name, targets):
   # Remove Falsey (None and empty string) values
   targets = filter(None, targets)
 
-  return _convert_string_list_block(list_name, targets, sort=True)
+  return _convert_string_list_block(list_name, targets, sort=True, quote=False)
 
 
 class BuildFileFunctions(object):
@@ -289,7 +291,7 @@ class BuildFileFunctions(object):
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
                                                     textual_hdrs,
@@ -319,7 +321,7 @@ class BuildFileFunctions(object):
               deps=None,
               tags=None,
               **kwargs):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
@@ -345,7 +347,7 @@ class BuildFileFunctions(object):
                 **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     out_block = _convert_string_arg_block("OUT", name)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
@@ -378,7 +380,7 @@ class BuildFileFunctions(object):
     if identifier:
       self._convert_unimplemented_function("cc_embed_data",
                                            name + " has identifier")
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     cc_file_output_block = _convert_string_arg_block("CC_FILE_OUTPUT",
                                                      cc_file_output)
@@ -399,7 +401,7 @@ class BuildFileFunctions(object):
                             f"  PUBLIC\n)\n\n")
 
   def spirv_kernel_cc_library(self, name, srcs):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
 
     self.converter.body += (f"iree_spirv_kernel_cc_library(\n"
@@ -414,7 +416,7 @@ class BuildFileFunctions(object):
                            translate_tool=None,
                            cc_namespace=None,
                            testonly=None):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
     namespace_block = _convert_string_arg_block("CC_NAMESPACE", cc_namespace)
     translate_tool_block = _convert_translate_tool_block(translate_tool)
@@ -431,7 +433,7 @@ class BuildFileFunctions(object):
                             f"  PUBLIC\n)\n\n")
 
   def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     flatcc_args_block = _convert_string_list_block("FLATCC_ARGS", flatcc_args)
 
@@ -450,7 +452,7 @@ class BuildFileFunctions(object):
              td_includes=None,
              strip_include_prefix=None,
              test=None):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     tblgen_block = _convert_tblgen_block(tblgen)
     td_file_block = _convert_td_file_block(td_file)
     outs_block = _convert_tbl_outs_block(tbl_outs)
@@ -470,7 +472,7 @@ class BuildFileFunctions(object):
                         td_srcs=None,
                         td_includes=None,
                         strip_include_prefix=None):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     tblgen_block = _convert_tblgen_block(tblgen)
     td_file_block = _convert_td_file_block(td_file)
     outs_block = _convert_tbl_outs_block(tbl_outs)
@@ -483,7 +485,7 @@ class BuildFileFunctions(object):
                             f")\n\n")
 
   def iree_lit_test_suite(self, name, srcs, data, tags=None, **kwargs):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)
     labels_block = _convert_string_list_block("LABELS", tags)
@@ -505,7 +507,7 @@ class BuildFileFunctions(object):
                                            runner_args=None,
                                            tags=None,
                                            **kwargs):
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     target_backend_block = _convert_string_arg_block("TARGET_BACKEND",
                                                      target_backend)
@@ -539,7 +541,7 @@ class BuildFileFunctions(object):
       target_backends = [it[0] for it in target_backends_and_drivers]
       drivers = [it[1] for it in target_backends_and_drivers]
 
-    name_block = _convert_string_arg_block("NAME", name)
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     target_backends_block = _convert_string_list_block("TARGET_BACKENDS",
                                                        target_backends)

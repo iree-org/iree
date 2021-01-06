@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "dialect"
+    dialect
   HDRS
     "conversion_patterns.h"
     "custom_dialect.h"
@@ -27,23 +27,23 @@ iree_cc_library(
     "custom_dialect.cc"
     "custom_ops.cc.inc"
   DEPS
-    "::custom_imports"
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRPass"
-    "MLIRSideEffectInterfaces"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::Conversion"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::VM::Conversion"
+    ::custom_imports
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRSideEffectInterfaces
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "custom_ops_gen"
+    custom_ops_gen
   TD_FILE
     "custom_ops.td"
   OUTS
@@ -53,7 +53,7 @@ iree_tablegen_library(
 
 iree_cc_embed_data(
   NAME
-    "custom_imports"
+    custom_imports
   SRCS
     "custom.imports.mlir"
   CC_FILE_OUTPUT
@@ -68,55 +68,55 @@ iree_cc_embed_data(
 
 iree_cc_library(
   NAME
-    "init_dialect"
+    init_dialect
   HDRS
     "init_dialect.h"
   DEPS
-    "::dialect"
-    "MLIRIR"
+    ::dialect
+    MLIRIR
   PUBLIC
 )
 
 iree_cc_binary(
   NAME
-    "custom-opt"
+    custom-opt
   OUT
     "custom-opt"
   SRCS
     "custom-opt-main.cc"
   DEPS
-    "::init_dialect"
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIROptLib"
-    "MLIRSupport"
-    "iree::tools::init_passes_and_dialects"
-    "iree::tools::init_targets"
+    ::init_dialect
+    LLVMSupport
+    MLIRIR
+    MLIROptLib
+    MLIRSupport
+    iree::tools::init_passes_and_dialects
+    iree::tools::init_targets
 )
 
 iree_cc_binary(
   NAME
-    "custom-translate"
+    custom-translate
   OUT
     "custom-translate"
   SRCS
     "custom-translate-main.cc"
   DEPS
-    "::init_dialect"
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRSCFTransforms"
-    "MLIRSupport"
-    "MLIRTranslation"
-    "iree::compiler::Conversion::init_conversions"
-    "iree::compiler::Dialect::VM::Target::Bytecode"
-    "iree::compiler::Dialect::VM::Target::init_targets"
-    "iree::compiler::Translation::IREEVM"
-    "iree::tools::init_compiler_modules"
-    "iree::tools::init_iree_passes_and_dialects"
-    "iree::tools::init_mlir_passes_and_dialects"
-    "iree::tools::init_targets"
-    "iree::tools::init_translations"
-    "iree::tools::init_xla_dialects"
+    ::init_dialect
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSCFTransforms
+    MLIRSupport
+    MLIRTranslation
+    iree::compiler::Conversion::init_conversions
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::init_targets
+    iree::compiler::Translation::IREEVM
+    iree::tools::init_compiler_modules
+    iree::tools::init_iree_passes_and_dialects
+    iree::tools::init_mlir_passes_and_dialects
+    iree::tools::init_targets
+    iree::tools::init_translations
+    iree::tools::init_xla_dialects
 )

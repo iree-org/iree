@@ -16,38 +16,38 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "vm_util"
+    vm_util
   HDRS
     "vm_util.h"
   SRCS
     "vm_util.cc"
   DEPS
-    "absl::span"
-    "absl::strings"
-    "iree::base::file_io"
-    "iree::base::signature_mangle"
-    "iree::base::status"
-    "iree::hal::api"
-    "iree::modules::hal"
-    "iree::vm"
-    "iree::vm::bytecode_module"
-    "iree::vm::cc"
+    absl::span
+    absl::strings
+    iree::base::file_io
+    iree::base::signature_mangle
+    iree::base::status
+    iree::hal::api
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    "vm_util_test"
+    vm_util_test
   SRCS
     "vm_util_test.cc"
   DEPS
-    "::vm_util"
-    "absl::strings"
-    "iree::base::api"
-    "iree::hal::api"
-    "iree::hal::vmla::registration"
-    "iree::modules::hal"
-    "iree::testing::gtest"
-    "iree::testing::gtest_main"
-    "iree::vm"
+    ::vm_util
+    absl::strings
+    iree::base::api
+    iree::hal::api
+    iree::hal::vmla::registration
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
 )

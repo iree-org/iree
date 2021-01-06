@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "LinalgToLLVM"
+    LinalgToLLVM
   HDRS
     "KernelDispatch.h"
     "Passes.h"
@@ -32,34 +32,34 @@ iree_cc_library(
     "Passes.cpp"
     "PlanConvLoopOrder.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRAffineToStandard"
-    "MLIRIR"
-    "MLIRLLVMIR"
-    "MLIRLinalg"
-    "MLIRLinalgToLLVM"
-    "MLIRLinalgTransforms"
-    "MLIRPass"
-    "MLIRSCF"
-    "MLIRSCFToStandard"
-    "MLIRStandard"
-    "MLIRStandardOpsTransforms"
-    "MLIRStandardToLLVM"
-    "MLIRStandardToSPIRV"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "MLIRVector"
-    "MLIRVectorToLLVM"
-    "MLIRVectorToSCF"
-    "iree::compiler::Conversion::CodegenUtils"
-    "iree::compiler::Conversion::Common"
-    "iree::compiler::Conversion::HLOToHLO"
-    "iree::compiler::Conversion::HLOToLinalg"
-    "iree::compiler::Conversion::LLVMToLLVM"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::HAL::IR::HALDialect"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::Shape::Transforms"
+    LLVMSupport
+    MLIRAffineToStandard
+    MLIRIR
+    MLIRLLVMIR
+    MLIRLinalg
+    MLIRLinalgToLLVM
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRSCF
+    MLIRSCFToStandard
+    MLIRStandard
+    MLIRStandardOpsTransforms
+    MLIRStandardToLLVM
+    MLIRStandardToSPIRV
+    MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    MLIRVectorToLLVM
+    MLIRVectorToSCF
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::Common
+    iree::compiler::Conversion::HLOToHLO
+    iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::LLVMToLLVM
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
   PUBLIC
 )

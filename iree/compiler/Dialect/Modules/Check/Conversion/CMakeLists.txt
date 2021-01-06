@@ -16,16 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Conversion"
+    Conversion
   HDRS
     "ConversionPatterns.h"
   SRCS
     "ConversionPatterns.cpp"
   DEPS
-    "MLIRPass"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::Conversion"
-    "iree::compiler::Dialect::Modules::Check::IR"
-    "iree::compiler::Dialect::VM::Conversion"
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::Modules::Check::IR
+    iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )

@@ -16,32 +16,32 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "HLOToLinalgOnTensors"
+    HLOToLinalgOnTensors
   HDRS
     "HLOToLinalgOnTensorPasses.h"
   SRCS
     "FusionOfTensorOps.cpp"
     "HLOToLinalgOnTensors.cpp"
   DEPS
-    "MLIRAffine"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRLinalgTransforms"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTensor"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::HAL::IR::HALDialect"
-    "iree::compiler::Dialect::Shape::IR"
-    "tensorflow::mlir_hlo"
+    MLIRAffine
+    MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    MLIRTensor
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "HLOToLinalg"
+    HLOToLinalg
   HDRS
     "Passes.h"
   SRCS
@@ -49,24 +49,24 @@ iree_cc_library(
     "Passes.cpp"
     "ResolveShapeOps.cpp"
   DEPS
-    "::HLOToLinalgOnTensors"
-    "LLVMSupport"
-    "MLIRAffine"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRLinalgTransforms"
-    "MLIRPass"
-    "MLIRSPIRV"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTensor"
-    "MLIRTransforms"
-    "iree::compiler::Conversion::CodegenUtils"
-    "iree::compiler::Conversion::HLOToHLO"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::HAL::IR::HALDialect"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
-    "tensorflow::mlir_hlo"
+    ::HLOToLinalgOnTensors
+    LLVMSupport
+    MLIRAffine
+    MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRSPIRV
+    MLIRStandard
+    MLIRSupport
+    MLIRTensor
+    MLIRTransforms
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::HLOToHLO
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )

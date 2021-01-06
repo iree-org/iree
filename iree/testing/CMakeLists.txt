@@ -16,42 +16,42 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "benchmark_main"
+    benchmark_main
   SRCS
     "benchmark_main.cc"
   DEPS
-    "benchmark"
-    "iree::base::flags"
+    benchmark
+    iree::base::flags
   TESTONLY
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "gtest"
+    gtest
   HDRS
     "gtest.h"
     "status_matchers.h"
   DEPS
-    "absl::optional"
-    "absl::strings"
-    "gmock"
-    "gtest"
-    "iree::base::status"
+    absl::optional
+    absl::strings
+    gmock
+    gtest
+    iree::base::status
   TESTONLY
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "gtest_main"
+    gtest_main
   SRCS
     "gtest_main.cc"
   DEPS
-    "::gtest"
-    "gmock"
-    "gtest"
-    "iree::base::flags"
+    ::gtest
+    gmock
+    gtest
+    iree::base::flags
   TESTONLY
   PUBLIC
 )

@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Transforms"
+    Transforms
   HDRS
     "Passes.h"
     "Patterns.h"
@@ -30,19 +30,19 @@ iree_cc_library(
     "MaterializeShapeCalculationsPass.cpp"
     "TieDynamicShapesPass.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRAnalysis"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTensor"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::Shape::Plugins::VMLA::VMLAShapeBuilder"
-    "iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder"
-    "iree::compiler::Dialect::Shape::Utils::TypeConversion"
-    "iree::compiler::Utils"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRAnalysis
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    MLIRTensor
+    MLIRTransforms
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Plugins::VMLA::VMLAShapeBuilder
+    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
+    iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Utils
+    tensorflow::mlir_hlo
   PUBLIC
 )

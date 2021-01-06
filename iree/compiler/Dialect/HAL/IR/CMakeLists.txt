@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "HALOps.h"
     "HALTypes.h"
@@ -35,42 +35,42 @@ iree_cc_library(
     "HALOps.cpp"
     "HALTypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRSideEffectInterfaces"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransformUtils"
-    "iree::compiler::Dialect::IREE::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRSideEffectInterfaces
+    MLIRStandard
+    MLIRSupport
+    MLIRTransformUtils
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "HALDialect"
+    HALDialect
   HDRS
     "HALDialect.h"
   SRCS
     "HALDialect.cpp"
   DEPS
-    "::IR"
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRStandard"
-    "MLIRTransformUtils"
-    "iree::compiler::Dialect::HAL::Conversion::HALToHAL"
-    "iree::compiler::Dialect::HAL::Conversion::HALToVM"
-    "iree::compiler::Dialect::HAL::hal_imports"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::VM::Conversion"
+    ::IR
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRStandard
+    MLIRTransformUtils
+    iree::compiler::Dialect::HAL::Conversion::HALToHAL
+    iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::HAL::hal_imports
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "HALOpsGen"
+    HALOpsGen
   TD_FILE
     "HALOps.td"
   OUTS
@@ -80,7 +80,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    "HALStructsGen"
+    HALStructsGen
   TD_FILE
     "HALBase.td"
   OUTS
@@ -92,7 +92,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    "HALTypesGen"
+    HALTypesGen
   TD_FILE
     "HALBase.td"
   OUTS
@@ -104,7 +104,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    "HALDialectDocGen"
+    HALDialectDocGen
   TD_FILE
     "HALOps.td"
   OUTS

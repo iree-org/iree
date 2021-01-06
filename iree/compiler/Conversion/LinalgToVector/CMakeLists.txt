@@ -16,25 +16,25 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "LinalgToVector"
+    LinalgToVector
   HDRS
     "Passes.h"
   SRCS
     "LoadStoreVectorization.cpp"
     "VectorizeConv.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRLinalgTransforms"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "MLIRVector"
-    "iree::compiler::Conversion::CodegenUtils"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::Shape::Transforms"
+    LLVMSupport
+    MLIRIR
+    MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
   PUBLIC
 )

@@ -16,20 +16,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "HALToVMLA"
+    HALToVMLA
   HDRS
     "ConvertHALToVMLA.h"
   SRCS
     "ConvertHALToVMLA.cpp"
   DEPS
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::VMLA::Conversion"
-    "iree::compiler::Dialect::VMLA::IR"
-    "iree::compiler::Dialect::VMLA::IR::VMLADialect"
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VMLA::Conversion
+    iree::compiler::Dialect::VMLA::IR
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
   PUBLIC
 )

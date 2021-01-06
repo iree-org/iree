@@ -16,16 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "LinkerTools_internal"
+    LinkerTools_internal
   SRCS
     "LinkerTools.cpp"
     "UnixLinkerTool.cpp"
     "WindowsLinkerTool.cpp"
   DEPS
-    "LLVMCore"
-    "LLVMSupport"
-    "MLIRSupport"
-    "iree::base::core_headers"
-    "iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs"
+    LLVMCore
+    LLVMSupport
+    MLIRSupport
+    iree::base::core_headers
+    iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs
   PUBLIC
 )

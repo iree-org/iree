@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Analysis"
+    Analysis
   HDRS
     "RegisterAllocation.h"
     "TestPasses.h"
@@ -27,12 +27,12 @@ iree_cc_library(
     "ValueLiveness.cpp"
     "ValueLivenessTest.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRAnalysis"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRSupport"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::VM::IR"
+    LLVMSupport
+    MLIRAnalysis
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::IR
   PUBLIC
 )

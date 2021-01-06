@@ -20,32 +20,32 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "VulkanSPIRV"
+    VulkanSPIRV
   HDRS
     "VulkanSPIRVTarget.h"
   SRCS
     "VulkanSPIRVTarget.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRAffine"
-    "MLIRGPU"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRParser"
-    "MLIRSPIRV"
-    "MLIRSPIRVSerialization"
-    "MLIRSupport"
-    "MLIRVector"
-    "iree::base::flatcc"
-    "iree::compiler::Conversion::Common"
-    "iree::compiler::Conversion::LinalgToSPIRV"
-    "iree::compiler::Conversion::LinalgToSPIRV::CodeGenOptionUtils"
-    "iree::compiler::Dialect::Flow::IR"
-    "iree::compiler::Dialect::HAL::Target"
-    "iree::compiler::Dialect::HAL::Target::SPIRVCommon"
-    "iree::compiler::Dialect::Vulkan::IR"
-    "iree::compiler::Dialect::Vulkan::Utils"
-    "iree::compiler::Utils"
-    "iree::schemas::spirv_executable_def_c_fbs"
+    LLVMSupport
+    MLIRAffine
+    MLIRGPU
+    MLIRIR
+    MLIRLinalg
+    MLIRParser
+    MLIRSPIRV
+    MLIRSPIRVSerialization
+    MLIRSupport
+    MLIRVector
+    iree::base::flatcc
+    iree::compiler::Conversion::Common
+    iree::compiler::Conversion::LinalgToSPIRV
+    iree::compiler::Conversion::LinalgToSPIRV::CodeGenOptionUtils
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::SPIRVCommon
+    iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::Dialect::Vulkan::Utils
+    iree::compiler::Utils
+    iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )

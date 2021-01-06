@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
-    "check_vmla_vmla"
+    check_vmla_vmla
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
@@ -28,7 +28,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_metal-spirv_metal"
+    check_metal-spirv_metal
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -69,7 +69,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_vulkan-spirv_vulkan"
+    check_vulkan-spirv_vulkan
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -122,7 +122,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_dylib-llvm-aot_dylib"
+    check_dylib-llvm-aot_dylib
   SRCS
     "abs.mlir"
     "add.mlir"

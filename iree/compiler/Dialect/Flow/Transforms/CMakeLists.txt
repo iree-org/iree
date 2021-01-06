@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Transforms"
+    Transforms
   HDRS
     "DispatchConfig.h"
     "Passes.h"
@@ -44,31 +44,31 @@ iree_cc_library(
     "RematerializeDispatchConstants.cpp"
     "StripAndSplatConstantVariables.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRLinalg"
-    "MLIRPass"
-    "MLIRShape"
-    "MLIRShapeOpsTransforms"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTensor"
-    "MLIRTransformUtils"
-    "MLIRTransforms"
-    "iree::base::signature_mangle"
-    "iree::compiler::Conversion::HLOToLinalg"
-    "iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors"
-    "iree::compiler::Dialect::Flow::Analysis"
-    "iree::compiler::Dialect::Flow::Conversion"
-    "iree::compiler::Dialect::Flow::Conversion::HLOToFlow"
-    "iree::compiler::Dialect::Flow::Conversion::StandardToFlow"
-    "iree::compiler::Dialect::Flow::IR"
-    "iree::compiler::Dialect::Flow::Utils"
-    "iree::compiler::Dialect::Shape::Conversion"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::Shape::Transforms"
-    "iree::compiler::Dialect::Shape::Utils::TypeConversion"
-    "iree::compiler::Utils"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRIR
+    MLIRLinalg
+    MLIRPass
+    MLIRShape
+    MLIRShapeOpsTransforms
+    MLIRStandard
+    MLIRSupport
+    MLIRTensor
+    MLIRTransformUtils
+    MLIRTransforms
+    iree::base::signature_mangle
+    iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
+    iree::compiler::Dialect::Flow::Analysis
+    iree::compiler::Dialect::Flow::Conversion
+    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
+    iree::compiler::Dialect::Flow::Conversion::StandardToFlow
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::Shape::Conversion
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Utils
+    tensorflow::mlir_hlo
   PUBLIC
 )

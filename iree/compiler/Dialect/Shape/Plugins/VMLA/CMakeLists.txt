@@ -16,15 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "VMLAShapeBuilder"
+    VMLAShapeBuilder
   HDRS
     "VMLAShapeBuilder.h"
   SRCS
     "VMLAShapeBuilder.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::VMLA::IR"
+    LLVMSupport
+    MLIRIR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::VMLA::IR
   PUBLIC
 )

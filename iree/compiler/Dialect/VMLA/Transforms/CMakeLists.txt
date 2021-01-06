@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Transforms"
+    Transforms
   HDRS
     "Passes.h"
   SRCS
@@ -25,22 +25,22 @@ iree_cc_library(
     "PreConversionLowering.cpp"
     "UnrollReductions.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::IR::HALDialect"
-    "iree::compiler::Dialect::IREE::Transforms"
-    "iree::compiler::Dialect::Shape::IR"
-    "iree::compiler::Dialect::Shape::Transforms"
-    "iree::compiler::Dialect::VMLA::Conversion"
-    "iree::compiler::Dialect::VMLA::Conversion::HALToVMLA"
-    "iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA"
-    "iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA"
-    "iree::compiler::Dialect::VMLA::IR"
-    "iree::compiler::Dialect::VMLA::IR::VMLADialect"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::Transforms
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::VMLA::Conversion
+    iree::compiler::Dialect::VMLA::Conversion::HALToVMLA
+    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
+    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
+    iree::compiler::Dialect::VMLA::IR
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
+    tensorflow::mlir_hlo
   PUBLIC
 )

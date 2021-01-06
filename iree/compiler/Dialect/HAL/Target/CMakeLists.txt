@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Target"
+    Target
   HDRS
     "TargetBackend.h"
     "TargetRegistry.h"
@@ -24,14 +24,14 @@ iree_cc_library(
     "TargetBackend.cpp"
     "TargetRegistry.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::Flow::IR"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::HAL::Utils"
-    "iree::compiler::Dialect::IREE::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

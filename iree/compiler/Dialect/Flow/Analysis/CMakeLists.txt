@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Analysis"
+    Analysis
   HDRS
     "Dispatchability.h"
     "TestPasses.h"
@@ -24,14 +24,14 @@ iree_cc_library(
     "Dispatchability.cpp"
     "DispatchabilityTest.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRSupport"
-    "iree::compiler::Dialect::Flow::IR"
-    "iree::compiler::Dialect::Flow::Utils"
-    "iree::compiler::Dialect::IREE::IR"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRSupport
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::IREE::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )

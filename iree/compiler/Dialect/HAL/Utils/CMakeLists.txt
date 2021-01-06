@@ -16,21 +16,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "Utils"
+    Utils
   HDRS
     "DeviceSwitchBuilder.h"
     "TypeUtils.h"
   SRCS
     "TypeUtils.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
-    "tensorflow::mlir_hlo"
+    LLVMSupport
+    MLIRIR
+    MLIRStandard
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
   PUBLIC
 )

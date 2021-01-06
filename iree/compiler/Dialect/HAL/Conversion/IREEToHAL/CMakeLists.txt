@@ -16,16 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "IREEToHAL"
+    IREEToHAL
   HDRS
     "ConvertIREEToHAL.h"
   SRCS
     "ConvertIREEToHAL.cpp"
   DEPS
-    "MLIRIR"
-    "MLIRStandard"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
+    MLIRIR
+    MLIRStandard
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

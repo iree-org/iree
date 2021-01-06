@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "TensorListOps.h"
     "TensorListOps.h.inc"
@@ -28,42 +28,42 @@ iree_cc_library(
     "TensorListOps.cpp"
     "TensorListTypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransformUtils"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRStandard
+    MLIRSupport
+    MLIRTransformUtils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    "TensorListDialect"
+    TensorListDialect
   HDRS
     "TensorListDialect.h"
   SRCS
     "TensorListDialect.cpp"
   DEPS
-    "::IR"
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRTransformUtils"
-    "iree::compiler::Dialect::HAL::Conversion"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Modules::TensorList::Conversion"
-    "iree::compiler::Dialect::Modules::TensorList::tensorlist_imports"
-    "iree::compiler::Dialect::VM::Conversion"
+    ::IR
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRTransformUtils
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Modules::TensorList::Conversion
+    iree::compiler::Dialect::Modules::TensorList::tensorlist_imports
+    iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "TensorListOpsGen"
+    TensorListOpsGen
   TD_FILE
     "TensorListOps.td"
   OUTS
@@ -73,7 +73,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    "TensorListDialectDocGen"
+    TensorListDialectDocGen
   TD_FILE
     "TensorListOps.td"
   OUTS

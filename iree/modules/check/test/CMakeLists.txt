@@ -17,27 +17,27 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
-    "lit"
+    lit
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    "iree::tools::IreeFileCheck"
-    "iree::tools::iree-check-module"
-    "iree::tools::iree-translate"
+    iree::tools::IreeFileCheck
+    iree::tools::iree-check-module
+    iree::tools::iree-translate
   LABELS
     "hostonly"
 )
 
 iree_check_test_suite(
   NAME
-    "check"
+    check
   SRCS
     "success.mlir"
 )
 
 iree_check_test_suite(
   NAME
-    "check_failure"
+    check_failure
   SRCS
     "failure.mlir"
   RUNNER_ARGS

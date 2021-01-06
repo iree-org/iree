@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_embed_data(
   NAME
-    "strings_imports"
+    strings_imports
   SRCS
     "strings.imports.mlir"
   CC_FILE_OUTPUT

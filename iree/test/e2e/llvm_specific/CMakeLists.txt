@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_llvm-aot-conv_img2col"
+    check_llvm-aot-conv_img2col
   SRCS
     "conv.mlir"
   TARGET_BACKEND
@@ -29,7 +29,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    "check_llvm-aot-exponential_fast"
+    check_llvm-aot-exponential_fast
   SRCS
     "exponential.mlir"
   TARGET_BACKEND

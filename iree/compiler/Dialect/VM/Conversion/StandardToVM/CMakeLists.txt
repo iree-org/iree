@@ -16,20 +16,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "StandardToVM"
+    StandardToVM
   HDRS
     "ConvertStandardToVM.h"
   SRCS
     "ConvertStandardToVM.cpp"
     "ConvertStandardToVMTest.cpp"
   DEPS
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRTransformUtils"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::VM::Conversion"
-    "iree::compiler::Dialect::VM::IR"
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRTransformUtils
+    MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::IR
   PUBLIC
 )

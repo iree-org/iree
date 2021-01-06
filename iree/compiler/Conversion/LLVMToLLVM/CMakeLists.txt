@@ -16,16 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "LLVMToLLVM"
+    LLVMToLLVM
   HDRS
     "Passes.h"
   SRCS
     "FastExpConversion.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRLLVMIR"
-    "MLIRPass"
-    "MLIRTransforms"
+    LLVMSupport
+    MLIRIR
+    MLIRLLVMIR
+    MLIRPass
+    MLIRTransforms
   PUBLIC
 )

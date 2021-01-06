@@ -16,21 +16,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    "HALToHAL"
+    HALToHAL
   HDRS
     "ConvertHALToHAL.h"
   SRCS
     "ConvertConstantOps.cpp"
     "ConvertHALToHAL.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRPass"
-    "MLIRStandard"
-    "MLIRTransforms"
-    "iree::compiler::Dialect::HAL::Conversion"
-    "iree::compiler::Dialect::HAL::IR"
-    "iree::compiler::Dialect::HAL::Utils"
-    "iree::compiler::Dialect::IREE::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandard
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

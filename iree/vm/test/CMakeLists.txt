@@ -20,7 +20,7 @@ endif()
 
 iree_cc_embed_data(
   NAME
-    "all_bytecode_modules_cc"
+    all_bytecode_modules_cc
   GENERATED_SRCS
     "arithmetic_ops.module"
     "arithmetic_ops_i64.module"
@@ -39,7 +39,7 @@ iree_cc_embed_data(
 
 iree_bytecode_module(
   NAME
-    "arithmetic_ops"
+    arithmetic_ops
   SRC
     "arithmetic_ops.mlir"
   FLAGS
@@ -49,7 +49,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "arithmetic_ops_i64"
+    arithmetic_ops_i64
   SRC
     "arithmetic_ops_i64.mlir"
   FLAGS
@@ -59,7 +59,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "comparison_ops"
+    comparison_ops
   SRC
     "comparison_ops.mlir"
   FLAGS
@@ -69,7 +69,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "control_flow_ops"
+    control_flow_ops
   SRC
     "control_flow_ops.mlir"
   FLAGS
@@ -79,7 +79,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "list_ops"
+    list_ops
   SRC
     "list_ops.mlir"
   CC_NAMESPACE

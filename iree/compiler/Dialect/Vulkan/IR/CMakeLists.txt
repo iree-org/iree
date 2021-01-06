@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "VulkanAttributes.h"
     "VulkanAttributes.h.inc"
@@ -31,17 +31,17 @@ iree_cc_library(
     "VulkanEnums.cpp.inc"
     "VulkanTypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRSPIRV"
-    "MLIRSupport"
-    "iree::compiler::Dialect::IREE::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRSPIRV
+    MLIRSupport
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "VulkanAttrsGen"
+    VulkanAttrsGen
   TD_FILE
     "VulkanAttributes.td"
   OUTS
@@ -51,7 +51,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    "VulkanEnumsGen"
+    VulkanEnumsGen
   TD_FILE
     "VulkanBase.td"
   OUTS

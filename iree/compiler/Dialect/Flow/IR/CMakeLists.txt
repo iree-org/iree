@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    "IR"
+    IR
   HDRS
     "FlowDialect.h"
     "FlowEnums.h.inc"
@@ -36,21 +36,21 @@ iree_cc_library(
     "FlowOps.cpp.inc"
     "FlowTypes.cpp"
   DEPS
-    "LLVMSupport"
-    "MLIRIR"
-    "MLIRParser"
-    "MLIRSideEffectInterfaces"
-    "MLIRStandard"
-    "MLIRSupport"
-    "MLIRTransformUtils"
-    "iree::compiler::Dialect::IREE::IR"
-    "iree::compiler::Dialect::Shape::IR"
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRSideEffectInterfaces
+    MLIRStandard
+    MLIRSupport
+    MLIRTransformUtils
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    "FlowEnumsGen"
+    FlowEnumsGen
   TD_FILE
     "FlowBase.td"
   OUTS
@@ -60,7 +60,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    "FlowOpInterfaceGen"
+    FlowOpInterfaceGen
   TD_FILE
     "FlowBase.td"
   OUTS
@@ -70,7 +70,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    "FlowOpsGen"
+    FlowOpsGen
   TD_FILE
     "FlowOps.td"
   OUTS
@@ -80,7 +80,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    "FlowDialectDocGen"
+    FlowDialectDocGen
   TD_FILE
     "FlowOps.td"
   OUTS
