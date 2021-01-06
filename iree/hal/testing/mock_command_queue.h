@@ -25,7 +25,7 @@ namespace testing {
 class MockCommandQueue : public ::testing::StrictMock<CommandQueue> {
  public:
   MockCommandQueue(std::string name,
-                   CommandCategoryBitfield supported_categories)
+                   iree_hal_command_category_t supported_categories)
       : ::testing::StrictMock<CommandQueue>(std::move(name),
                                             supported_categories) {}
 

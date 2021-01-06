@@ -39,7 +39,7 @@ namespace vulkan {
 class DirectCommandQueue final : public CommandQueue {
  public:
   DirectCommandQueue(std::string name,
-                     CommandCategoryBitfield supported_categories,
+                     iree_hal_command_category_t supported_categories,
                      const ref_ptr<VkDeviceHandle>& logical_device,
                      VkQueue queue);
   ~DirectCommandQueue() override;

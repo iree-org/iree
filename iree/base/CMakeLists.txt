@@ -35,26 +35,13 @@ iree_cc_library(
   HDRS
     "alignment.h"
     "atomics.h"
-    "bitfield.h"
     "debugging.h"
     "math.h"
     "memory.h"
     "target_platform.h"
   DEPS
     absl::core_headers
-    absl::span
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    bitfield_test
-  SRCS
-    "bitfield_test.cc"
-  DEPS
-    ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(

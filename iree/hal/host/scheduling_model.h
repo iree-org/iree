@@ -48,8 +48,8 @@ class SchedulingModel {
   // by this device. The command buffer may come from a pool but will be reset
   // prior to being returned to the caller.
   virtual StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) = 0;
+      iree_hal_command_buffer_mode_t mode,
+      iree_hal_command_category_t command_categories) = 0;
 
   // Creates an event for recording into command buffers.
   virtual StatusOr<ref_ptr<Event>> CreateEvent() = 0;

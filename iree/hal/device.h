@@ -88,8 +88,8 @@ class Device : public RefObject<Device> {
 
   // Creates a descriptor set layout with the given bindings.
   virtual StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings) = 0;
+      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings) = 0;
 
   // Creates an executable layout composed of the given descriptor set layouts.
   // The returned executable layout can be used by multiple executables with the
@@ -102,14 +102,14 @@ class Device : public RefObject<Device> {
   // Descriptor sets are immutable and retain their bindings.
   virtual StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
       DescriptorSetLayout* set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) = 0;
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings) = 0;
 
   // Creates a command buffer for recording commands to submit to queues owned
   // by this device. The command buffer may come from a pool but will be reset
   // prior to being returned to the caller.
   virtual StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) = 0;
+      iree_hal_command_buffer_mode_t mode,
+      iree_hal_command_category_t command_categories) = 0;
 
   // Creates an event for recording into command buffers.
   // The returned event object is only usable with this device and events must

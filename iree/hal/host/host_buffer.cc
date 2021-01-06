@@ -27,10 +27,11 @@ namespace hal {
 
 class Allocator;
 
-HostBuffer::HostBuffer(Allocator* allocator, MemoryTypeBitfield memory_type,
-                       MemoryAccessBitfield allowed_access,
-                       BufferUsageBitfield usage, device_size_t allocation_size,
-                       void* data, bool owns_data)
+HostBuffer::HostBuffer(Allocator* allocator, iree_hal_memory_type_t memory_type,
+                       iree_hal_memory_access_t allowed_access,
+                       iree_hal_buffer_usage_t usage,
+                       iree_device_size_t allocation_size, void* data,
+                       bool owns_data)
     : Buffer(allocator, memory_type, allowed_access, usage, allocation_size, 0,
              allocation_size),
       data_(data),
@@ -44,9 +45,9 @@ HostBuffer::~HostBuffer() {
   }
 }
 
-Status HostBuffer::FillImpl(device_size_t byte_offset,
-                            device_size_t byte_length, const void* pattern,
-                            device_size_t pattern_length) {
+Status HostBuffer::FillImpl(iree_device_size_t byte_offset,
+                            iree_device_size_t byte_length, const void* pattern,
+                            iree_device_size_t pattern_length) {
   auto data_ptr = data_;
   switch (pattern_length) {
     case 1: {
@@ -76,29 +77,30 @@ Status HostBuffer::FillImpl(device_size_t byte_offset,
   return OkStatus();
 }
 
-Status HostBuffer::ReadDataImpl(device_size_t source_offset, void* data,
-                                device_size_t data_length) {
+Status HostBuffer::ReadDataImpl(iree_device_size_t source_offset, void* data,
+                                iree_device_size_t data_length) {
   auto data_ptr = static_cast<uint8_t*>(data_);
   std::memcpy(data, data_ptr + source_offset, data_length);
   return OkStatus();
 }
 
-Status HostBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
-                                 device_size_t data_length) {
+Status HostBuffer::WriteDataImpl(iree_device_size_t target_offset,
+                                 const void* data,
+                                 iree_device_size_t data_length) {
   auto data_ptr = static_cast<uint8_t*>(data_);
   std::memcpy(data_ptr + target_offset, data, data_length);
   return OkStatus();
 }
 
-Status HostBuffer::CopyDataImpl(device_size_t target_offset,
+Status HostBuffer::CopyDataImpl(iree_device_size_t target_offset,
                                 Buffer* source_buffer,
-                                device_size_t source_offset,
-                                device_size_t data_length) {
+                                iree_device_size_t source_offset,
+                                iree_device_size_t data_length) {
   // This is pretty terrible. Let's not do this.
   // TODO(benvanik): a way for allocators to indicate transfer compat.
-  IREE_ASSIGN_OR_RETURN(auto source_data,
-                        source_buffer->MapMemory<uint8_t>(
-                            MemoryAccess::kRead, source_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto source_data, source_buffer->MapMemory<uint8_t>(
+                                              IREE_HAL_MEMORY_ACCESS_READ,
+                                              source_offset, data_length));
   IREE_CHECK_EQ(data_length, source_data.size());
   auto data_ptr = static_cast<uint8_t*>(data_);
   std::memcpy(data_ptr + target_offset, source_data.data(), data_length);
@@ -106,9 +108,9 @@ Status HostBuffer::CopyDataImpl(device_size_t target_offset,
 }
 
 Status HostBuffer::MapMemoryImpl(MappingMode mapping_mode,
-                                 MemoryAccessBitfield memory_access,
-                                 device_size_t local_byte_offset,
-                                 device_size_t local_byte_length,
+                                 iree_hal_memory_access_t memory_access,
+                                 iree_device_size_t local_byte_offset,
+                                 iree_device_size_t local_byte_length,
                                  void** out_data) {
   auto data_ptr = static_cast<uint8_t*>(data_);
   *out_data = data_ptr + local_byte_offset;
@@ -118,7 +120,7 @@ Status HostBuffer::MapMemoryImpl(MappingMode mapping_mode,
   // heap buffers we could reallocate them such that ASAN yells, but that
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
-  if (AnyBitSet(memory_access & MemoryAccess::kDiscard)) {
+  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
     std::memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
@@ -126,21 +128,22 @@ Status HostBuffer::MapMemoryImpl(MappingMode mapping_mode,
   return OkStatus();
 }
 
-Status HostBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
-                                   device_size_t local_byte_length,
+Status HostBuffer::UnmapMemoryImpl(iree_device_size_t local_byte_offset,
+                                   iree_device_size_t local_byte_length,
                                    void* data) {
   // No-op? We still want error checking to make finding misuse easier.
   return OkStatus();
 }
 
-Status HostBuffer::InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                              device_size_t local_byte_length) {
+Status HostBuffer::InvalidateMappedMemoryImpl(
+    iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
   // No-op? We still want error checking to make finding misuse easier.
   return OkStatus();
 }
 
-Status HostBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                                         device_size_t local_byte_length) {
+Status HostBuffer::FlushMappedMemoryImpl(iree_device_size_t local_byte_offset,
+                                         iree_device_size_t local_byte_length) {
   // No-op? We still want error checking to make finding misuse easier.
   return OkStatus();
 }

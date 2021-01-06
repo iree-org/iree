@@ -42,8 +42,8 @@ class SerialSchedulingModel final : public SchedulingModel {
   }
 
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) override;
+      iree_hal_command_buffer_mode_t mode,
+      iree_hal_command_category_t command_categories) override;
 
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 

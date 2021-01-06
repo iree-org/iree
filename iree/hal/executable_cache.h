@@ -15,66 +15,16 @@
 #ifndef IREE_HAL_EXECUTABLE_CACHE_H_
 #define IREE_HAL_EXECUTABLE_CACHE_H_
 
-#include "iree/base/bitfield.h"
+#include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/executable_layout.h"
-#include "iree/hal/executable_spec.h"
 
 namespace iree {
 namespace hal {
-
-// Defines how the executable cache performs preparation.
-enum class ExecutableCachingMode : uint32_t {
-  // Allows the cache to reference the provided executable_data after it has
-  // prepared the executable. Callers must ensure the data remains valid for the
-  // lifetime of the cache. If memory mapping constant executable data from
-  // disk this can be used to avoid copies.
-  kAliasProvidedData = 1 << 0,
-
-  // Allows the prepared executable to be cached persistently (on disk/etc).
-  // Enable for any executable that is likely to be used in future runs.
-  // Note that not all caches support persistent serialization and this is just
-  // a hint.
-  kAllowPersistentCaching = 1 << 1,
-
-  // Allows the cache to optimize the executable as much as it can.
-  // This may cause preparation to take significantly longer while (hopefully)
-  // improving runtime performance. Avoid for one-shot executables.
-  kAllowOptimization = 1 << 2,
-
-  // Enables Executable debugging methods if supported by the device and
-  // executable. This may disable certain optimizations or retain additional
-  // data to allow disassembly, stepping, etc.
-  //
-  // Device must support the DeviceFeature::kDebugging feature and executables
-  // must support the ExecutableFeature::kDebugging feature.
-  kEnableDebugging = 1 << 3,
-
-  // Enables Executable coverage if supported by the device and executable.
-  // Depending on the optimization mode this may produce partial coverage
-  // results (for example, when certain source operations were optimized away).
-  //
-  // Device must support the DeviceFeature::kCoverage feature and executables
-  // must support the ExecutableFeature::kCoverage feature.
-  kEnableCoverage = 1 << 4,
-
-  // Enables Executable profiling if supported by the device and executable.
-  // Depending on the optimization mode this may produce partial profiling
-  // results. Profiling attribution (whether to the entire executable or
-  // specific operations) depends on the implementation.
-  //
-  // Device must support the DeviceFeature::kProfiling feature and executables
-  // must support the ExecutableFeature::kProfiling feature.
-  kEnableProfiling = 1 << 5,
-
-  // Default caching mode.
-  kDefault = kAllowPersistentCaching | kAllowOptimization,
-};
-IREE_BITFIELD(ExecutableCachingMode);
-using ExecutableCachingModeBitfield = ExecutableCachingMode;
 
 // A cache of prepared executables for a particular device.
 // Caches may be shared across multiple devices from the same driver or specific
@@ -92,7 +42,7 @@ using ExecutableCachingModeBitfield = ExecutableCachingMode;
 // executable) simultaneously.
 class ExecutableCache : public RefObject<ExecutableCache> {
  public:
-  virtual ~ExecutableCache();
+  virtual ~ExecutableCache() = default;
 
   // TODO(benvanik): status/queries (size, etc).
 
@@ -115,11 +65,12 @@ class ExecutableCache : public RefObject<ExecutableCache> {
   // When preparing a large number of executables it's recommended to use the
   // PrepareExecutables method to batch and wait on the results.
   virtual StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
-      const ExecutableSpec& spec) = 0;
+      ExecutableLayout* executable_layout,
+      iree_hal_executable_caching_mode_t mode,
+      iree_const_byte_span_t executable_data) = 0;
 
  protected:
-  ExecutableCache();
+  ExecutableCache() = default;
 };
 
 }  // namespace hal

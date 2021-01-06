@@ -82,7 +82,8 @@ class VulkanDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
+  StatusOr<ref_ptr<Device>> CreateDevice(
+      iree_hal_device_id_t device_id) override;
 
   // Creates a device that wraps an externally managed VkDevice.
   //

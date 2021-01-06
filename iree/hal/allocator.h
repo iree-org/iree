@@ -44,24 +44,28 @@ class Allocator : public RefObject<Allocator> {
   //
   // Returning false indicates that the buffer must be transferred externally
   // into a buffer compatible with the device this allocator services.
-  bool CanUseBuffer(Buffer* buffer, BufferUsageBitfield intended_usage) const;
-  virtual bool CanUseBufferLike(Allocator* source_allocator,
-                                MemoryTypeBitfield memory_type,
-                                BufferUsageBitfield buffer_usage,
-                                BufferUsageBitfield intended_usage) const = 0;
+  bool CanUseBuffer(Buffer* buffer,
+                    iree_hal_buffer_usage_t intended_usage) const {
+    return CanUseBufferLike(buffer->allocator(), buffer->memory_type(),
+                            buffer->usage(), intended_usage);
+  }
+  virtual bool CanUseBufferLike(
+      Allocator* source_allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_buffer_usage_t buffer_usage,
+      iree_hal_buffer_usage_t intended_usage) const = 0;
 
   // Returns true if the allocator can allocate a buffer with the given
   // attributes.
-  virtual bool CanAllocate(MemoryTypeBitfield memory_type,
-                           BufferUsageBitfield buffer_usage,
+  virtual bool CanAllocate(iree_hal_memory_type_t memory_type,
+                           iree_hal_buffer_usage_t buffer_usage,
                            size_t allocation_size) const = 0;
 
   // Adjusts allocation parameters to be compatible with the allocator.
   // Certain allocators may require particular memory types to function. By
   // adjusting the parameters prior to allocation callers can be sure they are
   // able to successfully Allocate a buffer later on with the same parameters.
-  virtual Status MakeCompatible(MemoryTypeBitfield* memory_type,
-                                BufferUsageBitfield* buffer_usage) const {
+  virtual Status MakeCompatible(iree_hal_memory_type_t* memory_type,
+                                iree_hal_buffer_usage_t* buffer_usage) const {
     return OkStatus();
   }
 
@@ -71,24 +75,19 @@ class Allocator : public RefObject<Allocator> {
   //
   // The memory type of the buffer returned may differ from the requested value
   // if the device can provide more functionality; for example, if requesting
-  // MemoryType::kHostVisible but the memory is really host cached you may get
-  // a buffer back with MemoryType::kHostVisible | MemoryType::kHostCached. The
-  // only requirement is that the buffer satisfy the required bits.
-  virtual StatusOr<ref_ptr<Buffer>> Allocate(MemoryTypeBitfield memory_type,
-                                             BufferUsageBitfield buffer_usage,
-                                             size_t allocation_size) = 0;
-
-  // Allocates a buffer from the allocator for use as a constant value.
-  // The provided |source_buffer| may be returned if the device can use it
-  // directly and otherwise will be copied.
-  virtual StatusOr<ref_ptr<Buffer>> AllocateConstant(
-      BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer);
+  // IREE_HAL_MEMORY_TYPE_HOST_VISIBLE but the memory is really host cached you
+  // may get a buffer back with IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+  // IREE_HAL_MEMORY_TYPE_HOST_CACHED. The only requirement is that the buffer
+  // satisfy the required bits.
+  virtual StatusOr<ref_ptr<Buffer>> Allocate(
+      iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
+      size_t allocation_size) = 0;
 
   // Wraps an existing host heap allocation in a buffer.
   // Ownership of the host allocation remains with the caller and the memory
   // must remain valid for so long as the Buffer may be in use.
-  // Will have MemoryType::kHostLocal in most cases and may not be usable
-  // by the device.
+  // Will have IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases and may not be
+  // usable by the device.
   //
   // The inference optimizer makes assumptions about buffer aliasing based on
   // Buffer instances and because of this wrapping the same host buffer in
@@ -99,36 +98,43 @@ class Allocator : public RefObject<Allocator> {
   // new Buffers).
   //
   // Fails if the allocator cannot access host memory in this way.
-  StatusOr<ref_ptr<Buffer>> Wrap(MemoryTypeBitfield memory_type,
-                                 BufferUsageBitfield buffer_usage,
-                                 const void* data, size_t data_length);
+  StatusOr<ref_ptr<Buffer>> Wrap(iree_hal_memory_type_t memory_type,
+                                 iree_hal_buffer_usage_t buffer_usage,
+                                 const void* data, size_t data_length) {
+    return WrapMutable(memory_type, IREE_HAL_MEMORY_ACCESS_READ, buffer_usage,
+                       const_cast<void*>(data), data_length);
+  }
   virtual StatusOr<ref_ptr<Buffer>> WrapMutable(
-      MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
-      BufferUsageBitfield buffer_usage, void* data, size_t data_length);
+      iree_hal_memory_type_t memory_type,
+      iree_hal_memory_access_t allowed_access,
+      iree_hal_buffer_usage_t buffer_usage, void* data, size_t data_length) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "Allocator does not support wrapping host memory";
+  }
   template <typename T>
-  StatusOr<ref_ptr<Buffer>> Wrap(MemoryTypeBitfield memory_type,
-                                 BufferUsageBitfield buffer_usage,
+  StatusOr<ref_ptr<Buffer>> Wrap(iree_hal_memory_type_t memory_type,
+                                 iree_hal_buffer_usage_t buffer_usage,
                                  absl::Span<const T> data);
   template <typename T>
-  StatusOr<ref_ptr<Buffer>> WrapMutable(MemoryTypeBitfield memory_type,
-                                        MemoryAccessBitfield allowed_access,
-                                        BufferUsageBitfield buffer_usage,
+  StatusOr<ref_ptr<Buffer>> WrapMutable(iree_hal_memory_type_t memory_type,
+                                        iree_hal_memory_access_t allowed_access,
+                                        iree_hal_buffer_usage_t buffer_usage,
                                         absl::Span<T> data);
 };
 
 // Inline functions and template definitions follow:
 
 template <typename T>
-StatusOr<ref_ptr<Buffer>> Allocator::Wrap(MemoryTypeBitfield memory_type,
-                                          BufferUsageBitfield buffer_usage,
+StatusOr<ref_ptr<Buffer>> Allocator::Wrap(iree_hal_memory_type_t memory_type,
+                                          iree_hal_buffer_usage_t buffer_usage,
                                           absl::Span<const T> data) {
   return Wrap(memory_type, buffer_usage, data.data(), data.size() * sizeof(T));
 }
 
 template <typename T>
 StatusOr<ref_ptr<Buffer>> Allocator::WrapMutable(
-    MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
-    BufferUsageBitfield buffer_usage, absl::Span<T> data) {
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t buffer_usage, absl::Span<T> data) {
   return WrapMutable(memory_type, allowed_access, buffer_usage, data.data(),
                      data.size() * sizeof(T));
 }

@@ -53,7 +53,8 @@ class HostExecutable : public Executable {
     const PushConstantBlock* push_constants = nullptr;
 
     // Descriptor set bindings organized by set and binding ordinal.
-    absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings;
+    absl::Span<const absl::Span<const iree_hal_descriptor_set_binding_t>>
+        set_bindings;
   };
 
   struct DispatchState : public RefObject<DispatchState> {

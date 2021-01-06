@@ -39,7 +39,7 @@ namespace {
 class UnsynchronizedCommandQueue final : public CommandQueue {
  public:
   UnsynchronizedCommandQueue(std::string name,
-                             CommandCategoryBitfield supported_categories)
+                             iree_hal_command_category_t supported_categories)
       : CommandQueue(std::move(name), supported_categories) {}
   ~UnsynchronizedCommandQueue() override = default;
 
@@ -85,7 +85,7 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
 SerialSchedulingModel::SerialSchedulingModel() {
   // We currently only expose a single command queue.
   auto command_queue = absl::make_unique<UnsynchronizedCommandQueue>(
-      "cpu0", CommandCategory::kTransfer | CommandCategory::kDispatch);
+      "cpu0", IREE_HAL_COMMAND_CATEGORY_ANY);
 
   // Wrap in the simple async command queue.
   auto async_command_queue =
@@ -96,8 +96,8 @@ SerialSchedulingModel::SerialSchedulingModel() {
 SerialSchedulingModel::~SerialSchedulingModel() = default;
 
 StatusOr<ref_ptr<CommandBuffer>> SerialSchedulingModel::CreateCommandBuffer(
-    CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories) {
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories) {
   return make_ref<InProcCommandBuffer>(mode, command_categories);
 }
 

@@ -53,7 +53,7 @@ namespace vulkan {
 class SerializingCommandQueue final : public CommandQueue {
  public:
   SerializingCommandQueue(std::string name,
-                          CommandCategoryBitfield supported_categories,
+                          iree_hal_command_category_t supported_categories,
                           const ref_ptr<VkDeviceHandle>& logical_device,
                           const ref_ptr<TimePointFencePool>& fence_pool,
                           VkQueue queue);

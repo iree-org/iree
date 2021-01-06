@@ -35,7 +35,7 @@ struct MetalDriverOptions {
 // A pseudo Metal GPU driver which retains all available Metal GPU devices
 // during its lifetime.
 //
-// It uses the DriverDeviceID to store the underlying id<MTLDevice>.
+// It uses the iree_hal_device_id_t to store the underlying id<MTLDevice>.
 class MetalDriver final : public Driver {
  public:
   static StatusOr<ref_ptr<MetalDriver>> Create(
@@ -47,7 +47,8 @@ class MetalDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
+  StatusOr<ref_ptr<Device>> CreateDevice(
+      iree_hal_device_id_t device_id) override;
 
  private:
   MetalDriver(std::vector<DeviceInfo> devices,

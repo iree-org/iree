@@ -206,7 +206,7 @@ typedef size_t iree_host_size_t;
 // Size, in bytes, of a buffer on devices.
 typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
-#define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
+#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
 // TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
 // TODO(benvanik): see if we can shove in static_asserts somehow?
@@ -231,6 +231,11 @@ static inline iree_host_size_t iree_math_align(iree_host_size_t value,
 
 #define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
 #define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
+
+// Returns true if any bit from |rhs| is set in |lhs|.
+#define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
+// Returns true iff all bits from |rhs| are set in |lhs|.
+#define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities

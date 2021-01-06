@@ -27,25 +27,25 @@ class MockAllocator : public ::testing::StrictMock<Allocator> {
   MockAllocator() : ::testing::StrictMock<Allocator>() {}
 
   MOCK_METHOD(bool, CanUseBufferLike,
-              (Allocator * source_allocator, MemoryTypeBitfield memory_type,
-               BufferUsageBitfield buffer_usage,
-               BufferUsageBitfield intended_usage),
+              (Allocator * source_allocator, iree_hal_memory_type_t memory_type,
+               iree_hal_buffer_usage_t buffer_usage,
+               iree_hal_buffer_usage_t intended_usage),
               (const, override));
 
   MOCK_METHOD(bool, CanAllocate,
-              (MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-               size_t allocation_size),
+              (iree_hal_memory_type_t memory_type,
+               iree_hal_buffer_usage_t buffer_usage, size_t allocation_size),
               (const, override));
 
   MOCK_METHOD(StatusOr<ref_ptr<Buffer>>, Allocate,
-              (MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-               size_t allocation_size),
+              (iree_hal_memory_type_t memory_type,
+               iree_hal_buffer_usage_t buffer_usage, size_t allocation_size),
               (override));
 
   MOCK_METHOD(StatusOr<ref_ptr<Buffer>>, WrapMutable,
-              (MemoryTypeBitfield memory_type,
-               MemoryAccessBitfield allowed_access,
-               BufferUsageBitfield buffer_usage, void* data,
+              (iree_hal_memory_type_t memory_type,
+               iree_hal_memory_access_t allowed_access,
+               iree_hal_buffer_usage_t buffer_usage, void* data,
                size_t data_length),
               (override));
 };

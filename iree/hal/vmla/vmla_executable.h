@@ -20,7 +20,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"
 #include "iree/vm/api.h"
 
@@ -32,20 +31,13 @@ class Interface;
 
 class VMLAExecutable final : public HostExecutable {
  public:
-  static StatusOr<ref_ptr<VMLAExecutable>> Load(iree_vm_instance_t* instance,
-                                                iree_vm_module_t* vmla_module,
-                                                ExecutableSpec spec,
-                                                bool allow_aliasing_data);
+  static StatusOr<ref_ptr<VMLAExecutable>> Load(
+      iree_vm_instance_t* instance, iree_vm_module_t* vmla_module,
+      iree_const_byte_span_t executable_data, bool allow_aliasing_data);
 
-  VMLAExecutable(ExecutableSpec spec, bool allow_aliasing_data);
+  VMLAExecutable(iree_const_byte_span_t executable_data,
+                 bool allow_aliasing_data);
   ~VMLAExecutable() override;
-
-  bool supports_debugging() const override { return false; }
-
-  // Reference to the bytecode blob contents.
-  absl::Span<const uint8_t> executable_data() const {
-    return spec_.executable_data;
-  }
 
   // VM context containing the loaded executable module.
   iree_vm_context_t* context() const { return context_; }
@@ -64,7 +56,7 @@ class VMLAExecutable final : public HostExecutable {
   Status Initialize(iree_vm_instance_t* instance,
                     iree_vm_module_t* vmla_module);
 
-  ExecutableSpec spec_;
+  iree_const_byte_span_t executable_data_;
   std::vector<uint8_t> cloned_executable_data_;
 
   iree_vm_context_t* context_ = nullptr;

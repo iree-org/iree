@@ -20,8 +20,8 @@ namespace iree {
 namespace hal {
 
 HostDescriptorSetLayout::HostDescriptorSetLayout(
-    DescriptorSetLayout::UsageType usage_type,
-    absl::Span<const DescriptorSetLayout::Binding> bindings)
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    absl::Span<const iree_hal_descriptor_set_layout_binding_t> bindings)
     : bindings_(bindings.begin(), bindings.end()) {}
 
 HostDescriptorSetLayout::~HostDescriptorSetLayout() = default;
@@ -34,8 +34,8 @@ HostExecutableLayout::HostExecutableLayout(
     auto* set_layout = static_cast<HostDescriptorSetLayout*>(set_layouts[i]);
     auto& set_binding_map = dynamic_binding_map_[i];
     for (auto& binding : set_layout->bindings()) {
-      if (binding.type == DescriptorType::kStorageBufferDynamic ||
-          binding.type == DescriptorType::kUniformBufferDynamic) {
+      if (binding.type == IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC ||
+          binding.type == IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
         set_binding_map.push_back(binding.binding);
       }
     }

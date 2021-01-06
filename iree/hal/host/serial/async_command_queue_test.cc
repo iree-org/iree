@@ -53,7 +53,7 @@ struct AsyncCommandQueueTest : public ::testing::Test {
 
   void SetUp() override {
     auto mock_queue = absl::make_unique<MockCommandQueue>(
-        "mock", CommandCategory::kTransfer | CommandCategory::kDispatch);
+        "mock", IREE_HAL_COMMAND_CATEGORY_ANY);
     mock_target_queue = mock_queue.get();
     command_queue = absl::make_unique<AsyncCommandQueue>(std::move(mock_queue));
   }
@@ -69,8 +69,9 @@ struct AsyncCommandQueueTest : public ::testing::Test {
 TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                CommandCategory::kTransfer);
+  auto cmd_buffer =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([&](absl::Span<const SubmissionBatch> batches) {
@@ -89,8 +90,9 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
 TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                CommandCategory::kTransfer);
+  auto cmd_buffer =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
@@ -111,8 +113,9 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWhileIdle) {
 TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                CommandCategory::kTransfer);
+  auto cmd_buffer =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
@@ -142,10 +145,12 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
         return OkStatus();
       });
 
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_0 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
+  auto cmd_buffer_1 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
 
   CondVarSemaphore semaphore_0(0u);
   IREE_ASSERT_OK(command_queue->Submit(
@@ -174,8 +179,9 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
         Sleep(std::chrono::milliseconds(100));
         return DataLossErrorBuilder(IREE_LOC);
       });
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_0 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
   CondVarSemaphore semaphore_0(0ull);
   IREE_ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1u}}}));
@@ -185,8 +191,9 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 
   // Future submits should fail asynchronously.
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_1 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
   CondVarSemaphore semaphore_1(0ull);
   EXPECT_TRUE(IsDataLoss(command_queue->Submit(
       {{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}})));
@@ -204,10 +211,12 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
         return DataLossErrorBuilder(IREE_LOC);
       });
 
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
-                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_0 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
+  auto cmd_buffer_1 =
+      make_ref<MockCommandBuffer>(IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                                  IREE_HAL_COMMAND_CATEGORY_TRANSFER);
 
   CondVarSemaphore semaphore_0(0ull);
   IREE_ASSERT_OK(command_queue->Submit(

@@ -47,7 +47,8 @@ class Driver : public RefObject<Driver> {
   virtual StatusOr<ref_ptr<Device>> CreateDefaultDevice() = 0;
 
   // Creates a device as queried with the given |driver_handle|.
-  virtual StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) = 0;
+  virtual StatusOr<ref_ptr<Device>> CreateDevice(
+      iree_hal_device_id_t device_id) = 0;
   StatusOr<ref_ptr<Device>> CreateDevice(const DeviceInfo& device_info) {
     return CreateDevice(device_info.device_id());
   }

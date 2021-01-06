@@ -445,7 +445,7 @@ def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
 def HAL_DeviceSize : TypeAlias<Index>;
-def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"device_size_t">;
+def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"iree_device_size_t">;
 
 def HAL_HostSize : TypeAlias<Index>;
 def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;

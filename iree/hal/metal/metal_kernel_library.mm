@@ -88,8 +88,8 @@ namespace metal {
 
 // static
 StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(id<MTLDevice> device,
-                                                                 ExecutableCachingModeBitfield mode,
-                                                                 const ExecutableSpec& spec) {
+                                                                 iree_hal_executable_caching_mode_t mode,
+                                                                 iree_const_byte_span_t executable_data) {
   IREE_TRACE_SCOPE0("MetalKernelLibrary::Create");
 
   // Verify and fetch the executable flatbuffer wrapper.

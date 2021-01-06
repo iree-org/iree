@@ -38,10 +38,10 @@ class DescriptorSetArena final {
   // Allocates and binds a descriptor set from the arena.
   // The command buffer will have the descriptor set containing |bindings| bound
   // to it.
-  Status BindDescriptorSet(VkCommandBuffer command_buffer,
-                           PipelineExecutableLayout* executable_layout,
-                           int32_t set,
-                           absl::Span<const DescriptorSet::Binding> bindings);
+  Status BindDescriptorSet(
+      VkCommandBuffer command_buffer,
+      PipelineExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings);
 
   // Flushes all pending writes to descriptor sets allocated from the arena and
   // returns a group that - when dropped - will release the descriptor sets
@@ -52,10 +52,10 @@ class DescriptorSetArena final {
   const DynamicSymbols& syms() const { return *logical_device_->syms(); }
 
   // Pushes the descriptor set to the command buffer, if supported.
-  Status PushDescriptorSet(VkCommandBuffer command_buffer,
-                           PipelineExecutableLayout* executable_layout,
-                           int32_t set,
-                           absl::Span<const DescriptorSet::Binding> bindings);
+  Status PushDescriptorSet(
+      VkCommandBuffer command_buffer,
+      PipelineExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const iree_hal_descriptor_set_binding_t> bindings);
 
   ref_ptr<VkDeviceHandle> logical_device_;
   ref_ptr<DescriptorPoolCache> descriptor_pool_cache_;
