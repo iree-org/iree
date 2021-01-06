@@ -1409,44 +1409,45 @@ static LogicalResult propagateBufferUsedForResultTensor(
 static LogicalResult createAndPropagateBufferUsedForResultTensors(
     FuncOp funcOp, OutputBufferMap &outputBufferMap,
     TensorToBufferMap &resultTensorToBufferMap) {
-  OpBuilder builder(funcOp.getBody());
-  for (auto &block : funcOp.body().getBlocks()) {
-    // Walks in a reverse way, because we create placeholders for output buffers
-    // and temp buffers, and propagate them to their defining ops.
-    for (auto op = block.rbegin(); op != block.rend(); op++) {
-      if (auto storeTensorOp =
-              dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(*op)) {
-        Value tensor = storeTensorOp.operand();
-        Value buffer = createBufferForResultTensor(storeTensorOp, builder);
-        outputBufferMap[storeTensorOp] = buffer;
-        if (failed(propagateBufferUsedForResultTensor(tensor, buffer,
-                                                      resultTensorToBufferMap,
-                                                      builder, op->getLoc()))) {
-          return failure();
-        }
-        continue;
-      }
+  if (funcOp.getBlocks().size() != 1) {
+    return funcOp.emitError("expected a single block");
+  }
 
-      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
-        for (auto result : llvm::enumerate(op->getResults())) {
-          Value resultBuffer = resultTensorToBufferMap.lookup(result.value());
-          if (resultBuffer) continue;
-          if (auto shapedType =
-                  result.value().getType().dyn_cast<ShapedType>()) {
-            if (shapedType.hasStaticShape()) {
-              resultBuffer = builder.create<AllocOp>(
-                  op->getLoc(), getMemrefTypeForTensor(shapedType));
-            }
+  // Walks in a reverse way, because we create placeholders for output buffers
+  // and temp buffers, and propagate them to their defining ops.
+  OpBuilder builder(funcOp.getBody());
+  auto &block = funcOp.front();
+  for (auto op = block.rbegin(); op != block.rend(); op++) {
+    if (auto storeTensorOp = dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(*op)) {
+      Value tensor = storeTensorOp.operand();
+      Value buffer = createBufferForResultTensor(storeTensorOp, builder);
+      outputBufferMap[storeTensorOp] = buffer;
+      if (failed(propagateBufferUsedForResultTensor(tensor, buffer,
+                                                    resultTensorToBufferMap,
+                                                    builder, op->getLoc()))) {
+        return failure();
+      }
+      continue;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
+      for (auto result : llvm::enumerate(op->getResults())) {
+        Value resultBuffer = resultTensorToBufferMap.lookup(result.value());
+        if (resultBuffer) continue;
+        if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
+          if (shapedType.hasStaticShape()) {
+            resultBuffer = builder.create<AllocOp>(
+                op->getLoc(), getMemrefTypeForTensor(shapedType));
           }
-          if (!resultBuffer) {
-            return op->emitError("failed to create buffer for result #")
-                   << result.index();
-          }
-          if (failed(propagateBufferUsedForResultTensor(
-                  result.value(), resultBuffer, resultTensorToBufferMap,
-                  builder, op->getLoc()))) {
-            return failure();
-          }
+        }
+        if (!resultBuffer) {
+          return op->emitError("failed to create buffer for result #")
+                 << result.index();
+        }
+        if (failed(propagateBufferUsedForResultTensor(
+                result.value(), resultBuffer, resultTensorToBufferMap, builder,
+                op->getLoc()))) {
+          return failure();
         }
       }
     }
