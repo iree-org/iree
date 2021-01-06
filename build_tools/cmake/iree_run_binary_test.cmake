@@ -70,6 +70,8 @@ function(iree_run_binary_test)
   string(REPLACE "::" "_" _TEST_BINARY_EXECUTABLE ${_TEST_BINARY_TARGET})
 
   if(ANDROID)
+    # TODO(gcmn): Fix this on android
+    return()
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
