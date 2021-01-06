@@ -518,11 +518,6 @@ add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
-elseif(${IREE_ENABLE_MLIR})
-  # If not building the compiler, tablegen is still needed
-  # to generate vm ops so deep include it only.
-  add_subdirectory(iree/compiler/Dialect/IREE/Tools)
-  add_subdirectory(iree/compiler/Dialect/VM/Tools)
 endif()
 
 if(${IREE_BUILD_JAVA_BINDINGS})
