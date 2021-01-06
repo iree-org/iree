@@ -140,16 +140,16 @@ class TensorListModulesTest : public ::testing::Test {
         iree_hal_buffer_view_buffer(returned_buffer_view);
     ASSERT_NE(returned_buffer, nullptr);
 
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
-                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
+    iree_hal_buffer_mapping_t mapped_memory;
+    IREE_ASSERT_OK(
+        iree_hal_buffer_map_range(returned_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                                  0, IREE_WHOLE_BUFFER, &mapped_memory));
     for (int i = 0; i < expected_values.size(); i++) {
       EXPECT_EQ(reinterpret_cast<float*>(mapped_memory.contents.data)[i],
                 expected_values[i]);
     }
 
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapped_memory));
   }
 
   void CreateBufferView(absl::Span<const float> contents,
@@ -169,18 +169,11 @@ class TensorListModulesTest : public ::testing::Test {
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
-    iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
-                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
-                                       IREE_WHOLE_BUFFER, &mapped_memory));
-    memcpy(mapped_memory.contents.data,
-           static_cast<const void*>(contents.data()),
-           mapped_memory.contents.data_length);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
+                                              contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
-        &*out_buffer_view));
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
   iree_hal_device_t* device_ = nullptr;

@@ -20,7 +20,7 @@
 #include <memory>
 
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
+#include "iree/hal/cc/allocator.h"
 
 namespace iree {
 namespace hal {

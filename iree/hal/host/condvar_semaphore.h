@@ -22,7 +22,7 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/semaphore.h"
 
 namespace iree {
 namespace hal {

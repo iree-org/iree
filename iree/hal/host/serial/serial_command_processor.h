@@ -16,7 +16,7 @@
 #define IREE_HAL_HOST_SERIAL_SERIAL_COMMAND_PROCESSOR_H_
 
 #include "absl/container/inlined_vector.h"
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 #include "iree/hal/host/host_executable.h"
 
 namespace iree {

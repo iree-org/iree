@@ -23,9 +23,9 @@
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
-#include "iree/hal/executable.h"
-#include "iree/hal/executable_cache.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/cc/executable.h"
+#include "iree/hal/cc/executable_cache.h"
+#include "iree/hal/cc/executable_layout.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/pipeline_executable_layout.h"

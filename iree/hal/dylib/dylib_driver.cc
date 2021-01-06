@@ -16,7 +16,7 @@
 
 #include <memory>
 
-#include "iree/hal/device_info.h"
+#include "iree/hal/cc/device_info.h"
 #include "iree/hal/dylib/dylib_device.h"
 #include "iree/hal/host/serial/serial_scheduling_model.h"
 

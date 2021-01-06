@@ -119,14 +119,14 @@ class PyMappedMemory {
     }
   };
 
-  PyMappedMemory(Description desc, iree_hal_mapped_memory_t mapped_memory,
+  PyMappedMemory(Description desc, iree_hal_buffer_mapping_t mapped_memory,
                  HalBuffer buffer)
       : desc_(std::move(desc)),
         mapped_memory_(mapped_memory),
         buf_(std::move(buffer)) {}
   ~PyMappedMemory() {
     if (buf_) {
-      CheckApiStatus(iree_hal_buffer_unmap(buf_.raw_ptr(), &mapped_memory_),
+      CheckApiStatus(iree_hal_buffer_unmap_range(&mapped_memory_),
                      "Error unmapping memory");
     }
   }
@@ -139,7 +139,7 @@ class PyMappedMemory {
                                               HalBuffer buffer) {
     iree_device_size_t byte_length =
         iree_hal_buffer_byte_length(buffer.raw_ptr());
-    iree_hal_mapped_memory_t mapped_memory;
+    iree_hal_buffer_mapping_t mapped_memory;
     CheckApiStatus(iree_hal_buffer_map(
                        buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
                        0 /* element_offset */, byte_length, &mapped_memory),
@@ -160,7 +160,7 @@ class PyMappedMemory {
 
  private:
   Description desc_;
-  iree_hal_mapped_memory_t mapped_memory_;
+  iree_hal_buffer_mapping_t mapped_memory_;
   HalBuffer buf_;
 };
 

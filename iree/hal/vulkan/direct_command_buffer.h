@@ -19,7 +19,7 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

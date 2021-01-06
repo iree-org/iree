@@ -15,8 +15,8 @@
 #ifndef IREE_HAL_DYLIB_EXECUTABLE_CACHE_H_
 #define IREE_HAL_DYLIB_EXECUTABLE_CACHE_H_
 
-#include "iree/hal/executable.h"
-#include "iree/hal/executable_cache.h"
+#include "iree/hal/cc/executable.h"
+#include "iree/hal/cc/executable_cache.h"
 
 namespace iree {
 namespace hal {

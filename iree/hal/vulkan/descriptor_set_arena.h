@@ -20,7 +20,7 @@
 
 #include "iree/base/arena.h"
 #include "iree/base/status.h"
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/pipeline_executable.h"
 

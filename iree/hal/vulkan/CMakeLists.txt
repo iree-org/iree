@@ -69,7 +69,7 @@ iree_cc_library(
     iree::base::status
     iree::base::time
     iree::base::tracing
-    iree::hal
+    iree::hal::cc
     renderdoc_api::renderdoc_app
   PUBLIC
 )
@@ -107,7 +107,7 @@ iree_cc_library(
     iree::base::logging
     iree::base::status
     iree::base::tracing
-    iree::hal
+    iree::hal::cc
     vulkan_memory_allocator
   PUBLIC
 )
@@ -163,8 +163,7 @@ iree_cc_library(
     iree::base::status
     iree::base::time
     iree::base::tracing
-    iree::hal
-    iree::hal::command_buffer_validation
+    iree::hal::cc
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )

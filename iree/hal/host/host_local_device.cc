@@ -19,7 +19,7 @@
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/command_buffer_validation.h"
+#include "iree/hal/cc/command_buffer_validation.h"
 #include "iree/hal/host/host_descriptor_set.h"
 #include "iree/hal/host/host_executable_layout.h"
 

@@ -19,7 +19,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/cc/command_buffer.h"
 #include "iree/hal/metal/metal_buffer.h"
 
 namespace iree {

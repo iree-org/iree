@@ -19,7 +19,7 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include "iree/hal/event.h"
+#include "iree/hal/cc/event.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 namespace iree {

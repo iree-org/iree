@@ -106,7 +106,7 @@ Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
         input_buffer, /*shape=*/&input_element_count,
         /*shape_rank=*/1, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-        iree_allocator_system(), &input_buffer_view));
+        &input_buffer_view));
     iree_hal_buffer_release(input_buffer);
 
     // Marshal the input buffer views through the input VM variant list.
@@ -132,13 +132,9 @@ Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
       reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
           outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
   auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map(output_buffer,
-                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                           IREE_WHOLE_BUFFER, &mapped_memory));
-  memcpy(output, mapped_memory.contents.data,
-         mapped_memory.contents.data_length);
-  iree_hal_buffer_unmap(output_buffer, &mapped_memory);
+  // TODO(jennik): this is unsafe - we don't know the size of output ptr here!
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(
+        output_buffer, 0, output, iree_hal_buffer_byte_length(output_buffer)));
   return OkStatus();
 }
 

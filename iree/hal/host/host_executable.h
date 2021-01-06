@@ -16,8 +16,8 @@
 #define IREE_HAL_HOST_HOST_EXECUTABLE_H_
 
 #include "iree/base/status.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/executable.h"
+#include "iree/hal/cc/descriptor_set.h"
+#include "iree/hal/cc/executable.h"
 
 namespace iree {
 namespace hal {

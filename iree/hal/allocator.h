@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,131 +15,162 @@
 #ifndef IREE_HAL_ALLOCATOR_H_
 #define IREE_HAL_ALLOCATOR_H_
 
-#include <cstddef>
-#include <memory>
+#include <stdbool.h>
+#include <stdint.h>
 
-#include "absl/types/span.h"
-#include "iree/base/ref_ptr.h"
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/hal/buffer.h"
+#include "iree/hal/resource.h"
 
-namespace iree {
-namespace hal {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// Allocates buffers for a particular device memory space.
-//
-// Buffers allocated are only guaranteed to work with the driver that the
-// allocator services. Any attempt to use buffers on drivers they were not
-// allocated from must first be checked with CanUseBuffer.
-//
-// Thread-safe.
-class Allocator : public RefObject<Allocator> {
- public:
-  virtual ~Allocator() = default;
+//===----------------------------------------------------------------------===//
+// Types and Enums
+//===----------------------------------------------------------------------===//
 
-  // Returns true if the device can use the given buffer for the provided usage.
-  // For buffers allocated from this allocator it's expected that the result
-  // will always be true. For buffers that originate from another allocator
-  // there may be limited support for cross-device usage.
-  //
-  // Returning false indicates that the buffer must be transferred externally
-  // into a buffer compatible with the device this allocator services.
-  bool CanUseBuffer(Buffer* buffer,
-                    iree_hal_buffer_usage_t intended_usage) const {
-    return CanUseBufferLike(buffer->allocator(), buffer->memory_type(),
-                            buffer->usage(), intended_usage);
-  }
-  virtual bool CanUseBufferLike(
-      Allocator* source_allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_buffer_usage_t buffer_usage,
-      iree_hal_buffer_usage_t intended_usage) const = 0;
+// A bitfield indicating compatible behavior for buffers in an allocator.
+enum iree_hal_buffer_compatibility_e {
+  // Indicates (in the absence of other bits) the buffer is not compatible with
+  // the allocator or device at all. Any attempts to use the buffer for any
+  // usage will fail. This will happen if the buffer is device-local to another
+  // device without peering and not visible to the host.
+  IREE_HAL_BUFFER_COMPATIBILITY_NONE = 0u,
 
-  // Returns true if the allocator can allocate a buffer with the given
-  // attributes.
-  virtual bool CanAllocate(iree_hal_memory_type_t memory_type,
-                           iree_hal_buffer_usage_t buffer_usage,
-                           size_t allocation_size) const = 0;
+  // Indicates that the allocator could allocate new buffers of this type and
+  // usage natively. Allocations with the queried parameters may still fail due
+  // to runtime conditions (out of memory, fragmentation, etc) but are otherwise
+  // valid.
+  IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE = 1u << 0,
 
-  // Adjusts allocation parameters to be compatible with the allocator.
-  // Certain allocators may require particular memory types to function. By
-  // adjusting the parameters prior to allocation callers can be sure they are
-  // able to successfully Allocate a buffer later on with the same parameters.
-  virtual Status MakeCompatible(iree_hal_memory_type_t* memory_type,
-                                iree_hal_buffer_usage_t* buffer_usage) const {
-    return OkStatus();
-  }
+  // Indicates that the buffer can be used as a transfer source or target on the
+  // a device queue (such as being the source or target of a DMA operation,
+  // etc). If not set then the buffer may still be usable for
+  // iree_hal_buffer_copy_data but not with queued operations.
+  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER = 1u << 1,
 
-  // Allocates a buffer from the allocator.
-  // Fails if the memory type requested for the given usage cannot be serviced.
-  // Callers can use CanAllocate to decide their memory use strategy.
-  //
-  // The memory type of the buffer returned may differ from the requested value
-  // if the device can provide more functionality; for example, if requesting
-  // IREE_HAL_MEMORY_TYPE_HOST_VISIBLE but the memory is really host cached you
-  // may get a buffer back with IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
-  // IREE_HAL_MEMORY_TYPE_HOST_CACHED. The only requirement is that the buffer
-  // satisfy the required bits.
-  virtual StatusOr<ref_ptr<Buffer>> Allocate(
-      iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t buffer_usage,
-      size_t allocation_size) = 0;
-
-  // Wraps an existing host heap allocation in a buffer.
-  // Ownership of the host allocation remains with the caller and the memory
-  // must remain valid for so long as the Buffer may be in use.
-  // Will have IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases and may not be
-  // usable by the device.
-  //
-  // The inference optimizer makes assumptions about buffer aliasing based on
-  // Buffer instances and because of this wrapping the same host buffer in
-  // multiple Buffers will create potential memory aliasing issues that can be
-  // difficult to track down. There's no checking as to whether a host buffer
-  // has already been wrapped so it's best for callers to ensure this is never
-  // possible (the simplest way being to never use Wrap and always just allocate
-  // new Buffers).
-  //
-  // Fails if the allocator cannot access host memory in this way.
-  StatusOr<ref_ptr<Buffer>> Wrap(iree_hal_memory_type_t memory_type,
-                                 iree_hal_buffer_usage_t buffer_usage,
-                                 const void* data, size_t data_length) {
-    return WrapMutable(memory_type, IREE_HAL_MEMORY_ACCESS_READ, buffer_usage,
-                       const_cast<void*>(data), data_length);
-  }
-  virtual StatusOr<ref_ptr<Buffer>> WrapMutable(
-      iree_hal_memory_type_t memory_type,
-      iree_hal_memory_access_t allowed_access,
-      iree_hal_buffer_usage_t buffer_usage, void* data, size_t data_length) {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Allocator does not support wrapping host memory";
-  }
-  template <typename T>
-  StatusOr<ref_ptr<Buffer>> Wrap(iree_hal_memory_type_t memory_type,
-                                 iree_hal_buffer_usage_t buffer_usage,
-                                 absl::Span<const T> data);
-  template <typename T>
-  StatusOr<ref_ptr<Buffer>> WrapMutable(iree_hal_memory_type_t memory_type,
-                                        iree_hal_memory_access_t allowed_access,
-                                        iree_hal_buffer_usage_t buffer_usage,
-                                        absl::Span<T> data);
+  // Indicates that the buffer can be used as an input/output to a dispatch.
+  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH = 1u << 2,
 };
+typedef uint32_t iree_hal_buffer_compatibility_t;
 
-// Inline functions and template definitions follow:
+//===----------------------------------------------------------------------===//
+// iree_hal_allocator_t
+//===----------------------------------------------------------------------===//
 
-template <typename T>
-StatusOr<ref_ptr<Buffer>> Allocator::Wrap(iree_hal_memory_type_t memory_type,
-                                          iree_hal_buffer_usage_t buffer_usage,
-                                          absl::Span<const T> data) {
-  return Wrap(memory_type, buffer_usage, data.data(), data.size() * sizeof(T));
-}
+typedef struct iree_hal_allocator_s iree_hal_allocator_t;
 
-template <typename T>
-StatusOr<ref_ptr<Buffer>> Allocator::WrapMutable(
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t buffer_usage, absl::Span<T> data) {
-  return WrapMutable(memory_type, allowed_access, buffer_usage, data.data(),
-                     data.size() * sizeof(T));
-}
+// Retains the given |allocator| for the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
 
-}  // namespace hal
-}  // namespace iree
+// Releases the given |allocator| from the caller.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_allocator_release(iree_hal_allocator_t* allocator);
+
+// Returns the host allocator used for allocating host objects.
+IREE_API_EXPORT iree_allocator_t IREE_API_CALL
+iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
+
+// Returns a bitmask indicating what operations with buffers of the given type
+// are available on the allocator.
+//
+// For buffers allocated from the given allocator it's expected that the result
+// will always be non-NONE. For buffers that originate from another allocator
+// there may be limited support for cross-device usage.
+//
+// Returning IREE_HAL_BUFFER_COMPATIBILITY_NONE indicates that the buffer must
+// be transferred externally into a buffer compatible with the device the
+// allocator services.
+IREE_API_EXPORT iree_hal_buffer_compatibility_t
+iree_hal_allocator_query_buffer_compatibility(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_usage_t intended_usage, iree_device_size_t allocation_size);
+
+// Allocates a buffer from the allocator.
+// Fails if the memory type requested for the given usage cannot be serviced.
+// Callers can use iree_hal_allocator_can_allocate to decide their memory use
+// strategy.
+//
+// The memory type of the buffer returned may differ from the requested value
+// if the device can provide more functionality; for example, if requesting
+// IREE_HAL_MEMORY_TYPE_HOST_VISIBLE but the memory is really host cached you
+// may get a buffer back with IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+// IREE_HAL_MEMORY_TYPE_HOST_CACHED. The only requirement is that the buffer
+// satisfy the required bits.
+//
+// Fails if it is not possible to allocate and satisfy all placements for the
+// requested |allowed_usage|.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer);
+
+// Wraps an existing host allocation in a buffer.
+// |data_allocator| will be used to free the memory when the buffer is
+// destroyed. iree_allocator_null() can be passed to indicate the buffer does
+// not own the data.
+//
+// Fails if the allocator cannot access host memory in this way.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_heap_allocator_t
+//===----------------------------------------------------------------------===//
+
+// Creates a host-local heap allocator that can be used when buffers are
+// required that will not interact with a real hardware device (such as those
+// used in file IO or tests). Buffers allocated with this will not be compatible
+// with real device allocators and will likely incur a copy (or failure) if
+// used.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_create_heap(
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_allocator_t implementation details
+//===----------------------------------------------------------------------===//
+
+typedef struct {
+  // << HAL C porting in progress >>
+  IREE_API_UNSTABLE
+
+  void(IREE_API_PTR* destroy)(iree_hal_allocator_t* allocator);
+
+  iree_allocator_t(IREE_API_PTR* host_allocator)(
+      const iree_hal_allocator_t* allocator);
+
+  iree_hal_buffer_compatibility_t(IREE_API_PTR* query_buffer_compatibility)(
+      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_buffer_usage_t allowed_usage,
+      iree_hal_buffer_usage_t intended_usage,
+      iree_device_size_t allocation_size);
+
+  iree_status_t(IREE_API_PTR* allocate_buffer)(
+      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
+      iree_hal_buffer_t** out_buffer);
+
+  iree_status_t(IREE_API_PTR* wrap_buffer)(
+      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_memory_access_t allowed_access,
+      iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+      iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
+} iree_hal_allocator_vtable_t;
+
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_allocator_destroy(iree_hal_allocator_t* allocator);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_ALLOCATOR_H_

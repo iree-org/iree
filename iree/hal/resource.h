@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,38 +15,48 @@
 #ifndef IREE_HAL_RESOURCE_H_
 #define IREE_HAL_RESOURCE_H_
 
-#include <ostream>
-#include <string>
+#include <stdbool.h>
+#include <stdint.h>
 
-#include "iree/base/ref_ptr.h"
+#include "iree/base/api.h"
+#include "iree/base/atomics.h"
 
-namespace iree {
-namespace hal {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// Abstract resource type whose lifetime is managed by a ResourceSet.
-// Used mostly just to get a virtual dtor, though we could add nicer logging
-// by allowing resources to capture debug names, stack traces of creation, etc.
-class Resource : public RefObject<Resource> {
- public:
-  virtual ~Resource() = default;
+// Abstract resource type whose lifetime is managed by reference counting.
+// Used mostly just to get a virtual dtor and vtable, though we could add nicer
+// logging by allowing resources to capture debug names, stack traces of
+// creation, etc.
+//
+// All resource types must have the iree_hal_resource_t at offset 0. This allows
+// the HAL code to cast any type pointer to a resource to gain access to the
+// ref count and vtable at predictable locations. Note that this allows for the
+// resource to be at >0 of the allocation but the pointers used with the HAL
+// (iree_hal_event_t*, etc) must point to the iree_hal_resource_t.
+typedef struct iree_hal_resource_s {
+  // Reference count used to manage resource lifetime. The vtable->destroy
+  // method will be called when the reference count falls to zero.
+  iree_atomic_ref_count_t ref_count;
 
-  // Returns a longer debug string describing the resource and its attributes.
-  virtual std::string DebugString() const { return DebugStringShort(); }
-  // Returns a short debug string describing the resource.
-  virtual std::string DebugStringShort() const {
-    // TODO(benvanik): remove this when all resource types have custom logic.
-    return std::string("resource_") + std::to_string(static_cast<uint64_t>(
-                                          reinterpret_cast<uintptr_t>(this)));
-  }
-};
+  // Opaque vtable for the resource object.
+  //
+  // NOTE: this field may be hidden in the future. Only use this for
+  // IREE_HAL_VTABLE_DISPATCH and not equality/direct dereferencing.
+  const void* vtable;
 
-}  // namespace hal
-}  // namespace iree
+  // TODO(benvanik): debug string/logging utilities.
+} iree_hal_resource_t;
 
-inline std::ostream& operator<<(std::ostream& stream,
-                                const iree::hal::Resource& resource) {
-  stream << resource.DebugStringShort();
-  return stream;
+static inline void iree_hal_resource_initialize(
+    const void* vtable, iree_hal_resource_t* out_resource) {
+  iree_atomic_ref_count_init(&out_resource->ref_count);
+  out_resource->vtable = vtable;
 }
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_RESOURCE_H_

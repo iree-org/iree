@@ -109,13 +109,12 @@ class TensorList final : public RefObject<TensorList> {
       vm::ref<iree_hal_buffer_t> subview_buffer;
       IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
           iree_hal_buffer_view_buffer(tensor.get()), start_offset,
-          subview_length, iree_allocator_system(), &subview_buffer));
+          subview_length, &subview_buffer));
 
       iree_hal_buffer_view_t* slice = nullptr;
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
           subview_buffer.get(), element_shape.data(), element_shape.size(),
-          iree_hal_buffer_view_element_type(tensor.get()),
-          iree_allocator_system(), &slice));
+          iree_hal_buffer_view_element_type(tensor.get()), &slice));
       list->SetItem(i, slice);
     }
     return list;
@@ -171,9 +170,9 @@ class TensorList final : public RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), result_shape.data(), result_shape.size(), type,
-        iree_allocator_system(), &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
     return std::move(result_view);
   }
 
@@ -241,21 +240,21 @@ class TensorList final : public RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        result_buffer.get(), result_shape.data(), result_shape.size(), type,
-        iree_allocator_system(), &result_view));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type, &result_view));
 
     return std::move(result_view);
   }
 
  private:
   iree_status_t CopyTensorBytes(iree_hal_buffer_t* buffer) {
-    iree_hal_mapped_memory_t result_mapping;
+    iree_hal_buffer_mapping_t result_mapping;
     iree_device_size_t dest_byte_size = iree_hal_buffer_byte_length(buffer);
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_WRITE,
-                            /*byte_offset=*/0,
-                            /*byte_length=*/dest_byte_size, &result_mapping));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        buffer, IREE_HAL_MEMORY_ACCESS_WRITE,
+        /*byte_offset=*/0,
+        /*byte_length=*/dest_byte_size, &result_mapping));
 
     // Copy each buffer into the result at the right offset.
     // This is just a naive map+memcpy.
@@ -283,21 +282,14 @@ class TensorList final : public RefObject<TensorList> {
       }
 
       iree_hal_buffer_t* tensor_buffer = iree_hal_buffer_view_buffer(tensor);
-      iree_hal_mapped_memory_t tensor_mapping;
+      iree_hal_buffer_mapping_t tensor_mapping;
       iree_device_size_t tensor_byte_size =
           iree_hal_buffer_byte_length(tensor_buffer);
-
       IREE_RETURN_IF_ERROR(
-          iree_hal_buffer_map(tensor_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                              tensor_byte_size, &tensor_mapping));
-
-      memcpy(block_begin, tensor_mapping.contents.data, block_size);
-
-      IREE_RETURN_IF_ERROR(
-          iree_hal_buffer_unmap(tensor_buffer, &tensor_mapping));
+          iree_hal_buffer_read_data(tensor_buffer, 0, block_begin, block_size));
     }
 
-    return iree_hal_buffer_unmap(buffer, &result_mapping);
+    return iree_hal_buffer_unmap_range(&result_mapping);
   }
 
   std::vector<vm::ref<iree_hal_buffer_view_t>> list_;
@@ -349,11 +341,11 @@ static StatusOr<int32_t> ReadInt32FromScalarBufferView(
            << "expected rank-0 buffer view";
   }
   iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                           0, 4, &mapped_memory));
+  iree_hal_buffer_mapping_t mapped_memory;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MEMORY_ACCESS_READ, 0, 4, &mapped_memory));
   int32_t scalar = *reinterpret_cast<int32_t*>(mapped_memory.contents.data);
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(buffer, &mapped_memory));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&mapped_memory));
   return scalar;
 }
 
@@ -373,16 +365,9 @@ static StatusOr<std::vector<int32_t>> ReadInt32VectorFromBufferView(
       buffer_view, /*rank_capacity=*/1, &length, nullptr));
 
   iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
-  iree_hal_mapped_memory_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                           0, length * sizeof(int32_t),
-                                           &mapped_memory));
-
-  std::vector<int32_t> contents(
-      reinterpret_cast<int32_t*>(mapped_memory.contents.data),
-      reinterpret_cast<int32_t*>(mapped_memory.contents.data) + length);
-
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(buffer, &mapped_memory));
+  std::vector<int32_t> contents(length);
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(
+      buffer, 0, contents.data(), contents.size() * sizeof(int32_t)));
   return contents;
 }
 

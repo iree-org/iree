@@ -20,7 +20,7 @@
 #include "iree/base/arena.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
-#include "iree/hal/command_queue.h"
+#include "iree/hal/cc/command_queue.h"
 
 namespace iree {
 namespace hal {

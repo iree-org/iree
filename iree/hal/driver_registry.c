@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/api.h"
+#include "iree/hal/driver_registry.h"
 
 #include "iree/base/synchronization.h"
 #include "iree/base/threading.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/detail.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t

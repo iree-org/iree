@@ -20,7 +20,7 @@
 // clang-format on
 
 #include "absl/synchronization/mutex.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/cc/semaphore.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 namespace iree {
