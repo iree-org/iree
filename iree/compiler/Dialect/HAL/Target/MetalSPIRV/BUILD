@@ -18,6 +18,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(NOT "${IREE_TARGET_BACKEND_METAL-SPIRV}")
+  return()
+endif()
+""",
+)
+
 cc_library(
     name = "MetalSPIRV",
     srcs = ["MetalSPIRVTarget.cpp"],
