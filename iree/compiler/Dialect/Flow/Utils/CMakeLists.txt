@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Utils
+    "Utils"
   HDRS
     "DispatchUtils.h"
     "WorkloadUtils.h"
@@ -24,13 +24,13 @@ iree_cc_library(
     "DispatchUtils.cpp"
     "WorkloadUtils.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRLinalg
-    MLIRStandard
-    MLIRSupport
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRLinalg"
+    "MLIRStandard"
+    "MLIRSupport"
+    "iree::compiler::Dialect::Flow::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

@@ -16,13 +16,13 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    init_conversions
+    "init_conversions"
   HDRS
     "init_conversions.h"
   DEPS
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Conversion::LinalgToVector
+    "iree::compiler::Conversion::HLOToLinalg"
+    "iree::compiler::Conversion::LinalgToLLVM"
+    "iree::compiler::Conversion::LinalgToSPIRV"
+    "iree::compiler::Conversion::LinalgToVector"
   PUBLIC
 )

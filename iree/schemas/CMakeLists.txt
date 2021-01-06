@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 flatbuffer_c_library(
   NAME
-    bytecode_module_def_c_fbs
+    "bytecode_module_def_c_fbs"
   SRCS
     "bytecode_module_def.fbs"
   FLATCC_ARGS
@@ -29,7 +29,7 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    dylib_executable_def_c_fbs
+    "dylib_executable_def_c_fbs"
   SRCS
     "dylib_executable_def.fbs"
   FLATCC_ARGS
@@ -42,7 +42,7 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    metal_executable_def_c_fbs
+    "metal_executable_def_c_fbs"
   SRCS
     "metal_executable_def.fbs"
   FLATCC_ARGS
@@ -55,7 +55,7 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    spirv_executable_def_c_fbs
+    "spirv_executable_def_c_fbs"
   SRCS
     "spirv_executable_def.fbs"
   FLATCC_ARGS
@@ -68,7 +68,7 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    vmla_executable_def_c_fbs
+    "vmla_executable_def_c_fbs"
   SRCS
     "vmla_executable_def.fbs"
   FLATCC_ARGS

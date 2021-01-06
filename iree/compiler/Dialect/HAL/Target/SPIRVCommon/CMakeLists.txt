@@ -20,24 +20,24 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    SPIRVCommon
+    "SPIRVCommon"
   HDRS
     "SPIRVTarget.h"
   SRCS
     "SPIRVTarget.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRSPIRV
-    MLIRSPIRVConversion
-    MLIRSPIRVSerialization
-    MLIRSupport
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRSPIRV"
+    "MLIRSPIRVConversion"
+    "MLIRSPIRVSerialization"
+    "MLIRSupport"
+    "iree::compiler::Conversion::CodegenUtils"
+    "iree::compiler::Conversion::Common"
+    "iree::compiler::Conversion::LinalgToSPIRV"
+    "iree::compiler::Dialect::Flow::IR"
+    "iree::compiler::Dialect::HAL::Target"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
   PUBLIC
 )

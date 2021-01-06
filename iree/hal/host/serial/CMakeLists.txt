@@ -16,94 +16,94 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    async_command_queue
+    "async_command_queue"
   HDRS
     "async_command_queue.h"
   SRCS
     "async_command_queue.cc"
   DEPS
-    absl::core_headers
-    absl::synchronization
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    iree::hal::host::serial::serial_submission_queue
+    "absl::core_headers"
+    "absl::synchronization"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::host::serial::serial_submission_queue"
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    async_command_queue_test
+    "async_command_queue_test"
   SRCS
     "async_command_queue_test.cc"
   DEPS
-    ::async_command_queue
-    absl::memory
-    iree::base::status
-    iree::base::time
-    iree::hal
-    iree::hal::host::serial::serial_submission_queue
-    iree::hal::testing::mock_command_buffer
-    iree::hal::testing::mock_command_queue
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::async_command_queue"
+    "absl::memory"
+    "iree::base::status"
+    "iree::base::time"
+    "iree::hal"
+    "iree::hal::host::serial::serial_submission_queue"
+    "iree::hal::testing::mock_command_buffer"
+    "iree::hal::testing::mock_command_queue"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_library(
   NAME
-    serial_command_processor
+    "serial_command_processor"
   HDRS
     "serial_command_processor.h"
   SRCS
     "serial_command_processor.cc"
   DEPS
-    absl::inlined_vector
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    iree::hal::host::host_descriptor_set
-    iree::hal::host::host_executable
-    iree::hal::host::host_executable_layout
+    "absl::inlined_vector"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::host::host_descriptor_set"
+    "iree::hal::host::host_executable"
+    "iree::hal::host::host_executable_layout"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    serial_scheduling_model
+    "serial_scheduling_model"
   HDRS
     "serial_scheduling_model.h"
   SRCS
     "serial_scheduling_model.cc"
   DEPS
-    ::async_command_queue
-    ::serial_command_processor
-    ::serial_submission_queue
-    absl::inlined_vector
-    iree::base::core_headers
-    iree::base::status
-    iree::base::tracing
-    iree::hal::host::condvar_semaphore
-    iree::hal::host::inproc_command_buffer
-    iree::hal::host::nop_event
-    iree::hal::host::scheduling_model
+    "::async_command_queue"
+    "::serial_command_processor"
+    "::serial_submission_queue"
+    "absl::inlined_vector"
+    "iree::base::core_headers"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal::host::condvar_semaphore"
+    "iree::hal::host::inproc_command_buffer"
+    "iree::hal::host::nop_event"
+    "iree::hal::host::scheduling_model"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    serial_submission_queue
+    "serial_submission_queue"
   HDRS
     "serial_submission_queue.h"
   SRCS
     "serial_submission_queue.cc"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::synchronization
-    iree::base::intrusive_list
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    iree::hal::host::condvar_semaphore
+    "absl::core_headers"
+    "absl::inlined_vector"
+    "absl::synchronization"
+    "iree::base::intrusive_list"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::host::condvar_semaphore"
   PUBLIC
 )

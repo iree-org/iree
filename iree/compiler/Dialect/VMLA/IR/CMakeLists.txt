@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    IR
+    "IR"
   HDRS
     "VMLAEnums.h.inc"
     "VMLAOpInterface.h.inc"
@@ -33,43 +33,43 @@ iree_cc_library(
     "VMLAOps.cpp"
     "VMLATypes.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRSideEffectInterfaces
-    MLIRStandard
-    MLIRSupport
-    MLIRTransformUtils
-    MLIRTranslation
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VM::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRSideEffectInterfaces"
+    "MLIRStandard"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "MLIRTranslation"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "iree::compiler::Dialect::VM::IR"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    VMLADialect
+    "VMLADialect"
   HDRS
     "VMLADialect.h"
   SRCS
     "VMLADialect.cpp"
   DEPS
-    ::IR
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRStandard
-    MLIRSupport
-    MLIRTransformUtils
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
-    iree::compiler::Dialect::VMLA::vmla_imports
+    "::IR"
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRStandard"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "iree::compiler::Dialect::VM::Conversion"
+    "iree::compiler::Dialect::VMLA::Conversion::VMLAToVM"
+    "iree::compiler::Dialect::VMLA::vmla_imports"
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    VMLAEnumsGen
+    "VMLAEnumsGen"
   TD_FILE
     "VMLABase.td"
   OUTS
@@ -79,7 +79,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMLAOpsGen
+    "VMLAOpsGen"
   TD_FILE
     "VMLAOps.td"
   OUTS
@@ -89,7 +89,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMLAOpInterfaceGen
+    "VMLAOpInterfaceGen"
   TD_FILE
     "VMLABase.td"
   OUTS
@@ -99,7 +99,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    VMLADialecDocGen
+    "VMLADialecDocGen"
   TD_FILE
     "VMLAOps.td"
   OUTS

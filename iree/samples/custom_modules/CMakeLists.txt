@@ -20,13 +20,13 @@ iree_add_all_subdirs()
 
 iree_bytecode_module(
   NAME
-    custom_modules_test_module
+    "custom_modules_test_module"
   SRC
     "custom_modules_test.mlir"
   CC_NAMESPACE
     "iree::samples::custom_modules"
   TRANSLATE_TOOL
-    iree_samples_custom_modules_dialect_custom-translate
+    "iree_samples_custom_modules_dialect_custom-translate"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
@@ -34,38 +34,38 @@ iree_bytecode_module(
 
 iree_cc_test(
   NAME
-    custom_modules_test
+    "custom_modules_test"
   SRCS
     "custom_modules_test.cc"
   DEPS
-    ::custom_modules_test_module_cc
-    ::native_module
-    absl::core_headers
-    absl::strings
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::hal::vmla::registration
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::cc
+    "::custom_modules_test_module_cc"
+    "::native_module"
+    "absl::core_headers"
+    "absl::strings"
+    "iree::base::api"
+    "iree::base::logging"
+    "iree::hal::api"
+    "iree::hal::vmla::registration"
+    "iree::modules::hal"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
+    "iree::vm"
+    "iree::vm::bytecode_module"
+    "iree::vm::cc"
 )
 
 iree_cc_library(
   NAME
-    native_module
+    "native_module"
   HDRS
     "native_module.h"
   SRCS
     "native_module.cc"
   DEPS
-    iree::base::api
-    iree::hal::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::cc
+    "iree::base::api"
+    "iree::hal::api"
+    "iree::modules::hal"
+    "iree::vm"
+    "iree::vm::cc"
   PUBLIC
 )

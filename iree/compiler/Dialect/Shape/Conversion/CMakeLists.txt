@@ -16,28 +16,28 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    ConvertShapeToShapex
+    "ConvertShapeToShapex"
   SRCS
     "ConvertShapeToShapex.cpp"
   DEPS
-    MLIRDialect
-    MLIRIR
-    MLIRPass
-    MLIRShape
-    MLIRStandard
-    MLIRTensor
-    MLIRTransforms
-    iree::compiler::Dialect::Shape::IR
+    "MLIRDialect"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRShape"
+    "MLIRStandard"
+    "MLIRTensor"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::Shape::IR"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    Conversion
+    "Conversion"
   HDRS
     "Passes.h"
   DEPS
-    ::ConvertShapeToShapex
-    MLIRPass
+    "::ConvertShapeToShapex"
+    "MLIRPass"
   PUBLIC
 )

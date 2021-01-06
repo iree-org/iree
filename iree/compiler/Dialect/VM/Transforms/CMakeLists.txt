@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Transforms
+    "Transforms"
   HDRS
     "Passes.h"
   SRCS
@@ -28,19 +28,19 @@ iree_cc_library(
     "Passes.cpp"
     "SinkDefiningOps.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSideEffectInterfaces
-    MLIRSupport
-    MLIRTransformUtils
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::IREEToVM
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRSideEffectInterfaces"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "iree::compiler::Dialect::VM::Conversion"
+    "iree::compiler::Dialect::VM::Conversion::IREEToVM"
+    "iree::compiler::Dialect::VM::Conversion::StandardToVM"
+    "iree::compiler::Dialect::VM::IR"
   PUBLIC
 )

@@ -16,19 +16,19 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    HLOToFlow
+    "HLOToFlow"
   HDRS
     "ConvertHLOToFlow.h"
   SRCS
     "ConvertHLOToFlow.cpp"
   DEPS
-    MLIRIR
-    MLIRPass
-    MLIRStandard
-    MLIRTensor
-    MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRStandard"
+    "MLIRTensor"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::Flow::IR"
+    "iree::compiler::Dialect::IREE::IR"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

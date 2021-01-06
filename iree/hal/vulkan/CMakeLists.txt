@@ -20,23 +20,23 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
+    "api"
   HDRS
     "api.h"
   SRCS
     "api.cc"
   DEPS
-    ::utils
-    ::vulkan
-    iree::base::api
-    iree::base::tracing
-    iree::hal::api
+    "::utils"
+    "::vulkan"
+    "iree::base::api"
+    "iree::base::tracing"
+    "iree::hal::api"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    utils
+    "utils"
   HDRS
     "debug_reporter.h"
     "dynamic_symbol_tables.h"
@@ -55,41 +55,41 @@ iree_cc_library(
     "status_util.cc"
     "timepoint_util.cc"
   DEPS
-    Vulkan::Headers
-    absl::core_headers
-    absl::memory
-    absl::span
-    absl::strings
-    absl::synchronization
-    iree::base::core_headers
-    iree::base::dynamic_library
-    iree::base::intrusive_list
-    iree::base::logging
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-    iree::hal
-    renderdoc_api::renderdoc_app
+    "Vulkan::Headers"
+    "absl::core_headers"
+    "absl::memory"
+    "absl::span"
+    "absl::strings"
+    "absl::synchronization"
+    "iree::base::core_headers"
+    "iree::base::dynamic_library"
+    "iree::base::intrusive_list"
+    "iree::base::logging"
+    "iree::base::ref_ptr"
+    "iree::base::status"
+    "iree::base::time"
+    "iree::base::tracing"
+    "iree::hal"
+    "renderdoc_api::renderdoc_app"
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    dynamic_symbols_test
+    "dynamic_symbols_test"
   SRCS
     "dynamic_symbols_test.cc"
   DEPS
-    ::utils
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::utils"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
   LABELS
     "driver=vulkan"
 )
 
 iree_cc_library(
   NAME
-    vma_allocator
+    "vma_allocator"
   HDRS
     "vma_allocator.h"
     "vma_buffer.h"
@@ -99,22 +99,22 @@ iree_cc_library(
     "vma_allocator.cc"
     "vma_buffer.cc"
   DEPS
-    ::utils
-    absl::flat_hash_map
-    absl::memory
-    absl::synchronization
-    iree::base::core_headers
-    iree::base::logging
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    vulkan_memory_allocator
+    "::utils"
+    "absl::flat_hash_map"
+    "absl::memory"
+    "absl::synchronization"
+    "iree::base::core_headers"
+    "iree::base::logging"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal"
+    "vulkan_memory_allocator"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    vulkan
+    "vulkan"
   HDRS
     "descriptor_pool_cache.h"
     "descriptor_set_arena.h"
@@ -146,25 +146,25 @@ iree_cc_library(
     "vulkan_device.cc"
     "vulkan_driver.cc"
   DEPS
-    ::utils
-    ::vma_allocator
-    absl::core_headers
-    absl::inlined_vector
-    absl::memory
-    absl::span
-    absl::strings
-    absl::synchronization
-    iree::base::api
-    iree::base::arena
-    iree::base::core_headers
-    iree::base::flatcc
-    iree::base::intrusive_list
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-    iree::hal
-    iree::hal::command_buffer_validation
-    iree::schemas::spirv_executable_def_c_fbs
+    "::utils"
+    "::vma_allocator"
+    "absl::core_headers"
+    "absl::inlined_vector"
+    "absl::memory"
+    "absl::span"
+    "absl::strings"
+    "absl::synchronization"
+    "iree::base::api"
+    "iree::base::arena"
+    "iree::base::core_headers"
+    "iree::base::flatcc"
+    "iree::base::intrusive_list"
+    "iree::base::ref_ptr"
+    "iree::base::status"
+    "iree::base::time"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::command_buffer_validation"
+    "iree::schemas::spirv_executable_def_c_fbs"
   PUBLIC
 )

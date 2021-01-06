@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    IR
+    "IR"
   HDRS
     "SequenceDialect.h"
     "SequenceEnums.h.inc"
@@ -33,17 +33,17 @@ iree_cc_library(
     "SequenceOps.cpp.inc"
     "SequenceTypes.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRSupport
-    iree::compiler::Dialect::IREE::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRSupport"
+    "iree::compiler::Dialect::IREE::IR"
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    SequenceEnumsGen
+    "SequenceEnumsGen"
   TD_FILE
     "SequenceBase.td"
   OUTS
@@ -53,7 +53,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    SequenceOpInterfaceGen
+    "SequenceOpInterfaceGen"
   TD_FILE
     "SequenceBase.td"
   OUTS
@@ -63,7 +63,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    SequenceOpsGen
+    "SequenceOpsGen"
   TD_FILE
     "SequenceOps.td"
   OUTS
@@ -73,7 +73,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    SequenceDialectDocGen
+    "SequenceDialectDocGen"
   TD_FILE
     "SequenceOps.td"
   OUTS

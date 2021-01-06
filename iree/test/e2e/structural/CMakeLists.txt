@@ -17,37 +17,37 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
-    check_vmla_vmla
+    "check_vmla_vmla"
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vmla
+    "vmla"
   DRIVER
-    vmla
+    "vmla"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
+    "check_vulkan-spirv_vulkan"
   SRCS
     "gather_add.mlir"
     "matmul_add.mlir"
     "slice_add.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib-llvm-aot_dylib
+    "check_dylib-llvm-aot_dylib"
   SRCS
     "gather_add.mlir"
     "matmul_add.mlir"
     "slice_add.mlir"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
 )

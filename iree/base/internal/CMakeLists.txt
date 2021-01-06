@@ -16,56 +16,56 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    file_handle_win32
+    "file_handle_win32"
   HDRS
     "file_handle_win32.h"
   SRCS
     "file_handle_win32.cc"
   DEPS
-    absl::memory
-    absl::strings
-    iree::base::core_headers
-    iree::base::status
+    "absl::memory"
+    "absl::strings"
+    "iree::base::core_headers"
+    "iree::base::status"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    file_io_internal
+    "file_io_internal"
   SRCS
     "file_io_posix.cc"
     "file_io_win32.cc"
   DEPS
-    ::file_handle_win32
-    absl::memory
-    absl::strings
-    iree::base::core_headers
-    iree::base::file_io_hdrs
-    iree::base::file_path
-    iree::base::status
-    iree::base::tracing
+    "::file_handle_win32"
+    "absl::memory"
+    "absl::strings"
+    "iree::base::core_headers"
+    "iree::base::file_io_hdrs"
+    "iree::base::file_path"
+    "iree::base::status"
+    "iree::base::tracing"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    file_mapping_internal
+    "file_mapping_internal"
   SRCS
     "file_mapping_posix.cc"
     "file_mapping_win32.cc"
   DEPS
-    ::file_handle_win32
-    absl::memory
-    absl::strings
-    iree::base::core_headers
-    iree::base::file_mapping_hdrs
-    iree::base::tracing
+    "::file_handle_win32"
+    "absl::memory"
+    "absl::strings"
+    "iree::base::core_headers"
+    "iree::base::file_mapping_hdrs"
+    "iree::base::tracing"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    ostringstream
+    "ostringstream"
   HDRS
     "ostringstream.h"
   SRCS
@@ -75,7 +75,7 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    status_internal
+    "status_internal"
   HDRS
     "status.h"
     "status_builder.h"
@@ -85,12 +85,12 @@ iree_cc_library(
     "status_builder.cc"
     "statusor.cc"
   DEPS
-    ::ostringstream
-    absl::core_headers
-    absl::strings
-    absl::utility
-    iree::base::api
-    iree::base::core_headers
-    iree::base::logging
+    "::ostringstream"
+    "absl::core_headers"
+    "absl::strings"
+    "absl::utility"
+    "iree::base::api"
+    "iree::base::core_headers"
+    "iree::base::logging"
   PUBLIC
 )

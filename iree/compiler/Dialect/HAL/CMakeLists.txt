@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_embed_data(
   NAME
-    hal_imports
+    "hal_imports"
   SRCS
     "hal.imports.mlir"
   CC_FILE_OUTPUT

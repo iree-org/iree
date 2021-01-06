@@ -20,7 +20,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    dylib
+    "dylib"
   HDRS
     "dylib_device.h"
     "dylib_driver.h"
@@ -32,18 +32,18 @@ iree_cc_library(
     "dylib_executable.cc"
     "dylib_executable_cache.cc"
   DEPS
-    absl::inlined_vector
-    absl::span
-    iree::base::dynamic_library
-    iree::base::file_io
-    iree::base::file_path
-    iree::base::flatcc
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    iree::hal::host::host_executable
-    iree::hal::host::host_local_device
-    iree::hal::host::serial::serial_scheduling_model
-    iree::schemas::dylib_executable_def_c_fbs
+    "absl::inlined_vector"
+    "absl::span"
+    "iree::base::dynamic_library"
+    "iree::base::file_io"
+    "iree::base::file_path"
+    "iree::base::flatcc"
+    "iree::base::status"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::host::host_executable"
+    "iree::hal::host::host_local_device"
+    "iree::hal::host::serial::serial_scheduling_model"
+    "iree::schemas::dylib_executable_def_c_fbs"
   PUBLIC
 )

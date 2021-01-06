@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_embed_data(
   NAME
-    tensorlist_imports
+    "tensorlist_imports"
   SRCS
     "tensorlist.imports.mlir"
   CC_FILE_OUTPUT

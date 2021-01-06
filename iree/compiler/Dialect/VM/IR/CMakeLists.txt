@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    IR
+    "IR"
   HDRS
     "VMDialect.h"
     "VMEnums.h.inc"
@@ -37,21 +37,21 @@ iree_cc_library(
     "VMOps.cpp.inc"
     "VMTypes.cpp"
   DEPS
-    LLVMSupport
-    MLIRControlFlowInterfaces
-    MLIRIR
-    MLIRParser
-    MLIRSideEffectInterfaces
-    MLIRStandard
-    MLIRSupport
-    MLIRTransformUtils
-    iree::compiler::Dialect::IREE::IR
+    "LLVMSupport"
+    "MLIRControlFlowInterfaces"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRSideEffectInterfaces"
+    "MLIRStandard"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "iree::compiler::Dialect::IREE::IR"
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    VMEnumsGen
+    "VMEnumsGen"
   TD_FILE
     "VMBase.td"
   OUTS
@@ -61,7 +61,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMOpsGen
+    "VMOpsGen"
   TD_FILE
     "VMOps.td"
   OUTS
@@ -71,7 +71,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMOpEncoderGen
+    "VMOpEncoderGen"
   TD_FILE
     "VMOps.td"
   OUTS
@@ -82,7 +82,7 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMOpInterfaceGen
+    "VMOpInterfaceGen"
   TD_FILE
     "VMBase.td"
   OUTS
@@ -92,7 +92,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    VMDialectDocGen
+    "VMDialectDocGen"
   TD_FILE
     "VMOps.td"
   OUTS

@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    CodegenUtils
+    "CodegenUtils"
   HDRS
     "ForOpCanonicalization.h"
     "FunctionUtils.h"
@@ -30,22 +30,22 @@ iree_cc_library(
     "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
   DEPS
-    LLVMSupport
-    MLIRAffine
-    MLIRAnalysis
-    MLIRIR
-    MLIRLinalg
-    MLIRLinalgTransforms
-    MLIRPass
-    MLIRSCF
-    MLIRStandard
-    MLIRSupport
-    MLIRTransforms
-    MLIRVector
-    MLIRVectorToSCF
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::Shape::IR
+    "LLVMSupport"
+    "MLIRAffine"
+    "MLIRAnalysis"
+    "MLIRIR"
+    "MLIRLinalg"
+    "MLIRLinalgTransforms"
+    "MLIRPass"
+    "MLIRSCF"
+    "MLIRStandard"
+    "MLIRSupport"
+    "MLIRTransforms"
+    "MLIRVector"
+    "MLIRVectorToSCF"
+    "iree::compiler::Dialect::HAL::IR"
+    "iree::compiler::Dialect::HAL::IR::HALDialect"
+    "iree::compiler::Dialect::HAL::Utils"
+    "iree::compiler::Dialect::Shape::IR"
   PUBLIC
 )

@@ -16,16 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Utils
+    "Utils"
   HDRS
     "TargetEnvUtils.h"
   SRCS
     "TargetEnvUtils.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRSPIRV
-    MLIRSupport
-    iree::compiler::Dialect::Vulkan::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRSPIRV"
+    "MLIRSupport"
+    "iree::compiler::Dialect::Vulkan::IR"
   PUBLIC
 )

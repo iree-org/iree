@@ -16,15 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Conversion
+    "Conversion"
   HDRS
     "TypeConverter.h"
   SRCS
     "TypeConverter.cpp"
   DEPS
-    MLIRIR
-    MLIRParser
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::IREE::IR"
   PUBLIC
 )

@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    IR
+    "IR"
   HDRS
     "CheckOps.h"
     "CheckOps.h.inc"
@@ -25,34 +25,34 @@ iree_cc_library(
     "CheckOps.cpp"
     "CheckOps.cpp.inc"
   DEPS
-    MLIRIR
-    MLIRStandard
-    iree::compiler::Dialect::HAL::IR
+    "MLIRIR"
+    "MLIRStandard"
+    "iree::compiler::Dialect::HAL::IR"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    CheckDialect
+    "CheckDialect"
   HDRS
     "CheckDialect.h"
   SRCS
     "CheckDialect.cpp"
   DEPS
-    ::IR
-    MLIRIR
-    MLIRParser
-    MLIRTransforms
-    iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::Modules::Check::Conversion
-    iree::compiler::Dialect::Modules::Check::check_imports
-    iree::compiler::Dialect::VM::Conversion
+    "::IR"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::HAL::Conversion"
+    "iree::compiler::Dialect::Modules::Check::Conversion"
+    "iree::compiler::Dialect::Modules::Check::check_imports"
+    "iree::compiler::Dialect::VM::Conversion"
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    check_ops_gen
+    "check_ops_gen"
   TD_FILE
     "CheckOps.td"
   OUTS
@@ -62,7 +62,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    CheckDialectDocGen
+    "CheckDialectDocGen"
   TD_FILE
     "CheckOps.td"
   OUTS

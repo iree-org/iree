@@ -16,21 +16,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    hal
+    "hal"
   HDRS
     "hal_module.h"
   SRCS
     "hal_module.cc"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::memory
-    absl::span
-    iree::base::api
-    iree::base::tracing
-    iree::hal
-    iree::hal::api
-    iree::vm
-    iree::vm::cc
+    "absl::core_headers"
+    "absl::inlined_vector"
+    "absl::memory"
+    "absl::span"
+    "iree::base::api"
+    "iree::base::tracing"
+    "iree::hal"
+    "iree::hal::api"
+    "iree::vm"
+    "iree::vm::cc"
   PUBLIC
 )

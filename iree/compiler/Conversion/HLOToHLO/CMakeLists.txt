@@ -16,20 +16,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    HLOToHLO
+    "HLOToHLO"
   HDRS
     "Passes.h"
   SRCS
     "DecomposeHLOClamp.cpp"
     "DemoteF32ToF16.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransformUtils
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "iree::compiler::Dialect::Flow::IR"
+    "iree::compiler::Dialect::IREE::IR"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

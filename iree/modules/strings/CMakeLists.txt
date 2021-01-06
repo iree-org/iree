@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    strings_module
+    "strings_module"
   HDRS
     "api.h"
     "api_detail.h"
@@ -25,16 +25,16 @@ iree_cc_library(
     "api.cc"
     "strings_module.cc"
   DEPS
-    absl::inlined_vector
-    absl::span
-    absl::strings
-    benchmark
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::cc
+    "absl::inlined_vector"
+    "absl::span"
+    "absl::strings"
+    "benchmark"
+    "iree::base::api"
+    "iree::base::logging"
+    "iree::hal::api"
+    "iree::modules::hal"
+    "iree::vm"
+    "iree::vm::cc"
   PUBLIC
 )
 
@@ -44,30 +44,30 @@ endif()
 
 iree_cc_test(
   NAME
-    strings_module_test
+    "strings_module_test"
   SRCS
     "strings_module_test.cc"
   DEPS
-    ::strings_module
-    ::strings_module_test_module_cc
-    absl::inlined_vector
-    absl::strings
-    benchmark
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::hal::vmla::registration
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::cc
+    "::strings_module"
+    "::strings_module_test_module_cc"
+    "absl::inlined_vector"
+    "absl::strings"
+    "benchmark"
+    "iree::base::api"
+    "iree::base::logging"
+    "iree::hal::api"
+    "iree::hal::vmla::registration"
+    "iree::modules::hal"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
+    "iree::vm"
+    "iree::vm::bytecode_module"
+    "iree::vm::cc"
 )
 
 iree_bytecode_module(
   NAME
-    strings_module_test_module
+    "strings_module_test_module"
   SRC
     "strings_module_test.mlir"
   CC_NAMESPACE

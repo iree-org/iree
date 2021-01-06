@@ -16,19 +16,19 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    CodeGenOptionUtils
+    "CodeGenOptionUtils"
   HDRS
     "CodeGenOptionUtils.h"
   SRCS
     "CodeGenOptionUtils.cpp"
   DEPS
-    LLVMSupport
+    "LLVMSupport"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    LinalgToSPIRV
+    "LinalgToSPIRV"
   HDRS
     "CooperativeMatrixAnalysis.h"
     "KernelDispatchUtils.h"
@@ -49,39 +49,39 @@ iree_cc_library(
     "VectorToGPUPass.cpp"
     "VectorizeMemref.cpp"
   DEPS
-    ::CodeGenOptionUtils
-    LLVMSupport
-    MLIRAffine
-    MLIRAffineToStandard
-    MLIRAnalysis
-    MLIRGPU
-    MLIRGPUToSPIRV
-    MLIRIR
-    MLIRLinalg
-    MLIRLinalgTransforms
-    MLIRPass
-    MLIRSCF
-    MLIRSCFToGPU
-    MLIRSCFToSPIRV
-    MLIRSPIRV
-    MLIRSPIRVConversion
-    MLIRSPIRVTransforms
-    MLIRSideEffectInterfaces
-    MLIRStandard
-    MLIRStandardToSPIRV
-    MLIRSupport
-    MLIRTransforms
-    MLIRVector
-    MLIRVectorToSPIRV
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToVector
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    tensorflow::mlir_hlo
+    "::CodeGenOptionUtils"
+    "LLVMSupport"
+    "MLIRAffine"
+    "MLIRAffineToStandard"
+    "MLIRAnalysis"
+    "MLIRGPU"
+    "MLIRGPUToSPIRV"
+    "MLIRIR"
+    "MLIRLinalg"
+    "MLIRLinalgTransforms"
+    "MLIRPass"
+    "MLIRSCF"
+    "MLIRSCFToGPU"
+    "MLIRSCFToSPIRV"
+    "MLIRSPIRV"
+    "MLIRSPIRVConversion"
+    "MLIRSPIRVTransforms"
+    "MLIRSideEffectInterfaces"
+    "MLIRStandard"
+    "MLIRStandardToSPIRV"
+    "MLIRSupport"
+    "MLIRTransforms"
+    "MLIRVector"
+    "MLIRVectorToSPIRV"
+    "iree::compiler::Conversion::CodegenUtils"
+    "iree::compiler::Conversion::Common"
+    "iree::compiler::Conversion::HLOToHLO"
+    "iree::compiler::Conversion::HLOToLinalg"
+    "iree::compiler::Conversion::LinalgToVector"
+    "iree::compiler::Dialect::HAL::IR"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "iree::compiler::Dialect::Shape::Transforms"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

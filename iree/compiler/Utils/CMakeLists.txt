@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Utils
+    "Utils"
   HDRS
     "FlatbufferUtils.h"
     "GraphUtils.h"
@@ -25,15 +25,15 @@ iree_cc_library(
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandard
-    MLIRSupport
-    MLIRTransformUtils
-    MLIRTransforms
-    iree::base::flatcc
-    iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRStandard"
+    "MLIRSupport"
+    "MLIRTransformUtils"
+    "MLIRTransforms"
+    "iree::base::flatcc"
+    "iree::compiler::Dialect::IREE::IR"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

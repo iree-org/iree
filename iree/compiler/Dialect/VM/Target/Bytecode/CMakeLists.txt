@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Bytecode
+    "Bytecode"
   HDRS
     "BytecodeModuleTarget.h"
     "TranslationFlags.h"
@@ -29,18 +29,18 @@ iree_cc_library(
     "TranslationFlags.cpp"
     "TranslationRegistration.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
-    MLIRTranslation
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::VM::Analysis
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Transforms
-    iree::compiler::Utils
-    iree::schemas::bytecode_module_def_c_fbs
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRSupport"
+    "MLIRTransforms"
+    "MLIRTranslation"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::IREE::Transforms"
+    "iree::compiler::Dialect::VM::Analysis"
+    "iree::compiler::Dialect::VM::IR"
+    "iree::compiler::Dialect::VM::Transforms"
+    "iree::compiler::Utils"
+    "iree::schemas::bytecode_module_def_c_fbs"
   PUBLIC
 )

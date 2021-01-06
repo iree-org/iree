@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    task
+    "task"
   HDRS
     "affinity_set.h"
     "executor.h"
@@ -44,91 +44,91 @@ iree_cc_library(
     "worker.c"
     "worker.h"
   DEPS
-    cpuinfo
-    iree::base::api
-    iree::base::atomic_slist
-    iree::base::core_headers
-    iree::base::synchronization
-    iree::base::threading
-    iree::base::tracing
-    iree::base::wait_handle
+    "cpuinfo"
+    "iree::base::api"
+    "iree::base::atomic_slist"
+    "iree::base::core_headers"
+    "iree::base::synchronization"
+    "iree::base::threading"
+    "iree::base::tracing"
+    "iree::base::wait_handle"
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    executor_test
+    "executor_test"
   SRCS
     "executor_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::base::core_headers
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::base::core_headers"
+    "iree::task::testing::test_util"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    list_test
+    "list_test"
   SRCS
     "list_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::task::testing::test_util"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    pool_test
+    "pool_test"
   SRCS
     "pool_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::task::testing::test_util"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    queue_test
+    "queue_test"
   SRCS
     "queue_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::task::testing::test_util"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    scope_test
+    "scope_test"
   SRCS
     "scope_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::task::testing::test_util"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    topology_test
+    "topology_test"
   SRCS
     "topology_test.cc"
   DEPS
-    ::task
-    iree::base::api
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::task"
+    "iree::base::api"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )

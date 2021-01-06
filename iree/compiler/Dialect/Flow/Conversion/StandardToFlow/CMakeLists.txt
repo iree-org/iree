@@ -16,18 +16,18 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    StandardToFlow
+    "StandardToFlow"
   HDRS
     "ConvertStandardToFlow.h"
   SRCS
     "ConvertStandardToFlow.cpp"
   DEPS
-    MLIRIR
-    MLIRPass
-    MLIRStandard
-    MLIRTensor
-    MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRStandard"
+    "MLIRTensor"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::Flow::IR"
+    "iree::compiler::Dialect::IREE::IR"
   PUBLIC
 )

@@ -19,53 +19,53 @@ file(GLOB _GLOB_GEMM_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE
 list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_GEMM_MLIR})
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
+    "check_vulkan-spirv_vulkan"
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan_wgmem
+    "check_vulkan-spirv_vulkan_wgmem"
   SRCS
     "conv.mlir"
     "gemm.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-use-workgroup-memory"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan_vector
+    "check_vulkan-spirv_vulkan_vector"
   SRCS
     "compare.mlir"
     "log_plus_one.mlir"
     "pw_add_multiwg.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-enable-memref-vectorization"
 )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan_vectorized_conv
+    "check_vulkan-spirv_vulkan_vectorized_conv"
   SRCS
     "vectorized_conv.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-enable-vectorization"
     "-iree-vulkan-target-triple=valhall-g77-unknown-android10"

@@ -16,93 +16,93 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    cts_test_base
+    "cts_test_base"
   HDRS
     "cts_test_base.h"
   DATA
-    iree::tools::sanitizer_suppressions.txt
+    "iree::tools::sanitizer_suppressions.txt"
   DEPS
-    iree::base::status
-    iree::hal
-    iree::hal::api
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
+    "iree::base::status"
+    "iree::hal"
+    "iree::hal::api"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
   TESTONLY
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    allocator_test
+    "allocator_test"
   SRCS
     "allocator_test.cc"
   DEPS
-    ::cts_test_base
-    iree::base::status
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::base::status"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    buffer_test
+    "buffer_test"
   SRCS
     "buffer_test.cc"
   DEPS
-    ::cts_test_base
-    iree::base::status
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::base::status"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    command_buffer_test
+    "command_buffer_test"
   SRCS
     "command_buffer_test.cc"
   DEPS
-    ::cts_test_base
-    iree::base::status
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::base::status"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    command_queue_test
+    "command_queue_test"
   SRCS
     "command_queue_test.cc"
   DEPS
-    ::cts_test_base
-    iree::base::status
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::base::status"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    driver_test
+    "driver_test"
   SRCS
     "driver_test.cc"
   DEPS
-    ::cts_test_base
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )
 
 iree_cc_test(
   NAME
-    semaphore_test
+    "semaphore_test"
   SRCS
     "semaphore_test.cc"
   DEPS
-    ::cts_test_base
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
+    "::cts_test_base"
+    "iree::hal::testing::driver_registry"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
 )

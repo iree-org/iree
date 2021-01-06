@@ -17,7 +17,7 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    IR
+    "IR"
   HDRS
     "Ops.h"
     "Ops.h.inc"
@@ -26,45 +26,45 @@ iree_cc_library(
     "Ops.cc"
     "Ops.cc.inc"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRPass
-    MLIRSideEffectInterfaces
-    MLIRSupport
-    MLIRTransforms
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRPass"
+    "MLIRSideEffectInterfaces"
+    "MLIRSupport"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::HAL::IR"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::VM::Conversion"
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    Dialect
+    "Dialect"
   HDRS
     "Dialect.h"
   SRCS
     "Dialect.cc"
   DEPS
-    ::IR
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
-    iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Modules::Strings::Conversion
-    iree::compiler::Dialect::Modules::Strings::strings_imports
-    iree::compiler::Dialect::VM::Conversion
+    "::IR"
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRPass"
+    "MLIRSupport"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::HAL::Conversion"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Modules::Strings::Conversion"
+    "iree::compiler::Dialect::Modules::Strings::strings_imports"
+    "iree::compiler::Dialect::VM::Conversion"
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    Ops_gen
+    "Ops_gen"
   TD_FILE
     "Ops.td"
   OUTS
@@ -74,7 +74,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    DialectDocGen
+    "DialectDocGen"
   TD_FILE
     "Ops.td"
   OUTS

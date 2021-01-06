@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    HLOToVMLA
+    "HLOToVMLA"
   HDRS
     "ConvertHLOToVMLA.h"
   SRCS
@@ -24,16 +24,16 @@ iree_cc_library(
     "ConvertHLOToVMLA.cpp"
     "ConvertReductionOps.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandard
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_hlo
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRPass"
+    "MLIRStandard"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "iree::compiler::Dialect::VMLA::Conversion"
+    "iree::compiler::Dialect::VMLA::IR"
+    "iree::compiler::Dialect::VMLA::IR::VMLADialect"
+    "tensorflow::mlir_hlo"
   PUBLIC
 )

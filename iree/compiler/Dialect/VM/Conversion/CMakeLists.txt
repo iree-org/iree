@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Conversion
+    "Conversion"
   HDRS
     "ConversionDialectInterface.h"
     "ConversionTarget.h"
@@ -29,13 +29,13 @@ iree_cc_library(
     "TargetOptions.cpp"
     "TypeConverter.cpp"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRStandard
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VM::IR
+    "LLVMSupport"
+    "MLIRIR"
+    "MLIRParser"
+    "MLIRStandard"
+    "MLIRTransforms"
+    "iree::compiler::Dialect::IREE::IR"
+    "iree::compiler::Dialect::Shape::IR"
+    "iree::compiler::Dialect::VM::IR"
   PUBLIC
 )

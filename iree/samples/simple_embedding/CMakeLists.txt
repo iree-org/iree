@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_bytecode_module(
   NAME
-    simple_embedding_test_bytecode_module
+    "simple_embedding_test_bytecode_module"
   SRC
     "simple_embedding_test.mlir"
   CC_NAMESPACE
@@ -30,24 +30,24 @@ iree_bytecode_module(
 
 iree_cc_test(
   NAME
-    simple_embedding_test
+    "simple_embedding_test"
   SRCS
     "simple_embedding_test.cc"
   DATA
-    iree::tools::sanitizer_suppressions.txt
+    "iree::tools::sanitizer_suppressions.txt"
   DEPS
-    ::simple_embedding_test_bytecode_module_cc
-    absl::core_headers
-    absl::span
-    absl::strings
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::hal::testing::driver_registry
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::cc
+    "::simple_embedding_test_bytecode_module_cc"
+    "absl::core_headers"
+    "absl::span"
+    "absl::strings"
+    "iree::base::api"
+    "iree::base::logging"
+    "iree::hal::api"
+    "iree::hal::testing::driver_registry"
+    "iree::modules::hal"
+    "iree::testing::gtest"
+    "iree::testing::gtest_main"
+    "iree::vm"
+    "iree::vm::bytecode_module"
+    "iree::vm::cc"
 )
