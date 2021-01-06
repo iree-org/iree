@@ -60,7 +60,7 @@ struct DispatchLinalgOnTensorsPass
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
 
-static Operation *buildFlowWorkgroupDispatchOp(OpBuilder &b,
+static Operation *buildFlowDispatchWorkgroupOp(OpBuilder &b,
                                                linalg::LinalgOp root,
                                                linalg::LinalgOp &clonedRoot) {
   Location loc = root->getLoc();
@@ -127,20 +127,64 @@ struct TileAndDistributeOnTensorsPattern
 
     linalg::LinalgOp clonedLinalgOp;
     Operation *dispatch =
-        buildFlowWorkgroupDispatchOp(rewriter, linalgOp, clonedLinalgOp);
+        buildFlowDispatchWorkgroupOp(rewriter, linalgOp, clonedLinalgOp);
 
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(clonedLinalgOp);
-    SmallVector<Value, 4> tensorResults;
-    if (failed(Base::matchAndRewriteBase(clonedLinalgOp, rewriter,
-                                         tensorResults))) {
-      // Need to erase on failure to avoid infinite loop
-      rewriter.eraseOp(dispatch);
-      return failure();
+    MLIRContext *context = op->getContext();
+    Location loc = op->getLoc();
+    {
+      SmallVector<Value, 4> tensorResults;
+      // Scoped within DispatchWorkgroupOp.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(clonedLinalgOp);
+      if (failed(Base::matchAndRewriteBase(clonedLinalgOp, rewriter,
+                                           tensorResults))) {
+        // Need to erase on failure to avoid infinite loop.
+        rewriter.eraseOp(dispatch);
+        return failure();
+      }
+      rewriter.replaceOp(clonedLinalgOp, tensorResults);
     }
-    rewriter.replaceOp(op, dispatch->getResults());
-    rewriter.replaceOp(clonedLinalgOp, tensorResults);
 
+    // Add tie_shape for all outputs. This provides necessary information for
+    // a subsequent OutlineDispatchRegion2 pass invocation to work properly.
+    // TODO(nicolasvasilache): get rid of this once we have a proper shape +
+    // subshape in core and DispatchWorkgroupOp take output shape parameters.
+    assert(dispatch->getNumResults() == linalgOp.getNumOutputs());
+    SmallVector<Value, 4> shapedResults;
+    for (auto it : llvm::zip(linalgOp.getOutputs(), dispatch->getResults())) {
+      // Insert DimOp and MakeRankedShapeOp just before the dispatch to play
+      // nicely with a (much later) OutlineDispatchRegions2 which requires all
+      // dims and shapes to dominate the dispatch region.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(dispatch);
+
+      assert(std::get<0>(it).getType() == std::get<1>(it).getType());
+      auto rankedTensorType =
+          std::get<0>(it).getType().cast<RankedTensorType>();
+      if (rankedTensorType.hasStaticShape()) {
+        shapedResults.push_back(std::get<1>(it));
+        continue;
+      }
+      auto rank = rankedTensorType.getRank();
+      SmallVector<Value, 4> dims;
+      dims.reserve(rank);
+      for (unsigned d = 0, e = rank; d < e; ++d) {
+        if (rankedTensorType.isDynamicDim(d)) {
+          dims.push_back(rewriter.create<DimOp>(loc, std::get<0>(it), d));
+        }
+      }
+      auto shapeOp = rewriter.create<Shape::MakeRankedShapeOp>(
+          loc,
+          Shape::RankedShapeType::get(rankedTensorType.getShape(), context),
+          dims);
+
+      // The TieShapeOp use the dispatch results.
+      rewriter.setInsertionPointAfter(dispatch);
+      shapedResults.push_back(
+          rewriter.create<Shape::TieShapeOp>(loc, std::get<1>(it), shapeOp));
+    }
+
+    rewriter.replaceOp(op, shapedResults);
     return success();
   }
 };
@@ -153,6 +197,21 @@ static Value buildFlowWorkgroupIdOp(OpBuilder &b, unsigned dim) {
 static Value buildFlowWorkgroupCountOp(OpBuilder &b, unsigned dim) {
   return b.create<IREE::Flow::DispatchWorkgroupCountOp>(
       b.getInsertionPoint()->getLoc(), dim);
+}
+
+// Explcitly list the constant we want to clone inside the dispatch region
+// rather than pass as arguments.
+// TODO(nicolasvasilache): drop this in favor of RematerializeDispatchConstants
+// once it is updated to work with the new dispatch region formation.
+static bool isDispatchClonableConstant(Value v) {
+  Operation *op = v.getDefiningOp();
+  ConstantOp constantOp = dyn_cast_or_null<ConstantOp>(op);
+  if (!constantOp) return false;
+  if (isa<ConstantIndexOp>(op) || isa<ConstantIntOp>(op) ||
+      isa<ConstantFloatOp>(op)) {
+    return true;
+  }
+  return false;
 }
 
 // After outlining in dispatch region we can rewrite the dispatch ops with
@@ -168,7 +227,7 @@ static void setDispatchWorkgroupOperands(
       originalDispatchOperands.begin(), originalDispatchOperands.end());
   SmallVector<Value, 4> newOperands, clones;
   for (Value v : valuesDefinedAbove) {
-    if (v.getDefiningOp<ConstantOp>()) {
+    if (isDispatchClonableConstant(v)) {
       clones.push_back(v);
     } else if (!originalDispatchOperandsSet.contains(v)) {
       newOperands.push_back(v);
@@ -271,23 +330,29 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
-  bool fail = funcOp
-                  .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
-                    if (failed(rewriteLinalgDestructiveUpdates(op))) {
-                      return WalkResult::interrupt();
-                    }
-                    return WalkResult::advance();
-                  })
-                  .wasInterrupted();
-  fail |= funcOp
-              .walk([&](IREE::Flow::DispatchOutputStoreOp op) {
-                if (op.offsets().empty() || op.sizes().empty() ||
-                    op.strides().empty()) {
-                  return WalkResult::interrupt();
-                }
-                return WalkResult::advance();
-              })
-              .wasInterrupted();
+  bool fail =
+      funcOp
+          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
+            if (failed(rewriteLinalgDestructiveUpdates(op))) {
+              funcOp.emitError("Failed to rewrite destructive updates in:\n")
+                  << *op.getOperation();
+              return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+          })
+          .wasInterrupted();
+  fail |=
+      funcOp
+          .walk([&](IREE::Flow::DispatchOutputStoreOp op) {
+            if (op.offsets().empty() || op.sizes().empty() ||
+                op.strides().empty()) {
+              funcOp.emitError("Full-tensor DispatchOutputStoreOp remaining:\n")
+                  << *op.getOperation();
+              return WalkResult::interrupt();
+            }
+            return WalkResult::advance();
+          })
+          .wasInterrupted();
   if (fail) {
     signalPassFailure();
   }
