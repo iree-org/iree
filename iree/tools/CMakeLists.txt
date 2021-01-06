@@ -135,7 +135,7 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-if(${IREE_ENABLE_MLIR})
+if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -151,9 +151,7 @@ if(${IREE_ENABLE_MLIR})
       MLIRTableGen
     HOSTONLY
   )
-endif()
 
-if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
       init_iree_passes_and_dialects
@@ -370,10 +368,19 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
     HOSTONLY
   )
+
+  add_custom_target(IreeFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+  )
+  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
+    add_custom_target(BundledLLVMFileCheck ALL
+      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+      DEPENDS FileCheck
+    )
+  endif()
 endif(${IREE_BUILD_COMPILER})
 
 # If cross-compiling, we need to declare iree-translate under host configuration
-
 # unconditionally because we need to run it on host to generate VM modules
 # for tests.
 if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
@@ -386,16 +393,4 @@ if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
       ::iree_translate_main
     HOSTONLY
   )
-endif()
-
-if(${IREE_ENABLE_MLIR})
-  add_custom_target(IreeFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
-  )
-  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(BundledLLVMFileCheck ALL
-      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-      DEPENDS FileCheck
-    )
-  endif()
 endif()
