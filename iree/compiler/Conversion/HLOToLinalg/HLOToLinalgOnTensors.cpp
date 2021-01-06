@@ -164,8 +164,7 @@ struct ConvertHLOToLinalgOnTensorsPass
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation *op) {
               auto parentOp = op->getParentRegion()->getParentOp();
-              return isa<mhlo::ReduceOp>(parentOp) ||
-                     isa<mhlo::ReduceWindowOp>(parentOp);
+              return isa<mhlo::ReduceWindowOp>(parentOp);
             }));
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
