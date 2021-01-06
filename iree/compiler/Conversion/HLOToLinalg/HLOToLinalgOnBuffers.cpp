@@ -197,6 +197,9 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
     resultBuffers.reserve(op->getNumResults());
     for (auto result : llvm::enumerate(op->getResults())) {
       Value resultBuffer = resultTensorToBufferMap.lookup(result.value());
+      // TODO(hanchung): Remove the buffer allocation once every lowering moves
+      // to tensors world. The current logic only works for linalg::LinalgOp, so
+      // we still need to allocate buffers for some ops, e.g., mhlo.conv, etc.
       if (!resultBuffer) {
         if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
           if (shapedType.hasStaticShape()) {
@@ -1343,7 +1346,31 @@ struct HALInterfaceStoreTensorOpEraser final
 /// property of the buffer. The map `resultTensorToBufferMap` is updated to
 /// associate the tensor value that is stored with the buffer created. So when
 /// that value is seen during lowering the correct result buffer is used.
-///
+static Value createBufferForResultTensor(IREE::HAL::InterfaceStoreTensorOp op,
+                                         OpBuilder &builder) {
+  if (!matchPattern(op.offset(), m_Zero())) {
+    op.emitError("unhandled non-zero offset");
+    return nullptr;
+  }
+
+  // Get the corresponding memref type from the tensor type.
+  Value tensor = op.operand();
+  auto tensorType = tensor.getType().cast<RankedTensorType>();
+  auto bindingOp = op.queryBindingOp();
+  assert(bindingOp);
+  auto bufferType = getTensorBackingBufferType(tensorType, bindingOp.type());
+
+  // Create the placeholder op for the backing buffer. Make sure shape
+  // annotation is carried over if exists.
+  auto phOp = builder.create<IREE::PlaceholderOp>(op.getLoc(), bufferType,
+                                                  "interface buffer");
+  phOp->setAttr(getBindingAttrName(), op.binding());
+  StringRef attrName = getOperandResultNumAttrName();
+  if (Attribute operandResultNumAttr = op->getAttr(attrName))
+    phOp->setAttr(attrName, operandResultNumAttr);
+  return phOp.getResult();
+}
+
 /// There might be a sequence of view-like operations on memref, which dont
 /// modify the buffer, but just the way they are referenced. For example,
 ///
@@ -1366,38 +1393,16 @@ struct HALInterfaceStoreTensorOpEraser final
 /// in reality its semantics is a copy semantics. As long as the operand for the
 /// tensor_reshape operation has a single use (the tensor_reshape) there
 /// distinction can be ignored.
-static LogicalResult createAndPropagateBufferUsedForResultTensor(
-    IREE::HAL::InterfaceStoreTensorOp op, OutputBufferMap &outputBufferMap,
-    TensorToBufferMap &resultTensorToBufferMap, OpBuilder &builder) {
-  if (!matchPattern(op.offset(), m_Zero())) {
-    return op.emitError("unhandled non-zero offset");
-  }
-
-  // Get the corresponding memref type from the tensor type.
-  Value tensor = op.operand();
-  auto tensorType = tensor.getType().cast<RankedTensorType>();
-  auto bindingOp = op.queryBindingOp();
-  assert(bindingOp);
-  auto bufferType = getTensorBackingBufferType(tensorType, bindingOp.type());
-
-  // Create the placeholder op for the backing buffer. Make sure shape
-  // annotation is carried over if exists.
-  auto phOp = builder.create<IREE::PlaceholderOp>(op.getLoc(), bufferType,
-                                                  "interface buffer");
-  phOp->setAttr(getBindingAttrName(), op.binding());
-  StringRef attrName = getOperandResultNumAttrName();
-  if (Attribute operandResultNumAttr = op->getAttr(attrName))
-    phOp->setAttr(attrName, operandResultNumAttr);
-  Value buffer = phOp;
-  outputBufferMap[op] = buffer;
-
+static LogicalResult propagateBufferUsedForResultTensor(
+    Value tensor, Value buffer, TensorToBufferMap &resultTensorToBufferMap,
+    OpBuilder &builder, Location loc) {
   resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
   while (true) {
     if (auto tieShapeOp = tensor.getDefiningOp<Shape::TieShapeOp>()) {
       if (!tieShapeOp.result().hasOneUse()) break;
       builder.setInsertionPointAfter(tieShapeOp.shape().getDefiningOp());
       auto newTieShapeOp = builder.create<Shape::TieShapeOp>(
-          op.getLoc(), buffer.getType(), buffer, tieShapeOp.shape());
+          loc, buffer.getType(), buffer, tieShapeOp.shape());
       tensor = tieShapeOp.operand();
       buffer = newTieShapeOp.result();
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
@@ -1408,8 +1413,8 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
       tensor = tensorReshapeOp.src();
       if (resultTensorToBufferMap.count(tensor)) break;
       auto newReshapeOp = builder.create<linalg::ReshapeOp>(
-          op.getLoc(), getMemrefTypeForTensor(tensorReshapeOp.getSrcType()),
-          buffer, tensorReshapeOp.reassociation());
+          loc, getMemrefTypeForTensor(tensorReshapeOp.getSrcType()), buffer,
+          tensorReshapeOp.reassociation());
       buffer = newReshapeOp.result();
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
@@ -1433,13 +1438,51 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
 static LogicalResult createAndPropagateBufferUsedForResultTensors(
     FuncOp funcOp, OutputBufferMap &outputBufferMap,
     TensorToBufferMap &resultTensorToBufferMap) {
+  if (funcOp.getBlocks().size() != 1) {
+    return funcOp.emitError("expected a single block");
+  }
+
+  // Walks in a reverse way, because we create placeholders for output buffers
+  // and temp buffers, and propagate them to their defining ops.
   OpBuilder builder(funcOp.getBody());
-  auto walkResult = funcOp.walk(
-      [&](IREE::HAL::InterfaceStoreTensorOp storeTensorOp) -> WalkResult {
-        return createAndPropagateBufferUsedForResultTensor(
-            storeTensorOp, outputBufferMap, resultTensorToBufferMap, builder);
-      });
-  return failure(walkResult.wasInterrupted());
+  auto &block = funcOp.front();
+  for (auto op = block.rbegin(); op != block.rend(); op++) {
+    if (auto storeTensorOp = dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(*op)) {
+      Value tensor = storeTensorOp.operand();
+      Value buffer = createBufferForResultTensor(storeTensorOp, builder);
+      outputBufferMap[storeTensorOp] = buffer;
+      if (failed(propagateBufferUsedForResultTensor(tensor, buffer,
+                                                    resultTensorToBufferMap,
+                                                    builder, op->getLoc()))) {
+        return failure();
+      }
+      continue;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*op)) {
+      for (auto result : llvm::enumerate(op->getResults())) {
+        Value resultBuffer = resultTensorToBufferMap.lookup(result.value());
+        if (resultBuffer) continue;
+        if (auto shapedType = result.value().getType().dyn_cast<ShapedType>()) {
+          if (shapedType.hasStaticShape()) {
+            resultBuffer = builder.create<AllocOp>(
+                op->getLoc(), getMemrefTypeForTensor(shapedType));
+          }
+        }
+        if (!resultBuffer) {
+          return op->emitError("failed to create buffer for result #")
+                 << result.index();
+        }
+        if (failed(propagateBufferUsedForResultTensor(
+                result.value(), resultBuffer, resultTensorToBufferMap, builder,
+                op->getLoc()))) {
+          return failure();
+        }
+      }
+    }
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

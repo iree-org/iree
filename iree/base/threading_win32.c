@@ -17,6 +17,8 @@
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
+#include <stdio.h>
+
 #include "iree/base/atomics.h"
 #include "iree/base/threading.h"
 #include "iree/base/threading_impl.h"
@@ -50,6 +52,8 @@ static void iree_thread_set_priority_class(
 // See:
 // https://docs.microsoft.com/en-us/visualstudio/debugger/how-to-set-a-thread-name-in-native-code
 static void iree_thread_set_name(HANDLE handle, const char* name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Try first to use the modern SetThreadDescription API.
   // This will work even if a debugger is not attached meaning that tools that
   // don't use the debugger API can still query thread names. It's only
@@ -64,6 +68,7 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
     MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1, name_wide,
                         IREE_ARRAYSIZE(name_wide) - 1);
     pSetThreadDescription(handle, name_wide);
+    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -72,6 +77,7 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
     // doing any of the work if none is present. This means that a debugger
     // attached to the process after thread creation won't see thread names but
     // that's a rare case anyway.
+    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -97,6 +103,8 @@ static void iree_thread_set_name(HANDLE handle, const char* name) {
   } __except (EXCEPTION_EXECUTE_HANDLER) {
   }
 #pragma warning(pop)
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static DWORD WINAPI iree_thread_start_routine(LPVOID param) {
@@ -145,19 +153,21 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   thread->entry_arg = entry_arg;
   strncpy_s(thread->name, IREE_ARRAYSIZE(thread->name), params.name.data,
             min(params.name.size, IREE_ARRAYSIZE(thread->name) - 1));
-  iree_atomic_store_int32(&thread->is_suspended, 1, iree_memory_order_relaxed);
+  iree_atomic_store_int32(&thread->is_suspended,
+                          params.create_suspended ? 1 : 0,
+                          iree_memory_order_relaxed);
   iree_thread_override_list_initialize(iree_thread_set_priority_class,
                                        params.priority_class, thread->allocator,
                                        &thread->qos_override_list);
 
-  // Always create the thread suspended.
-  // If we didn't do this it's possible the OS could schedule the thread
-  // immediately inside of CreateThread and we wouldn't be able to prepare it
-  // (and even weirder, it's possible the thread would have exited and the
-  // handle would be closed before we even do anything with it!).
-  thread->handle =
-      CreateThread(NULL, params.stack_size, iree_thread_start_routine, thread,
-                   CREATE_SUSPENDED, &thread->id);
+  // Create the thread either suspended or running as the user requested.
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "CreateThread");
+    thread->handle = CreateThread(
+        NULL, params.stack_size, iree_thread_start_routine, thread,
+        params.create_suspended ? CREATE_SUSPENDED : 0, &thread->id);
+    IREE_TRACE_ZONE_END(z1);
+  }
   if (thread->handle == INVALID_HANDLE_VALUE) {
     iree_allocator_free(allocator, thread);
     IREE_TRACE_ZONE_END(z0);
@@ -180,12 +190,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // Retain the thread for the thread itself; this way if the caller immediately
   // releases the iree_thread_t handle the thread won't explode.
   iree_thread_retain(thread);
-
-  // If the thread is being created unsuspended then resume now. Otherwise the
-  // caller must resume when they want it spun up.
-  if (!params.create_suspended) {
-    iree_thread_resume(thread);
-  }
 
   IREE_TRACE_ZONE_END(z0);
   *out_thread = thread;
@@ -268,7 +272,29 @@ void iree_thread_request_affinity(iree_thread_t* thread,
                                   iree_thread_affinity_t affinity) {
   if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  char affinity_desc[32];
+  int affinity_desc_length = snprintf(
+      affinity_desc, IREE_ARRAYSIZE(affinity_desc), "group=%d, id=%d, smt=%d",
+      affinity.group, affinity.id, affinity.smt);
+  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, affinity_desc,
+                                          affinity_desc_length);
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+  GROUP_AFFINITY group_affinity;
+  memset(&group_affinity, 0, sizeof(group_affinity));
+  group_affinity.Group = affinity.group;
+  KAFFINITY affinity_mask = 1ull << affinity.id;
+  if (affinity.smt) {
+    affinity_mask |= 1ull << (affinity.id + 1);
+  }
+  group_affinity.Mask = affinity_mask;
+  SetThreadGroupAffinity(thread->handle, &group_affinity, NULL);
+
+  // TODO(benvanik): figure out of this is a bad thing; sometimes it can result
+  // in the scheduler alternating cores within the affinity mask; in theory it's
+  // just an SMT ID change and doesn't have any impact on caches but it'd be
+  // good to check.
   PROCESSOR_NUMBER ideal_processor;
   memset(&ideal_processor, 0, sizeof(ideal_processor));
   ideal_processor.Group = affinity.group;

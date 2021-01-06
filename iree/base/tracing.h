@@ -32,6 +32,7 @@
 // enables the C++ when in a valid context. Do not use C++ features or include
 // other files that are not C-compatible.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -221,6 +222,7 @@ void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
 void iree_tracing_mutex_terminate(uint32_t lock_id);
 void iree_tracing_mutex_before_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
 void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #endif  // IREE_TRACING_FEATURES
@@ -305,6 +307,11 @@ enum {
   iree_zone_id_t zone_id = iree_tracing_zone_begin_external_impl(             \
       file_name, file_name_length, line, function_name, function_name_length, \
       name, name_length)
+
+// Sets the dynamic color of the zone to an XXBBGGRR value.
+#define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xbgr)                   \
+  ___tracy_emit_zone_color((struct ___tracy_c_zone_context){zone_id, 1}, \
+                           color_xbgr);
 
 // Appends an integer value to the parent zone. May be called multiple times.
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value) \
@@ -393,8 +400,9 @@ enum {
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
+#define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
-#define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, value, value_length)
+#define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)

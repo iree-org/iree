@@ -21,9 +21,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vmla
+    "vmla"
   DRIVER
-    vmla
+    "vmla"
 )
 
 iree_check_single_backend_test_suite(
@@ -62,9 +62,9 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    metal-spirv
+    "metal-spirv"
   DRIVER
-    metal
+    "metal"
 )
 
 iree_check_single_backend_test_suite(
@@ -115,9 +115,9 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
@@ -167,7 +167,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
 )

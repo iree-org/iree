@@ -79,8 +79,9 @@ typedef int32_t iree_thread_priority_class_t;
 //   Stuff just works. Love it.
 typedef struct {
   uint32_t specified : 1;
+  uint32_t smt : 1;
   uint32_t group : 7;
-  uint32_t id : 24;
+  uint32_t id : 23;
 } iree_thread_affinity_t;
 
 // Sets |thread_affinity| to match with any processor in the system.

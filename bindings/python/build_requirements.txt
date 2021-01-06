@@ -1,0 +1,11 @@
+# Python package requirements for building.
+# This is what the CI uses, but is supported for users as well.
+# Usage:
+#   python -m pip install -r bindings/python/build_requirements.txt
+
+numpy>=1.19.4
+pybind11>=2.6.1
+# Ensure a recent cmake
+cmake>=3.18.4
+ninja
+wheel

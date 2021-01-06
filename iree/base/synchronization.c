@@ -259,6 +259,41 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 // iree_slim_mutex_t
 //==============================================================================
 
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
+
+// Turn fast locks into slow locks.
+// This lets us just reuse that code at the cost of obscuring our lock
+// performance; but at the time you are recording 2+ tracy messages per lock use
+// there's not much interesting to gain from that level of granularity anyway.
+// If these start showing up in traces it means that the higher-level algorithm
+// is taking too many locks and not that this taking time is the core issue.
+
+void iree_slim_mutex_initialize_impl(const iree_tracing_location_t* src_loc,
+                                     iree_slim_mutex_t* out_mutex) {
+  iree_mutex_initialize_impl(src_loc, &out_mutex->impl);
+}
+
+void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
+  iree_mutex_deinitialize(&mutex->impl);
+}
+
+void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  iree_mutex_lock(&mutex->impl);
+}
+
+bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  return iree_mutex_try_lock(&mutex->impl);
+}
+
+void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
+    IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  iree_mutex_unlock(&mutex->impl);
+}
+
+#else
+
 #if defined(IREE_PLATFORM_APPLE)
 
 void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {
@@ -457,6 +492,8 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 }
 
 #endif  // IREE_PLATFORM_*
+
+#endif  //  IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_SLOW_LOCKS
 
 //==============================================================================
 // iree_notification_t

@@ -19,7 +19,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "iree/base/alignment.h"
+#include "iree/base/api.h"
 #include "iree/base/target_platform.h"
+
+#if defined(IREE_ARCH_ARM_64)
+#include <arm_neon.h>
+#endif  // IREE_ARCH_ARM_64
 
 // Haswell or later, gcc compile time option: -mlzcnt
 #if defined(__LZCNT__)
@@ -390,6 +396,55 @@ static inline uint64_t iree_prng_xoroshiro128starstar_next_uint64(
   state->value[0] = iree_math_rotl_u64(s0, 24) ^ s1 ^ (s1 << 16);  // a, b
   state->value[1] = iree_math_rotl_u64(s1, 37);                    // c
   return result;
+}
+
+// MiniLcg by @bjacob: A shot at the cheapest possible PRNG on ARM NEON
+// https://gist.github.com/bjacob/7d635b91acd02559d73a6d159fe9cfbe
+// I have no idea what the entropy characteristics of it are but it's really
+// fast and in a lot of places that's all we need. For example, whatever number
+// we generate when doing worker thread selection is going to get AND'ed with
+// some other bitmasks by the caller -- and once you do that to a random number
+// you've pretty much admitted it's ok to not be so strong and may as well
+// capitalize on it!
+typedef iree_alignas(iree_max_align_t) struct {
+  uint8_t value[16];  // first to ensure alignment
+  uint8_t remaining;  // number of remaining valid values in the state
+} iree_prng_minilcg128_state_t;
+
+#define IREE_PRNG_MINILCG_INIT_MUL_CONSTANT 13
+#define IREE_PRNG_MINILCG_INIT_ADD_CONSTANT 47
+#define IREE_PRNG_MINILCG_NEXT_MUL_CONSTANT 37
+#define IREE_PRNG_MINILCG_NEXT_ADD_CONSTANT 47
+
+// Initializes a MiniLcg PRNG state vector; |out_state| is overwritten.
+// |seed| may be any 8-bit value.
+static inline void iree_prng_minilcg128_initialize(
+    uint64_t seed, iree_prng_minilcg128_state_t* out_state) {
+  uint8_t value = (seed ^ 11400714819323198485ull) & 0xFF;
+  for (size_t i = 0; i < 16; ++i) {
+    out_state->value[i] = value;
+    value = value * IREE_PRNG_MINILCG_INIT_MUL_CONSTANT +
+            IREE_PRNG_MINILCG_INIT_ADD_CONSTANT;
+  }
+  out_state->remaining = 16;
+}
+
+static inline uint8_t iree_prng_minilcg128_next_uint8(
+    iree_prng_minilcg128_state_t* state) {
+  if (IREE_UNLIKELY(--state->remaining == 0)) {
+#if defined(IREE_ARCH_ARM_64)
+    uint8x16_t kmul = vdupq_n_u8(IREE_PRNG_MINILCG_NEXT_MUL_CONSTANT);
+    uint8x16_t kadd = vdupq_n_u8(IREE_PRNG_MINILCG_NEXT_ADD_CONSTANT);
+    vst1q_u8(state->value, vmlaq_u8(kadd, kmul, vld1q_u8(state->value)));
+#else
+    for (size_t i = 0; i < 16; ++i) {
+      state->value[i] = state->value[i] * IREE_PRNG_MINILCG_NEXT_MUL_CONSTANT +
+                        IREE_PRNG_MINILCG_NEXT_ADD_CONSTANT;
+    }
+#endif  // IREE_ARCH_ARM_64
+    state->remaining = 16;
+  }
+  return state->value[16 - state->remaining + 1];
 }
 
 #endif  // IREE_BASE_MATH_H_

@@ -33,32 +33,16 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: "google"
+      - name: Setting git config
+        run: |
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "Submodule Update Action"
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
-      - name: Updating submodules
-        run: ./scripts/git/update_to_llvm_syncpoint.py
-      - name: Calculating SHAs
-        run: |
-          echo "LLVM_SHA=$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
-          echo "TF_SHA=$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
-          echo "LLVM_BAZEL_SHA=$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
-      - name: Creating Pull Request
-        uses: peter-evans/create-pull-request@v3
-        with:
+      - name: Updating submodules and creating PR
+        env:
           # Personal token is required to trigger additional automation (e.g. presubmits).
-          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
-          title: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
-          body: |
-            Updates LLVM dependencies to match
-            [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }}).
-            - llvm-bazel to
-              [${{ env.LLVM_BAZEL_SHA }}](https://github.com/google/llvm-bazel/commit/${{ env.LLVM_BAZEL_SHA }})
-            - TensorFlow to
-            [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
-
-            `./scripts/git/update_to_llvm_syncpoint.py`
-
-            Automated submodule bump from .github/workflows/update_llvm_dependent_submodules.yml
-          committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
-          branch: "auto_submodule_update"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
+          UPSTREAM_REMOTE: "origin"
+          PR_BRANCH: "auto_submodule_update"
+        run: ./scripts/git/update_llvm_dependent_submodules.sh

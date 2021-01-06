@@ -15,6 +15,7 @@
 # Common types and utilities used in the IREE codebase.
 
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -47,6 +48,7 @@ cc_library(
         "alignment.h",
         "atomics.h",
         "bitfield.h",
+        "debugging.h",
         "math.h",
         "memory.h",
         "target_platform.h",
@@ -378,14 +380,21 @@ cc_library(
     ],
 )
 
-cc_test(
+cc_binary(
     name = "synchronization_benchmark",
+    testonly = True,
     srcs = ["synchronization_benchmark.cc"],
     deps = [
         ":synchronization",
         "//iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
     ],
+)
+
+run_binary_test(
+    name = "synchronization_benchmark_test",
+    args = ["--benchmark_min_time=0"],
+    test_binary = ":synchronization_benchmark",
 )
 
 cc_test(

@@ -54,6 +54,11 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
 
+# Properties controlling version and naming of release artifacts.
+set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
+set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
+set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
+
 # Master enable for tensorflow build support.
 # Note that this is a normal CMake variable used to gate build features (not
 # a cache variable that is user-settable).
@@ -260,6 +265,7 @@ include(iree_python)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
+include(iree_run_binary_test)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -505,6 +511,7 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
+add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
@@ -518,16 +525,18 @@ elseif(${IREE_ENABLE_MLIR})
   add_subdirectory(iree/compiler/Dialect/VM/Tools)
 endif()
 
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  add_subdirectory(bindings/python)
-endif()
-
 if(${IREE_BUILD_JAVA_BINDINGS})
   add_subdirectory(bindings/java)
   add_subdirectory(bindings/javatests)
 endif()
 
 add_subdirectory(iree/tools)
+
+# Order constraint: The python bindings install tools targets from iree/tools
+# and must come after it.
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(bindings/python)
+endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)

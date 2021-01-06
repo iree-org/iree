@@ -142,7 +142,6 @@ build:generic_clang --copt=-Wtautological-overlap-compare
 build:generic_clang --copt=-Wthread-safety
 build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
-build:generic_clang --copt=-Wno-unused-variable
 build:generic_clang --copt=-Wvla
 
 ###############################################################################

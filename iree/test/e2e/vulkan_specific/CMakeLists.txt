@@ -23,9 +23,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
@@ -35,9 +35,9 @@ iree_check_single_backend_test_suite(
     "conv.mlir"
     "gemm.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-use-workgroup-memory"
 )
@@ -50,9 +50,9 @@ iree_check_single_backend_test_suite(
     "log_plus_one.mlir"
     "pw_add_multiwg.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-enable-memref-vectorization"
 )
@@ -63,9 +63,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "vectorized_conv.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
   COMPILER_FLAGS
     "-iree-spirv-enable-vectorization"
     "-iree-vulkan-target-triple=valhall-g77-unknown-android10"

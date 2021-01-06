@@ -36,7 +36,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
   TARGET_BACKEND
-    vmla
+    "vmla"
   DRIVER
-    vmla
+    "vmla"
 )

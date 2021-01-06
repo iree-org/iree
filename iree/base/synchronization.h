@@ -27,21 +27,33 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-#if defined(IREE_COMPILER_CLANG)
+// NOTE: clang cannot support thread annotations in C code due to some
+// representational bugs... which means that we can't use it here. Boo.
+// There's some workarounds I've seen but getting TSAN working would be much
+// easier as a starting point.
+#if 0  // defined(IREE_COMPILER_CLANG)
 #define IREE_THREAD_ANNOTATION_ATTRIBUTE(x) __attribute__((x))
 #else
 #define IREE_THREAD_ANNOTATION_ATTRIBUTE(x)
 #endif  // IREE_COMPILER_CLANG
 
+#ifdef __cplusplus
 // Documents if a shared field or global variable needs to be protected by a
 // mutex. IREE_GUARDED_BY() allows the user to specify a particular mutex that
 // should be held when accessing the annotated variable.
 #define IREE_GUARDED_BY(x) IREE_THREAD_ANNOTATION_ATTRIBUTE(guarded_by(x))
+#else
+#define IREE_GUARDED_BY(x)
+#endif  // __cplusplus
 
+#ifdef __cplusplus
 // Like IREE_GUARDED_BY but specifies that the contents of a pointer are guarded
 // by a mutex instead of the pointer itself.
 #define IREE_PTR_GUARDED_BY(x) \
   IREE_THREAD_ANNOTATION_ATTRIBUTE(pt_guarded_by(x))
+#else
+#define IREE_PTR_GUARDED_BY(x)
+#endif  // __cplusplus
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
@@ -193,7 +205,9 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 //   https://eli.thegreenplace.net/2018/basics-of-futexes/
 //   https://bartoszmilewski.com/2008/09/01/thin-lock-vs-futex/
 typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
-#if defined(IREE_PLATFORM_APPLE)
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
+  iree_mutex_t impl;  // re-route to slow mutex
+#elif defined(IREE_PLATFORM_APPLE)
   os_unfair_lock value;
 #elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
   SRWLOCK value;
@@ -204,6 +218,18 @@ typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
 #endif  // IREE_PLATFORM_*
 } iree_slim_mutex_t;
 
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
+// Initializes |out_mutex| to the well-defined unlocked contents.
+// Must be called prior to using any other iree_slim_mutex_* method.
+#define iree_slim_mutex_initialize(out_mutex)                             \
+  static const iree_tracing_location_t TracyConcat(                       \
+      __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
+                                            (uint32_t)__LINE__, 0};       \
+  iree_slim_mutex_initialize_impl(                                        \
+      &TracyConcat(__tracy_source_location, __LINE__), out_mutex);
+void iree_slim_mutex_initialize_impl(const iree_tracing_location_t* src_loc,
+                                     iree_slim_mutex_t* out_mutex);
+#else
 // Initializes |out_mutex| to the well-defined unlocked contents.
 // Must be called prior to using any other iree_slim_mutex_* method.
 //
@@ -212,6 +238,7 @@ typedef struct IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) {
 // also allows us to swap in a non-slim lock for enhanced debugging if we run
 // into threading issues.
 void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex);
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS
 
 // Deinitializes |mutex| (after a prior call to iree_slim_mutex_initialize).
 // The mutex must not be held by any thread.

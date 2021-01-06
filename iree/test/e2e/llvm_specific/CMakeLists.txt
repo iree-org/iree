@@ -20,9 +20,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "conv.mlir"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
 )
@@ -33,9 +33,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "exponential.mlir"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
   COMPILER_FLAGS
     "-iree-codegen-linalg-to-llvm-fast-exp=true"
 )
