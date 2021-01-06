@@ -80,7 +80,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/${_NAME}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_EXECUTABLE}>"
         ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
