@@ -38,6 +38,16 @@ jobs:
         #   - os: macos-latest
         #     build_package: compiler
         #     experimental: true
+        include:
+          - os: ubuntu-18.04
+            build_package: py-xla-compiler-tools
+            experimental: true
+          - os: ubuntu-18.04
+            build_package: py-tflite-compiler-tools
+            experimental: true
+          - os: ubuntu-18.04
+            build_package: py-tf-compiler-tools
+            experimental: true
 
     env:
       CIBW_BUILD_VERBOSITY: 1
@@ -137,6 +147,10 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
+          # Needs the bazel manylinux image.
+          # TODO: Move this to our repo and pin.
+          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
+
           package_dir="./iree-install/python_packages/iree_tools_xla"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
@@ -161,6 +175,10 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
+          # Needs the bazel manylinux image.
+          # TODO: Move this to our repo and pin.
+          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
+
           package_dir="./iree-install/python_packages/iree_tools_tflite"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
@@ -185,6 +203,10 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
+          # Needs the bazel manylinux image.
+          # TODO: Move this to our repo and pin.
+          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
+
           package_dir="./iree-install/python_packages/iree_tools_tf"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
