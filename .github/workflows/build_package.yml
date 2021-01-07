@@ -56,7 +56,11 @@ jobs:
       CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout"
       CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout'"
 
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+      # Needs the bazel manylinux image.
+      # TODO: Move this to our repo and pin.
+      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest
+      # CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+
       CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-*"
       CIBW_SKIP: "*-win32 *-manylinux_i686"
 
@@ -108,7 +112,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target IreePythonPackage-compiler-stripped"
+              --build ./iree-build --target install-IreePythonPackage-compiler-stripped"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
@@ -147,10 +151,6 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
-          # Needs the bazel manylinux image.
-          # TODO: Move this to our repo and pin.
-          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
-
           package_dir="./iree-install/python_packages/iree_tools_xla"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
             rm -Rf ./iree-install && \
@@ -161,7 +161,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target IreePythonPackage-tools-xla-stripped"
+              --build ./iree-build --target install-IreePythonPackage-tools-xla-stripped"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
@@ -175,9 +175,6 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
-          # Needs the bazel manylinux image.
-          # TODO: Move this to our repo and pin.
-          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
 
           package_dir="./iree-install/python_packages/iree_tools_tflite"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
@@ -189,7 +186,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target IreePythonPackage-tools-tflite-stripped"
+              --build ./iree-build --target install-IreePythonPackage-tools-tflite-stripped"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
@@ -203,9 +200,6 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
-          # Needs the bazel manylinux image.
-          # TODO: Move this to our repo and pin.
-          export CIBW_MANYLINUX_X86_64_IMAGE="stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest"
 
           package_dir="./iree-install/python_packages/iree_tools_tf"
           export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
@@ -217,7 +211,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target IreePythonPackage-compiler-stripped"
+              --build ./iree-build --target install-IreePythonPackage-compiler-stripped"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py
