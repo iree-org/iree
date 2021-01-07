@@ -38,7 +38,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+if (NOT ${IREE_BUILD_COMPILER})
   return()
 endif()
 
@@ -74,5 +74,6 @@ iree_bytecode_module(
     "iree::strings_module_test"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
+  TESTONLY
   PUBLIC
 )

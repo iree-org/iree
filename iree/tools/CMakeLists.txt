@@ -78,6 +78,31 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-check-module
+  OUT
+    iree-check-module
+  SRCS
+    "iree-check-module-main.cc"
+  DEPS
+    iree::modules::check::native_module
+    absl::flags
+    absl::strings
+    iree::base::api
+    iree::base::core_headers
+    iree::base::file_io
+    iree::base::flags
+    iree::base::status
+    iree::base::tracing
+    iree::hal::drivers
+    iree::modules::hal
+    iree::testing::gtest
+    iree::tools::utils::vm_util
+    iree::vm::bytecode_module
+  TESTONLY
+)
+
+iree_cc_binary(
+  NAME
     iree-dump-module
   OUT
     iree-dump-module
@@ -110,7 +135,7 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-if(${IREE_ENABLE_MLIR})
+if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -126,9 +151,7 @@ if(${IREE_ENABLE_MLIR})
       MLIRTableGen
     HOSTONLY
   )
-endif()
 
-if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
       init_iree_passes_and_dialects
@@ -345,10 +368,19 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
     HOSTONLY
   )
+
+  add_custom_target(IreeFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+  )
+  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
+    add_custom_target(BundledLLVMFileCheck ALL
+      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+      DEPENDS FileCheck
+    )
+  endif()
 endif(${IREE_BUILD_COMPILER})
 
 # If cross-compiling, we need to declare iree-translate under host configuration
-
 # unconditionally because we need to run it on host to generate VM modules
 # for tests.
 if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
@@ -361,16 +393,4 @@ if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
       ::iree_translate_main
     HOSTONLY
   )
-endif()
-
-if(${IREE_ENABLE_MLIR})
-  add_custom_target(IreeFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
-  )
-  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(BundledLLVMFileCheck ALL
-      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-      DEPENDS FileCheck
-    )
-  endif()
 endif()

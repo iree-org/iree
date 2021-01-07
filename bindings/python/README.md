@@ -15,21 +15,23 @@ Deprecated packages:
 
 ## Installing
 
-First perform a normal CMake build with the following options:
+First perform a normal CMake build/install with the following options:
 
+* `-DCMAKE_INSTALL_PREFIX=...path to install to...` : Sets up installation
+  prefix.
 * `-DIREE_BUILD_PYTHON_BINDINGS=ON` : Enables Python Bindings
 * `-DIREE_BUILD_TENSORFLOW_COMPILER=ON` (optional) : Enables building the
   TensorFlow compilers (note: requires additional dependencies. see overall
   build docs).
 
-Then from the build directory, run:
+Then from the install directory, run:
 
 ```shell
+# Multiple packages will exist under python_packages. Choose the one you want.
+cd python_packages/iree_compiler
 # Install into a local installation or virtualenv.
-python bindings/python/setup.py install
-
-# Build wheels.
-python bindings/python/setup.py bdist_wheel
+python setup.py install
+python -m pip wheel .
 ```
 
 ## Development mode

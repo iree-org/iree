@@ -80,8 +80,6 @@ iree_cc_library(
 iree_cc_binary(
   NAME
     custom-opt
-  OUT
-    custom-opt
   SRCS
     "custom-opt-main.cc"
   DEPS
@@ -96,8 +94,6 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    custom-translate
-  OUT
     custom-translate
   SRCS
     "custom-translate-main.cc"

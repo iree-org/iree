@@ -132,9 +132,9 @@ Then run the compiled module using the `dylib` HAL driver:
 
 ```shell
 $ ./build/iree/tools/iree-run-module -driver=dylib \
-          -input_file=/tmp/simple-llvm_aot.vmfb \
+          -module_file=/tmp/simple-llvm_aot.vmfb \
           -entry_function=abs \
-          -inputs="i32=-5"
+          -function_inputs="i32=-5"
 
 EXEC @abs
 i32=5
