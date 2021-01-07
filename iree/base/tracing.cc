@@ -187,6 +187,12 @@ void iree_tracing_mutex_after_lock(uint32_t lock_id) {
   tracy::Profiler::QueueSerialFinish();
 }
 
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired) {
+  if (was_acquired) {
+    iree_tracing_mutex_after_lock(lock_id);
+  }
+}
+
 void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
   auto item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockRelease);

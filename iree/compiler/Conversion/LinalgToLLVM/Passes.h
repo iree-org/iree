@@ -44,6 +44,8 @@ void populateConvImg2ColMatmulConversionPatterns(
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
+/// Performs the revamped final conversion to LLVM dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVM2Pass();
 
 /// Pass to rewrite Linalg on tensors destructive updates into updates through
 /// memory.

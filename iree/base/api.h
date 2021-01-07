@@ -294,6 +294,9 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
+#define iree_string_view_literal(str) \
+  { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
+
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool IREE_API_CALL
 iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
@@ -343,6 +346,13 @@ IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
 // 'foo-10?' matches: 'foo-101', 'foo-102'
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern);
+
+// Copies the string bytes into the target buffer and returns the number of
+// characters copied. Does not include a NUL terminator.
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+iree_string_view_append_to_buffer(iree_string_view_t source_value,
+                                  iree_string_view_t* target_value,
+                                  char* buffer);
 
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
@@ -801,6 +811,16 @@ typedef enum {
   IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
 } iree_allocation_mode_t;
 
+// TODO(benvanik): replace with a single method with the mode setting. This will
+// reduce the overhead to just two pointers per allocator (from 3) and allow us
+// to add more distinct behavior in the future. If we really wanted to stretch
+// we could turn it into a pointer and require the allocator live somewhere
+// (possibly in .text as a const static), but two pointers seems fine.
+typedef iree_status_t(IREE_API_PTR* iree_allocator_alloc_fn_t)(
+    void* self, iree_allocation_mode_t mode, iree_host_size_t byte_length,
+    void** out_ptr);
+typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
+
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
 // Pass the iree_allocator_system() macro to use the system allocator.
@@ -811,11 +831,9 @@ typedef struct {
   // Systems should align to 16 byte boundaries (or otherwise their natural
   // SIMD alignment). The runtime pools internally and small allocations
   // (usually) won't be made through this interface.
-  iree_status_t(IREE_API_PTR* alloc)(void* self, iree_allocation_mode_t mode,
-                                     iree_host_size_t byte_length,
-                                     void** out_ptr);
+  iree_allocator_alloc_fn_t alloc;
   // Frees |ptr| from a previous alloc call.
-  void(IREE_API_PTR* free)(void* self, void* ptr);
+  iree_allocator_free_fn_t free;
 } iree_allocator_t;
 
 // Allocates a block of |byte_length| bytes from the given allocator.
@@ -827,6 +845,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
 // If the reallocation fails then the original |out_ptr| is unmodified.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Duplicates the given byte block by allocating memory and copying it in.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_clone(iree_allocator_t allocator,
+                     iree_const_byte_span_t source_bytes, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
 IREE_API_EXPORT void IREE_API_CALL

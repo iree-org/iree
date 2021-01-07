@@ -40,7 +40,7 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if (NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+if (NOT ${IREE_BUILD_COMPILER})
   return()
 endif()
 """,
@@ -49,6 +49,7 @@ endif()
 
 iree_bytecode_module(
     name = "tensorlist_test_module",
+    testonly = True,
     src = "tensorlist_test.mlir",
     cc_namespace = "iree::modules::tensorlist",
     flags = ["-iree-mlir-to-vm-bytecode-module"],

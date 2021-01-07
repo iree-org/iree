@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
-
 iree_pyext_module(
   NAME
     PyExtRt
@@ -91,4 +88,18 @@ iree_py_test(
     vm_test
   SRCS
     "vm_test.py"
+)
+
+iree_py_install_package(
+  COMPONENT IreePythonPackage-rt
+  PACKAGE_NAME iree_rt
+  MODULE_PATH pyiree/rt
+  DEPS
+    bindings_python_pyiree_rt_PyExtRt
+)
+
+install(
+  TARGETS bindings_python_pyiree_rt_PyExtRt
+  COMPONENT ${PY_INSTALL_COMPONENT}
+  DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )

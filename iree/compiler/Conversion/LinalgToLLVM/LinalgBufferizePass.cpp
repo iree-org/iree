@@ -21,9 +21,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -34,6 +37,31 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+// Traverse all transitive "TieShapeOp" uses of `tensor`, map them to `memref`.
+// Replace all uses of any such transitive tensor in a "DimOp" by `memref`.
+// TODO(nicolasvasilache): kill "TieShapeOp" with fire.
+static void mapAllTieShapeUsesAndReplaceDimUsesOf(Value tensor, Value memref,
+                                                  BlockAndValueMapping &bvm) {
+  SmallVector<Value, 4> workList{tensor};
+  for (unsigned idx = 0; idx < workList.size() /*recompute: it grows*/; ++idx) {
+    // Update of DimOp uses must occur in 2 steps or use list gets messed up.
+    SmallVector<OpOperand *, 4> dimOps;
+    for (auto &use : workList[idx].getUses()) {
+      auto tieShapeOp = dyn_cast<Shape::TieShapeOp>(use.getOwner());
+      auto dimOp = dyn_cast<DimOp>(use.getOwner());
+      if (tieShapeOp) {
+        workList.push_back(tieShapeOp.getResult());
+        bvm.map(tieShapeOp.getResult(), memref);
+      } else if (dimOp) {
+        dimOps.push_back(&dimOp->getOpOperand(use.getOperandNumber()));
+      }
+    }
+    for (OpOperand *opOperand : dimOps) {
+      opOperand->set(memref);
+    }
+  }
+}
 
 static Value maybeConvertToIndex(Location loc, Value val, OpBuilder &b) {
   if (val.getType().isIndex()) {
@@ -58,8 +86,8 @@ static LogicalResult allocateBuffersForResults(
     Value resultTensor = op.getOutput(resultIndex);
 
     // If output tensor was produced by a LinalgOp, just reuse the buffer.
-    // TODO: this may be too brutal and we may prefer to leave this decision to
-    // a copy + alloc removal pass.
+    // TODO(nicolasvasilache): this may be too brutal and we may prefer to leave
+    // this decision to a copy + alloc removal pass.
     if (resultTensor.getDefiningOp<linalg::LinalgOp>()) {
       resultBuffers.push_back(bvm.lookup(resultTensor));
       continue;
@@ -72,7 +100,8 @@ static LogicalResult allocateBuffersForResults(
     SmallVector<Value, 4> dynOperands;
     for (auto dim : llvm::enumerate(tensorShape)) {
       if (dim.value() == TensorType::kDynamicSize) {
-        dynOperands.push_back(b.create<DimOp>(loc, resultTensor, dim.index()));
+        dynOperands.push_back(
+            b.create<DimOp>(loc, bvm.lookup(resultTensor), dim.index()));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
@@ -83,6 +112,11 @@ static LogicalResult allocateBuffersForResults(
       b.create<linalg::CopyOp>(loc, bvm.lookup(resultTensor), alloc);
   }
   bvm.map(op->getResults(), resultBuffers);
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  for (auto it : llvm::zip(op->getResults(), resultBuffers)) {
+    mapAllTieShapeUsesAndReplaceDimUsesOf(std::get<0>(it), std::get<1>(it),
+                                          bvm);
+  }
   return success();
 }
 
@@ -98,8 +132,12 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
   op.clone(b, loc, /*resultTypes=*/TypeRange{}, newOperands);
 
   // Replace the results of the old op with the new output buffers.
-  for (auto it : llvm::zip(op.getOperation()->getResults(), outputs))
-    bvm.map(std::get<0>(it), std::get<1>(it));
+  bvm.map(op.getOperation()->getResults(), outputs);
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  for (auto it : llvm::zip(op.getOperation()->getResults(), outputs)) {
+    mapAllTieShapeUsesAndReplaceDimUsesOf(std::get<0>(it), std::get<1>(it),
+                                          bvm);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -115,7 +153,9 @@ LogicalResult convertAnyLinalgOp(OpBuilder &b, linalg::LinalgOp op,
   Location loc = op.getLoc();
   SmallVector<Value, 2> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
-  for (Value v : op.getInputs()) newInputBuffers.push_back(bvm.lookup(v));
+  for (Value v : op.getInputs()) {
+    newInputBuffers.push_back(bvm.lookup(v));
+  }
   SmallVector<Value, 2> newOutputBuffers;
   if (failed(allocateBuffersForResults(b, loc, op, newOutputBuffers, bvm))) {
     assert(false);
@@ -146,7 +186,7 @@ static MemRefType getMemrefTypeForTensor(
                          affineMapComposition, memorySpace);
 }
 
-// TODO: this will go away once integrated at the flow level.
+// TODO(nicolasvasilache): this will go away once integrated at the flow level.
 SymbolRefAttr getBinding(Operation *op) {
   return llvm::TypeSwitch<Operation *, SymbolRefAttr>(op)
       .Case<IREE::HAL::InterfaceLoadTensorOp, IREE::HAL::InterfaceStoreTensorOp,
@@ -160,7 +200,8 @@ SymbolRefAttr getBinding(Operation *op) {
 }
 
 // Create the placeholder op for the backing buffer.
-// TODO: evolve to target flow ops directly with additional shape annotation.
+// TODO(nicolasvasilache): evolve to target flow ops directly with additional
+// shape annotation.
 IREE::PlaceholderOp createPlaceholderOp(OpBuilder &b, Location loc,
                                         Operation *op, Value rankedTensor,
                                         IREE::HAL::InterfaceBindingOp bindingOp,
@@ -177,8 +218,8 @@ IREE::PlaceholderOp createPlaceholderOp(OpBuilder &b, Location loc,
   if (typeErase) {
     // HAL tensor tile ops does not have enough info to reconstruct the original
     // buffer type. So we just type erase it for now.
-    // TODO: evolve to target flow ops directly with additional shape annotation
-    // so we do not need to type erase.
+    // TODO(nicolasvasilache): evolve to target flow ops directly with
+    // additional shape annotation so we do not need to type erase.
     bufferType = MemRefType::get(
         SmallVector<int64_t>(bufferType.getRank(), ShapedType::kDynamicSize),
         bufferType.getElementType(), bufferType.getAffineMaps(),
@@ -198,17 +239,17 @@ IREE::PlaceholderOp createPlaceholderOp(OpBuilder &b, Location loc,
   return phOp;
 }
 
-// TODO: evolve into flow.interface.load.tensor when the abstraction to get
-// a raw void* / memref<?xi8> + offset + shape exists.
-// Then we can immediately emit a view op.
-// TODO: canonicalizations of the view op.
+// TODO(nicolasvasilache): evolve into flow.interface.load.tensor when the
+// abstraction to get a raw void* / memref<?xi8> + offset + shape exists. Then
+// we can immediately emit a view op.
+// TODO(nicolasvasilache): canonicalizations of the view op.
 LogicalResult convertInterfaceLoadTensorOp(
     OpBuilder &b, IREE::HAL::InterfaceLoadTensorOp loadOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(loadOp);
 
-  // TODO: view + subview
+  // TODO(nicolasvasilache): view + subview
   if (!matchPattern(loadOp.offset(), m_Zero())) {
     return loadOp.emitError("unhandled non-zero offset");
   }
@@ -217,18 +258,21 @@ LogicalResult convertInterfaceLoadTensorOp(
                                   loadOp.queryBindingOp());
   Value buffer = phOp.getResult();
   bvm.map(loadOp.result(), buffer);
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), buffer, bvm);
   return success();
 }
 
-// TODO: evolve into flow.interface.load.tensor.tile when the abstraction
-// exists. This will turn into some subview chain from the base view.
+// TODO(nicolasvasilache): evolve into flow.interface.load.tensor.tile when the
+// abstraction exists. This will turn into some subview chain from the base
+// view.
 LogicalResult convertInterfaceLoadTensorOp(
     OpBuilder &b, IREE::HAL::InterfaceLoadTensorTileOp loadOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(loadOp);
 
-  // TODO: view + subview
+  // TODO(nicolasvasilache): view + subview
   if (!matchPattern(loadOp.base_offset(), m_Zero())) {
     return loadOp.emitError("unhandled non-zero offset");
   }
@@ -243,20 +287,36 @@ LogicalResult convertInterfaceLoadTensorOp(
                           extractFromI64ArrayAttr(loadOp.static_strides()),
                           loadOp.offsets(), loadOp.sizes(), loadOp.strides());
   bvm.map(loadOp.result(), subview);
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), subview, bvm);
   return success();
 }
 
-// TODO: evolve into flow.interface.store.tensor when the abstraction to get
-// a raw void* / memref<?xi8> + offset + shape exists.
-// Then we can immediately emit a view op.
-// TODO: canonicalizations of the view op.
+LogicalResult convertInterfaceLoadTensorOp(
+    OpBuilder &b, IREE::Flow::DispatchInputLoadOp loadOp,
+    BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(loadOp);
+  Value subview =
+      b.create<SubViewOp>(loadOp.getLoc(), bvm.lookup(loadOp.source()),
+                          loadOp.offsets(), loadOp.sizes(), loadOp.strides());
+  bvm.map(loadOp.result(), subview);
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), subview, bvm);
+  return success();
+}
+
+// TODO(nicolasvasilache): evolve into flow.interface.store.tensor when the
+// abstraction to get a raw void* / memref<?xi8> + offset + shape exists. Then
+// we can immediately emit a view op.
+// TODO(nicolasvasilache): canonicalizations of the view op.
 LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::HAL::InterfaceStoreTensorOp storeOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
 
-  // TODO: view + subview
+  // TODO(nicolasvasilache): view + subview
   if (!matchPattern(storeOp.offset(), m_Zero())) {
     return storeOp.emitError("unhandled non-zero offset");
   }
@@ -271,15 +331,16 @@ LogicalResult convertInterfaceStoreTensorOp(
   ;
 }
 
-// TODO: evolve into flow.interface.store.tensor.tile when the abstraction
-// exists. This will turn into some subview chain from the base view.
+// TODO(nicolasvasilache): evolve into flow.interface.store.tensor.tile when the
+// abstraction exists. This will turn into some subview chain from the base
+// view.
 LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::HAL::InterfaceStoreTensorTileOp storeOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
 
-  // TODO: view + subview
+  // TODO(nicolasvasilache): view + subview
   if (!matchPattern(storeOp.base_offset(), m_Zero())) {
     return storeOp.emitError("unhandled non-zero offset");
   }
@@ -295,6 +356,20 @@ LogicalResult convertInterfaceStoreTensorOp(
       extractFromI64ArrayAttr(storeOp.static_strides()), storeOp.offsets(),
       storeOp.sizes(), storeOp.strides());
   b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.operand()),
+                           subview);
+  storeOp->erase();
+  return success();
+}
+
+LogicalResult convertInterfaceStoreTensorOp(
+    OpBuilder &b, IREE::Flow::DispatchOutputStoreOp storeOp,
+    BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(storeOp);
+  Value subview = b.create<SubViewOp>(
+      storeOp.getLoc(), bvm.lookup(storeOp.target()), storeOp.offsets(),
+      storeOp.sizes(), storeOp.strides());
+  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.value()),
                            subview);
   storeOp->erase();
   return success();
@@ -317,11 +392,27 @@ void LinalgLLVMBufferizePass::runOnFunction() {
   OpBuilder b(context);
 
   BlockAndValueMapping bvm;
+  funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
+    auto shapedType =
+        op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    if (!shapedType || !shapedType.hasRank()) return;
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(op);
+    Value memref = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        op->getLoc(),
+        MemRefType::get(shapedType.getShape(), shapedType.getElementType()),
+        op.binding(), op.byte_offset(), op.byte_length());
+    bvm.map(op, memref);
+    // TODO(nicolasvasilache): kill tie_shape with fire.
+    mapAllTieShapeUsesAndReplaceDimUsesOf(op.result(), memref, bvm);
+  });
   funcOp.walk([&](Operation *op) {
     if (auto loadOp = dyn_cast<IREE::HAL::InterfaceLoadTensorOp>(op)) {
       convertInterfaceLoadTensorOp(b, loadOp, bvm);
     } else if (auto loadOp =
                    dyn_cast<IREE::HAL::InterfaceLoadTensorTileOp>(op)) {
+      convertInterfaceLoadTensorOp(b, loadOp, bvm);
+    } else if (auto loadOp = dyn_cast<IREE::Flow::DispatchInputLoadOp>(op)) {
       convertInterfaceLoadTensorOp(b, loadOp, bvm);
     }
   });
@@ -331,6 +422,8 @@ void LinalgLLVMBufferizePass::runOnFunction() {
       convertInterfaceStoreTensorOp(b, storeOp, bvm);
     } else if (auto storeOp =
                    dyn_cast<IREE::HAL::InterfaceStoreTensorTileOp>(op)) {
+      convertInterfaceStoreTensorOp(b, storeOp, bvm);
+    } else if (auto storeOp = dyn_cast<IREE::Flow::DispatchOutputStoreOp>(op)) {
       convertInterfaceStoreTensorOp(b, storeOp, bvm);
     }
   });

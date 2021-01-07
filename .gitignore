@@ -25,6 +25,7 @@ build-*/
 # Local-only config options
 configured.bazelrc
 user.bazelrc
+version_info.json
 
 # Dear ImGui Ini files
 imgui.ini

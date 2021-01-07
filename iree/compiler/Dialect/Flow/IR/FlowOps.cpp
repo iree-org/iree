@@ -507,12 +507,21 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                  ValueRange workgroupCount,
                                  TypeRange resultTypes, ValueRange operands,
                                  ArrayRef<NamedAttribute> attributes) {
-  state.addOperands(workgroupCount);
   state.addTypes(resultTypes);
+  state.addOperands(workgroupCount);
   state.addOperands(operands);
   state.addAttributes(attributes);
+  state.addAttribute(
+      "operand_segment_sizes",
+      builder.getI32VectorAttr({static_cast<int32_t>(workgroupCount.size()),
+                                static_cast<int32_t>(operands.size())}));
 
   auto *body = state.addRegion();
+  assert(body->begin() == body->end());
+  {
+    OpBuilder::InsertionGuard g(builder);
+    builder.createBlock(body);  // createBlock implicitly moves IP, RAII away...
+  }
   for (auto operand : operands) {
     Type type = operand.getType();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
@@ -527,6 +536,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     }
     body->addArgument(type);
   }
+  assert(std::next(body->begin()) == body->end());
 }
 
 static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,

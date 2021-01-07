@@ -37,6 +37,7 @@ class IntrusiveListUniquePtrBase
   using IteratorT = IntrusiveListIterator<T, kOffset, true>;
   using ReverseIteratorT = IntrusiveListIterator<T, kOffset, false>;
   using base_list = IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>;
+  using self_type = IntrusiveListUniquePtrBase<T, kOffset>;
 
   IntrusiveListUniquePtrBase() = default;
 
@@ -44,6 +45,10 @@ class IntrusiveListUniquePtrBase
   using base_list::size;
 
   using base_list::contains;
+
+  inline void merge_from(self_type* other_list) {
+    return base_list::merge_from(static_cast<base_list*>(other_list));
+  }
 
   using base_list::clear;
 

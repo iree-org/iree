@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Static and generated files.
-configure_file(README.md README.md COPYONLY)
-
 iree_py_library(
   NAME
     compiler2
@@ -25,4 +22,10 @@ iree_py_library(
     "tflite.py"
     "tools.py"
     "xla.py"
+)
+
+iree_py_install_package(
+  COMPONENT IreePythonPackage-compiler
+  PACKAGE_NAME iree_compiler
+  MODULE_PATH pyiree/compiler2
 )
