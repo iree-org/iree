@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cd "@_bazel_src_root@"
-exec '@IREE_BAZEL_EXECUTABLE@' @_bazel_startup_options@ "$@" @_bazel_build_options@
+cd "@IREE_BAZEL_SRC_ROOT@"
+exec '@IREE_BAZEL_EXECUTABLE@' @_bazel_startup_options_joined@ "$@" --color=yes

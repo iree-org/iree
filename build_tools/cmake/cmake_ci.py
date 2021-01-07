@@ -154,7 +154,18 @@ if is_windows:
              cmake_environ)
     return cmake_environ
 
+  # Note that we search for bash in the *original environment* because
+  # that may be more likely to retain user overrides. Bazel needs msys
+  # bash and TensorFlow will melt down and cry if it finds system bash.
+  # Because, of course it will.
+  bash_exe = which('bash')
+  report('Found Windows bash:', bash_exe)
+  report('NOTE: If the above is system32 bash and you are using bazel to build '
+         'TensorFlow, you are going to have a bad time. Suggest being explicit '
+         'by setting USE_BASH in the environment. I\'m really sorry. '
+         'I didn\'t make this mess... just the messenger')
   cmake_environ = compute_vcvars_environ()
+  report('New Windows Path:', cmake_environ['PATH'])
 
 
 def invoke_generate():
@@ -207,6 +218,9 @@ def invoke_generate():
       f'-DIREE_RELEASE_VERSION:STRING={version_info.get("package-version") or "0.0.1a1"}',
       f'-DIREE_RELEASE_REVISION:STRING={version_info.get("iree-revision") or "HEAD"}',
   ]
+
+  if is_windows and bash_exe:
+    cmake_args.append(f'-DIREE_BAZEL_SH={bash_exe}')
 
   ### HACK: Add a Python3_LIBRARY because cmake needs it, but it legitimately
   ### does not exist on manylinux (or any linux static python).
