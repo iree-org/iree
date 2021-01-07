@@ -1,9 +1,7 @@
 # Google Colaboratory (Colab) Notebooks
 
-To run these notebooks with a local runtime, refer to the
-[Using Colab docs](../docs/using_iree/using_colab.md).
-
-Hosted/remote runtimes are not yet supported.
+Note: some of these notebooks are outdated and will be updated to IREE's latest
+Python bindings soon.
 
 ## Notebooks
 
@@ -50,7 +48,7 @@ for general information about using Colab with GitHub.
 To make changes to a notebook in this repository, one possible workflow is:
 
 *   Open or create the notebook in Colab
-*   Connect to your local runtime
+*   Connect to a hosted or local runtime
 *   Make your changes, run the notebook, etc.
 *   Download the modified notebook using `File > Download .ipynb`
 *   Move the downloaded notebook file into a clone of this repository and submit
