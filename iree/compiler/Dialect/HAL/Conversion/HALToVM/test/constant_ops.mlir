@@ -28,7 +28,7 @@ func private @pool_storage0_buffer_initializer() -> !hal.buffer {
 
 // CHECK: vm.global.ref @pool_storage1_buffer init(@pool_storage1_buffer_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_storage1_buffer init(@pool_storage1_buffer_initializer) : !hal.buffer attributes {sym_visibility = "private"}
-func @pool_storage1_buffer_initializer() -> !hal.buffer attributes {sym_visibility = "private"}
+func private @pool_storage1_buffer_initializer() -> !hal.buffer
 
 // CHECK: vm.global.ref @pool_splats init(@pool_splats_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_splats init(@pool_splats_initializer) : !hal.buffer attributes {sym_visibility = "private"}

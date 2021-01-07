@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @conv
-func @conv(%arg0: tensor<1x4x5x2xf32>, %arg1: tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32> attributes { sym_visibility = "private" } {
+func private @conv(%arg0: tensor<1x4x5x2xf32>, %arg1: tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32> {
   // CHECK: vmla.conv
   // CHECK-SAME: {batch_group_count = 1 : i32,
   // CHECK-SAME: feature_group_count = 1 : i32,

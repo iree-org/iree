@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -cse %s | IreeFileCheck %s
 
 // CHECK-LABEL: @single_reduction
-func @single_reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+func private @single_reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
   // CHECK-DAG: %[[INIT:.+]] = vmla.constant dense<0.000000e+00> : tensor<f32> -> !vmla.buffer
   %cst = constant dense<0.000000e+00> : tensor<f32>
   //  CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[4,8]>
@@ -25,7 +25,7 @@ func @single_reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> attributes { sym
 // -----
 
 // CHECK-LABEL: @multi_reduction
-func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tensor<4xf32>, tensor<4xf32>) attributes { sym_visibility = "private" } {
+func private @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
   //  CHECK-DAG: %[[CST0:.+]] = vmla.constant dense<0.000000e+00> : tensor<f32> -> !vmla.buffer
   %0 = constant dense<0.000000e+00> : tensor<f32>
   //  CHECK-DAG: %[[CST1:.+]] = vmla.constant dense<1.000000e+00> : tensor<f32> -> !vmla.buffer

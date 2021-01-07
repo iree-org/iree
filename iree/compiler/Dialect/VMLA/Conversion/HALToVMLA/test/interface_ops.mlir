@@ -19,7 +19,7 @@ func @inc_rgn_dispatch_0() attributes {iree.module.export} {
   hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<f32>
   return
 }
-func @inc_rgn_dispatch_0_impl(%arg0: tensor<f32>) -> tensor<f32> attributes {iree.module.export, sym_visibility = "private"} {
+func private @inc_rgn_dispatch_0_impl(%arg0: tensor<f32>) -> tensor<f32> attributes {iree.module.export} {
   %cst = constant dense<1.000000e+00> : tensor<f32>
   %0 = mhlo.add %arg0, %cst : tensor<f32>
   return %0 : tensor<f32>

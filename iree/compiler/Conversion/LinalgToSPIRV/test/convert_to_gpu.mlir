@@ -25,10 +25,9 @@ module attributes {
     }
     return
   }
-  func @parallel_4D__num_workgroups__
+  func private @parallel_4D__num_workgroups__
     (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
      !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -92,10 +91,9 @@ module attributes {
     }
     return
   }
-  func @parallel_4D_static__num_workgroups__
+  func private @parallel_4D_static__num_workgroups__
     (!shapex.ranked_shape<[3,4,5,6]>, !shapex.ranked_shape<[3,4,5,6]>,
      !shapex.ranked_shape<[3,4,5,6]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -161,10 +159,9 @@ module attributes {
      }
      return
   }
-  func @scalar_add__num_workgroups__
+  func private @scalar_add__num_workgroups__
     (!shapex.ranked_shape<[]>, !shapex.ranked_shape<[]>,
      !shapex.ranked_shape<[]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

@@ -18,10 +18,9 @@ module attributes {
       memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
     return
   }
-  func @conv_no_padding__num_workgroups__
+  func private @conv_no_padding__num_workgroups__
     (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
      !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -88,10 +87,9 @@ module attributes {
                  outs(%2 : memref<?x?xf32>)
     return
   }
-  func @matmul__num_workgroups__
+  func private @matmul__num_workgroups__
     (!shapex.ranked_shape<[?,?]>, !shapex.ranked_shape<[?,?]>,
      !shapex.ranked_shape<[?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -159,10 +157,9 @@ module attributes {
       memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
     return
   }
-  func @pooling_sum_no_padding__num_workgroups__
+  func private @pooling_sum_no_padding__num_workgroups__
     (!shapex.ranked_shape<[?,?]>, !shapex.ranked_shape<[?,?]>,
      !shapex.ranked_shape<[?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -222,10 +219,9 @@ module attributes {
       memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
     return
   }
-  func @pooling_max_4D__num_workgroups__
+  func private @pooling_max_4D__num_workgroups__
     (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
      !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

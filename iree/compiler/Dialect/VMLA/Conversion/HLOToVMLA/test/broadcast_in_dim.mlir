@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @broadcast_in_dim_2D_3D
-func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
+func private @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> {
   %rs3_2_4 = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
   %input = constant dense<[[1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>
   // CHECK-DAG: %[[SRC:.+]] = vmla.constant
@@ -18,7 +18,7 @@ func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> attributes { sym_visibility 
 // -----
 
 // CHECK-LABEL: @broadcast_in_dim_3D_scalar
-func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
+func private @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> {
   %rs3_2_4 = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
   // CHECK-DAG: %[[SRC:.+]] = vmla.constant
   // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[]>
