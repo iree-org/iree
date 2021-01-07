@@ -211,7 +211,7 @@ jobs:
               -DIREE_BUILD_PYTHON_BINDINGS=ON \
               -DIREE_BUILD_SAMPLES=OFF && \
             python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-compiler-stripped"
+              --build ./iree-build --target install-IreePythonPackage-tools-tf-stripped"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( File a bug.
           mkdir -p $package_dir && touch $package_dir/setup.py

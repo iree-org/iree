@@ -50,8 +50,9 @@ function(iree_py_install_package)
   set(_install_component ${ARG_COMPONENT})
   set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
   set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
+  set(_target_name install-${_install_component})
 
-  if(NOT ${ARG_AUGMENT_EXISTING_PACKAGE})
+  if(NOT ARG_AUGMENT_EXISTING_PACKAGE)
     configure_file(setup.py.in setup.py)
     install(
       FILES
@@ -67,21 +68,25 @@ function(iree_py_install_package)
       DESTINATION "${_install_module_dir}"
     )
 
-    set(_target_name install-${_install_component})
     set(_component_option -DCMAKE_INSTALL_COMPONENT="${ARG_COMPONENT}")
     add_custom_target(${_target_name}
-      DEPENDS ${ARG_DEPS}
       COMMAND "${CMAKE_COMMAND}"
               ${_component_option}
               -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
       USES_TERMINAL)
     add_custom_target(${_target_name}-stripped
-      DEPENDS ${ARG_DEPS}
       COMMAND "${CMAKE_COMMAND}"
               ${_component_option}
               -DCMAKE_INSTALL_DO_STRIP=1
               -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
       USES_TERMINAL)
+  endif()
+
+  # Explicit add dependencies in case if we are just extending a package
+  # vs adding the targets.
+  if(ARG_DEPS)
+    add_dependencies(${_target_name} ${ARG_DEPS})
+    add_dependencies(${_target_name}-stripped ${ARG_DEPS})
   endif()
 
   install(

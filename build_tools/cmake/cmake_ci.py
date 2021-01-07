@@ -269,4 +269,6 @@ if mode == 'generate':
   invoke_generate()
 else:
   # Just pass-through.
-  subprocess.check_call(cmake_commandline(sys.argv[1:]), env=cmake_environ)
+  cmake_args = cmake_commandline(sys.argv[1:])
+  report('Invoke CMake:', ' '.join(cmake_args))
+  subprocess.check_call(cmake_args, env=cmake_environ)
