@@ -31,23 +31,18 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-18.04, windows-2019, macos-latest]
-        build_package: [py-compiler-pkg, py-runtime-pkg]
+        build_package:
+          - py-compiler-pkg
+          - py-runtime-pkg
+          - py-xla-compiler-tools-pkg
+          - py-tflite-compiler-tools-pkg
+          - py-tf-compiler-tools-pkg
         experimental: [false]
         # Add experimental one off combinations below:
         # include:
         #   - os: macos-latest
         #     build_package: compiler
         #     experimental: true
-        include:
-          - os: ubuntu-18.04
-            build_package: py-xla-compiler-tools-pkg
-            experimental: true
-          - os: ubuntu-18.04
-            build_package: py-tflite-compiler-tools-pkg
-            experimental: true
-          - os: ubuntu-18.04
-            build_package: py-tf-compiler-tools-pkg
-            experimental: true
 
     env:
       CIBW_BUILD_VERBOSITY: 1
