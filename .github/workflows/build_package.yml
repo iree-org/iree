@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-18.04, windows-2019, macos-latest]
-        build_package: [compiler, runtime]
+        build_package: [py-compiler-pkg, py-runtime-pkg]
         experimental: [false]
         # Add experimental one off combinations below:
         # include:
@@ -40,13 +40,13 @@ jobs:
         #     experimental: true
         include:
           - os: ubuntu-18.04
-            build_package: py-xla-compiler-tools
+            build_package: py-xla-compiler-tools-pkg
             experimental: true
           - os: ubuntu-18.04
-            build_package: py-tflite-compiler-tools
+            build_package: py-tflite-compiler-tools-pkg
             experimental: true
           - os: ubuntu-18.04
-            build_package: py-tf-compiler-tools
+            build_package: py-tf-compiler-tools-pkg
             experimental: true
 
     env:
@@ -97,7 +97,7 @@ jobs:
       # time by not building IREE's runtime, but it is small compared to
       # the compiler build.
       - name: Build compiler wheels
-        if: "contains(matrix.build_package, 'compiler')"
+        if: "contains(matrix.build_package, 'py-compiler-pkg')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -123,7 +123,7 @@ jobs:
       # directory between runs. Most of the build will be incremental.
       # We save a little bit of time by disabling the compiler build.
       - name: Build runtime wheels
-        if: "contains(matrix.build_package, 'runtime')"
+        if: "contains(matrix.build_package, 'py-runtime-pkg')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -146,7 +146,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build XLA Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-xla-compiler-tools')"
+        if: "contains(matrix.build_package, 'py-xla-compiler-tools-pkg')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -170,7 +170,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build TFLite Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-tflite-compiler-tools')"
+        if: "contains(matrix.build_package, 'py-tflite-compiler-tools-pkg')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -195,7 +195,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build TF Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-tf-compiler-tools')"
+        if: "contains(matrix.build_package, 'py-tf-compiler-tools-pkg')"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
