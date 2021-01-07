@@ -101,8 +101,8 @@ class ConvertFunc : public ConvertToLLVMPattern {
         LLVM::LLVMPointerType::get(LLVM::LLVMIntegerType::get(context, 32));
     signatureConverter.addInputs(
         {packedBuffersArgsTy, pushConstantArgTy, xyzTy, xyzTy, xyzTy});
-    SmallVector<Type, 5> llvmInputTypes{
-        packedBuffersArgsTy, pushConstantArgTy, xyzTy, xyzTy, xyzTy};
+    SmallVector<Type, 5> llvmInputTypes{packedBuffersArgsTy, pushConstantArgTy,
+                                        xyzTy, xyzTy, xyzTy};
 
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute, 4> funcAttrs;
@@ -160,9 +160,7 @@ class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
     if (!parentFuncOp) return failure();
 
     assert(parentFuncOp.getNumArguments() > 0 &&
-           parentFuncOp.getArgument(kIndexPackedBuffer)
-               .getType()
-               .isa<Type>());
+           parentFuncOp.getArgument(kIndexPackedBuffer).getType().isa<Type>());
 
     Location loc = op->getLoc();
     auto interfaceBindingSubspanOp =
