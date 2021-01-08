@@ -95,7 +95,8 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addPass(createDeclareNumWorkgroupsFnPass());
+  if (!clEnableLinalgOnTensors)
+    passManager.addPass(createDeclareNumWorkgroupsFnPass());
 
   passManager.addPass(createInlinerPass());
 
@@ -110,7 +111,6 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
-    passManager.addPass(createLegalizeNumWorkgroupsFnPass());
     passManager.addPass(createCopyRemovalPass());
     passManager.addPass(createBufferHoistingPass());
     passManager.addPass(createBufferLoopHoistingPass());
