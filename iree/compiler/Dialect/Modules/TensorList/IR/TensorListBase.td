@@ -37,7 +37,7 @@ def TensorList_TensorList : DialectType<
     TensorList_Dialect,
     CPred<"$_self.isa<IREE::TensorList::TensorListType>()">,
     "tensorlist.list"> {
-  let typeDescription = [{
+  let description = [{
     IREE VM type representing a TensorList.
   }];
 }

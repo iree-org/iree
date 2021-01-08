@@ -42,7 +42,7 @@ struct FastExpConversionPattern : public OpRewritePattern<LLVM::ExpOp> {
     Value x = op.getOperand();
 
     auto floatType = LLVM::LLVMFloatType::get(rewriter.getContext());
-    auto i32Type = LLVM::LLVMIntegerType::get(rewriter.getContext(), 32);
+    auto i32Type = IntegerType::get(rewriter.getContext(), 32);
 
     Value ln2 = rewriter.create<LLVM::ConstantOp>(
         loc, floatType, rewriter.getF32FloatAttr(ln2Const));
