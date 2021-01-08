@@ -38,10 +38,9 @@ module attributes {
                  outs(%ret0 : memref<4096x4096xf16>)
     return
   }
-  func @matmul_static_shape__num_workgroups__
+  func private @matmul_static_shape__num_workgroups__
     (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
      !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

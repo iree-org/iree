@@ -27,10 +27,9 @@ module attributes {
     linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
     return
   }
-  func @matmul_static_shape__num_workgroups__
+  func private @matmul_static_shape__num_workgroups__
     (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
      !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -311,10 +310,9 @@ module attributes {
     linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
     return
   }
-  func @batch_matmul_fused_fillop__num_workgroups__
+  func private @batch_matmul_fused_fillop__num_workgroups__
     (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
      !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

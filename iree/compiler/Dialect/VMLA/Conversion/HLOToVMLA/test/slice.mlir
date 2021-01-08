@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @slice_whole_stride
-func @slice_whole_stride(%arg0 : tensor<3x4xi32>) -> tensor<1x4xi32> attributes { sym_visibility = "private" } {
+func private @slice_whole_stride(%arg0 : tensor<3x4xi32>) -> tensor<1x4xi32> {
   // CHECK-SAME: %[[SRC:.+]]:
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c16
   // CHECK:      vmla.copy
@@ -21,7 +21,7 @@ func @slice_whole_stride(%arg0 : tensor<3x4xi32>) -> tensor<1x4xi32> attributes 
 // -----
 
 // CHECK-LABEL: @slice_stride_part
-func @slice_stride_part(%arg0 : tensor<3x4xi32>) -> tensor<1x2xi32> attributes { sym_visibility = "private" } {
+func private @slice_stride_part(%arg0 : tensor<3x4xi32>) -> tensor<1x2xi32> {
   // CHECK-SAME: %[[SRC:.+]]:
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c8
   // CHECK:      vmla.copy
@@ -41,7 +41,7 @@ func @slice_stride_part(%arg0 : tensor<3x4xi32>) -> tensor<1x2xi32> attributes {
 // -----
 
 // CHECK-LABEL: @slice_multi_stride
-func @slice_multi_stride(%arg0: tensor<3x4xi32>) -> tensor<2x4xi32> attributes { sym_visibility = "private" } {
+func private @slice_multi_stride(%arg0: tensor<3x4xi32>) -> tensor<2x4xi32> {
   // CHECK-SAME: %[[SRC:.+]]:
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c32
   // CHECK:      vmla.copy
