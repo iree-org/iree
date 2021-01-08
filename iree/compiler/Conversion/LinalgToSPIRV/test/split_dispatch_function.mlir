@@ -22,10 +22,9 @@ module {
     linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
     return
   }
-  func @kernel_fusable_fill_conv_ops_num_workgroups__
+  func private @kernel_fusable_fill_conv_ops_num_workgroups__
     (!shapex.ranked_shape<[?,2,2,512]>, !shapex.ranked_shape<[3,3,512,1]>,
      !shapex.ranked_shape<[?,1,1,512]>) -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -61,11 +60,11 @@ module {
                   outs(%ts3 : memref<?x?xf32>)
     return
   }
-  func @kernel_fusable_matmul_ops_num_workgroups__(!shapex.ranked_shape<[?,512]>,
+  func private @kernel_fusable_matmul_ops_num_workgroups__(
+                                                   !shapex.ranked_shape<[?,512]>,
                                                    !shapex.ranked_shape<[512,?]>,
                                                    !shapex.ranked_shape<[?,?]>)
                                                   -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -91,11 +90,10 @@ module {
       memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
     return
   }
-  func @kernel_fusable_pooling__num_workgroups__(!shapex.ranked_shape<[?,?]>,
+  func private @kernel_fusable_pooling__num_workgroups__(!shapex.ranked_shape<[?,?]>,
                                                  !shapex.ranked_shape<[?,?]>,
                                                  !shapex.ranked_shape<[?,?]>)
                                                 -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -142,11 +140,10 @@ module {
     linalg.fill(%ts2, %cst) : memref<?x1x1x512xf32>, f32
     return
   }
-  func @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
                                  !shapex.ranked_shape<[3,3,512,1]>,
                                  !shapex.ranked_shape<[?,1,1,512]>)
                                  -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -214,11 +211,10 @@ module {
     linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
     return
   }
-  func @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
                                  !shapex.ranked_shape<[3,3,512,1]>,
                                  !shapex.ranked_shape<[?,1,1,512]>)
                                  -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -242,7 +238,7 @@ module {
     return
   }
   // CHECK-LABEL: @kernel__num_workgroups__
-  func @kernel__num_workgroups__(!shapex.ranked_shape<[1,2,2,512]>, !shapex.ranked_shape<[3,3,1,512]>, !shapex.ranked_shape<[1,1,1,512]>) -> (index, index, index) attributes {sym_visibility = "private"}
+  func private @kernel__num_workgroups__(!shapex.ranked_shape<[1,2,2,512]>, !shapex.ranked_shape<[3,3,1,512]>, !shapex.ranked_shape<[1,1,1,512]>) -> (index, index, index)
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -289,10 +285,9 @@ module {
     linalg.copy(%1, %2) : memref<12x4xf32>, memref<18x12xf32, #map0>
     return
   }
-  func @subview_interleaved__num_workgroups__(!shapex.ranked_shape<[12,4]>,
+  func private @subview_interleaved__num_workgroups__(!shapex.ranked_shape<[12,4]>,
                                               !shapex.ranked_shape<[18,12]>)
                                               -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
@@ -339,11 +334,10 @@ module {
     linalg.copy(%3, %1) : memref<1x2x4xf32>, memref<1x2x4xf32>
     return
   }
-  func @reshape_interleaved__num_workgroups__(!shapex.ranked_shape<[2,4]>,
+  func private @reshape_interleaved__num_workgroups__(!shapex.ranked_shape<[2,4]>,
                                               !shapex.ranked_shape<[2,4]>,
                                               !shapex.ranked_shape<[1,2,4]>)
                                               -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -390,12 +384,11 @@ module {
     }
     return
   }
-  func @predict_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[1,512,1]>,
+  func private @predict_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[1,512,1]>,
                                                 !shapex.ranked_shape<[4,8,16]>,
                                                 !shapex.ranked_shape<[1,512,1]>,
                                                 !shapex.ranked_shape<[4,8,16]>)
                                                 -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -468,12 +461,11 @@ module {
     }
     return
   }
-  func @kernel_fusable_matmul_ops_num_workgroups__(!shapex.ranked_shape<[?,512]>,
+  func private @kernel_fusable_matmul_ops_num_workgroups__(!shapex.ranked_shape<[?,512]>,
                                                    !shapex.ranked_shape<[512,?]>,
                                                    !shapex.ranked_shape<[?,?]>,
                                                    !shapex.ranked_shape<[?,?]>)
                                                   -> (index, index, index)
-  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

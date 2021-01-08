@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @abs_scalar
-func @abs_scalar(%arg0 : tensor<f32>) -> tensor<f32> attributes { sym_visibility = "private" } {
+func private @abs_scalar(%arg0 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
   // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
   // CHECK-NEXT: vmla.abs %arg0, out %[[BUF]] : f32
@@ -13,7 +13,7 @@ func @abs_scalar(%arg0 : tensor<f32>) -> tensor<f32> attributes { sym_visibility
 // -----
 
 // CHECK-LABEL: @abs_tensor
-func @abs_tensor(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+func private @abs_tensor(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 16
   // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
   // CHECK-NEXT: vmla.abs %arg0, out %[[BUF]] : f32
@@ -25,7 +25,7 @@ func @abs_tensor(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibi
 // -----
 
 // CHECK-LABEL: @clamp
-func @clamp(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+func private @clamp(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 16
   // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
   // CHECK-NEXT: vmla.clamp %arg0, %arg1, %arg2, out %[[BUF]] : f32
@@ -37,7 +37,7 @@ func @clamp(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>)
 // -----
 
 // CHECK-LABEL: @finite
-func @finite(%arg0 : tensor<4xf32>) -> tensor<4xi1> attributes { sym_visibility = "private" } {
+func private @finite(%arg0 : tensor<4xf32>) -> tensor<4xi1> {
   // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
   // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
   // CHECK-NEXT: vmla.finite %arg0, out %[[BUF]] : f32
@@ -49,7 +49,7 @@ func @finite(%arg0 : tensor<4xf32>) -> tensor<4xi1> attributes { sym_visibility 
 // -----
 
 // CHECK-LABEL: @not
-func @not(%arg0 : tensor<4xi8>) -> tensor<4xi8> attributes { sym_visibility = "private" } {
+func private @not(%arg0 : tensor<4xi8>) -> tensor<4xi8> {
   // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
   // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
   // CHECK-NEXT: vmla.not %arg0, out %[[BUF]] : i8

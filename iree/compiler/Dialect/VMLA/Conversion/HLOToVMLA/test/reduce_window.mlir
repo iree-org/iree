@@ -1,8 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -cse %s | IreeFileCheck %s
 
 // CHECK-LABEL: @pooling_max
-func @pooling_max(%arg0: tensor<1x4x6x1xf32>) -> tensor<1x2x2x1xf32>
-    attributes { sym_visibility = "private" } {
+func private @pooling_max(%arg0: tensor<1x4x6x1xf32>) -> tensor<1x2x2x1xf32> {
   // CHECK: vmla.pooling.max
   %cst = constant dense<0.000000e+00> : tensor<f32>
   %0 = "mhlo.reduce_window"(%arg0, %cst) ( {
@@ -18,8 +17,7 @@ func @pooling_max(%arg0: tensor<1x4x6x1xf32>) -> tensor<1x2x2x1xf32>
 // -----
 
 // CHECK-LABEL: @pooling_min
-func @pooling_min(%arg0: tensor<1x4x6x1xi32>) -> tensor<1x2x2x1xi32>
-    attributes { sym_visibility = "private" } {
+func private @pooling_min(%arg0: tensor<1x4x6x1xi32>) -> tensor<1x2x2x1xi32> {
   // CHECK: vmla.pooling.min
   %cst = constant dense<0> : tensor<i32>
   %0 = "mhlo.reduce_window"(%arg0, %cst) ( {
@@ -35,8 +33,7 @@ func @pooling_min(%arg0: tensor<1x4x6x1xi32>) -> tensor<1x2x2x1xi32>
 // -----
 
 // CHECK-LABEL: @pooling_sum
-func @pooling_sum(%arg0: tensor<4x6xf32>) -> tensor<3x4xf32> attributes
-    { sym_visibility = "private" } {
+func private @pooling_sum(%arg0: tensor<4x6xf32>) -> tensor<3x4xf32> {
   // CHECK: vmla.pooling.sum
   %cst = constant dense<0.000000e+00> : tensor<f32>
   %0 = "mhlo.reduce_window"(%arg0, %cst) ( {

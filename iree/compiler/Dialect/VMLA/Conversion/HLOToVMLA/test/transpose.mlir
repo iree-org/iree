@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @transpose
-func @transpose() -> tensor<24x7x10xf32> attributes { sym_visibility = "private" } {
+func private @transpose() -> tensor<24x7x10xf32> {
   // CHECK-DAG: %[[SRC:.+]] = vmla.constant
   %input = constant dense<1.0> : tensor<7x24x10xf32>
   // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[7,24,10]>
