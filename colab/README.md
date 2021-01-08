@@ -1,8 +1,5 @@
 # Google Colaboratory (Colab) Notebooks
 
-Note: some of these notebooks are outdated and will be updated to IREE's latest
-Python bindings soon.
-
 ## Notebooks
 
 ### [edge_detection\.ipynb](edge_detection.ipynb)
@@ -32,12 +29,6 @@ Loads a pretrained
 model and runs it using IREE
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/resnet.ipynb)
-
-### [simple_tensorflow_module_import\.ipynb](simple_tensorflow_module_import.ipynb)
-
-Defines a simple TF module, saves it and loads it in IREE
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/simple_tensorflow_module_import.ipynb)
 
 ## Working with GitHub
 
