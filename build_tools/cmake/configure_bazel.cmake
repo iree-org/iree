@@ -43,7 +43,9 @@ function(iree_configure_bazel)
     set(_bazel_compilation_mode_opt "build --compilation_mode=opt")
     # Note: Bazel --strip is not strip.
     # https://docs.bazel.build/versions/master/user-manual.html#flag--strip
-    set(_bazel_strip_opt "build --linkopt=-Wl,--strip-all")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      set(_bazel_strip_opt "build --linkopt=-Wl,--strip-all")
+    endif()
   endif()
 
   # Use the utility to emit _bazelrc_file configuration options.
