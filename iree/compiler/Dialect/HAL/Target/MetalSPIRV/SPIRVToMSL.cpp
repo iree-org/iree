@@ -19,6 +19,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+
+// Disable exception handling in favor of assertions.
+#define SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 #include "third_party/spirv_cross/spirv_msl.hpp"
 
 #define DEBUG_TYPE "spirv-to-msl"

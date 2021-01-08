@@ -357,8 +357,7 @@ struct ParamUnpack<ref<T>> {
       status = InvalidArgumentErrorBuilder(IREE_LOC)
                << "Parameter contains a reference to the wrong type; have "
                << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
-               << ref_type_descriptor<T>::get()->type_name.data << " ("
-               << typeid(storage_type).name() << ")";
+               << ref_type_descriptor<T>::get()->type_name.data;
     } else {
       out_param = {};
     }
@@ -379,8 +378,7 @@ struct ParamUnpack<const ref<T>> {
       status = InvalidArgumentErrorBuilder(IREE_LOC)
                << "Parameter contains a reference to the wrong type; have "
                << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
-               << ref_type_descriptor<T>::get()->type_name.data << " ("
-               << typeid(storage_type).name() << ")";
+               << ref_type_descriptor<T>::get()->type_name.data;
     } else {
       out_param = {};
     }
@@ -406,8 +404,7 @@ struct ParamUnpack<absl::string_view> {
                << "Parameter contains a reference to the wrong type; have "
                << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
                << ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
-                      ->type_name.data
-               << " (" << typeid(storage_type).name() << ")";
+                      ->type_name.data;
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};
