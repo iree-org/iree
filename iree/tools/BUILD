@@ -206,8 +206,8 @@ cc_library(
     ],
     deps = [
         "@llvm-project//mlir:IR",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:lhlo",
     ],
 )
 
@@ -293,6 +293,7 @@ cc_binary(
     ],
     tags = ["hostonly"],
     deps = [
+        "//build_tools:default_linkopts",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",

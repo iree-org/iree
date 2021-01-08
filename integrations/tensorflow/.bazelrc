@@ -1,0 +1,25 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Import the main bazelrc config. This is in a separate file so that it's
+# possible to turn off all user bazelrc options by specifying
+# `--nosystem_rc --nohome_rc --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc`
+try-import %workspace%/../../build_tools/bazel/iree.bazelrc
+
+# Run the configure_bazel.py script to generate.
+try-import %workspace%/../../configured.bazelrc
+
+# The user.bazelrc file is not checked in but available for local mods.
+# Always keep this at the end of the file so that user flags override.
+try-import %workspace%/../../user.bazelrc

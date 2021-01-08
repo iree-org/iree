@@ -40,9 +40,9 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:legalize_to_linalg",
+        "@mlir-hlo//:map_lmhlo_to_scalar_op",
     ],
 )
 
@@ -76,7 +76,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:map_lmhlo_to_scalar_op",
     ],
 )

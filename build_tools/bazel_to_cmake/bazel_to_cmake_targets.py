@@ -59,7 +59,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
-    "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
+    "@cpuinfo//:cpuinfo": ["cpuinfo"],
     "@half//:half": ["half"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
