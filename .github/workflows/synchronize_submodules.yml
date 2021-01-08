@@ -31,7 +31,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           # Get all history. We're force-pushing here and will otherwise drop
-          # all the branch history
+          # all the branch history. This takes a whopping 2 seconds. I think
+          # we'll live.
           fetch-depth: 0
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
@@ -48,3 +49,11 @@ jobs:
       - name: Pushing changes
         if: env.has_diff == 'true'
         run: git push -f origin ${{ github.ref }}
+
+  check:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Checking submodules
+        run: ./scripts/git/submodule_versions.py check
