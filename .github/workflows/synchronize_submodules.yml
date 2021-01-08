@@ -34,8 +34,8 @@ jobs:
           # all the branch history. This takes a whopping 2 seconds. I think
           # we'll live.
           fetch-depth: 0
-      - name: Initializing submodules
-        run: ./scripts/git/submodule_versions.py init
+      - name: Importing submodules from SUBMODULE_VERSIONS
+        run: ./scripts/git/submodule_versions.py import
       - name: Checking submodule state
         run: |
           echo "has_diff=false" >> $GITHUB_ENV
