@@ -20,6 +20,7 @@ name: Synchronize Submodules
 on:
   push:
     branches:
+      # Do not add this to human branches like main. It rewrites history!
       - google
 
 jobs:
