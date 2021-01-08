@@ -20,7 +20,7 @@ build/
 build-*/
 
 # Bazel artifacts
-/bazel-*
+**/bazel-*
 
 # Local-only config options
 configured.bazelrc

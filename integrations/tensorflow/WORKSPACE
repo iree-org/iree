@@ -1,0 +1,89 @@
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
+
+IREE_PATH = "../.."
+
+###############################################################################
+# Skylib
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
+###############################################################################
+
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
+########################### Configure TensorFlow ###############################
+# Bootstrap TensorFlow.
+maybe(
+    local_repository,
+    name = "org_tensorflow",
+    path = paths.join(IREE_PATH, "third_party/tensorflow"),
+)
+
+# io_bazel_rules_closure
+# This is copied from https://github.com/tensorflow/tensorflow/blob/v2.0.0-alpha0/WORKSPACE.
+# Dependency of:
+#   TensorFlow (boilerplate for tf_workspace(), apparently)
+http_archive(
+    name = "io_bazel_rules_closure",
+    sha256 = "5b00383d08dd71f28503736db0500b6fb4dda47489ff5fc6bed42557c07c6ba9",
+    strip_prefix = "rules_closure-308b05b2419edb5c8ee0471b67a40403df940149",
+    urls = [
+        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_closure/archive/308b05b2419edb5c8ee0471b67a40403df940149.tar.gz",
+        "https://github.com/bazelbuild/rules_closure/archive/308b05b2419edb5c8ee0471b67a40403df940149.tar.gz",  # 2019-06-13
+    ],
+)
+
+# Import all of the tensorflow dependencies. Note that we are deliberately
+# letting TensorFlow take control of all the dependencies it sets up, whereas
+# ours are initialized with `maybe`. Actually tracking this with Bazel is PITA
+# and for now this gets TF stuff building. This includes, for instance,
+# @llvm-project and @com_google_absl.
+load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
+tf_repositories()
+
+
+# TF depends on tf_toolchains.
+http_archive(
+    name = "tf_toolchains",
+    sha256 = "d60f9637c64829e92dac3f4477a2c45cdddb9946c5da0dd46db97765eb9de08e",
+    strip_prefix = "toolchains-1.1.5",
+    urls = [
+        "http://mirror.tensorflow.org/github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+        "https://github.com/tensorflow/toolchains/archive/v1.1.5.tar.gz",
+    ],
+)
+
+###############################################################################
+
+# We need a shim here to make this use the version of mlir-hlo present in
+# TensorFlow. This shim is just alias rules that forward to the TF rule. Note
+# that because configure_iree_submodule_deps uses `maybe` and we define this
+# first we will use this definition instead of the one there.
+maybe(
+    local_repository,
+    name = "mlir-hlo",
+    path = "build_tools/overlay/mlir-hlo",
+)
+
+maybe(
+    local_repository,
+    name = "iree",
+    path = IREE_PATH,
+)
+
+load("@iree//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
+
+configure_iree_submodule_deps(
+    iree_path = IREE_PATH,
+    iree_repo_alias = "@iree",
+)

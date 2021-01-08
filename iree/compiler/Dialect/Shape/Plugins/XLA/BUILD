@@ -30,6 +30,6 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@mlir-hlo//:hlo",
     ],
 )

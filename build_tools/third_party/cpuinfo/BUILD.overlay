@@ -1,6 +1,4 @@
 # cpuinfo, a library to detect information about the host CPU
-# Taken from https://github.com/google/XNNPACK/blob/master/third_party/cpuinfo.BUILD
-
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
@@ -96,13 +94,42 @@ MACH_ARM_SRCS = [
 ]
 
 cc_library(
+    name = "clog",
+    srcs = [
+        "deps/clog/src/clog.c",
+    ],
+    hdrs = [
+        "deps/clog/include/clog.h",
+    ],
+    copts = select({
+        ":windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-result"],
+    }),
+    linkopts = select({
+        ":android": ["-llog"],
+        "//conditions:default": [],
+    }),
+    linkstatic = select({
+        # https://github.com/bazelbuild/bazel/issues/11552
+        ":macos_x86_64": False,
+        "//conditions:default": True,
+    }),
+    defines = select({
+        # When linkstatic=False, we need default visibility
+        ":macos_x86_64": ["CLOG_VISIBILITY="],
+        "//conditions:default": [],
+    }),
+    strip_include_prefix = "deps/clog/include",
+)
+
+cc_library(
     name = "cpuinfo_impl",
     srcs = select({
         ":linux_x86_64": COMMON_SRCS + X86_SRCS + LINUX_SRCS + LINUX_X86_SRCS,
         ":linux_arm": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM32_SRCS,
-        ":linux_armeabi": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM32_SRCS,
         ":linux_armhf": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM32_SRCS,
         ":linux_armv7a": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM32_SRCS,
+        ":linux_armeabi": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM32_SRCS,
         ":linux_aarch64": COMMON_SRCS + ARM_SRCS + LINUX_SRCS + LINUX_ARM64_SRCS,
         ":macos_x86_64": COMMON_SRCS + X86_SRCS + MACH_SRCS + MACH_X86_SRCS,
         ":windows_x86_64": COMMON_SRCS + X86_SRCS + WINDOWS_X86_SRCS,
@@ -127,10 +154,14 @@ cc_library(
         ":windows_x86_64": [],
         "//conditions:default": C99OPTS,
     }) + [
-        "-Iexternal/com_github_pytorch_cpuinfo/include",
-        "-Iexternal/com_github_pytorch_cpuinfo/src",
+        "-Iexternal/cpuinfo/include",
+        "-Iexternal/cpuinfo/src",
     ],
-    linkstatic = True,
+    linkstatic = select({
+        # https://github.com/bazelbuild/bazel/issues/11552
+        ":macos_x86_64": False,
+        "//conditions:default": True,
+    }),
     # Headers must be in textual_hdrs to allow us to set the standard to C99
     textual_hdrs = [
         "include/cpuinfo.h",
@@ -166,36 +197,16 @@ cc_library(
 )
 
 cc_library(
-    name = "clog",
-    srcs = [
-        "deps/clog/src/clog.c",
-    ],
+    name = "cpuinfo_with_unstripped_include_path",
     hdrs = [
-        "deps/clog/include/clog.h",
+        "include/cpuinfo.h",
     ],
-    copts = select({
-        ":windows": [],
-        "//conditions:default": ["-Wno-unused-result"],
-    }),
-    linkopts = select({
-        ":android": ["-llog"],
-        "//conditions:default": [],
-    }),
-    linkstatic = True,
-    strip_include_prefix = "deps/clog/include",
+    deps = [
+        ":cpuinfo_impl",
+    ],
 )
 
 ############################# Build configurations #############################
-
-config_setting(
-    name = "android",
-    values = {"crosstool_top": "//external:android/crosstool"},
-)
-
-config_setting(
-    name = "windows",
-    values = {"cpu": "x64_windows"},
-)
 
 config_setting(
     name = "linux_x86_64",
@@ -205,11 +216,6 @@ config_setting(
 config_setting(
     name = "linux_arm",
     values = {"cpu": "arm"},
-)
-
-config_setting(
-    name = "linux_armeabi",
-    values = {"cpu": "armeabi"},
 )
 
 config_setting(
@@ -223,6 +229,11 @@ config_setting(
 )
 
 config_setting(
+    name = "linux_armeabi",
+    values = {"cpu": "armeabi"},
+)
+
+config_setting(
     name = "linux_aarch64",
     values = {"cpu": "aarch64"},
 )
@@ -233,6 +244,11 @@ config_setting(
         "apple_platform_type": "macos",
         "cpu": "darwin",
     },
+)
+
+config_setting(
+    name = "android",
+    values = {"crosstool_top": "//external:android/crosstool"},
 )
 
 config_setting(
