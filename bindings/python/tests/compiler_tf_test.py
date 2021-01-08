@@ -54,7 +54,7 @@ class TfCompilerTest(tf.test.TestCase):
   def testImportSavedModel(self):
     import_mlir = compile_saved_model(self.smdir,
                                       import_only=True).decode("utf-8")
-    self.assertIn("func @simple_matmul", import_mlir)
+    self.assertIn("sym_name = \"simple_matmul\"", import_mlir)
 
   def testCompileSavedModel(self):
     binary = compile_saved_model(self.smdir,
