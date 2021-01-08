@@ -108,7 +108,7 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
   static StringRef getKindName() { return "{2}"; }
 
 )",
-                structAttr.getDescription(), structAttr.getStructClassName(),
+                structAttr.getSummary(), structAttr.getStructClassName(),
                 structAttr.getStructKind(),
                 structAttr.getAllFields().empty()
                     ? "Attribute"
@@ -300,7 +300,7 @@ static void emitVerifierDef(const StructAttr &structAttr, raw_ostream &os) {
 )",
                   tgfmt(type.getConditionTemplate(),
                         &fmt.withSelf(field.getName()), field.getName()),
-                  field.getName(), type.getDescription());
+                  field.getName(), type.getSummary());
   }
 
   os << "  return success();\n";
