@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Edits the HEAD commit to use the submodule state specified in SUBMODULE_VERSIONS
+# Edits the HEAD commit to use the submodule state specified in SUBMODULE_VERSIONS.txt
 # WARNING: rewrites history!
 
 name: Synchronize Submodules
@@ -35,7 +35,7 @@ jobs:
           # all the branch history. This takes a whopping 2 seconds. I think
           # we'll live.
           fetch-depth: 0
-      - name: Importing submodules from SUBMODULE_VERSIONS
+      - name: Importing submodules from SUBMODULE_VERSIONS.txt
         run: ./scripts/git/submodule_versions.py import
       - name: Checking submodule state
         run: |
