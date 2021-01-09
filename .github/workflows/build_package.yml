@@ -103,28 +103,6 @@ jobs:
           path: 'main_checkout'
           submodules: true
 
-      - uses: actions/setup-python@v2
-        name: Install Python
-        with:
-          python-version: '3.8'
-
-      - name: Write version info
-        shell: bash
-        run: |
-          cat << EOF > ./main_checkout/version_info.json
-          {
-            "package-suffix": "${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.package_version }}",
-            "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
-          }
-          EOF
-          cat ./main_checkout/version_info.json
-
-      - name: Install cibuildwheel
-        shell: bash
-        run: |
-          python -m pip install cibuildwheel==1.7.2
-
       # It is 2021. And the Windows Path is still a mess.
       - name: Set up Visual Studio shell
         if: "contains(matrix.os, 'windows')"
@@ -145,6 +123,30 @@ jobs:
           $env:path -split ";"
           echo "--- Result of asking bash to run 'mount':"
           bash -c mount
+
+      # Setup python after getting the windows dev path set up and adding
+      # msys to it (since we want this python to take precedence).
+      - uses: actions/setup-python@v2
+        name: Install Python
+        with:
+          python-version: '3.8'
+
+      - name: Install cibuildwheel
+        shell: bash
+        run: |
+          python -m pip install cibuildwheel==1.7.2
+
+      - name: Write version info
+        shell: bash
+        run: |
+          cat << EOF > ./main_checkout/version_info.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.package_version }}",
+            "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./main_checkout/version_info.json
 
       # Compiler wheels are not python version specific, so we just shard and
       # build once for an examplar version of python. This could save a bit of
