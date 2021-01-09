@@ -36,6 +36,7 @@ class CompilerTest(unittest.TestCase):
     text = compile_file(path, import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("mhlo.constant", text)
+    self.assertIn("iree.module.export", text)
 
   def testCompileBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.pb")
