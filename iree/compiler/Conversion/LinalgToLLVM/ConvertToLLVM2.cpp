@@ -293,6 +293,14 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorContractLoweringPatterns(patterns, &getContext());
     applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
+  {
+    OwningRewritePatternList vectorToLoopsPatterns;
+    populateVectorToSCFConversionPatterns(
+        vectorToLoopsPatterns, &getContext(),
+        VectorTransferToSCFOptions().setUnroll(true));
+    applyPatternsAndFoldGreedily(getOperation(),
+                                 std::move(vectorToLoopsPatterns));
+  }
 
   auto module = getOperation();
 

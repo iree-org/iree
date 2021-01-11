@@ -33,9 +33,16 @@ of feedback on any [communication channels](#communication-channels)!
 
 ## Getting Started
 
-For development, IREE supports both Bazel and CMake on Windows and Linux. We are
-working on enabling macOS support. For deployment, IREE aims to additionally
-cover Android and iOS.
+### Quick Start using Python
+
+Python packages are published on the
+[releases](https://github.com/google/iree/releases) page. See the
+[colab/](https://github.com/google/iree/tree/main/colab) directory for examples.
+
+### Building from Source
+
+IREE can be built from source using both Bazel and CMake on Windows and Linux.
+We also have experimental macOS support.
 
 Please see the [Getting Started](https://google.github.io/iree/get-started)
 pages on IREE's [documentation hub](https://google.github.io/iree) to configure,

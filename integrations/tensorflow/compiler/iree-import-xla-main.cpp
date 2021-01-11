@@ -27,6 +27,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/xla/hlo_to_mlir_hlo.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
@@ -152,6 +153,19 @@ int main(int argc, char **argv) {
     return 2;
   }
 
+  // Find the entry function an annotate it as exported.
+  // Note that the XLA importer always produced an MLIR module with a @main
+  // function.
+  std::string entryName = "main";
+  SymbolTable symbolTable(module.get());
+  Operation *mainFunc = symbolTable.lookup(entryName);
+  if (!mainFunc) {
+    llvm::errs() << "Unable to find main function '" << entryName
+                 << "' in converted module.\n";
+    return 3;
+  }
+  mainFunc->setAttr("iree.module.export", UnitAttr::get(&context));
+
   // Save.
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
     auto outputFile = openOutputFile(savePath);
@@ -161,6 +175,7 @@ int main(int argc, char **argv) {
     }
     OpPrintingFlags printFlags;
     printFlags.enableDebugInfo();
+    printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";
     outputFile->keep();

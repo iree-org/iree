@@ -108,53 +108,19 @@ def cmake_commandline(args):
   return cmake_command_prefix + args
 
 
-### On Windows, we need to make sure to wrap any cmake invocation to populate
-### vcvars. In order to do this robustly, we have to get another tool. Because,
-### why wouldn't we?
-### So we install vswhere if needed. Then we create a temporary batch file
-### that calls vcvarsall.bat and prints the resulting environment (because for
-### the life of me, I could not figure out the god-forsaken quoting incantation
-### to do a "cmd /c ... & ..."), capture the environment and use it in any
-### calls to cmake. Awesome.
 if is_windows:
-
-  def compute_vcvars_environ():
-    if os.environ.get('VCINSTALLDIR'):
-      report('Appear to be running with vcvars set. Not resetting.')
-    use_vswhere = use_tool_path('vswhere')
-    if not use_vswhere:
-      report('vswhere not found. attempting to install it.')
-      subprocess.check_call(['choco', 'install', 'vswhere'])
-    use_vswhere = use_tool_path('vswhere')
-    if not use_vswhere:
-      report('Still could not find vswhere after attempting to install it')
-    vs_install_path = subprocess.check_output(
-        ['vswhere', '-property', 'installationPath']).decode('utf-8').strip()
-    report('Found visual studio installation:', vs_install_path)
-    vcvars_all = os.path.join(vs_install_path, 'VC', 'Auxiliary', 'Build',
-                              'vcvarsall.bat')
-    vcvars_arch = get_setting('VCVARS_ARCH', 'x64')
-    with tempfile.NamedTemporaryFile(mode='wt', delete=False,
-                                     suffix='.cmd') as f:
-      f.write('@echo off\n')
-      f.write(f'call "{vcvars_all}" {vcvars_arch} > NUL\n')
-      f.write('set\n')
-    try:
-      env_vars = subprocess.check_output(["cmd", "/c",
-                                          f.name]).decode('utf-8').splitlines()
-    finally:
-      os.unlink(f.name)
-
-    cmake_environ = {}
-    for env_line in env_vars:
-      name, value = env_line.split('=', maxsplit=1)
-      cmake_environ[name] = value
-    if 'VCINSTALLDIR' not in cmake_environ:
-      report('vcvars environment did not include VCINSTALLDIR:\n',
-             cmake_environ)
-    return cmake_environ
-
-  cmake_environ = compute_vcvars_environ()
+  # Bazel needs msys bash and TensorFlow will melt down and cry if it finds
+  # system bash. Because, of course it will.
+  # Note that we don't set this as a CMake option because it may have spaces
+  # in the path, use backslashes or various other things that get corrupted
+  # in the five or six layers of shoddy string transformations between here
+  # and where it gets used.
+  bash_exe = which('bash')
+  report('Found Windows bash:', bash_exe)
+  report('NOTE: If the above is system32 bash and you are using bazel to build '
+         'TensorFlow, you are going to have a bad time. Suggest being explicit '
+         'adding the correct directory to your path. I\'m really sorry. '
+         'I didn\'t make this mess... just the messenger')
 
 
 def invoke_generate():

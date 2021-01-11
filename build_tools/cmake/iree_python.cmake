@@ -146,10 +146,36 @@ function(iree_pyext_module)
     "$<BUILD_INTERFACE:${ARG_INCLUDES}>"
   )
 
+  # pybind11 requires both RTTI and Exceptions, and it does not know that
+  # we have disabled them globally, so turn them back on. Since this is
+  # *the only* place in the codebase where we do this, just inline here.
+  # Note that this is playing with fire and the extension code is structured
+  # so as not to cause problems with RTTI cross-module issues.
+  iree_select_compiler_opts(_RTTI_AND_EXCEPTION_COPTS
+    CLANG_OR_GCC
+      "-frtti"
+      "-fexceptions"
+    MSVC_OR_CLANG_CL
+      # Configure exception handling for standard C++ behavior.
+      # - /EHs enables C++ catch-style exceptions
+      # - /EHc breaks unwinding across extern C boundaries, dramatically reducing
+      #   unwind table size and associated exception handling overhead as the
+      #   compiler can assume no exception will ever be thrown within any function
+      #   annotated with extern "C".
+      # https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model
+      "/EHsc"
+      # Configure RTTI generation.
+      # - /GR - Enable generation of RTTI (default)
+      # - /GR- - Disables generation of RTTI
+      # https://docs.microsoft.com/en-us/cpp/build/reference/gr-enable-run-time-type-information?view=msvc-160
+      "/GR"
+  )
+
   target_compile_options(
     ${_NAME} PRIVATE
     ${ARG_COPTS}
     ${IREE_DEFAULT_COPTS}
+    ${_RTTI_AND_EXCEPTION_COPTS}
   )
 
 

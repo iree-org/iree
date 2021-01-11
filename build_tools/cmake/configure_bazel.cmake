@@ -14,6 +14,8 @@
 
 set(IREE_BAZEL_EXECUTABLE "bazel"
     CACHE STRING "Bazel executable to use for bazel builds")
+set(IREE_BAZEL_SH "bash"
+    CACHE STRING "Bash command for bazel (on Windows cannot be system32 bash)")
 
 # iree_configure_bazel
 #
@@ -29,8 +31,9 @@ set(IREE_BAZEL_EXECUTABLE "bazel"
 #   IREE_BAZEL_WRAPPER: Executable wrapper to invoke to run bazel
 #   IREE_BAZEL_BIN: Path to the bazel-bin directory
 function(iree_configure_bazel)
+  message(STATUS "Using bazel executable: ${IREE_BAZEL_EXECUTABLE}")
   set(_bazel_output_base "${CMAKE_BINARY_DIR}/bazel-out")
-  set(_bazel_src_root "${CMAKE_SOURCE_DIR}")
+  set(IREE_BAZEL_SRC_ROOT "${CMAKE_SOURCE_DIR}")
 
   # Configure comilation mode.
   set(_bazel_compilation_mode_opt "")
@@ -40,43 +43,50 @@ function(iree_configure_bazel)
     set(_bazel_compilation_mode_opt "build --compilation_mode=opt")
     # Note: Bazel --strip is not strip.
     # https://docs.bazel.build/versions/master/user-manual.html#flag--strip
-    set(_bazel_strip_opt "build --linkopt=-Wl,--strip-all")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      set(_bazel_strip_opt "build --linkopt=-Wl,--strip-all")
+    endif()
   endif()
 
   # Use the utility to emit _bazelrc_file configuration options.
   set(_bazelrc_file "${CMAKE_BINARY_DIR}/bazelrc")
-  if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(_bazel_platform_config generic_clang)
-  elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     message(WARNING "Configuring bazel build for GCC: This receives minimal testing (recommend clang)")
     set(_bazel_platform_config generic_gcc)
-  elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(_bazel_platform_config windows)
   else()
-    message(WARNING "Did not recognize C++ compiler R{CMAKE_CXX_COMPILER_ID}. Configuring bazel for gcc mode and hoping for the best.")
+    message(WARNING "Did not recognize C++ compiler ${CMAKE_CXX_COMPILER_ID}. Configuring bazel for gcc mode and hoping for the best.")
     set(_bazel_platform_config generic_gcc)
   endif()
   # Now add an import to the configured.bazelrc to load the project-wide
   # bazelrc file.
+  # Note that the PYTHON_BIN_PATH is for TensorFlow's benefit on
+  # Windows. Just because. Everything has to be special. And the BAZEL_SH
+  # *HAS* to be non system32 bash (WSL). Because, why? Just because.
   file(WRITE "${_bazelrc_file}" "
 build --config ${_bazel_platform_config}
 build --progress_report_interval=30
 build --python_path='${Python3_EXECUTABLE}'
+build --action_env BAZEL_SH='${IREE_BAZEL_SH}'
+build --action_env PYTHON_BIN_PATH='${Python3_EXECUTABLE}'
 build --action_env CC='${CMAKE_C_COMPILER}'
 build --action_env CXX='${CMAKE_CXX_COMPILER}'
 ${_bazel_compilation_mode_opt}
 ${_bazel_strip_opt}
-import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
+import ${IREE_BAZEL_SRC_ROOT}/build_tools/bazel/iree.bazelrc
 ")
 
   # Note that we do allow a .bazelrc in the home directory (otherwise we
   # would have --nohome_rc). This is mainly about disabling interference from
   # interactive builds in the workspace.
-  set(_bazel_startup_options "--nosystem_rc --noworkspace_rc '--bazelrc=${_bazelrc_file}' '--output_base=${_bazel_output_base}'")
-  set(_bazel_build_options "--color=yes")
+  set(_bazel_startup_options --nosystem_rc --noworkspace_rc "--bazelrc=${_bazelrc_file}" "--output_base=${_bazel_output_base}")
 
   # And emit scripts to delegate to bazel.
   set(IREE_BAZEL_WRAPPER "${CMAKE_BINARY_DIR}/bazel")
+  string(REPLACE ";" " " _bazel_startup_options_joined "${_bazel_startup_options}")
   configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/build_tools/cmake/bazel.sh.in"
     "${IREE_BAZEL_WRAPPER}"
@@ -91,27 +101,35 @@ import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
     )
   endif()
 
+  # On windows, the vagaries of tunneling through cmd.exe are not worth it
+  # (nested quoting...), so we just invoke bazel directly and accept that
+  # there can be a variance with an interactive launch.
+  if(WIN32)
+    set(IREE_BAZEL_COMMAND ${IREE_BAZEL_EXECUTABLE} ${_bazel_startup_options})
+  else()
+    set(IREE_BAZEL_COMMAND ${IREE_BAZEL_WRAPPER})
+  endif()
+
+  message(STATUS "Full bazel command: ${IREE_BAZEL_COMMAND}")
   # Now ready to start bazel and ask it things.
   message(STATUS "Detecting bazel version...")
   execute_process(
     RESULT_VARIABLE RC
     OUTPUT_VARIABLE BAZEL_RELEASE
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    COMMAND
-      "${IREE_BAZEL_WRAPPER}" info release
-  )
+    WORKING_DIRECTORY "${IREE_BAZEL_SRC_ROOT}"
+    COMMAND ${IREE_BAZEL_COMMAND} info release)
   if(NOT RC EQUAL 0)
-    message(FATAL_ERROR "Failed to launch bazel using wrapper ${IREE_BAZEL_WRAPPER}. Inspect that script and ensure bazel is installed properly.")
+    message(FATAL_ERROR "Failed to launch bazel: ${IREE_BAZEL_COMMAND}")
   endif()
   execute_process(
     RESULT_VARIABLE RC
     OUTPUT_VARIABLE IREE_BAZEL_BIN
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    COMMAND
-      "${IREE_BAZEL_WRAPPER}" info bazel-bin
-  )
+    WORKING_DIRECTORY "${IREE_BAZEL_SRC_ROOT}"
+    COMMAND ${IREE_BAZEL_COMMAND} info bazel-bin)
   if(NOT RC EQUAL 0)
-    message(FATAL_ERROR "Failed to run 'info bazel-bin' via ${IREE_BAZEL_WRAPPER}. Inspect that script and ensure bazel is installed properly.")
+    message(FATAL_ERROR "Failed to run 'info bazel-bin' via ${IREE_BAZEL_COMMAND}")
   endif()
   message(STATUS "Found bazel ${BAZEL_RELEASE}, bin directory: ${IREE_BAZEL_BIN}")
   message(STATUS "Bazel wrapper script generated at: ${IREE_BAZEL_WRAPPER}")
@@ -130,7 +148,9 @@ import ${_bazel_src_root}/build_tools/bazel/iree.bazelrc
     endif()
   endif()
 
+  set(IREE_BAZEL_SRC_ROOT "${IREE_BAZEL_SRC_ROOT}" PARENT_SCOPE)
   set(IREE_BAZEL_WRAPPER "${IREE_BAZEL_WRAPPER}" PARENT_SCOPE)
+  set(IREE_BAZEL_COMMAND "${IREE_BAZEL_COMMAND}" PARENT_SCOPE)
   set(IREE_BAZEL_BIN "${IREE_BAZEL_BIN}" PARENT_SCOPE)
 endfunction()
 
@@ -158,9 +178,10 @@ function(iree_add_bazel_invocation)
   endif()
   add_custom_target(${ARG_INVOCATION_TARGET} ${_all_option}
     USES_TERMINAL
+    WORKING_DIRECTORY "${IREE_BAZEL_SRC_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E echo
         "Starting bazel build of targets '${ARG_BAZEL_TARGETS}'"
-    COMMAND "${IREE_BAZEL_WRAPPER}" build ${ARG_BAZEL_TARGETS}
+    COMMAND ${IREE_BAZEL_COMMAND} build ${ARG_BAZEL_TARGETS}
     COMMAND ${CMAKE_COMMAND} -E echo "Bazel build complete."
   )
 

@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04, windows-2019, macos-latest]
+        os: [ubuntu-18.04]
         build_package:
           - py-compiler-pkg
           - py-runtime-pkg
@@ -38,12 +38,50 @@ jobs:
           - py-tflite-compiler-tools-pkg
           - py-tf-compiler-tools-pkg
         experimental: [false]
-        # Add experimental one off combinations below:
-        # include:
-        #   - os: macos-latest
-        #     build_package: compiler
-        #     experimental: true
-
+        needs_bazel: [false]  # Bazel comes in with the container.
+        include:
+          # Windows packages.
+          - os: windows-2019
+            build_package: py-compiler-pkg
+            experimental: true
+            needs_bazel: false
+          - os: windows-2019
+            build_package: py-runtime-pkg
+            experimental: true
+            needs_bazel: false
+          - os: windows-2019
+            build_package: py-xla-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
+          - os: windows-2019
+            build_package: py-tflite-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
+          - os: windows-2019
+            build_package: py-tf-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
+          # Macos packages.
+          - os: macos-latest
+            build_package: py-compiler-pkg
+            experimental: true
+            needs_bazel: false
+          - os: macos-latest
+            build_package: py-runtime-pkg
+            experimental: true
+            needs_bazel: false
+          - os: macos-latest
+            build_package: py-xla-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
+          - os: macos-latest
+            build_package: py-tflite-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
+          - os: macos-latest
+            build_package: py-tf-compiler-tools-pkg
+            experimental: true
+            needs_bazel: true
     env:
       CIBW_BUILD_VERBOSITY: 1
       # Note that on Linux, we run under docker with an altered path.
@@ -65,10 +103,38 @@ jobs:
           path: 'main_checkout'
           submodules: true
 
+      # It is 2021. And the Windows Path is still a mess.
+      - name: Set up Visual Studio shell
+        if: "contains(matrix.os, 'windows')"
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: x64
+      - name: Unbreak the system path
+        if: "contains(matrix.os, 'windows')"
+        shell: powershell
+        run: |
+          echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Make sure WSL bash is not enabled
+        if: "contains(matrix.os, 'windows')"
+        shell: powershell
+        run: |
+          # Should display either an msys mount table or an "install from the windows store" banner
+          echo "--- System path:"
+          $env:path -split ";"
+          echo "--- Result of asking bash to run 'mount':"
+          bash -c mount
+
+      # Setup python after getting the windows dev path set up and adding
+      # msys to it (since we want this python to take precedence).
       - uses: actions/setup-python@v2
         name: Install Python
         with:
           python-version: '3.8'
+
+      - name: Install cibuildwheel
+        shell: bash
+        run: |
+          python -m pip install cibuildwheel==1.7.2
 
       - name: Write version info
         shell: bash
@@ -82,17 +148,12 @@ jobs:
           EOF
           cat ./main_checkout/version_info.json
 
-      - name: Install cibuildwheel
-        shell: bash
-        run: |
-          python -m pip install cibuildwheel==1.7.2
-
       # Compiler wheels are not python version specific, so we just shard and
       # build once for an examplar version of python. This could save a bit of
       # time by not building IREE's runtime, but it is small compared to
       # the compiler build.
       - name: Build compiler wheels
-        if: "contains(matrix.build_package, 'py-compiler-pkg')"
+        if: "matrix.build_package == 'py-compiler-pkg'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -118,7 +179,7 @@ jobs:
       # directory between runs. Most of the build will be incremental.
       # We save a little bit of time by disabling the compiler build.
       - name: Build runtime wheels
-        if: "contains(matrix.build_package, 'py-runtime-pkg')"
+        if: "matrix.build_package == 'py-runtime-pkg'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -141,7 +202,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build XLA Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-xla-compiler-tools-pkg')"
+        if: "matrix.build_package == 'py-xla-compiler-tools-pkg'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -165,7 +226,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build TFLite Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-tflite-compiler-tools-pkg')"
+        if: "matrix.build_package == 'py-tflite-compiler-tools-pkg'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
@@ -190,7 +251,7 @@ jobs:
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build TF Compiler Tools wheels
-        if: "contains(matrix.build_package, 'py-tf-compiler-tools-pkg')"
+        if: "matrix.build_package == 'py-tf-compiler-tools-pkg'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.

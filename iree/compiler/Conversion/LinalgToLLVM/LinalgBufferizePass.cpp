@@ -30,6 +30,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
@@ -169,6 +170,49 @@ LogicalResult convertAnyLinalgOp(OpBuilder &b, linalg::LinalgOp op,
   }
 
   finalizeBufferAllocation(b, op, newInputBuffers, newOutputBuffers, bvm);
+  return success();
+}
+
+static LogicalResult convertTransferOp(OpBuilder &b,
+                                       VectorTransferOpInterface op,
+                                       BlockAndValueMapping &bvm) {
+  if (op.getShapedType().isa<MemRefType>()) return failure();
+  assert(op->getNumResults() == 1);
+  Value outputTensor = op->getResult(0);
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Location loc = op.getLoc();
+  Value newInputBuffer = bvm.lookup(op.source());
+  if (auto tensorType =
+          op->getResult(0).getType().dyn_cast<RankedTensorType>()) {
+    // If the op return a Tensor allocate a buffer for the returned value.
+    auto tensorShape = tensorType.getShape();
+    auto memrefType = MemRefType::get(tensorShape, tensorType.getElementType());
+    SmallVector<Value, 4> dynOperands;
+    for (size_t idx : llvm::seq(size_t(0), tensorShape.size())) {
+      if (tensorType.isDynamicDim(idx)) {
+        dynOperands.push_back(
+            b.create<DimOp>(loc, bvm.lookup(outputTensor), idx));
+      }
+    }
+    auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
+    bvm.map(op->getResult(0), alloc);
+    mapAllTieShapeUsesAndReplaceDimUsesOf(op->getResult(0), alloc, bvm);
+  }
+
+  // Replace the tensor operand.
+  if (auto readOp = dyn_cast<vector::TransferReadOp>(op.getOperation())) {
+    readOp.sourceMutable().assign(newInputBuffer);
+  } else {
+    auto writeOp = cast<vector::TransferWriteOp>(op.getOperation());
+    // Create a new transfer_write on buffer that doesn't have a return value.
+    // Leave the previous transfer_write to dead code as it still has uses at
+    // this point.
+    b.create<vector::TransferWriteOp>(
+        loc, writeOp.vector(), newInputBuffer, writeOp.indices(),
+        writeOp.permutation_map(),
+        writeOp.masked() ? *writeOp.masked() : ArrayAttr());
+  }
   return success();
 }
 
@@ -417,6 +461,8 @@ void LinalgLLVMBufferizePass::runOnFunction() {
     }
   });
   funcOp.walk([&](linalg::LinalgOp op) { convertAnyLinalgOp(b, op, bvm); });
+  funcOp.walk(
+      [&](VectorTransferOpInterface op) { convertTransferOp(b, op, bvm); });
   funcOp.walk([&](Operation *op) {
     if (auto storeOp = dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(op)) {
       convertInterfaceStoreTensorOp(b, storeOp, bvm);
