@@ -21,30 +21,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 ###############################################################################
-# Bazel rules.
-http_archive(
-    name = "rules_cc",
-    sha256 = "cf3b76a90c86c0554c5b10f4b160f05af71d252026b71362c4674e2fb9936cf9",
-    strip_prefix = "rules_cc-01d4a48911d5e7591ecb1c06d3b8af47fe872371",
-    urls = [
-        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
-        "https://github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
-    ],
-)
-
-http_archive(
-    name = "rules_python",
-    sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
-)
-
-load("@rules_python//python:repositories.bzl", "py_repositories")
-
-py_repositories()
-
-###############################################################################
-
-###############################################################################
 # bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
 http_archive(
     name = "bazel_toolchains",
@@ -166,18 +142,6 @@ load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 ###############################################################################
 
 ###############################################################################
-# Autoconfigure native build repo for python.
-load("//bindings/python/build_tools/python:configure.bzl", "python_configure")
-
-# TODO(laurenzo): Scoping to "iree" to avoid conflicts with other things that
-# take an opinion until we can isolate.
-maybe(
-    python_configure,
-    name = "iree_native_python",
-)
-###############################################################################
-
-###############################################################################
 # Find and configure the Vulkan SDK, if installed.
 load("//build_tools/third_party/vulkan_sdk:repo.bzl", "vulkan_sdk_setup")
 
@@ -234,15 +198,6 @@ maybe(
     path = "third_party/spirv_headers",
 )
 
-# TODO(laurenzo): TensorFlow is squatting on the pybind11 repo name, so
-# we use a temporary one until resolved. Theirs pulls in a bunch of stuff.
-maybe(
-    new_local_repository,
-    name = "iree_pybind11",
-    build_file = "build_tools/third_party/pybind11/BUILD.overlay",
-    path = "third_party/pybind11",
-)
-
 maybe(
     local_repository,
     name = "com_google_benchmark",
@@ -282,16 +237,6 @@ maybe(
     name = "spirv_cross",
     build_file = "build_tools/third_party/spirv_cross/BUILD.overlay",
     path = "third_party/spirv_cross",
-)
-
-GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"
-
-http_archive(
-    name = "kws_streaming",
-    build_file = "@//:build_tools/third_party/kws_streaming/BUILD.overlay",
-    sha256 = "1e3260536491840a011ee12cae4f55878ed6a0dd8fdf7d15cd768836d55cb89c",
-    strip_prefix = "google-research-{}/kws_streaming".format(GOOGLE_RESEARCH_COMMIT),
-    url = "https://github.com/google-research/google-research/archive/{}.tar.gz".format(GOOGLE_RESEARCH_COMMIT),
 )
 
 # Bootstrap TensorFlow deps last so that ours can take precedence.
