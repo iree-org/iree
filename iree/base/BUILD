@@ -388,24 +388,6 @@ cc_test(
 )
 
 cc_library(
-    name = "time",
-    hdrs = ["time.h"],
-    deps = [
-        ":api",
-    ],
-)
-
-cc_test(
-    name = "time_test",
-    srcs = ["time_test.cc"],
-    deps = [
-        ":time",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "threading",
     srcs = [
         "threading.c",

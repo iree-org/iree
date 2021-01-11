@@ -417,27 +417,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    time
-  HDRS
-    "time.h"
-  DEPS
-    ::api
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    time_test
-  SRCS
-    "time_test.cc"
-  DEPS
-    ::time
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     threading
   HDRS
     "threading.h"
