@@ -239,15 +239,5 @@ maybe(
     path = "third_party/spirv_cross",
 )
 
-GOOGLE_RESEARCH_COMMIT = "a5213e2c92c3e87849fe417ba42786d0324e7c75"
-
-http_archive(
-    name = "kws_streaming",
-    build_file = "@//:build_tools/third_party/kws_streaming/BUILD.overlay",
-    sha256 = "1e3260536491840a011ee12cae4f55878ed6a0dd8fdf7d15cd768836d55cb89c",
-    strip_prefix = "google-research-{}/kws_streaming".format(GOOGLE_RESEARCH_COMMIT),
-    url = "https://github.com/google-research/google-research/archive/{}.tar.gz".format(GOOGLE_RESEARCH_COMMIT),
-)
-
 # Bootstrap TensorFlow deps last so that ours can take precedence.
 tf_repositories()
