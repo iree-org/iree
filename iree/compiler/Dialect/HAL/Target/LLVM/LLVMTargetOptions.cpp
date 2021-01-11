@@ -34,7 +34,7 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
   {
     llvm::SubtargetFeatures features;
     llvm::StringMap<bool> hostFeatures;
-    	if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
+    if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
       for (auto &feature : hostFeatures) {
         features.AddFeature(feature.first(), feature.second);
       }
@@ -111,7 +111,6 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-address-sanitizer",
       llvm::cl::desc("Turn on address sanitization to detect memory violations"),
       llvm::cl::init(llvmTargetOptions.addressSanitizer));
-//  if(clAddressSanitizer)
   llvmTargetOptions.addressSanitizer = clAddressSanitizer;
 
   static llvm::cl::opt<bool> clLinkStatic(
