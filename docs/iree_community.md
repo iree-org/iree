@@ -2,7 +2,7 @@
 layout: default
 permalink: iree-community
 title: "IREE Community"
-nav_order: 9
+nav_order: 8
 ---
 
 # IREE Community

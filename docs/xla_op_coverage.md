@@ -2,7 +2,7 @@
 layout: default
 permalink: xla-op-coverage
 title: "XLA HLO Op Coverage"
-nav_order: 7
+nav_order: 6
 js_files: 
 - js/add_classes.js
 ---
