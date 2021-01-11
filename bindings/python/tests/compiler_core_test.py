@@ -44,6 +44,15 @@ class CompilerTest(unittest.TestCase):
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
+  # Compiling the string form means that the compiler does not have a valid
+  # source file name, which can cause issues on the AOT side. Verify
+  # specifically. See: https://github.com/google/iree/issues/4439
+  def testCompileStrLLVMAOT(self):
+    binary = compiler.compile_str(SIMPLE_MUL_ASM,
+                                  target_backends=["dylib-llvm-aot"])
+    logging.info("Flatbuffer size = %d", len(binary))
+    self.assertTrue(binary)
+
   def testCompileInputFile(self):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
