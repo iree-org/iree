@@ -275,7 +275,7 @@ def HAL_Allocator : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::AllocatorType>()">,
     "allocator"> {
-  let typeDescription = [{
+  let description = [{
     Allocates buffers for a particular device memory space.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::AllocatorType>()";
@@ -285,7 +285,7 @@ def HAL_Buffer : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::BufferType>()">,
     "buffer"> {
-  let typeDescription = [{
+  let description = [{
     A memory buffer with a specific memory_type that is used to describe the
     capabilities and behavior of the backing memory of the buffer. Buffers may
     be any mix of host-accessible, host-coherent, or device-accessible for
@@ -299,7 +299,7 @@ def HAL_BufferView : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::BufferViewType>()">,
     "buffer_view"> {
-  let typeDescription = [{
+  let description = [{
     A shaped and typed buffer reference. This just wraps an existing hal.buffer
     with its associated metadata to make it easier to pass across ABI
     boundaries. In most cases buffer views can be elided entirely by the
@@ -312,7 +312,7 @@ def HAL_CommandBuffer : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::CommandBufferType>()">,
     "command_buffer"> {
-  let typeDescription = [{
+  let description = [{
     Asynchronous command buffer recording interface. Commands are recorded by
     the implementation for later submission to command queues.
   }];
@@ -323,7 +323,7 @@ def HAL_DescriptorSet : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DescriptorSetType>()">,
     "descriptor_set"> {
-  let typeDescription = [{
+  let description = [{
     Descriptor set.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetType>()";
@@ -333,7 +333,7 @@ def HAL_DescriptorSetLayout : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DescriptorSetLayoutType>()">,
     "descriptor_set_layout"> {
-  let typeDescription = [{
+  let description = [{
     Descriptor set layout.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetLayoutType>()";
@@ -343,7 +343,7 @@ def HAL_Device : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DeviceType>()">,
     "device"> {
-  let typeDescription = [{
+  let description = [{
     Logical device instance.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::DeviceType>()";
@@ -353,7 +353,7 @@ def HAL_Event : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::EventType>()">,
     "event"> {
-  let typeDescription = [{
+  let description = [{
     Events are used for defining synchronization scopes within CommandBuffers.
     An event only exists within a single CommandBuffer and must not be used
     across CommandBuffers from the same device or others.
@@ -364,7 +364,7 @@ def HAL_Executable : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::ExecutableType>()">,
     "executable"> {
-  let typeDescription = [{
+  let description = [{
     A prepared and ready-to-dispatch executable.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
@@ -374,7 +374,7 @@ def HAL_ExecutableCache : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::ExecutableCacheType>()">,
     "executable_cache"> {
-  let typeDescription = [{
+  let description = [{
     A cache of prepared executables for a particular device.
     Caches may be shared across multiple devices from the same driver or
     specific to individual devices. Caches may persist prepared executables
@@ -389,7 +389,7 @@ def HAL_ExecutableLayout : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
     "executable_layout"> {
-  let typeDescription = [{
+  let description = [{
     An executable layout describing the descriptor sets and push constants used.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
@@ -399,7 +399,7 @@ def HAL_RingBuffer : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::RingBufferType>()">,
     "ring_buffer"> {
-  let typeDescription = [{
+  let description = [{
     Ringbuffer used for transient buffer allocation.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::RingBufferType>()";
@@ -409,7 +409,7 @@ def HAL_Semaphore : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::SemaphoreType>()">,
     "semaphore"> {
-  let typeDescription = [{
+  let description = [{
     Synchronization mechanism for host->device, device->host, host->host,
     and device->device notification. Semaphores behave like Vulkan timeline
     semaphores (or D3D12 fences) and contain a monotonically increasing
@@ -476,7 +476,7 @@ def HAL_HostBuffer : AnyTypeOf<[
 
 def HAL_CommandQueueAffinityAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.
-  // let typeDescription = [{
+  // let description = [{
   //   A bitmask defining which queues an operation is allowed to execute on.
   //   The selection is wrapped to the total number of available queues, so 0b0101
   //   would enable queues 0 and 2 if there were four queues or queue 0 if there
@@ -486,7 +486,7 @@ def HAL_CommandQueueAffinityAttr : SignlessIntElementsAttr<32> {
 
 def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.
-  // let typeDescription = [{
+  // let description = [{
   //   A duration to wait in milliseconds. 0 indicates that the operation should
   //   return immediately without waiting and can be used as a way to poll handles.
   //   INT32_MAX will wait forever until the handle is signaled.
@@ -529,7 +529,7 @@ def HAL_MemoryBarrier : NamedTupleOf<[
     NamedTupleElement<0, "source_scope", I32>,
     NamedTupleElement<1, "target_scope", I32>
   ], "MemoryBarrier"> {
-  let typeDescription = [{
+  let description = [{
     MemoryBarrier struct that can be passed to the command buffer barrier
     operations.
   }];
@@ -543,7 +543,7 @@ def HAL_BufferBarrier : NamedTupleOf<[
     NamedTupleElement<3, "offset", HAL_DeviceSize>,
     NamedTupleElement<4, "length", HAL_DeviceSize>
   ], "BufferBarrier"> {
-  let typeDescription = [{
+  let description = [{
     BufferBarrier struct that can be passed to the command buffer barrier
     operations.
   }];
@@ -569,7 +569,7 @@ def HAL_SemaphoreValue : NamedTupleOf<[
     NamedTupleElement<0, "semaphore", HAL_Semaphore>,
     NamedTupleElement<1, "value", HAL_TimelineValue>
   ], "SemaphoreValue"> {
-  let typeDescription = [{
+  let description = [{
     A reference to a semaphore and associated payload value.
   }];
 }

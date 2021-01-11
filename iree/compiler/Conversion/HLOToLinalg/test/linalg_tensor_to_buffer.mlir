@@ -493,37 +493,38 @@ module {
 
 // -----
 
-#map0 = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func @matmul_add() {
     %c0 = constant 0 : index
-    %shape = linalg.init_tensor[32, 64] : tensor<32x64xf32>
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0
-      : tensor<32x48xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0
-      : tensor<48x64xf32>
-    %2 = hal.interface.load.tensor @legacy_io::@arg2, offset = %c0
-      : tensor<32x64xf32>
-    %3 = "mhlo.dot"(%0, %1)
-      : (tensor<32x48xf32>, tensor<48x64xf32>) -> tensor<32x64xf32>
-    %4 = linalg.generic {
-      indexing_maps = [#map0, #map0, #map0],
-      iterator_types = ["parallel", "parallel"]}
-       ins(%2, %3 : tensor<32x64xf32>, tensor<32x64xf32>)
-      outs(%shape : tensor<32x64xf32>) {
-        ^bb0(%arg0: f32, %arg1: f32, %s: f32):
-          %5 = addf %arg0, %arg1 : f32
-          linalg.yield %5 : f32
-      } -> tensor<32x64xf32>
-    hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0
-      : tensor<32x64xf32>
+    %cst = constant 0.000000e+00 : f32
+    %0 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x48xf32>
+    %2 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<48x64xf32>
+    %3 = hal.interface.load.tensor @legacy_io::@arg2, offset = %c0 : tensor<32x64xf32>
+    %4 = dynamic_tensor_from_elements  {
+    ^bb0(%arg0: index, %arg1: index):  // no predecessors
+      yield %cst : f32
+    } : tensor<32x64xf32>
+    %5 = linalg.matmul ins(%1, %2 : tensor<32x48xf32>, tensor<48x64xf32>)
+                       outs(%4 : tensor<32x64xf32>) -> tensor<32x64xf32>
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                         iterator_types = ["parallel", "parallel"]
+    } ins(%3, %5 : tensor<32x64xf32>, tensor<32x64xf32>)
+      outs(%0 : tensor<32x64xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
+      %7 = addf %arg0, %arg1 : f32
+      linalg.yield %7 : f32
+    } -> tensor<32x64xf32>
+    hal.interface.store.tensor %6, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
     return
   }
-  hal.interface @legacy_io attributes {sym_visiblity = "private"} {
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write"
   }
 }
 

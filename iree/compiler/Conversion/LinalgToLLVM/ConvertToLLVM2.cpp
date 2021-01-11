@@ -94,11 +94,10 @@ class ConvertFunc : public ConvertToLLVMPattern {
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     MLIRContext *context = rewriter.getContext();
     auto packedBuffersArgsTy = LLVM::LLVMPointerType::get(
-        LLVM::LLVMPointerType::get(LLVM::LLVMIntegerType::get(context, 8)));
+        LLVM::LLVMPointerType::get(IntegerType::get(context, 8)));
     auto pushConstantArgTy =
-        LLVM::LLVMPointerType::get(LLVM::LLVMIntegerType::get(context, 32));
-    auto xyzTy =
-        LLVM::LLVMPointerType::get(LLVM::LLVMIntegerType::get(context, 32));
+        LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
+    auto xyzTy = LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
     signatureConverter.addInputs(
         {packedBuffersArgsTy, pushConstantArgTy, xyzTy, xyzTy, xyzTy});
     SmallVector<Type, 5> llvmInputTypes{packedBuffersArgsTy, pushConstantArgTy,

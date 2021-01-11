@@ -42,6 +42,7 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -60,14 +61,18 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 /// Returns the constant value associated with the init value if the defining
 /// operation is a constant.
 static Attribute getInitValueAsConst(Value init) {
-  DenseElementsAttr attr;
+  Attribute attr;
   if (!matchPattern(init, m_Constant(&attr))) return {};
-  auto type = attr.getType().dyn_cast<ShapedType>();
-  if (!type || type.getRank() != 0) return {};
+  if (attr.getType().isa<IntegerType, FloatType>()) return attr;
+
+  auto splatAttr = attr.dyn_cast<SplatElementsAttr>();
+  if (!splatAttr) return {};
+  auto type = splatAttr.getType().dyn_cast<ShapedType>();
+  if (!type) return {};
   if (auto intType = type.getElementType().dyn_cast<IntegerType>()) {
-    return IntegerAttr::get(intType, attr.getValue<APInt>({}));
+    return IntegerAttr::get(intType, splatAttr.getSplatValue<APInt>());
   } else if (auto floatType = type.getElementType().dyn_cast<FloatType>()) {
-    return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
+    return FloatAttr::get(floatType, splatAttr.getSplatValue<APFloat>());
   }
   return {};
 }
@@ -236,67 +241,6 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
   /// Map from tensor value that is a result of the dispatch function to the
   /// buffer that holds the result
   TensorToBufferMap const &resultTensorToBufferMap;
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
-// mhlo.dot conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-enum class DotOperationType {
-  VectorDot = 0,
-  MatrixVector = 1,
-  MatrixMatrix = 2,
-  Unsupported = 3
-};
-}
-
-static DotOperationType getDotOperationType(mhlo::DotOp dotOp) {
-  ArrayRef<int64_t> lhsShape =
-      dotOp.lhs().getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape =
-      dotOp.rhs().getType().cast<ShapedType>().getShape();
-  auto shapeMatches = [](int64_t a, int64_t b) {
-    return a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize ||
-           a == b;
-  };
-  if (lhsShape.size() == 1 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[0], rhsShape[0])) {
-    return DotOperationType::VectorDot;
-  }
-  if (lhsShape.size() == 2 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[1], rhsShape[0])) {
-    return DotOperationType::MatrixVector;
-  }
-  if (rhsShape.size() == 2 && rhsShape.size() == 2 &&
-      shapeMatches(lhsShape[1], rhsShape[0])) {
-    return DotOperationType::MatrixMatrix;
-  }
-  return DotOperationType::Unsupported;
-}
-
-namespace {
-/// Converts mhlo.dot operation to linalg.matmul op
-template <DotOperationType opType, typename LinalgOpTy>
-struct DotOpConversion
-    : public ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
-                                     mhlo::DotOp> {
-  using ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
-                                mhlo::DotOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::DotOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const {
-    if (getDotOperationType(op) == opType) {
-      if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-        rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-        return failure();
-      }
-      rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers, resultBuffers);
-      return success();
-    }
-    return failure();
-  }
 };
 }  // namespace
 
@@ -1115,6 +1059,48 @@ struct LinalgOpOnTensorConversion
   }
 };
 
+/// Converts linalg.matmul on tensors to linalg.matmul on buffers.
+struct DynamicTensorFromElementsOpConversion
+    : public ConvertToLinalgBufferOp<DynamicTensorFromElementsOpConversion,
+                                     DynamicTensorFromElementsOp> {
+  using ConvertToLinalgBufferOp<
+      DynamicTensorFromElementsOpConversion,
+      DynamicTensorFromElementsOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(DynamicTensorFromElementsOp op,
+                      ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    if (op.getBody(0)->getOperations().size() != 1) {
+      return op.emitError("expected only contain yield op");
+    }
+    auto yieldOp = dyn_cast<YieldOp>(op.getBody(0)->getTerminator());
+    if (!yieldOp) {
+      return op.emitError("expected to use a yield op as the terminator");
+    }
+
+    rewriter.create<linalg::FillOp>(op.getLoc(), resultBuffers[0],
+                                    yieldOp.value());
+    return success();
+  }
+};
+
+/// Converts linalg.matmul on tensors to linalg.matmul on buffers.
+struct MatmulOnTensorConversion
+    : public ConvertToLinalgBufferOp<MatmulOnTensorConversion,
+                                     linalg::MatmulOp> {
+  using ConvertToLinalgBufferOp<MatmulOnTensorConversion,
+                                linalg::MatmulOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(linalg::MatmulOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    if (!op.hasTensorSemantics()) return failure();
+    // The last one is a init tensor.
+    rewriter.create<linalg::MatmulOp>(op.getLoc(), inputBuffers.drop_back(1),
+                                      resultBuffers);
+    return success();
+  }
+};
+
 /// Convert linalg.tensor_reshape to linalg.reshape. The former has copy
 /// semantics while the later is an aliasing instruction. As long as the operand
 /// to the tensor_reshape has a single use, this distinction can be ignored.
@@ -1503,15 +1489,14 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns
-      .insert<ConvOpConversion, ConcatenateOpConversion,
-              DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
-              DotGeneralOpConversion, InitTensorOpConversion,
-              LinalgOpOnTensorConversion<linalg::GenericOp>,
-              LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-              PadOpConversion, ReduceOpConversion, ReduceWindowOpConversion,
-              SliceOpConversion, TensorReshapeOpConversion>(
-          context, resultTensorToBufferMap);
+  patterns.insert<ConvOpConversion, ConcatenateOpConversion,
+                  MatmulOnTensorConversion, DotGeneralOpConversion,
+                  DynamicTensorFromElementsOpConversion, InitTensorOpConversion,
+                  LinalgOpOnTensorConversion<linalg::GenericOp>,
+                  LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+                  PadOpConversion, ReduceOpConversion, ReduceWindowOpConversion,
+                  SliceOpConversion, TensorReshapeOpConversion>(
+      context, resultTensorToBufferMap);
   // Reduce region operation conversions.
   patterns.insert<ReduceRegionXLAOpConversion<mhlo::AddOp>,
                   ReduceRegionXLAOpConversion<mhlo::MinOp>,
@@ -1545,7 +1530,8 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
-                      IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp>();
+                      IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp,
+                      DynamicTensorFromElementsOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

@@ -125,7 +125,7 @@ def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
 def FLOW_Workload : AnyTypeOf<[Index]> {
-  let typeDescription = [{
+  let description = [{
     Describes the total untiled invocations along one or more dimensions.
     Tiling may later divide this value for workgroup sizes.
   }];
@@ -135,7 +135,7 @@ def FLOW_DispatchInput : DialectType<
     FLOW_Dialect,
     CPred<"$_self.isa<IREE::Flow::DispatchInputType>()">,
     "dispatch.input"> {
-  let typeDescription = [{
+  let description = [{
     A placeholder for a dispatch region input operand. This can be used to query
     the metadata about the input (such as its shape) as well as load from the
     backing tensor representation.
@@ -146,7 +146,7 @@ def FLOW_DispatchOutput : DialectType<
     FLOW_Dialect,
     CPred<"$_self.isa<IREE::Flow::DispatchOutputType>()">,
     "dispatch.output"> {
-  let typeDescription = [{
+  let description = [{
     A placeholder for a dispatch region output result. This can be used to
     query the metadata about the output (such as its shape) as well as store
     into the backing tensor representation.
