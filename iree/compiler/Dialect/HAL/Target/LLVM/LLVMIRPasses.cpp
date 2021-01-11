@@ -66,6 +66,8 @@ std::unique_ptr<llvm::TargetMachine> createTargetMachine(
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                               llvm::TargetMachine *machine,
                               llvm::Module *module) {
+  if(options.addressSanitizer)
+    assert(false && "Address Sanitization feature has not been implemented yet.");
   llvm::LoopAnalysisManager loopAnalysisManager;
   llvm::FunctionAnalysisManager functionAnalysisManager;
   llvm::CGSCCAnalysisManager cGSCCAnalysisManager;
