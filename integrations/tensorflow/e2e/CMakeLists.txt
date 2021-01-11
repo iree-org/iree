@@ -32,7 +32,6 @@ set(TFLITE_FAILING
     "scatter_update_test.py"
     "simple_stateful_test.py"
     "sliding_window_test.py"
-    "strings_test.py"
 )
 
 set(VMLA_FAILING
@@ -41,8 +40,6 @@ set(VMLA_FAILING
     "einsum_vector_test.py"
     "mandelbrot_test.py"  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py"  # TODO(b/148747011)
-    "strings_test.py"
-    "tensorlist_test.py"  # TODO(suderman): Re-enable once dependencies resolved
 )
 
 set(LLVM_FAILING
@@ -63,8 +60,6 @@ set(LLVM_FAILING
     "range_test.py"
     "ring_buffer_test.py"  # TODO(b/148747011)
     "scatter_update_test.py"
-    "strings_test.py"
-    "tensorlist_test.py"  # TODO(suderman): Re-enable once dependencies resolved
 )
 
 set(VULKAN_FAILING
@@ -85,8 +80,6 @@ set(VULKAN_FAILING
     "range_test.py"
     "ring_buffer_test.py"  # TODO(b/148747011)
     "scatter_update_test.py"
-    "strings_test.py"
-    "tensorlist_test.py"  # TODO(suderman): Re-enable once dependencies resolved
 )
 
 set(REFERENCE_BACKEND tf)
