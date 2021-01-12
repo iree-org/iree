@@ -70,6 +70,8 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   SmallVector<Value, 4> newOperands;
   for (auto operand : regionOp.operands()) {
     newOperands.push_back(operand);
+  }
+  for (auto operand : regionOp.operands()) {
     if (operand.getType().isa<TensorType>()) {
       insertDynamicShapeDimOperands(regionOp, operand, newOperands, builder);
     }
