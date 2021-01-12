@@ -48,7 +48,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVM2Pass();
 
 /// Pass to convert Linalg ops into vector operations.
-std::unique_ptr<OperationPass<ModuleOp>> createLinalgVectorizePass();
+std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 
 /// Pass to rewrite Linalg on tensors destructive updates into updates through
 /// memory.
