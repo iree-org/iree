@@ -50,10 +50,7 @@ gentbl(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "convert_tf_to_tf_tensorlist.td",
-    td_includes = [
-        "external/iree",
-        "external/org_tensorflow",
-    ],
+    td_includes = ["external/org_tensorflow"],
     td_srcs = [
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_ops_td_files",
         "//iree_tf_compiler/dialect/tf_tensorlist/ir:td_files",
