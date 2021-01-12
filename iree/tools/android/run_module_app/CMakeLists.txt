@@ -49,5 +49,4 @@ iree_cc_library(
     "-landroid"
     "-llog"
   SHARED
-  WHOLEARCHIVE
 )
