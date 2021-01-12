@@ -34,15 +34,13 @@ def gentbl(name, tblgen, td_file, tbl_outs, td_srcs = [], td_includes = [], stri
     if td_file not in td_srcs:
         srcs.append(td_file)
 
-    # TODO(gcmn): Every use of "external" here is a hack that depends on Bazel
-    # implementation details and the specific names of Bazel repository aliases.
+    # TODO(gcmn): Every use of "external" in tblgen rules is a hack that depends
+    # on Bazel implementation details and the specific names of Bazel repository
+    # aliases.
     td_includes_cmd = [
         # Allow including MLIR td files, including generated ones
         "-I external/llvm-project/mlir/include",
         "-I $(GENDIR)/external/llvm-project/mlir/include",
-        # Allow including IREE td files when IREE is used as an external
-        # repository. Only works if the repository alias is literally "iree"
-        "-I external/iree",
     ]
     for td_include in td_includes:
         td_includes_cmd.append("-I%s" % td_include)

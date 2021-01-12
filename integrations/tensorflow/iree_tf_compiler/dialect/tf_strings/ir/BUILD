@@ -33,6 +33,10 @@ gentbl(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
+    td_includes = [
+        "external/iree",
+        "external/org_tensorflow",
+    ],
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -47,6 +51,10 @@ gentbl(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "base.td",
+    td_includes = [
+        "external/iree",
+        "external/org_tensorflow",
+    ],
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
