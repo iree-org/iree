@@ -30,7 +30,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 
 # Print NVIDIA GPU information inside the VM
 dmesg | grep NVRM
-pkg-query -l | grep nvidia
+dpkg -l | grep nvidia
 nvidia-smi || true
 
 # Sets DOCKER_RUN_ARGS
