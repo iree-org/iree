@@ -185,7 +185,7 @@ def main(args):
                            args.mlir_hlo_path,
                            exit_on_failure=args.validate)
 
-  # Export SUBMODULE_VERSIONS.
+  # Export SUBMODULE_VERSIONS.txt.
   print()  # Add line break.
   submodule_versions.export_versions(args.repo)
 
