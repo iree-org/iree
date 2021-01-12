@@ -67,7 +67,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;SHARED;WHOLEARCHIVE"
+    "PUBLIC;TESTONLY;SHARED"
     "NAME"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
