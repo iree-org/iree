@@ -20,7 +20,6 @@ from absl import app
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
 import tensorflow as tf
 
 FLAGS = flags.FLAGS
@@ -40,7 +39,7 @@ BIASES = np.random.uniform(-1, 1, size=(OUTPUT_DIM,))
 def get_linear_data():
   x = np.random.uniform(-1, 1, size=(BATCH_SIZE, INPUT_DIM))
   y = np.dot(x, WEIGHTS) + BIASES
-  return x, y
+  return x.astype(np.float32), y.astype(np.float32)
 
 
 class RegressionTrainingModule(tf.Module):
@@ -67,6 +66,14 @@ class RegressionTrainingModule(tf.Module):
     self.optimizer.apply_gradients(zip(gradients, variables))
     return loss
 
+  @tf.function(input_signature=[])
+  def get_weights(self):
+    return self.model.weights[0]
+
+  @tf.function(input_signature=[])
+  def get_bias(self):
+    return self.model.weights[1]
+
 
 class RegressionTrainingTest(tf_test_utils.TracedModuleTestCase):
 
@@ -74,7 +81,7 @@ class RegressionTrainingTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         RegressionTrainingModule,
-        exported_names=["train_on_batch"],
+        exported_names=["train_on_batch", "get_weights", "get_bias"],
         relative_artifacts_dir=os.path.join(RegressionTrainingModule.__name__,
                                             FLAGS.optimizer))
 
@@ -83,6 +90,9 @@ class RegressionTrainingTest(tf_test_utils.TracedModuleTestCase):
     def train_on_batch(module):
       x, y = get_linear_data()
       module.train_on_batch(x, y)
+      # Ensures the weights are identical.
+      module.get_weights()
+      module.get_bias()
 
     self.compare_backends(train_on_batch, self._modules)
 

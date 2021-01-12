@@ -138,3 +138,5 @@ function(add_all_e2e_tests pattern)
 endfunction()
 
 add_all_e2e_tests("*_test.py")
+
+add_subdirectory(keras)

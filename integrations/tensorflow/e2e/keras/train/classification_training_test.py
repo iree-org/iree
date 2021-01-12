@@ -18,10 +18,8 @@ import os
 
 from absl import app
 from absl import flags
-from absl import logging
 import numpy as np
 from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
 import tensorflow as tf
 
 FLAGS = flags.FLAGS
@@ -60,7 +58,7 @@ def get_spiral_dataset(samples_per_spiral: int,
     inputs = inputs[index]
     labels = labels[index]
 
-  return inputs, labels
+  return inputs.astype(np.float32), labels.astype(np.float32)
 
 
 class ClassificationTrainingModule(tf.Module):
@@ -88,6 +86,14 @@ class ClassificationTrainingModule(tf.Module):
     self.optimizer.apply_gradients(zip(gradients, variables))
     return loss
 
+  @tf.function(input_signature=[])
+  def get_weights(self):
+    return self.model.weights[0]
+
+  @tf.function(input_signature=[])
+  def get_bias(self):
+    return self.model.weights[1]
+
 
 class ClassificationTrainingTest(tf_test_utils.TracedModuleTestCase):
 
@@ -95,7 +101,7 @@ class ClassificationTrainingTest(tf_test_utils.TracedModuleTestCase):
     super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(
         ClassificationTrainingModule,
-        exported_names=["train_on_batch"],
+        exported_names=["train_on_batch", "get_weights", "get_bias"],
         relative_artifacts_dir=os.path.join(
             ClassificationTrainingModule.__name__, FLAGS.optimizer))
 
@@ -104,6 +110,9 @@ class ClassificationTrainingTest(tf_test_utils.TracedModuleTestCase):
     def train_on_batch(module):
       inputs, labels = get_spiral_dataset(SAMPLES_PER_SPIRAL, noise_scale=0.05)
       module.train_on_batch(inputs, labels)
+      # Ensures the weights are identical.
+      module.get_weights()
+      module.get_bias()
 
     self.compare_backends(train_on_batch, self._modules)
 
