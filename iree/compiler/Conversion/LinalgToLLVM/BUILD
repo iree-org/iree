@@ -30,6 +30,7 @@ cc_library(
         "LinalgTileAndDistributeOnTensorsPass.cpp",
         "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndVectorizePass.cpp",
+        "LinalgVectorizePass.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
     ],
