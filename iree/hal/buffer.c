@@ -43,6 +43,7 @@ static iree_status_t iree_hal_subspan_buffer_create(
                                  &buffer->resource);
     buffer->allocator = allocated_buffer->allocator;
     buffer->allocated_buffer = allocated_buffer;
+    iree_hal_buffer_retain(buffer->allocated_buffer);
     buffer->allocation_size = allocated_buffer->allocation_size;
     buffer->byte_offset = byte_offset;
     buffer->byte_length = byte_length;
@@ -71,21 +72,22 @@ static iree_status_t iree_hal_subspan_buffer_fill(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, const void* pattern,
     iree_host_size_t pattern_length) {
-  return _VTABLE_DISPATCH(buffer, fill)(buffer->allocated_buffer, byte_offset,
-                                        byte_length, pattern, pattern_length);
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, fill)(
+      buffer->allocated_buffer, byte_offset, byte_length, pattern,
+      pattern_length);
 }
 
 static iree_status_t iree_hal_subspan_buffer_read_data(
     iree_hal_buffer_t* buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
-  return _VTABLE_DISPATCH(buffer, read_data)(
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, read_data)(
       buffer->allocated_buffer, source_offset, target_buffer, data_length);
 }
 
 static iree_status_t iree_hal_subspan_buffer_write_data(
     iree_hal_buffer_t* buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
-  return _VTABLE_DISPATCH(buffer, write_data)(
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, write_data)(
       buffer->allocated_buffer, target_offset, source_buffer, data_length);
 }
 
@@ -93,7 +95,7 @@ static iree_status_t iree_hal_subspan_buffer_copy_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length) {
-  return _VTABLE_DISPATCH(target_buffer, copy_data)(
+  return _VTABLE_DISPATCH(target_buffer->allocated_buffer, copy_data)(
       source_buffer, source_offset, target_buffer->allocated_buffer,
       target_offset, data_length);
 }
@@ -103,30 +105,30 @@ static iree_status_t iree_hal_subspan_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     void** out_data_ptr) {
-  return _VTABLE_DISPATCH(buffer, map_range)(buffer, mapping_mode,
-                                             memory_access, local_byte_offset,
-                                             local_byte_length, out_data_ptr);
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, map_range)(
+      buffer->allocated_buffer, mapping_mode, memory_access, local_byte_offset,
+      local_byte_length, out_data_ptr);
 }
 
 static iree_status_t iree_hal_subspan_buffer_unmap_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, void* data_ptr) {
-  return _VTABLE_DISPATCH(buffer, unmap_range)(buffer, local_byte_offset,
-                                               local_byte_length, data_ptr);
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, unmap_range)(
+      buffer->allocated_buffer, local_byte_offset, local_byte_length, data_ptr);
 }
 
 static iree_status_t iree_hal_subspan_buffer_invalidate_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  return _VTABLE_DISPATCH(buffer, invalidate_range)(buffer, local_byte_offset,
-                                                    local_byte_length);
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, invalidate_range)(
+      buffer->allocated_buffer, local_byte_offset, local_byte_length);
 }
 
 static iree_status_t iree_hal_subspan_buffer_flush_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  return _VTABLE_DISPATCH(buffer, flush_range)(buffer, local_byte_offset,
-                                               local_byte_length);
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, flush_range)(
+      buffer->allocated_buffer, local_byte_offset, local_byte_length);
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable = {

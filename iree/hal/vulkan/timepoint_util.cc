@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
-#include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -47,13 +46,13 @@ void TimePointFence::ResetStatus() {
 }
 
 // static
-StatusOr<ref_ptr<TimePointFencePool>> TimePointFencePool::Create(
-    ref_ptr<VkDeviceHandle> logical_device) {
+iree_status_t TimePointFencePool::Create(VkDeviceHandle* logical_device,
+                                         TimePointFencePool** out_pool) {
   IREE_TRACE_SCOPE0("TimePointFencePool::Create");
-  ref_ptr<TimePointFencePool> pool(
-      new TimePointFencePool(std::move(logical_device)));
+  ref_ptr<TimePointFencePool> pool(new TimePointFencePool(logical_device));
   IREE_RETURN_IF_ERROR(pool->PreallocateFences());
-  return pool;
+  *out_pool = pool.release();
+  return iree_ok_status();
 }
 
 TimePointFencePool::~TimePointFencePool() {
@@ -100,8 +99,8 @@ void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
   free_fences_.push_back(std::unique_ptr<TimePointFence>(fence));
 }
 
-TimePointFencePool::TimePointFencePool(ref_ptr<VkDeviceHandle> logical_device)
-    : logical_device_(std::move(logical_device)) {}
+TimePointFencePool::TimePointFencePool(VkDeviceHandle* logical_device)
+    : logical_device_(logical_device) {}
 
 const ref_ptr<DynamicSymbols>& TimePointFencePool::syms() const {
   return logical_device_->syms();
@@ -142,13 +141,14 @@ Status TimePointFencePool::PreallocateFences() {
 }
 
 // static
-StatusOr<ref_ptr<TimePointSemaphorePool>> TimePointSemaphorePool::Create(
-    ref_ptr<VkDeviceHandle> logical_device) {
+iree_status_t TimePointSemaphorePool::Create(
+    VkDeviceHandle* logical_device, TimePointSemaphorePool** out_pool) {
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Create");
   ref_ptr<TimePointSemaphorePool> pool(
-      new TimePointSemaphorePool(std::move(logical_device)));
+      new TimePointSemaphorePool(logical_device));
   IREE_RETURN_IF_ERROR(pool->PreallocateSemaphores());
-  return pool;
+  *out_pool = pool.release();
+  return iree_ok_status();
 }
 
 TimePointSemaphorePool::~TimePointSemaphorePool() {
@@ -206,9 +206,8 @@ void TimePointSemaphorePool::ReleaseUnresolved(
   free_semaphores_.merge_from(semaphores);
 }
 
-TimePointSemaphorePool::TimePointSemaphorePool(
-    ref_ptr<VkDeviceHandle> logical_device)
-    : logical_device_(std::move(logical_device)) {}
+TimePointSemaphorePool::TimePointSemaphorePool(VkDeviceHandle* logical_device)
+    : logical_device_(logical_device) {}
 
 const ref_ptr<DynamicSymbols>& TimePointSemaphorePool::syms() const {
   return logical_device_->syms();

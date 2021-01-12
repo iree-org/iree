@@ -48,8 +48,8 @@ Status DescriptorSetGroup::Reset() {
   return OkStatus();
 }
 
-DescriptorPoolCache::DescriptorPoolCache(ref_ptr<VkDeviceHandle> logical_device)
-    : logical_device_(std::move(logical_device)) {}
+DescriptorPoolCache::DescriptorPoolCache(VkDeviceHandle* logical_device)
+    : logical_device_(logical_device) {}
 
 StatusOr<DescriptorPool> DescriptorPoolCache::AcquireDescriptorPool(
     VkDescriptorType descriptor_type, int max_descriptor_count) {

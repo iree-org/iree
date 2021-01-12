@@ -14,195 +14,205 @@
 
 #include "iree/hal/vulkan/extensibility_util.h"
 
-#include "iree/base/memory.h"
-#include "iree/base/status.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
-
-namespace {
-
-StatusOr<std::vector<const char*>> MatchAvailableLayers(
-    absl::Span<const char* const> required_layers,
-    absl::Span<const char* const> optional_layers,
-    absl::Span<const VkLayerProperties> properties) {
-  IREE_TRACE_SCOPE0("MatchAvailableLayers");
-
-  std::vector<const char*> enabled_layers;
-  enabled_layers.reserve(required_layers.size() + optional_layers.size());
-
-  for (const char* layer_name : required_layers) {
-    bool found = false;
-    for (const auto& layer_properties : properties) {
-      if (std::strcmp(layer_name, layer_properties.layerName) == 0) {
-        IREE_VLOG(1) << "Enabling required layer: " << layer_name;
-        found = true;
-        enabled_layers.push_back(layer_name);
-        break;
-      }
-    }
-    if (!found) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Required layer " << layer_name << " not available";
+// Returns true if |layers| contains a layer matching |layer_name|.
+static bool iree_hal_vulkan_layer_list_contains(uint32_t layer_count,
+                                                const VkLayerProperties* layers,
+                                                const char* layer_name) {
+  for (uint32_t i = 0; i < layer_count; ++i) {
+    if (strcmp(layer_name, layers[i].layerName) == 0) {
+      return true;
     }
   }
-
-  for (const char* layer_name : optional_layers) {
-    bool found = false;
-    for (const auto& layer_properties : properties) {
-      if (std::strcmp(layer_name, layer_properties.layerName) == 0) {
-        IREE_VLOG(1) << "Enabling optional layer: " << layer_name;
-        found = true;
-        enabled_layers.push_back(layer_name);
-        break;
-      }
-    }
-    if (!found) {
-      IREE_VLOG(1) << "Optional layer " << layer_name << " not available";
-    }
-  }
-
-  return enabled_layers;
+  return false;
 }
 
-StatusOr<std::vector<const char*>> MatchAvailableExtensions(
-    absl::Span<const char* const> required_extensions,
-    absl::Span<const char* const> optional_extensions,
-    absl::Span<const VkExtensionProperties> properties) {
-  IREE_TRACE_SCOPE0("MatchAvailableExtensions");
+static iree_status_t iree_hal_vulkan_match_available_layers(
+    iree_host_size_t available_layers_count,
+    const VkLayerProperties* available_layers,
+    const iree_hal_vulkan_string_list_t* required_layers,
+    const iree_hal_vulkan_string_list_t* optional_layers,
+    iree_hal_vulkan_string_list_t* out_enabled_layers) {
+  memset(out_enabled_layers->values, 0,
+         (required_layers->count + optional_layers->count) *
+             sizeof(out_enabled_layers->values[0]));
 
-  std::vector<const char*> enabled_extensions;
-  enabled_extensions.reserve(required_extensions.size() +
-                             optional_extensions.size());
-
-  for (const char* extension_name : required_extensions) {
-    bool found = false;
-    for (const auto& extension_properties : properties) {
-      if (std::strcmp(extension_name, extension_properties.extensionName) ==
-          0) {
-        IREE_VLOG(1) << "Enabling required extension: " << extension_name;
-        found = true;
-        enabled_extensions.push_back(extension_name);
-        break;
-      }
+  for (iree_host_size_t i = 0; i < required_layers->count; ++i) {
+    const char* layer_name = required_layers->values[i];
+    if (!iree_hal_vulkan_layer_list_contains(available_layers_count,
+                                             available_layers, layer_name)) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "required layer %s not available", layer_name);
     }
-    if (!found) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Required extension " << extension_name << " not available";
+    out_enabled_layers->values[out_enabled_layers->count++] = layer_name;
+  }
+
+  for (iree_host_size_t i = 0; i < optional_layers->count; ++i) {
+    const char* layer_name = optional_layers->values[i];
+    if (iree_hal_vulkan_layer_list_contains(available_layers_count,
+                                            available_layers, layer_name)) {
+      out_enabled_layers->values[out_enabled_layers->count++] = layer_name;
     }
   }
 
-  for (const char* extension_name : optional_extensions) {
-    bool found = false;
-    for (const auto& extension_properties : properties) {
-      if (std::strcmp(extension_name, extension_properties.extensionName) ==
-          0) {
-        IREE_VLOG(1) << "Enabling optional extension: " << extension_name;
-        found = true;
-        enabled_extensions.push_back(extension_name);
-        break;
-      }
-    }
-    if (!found) {
-      IREE_VLOG(1) << "Optional extension " << extension_name
-                   << " not available";
-    }
-  }
-
-  return enabled_extensions;
+  return iree_ok_status();
 }
 
-}  // namespace
-
-StatusOr<std::vector<const char*>> MatchAvailableInstanceLayers(
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
+iree_status_t iree_hal_vulkan_match_available_instance_layers(
+    const iree::hal::vulkan::DynamicSymbols* syms,
+    const iree_hal_vulkan_string_list_t* required_layers,
+    const iree_hal_vulkan_string_list_t* optional_layers, iree::Arena* arena,
+    iree_hal_vulkan_string_list_t* out_enabled_layers) {
   uint32_t layer_property_count = 0;
   VK_RETURN_IF_ERROR(
-      syms.vkEnumerateInstanceLayerProperties(&layer_property_count, nullptr));
-  std::vector<VkLayerProperties> layer_properties(layer_property_count);
-  VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceLayerProperties(
-      &layer_property_count, layer_properties.data()));
-  IREE_ASSIGN_OR_RETURN(auto enabled_layers,
-                        MatchAvailableLayers(extensibility_spec.required_layers,
-                                             extensibility_spec.optional_layers,
-                                             layer_properties),
-                        _ << "Unable to find all required instance layers");
-  return enabled_layers;
+      syms->vkEnumerateInstanceLayerProperties(&layer_property_count, NULL));
+  VkLayerProperties* layer_properties =
+      (VkLayerProperties*)arena->AllocateBytes(layer_property_count *
+                                               sizeof(VkLayerProperties));
+  VK_RETURN_IF_ERROR(syms->vkEnumerateInstanceLayerProperties(
+      &layer_property_count, layer_properties));
+  out_enabled_layers->count = 0;
+  out_enabled_layers->values = (const char**)arena->AllocateBytes(
+      (required_layers->count + optional_layers->count) *
+      sizeof(out_enabled_layers->values[0]));
+  return iree_hal_vulkan_match_available_layers(
+      layer_property_count, layer_properties, required_layers, optional_layers,
+      out_enabled_layers);
 }
 
-StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
+// Returns true if |extensions| contains a layer matching |extension_name|.
+static bool iree_hal_vulkan_extension_list_contains(
+    uint32_t extension_count, const VkExtensionProperties* extensions,
+    const char* extension_name) {
+  for (uint32_t i = 0; i < extension_count; ++i) {
+    if (strcmp(extension_name, extensions[i].extensionName) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_vulkan_match_available_extensions(
+    iree_host_size_t available_extension_count,
+    const VkExtensionProperties* available_extensions,
+    const iree_hal_vulkan_string_list_t* required_extensions,
+    const iree_hal_vulkan_string_list_t* optional_extensions,
+    iree_hal_vulkan_string_list_t* out_enabled_extensions) {
+  memset(out_enabled_extensions->values, 0,
+         (required_extensions->count + optional_extensions->count) *
+             sizeof(out_enabled_extensions->values[0]));
+
+  for (iree_host_size_t i = 0; i < required_extensions->count; ++i) {
+    const char* extension_name = required_extensions->values[i];
+    if (!iree_hal_vulkan_extension_list_contains(
+            available_extension_count, available_extensions, extension_name)) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "required extension %s not available",
+                              extension_name);
+    }
+    out_enabled_extensions->values[out_enabled_extensions->count++] =
+        extension_name;
+  }
+
+  for (iree_host_size_t i = 0; i < optional_extensions->count; ++i) {
+    const char* extension_name = optional_extensions->values[i];
+    if (iree_hal_vulkan_extension_list_contains(
+            available_extension_count, available_extensions, extension_name)) {
+      out_enabled_extensions->values[out_enabled_extensions->count++] =
+          extension_name;
+    }
+  }
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_match_available_instance_extensions(
+    const iree::hal::vulkan::DynamicSymbols* syms,
+    const iree_hal_vulkan_string_list_t* required_extensions,
+    const iree_hal_vulkan_string_list_t* optional_extensions,
+    iree::Arena* arena, iree_hal_vulkan_string_list_t* out_enabled_extensions) {
   uint32_t extension_property_count = 0;
-  // Warning: leak checks remain disabled if an error is returned.
-  IREE_DISABLE_LEAK_CHECKS();
-  VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceExtensionProperties(
-      nullptr, &extension_property_count, nullptr));
-  std::vector<VkExtensionProperties> extension_properties(
-      extension_property_count);
-  VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceExtensionProperties(
-      nullptr, &extension_property_count, extension_properties.data()));
-  IREE_ASSIGN_OR_RETURN(
-      auto enabled_extensions,
-      MatchAvailableExtensions(extensibility_spec.required_extensions,
-                               extensibility_spec.optional_extensions,
-                               extension_properties),
-      _ << "Unable to find all required instance extensions");
-  IREE_ENABLE_LEAK_CHECKS();
-  return enabled_extensions;
+  VK_RETURN_IF_ERROR(syms->vkEnumerateInstanceExtensionProperties(
+      NULL, &extension_property_count, NULL));
+  VkExtensionProperties* extension_properties =
+      (VkExtensionProperties*)arena->AllocateBytes(
+          extension_property_count * sizeof(VkExtensionProperties));
+  VK_RETURN_IF_ERROR(syms->vkEnumerateInstanceExtensionProperties(
+      NULL, &extension_property_count, extension_properties));
+  out_enabled_extensions->count = 0;
+  out_enabled_extensions->values = (const char**)arena->AllocateBytes(
+      (required_extensions->count + optional_extensions->count) *
+      sizeof(out_enabled_extensions->values[0]));
+  return iree_hal_vulkan_match_available_extensions(
+      extension_property_count, extension_properties, required_extensions,
+      optional_extensions, out_enabled_extensions);
 }
 
-StatusOr<std::vector<const char*>> MatchAvailableDeviceExtensions(
+iree_status_t iree_hal_vulkan_match_available_device_extensions(
+    const iree::hal::vulkan::DynamicSymbols* syms,
     VkPhysicalDevice physical_device,
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
+    const iree_hal_vulkan_string_list_t* required_extensions,
+    const iree_hal_vulkan_string_list_t* optional_extensions,
+    iree::Arena* arena, iree_hal_vulkan_string_list_t* out_enabled_extensions) {
   uint32_t extension_property_count = 0;
-  VK_RETURN_IF_ERROR(syms.vkEnumerateDeviceExtensionProperties(
-      physical_device, nullptr, &extension_property_count, nullptr));
-  std::vector<VkExtensionProperties> extension_properties(
-      extension_property_count);
-  VK_RETURN_IF_ERROR(syms.vkEnumerateDeviceExtensionProperties(
-      physical_device, nullptr, &extension_property_count,
-      extension_properties.data()));
-  IREE_ASSIGN_OR_RETURN(
-      auto enabled_extensions,
-      MatchAvailableExtensions(extensibility_spec.required_extensions,
-                               extensibility_spec.optional_extensions,
-                               extension_properties),
-      _ << "Unable to find all required device extensions");
-  return enabled_extensions;
+  VK_RETURN_IF_ERROR(syms->vkEnumerateDeviceExtensionProperties(
+      physical_device, NULL, &extension_property_count, NULL));
+  VkExtensionProperties* extension_properties =
+      (VkExtensionProperties*)arena->AllocateBytes(
+          extension_property_count * sizeof(VkExtensionProperties));
+  VK_RETURN_IF_ERROR(syms->vkEnumerateDeviceExtensionProperties(
+      physical_device, NULL, &extension_property_count, extension_properties));
+  out_enabled_extensions->count = 0;
+  out_enabled_extensions->values = (const char**)arena->AllocateBytes(
+      (required_extensions->count + optional_extensions->count) *
+      sizeof(out_enabled_extensions->values[0]));
+  return iree_hal_vulkan_match_available_extensions(
+      extension_property_count, extension_properties, required_extensions,
+      optional_extensions, out_enabled_extensions);
 }
 
-InstanceExtensions PopulateEnabledInstanceExtensions(
-    absl::Span<const char* const> extension_names) {
-  InstanceExtensions extensions = {0};
-  for (const char* extension_name : extension_names) {
-    if (std::strcmp(extension_name, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0) {
-      extensions.debug_report = true;
-    } else if (std::strcmp(extension_name, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) ==
-               0) {
+iree_hal_vulkan_instance_extensions_t
+iree_hal_vulkan_populate_enabled_instance_extensions(
+    const iree_hal_vulkan_string_list_t* enabled_extensions) {
+  iree_hal_vulkan_instance_extensions_t extensions;
+  memset(&extensions, 0, sizeof(extensions));
+  for (iree_host_size_t i = 0; i < enabled_extensions->count; ++i) {
+    const char* extension_name = enabled_extensions->values[i];
+    if (strcmp(extension_name, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
       extensions.debug_utils = true;
     }
   }
   return extensions;
 }
 
-DeviceExtensions PopulateEnabledDeviceExtensions(
-    absl::Span<const char* const> extension_names) {
-  DeviceExtensions extensions = {0};
-  for (const char* extension_name : extension_names) {
-    if (std::strcmp(extension_name, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME) ==
-        0) {
+iree_hal_vulkan_device_extensions_t
+iree_hal_vulkan_populate_enabled_device_extensions(
+    const iree_hal_vulkan_string_list_t* enabled_extensions) {
+  iree_hal_vulkan_device_extensions_t extensions;
+  memset(&extensions, 0, sizeof(extensions));
+  for (iree_host_size_t i = 0; i < enabled_extensions->count; ++i) {
+    const char* extension_name = enabled_extensions->values[i];
+    if (strcmp(extension_name, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME) == 0) {
       extensions.push_descriptors = true;
-    } else if (std::strcmp(extension_name,
-                           VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
+    } else if (strcmp(extension_name,
+                      VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
       extensions.timeline_semaphore = true;
     }
   }
   return extensions;
 }
 
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+iree_hal_vulkan_device_extensions_t
+iree_hal_vulkan_infer_enabled_device_extensions(
+    const iree::hal::vulkan::DynamicSymbols* device_syms) {
+  iree_hal_vulkan_device_extensions_t extensions;
+  memset(&extensions, 0, sizeof(extensions));
+  if (device_syms->vkCmdPushDescriptorSetKHR) {
+    extensions.push_descriptors = true;
+  }
+  if (device_syms->vkSignalSemaphore || device_syms->vkSignalSemaphoreKHR) {
+    extensions.timeline_semaphore = true;
+  }
+  return extensions;
+}

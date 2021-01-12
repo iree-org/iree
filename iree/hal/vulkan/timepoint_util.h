@@ -125,8 +125,8 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
   static constexpr int kMaxInFlightFenceCount = 64;
 
   // Creates a new pool and pre-allocates `kMaxInFlightFenceCount` fences.
-  static StatusOr<ref_ptr<TimePointFencePool>> Create(
-      ref_ptr<VkDeviceHandle> logical_device);
+  static iree_status_t Create(VkDeviceHandle* logical_device,
+                              TimePointFencePool** out_pool);
 
   ~TimePointFencePool();
 
@@ -143,18 +143,16 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
   // not be in flight on GPU.
   void ReleaseResolved(TimePointFence* fence);
 
-  const ref_ptr<VkDeviceHandle>& logical_device() const {
-    return logical_device_;
-  }
+  VkDeviceHandle* logical_device() const { return logical_device_; }
 
  private:
-  explicit TimePointFencePool(ref_ptr<VkDeviceHandle> logical_device);
+  explicit TimePointFencePool(VkDeviceHandle* logical_device);
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
   Status PreallocateFences() ABSL_LOCKS_EXCLUDED(mutex_);
 
-  ref_ptr<VkDeviceHandle> logical_device_;
+  VkDeviceHandle* logical_device_;
 
   absl::Mutex mutex_;
 
@@ -171,8 +169,8 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
 
   // Creates a new pool and pre-allocates `kMaxInFlightSemaphoreCount` binary
   // semaphores.
-  static StatusOr<ref_ptr<TimePointSemaphorePool>> Create(
-      ref_ptr<VkDeviceHandle> logical_device);
+  static iree_status_t Create(VkDeviceHandle* logical_device,
+                              TimePointSemaphorePool** out_pool);
 
   ~TimePointSemaphorePool();
 
@@ -195,13 +193,13 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
   void ReleaseUnresolved(IntrusiveList<TimePointSemaphore>* semaphores);
 
  private:
-  explicit TimePointSemaphorePool(ref_ptr<VkDeviceHandle> logical_device);
+  explicit TimePointSemaphorePool(VkDeviceHandle* logical_device);
 
   const ref_ptr<DynamicSymbols>& syms() const;
 
   Status PreallocateSemaphores() ABSL_LOCKS_EXCLUDED(mutex_);
 
-  ref_ptr<VkDeviceHandle> logical_device_;
+  VkDeviceHandle* logical_device_;
 
   absl::Mutex mutex_;
 

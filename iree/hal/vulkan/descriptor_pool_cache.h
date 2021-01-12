@@ -16,7 +16,6 @@
 #define IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 
 #include "absl/container/inlined_vector.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 
@@ -43,9 +42,9 @@ struct DescriptorPool {
 class DescriptorSetGroup final {
  public:
   DescriptorSetGroup() = default;
-  DescriptorSetGroup(ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
+  DescriptorSetGroup(DescriptorPoolCache* descriptor_pool_cache,
                      absl::InlinedVector<DescriptorPool, 8> descriptor_pools)
-      : descriptor_pool_cache_(std::move(descriptor_pool_cache)),
+      : descriptor_pool_cache_(descriptor_pool_cache),
         descriptor_pools_(std::move(descriptor_pools)) {}
   DescriptorSetGroup(const DescriptorSetGroup&) = delete;
   DescriptorSetGroup& operator=(const DescriptorSetGroup&) = delete;
@@ -62,7 +61,7 @@ class DescriptorSetGroup final {
   Status Reset();
 
  private:
-  ref_ptr<DescriptorPoolCache> descriptor_pool_cache_;
+  DescriptorPoolCache* descriptor_pool_cache_;
   absl::InlinedVector<DescriptorPool, 8> descriptor_pools_;
 };
 
@@ -72,13 +71,11 @@ class DescriptorSetGroup final {
 // resources. After the descriptors in the pool are no longer used (all
 // command buffers using descriptor sets allocated from the pool have retired)
 // the pool is returned here to be reused in the future.
-class DescriptorPoolCache final : public RefObject<DescriptorPoolCache> {
+class DescriptorPoolCache final {
  public:
-  explicit DescriptorPoolCache(ref_ptr<VkDeviceHandle> logical_device);
+  explicit DescriptorPoolCache(VkDeviceHandle* logical_device);
 
-  const ref_ptr<VkDeviceHandle>& logical_device() const {
-    return logical_device_;
-  }
+  VkDeviceHandle* logical_device() const { return logical_device_; }
   const DynamicSymbols& syms() const { return *logical_device_->syms(); }
 
   // Acquires a new descriptor pool for use by the caller.
@@ -93,7 +90,7 @@ class DescriptorPoolCache final : public RefObject<DescriptorPoolCache> {
   Status ReleaseDescriptorPools(absl::Span<DescriptorPool> descriptor_pools);
 
  private:
-  ref_ptr<VkDeviceHandle> logical_device_;
+  VkDeviceHandle* logical_device_;
 };
 
 }  // namespace vulkan

@@ -24,13 +24,11 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
-#include "absl/synchronization/mutex.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
-#include "iree/base/time.h"
-#include "iree/hal/cc/command_buffer.h"
-#include "iree/hal/cc/command_queue.h"
+#include "iree/hal/api.h"
+#include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/timepoint_util.h"
@@ -38,6 +36,8 @@
 namespace iree {
 namespace hal {
 namespace vulkan {
+
+using SemaphoreValue = std::pair<iree_hal_semaphore_t*, uint64_t>;
 
 // A command queue that potentially defers and serializes command buffer
 // submission to the GPU.
@@ -52,23 +52,22 @@ namespace vulkan {
 // the GPU.
 class SerializingCommandQueue final : public CommandQueue {
  public:
-  SerializingCommandQueue(std::string name,
+  SerializingCommandQueue(VkDeviceHandle* logical_device, std::string name,
                           iree_hal_command_category_t supported_categories,
-                          const ref_ptr<VkDeviceHandle>& logical_device,
-                          const ref_ptr<TimePointFencePool>& fence_pool,
-                          VkQueue queue);
+                          VkQueue queue, TimePointFencePool* fence_pool);
   ~SerializingCommandQueue() override;
 
   const ref_ptr<DynamicSymbols>& syms() const {
     return logical_device_->syms();
   }
 
-  Status Submit(absl::Span<const SubmissionBatch> batches) override;
+  iree_status_t Submit(iree_host_size_t batch_count,
+                       const iree_hal_submission_batch_t* batches) override;
 
-  Status WaitIdle(Time deadline_ns) override;
+  iree_status_t WaitIdle(iree_time_t deadline_ns) override;
 
   // Releases all deferred submissions ready to submit to the GPU.
-  Status AdvanceQueueSubmission();
+  iree_status_t AdvanceQueueSubmission();
 
   // Aborts all deferred submissions and waits for submitted work to complete.
   void AbortQueueSubmission();
@@ -77,37 +76,27 @@ class SerializingCommandQueue final : public CommandQueue {
   void SignalFences(absl::Span<VkFence> fences);
 
  private:
-  struct PendingBatch {
-    absl::InlinedVector<SemaphoreValue, 4> wait_semaphores;
-    absl::InlinedVector<CommandBuffer*, 4> command_buffers;
-    absl::InlinedVector<SemaphoreValue, 4> signal_semaphores;
-  };
   // A submission batch together with the fence to singal its status.
   struct FencedSubmission : public IntrusiveLinkBase<void> {
-    PendingBatch batch;
+    absl::InlinedVector<SemaphoreValue, 4> wait_semaphores;
+    absl::InlinedVector<VkCommandBuffer, 4> command_buffers;
+    absl::InlinedVector<SemaphoreValue, 4> signal_semaphores;
     ref_ptr<TimePointFence> fence;
   };
 
   // Processes deferred submissions in this queue and returns whether there are
   // new workload submitted to the GPU if no errors happen.
-  StatusOr<bool> ProcessDeferredSubmissions()
+  iree_status_t ProcessDeferredSubmissions(bool* out_work_submitted = NULL)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  ref_ptr<VkDeviceHandle> logical_device_;
-
-  ref_ptr<TimePointFencePool> fence_pool_;
-
-  mutable absl::Mutex mutex_;
+  TimePointFencePool* fence_pool_;
 
   // A list of fences that are submitted to GPU.
   absl::InlinedVector<ref_ptr<TimePointFence>, 4> pending_fences_
-      ABSL_GUARDED_BY(mutex_);
+      IREE_GUARDED_BY(mutex_);
   // A list of deferred submissions that haven't been submitted to GPU.
   IntrusiveList<std::unique_ptr<FencedSubmission>> deferred_submissions_
-      ABSL_GUARDED_BY(mutex_);
-
-  // VkQueue needs to be externally synchronized.
-  VkQueue queue_ ABSL_GUARDED_BY(mutex_);
+      IREE_GUARDED_BY(mutex_);
 };
 
 }  // namespace vulkan

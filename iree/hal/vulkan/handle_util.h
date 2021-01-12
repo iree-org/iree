@@ -28,11 +28,12 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include "absl/synchronization/mutex.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
+#include "iree/base/synchronization.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
+#include "iree/hal/vulkan/status_util.h"
 
 namespace iree {
 namespace hal {
@@ -40,13 +41,15 @@ namespace vulkan {
 
 class VkDeviceHandle : public RefObject<VkDeviceHandle> {
  public:
-  VkDeviceHandle(const ref_ptr<DynamicSymbols>& syms,
-                 DeviceExtensions enabled_extensions, bool owns_device,
+  VkDeviceHandle(DynamicSymbols* syms,
+                 iree_hal_vulkan_device_extensions_t enabled_extensions,
+                 bool owns_device, iree_allocator_t host_allocator,
                  const VkAllocationCallbacks* allocator = nullptr)
       : syms_(add_ref(syms)),
         enabled_extensions_(enabled_extensions),
         owns_device_(owns_device),
-        allocator_(allocator) {}
+        allocator_(allocator),
+        host_allocator_(host_allocator) {}
   ~VkDeviceHandle() { reset(); }
 
   VkDeviceHandle(const VkDeviceHandle&) = delete;
@@ -57,7 +60,8 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
         syms_(std::move(other.syms_)),
         enabled_extensions_(other.enabled_extensions_),
         owns_device_(other.owns_device_),
-        allocator_(other.allocator_) {}
+        allocator_(other.allocator_),
+        host_allocator_(other.host_allocator_) {}
 
   void reset() {
     if (value_ == VK_NULL_HANDLE) return;
@@ -73,24 +77,31 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
 
   const ref_ptr<DynamicSymbols>& syms() const noexcept { return syms_; }
   const VkAllocationCallbacks* allocator() const noexcept { return allocator_; }
+  iree_allocator_t host_allocator() const noexcept { return host_allocator_; }
 
-  const DeviceExtensions& enabled_extensions() const {
+  const iree_hal_vulkan_device_extensions_t& enabled_extensions() const {
     return enabled_extensions_;
   }
 
  private:
   VkDevice value_ = VK_NULL_HANDLE;
   ref_ptr<DynamicSymbols> syms_;
-  DeviceExtensions enabled_extensions_;
+  iree_hal_vulkan_device_extensions_t enabled_extensions_;
   bool owns_device_;
   const VkAllocationCallbacks* allocator_ = nullptr;
+  iree_allocator_t host_allocator_;
 };
 
-class VkCommandPoolHandle : public RefObject<VkCommandPoolHandle> {
+class VkCommandPoolHandle {
  public:
-  explicit VkCommandPoolHandle(const ref_ptr<VkDeviceHandle>& logical_device)
-      : logical_device_(add_ref(logical_device)) {}
-  ~VkCommandPoolHandle() { reset(); }
+  explicit VkCommandPoolHandle(VkDeviceHandle* logical_device)
+      : logical_device_(logical_device) {
+    iree_slim_mutex_initialize(&mutex_);
+  }
+  ~VkCommandPoolHandle() {
+    reset();
+    iree_slim_mutex_deinitialize(&mutex_);
+  }
 
   VkCommandPoolHandle(const VkCommandPoolHandle&) = delete;
   VkCommandPoolHandle& operator=(const VkCommandPoolHandle&) = delete;
@@ -114,7 +125,7 @@ class VkCommandPoolHandle : public RefObject<VkCommandPoolHandle> {
   VkCommandPool* mutable_value() noexcept { return &value_; }
   operator VkCommandPool() const noexcept { return value_; }
 
-  const ref_ptr<VkDeviceHandle>& logical_device() const noexcept {
+  const VkDeviceHandle* logical_device() const noexcept {
     return logical_device_;
   }
   const ref_ptr<DynamicSymbols>& syms() const noexcept {
@@ -124,16 +135,31 @@ class VkCommandPoolHandle : public RefObject<VkCommandPoolHandle> {
     return logical_device_->allocator();
   }
 
-  absl::Mutex* mutex() const { return &mutex_; }
+  iree_status_t Allocate(const VkCommandBufferAllocateInfo* allocate_info,
+                         VkCommandBuffer* out_handle) {
+    iree_slim_mutex_lock(&mutex_);
+    iree_status_t status =
+        VkResultToStatus(syms()->vkAllocateCommandBuffers(
+                             *logical_device_, allocate_info, out_handle),
+                         IREE_LOC);
+    iree_slim_mutex_unlock(&mutex_);
+    return status;
+  }
+
+  void Free(VkCommandBuffer handle) {
+    iree_slim_mutex_lock(&mutex_);
+    syms()->vkFreeCommandBuffers(*logical_device_, value_, 1, &handle);
+    iree_slim_mutex_unlock(&mutex_);
+  }
 
  private:
-  ref_ptr<VkDeviceHandle> logical_device_;
+  VkDeviceHandle* logical_device_;
   VkCommandPool value_ = VK_NULL_HANDLE;
 
   // Vulkan command pools are not thread safe and require external
   // synchronization. Since we allow arbitrary threads to allocate and
   // deallocate the HAL command buffers we need to externally synchronize.
-  mutable absl::Mutex mutex_;
+  iree_slim_mutex_t mutex_;
 };
 
 }  // namespace vulkan
