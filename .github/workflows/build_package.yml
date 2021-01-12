@@ -103,33 +103,27 @@ jobs:
           path: 'main_checkout'
           submodules: true
 
-      # It is 2021. And the Windows Path is still a mess.
-      - name: Set up Visual Studio shell
-        if: "contains(matrix.os, 'windows')"
-        uses: egor-tensin/vs-shell@v2
+      # Make sure we have a system python before setting up the dev path.
+      - uses: actions/setup-python@v2
+        name: Install Python
         with:
-          arch: x64
-      - name: Unbreak the system path
+          python-version: '3.8'
+
+      # It is 2021. And the Windows Path is still a mess.
+      - name: Set up visual studio environment
         if: "contains(matrix.os, 'windows')"
         shell: powershell
         run: |
-          echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Make sure WSL bash is not enabled
+          ${{ github.workspace }}\main_checkout\build_tools\github_actions\configure_dev_environment.ps1 -bashExePath C:\msys64\usr\bin\bash.exe
+      - name: Report windows environment
         if: "contains(matrix.os, 'windows')"
         shell: powershell
         run: |
           # Should display either an msys mount table or an "install from the windows store" banner
           echo "--- System path:"
           $env:path -split ";"
-          echo "--- Result of asking bash to run 'mount':"
+          echo "--- Result of asking bash to run 'mount' (should show msys mounts):"
           bash -c mount
-
-      # Setup python after getting the windows dev path set up and adding
-      # msys to it (since we want this python to take precedence).
-      - uses: actions/setup-python@v2
-        name: Install Python
-        with:
-          python-version: '3.8'
 
       - name: Install cibuildwheel
         shell: bash
