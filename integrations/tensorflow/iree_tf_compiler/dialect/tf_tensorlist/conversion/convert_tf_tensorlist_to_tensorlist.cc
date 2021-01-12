@@ -14,11 +14,11 @@
 
 #include "iree_tf_compiler/dialect/tf_tensorlist/conversion/convert_tf_tensorlist_to_tensorlist.h"
 
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
+#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
 #include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.h"
 #include "iree_tf_compiler/dialect/utils/conversion_utils.h"
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"

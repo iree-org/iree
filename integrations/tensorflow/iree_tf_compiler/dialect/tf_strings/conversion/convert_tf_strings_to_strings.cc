@@ -14,12 +14,12 @@
 
 #include "iree_tf_compiler/dialect/tf_strings/conversion/convert_tf_strings_to_strings.h"
 
+#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
+#include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/ops.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/types.h"
 #include "iree_tf_compiler/dialect/utils/conversion_utils.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"

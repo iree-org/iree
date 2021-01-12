@@ -81,6 +81,7 @@ maybe(
 # All other IREE submodule dependencies
 
 load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
+
 configure_iree_submodule_deps()
 
 ###############################################################################
