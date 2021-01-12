@@ -53,6 +53,15 @@ class CompilerTest(unittest.TestCase):
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
+  # Verifies that multiple target_backends are accepted. Which two are not
+  # load bearing.
+  # See: https://github.com/google/iree/issues/4436
+  def testCompileMultipleBackends(self):
+    binary = compiler.compile_str(
+        SIMPLE_MUL_ASM, target_backends=["dylib-llvm-aot", "vulkan-spirv"])
+    logging.info("Flatbuffer size = %d", len(binary))
+    self.assertTrue(binary)
+
   def testCompileInputFile(self):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:

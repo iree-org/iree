@@ -132,8 +132,9 @@ def build_compile_command_line(input_file: str,
       iree_translate,
       input_file,
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
-      f"--iree-hal-target-backends={','.join(options.target_backends)}",
   ]
+  for target_backend in options.target_backends:
+    cl.append(f"--iree-hal-target-backends={target_backend}")
 
   # Output file.
   if options.output_file:
