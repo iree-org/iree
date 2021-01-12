@@ -208,9 +208,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from
   // dispatchees.
-  if (!clEnableLinalgOnTensorsDispatch) {
-    passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
-  }
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
   passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.

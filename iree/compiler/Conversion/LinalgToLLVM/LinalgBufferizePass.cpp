@@ -18,6 +18,10 @@
 // This just inserts AllocOp to address space 0 that can be later hoisted,
 // promoted and generally rewritten to the desired backend.
 //
+// TODO(nicolasvasilache): the implementation of this pass is unnecessarily
+// convoluted due to asymmetries arising from tie_shape weirdness. Revisit once
+// this abstraction is replaced.
+//
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
@@ -36,8 +40,22 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 
+#define DEBUG_TYPE "iree-codegen-linalg-bufferize"
+
 namespace mlir {
 namespace iree_compiler {
+
+// "TieShapeOp" combined with bvm make it necessary to iteratively lookup the
+// value.
+// TODO(nicolasvasilache): kill "TieShapeOp" with fire.
+static Value iterativeLookup(BlockAndValueMapping &bvm, Value v) {
+  while (true) {
+    Value nextV = bvm.lookupOrDefault(v);
+    if (nextV == v) return v;
+    v = nextV;
+  }
+  return v;
+}
 
 // Traverse all transitive "TieShapeOp" uses of `tensor`, map them to `memref`.
 // Replace all uses of any such transitive tensor in a "DimOp" by `memref`.
@@ -90,7 +108,7 @@ static LogicalResult allocateBuffersForResults(
     // TODO(nicolasvasilache): this may be too brutal and we may prefer to leave
     // this decision to a copy + alloc removal pass.
     if (resultTensor.getDefiningOp<linalg::LinalgOp>()) {
-      resultBuffers.push_back(bvm.lookup(resultTensor));
+      resultBuffers.push_back(iterativeLookup(bvm, resultTensor));
       continue;
     }
 
@@ -101,8 +119,8 @@ static LogicalResult allocateBuffersForResults(
     SmallVector<Value, 4> dynOperands;
     for (auto dim : llvm::enumerate(tensorShape)) {
       if (dim.value() == TensorType::kDynamicSize) {
-        dynOperands.push_back(
-            b.create<DimOp>(loc, bvm.lookup(resultTensor), dim.index()));
+        dynOperands.push_back(b.create<DimOp>(
+            loc, iterativeLookup(bvm, resultTensor), dim.index()));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
@@ -110,7 +128,7 @@ static LogicalResult allocateBuffersForResults(
 
     // Additionally, if the output buffer is used, clone its value for now.
     if (op.payloadUsesValueFromOutputOperandIndex(resultIndex))
-      b.create<linalg::CopyOp>(loc, bvm.lookup(resultTensor), alloc);
+      b.create<linalg::CopyOp>(loc, iterativeLookup(bvm, resultTensor), alloc);
   }
   bvm.map(op->getResults(), resultBuffers);
   // TODO(nicolasvasilache): kill tie_shape with fire.
@@ -155,7 +173,7 @@ LogicalResult convertAnyLinalgOp(OpBuilder &b, linalg::LinalgOp op,
   SmallVector<Value, 2> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
   for (Value v : op.getInputs()) {
-    newInputBuffers.push_back(bvm.lookup(v));
+    newInputBuffers.push_back(iterativeLookup(bvm, v));
   }
   SmallVector<Value, 2> newOutputBuffers;
   if (failed(allocateBuffersForResults(b, loc, op, newOutputBuffers, bvm))) {
@@ -341,12 +359,19 @@ LogicalResult convertInterfaceLoadTensorOp(
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(loadOp);
-  Value subview =
-      b.create<SubViewOp>(loadOp.getLoc(), bvm.lookup(loadOp.source()),
-                          loadOp.offsets(), loadOp.sizes(), loadOp.strides());
-  bvm.map(loadOp.result(), subview);
+  Location loc = loadOp.getLoc();
+  Value memref = iterativeLookup(bvm, loadOp.source());
+  Value res = !loadOp.offsets().empty()
+                  ? b.create<SubViewOp>(loc, memref, loadOp.offsets(),
+                                        loadOp.sizes(), loadOp.strides())
+                  :
+                  // If the loadOp has no offsets/sizes and strides, it is the
+                  // original op that "converts" a !flow.dispatch.input to a
+                  // tensor. Just forward the subview.
+                  iterativeLookup(bvm, loadOp.source());
+  bvm.map(loadOp.result(), res);
   // TODO(nicolasvasilache): kill tie_shape with fire.
-  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), subview, bvm);
+  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), res, bvm);
   return success();
 }
 
@@ -368,11 +393,10 @@ LogicalResult convertInterfaceStoreTensorOp(
   auto phOp = createPlaceholderOp(b, storeOp.getLoc(), storeOp,
                                   storeOp.operand(), storeOp.queryBindingOp());
   Value buffer = phOp.getResult();
-  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.operand()),
-                           buffer);
+  b.create<linalg::CopyOp>(storeOp->getLoc(),
+                           iterativeLookup(bvm, storeOp.operand()), buffer);
   storeOp->erase();
   return success();
-  ;
 }
 
 // TODO(nicolasvasilache): evolve into flow.interface.store.tensor.tile when the
@@ -399,8 +423,8 @@ LogicalResult convertInterfaceStoreTensorOp(
       extractFromI64ArrayAttr(storeOp.static_sizes()),
       extractFromI64ArrayAttr(storeOp.static_strides()), storeOp.offsets(),
       storeOp.sizes(), storeOp.strides());
-  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.operand()),
-                           subview);
+  b.create<linalg::CopyOp>(storeOp->getLoc(),
+                           iterativeLookup(bvm, storeOp.operand()), subview);
   storeOp->erase();
   return success();
 }
@@ -411,10 +435,10 @@ LogicalResult convertInterfaceStoreTensorOp(
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
   Value subview = b.create<SubViewOp>(
-      storeOp.getLoc(), bvm.lookup(storeOp.target()), storeOp.offsets(),
-      storeOp.sizes(), storeOp.strides());
-  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.value()),
-                           subview);
+      storeOp.getLoc(), iterativeLookup(bvm, storeOp.target()),
+      storeOp.offsets(), storeOp.sizes(), storeOp.strides());
+  b.create<linalg::CopyOp>(storeOp->getLoc(),
+                           iterativeLookup(bvm, storeOp.value()), subview);
   storeOp->erase();
   return success();
 }
@@ -430,6 +454,22 @@ struct LinalgLLVMBufferizePass
 };
 }  // namespace
 
+// Special handling of dynamic sizes that must tie to InterfaceBindingSubspanOp.
+// This is necessary to propagate the InterfaceLoadConstantOp to memrefs.
+// In tensor world, the information is carried by TieShape ops.
+static Shape::MakeRankedShapeOp getMakeRankedShapeFromInterface(
+    IREE::HAL::InterfaceBindingSubspanOp op) {
+  for (Operation *user : op->getUsers()) {
+    auto tieOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(user);
+    if (!tieOp) continue;
+    auto makeRankedShapeOp =
+        tieOp.shape().getDefiningOp<Shape::MakeRankedShapeOp>();
+    assert(makeRankedShapeOp);
+    return makeRankedShapeOp;
+  }
+  llvm_unreachable("Expected IREE::Flow::DispatchTieShapeOp of op");
+}
+
 void LinalgLLVMBufferizePass::runOnFunction() {
   FuncOp funcOp = getFunction();
   MLIRContext *context = &getContext();
@@ -442,13 +482,55 @@ void LinalgLLVMBufferizePass::runOnFunction() {
     if (!shapedType || !shapedType.hasRank()) return;
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(op);
-    Value memref = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+    // Just change the resulttype of InterfaceBindingSubspanOp to form the base
+    // buffer.
+    Value baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op->getLoc(),
-        MemRefType::get(shapedType.getShape(), shapedType.getElementType()),
+        MemRefType::get({-1}, b.getIntegerType(8)),  // memref<?xi8>
         op.binding(), op.byte_offset(), op.byte_length());
-    bvm.map(op, memref);
+    // Give the base buffer an indexing structure.
+    // TODO(nicolasvasilache): layout and memory space.
+    SmallVector<Value, 4> dynamicDims;
+    auto tensorType =
+        op.result().getType().cast<IREE::Flow::DispatchTensorType>();
+    if (!tensorType.hasStaticShape()) {
+      // View creation must happen once we know all dynamic sizes are available
+      // (e.g. after the makeShapeOp that uses them).
+      Shape::MakeRankedShapeOp makeShapeOp =
+          getMakeRankedShapeFromInterface(op);
+      b.setInsertionPoint(makeShapeOp);
+      dynamicDims = makeShapeOp.dynamic_dimensions();
+    }
+    Value view = b.create<ViewOp>(
+        op->getLoc(),
+        MemRefType::get(tensorType.getShape(), tensorType.getElementType()),
+        baseBuffer, op.byte_offset(), dynamicDims);
+    bvm.map(op, view);
     // TODO(nicolasvasilache): kill tie_shape with fire.
-    mapAllTieShapeUsesAndReplaceDimUsesOf(op.result(), memref, bvm);
+    mapAllTieShapeUsesAndReplaceDimUsesOf(op, view, bvm);
+  });
+  // TODO(nicolasvasilache): kill tie_shape with fire.
+  funcOp.walk([&](Operation *op) {
+    if (!isa<Shape::TieShapeOp>(op) && !isa<IREE::Flow::DispatchTieShapeOp>(op))
+      return;
+    Operation *recOp = op;
+    Value recVal;
+    while (recOp) {
+      Shape::TieShapeOp tieShapeOp = dyn_cast<Shape::TieShapeOp>(recOp);
+      IREE::Flow::DispatchTieShapeOp dispatchTieShapeOp =
+          dyn_cast<IREE::Flow::DispatchTieShapeOp>(recOp);
+      if (tieShapeOp) {
+        recVal = tieShapeOp.operand();
+        recOp = recVal.getDefiningOp();
+      } else if (dispatchTieShapeOp) {
+        recVal = dispatchTieShapeOp.operand();
+        recOp = recVal.getDefiningOp();
+      } else {
+        break;
+      }
+    }
+    LLVM_DEBUG(llvm::dbgs() << "map " << *op << " to " << recVal << "\n");
+    bvm.map(op->getResult(0), recVal);
   });
   funcOp.walk([&](Operation *op) {
     if (auto loadOp = dyn_cast<IREE::HAL::InterfaceLoadTensorOp>(op)) {

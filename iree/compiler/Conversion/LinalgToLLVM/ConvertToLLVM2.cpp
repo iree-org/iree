@@ -51,6 +51,32 @@ static constexpr int kIndexWorkGroupId = 2;
 static constexpr int kIndexWorkGroupCount = 3;
 static constexpr int kIndexWorkGroupSize = 4;
 
+// Return the index type: i32.
+static Type getIndexTy(MLIRContext *context) {
+  return IntegerType::get(context, 32);
+}
+
+// func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
+//          %push_constant: !llvm.ptr<i32>,
+//          workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//          workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//          workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
+static SmallVector<Type, 5> getABITypes(MLIRContext *context) {
+  auto indexTy = getIndexTy(context);
+  return SmallVector<Type, 5>{
+      // %packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>
+      LLVM::LLVMPointerType::get(
+          LLVM::LLVMPointerType::get(IntegerType::get(context, 8))),
+      // %push_constant: !llvm.ptr<i32>
+      LLVM::LLVMPointerType::get(indexTy),
+      // %workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>
+      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
+      // %workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>
+      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
+      // %workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>
+      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3))};
+}
+
 // Convert to an LLVMFuncOp form with LLVM types. This implements an ABI that is
 // compatible with IREE and which cannot be represented in std atm.
 // Since it cannot be represented in std, this is an IREE-specific conversion.
@@ -65,9 +91,9 @@ static constexpr int kIndexWorkGroupSize = 4;
 // ```
 //    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
 //                  %push_constant: !llvm.ptr<i32>,
-//                  workgroup_id[3]: !llvm.ptr<i32>,
-//                  workgroup_count[3]: !llvm.ptr<i32>,
-//                  workgroup_size[3]: !llvm.ptr<i32>)
+//                  workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
 // ```
 class ConvertFunc : public ConvertToLLVMPattern {
  public:
@@ -88,20 +114,13 @@ class ConvertFunc : public ConvertToLLVMPattern {
 
     // func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
     //          %push_constant: !llvm.ptr<i32>,
-    //          workgroup_id[3]: !llvm.ptr<i32>,
-    //          workgroup_count[3]: !llvm.ptr<i32>,
-    //          workgroup_size[3]: !llvm.ptr<i32>)
+    //          workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+    //          workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+    //          workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     MLIRContext *context = rewriter.getContext();
-    auto packedBuffersArgsTy = LLVM::LLVMPointerType::get(
-        LLVM::LLVMPointerType::get(IntegerType::get(context, 8)));
-    auto pushConstantArgTy =
-        LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
-    auto xyzTy = LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
-    signatureConverter.addInputs(
-        {packedBuffersArgsTy, pushConstantArgTy, xyzTy, xyzTy, xyzTy});
-    SmallVector<Type, 5> llvmInputTypes{packedBuffersArgsTy, pushConstantArgTy,
-                                        xyzTy, xyzTy, xyzTy};
+    SmallVector<Type, 5> llvmInputTypes = getABITypes(context);
+    signatureConverter.addInputs(llvmInputTypes);
 
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute, 4> funcAttrs;
@@ -136,9 +155,9 @@ class ConvertFunc : public ConvertToLLVMPattern {
 // ```
 //    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
 //                  %push_constant: !llvm.ptr<i32>,
-//                  workgroup_id[3]: !llvm.ptr<i32>,
-//                  workgroup_count[3]: !llvm.ptr<i32>,
-//                  workgroup_size[3]: !llvm.ptr<i32>)
+//                  workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
+//                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
 // ```
 //
 // Rewrites hal.interface.subspan into a subview into the proper buffer
@@ -155,12 +174,11 @@ class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
-    auto parentFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!parentFuncOp) return failure();
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    assert(llvmFuncOp.getNumArguments() > 0);
 
-    assert(parentFuncOp.getNumArguments() > 0 &&
-           parentFuncOp.getArgument(kIndexPackedBuffer).getType().isa<Type>());
-
+    auto llvmTypeConverter = getTypeConverter();
     Location loc = op->getLoc();
     auto interfaceBindingSubspanOp =
         cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
@@ -176,10 +194,11 @@ class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
     Value bufferIndex =
         rewriter.create<ConstantIndexOp>(loc, interfaceBindingOp.binding());
     Value llvmBufferIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(bufferIndex.getType()), bufferIndex);
+        loc, llvmTypeConverter->convertType(bufferIndex.getType()),
+        bufferIndex);
     Value llvmBufferBasePtrAddr = rewriter.create<LLVM::GEPOp>(
-        loc, parentFuncOp.getArgument(kIndexPackedBuffer).getType(),
-        parentFuncOp.getArgument(kIndexPackedBuffer), llvmBufferIndex);
+        loc, llvmFuncOp.getArgument(kIndexPackedBuffer).getType(),
+        llvmFuncOp.getArgument(kIndexPackedBuffer), llvmBufferIndex);
     Value llvmBufferBasePtr =
         rewriter.create<LLVM::LoadOp>(loc, llvmBufferBasePtrAddr);
 
@@ -189,50 +208,64 @@ class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
                         /*layoutMap*/ {}, memrefType.getMemorySpace());
     // Just create a descriptor and set the allocatedPtr and alignedPtr.
     // The size is deemed unimportant at this point.
-    Value zeroIndex = rewriter.create<ConstantIndexOp>(loc, 0);
-    Value llvmZeroIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(zeroIndex.getType()), zeroIndex);
-    Value oneIndex = rewriter.create<ConstantIndexOp>(loc, 0);
+    Value oneIndex = rewriter.create<ConstantIndexOp>(loc, 1);
     Value llvmOneIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(oneIndex.getType()), oneIndex);
-    auto llvmBaseDesc = MemRefDescriptor::undef(
-        rewriter, loc, typeConverter->convertType(baseMemRefType));
-    llvmBaseDesc.setAllocatedPtr(rewriter, loc, llvmBufferBasePtr);
-    llvmBaseDesc.setAlignedPtr(rewriter, loc, llvmBufferBasePtr);
-    llvmBaseDesc.setOffset(rewriter, loc, llvmZeroIndex);
-    // TODO(nicolasvasilache): get proper dynamic size if needed.
-    llvmBaseDesc.setSize(rewriter, loc, 0, llvmOneIndex);
-    llvmBaseDesc.setStride(rewriter, loc, 0, llvmOneIndex);
-    // Dialect cast to the `baseMemRefType` so we can take the view in std land.
-    Value baseDesc =
-        rewriter.create<LLVM::DialectCastOp>(loc, baseMemRefType, llvmBaseDesc);
+        loc, llvmTypeConverter->convertType(oneIndex.getType()), oneIndex);
+    Value llvmByteOffset = rewriter.create<LLVM::DialectCastOp>(
+        loc, llvmTypeConverter->convertType(oneIndex.getType()),
+        interfaceBindingSubspanOp.byte_offset());
+    // If no size is specified, just use size 1 as it does not matter.
+    Value llvmByteLength =
+        interfaceBindingSubspanOp.byte_length()
+            ? rewriter.create<LLVM::DialectCastOp>(
+                  loc, llvmTypeConverter->convertType(oneIndex.getType()),
+                  interfaceBindingSubspanOp.byte_length())
+            : llvmOneIndex;
+    auto llvmBaseDesc = MemRefDescriptor::pack(
+        rewriter, loc, *llvmTypeConverter, baseMemRefType,
+        ValueRange{/*allocatedPointer=*/llvmBufferBasePtr,
+                   /*alignedPointer=*/llvmBufferBasePtr,
+                   /*offset=*/llvmByteOffset,
+                   /*size[1]=*/llvmByteLength, /*stride[1]=*/llvmOneIndex});
+    rewriter.replaceOp(op, llvmBaseDesc);
+    return success();
+  }
+};
 
-    // TODO(nicolasvasilache): adapt the following to extract dynamic sizes from
-    // push constant.
-    SmallVector<Value, 4> dynamicSizes;
-#if 0
-    // Go grab dynamic sizes from special buffer location.
-    Value pushConstantIndex = rewriter.create<ConstantIndexOp>(loc, 0);
-        //adaptor.binding().cast<IREE::HAL::InterfaceBindingOp>().);
-    Value llvmPushConstantIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc,
-        typeConverter->convertType(pushConstantIndex.getType()),
-        pushConstantIndex);
-    Value llvmPushConstantrBasePtr = rewriter.create<LLVM::GEPOp>(
-        loc,
-        parentFuncOp.getArgument(kIndexPushConstant).getType(),
-        parentFuncOp.getArgument(kIndexPushConstant),
-        llvmPushConstantIndex);
-    rewriter.create<LLVM::LoadOp>(loc, llvmPushConstantrBasePtr);
-#endif
+class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
+                                           LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            converter) {}
 
-    // Construct view memref from base memref in std land and cast to LLVM.
-    Value view = rewriter.create<ViewOp>(
-        loc, op->getResultTypes().front(), baseDesc,
-        interfaceBindingSubspanOp.byte_offset(), dynamicSizes);
-    rewriter.replaceOpWithNewOp<LLVM::DialectCastOp>(
-        op, typeConverter->convertType(view.getType()), view);
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Bail until nested under an LLVMFuncOp.
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
 
+    assert(llvmFuncOp.getNumArguments() > 0);
+
+    auto llvmTypeConverter = getTypeConverter();
+    Location loc = op->getLoc();
+    auto interfaceLoadConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
+    Value pushConstantOffset = rewriter.create<ConstantIndexOp>(
+        loc, interfaceLoadConstantOp.offset().getSExtValue());
+    Value llvmPushConstantOffset = rewriter.create<LLVM::DialectCastOp>(
+        loc, llvmTypeConverter->convertType(pushConstantOffset.getType()),
+        pushConstantOffset);
+    Value llvmPushConstantOffsetAddr = rewriter.create<LLVM::GEPOp>(
+        loc, llvmFuncOp.getArgument(kIndexPushConstant).getType(),
+        llvmFuncOp.getArgument(kIndexPushConstant), llvmPushConstantOffset);
+    Value llvmPushConstantValue =
+        rewriter.create<LLVM::LoadOp>(loc, llvmPushConstantOffsetAddr);
+    Value indexValue = rewriter.create<LLVM::ZExtOp>(
+        loc, llvmTypeConverter->convertType(rewriter.getIndexType()),
+        llvmPushConstantValue);
+    rewriter.replaceOp(op, indexValue);
     return success();
   }
 };
@@ -254,17 +287,12 @@ class ConvertWorkgroupInfoOpPattern : public ConvertToLLVMPattern {
     if (!newFuncOp) return failure();
 
     Location loc = op->getLoc();
-    auto xyzArgument = newFuncOp.getArgument(ArgIndex);
-
-    Value dimIndex = rewriter.create<ConstantIndexOp>(
-        loc, op->getAttrOfType<IntegerAttr>("dimension").getInt());
-    Value llvmDimIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(dimIndex.getType()), dimIndex);
-
-    auto dimPtr = rewriter.createOrFold<LLVM::GEPOp>(
-        loc, typeConverter->convertType(xyzArgument.getType()), xyzArgument,
-        llvmDimIndex);
-    auto dimValue = rewriter.createOrFold<LLVM::LoadOp>(loc, dimPtr);
+    auto xyzArrayPtr = newFuncOp.getArgument(ArgIndex);
+    auto xyzArrayValue = rewriter.createOrFold<LLVM::LoadOp>(loc, xyzArrayPtr);
+    auto dimValue = rewriter.createOrFold<LLVM::ExtractValueOp>(
+        loc, getIndexTy(op->getContext()), xyzArrayValue,
+        rewriter.getI32ArrayAttr(ArrayRef<int>(
+            op->getAttrOfType<IntegerAttr>("dimension").getInt())));
 
     rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(
         op, typeConverter->convertType(op->getResult(0).getType()), dimValue);
@@ -323,6 +351,7 @@ void ConvertToLLVMPass::runOnOperation() {
   patterns.insert<
     ConvertFunc,
     ConvertHALInterfaceBindingSubspanToView,
+    ConvertHALInterfaceLoadConstant,
     ConvertWorkgroupInfoOpPattern<
       IREE::HAL::InterfaceWorkgroupIDOp, kIndexWorkGroupId>,
     ConvertWorkgroupInfoOpPattern<
