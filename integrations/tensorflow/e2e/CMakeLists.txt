@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(keras)
+
 # Special cases to exclude from automatically expanding targets for all
 # backends.
 set(SPECIAL_CASES

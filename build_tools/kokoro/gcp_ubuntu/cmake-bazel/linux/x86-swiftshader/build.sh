@@ -68,4 +68,4 @@ cd ../iree-build/
 ninja
 
 echo "Testing with CTest"
-ctest -R 'tensorflow_e2e|bindings/python'
+ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/'
