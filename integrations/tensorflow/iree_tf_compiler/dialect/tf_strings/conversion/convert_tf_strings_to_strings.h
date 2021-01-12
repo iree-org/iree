@@ -15,9 +15,9 @@
 #ifndef IREE_INTEGRATIONS_TFSTRINGS_CONVERSION_CONVERT_TF_STRINGS_TO_STRINGS_H_
 #define IREE_INTEGRATIONS_TFSTRINGS_CONVERSION_CONVERT_TF_STRINGS_TO_STRINGS_H_
 
-#include "iree_tf_compiler/dialect/tf_strings/ir/types.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Types.h"
+#include "iree_tf_compiler/dialect/tf_strings/ir/types.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"

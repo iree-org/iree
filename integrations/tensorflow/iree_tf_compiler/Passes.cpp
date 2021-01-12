@@ -14,10 +14,10 @@
 
 #include "iree_tf_compiler/Passes.h"
 
-#include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
-#include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
+#include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"

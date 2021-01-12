@@ -49,8 +49,8 @@ http_archive(
 # and for now this gets TF stuff building. This includes, for instance,
 # @llvm-project and @com_google_absl.
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
-tf_repositories()
 
+tf_repositories()
 
 # TF depends on tf_toolchains.
 http_archive(

@@ -18,8 +18,8 @@
 // passes here. If you need something, add it, but add only what you need as
 // each addition will likely end up on the build critical path.
 
-#include "iree_tf_compiler/Passes.h"
 #include "iree/tools/init_xla_dialects.h"
+#include "iree_tf_compiler/Passes.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/MlirOptMain.h"
