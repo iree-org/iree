@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Sets submodule state to the one specified in SUBMODULE_VERSIONS
+# Edits the HEAD commit to use the submodule state specified in SUBMODULE_VERSIONS
+# WARNING: rewrites history!
 
 name: Synchronize Submodules
 
 on:
   push:
     branches:
+      # Do not add this to human branches like main. It rewrites history!
       - google
 
 jobs:
@@ -29,8 +31,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-      - name: Initializing submodules
-        run: ./scripts/git/submodule_versions.py init
+          # Get all history. We're force-pushing here and will otherwise drop
+          # all the branch history. This takes a whopping 2 seconds. I think
+          # we'll live.
+          fetch-depth: 0
+      - name: Importing submodules from SUBMODULE_VERSIONS
+        run: ./scripts/git/submodule_versions.py import
       - name: Checking submodule state
         run: |
           echo "has_diff=false" >> $GITHUB_ENV
@@ -40,10 +46,15 @@ jobs:
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Submodule Synchronize Action"
-          git commit -am "Synchronize submodules"
+          git commit --amend -a --no-edit
       - name: Pushing changes
         if: env.has_diff == 'true'
-        uses: ad-m/github-push-action@v0.5.0
-        with:
-          github_token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          branch: ${{ github.ref }}
+        run: git push -f origin ${{ github.ref }}
+
+  check:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Checking submodules
+        run: ./scripts/git/submodule_versions.py check
