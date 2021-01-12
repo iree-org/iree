@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-vmla-pre-conversion-lowering -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
-func @fft(%arg0: tensor<8xf32>, %arg1: tensor<8xf32>) ->  (tensor<8xf32>, tensor<8xf32>) attributes { sym_visibility = "private" } {
+func private @fft(%arg0: tensor<8xf32>, %arg1: tensor<8xf32>) ->  (tensor<8xf32>, tensor<8xf32>) {
   // CHECK: [[RS:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[8]>
   // CHECK-NEXT: [[C32:%.+]] = constant 32 : index
   // CHECK-NEXT: [[OUTBUF1:%.+]] = vmla.buffer.alloc byte_length = [[C32]] : !vmla.buffer

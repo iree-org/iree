@@ -67,7 +67,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;SHARED;WHOLEARCHIVE"
+    "PUBLIC;TESTONLY;SHARED"
     "NAME"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -163,6 +163,11 @@ function(iree_cc_library)
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
+    )
+    target_link_options(${_NAME}
+      INTERFACE
+        ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
     )
     target_link_libraries(${_NAME}
       INTERFACE

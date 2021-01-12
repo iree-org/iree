@@ -74,6 +74,9 @@ static bool hasDestructiveUpdateSubTensorUses(
       writes.push_back(subTensorInsertOp);
       continue;
     }
+    if (auto dimOp = dyn_cast<DimOp>(u.getOwner())) {
+      continue;
+    }
     LLVM_DEBUG(llvm::dbgs() << "found non-destructive update pattern use: "
                             << *(u.getOwner()) << "\n");
     return false;

@@ -62,7 +62,7 @@ application should be able to run. You may additionally want to install
     `vulkancube` (rendering a rotating cube).
 
 In order to develop Vulkan applications, you additionally need the following
-pacages:
+packages:
 
 *   [libvulkan-dev][PackageVulkanDev] for various Vulkan header files.
 *   [vulkan-validationlayers][PackageVulkanValidation] for Vulkan validation
