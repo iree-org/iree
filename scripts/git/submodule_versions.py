@@ -17,18 +17,18 @@
 # pylint: disable=missing-docstring
 """submodule_versions.
 
-Synchronizes the tracked SUBMODULE_VERSIONS file with the submodule state
+Synchronizes the tracked SUBMODULE_VERSIONS.txt file with the submodule state
 in git.
 
 Typical usage:
 --------------
-Exporting current git submodule state to SUBMODULE_VERSIONS:
+Exporting current git submodule state to SUBMODULE_VERSIONS.txt:
   Syntax: ./scripts/git/submodule_versions.py export
 
-Importing versions in SUBMODULE_VERSIONS to git submodule state:
+Importing versions in SUBMODULE_VERSIONS.txt to git submodule state:
   Syntax: ./scripts/git/submodule_versions.py import
 
-Checking whether SUBMODULE_VERSIONS and git state are in sync:
+Checking whether SUBMODULE_VERSIONS.txt and git state are in sync:
   Syntax: ./scripts/git/submodule_versions.py check
 """
 
@@ -39,7 +39,7 @@ import sys
 
 import utils
 
-VERSIONS_FILE = "SUBMODULE_VERSIONS"
+VERSIONS_FILE = "SUBMODULE_VERSIONS.txt"
 
 
 def get_submodule_versions(repo_dir):
@@ -128,15 +128,12 @@ def parallel_shallow_update_submodules(repo_dir):
 def check_submodule_versions(repo_dir):
   diff_versions = get_diff_versions(repo_dir)
   if diff_versions:
-    print(
-        "Submodule state differs from SUBMODULE_VERSIONS file. Run (and commit) one of:"
-    )
-    print(
-        "  ./scripts/git/submodule_versions.py import # Use version in SUBMODULE_VERSIONS ('written')"
-    )
-    print(
-        "  ./scripts/git/submodule_versions.py export # Use version in git state ('actual')"
-    )
+    print("Submodule state differs from SUBMODULE_VERSIONS.txt file."
+          " Run (and commit) one of:")
+    print("  ./scripts/git/submodule_versions.py import"
+          " # Use version in SUBMODULE_VERSIONS.txt ('written')")
+    print("  ./scripts/git/submodule_versions.py export"
+          " # Use version in git state ('actual')")
     for k, (current, written) in diff_versions.items():
       print(f"{k} : actual={current} written={written}")
     return False
@@ -174,8 +171,9 @@ def main(args):
     # but good to only print output about the import if it's actually
     # needed.
     if not check_submodule_versions(args.repo):
-      print("Warning: git submodule state does not match SUBMODULE_VERSIONS. "
-            "Using state in SUBMODULE_VERSIONS")
+      print(
+          "Warning: git submodule state does not match SUBMODULE_VERSIONS.txt. "
+          "Using state in SUBMODULE_VERSIONS.txt")
       import_versions(args.repo)
     parallel_shallow_update_submodules(args.repo)
   else:

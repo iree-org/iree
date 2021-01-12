@@ -108,6 +108,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
 
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {
+    passManager.addPass(createLinalgVectorizePass());
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());

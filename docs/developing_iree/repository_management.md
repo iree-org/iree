@@ -29,20 +29,20 @@ that may not be obvious.
 
 The git submodule state is not accessible to the tooling that moves the IREE
 source between GitHub and Google's source repository. We therefore mirror this
-state in a special `SUBMODULE_VERSIONS` file. This file is considered the source
-of truth for the correct submodule state and is what is used by the CI. When
-updating the submodule state from Google's source repository, only this file is
-updated and another
+state in a special `SUBMODULE_VERSIONS.txt` file. This file is considered the
+source of truth for the correct submodule state and is what is used by the CI.
+When updating the submodule state from Google's source repository, only this
+file is updated and another
 [GitHub Actions workflow](https://github.com/google/iree/blob/main/.github/workflows/synchronize_submodules.yml)
 immediately commits a submodule update on top of that.
 
 Shortcut commands (read below for full documentation):
 
 ```shell
-# Update SUBMODULE_VERSIONS from current git submodule pointers
+# Update SUBMODULE_VERSIONS.txt from current git submodule pointers
 $ ./scripts/git/submodule_versions.py export
 
-# Update current git submodule pointers based on SUBMODULE_VERSIONS
+# Update current git submodule pointers based on SUBMODULE_VERSIONS.txt
 $ ./scripts/git/submodule_versions.py import
 ```
 
@@ -97,7 +97,7 @@ contribute such changes.
 
 When working on a development branch, feel free to stage changes however makes
 sense. However, when sending a PR, note that our integration systems will
-overwrite the submodule version updates from the `SUBMODULE_VERSIONS` file in
+overwrite the submodule version updates from the `SUBMODULE_VERSIONS.txt` file in
 the repository root. Here is an example:
 
 ```text
@@ -119,7 +119,7 @@ If bumping versions, you must include an update to this file with your commit.
 To generate it, run:
 
 ```shell
-# Performs a submodule sync+update and stages an updated SUBMODULE_VERSIONS
+# Performs a submodule sync+update and stages an updated SUBMODULE_VERSIONS.txt
 # file.
 $ ./scripts/git/submodule_versions.py export
 ```
@@ -128,24 +128,24 @@ If you don't know if this is required, you may run:
 
 ```shell
 # The check command is intended to eventually be usable as a git hook
-# for verification of consistency between SUBMODULE_VERSIONS and the
+# for verification of consistency between SUBMODULE_VERSIONS.txt and the
 # corresponding local git state.
 $ ./scripts/git/submodule_versions.py check
 ```
 
 #### Pulling dependency changes
 
-If you pull a change to `SUBMODULE_VERSIONS` it is necessary to import it into
+If you pull a change to `SUBMODULE_VERSIONS.txt` it is necessary to import it into
 the current git state:
 
 ```shell
-# Updates the commit hash of any entries in SUBMODULE_VERSIONS that differ
+# Updates the commit hash of any entries in SUBMODULE_VERSIONS.txt that differ
 # and stages the changes.
 $ ./scripts/git/submodule_versions.py import
 ```
 
 This will stage any needed changes to the submodules to bring them up to date
-with the `SUBMODULE_VERSIONS`. If you have local changes, you may get conflicts
+with the `SUBMODULE_VERSIONS.txt`. If you have local changes, you may get conflicts
 on the `submodule update` step at the end, and you will need to manually resolve
 as usual.
 
