@@ -32,7 +32,7 @@ set(IREE_BAZEL_SH "bash"
 #   IREE_BAZEL_BIN: Path to the bazel-bin directory
 function(iree_configure_bazel)
   message(STATUS "Using bazel executable: ${IREE_BAZEL_EXECUTABLE}")
-  set(_bazel_output_base "${CMAKE_BINARY_DIR}/integrations/tensorflow/bazel-out")
+  set(_bazel_output_base "${CMAKE_BINARY_DIR}/bazel_output_base")
   set(IREE_BAZEL_SRC_ROOT "${CMAKE_SOURCE_DIR}/integrations/tensorflow")
 
   # Configure comilation mode.
@@ -76,6 +76,7 @@ build --action_env BAZEL_SH='${IREE_BAZEL_SH}'
 build --action_env PYTHON_BIN_PATH='${Python3_EXECUTABLE}'
 build --action_env CC='${CMAKE_C_COMPILER}'
 build --action_env CXX='${CMAKE_CXX_COMPILER}'
+build --experimental_convenience_symlinks=ignore
 ${_bazel_compilation_mode_opt}
 ${_bazel_strip_opt}
 import ${CMAKE_SOURCE_DIR}/build_tools/bazel/iree.bazelrc
