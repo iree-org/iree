@@ -41,6 +41,9 @@ def gentbl(name, tblgen, td_file, tbl_outs, td_srcs = [], td_includes = [], stri
         # Allow including MLIR td files, including generated ones
         "-I external/llvm-project/mlir/include",
         "-I $(GENDIR)/external/llvm-project/mlir/include",
+        # Allow IREE to be used as an external repository, but *only* if the
+        # Bazel repository alias is literally "iree".
+        "-I external/iree",
     ]
     for td_include in td_includes:
         td_includes_cmd.append("-I%s" % td_include)
