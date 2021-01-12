@@ -24,6 +24,21 @@ endif()
 
 iree_cc_library(
   NAME
+    common
+  HDRS
+    "common.h"
+  SRCS
+    "common.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    iree::compiler::Dialect::VM::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     init_targets
   HDRS
     "init_targets.h"
