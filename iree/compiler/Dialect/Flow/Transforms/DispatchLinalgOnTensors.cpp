@@ -131,15 +131,15 @@ struct TileAndDistributeOnTensorsPattern
 
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(clonedLinalgOp);
-    SmallVector<Value, 4> tensorResults;
+    linalg::TiledLinalgOp tiledLinalgOp;
     if (failed(Base::matchAndRewriteBase(clonedLinalgOp, rewriter,
-                                         tensorResults))) {
+                                         tiledLinalgOp))) {
       // Need to erase on failure to avoid infinite loop
       rewriter.eraseOp(dispatch);
       return failure();
     }
     rewriter.replaceOp(op, dispatch->getResults());
-    rewriter.replaceOp(clonedLinalgOp, tensorResults);
+    rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
     return success();
   }

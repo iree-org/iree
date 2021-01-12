@@ -36,9 +36,9 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
              benefit) {}
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    SmallVector<Value, 4> tensorResults;
-    if (failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
-        !tensorResults.empty()) {
+    linalg::TiledLinalgOp tiledLinalgOp;
+    if (failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp)) ||
+        !tiledLinalgOp.tensorResults.empty()) {
       return failure();
     }
     rewriter.eraseOp(op);
