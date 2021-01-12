@@ -76,6 +76,7 @@ build --action_env BAZEL_SH='${IREE_BAZEL_SH}'
 build --action_env PYTHON_BIN_PATH='${Python3_EXECUTABLE}'
 build --action_env CC='${CMAKE_C_COMPILER}'
 build --action_env CXX='${CMAKE_CXX_COMPILER}'
+build --symlink_prefix=/
 ${_bazel_compilation_mode_opt}
 ${_bazel_strip_opt}
 import ${IREE_BAZEL_SRC_ROOT}/build_tools/bazel/iree.bazelrc
