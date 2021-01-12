@@ -91,7 +91,7 @@ http_archive(
 maybe(
     local_repository,
     name = "mlir-hlo",
-    path = "build_tools/overlay/mlir-hlo",
+    path = "build_tools/overlay/mlir_hlo",
 )
 
 maybe(
