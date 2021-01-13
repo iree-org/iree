@@ -220,7 +220,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 // Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   bool optimize = true;
-  bool stripDebugOps = true;
+  bool stripDebugOps = false;
 
   OwningRewritePatternList patterns;
   ConversionTarget target(*moduleOp.getContext());
@@ -232,9 +232,11 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   for (auto *op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
     if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
-      op->getCanonicalizationPatterns(patterns, context);
-      target.setOpAction(OperationName(op->name, context),
-                         ConversionTarget::LegalizationAction::Illegal);
+      // TODO(simon-camp) reenable pass once support for control flow ops has
+      // landed
+      // op->getCanonicalizationPatterns(patterns, context);
+      // target.setOpAction(OperationName(op->name, context),
+      //                    ConversionTarget::LegalizationAction::Illegal);
     }
 
     // Debug ops must not be present when stripping.
@@ -255,10 +257,15 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
 
   if (optimize) {
     // TODO(benvanik): does this run until it quiesces?
-    modulePasses.addPass(mlir::createInlinerPass());
+    // TODO(simon-camp) reenable pass once support for control flow ops has
+    // landed
+    // modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());
-    modulePasses.addPass(mlir::createCanonicalizerPass());
+    // modulePasses.addPass(mlir::createCanonicalizerPass());
   }
+
+  // C target specific passes
+  modulePasses.addPass(createConvertVMToEmitCPass());
 
   modulePasses.addPass(createDropCompilerHintsPass());
 
@@ -268,9 +275,6 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   // We don't want any more modifications after this point as they could
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
-
-  // C target specific passes
-  modulePasses.addPass(createConvertVMToEmitCPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";

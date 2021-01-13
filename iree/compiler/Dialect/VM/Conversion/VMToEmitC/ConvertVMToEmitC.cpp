@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
@@ -103,7 +104,7 @@ class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::emitc::EmitCDialect>();
+    registry.insert<mlir::emitc::EmitCDialect, iree_compiler::IREEDialect>();
   }
 
   void runOnOperation() override {
@@ -113,6 +114,7 @@ class ConvertVMToEmitCPass
     populateVMToCPatterns(&getContext(), patterns);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
+    target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
 
     // Arithmetic
