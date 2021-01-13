@@ -22,7 +22,7 @@ func @compileTime(%arg0 : tensor<?x2xf32>, %arg1 : !shapex.ranked_shape<[?,2]>) 
 func @f(%arg0 : !shapex.ranked_shape<[?]>, %arg1 : !shapex.ranked_shape<[?]>) -> (!shapex.ranked_shape<[?]>) {
   // CHECK-DAG: %[[LHSEXTENT:.+]] = shapex.ranked_dim %arg0[0]
   // CHECK-DAG: %[[RHSEXTENT:.+]] = shapex.ranked_dim %arg1[0]
-  // CHECK-DAG: %[[GT:.+]] = cmpi "ugt", %[[LHSEXTENT]], %[[RHSEXTENT]] : index
+  // CHECK-DAG: %[[GT:.+]] = cmpi ugt, %[[LHSEXTENT]], %[[RHSEXTENT]] : index
   // CHECK-DAG: %[[MAX:.+]] = select %[[GT]], %[[LHSEXTENT]], %[[RHSEXTENT]] : index
   // CHECK-DAG: %[[RS:.+]] = shapex.make_ranked_shape %[[MAX]]
   // CHECK-DAG: return %[[RS]]

@@ -24,10 +24,10 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
     // CHECK-NEXT:  %[[IS1:.+]] = or %[[IS1L]], %[[IS1R]] : i1
     // CHECK-NEXT:  cond_br %[[IS1]], ^bb2, ^bb3(%[[C0]] : i32)
     // CHECK-NEXT: ^bb2:
-    // CHECK-NEXT:  %[[EQZ:.+]] = cmpi "eq", %[[ARG]], %[[C2]] : i32
+    // CHECK-NEXT:  %[[EQZ:.+]] = cmpi eq, %[[ARG]], %[[C2]] : i32
     // CHECK-NEXT:  cond_br %[[EQZ]], ^bb3(%[[C3]] : i32), ^bb3(%[[C4]] : i32)
     #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%arga = %arg : i32, %c2a = %c2 : i32) {
-      %eqz = cmpi "eq", %arga, %c2a : i32
+      %eqz = cmpi eq, %arga, %c2a : i32
       cond_br %eqz, ^bb_true, ^bb_false
     ^bb_true:
       %c3 = constant 3 : i32

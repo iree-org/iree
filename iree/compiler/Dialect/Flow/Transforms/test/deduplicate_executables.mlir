@@ -291,7 +291,7 @@ flow.executable @block_successors_ex_0 {
     func @entry_0(%arg0: i32, %arg1: i32) -> i32 {
       %c0 = constant 0 : i32
       %c1 = constant 1 : i32
-      %eqz = cmpi "eq", %arg0, %arg1 : i32
+      %eqz = cmpi eq, %arg0, %arg1 : i32
       cond_br %eqz, ^bb_a(%c0 : i32), ^bb_b(%c1 : i32)
     ^bb_a(%bb_a_arg0 : i32):
       return %bb_a_arg0 : i32
@@ -307,7 +307,7 @@ flow.executable @block_successors_ex_with_swapped_cond_br {
     func @entry_0(%arg0: i32, %arg1: i32) -> i32 {
       %c0 = constant 0 : i32
       %c1 = constant 1 : i32
-      %eqz = cmpi "eq", %arg0, %arg1 : i32
+      %eqz = cmpi eq, %arg0, %arg1 : i32
       cond_br %eqz, ^bb_b(%c0 : i32), ^bb_b(%c1 : i32)
     ^bb_a(%bb_a_arg0 : i32):
       return %bb_a_arg0 : i32
