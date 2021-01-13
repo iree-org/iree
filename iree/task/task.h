@@ -151,6 +151,12 @@ typedef uint16_t iree_task_flags_t;
 
 typedef struct iree_task_s iree_task_t;
 
+// A function called to cleanup tasks.
+// The provided |status| is unowned and must be cloned if used beyond the scope
+// of the cleanup function (such as when stored for later usage).
+typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(iree_task_t* task,
+                                                   iree_status_t status);
+
 // A task within the task system that runs on an executor.
 // Tasks have an iree_task_type_t that defines which parameters are valid and
 // how the executor is to treat the task. Dependency edges can be defined that
@@ -165,6 +171,11 @@ struct iree_alignas(iree_max_align_t) iree_task_s {
   // propagated to the scope and errors in the scope will cause pending tasks to
   // be skipped.
   iree_task_scope_t* scope;
+
+  // Optional function to call to cleanup the task on completion.
+  // Will be called after the task has retired or if the task fails to issue
+  // (dependency failed, etc).
+  iree_task_cleanup_fn_t cleanup_fn;
 
   // Optional task that will be notified when the task completes.
   // The task will have its pending_dependency_count decremented and will be
@@ -206,6 +217,11 @@ static_assert(offsetof(iree_task_t, next_task) == 0,
 // the caller.
 void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
                           iree_task_t* out_task);
+
+// Sets the optional function called when the task completes (whether successful
+// or not).
+void iree_task_set_cleanup_fn(iree_task_t* task,
+                              iree_task_cleanup_fn_t cleanup_fn);
 
 // Sets up a dependency edge from |task| to |completion_task| such that when
 // |task| completes |completion_task| will be notified and have its
@@ -341,6 +357,7 @@ typedef struct {
   iree_task_t header;
 
   // The external wait handle that the task is waiting on.
+  // TODO(benvanik): multiple wait handles.
   iree_wait_handle_t wait_handle;
 
   // TODO(benvanik): deadline_ns.
