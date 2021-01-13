@@ -19,7 +19,7 @@
 #include <mutex>
 #include <set>
 
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -36,17 +36,17 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
-    auto driver_or = GetDriver(driver_name);
-    if (IsUnavailable(driver_or.status())) {
-      IREE_LOG(WARNING) << "Skipping test as driver is unavailable: "
-                        << driver_or.status();
+    iree_hal_driver_t* driver;
+    iree_status_t status = TryGetDriver(driver_name, &driver);
+    if (iree_status_is_unavailable(status)) {
+      IREE_LOG(WARNING) << "Skipping test as driver is unavailable";
       GTEST_SKIP();
       return;
     }
-    IREE_ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
+    driver_ = driver;
 
     iree_hal_device_t* device;
-    iree_status_t status = iree_hal_driver_create_default_device(
+    status = iree_hal_driver_create_default_device(
         driver_, iree_allocator_system(), &device);
     IREE_ASSERT_OK(status);
     device_ = device;
@@ -77,8 +77,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
  private:
   // Gets a HAL driver with the provided name, if available.
-  static StatusOr<iree_hal_driver_t*> GetDriver(
-      const std::string& driver_name) {
+  static iree_status_t TryGetDriver(const std::string& driver_name,
+                                    iree_hal_driver_t** out_driver) {
     static std::set<std::string> unavailable_driver_names;
 
     // If creation failed before, don't try again.
@@ -96,8 +96,10 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     if (iree_status_is_unavailable(status)) {
       unavailable_driver_names.insert(driver_name);
     }
-    IREE_RETURN_IF_ERROR(status);
-    return driver;
+    if (iree_status_is_ok(status)) {
+      *out_driver = driver;
+    }
+    return status;
   }
 };
 

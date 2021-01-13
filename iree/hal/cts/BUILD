@@ -25,9 +25,8 @@ cc_library(
     testonly = True,
     hdrs = ["cts_test_base.h"],
     deps = [
-        "//iree/base:status",
+        "//iree/base:api",
         "//iree/hal:api",
-        "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
     ],
 )
@@ -37,7 +36,6 @@ cc_test(
     srcs = ["allocator_test.cc"],
     deps = [
         ":cts_test_base",
-        "//iree/base:status",
         "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -49,7 +47,6 @@ cc_test(
     srcs = ["command_buffer_test.cc"],
     deps = [
         ":cts_test_base",
-        "//iree/base:status",
         "//iree/hal/testing:driver_registry",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",

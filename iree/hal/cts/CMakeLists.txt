@@ -20,9 +20,8 @@ iree_cc_library(
   HDRS
     "cts_test_base.h"
   DEPS
-    iree::base::status
+    iree::base::api
     iree::hal::api
-    iree::hal::testing::driver_registry
     iree::testing::gtest
   TESTONLY
   PUBLIC
@@ -35,7 +34,6 @@ iree_cc_test(
     "allocator_test.cc"
   DEPS
     ::cts_test_base
-    iree::base::status
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -48,7 +46,6 @@ iree_cc_test(
     "command_buffer_test.cc"
   DEPS
     ::cts_test_base
-    iree::base::status
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main

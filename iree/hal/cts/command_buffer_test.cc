@@ -15,7 +15,6 @@
 #include <cstring>
 #include <vector>
 
-#include "iree/base/status.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
@@ -33,9 +32,9 @@ class CommandBufferTest : public CtsTestBase {
 
   // Helper for submitting a command buffer and waiting for it to complete.
   // |signal_semaphore| must start with a payload value of 0.
-  void SubmitAndWait(iree_hal_command_buffer_t* command_buffer,
-                     iree_hal_command_category_t command_categories,
-                     iree_hal_semaphore_t* signal_semaphore) {
+  iree_status_t SubmitAndWait(iree_hal_command_buffer_t* command_buffer,
+                              iree_hal_command_category_t command_categories,
+                              iree_hal_semaphore_t* signal_semaphore) {
     iree_hal_submission_batch_t submission_batch;
 
     // No wait semaphores.
@@ -51,16 +50,18 @@ class CommandBufferTest : public CtsTestBase {
     submission_batch.signal_semaphores.count =
         IREE_ARRAYSIZE(signal_semaphore_ptrs);
     submission_batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
-    uint64_t payload_values[] = {1u};
+    uint64_t payload_values[] = {1ull};
     submission_batch.signal_semaphores.payload_values = payload_values;
 
-    IREE_ASSERT_OK(iree_hal_device_queue_submit(device_, command_categories,
-                                                /*queue_affinity=*/0,
-                                                /*batch_count=*/1,
-                                                &submission_batch));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_device_queue_submit(device_, command_categories,
+                                     /*queue_affinity=*/0,
+                                     /*batch_count=*/1, &submission_batch));
 
-    IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait_with_deadline(
         signal_semaphore, 1u, IREE_TIME_INFINITE_FUTURE));
+
+    return iree_ok_status();
   }
 };
 
@@ -83,8 +84,8 @@ TEST_P(CommandBufferTest, BeginEnd) {
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, &command_buffer));
 
-  IREE_EXPECT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_EXPECT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_command_buffer_release(command_buffer);
 }
@@ -111,7 +112,7 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   iree_hal_command_buffer_fill_buffer(
       command_buffer, device_buffer,
       /*target_offset=*/0, /*length=*/kBufferSize / 4, /*pattern=*/&val1,
-      /*pattern_length=*/1);
+      /*pattern_length=*/sizeof(val1));
   std::memset(reference_buffer.data(), val1, kBufferSize / 4);
 
   uint8_t val2 = 0xbe;
@@ -119,7 +120,7 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
                                       /*target_offset=*/kBufferSize / 4,
                                       /*length=*/kBufferSize / 4,
                                       /*pattern=*/&val2,
-                                      /*pattern_length=*/1);
+                                      /*pattern_length=*/sizeof(val2));
   std::memset(reference_buffer.data() + kBufferSize / 4, val2, kBufferSize / 4);
 
   uint8_t val3 = 0x54;
@@ -127,26 +128,22 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
                                       /*target_offset=*/kBufferSize / 2,
                                       /*length=*/kBufferSize / 2,
                                       /*pattern=*/&val3,
-                                      /*pattern_length=*/1);
+                                      /*pattern_length=*/sizeof(val3));
   std::memset(reference_buffer.data() + kBufferSize / 2, val3, kBufferSize / 2);
 
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_semaphore_t* signal_semaphore;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0u, &signal_semaphore));
-  SubmitAndWait(command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                signal_semaphore);
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+  IREE_ASSERT_OK(SubmitAndWait(
+      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER, signal_semaphore));
 
-  // Map the device buffer and compare.
-  iree_hal_buffer_mapping_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      device_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-      /*byte_offset=*/0, /*byte_length=*/kBufferSize, &mapped_memory));
-  std::vector<uint8_t> actual_data(
-      mapped_memory.contents.data,
-      mapped_memory.contents.data + mapped_memory.contents.data_length);
+  // Read the device buffer and compare.
+  std::vector<uint8_t> actual_data(kBufferSize);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
+                                           /*target_buffer=*/actual_data.data(),
+                                           /*data_length=*/kBufferSize));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapped_memory));
 
   // Must release the command buffer before resources used by it.
   iree_hal_command_buffer_release(command_buffer);
@@ -170,7 +167,7 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   uint8_t i8_val = 0x54;
   IREE_ASSERT_OK(iree_hal_buffer_fill(host_buffer, /*byte_offset=*/0,
                                       /*byte_length=*/kBufferSize, &i8_val,
-                                      /*pattern_length=*/1));
+                                      /*pattern_length=*/sizeof(i8_val)));
   std::vector<uint8_t> reference_buffer(kBufferSize);
   std::memset(reference_buffer.data(), i8_val, kBufferSize);
 
@@ -190,22 +187,17 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_semaphore_t* signal_semaphore;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0u, &signal_semaphore));
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
 
-  SubmitAndWait(command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                signal_semaphore);
+  IREE_ASSERT_OK(SubmitAndWait(
+      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER, signal_semaphore));
 
-  // Map the device buffer and compare.
-  iree_hal_buffer_mapping_t device_mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      device_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-      /*byte_offset=*/0, /*byte_length=*/kBufferSize, &device_mapped_memory));
-  std::vector<uint8_t> device_data(
-      device_mapped_memory.contents.data,
-      device_mapped_memory.contents.data +
-          device_mapped_memory.contents.data_length);
-  EXPECT_THAT(device_data, ContainerEq(reference_buffer));
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&device_mapped_memory));
+  // Read the device buffer and compare.
+  std::vector<uint8_t> actual_data(kBufferSize);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
+                                           /*target_buffer=*/actual_data.data(),
+                                           /*data_length=*/kBufferSize));
+  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   // Must release the command buffer before resources used by it.
   iree_hal_command_buffer_release(command_buffer);
@@ -238,7 +230,7 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   uint8_t i8_val = 0x88;
   IREE_ASSERT_OK(iree_hal_buffer_fill(host_buffer, /*byte_offset=*/0,
                                       /*byte_length=*/kBufferSize / 2, &i8_val,
-                                      /*pattern_length=*/1));
+                                      /*pattern_length=*/sizeof(i8_val)));
   std::vector<uint8_t> reference_buffer(kBufferSize);
   std::memset(reference_buffer.data() + 8, i8_val, kBufferSize / 2 - 4);
 
@@ -251,21 +243,16 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_semaphore_t* signal_semaphore;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0u, &signal_semaphore));
-  SubmitAndWait(command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                signal_semaphore);
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+  IREE_ASSERT_OK(SubmitAndWait(
+      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER, signal_semaphore));
 
-  // Map the device buffer and compare.
-  iree_hal_buffer_mapping_t device_mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      device_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-      /*byte_offset=*/0, /*byte_length=*/kBufferSize, &device_mapped_memory));
-  std::vector<uint8_t> device_data(
-      device_mapped_memory.contents.data,
-      device_mapped_memory.contents.data +
-          device_mapped_memory.contents.data_length);
-  EXPECT_THAT(device_data, ContainerEq(reference_buffer));
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&device_mapped_memory));
+  // Read the device buffer and compare.
+  std::vector<uint8_t> actual_data(kBufferSize);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
+                                           /*target_buffer=*/actual_data.data(),
+                                           /*data_length=*/kBufferSize));
+  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   // Must release the command buffer before resources used by it.
   iree_hal_command_buffer_release(command_buffer);
