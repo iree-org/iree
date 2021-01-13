@@ -31,6 +31,11 @@ void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
   out_task->type = type;
 }
 
+void iree_task_set_cleanup_fn(iree_task_t* task,
+                              iree_task_cleanup_fn_t cleanup_fn) {
+  task->cleanup_fn = cleanup_fn;
+}
+
 void iree_task_set_completion_task(iree_task_t* task,
                                    iree_task_t* completion_task) {
   assert(!task->completion_task);
@@ -48,7 +53,25 @@ bool iree_task_is_ready(iree_task_t* task) {
   return true;
 }
 
+static void iree_task_cleanup(iree_task_t* task, iree_status_t status) {
+  // Call the (optional) cleanup function.
+  // NOTE: this may free the memory of the task itself!
+  iree_task_pool_t* pool = task->pool;
+  if (task->cleanup_fn) {
+    task->cleanup_fn(task, iree_ok_status());
+  }
+
+  // Return the task to the pool it was allocated from.
+  // Some tasks are allocated as part of arenas/ringbuffers and won't have a
+  // pool as they'll be cleaned up as part of a larger operation.
+  if (pool) {
+    iree_task_pool_release(pool, task);
+  }
+}
+
 void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // NOTE: we always try adding to the head of the discard_worklist so that
   // we hopefully get some locality benefits. This models a DFS discard in
   // our non-recursive approach.
@@ -85,34 +108,26 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       break;
   }
 
-  // Release the task back to the pool it was allocated from, if any.
-  // Some tasks are allocated from arenas and may not be able to be freed
-  // individually.
-  if (task->pool) {
-    iree_task_pool_release(task->pool, task);
-  }
-
+  iree_task_cleanup(task, iree_status_from_code(IREE_STATUS_ABORTED));
   // NOTE: task is invalidated here and cannot be used!
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static void iree_task_retire(iree_task_t* task,
                              iree_task_submission_t* pending_submission) {
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
+  task->completion_task = NULL;
   if (completion_task &&
       iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count, 1,
                                   iree_memory_order_acq_rel) == 1) {
     // The completion task has retired and can now be made ready.
     iree_task_submission_enqueue(pending_submission, completion_task);
   }
-  task->completion_task = NULL;
 
-  // Return the task to the pool it was allocated from.
-  // Some tasks are allocated as part of arenas/ringbuffers and won't have a
-  // pool as they'll be cleaned up as part of a larger operation.
-  if (task->pool) {
-    iree_task_pool_release(task->pool, task);
-  }
+  iree_task_cleanup(task, iree_ok_status());
+  // NOTE: task is invalidated here and cannot be used!
 }
 
 //==============================================================================
