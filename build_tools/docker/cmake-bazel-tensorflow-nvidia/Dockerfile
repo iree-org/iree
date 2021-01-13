@@ -26,4 +26,4 @@
 FROM gcr.io/iree-oss/cmake-bazel-tensorflow-vulkan@sha256:4f8366f0ac778db9e63d82d309b71ab379181a6699c254e08e1f8d71f43ffd6f AS final
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-440=440.100-0ubuntu0.18.04.1
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-460=460.32.03-0ubuntu0.18.04.1
