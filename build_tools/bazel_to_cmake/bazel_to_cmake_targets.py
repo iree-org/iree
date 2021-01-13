@@ -59,7 +59,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
-    "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
+    "@cpuinfo//:cpuinfo": ["cpuinfo"],
     "@half//:half": ["half"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
@@ -118,7 +118,7 @@ def convert_external_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
+  if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
   if target.startswith("@com_google_ruy//ruy"):

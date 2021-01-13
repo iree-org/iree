@@ -28,6 +28,10 @@ export PS4='[$(date -u "+%T %Z")] '
 
 source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
+# Print NVIDIA GPU information inside the VM
+nvidia-smi
+dmesg | grep NVRM
+
 # Sets DOCKER_RUN_ARGS
 docker_setup
 

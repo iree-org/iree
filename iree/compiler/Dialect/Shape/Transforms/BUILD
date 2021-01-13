@@ -48,6 +48,6 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@mlir-hlo//:hlo",
     ],
 )

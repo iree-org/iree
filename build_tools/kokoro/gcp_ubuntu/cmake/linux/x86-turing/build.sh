@@ -29,6 +29,10 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+# Print NVIDIA GPU information inside the docker
+nvidia-smi
+dmesg | grep NVRM
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 echo "Initializing submodules"

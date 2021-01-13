@@ -23,7 +23,7 @@ iree_py_library(
 
 iree_symlink_tool(
   TARGET tflite
-  FROM_TOOL_TARGET integrations_tensorflow_compiler_iree-import-tflite
+  FROM_TOOL_TARGET iree_tf_compiler_iree-import-tflite
   TO_EXE_NAME iree-import-tflite
 )
 
@@ -38,7 +38,7 @@ iree_py_install_package(
 # Since imported, need to resolve the TARGET_FILE ourselves instead of
 # install TARGETS form.
 install(
-  PROGRAMS "$<TARGET_FILE:integrations_tensorflow_compiler_iree-import-tflite>"
+  PROGRAMS "$<TARGET_FILE:iree_tf_compiler_iree-import-tflite>"
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
   COMPONENT "${PY_INSTALL_COMPONENT}"
 )

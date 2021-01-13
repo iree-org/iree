@@ -26,18 +26,18 @@ set(_bazel_targets)
 set(_executable_paths)
 
 if(${IREE_BUILD_TENSORFLOW_COMPILER})
-  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-tf-import)
-  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-tf-import)
+  list(APPEND _bazel_targets //iree_tf_compiler:iree-tf-import)
+  list(APPEND _executable_paths iree_tf_compiler/iree-tf-import)
 endif()
 
 if(${IREE_BUILD_TFLITE_COMPILER})
-  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-import-tflite)
-  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-import-tflite)
+  list(APPEND _bazel_targets //iree_tf_compiler:iree-import-tflite)
+  list(APPEND _executable_paths iree_tf_compiler/iree-import-tflite)
 endif()
 
 if(${IREE_BUILD_XLA_COMPILER})
-  list(APPEND _bazel_targets //integrations/tensorflow/compiler:iree-import-xla)
-  list(APPEND _executable_paths integrations/tensorflow/compiler/iree-import-xla)
+  list(APPEND _bazel_targets //iree_tf_compiler:iree-import-xla)
+  list(APPEND _executable_paths iree_tf_compiler/iree-import-xla)
 endif()
 
 iree_add_bazel_invocation(
@@ -54,11 +54,11 @@ if(${IREE_BUILD_TESTS})
     INVOCATION_TARGET
       integrations_iree_tensorflow_test_tools
     BAZEL_TARGETS
-      //integrations/tensorflow/compiler:iree-tf-opt
+      //iree_tf_compiler:iree-tf-opt
     EXECUTABLE_PATHS
-      integrations/tensorflow/compiler/iree-tf-opt
+      iree_tf_compiler/iree-tf-opt
   )
-  add_subdirectory(compiler/test)
+  add_subdirectory(iree_tf_compiler/test)
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
