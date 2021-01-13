@@ -163,14 +163,14 @@ TEST(ExecutorTest, Any) {
   iree_task_submission_t sub0;
   iree_task_submission_initialize(&sub0);
   iree_task_submission_enqueue(&sub0, &call0.header);
-  IREE_CHECK_OK(iree_task_executor_submit(executor, &sub0));
+  iree_task_executor_submit(executor, &sub0);
 
   //
   // iree_task_submission_t sub1;
   // iree_task_submission_initialize(&sub1);
   // IREE_CHECK_OK(iree_task_executor_submit(executor, &sub1));
 
-  IREE_CHECK_OK(iree_task_executor_flush(executor));
+  iree_task_executor_flush(executor);
 
   IREE_CHECK_OK(iree_task_scope_wait_idle(&scope_a, IREE_TIME_INFINITE_FUTURE));
 
