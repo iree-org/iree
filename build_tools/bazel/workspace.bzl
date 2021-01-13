@@ -17,10 +17,12 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
 def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
-    """Configure IREE all simple repository dependencies that come from submodules.
+    """Configure all of IREE's simple repository dependencies that come from submodules.
 
-    This assumes you have a directory that includes IREE and all its submodules.
-    Note that fetching a GitHub archive does not include submodules.
+    Simple is defined here as just calls to `local_repository` or
+    `new_local_repository`. This assumes you have a directory that includes IREE
+    and all its submodules. Note that fetching a GitHub archive does not include
+    submodules.
     Yes it is necessary to have both the workspace alias and path argument...
 
     Args:
