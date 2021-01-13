@@ -95,6 +95,7 @@ static iree_status_t iree_wait_primitive_create_pipe(
 
 iree_status_t iree_wait_primitive_create_native(
     bool initial_state, iree_wait_handle_t* out_handle) {
+  memset(out_handle, 0, sizeof(*out_handle));
 #if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
   // Always prefer eventfd when present; they rock.
   return iree_wait_primitive_create_eventfd(initial_state, out_handle);
