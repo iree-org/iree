@@ -293,18 +293,17 @@ void iree_task_executor_merge_submission(iree_task_executor_t* executor,
   iree_task_submission_reset(submission);
 }
 
-iree_status_t iree_task_executor_submit(iree_task_executor_t* executor,
-                                        iree_task_submission_t* submission) {
+void iree_task_executor_submit(iree_task_executor_t* executor,
+                               iree_task_submission_t* submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Concatenate the submitted tasks onto our primary LIFO incoming lists.
   iree_task_executor_merge_submission(executor, submission);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
-iree_status_t iree_task_executor_flush(iree_task_executor_t* executor) {
+void iree_task_executor_flush(iree_task_executor_t* executor) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Mostly a no-op today as we aren't deferring submission with the scheduling
@@ -314,7 +313,6 @@ iree_status_t iree_task_executor_flush(iree_task_executor_t* executor) {
                                 /*speculative=*/false);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 // Merges incoming likely-unresolved wait tasks into the primary executor lists.
