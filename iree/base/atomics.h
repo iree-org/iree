@@ -110,9 +110,9 @@ typedef struct {
 #define iree_atomic_load_int64(object, order) \
   InterlockedExchangeAdd64((volatile LONG64*)object, 0)
 #define iree_atomic_store_int64(object, desired, order) \
-  InterlockedExchange64((volatile LONG64*)object, desired)
+  InterlockedExchange64((volatile LONG64*)object, (LONG64)desired)
 #define iree_atomic_fetch_add_int64(object, operand, order) \
-  InterlockedExchangeAdd64((volatile LONG64*)object, operand)
+  InterlockedExchangeAdd64((volatile LONG64*)object, (LONG64)operand)
 #define iree_atomic_fetch_sub_int64(object, operand, order) \
   InterlockedExchangeAdd64((volatile LONG64*)object, -(operand))
 #define iree_atomic_fetch_and_int64(object, operand, order) \
