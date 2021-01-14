@@ -34,12 +34,46 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-#define DEBUG_TYPE "iree-linalg-tile-and-distribute-on-tensors"
+#define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+/// PatternRewriter that allows replacing only a subset of uses.
+/// Since this only adds a method, it can just be static_cast'ed to when
+/// applying a rewrite.
+/// TODO(nicolasvasilache): upstream support for this is landing, rebase on that
+struct PatternRewriterWithScopedReplaceOp : public PatternRewriter {
+  void replaceOpWithinScope(Operation *op, ValueRange newValues, Block *block) {
+    // Notify the rewriter subclass that we're about to replace this root.
+    notifyRootReplaced(op);
+
+    assert(op->getNumResults() == newValues.size() &&
+           "incorrect # of replacement values");
+    bool erase = true;
+    SmallVector<Operation *, 4> ops;
+    SmallVector<Value, 4> operands, repls;
+    for (auto &use : op->getUses()) {
+      if (!block->getParentOp()->isProperAncestor(use.getOwner())) {
+        erase = false;
+        continue;
+      }
+      OpResult opResult = use.get().cast<OpResult>();
+      ops.push_back(use.getOwner());
+      operands.push_back(use.get());
+      repls.push_back(newValues[opResult.getResultNumber()]);
+    }
+    // Perform the actual replacements.
+    for (auto it : llvm::zip(ops, operands, repls))
+      std::get<0>(it)->replaceUsesOfWith(std::get<1>(it), std::get<2>(it));
+    if (erase) {
+      notifyOperationRemoved(op);
+      op->erase();
+    }
+  }
+};
 
 struct DispatchLinalgOnTensorsPass
     : public PassWrapper<DispatchLinalgOnTensorsPass, OperationPass<FuncOp>> {
@@ -60,35 +94,25 @@ struct DispatchLinalgOnTensorsPass
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
 
-static Operation *buildFlowDispatchWorkgroupOp(OpBuilder &b,
-                                               linalg::LinalgOp root,
-                                               linalg::LinalgOp &clonedRoot) {
+// Creates a flow.dispatch.workgroup op without arguments.
+// All the necessary operands are transiently captured and rewritten late as
+// operands. This greatly simplifies transformations into the resulting op.
+static IREE::Flow::DispatchWorkgroupsOp buildOperandLessFlowDispatchWorkgroupOp(
+    PatternRewriter &rewriter, linalg::LinalgOp root,
+    linalg::LinalgOp &clonedRoot) {
   Location loc = root->getLoc();
   // TODO(nicolasvasilache): for now this is a 3-D grid of 1's.
   // In the future make constant and bind late into backend-specific values.
-  SmallVector<Value, 1> count(3, b.create<ConstantIndexOp>(loc, 1));
+  SmallVector<Value, 1> count(3, rewriter.create<ConstantIndexOp>(loc, 1));
 
-  SmallVector<Value, 4> dispatchOperands;
-  dispatchOperands.reserve(root->getNumOperands());
-  dispatchOperands.append(root.getInputs().begin(), root.getInputs().end());
-  for (OpOperand &opOperand : root.getOutputOpOperands()) {
-    if (root.isInitTensor(&opOperand)) {
-      dispatchOperands.push_back(opOperand.get());
-    } else {
-      dispatchOperands.push_back(
-          b.create<Shape::GetRankedShapeOp>(loc, opOperand.get()));
-    }
-  }
-  auto otherOperands = root.getAssumedNonShapedOperands();
-  dispatchOperands.append(otherOperands.begin(), otherOperands.end());
-  auto dispatchOp = b.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, count, root->getResultTypes(), dispatchOperands);
+  auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
+      loc, count, root->getResultTypes(), ValueRange{});
   Region &region = dispatchOp.body();
   Block *block = &region.front();
   {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointToStart(block);
-    clonedRoot = cast<linalg::LinalgOp>(b.clone(*root.getOperation()));
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(block);
+    clonedRoot = cast<linalg::LinalgOp>(rewriter.clone(*root.getOperation()));
     // Note: DispatchOutputStoreOp is an abstraction jump that consumes the SSA
     // value produced by `clonedRoot` but it does not comply with the semantics
     // of DispatchWorkgroupsOp which explicitly states:
@@ -100,15 +124,107 @@ static Operation *buildFlowDispatchWorkgroupOp(OpBuilder &b,
     for (auto it : llvm::zip(clonedRoot->getResults(),
                              dispatchOp.body().getArguments().take_back(
                                  clonedRoot->getNumResults()))) {
-      b.create<IREE::Flow::DispatchOutputStoreOp>(loc, std::get<0>(it),
-                                                  std::get<1>(it), llvm::None,
-                                                  llvm::None, llvm::None);
+      rewriter.create<IREE::Flow::DispatchOutputStoreOp>(
+          loc, std::get<0>(it), std::get<1>(it), llvm::None, llvm::None,
+          llvm::None);
     }
     // TODO(nicolasvasilache): return `clonedRoot->getResults()` once we have
     // shape operands and we drop tie_shape.
-    b.create<IREE::Flow::ReturnOp>(loc);
+    rewriter.create<IREE::Flow::ReturnOp>(loc);
   }
+  LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell " << *dispatchOp
+                          << "\n");
   return dispatchOp;
+}
+
+// Only fuses the first producer for the purpose of connecting the pieces.
+// The impl does not worry about the dispatchOp, operands and arguments are set
+// in a post-pattern `legalizeDispatchWorkgroupOperands` function.
+// To simplify the implementation of the dispatch region formation, we just
+// clone the op that needs to be fused inside the dispatch region and just fuse
+// that one. This avoid any concerns related to tensor operands that are only
+// used for their DimOp. This is a canonicalization that is more involved than
+// necessary across the boundary of regions without captures.
+//
+// TODO(nicolasvasilache): Enhance fusion.
+//
+// TODO(nicolasvasilache: This implementation jumps an abstraction gap as it
+// knows that `clonedLinalgOp` has been tiled into `tiledLinalgOp`. In the case
+// of `out` tensors, this allows calling into a `fuseProducerOfTensor` to which
+// we provide the producer by construction. This avoids an analysis that would
+// need to reconstruct a destructive update from the loop nest + operations in
+// order to get the producer of an `out` tensor.
+// In the future, this analysis should be implemented in core but for now it is
+// IREE-only.
+static Optional<linalg::FusionInfo> pullInFirstProducerOf(
+    PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
+    ValueRange shapedOperands, linalg::TiledLinalgOp &tiledLinalgOp) {
+  // Scoped within DispatchWorkgroupOp.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
+  for (auto en : llvm::enumerate(shapedOperands)) {
+    if (auto linalgOp = en.value().getDefiningOp<linalg::LinalgOp>()) {
+      Operation *clonedOpToFuse = rewriter.clone(*linalgOp);
+      static_cast<PatternRewriterWithScopedReplaceOp &>(rewriter)
+          .replaceOpWithinScope(linalgOp, clonedOpToFuse->getResults(),
+                                &dispatchOp.getRegion().front());
+      // TODO: this is incorrect on general pattern failures, try pattern within
+      // pattern.
+      OpResult opResult = en.value().cast<OpResult>();
+      auto maybeFusionInfo = linalg::fuseProducerOfTensor(
+          rewriter, clonedOpToFuse->getResult(opResult.getResultNumber()),
+          tiledLinalgOp.op.getShapedOpOperand(en.index()));
+      if (!maybeFusionInfo.hasValue()) {
+        rewriter.replaceOp(clonedOpToFuse, linalgOp->getResults());
+      }
+      return maybeFusionInfo;
+    }
+  }
+  return llvm::None;
+}
+
+// Add tie_shape for all outputs. This provides necessary information for
+// a subsequent OutlineDispatchRegion2 pass invocation to work properly.
+// TODO(nicolasvasilache): get rid of this once we have a proper shape +
+// subshape in core and DispatchWorkgroupOp takes output shape parameters.
+static SmallVector<Value, 4> createDispatchTieShapeOp(
+    PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+  assert(dispatchOp->getNumResults() == linalgOp.getNumOutputs());
+  MLIRContext *context = linalgOp->getContext();
+  Location loc = linalgOp->getLoc();
+  SmallVector<Value, 4> shapedResults;
+  for (auto it : llvm::zip(linalgOp.getOutputs(), dispatchOp->getResults())) {
+    // Insert DimOp and MakeRankedShapeOp just before the dispatchOp to play
+    // nicely with a (much later) OutlineDispatchRegions2 which requires all
+    // dims and shapes to dominate the dispatchOp region.
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(dispatchOp);
+
+    assert(std::get<0>(it).getType() == std::get<1>(it).getType());
+    auto rankedTensorType = std::get<0>(it).getType().cast<RankedTensorType>();
+    if (rankedTensorType.hasStaticShape()) {
+      shapedResults.push_back(std::get<1>(it));
+      continue;
+    }
+    auto rank = rankedTensorType.getRank();
+    SmallVector<Value, 4> dims;
+    dims.reserve(rank);
+    for (unsigned d = 0, e = rank; d < e; ++d) {
+      if (rankedTensorType.isDynamicDim(d)) {
+        dims.push_back(rewriter.create<DimOp>(loc, std::get<0>(it), d));
+      }
+    }
+    auto shapeOp = rewriter.create<Shape::MakeRankedShapeOp>(
+        loc, Shape::RankedShapeType::get(rankedTensorType.getShape(), context),
+        dims);
+
+    // The TieShapeOp use the dispatchOp results.
+    rewriter.setInsertionPointAfter(dispatchOp);
+    shapedResults.push_back(
+        rewriter.create<Shape::TieShapeOp>(loc, std::get<1>(it), shapeOp));
+  }
+  return shapedResults;
 }
 
 // Rewrite pattern to ensure only ops with tensor semantics are tiled.
@@ -125,65 +241,35 @@ struct TileAndDistributeOnTensorsPattern
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
 
+    // Temporary to only accept a MatmulOp root and fuse other ops into it.
+    // TODO(nicolasvasilache): remove this limitation.
+    if (!isa<linalg::MatmulOp>(op)) return failure();
+
     linalg::LinalgOp clonedLinalgOp;
-    Operation *dispatch =
-        buildFlowDispatchWorkgroupOp(rewriter, linalgOp, clonedLinalgOp);
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp =
+        buildOperandLessFlowDispatchWorkgroupOp(rewriter, linalgOp,
+                                                clonedLinalgOp);
+    // Scoped within DispatchWorkgroupOp.
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(clonedLinalgOp);
 
-    MLIRContext *context = op->getContext();
-    Location loc = op->getLoc();
-    {
-      linalg::TiledLinalgOp tiledLinalgOp;
-      // Scoped within DispatchWorkgroupOp.
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(clonedLinalgOp);
-      if (failed(Base::matchAndRewriteBase(clonedLinalgOp, rewriter,
-                                           tiledLinalgOp))) {
-        // Need to erase on failure to avoid infinite loop.
-        rewriter.eraseOp(dispatch);
-        return failure();
-      }
-      rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
+    linalg::TiledLinalgOp tiledLinalgOp;
+    LogicalResult tilingResult =
+        Base::matchAndRewriteBase(clonedLinalgOp, rewriter, tiledLinalgOp);
+    if (failed(tilingResult)) {
+      // GreedyPatternRewriter is not transactional and does not stop on
+      // failure. Must explicitly delete on all failure paths.
+      rewriter.eraseOp(dispatchOp);
+      return failure();
     }
+    // Keep track of the shapedOperands for fusion.
+    SmallVector<Value, 4> shapedOperands(clonedLinalgOp.getShapedOperands());
+    rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
-    // Add tie_shape for all outputs. This provides necessary information for
-    // a subsequent OutlineDispatchRegion2 pass invocation to work properly.
-    // TODO(nicolasvasilache): get rid of this once we have a proper shape +
-    // subshape in core and DispatchWorkgroupOp take output shape parameters.
-    assert(dispatch->getNumResults() == linalgOp.getNumOutputs());
-    SmallVector<Value, 4> shapedResults;
-    for (auto it : llvm::zip(linalgOp.getOutputs(), dispatch->getResults())) {
-      // Insert DimOp and MakeRankedShapeOp just before the dispatch to play
-      // nicely with a (much later) OutlineDispatchRegions2 which requires all
-      // dims and shapes to dominate the dispatch region.
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(dispatch);
+    pullInFirstProducerOf(rewriter, dispatchOp, shapedOperands, tiledLinalgOp);
 
-      assert(std::get<0>(it).getType() == std::get<1>(it).getType());
-      auto rankedTensorType =
-          std::get<0>(it).getType().cast<RankedTensorType>();
-      if (rankedTensorType.hasStaticShape()) {
-        shapedResults.push_back(std::get<1>(it));
-        continue;
-      }
-      auto rank = rankedTensorType.getRank();
-      SmallVector<Value, 4> dims;
-      dims.reserve(rank);
-      for (unsigned d = 0, e = rank; d < e; ++d) {
-        if (rankedTensorType.isDynamicDim(d)) {
-          dims.push_back(rewriter.create<DimOp>(loc, std::get<0>(it), d));
-        }
-      }
-      auto shapeOp = rewriter.create<Shape::MakeRankedShapeOp>(
-          loc,
-          Shape::RankedShapeType::get(rankedTensorType.getShape(), context),
-          dims);
-
-      // The TieShapeOp use the dispatch results.
-      rewriter.setInsertionPointAfter(dispatch);
-      shapedResults.push_back(
-          rewriter.create<Shape::TieShapeOp>(loc, std::get<1>(it), shapeOp));
-    }
-
+    SmallVector<Value, 4> shapedResults =
+        createDispatchTieShapeOp(rewriter, linalgOp, dispatchOp);
     rewriter.replaceOp(op, shapedResults);
     return success();
   }
@@ -199,83 +285,63 @@ static Value buildFlowWorkgroupCountOp(OpBuilder &b, unsigned dim) {
       b.getInsertionPoint()->getLoc(), dim);
 }
 
-// Explcitly list the constant we want to clone inside the dispatch region
-// rather than pass as arguments.
-// TODO(nicolasvasilache): drop this in favor of RematerializeDispatchConstants
-// once it is updated to work with the new dispatch region formation.
-static bool isDispatchClonableConstant(Value v) {
-  Operation *op = v.getDefiningOp();
-  ConstantOp constantOp = dyn_cast_or_null<ConstantOp>(op);
-  if (!constantOp) return false;
-  if (isa<ConstantIndexOp>(op) || isa<ConstantIntOp>(op) ||
-      isa<ConstantFloatOp>(op)) {
-    return true;
-  }
-  return false;
-}
-
 // After outlining in dispatch region we can rewrite the dispatch ops with
 // proper captures.
-static void setDispatchWorkgroupOperands(
+// A later RematerializeDispatchConstants should be called to avoid passing
+// unnecessary constant arguments.
+static void legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+  Location loc = dispatchOp.getLoc();
+  Block &block = dispatchOp.body().front();
+  unsigned numOldBBArgs = block.getNumArguments();
+  OpBuilder b = OpBuilder::atBlockBegin(&block);
+
   llvm::SetVector<Value> valuesSet;
   mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
   ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
 
-  SmallVector<Value, 4> originalDispatchOperands = dispatchOp.operands();
-  llvm::SetVector<Value> originalDispatchOperandsSet(
-      originalDispatchOperands.begin(), originalDispatchOperands.end());
-  SmallVector<Value, 4> newOperands, clones;
-  for (Value v : valuesDefinedAbove) {
-    if (isDispatchClonableConstant(v)) {
-      clones.push_back(v);
-    } else if (!originalDispatchOperandsSet.contains(v)) {
-      newOperands.push_back(v);
-    }
-  }
-  // Need to insert new operands into operands and BB args at proper
-  // positions.
-  assert(newOperands.empty() && "unsupported new operands from capture");
-  // dispatchOp.body().front().addArguments(ValueRange{newOperands}.getTypes());
-  // dispatchOp.setOperands(originalDispatchOperands + newOperands);
-
-  auto getUsesOfValueOutsideOfOp =
-      [](Value v, Operation *op) -> SmallVector<Operation *, 4> {
+  auto getUsesOfValueOutsideOfDispatchOp =
+      [&](Value v) -> SmallVector<Operation *, 4> {
     SmallVector<Operation *, 4> res;
     for (Operation *user : v.getUsers())
-      if (!op->isProperAncestor(user)) res.push_back(user);
+      if (!dispatchOp->isAncestor(user)) res.push_back(user);
     return res;
   };
+  // Replace valuesDefinedAbove by new BB args (including the op's operands).
+  for (Value operand : valuesDefinedAbove) {
+    if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
+      block.addArgument(IREE::Flow::DispatchInputType::get(
+          rt.getShape(), rt.getElementType()));
+    } else {
+      block.addArgument(operand.getType());
+    }
 
-  // Replace operands by BB args.
-  // TODO(nicolasvasilache): change BB arg type and use
-  // flow.interface.tensor.load/store
-  Location loc = dispatchOp.getLoc();
-  OpBuilder b = OpBuilder::atBlockBegin(&dispatchOp.body().front());
-  for (auto it : llvm::zip(originalDispatchOperands,
-                           dispatchOp.body().front().getArguments())) {
-    Value v = std::get<0>(it);
-    Value bbArg = std::get<1>(it);
-    auto uses = getUsesOfValueOutsideOfOp(v, dispatchOp);
+    Value bbArg = block.getArguments().back();
+    auto uses = getUsesOfValueOutsideOfDispatchOp(operand);
     Value repl = bbArg;
     if (bbArg.getType().isa<IREE::Flow::DispatchInputType>()) {
-      repl = b.create<IREE::Flow::DispatchInputLoadOp>(loc, v.getType(), bbArg);
+      repl = b.create<IREE::Flow::DispatchInputLoadOp>(loc, operand.getType(),
+                                                       bbArg);
     } else if (bbArg.getType().isa<IREE::Flow::DispatchOutputType>()) {
-      // TODO(nicolasvasilache): do something useful
+      // TODO(nicolasvasilache): do something useful.
       continue;
     }
-    v.replaceAllUsesExcept(
+    operand.replaceAllUsesExcept(
         repl, SmallPtrSet<Operation *, 8>(uses.begin(), uses.end()));
   }
-  // TODO(nicolasvasilache): add newOperands to op.
 
-  // Clone the constants inside the op.
-  for (Value v : clones) {
-    auto uses = getUsesOfValueOutsideOfOp(v, dispatchOp);
-    v.replaceAllUsesExcept(
-        b.clone(*v.getDefiningOp())->getResult(0),
-        SmallPtrSet<Operation *, 8>(uses.begin(), uses.end()));
+  // Reinsert and replace old BB args.
+  for (BlockArgument ba : block.getArguments().take_front(numOldBBArgs)) {
+    block.addArgument(ba.getType());
+    ba.replaceAllUsesWith(block.getArguments().back());
   }
+
+  // Drop old BB args.
+  block.eraseArguments(
+      llvm::to_vector<4>(llvm::seq<unsigned>(0, numOldBBArgs)));
+
+  // Set the operands.
+  dispatchOp.operandsMutable().assign(valuesDefinedAbove);
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
@@ -326,7 +392,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.
-  funcOp.walk(setDispatchWorkgroupOperands);
+  funcOp.walk(legalizeDispatchWorkgroupOperands);
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
