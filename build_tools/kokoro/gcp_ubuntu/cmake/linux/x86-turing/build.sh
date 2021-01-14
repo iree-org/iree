@@ -30,7 +30,6 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 
 # Print NVIDIA GPU information inside the docker
-dmesg | grep NVRM
 dpkg -l | grep nvidia
 nvidia-smi || true
 

@@ -31,7 +31,6 @@ python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
 
 # Print NVIDIA GPU information inside the docker
-dmesg | grep NVRM
 dpkg -l | grep nvidia
 nvidia-smi || true
 
