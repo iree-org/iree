@@ -29,37 +29,7 @@ extern "C" {
 typedef struct iree_task_list_s iree_task_list_t;
 typedef struct iree_task_pool_s iree_task_pool_t;
 typedef struct iree_task_scope_s iree_task_scope_t;
-
-//==============================================================================
-// Function closures
-//==============================================================================
-
-typedef iree_status_t(IREE_API_PTR* iree_task_closure_fn_t)(
-    uintptr_t user_context, uintptr_t task_context);
-
-// A function closure representing the function to call and its arguments.
-typedef struct {
-  // Function called per tile invocation.
-  iree_task_closure_fn_t fn;
-
-  // User-defined argument passed to task functions during invocation.
-  // Opaque pointer-sized values that could point to user data structures or
-  // contain embedded values. No lifetime management is performed by the task
-  // system and it is required that users ensure that the memory referenced is
-  // live until after the task has completed.
-  uintptr_t user_context;
-
-  // TODO(benvanik): cleanup function? right now assume arg is never freed.
-} iree_task_closure_t;
-
-// Binds a function pointer and the arguments it should be called with.
-// If the arguments represent pointers they must remain live until the task
-// has completed execution.
-static inline iree_task_closure_t iree_task_make_closure(
-    iree_task_closure_fn_t fn, uintptr_t user_context) {
-  iree_task_closure_t closure = {fn, user_context};
-  return closure;
-}
+typedef struct iree_task_submission_s iree_task_submission_t;
 
 //==============================================================================
 // Task header for internal tracking
@@ -264,6 +234,34 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 // IREE_TASK_TYPE_CALL
 //==============================================================================
 
+typedef iree_status_t(IREE_API_PTR* iree_task_call_closure_fn_t)(
+    uintptr_t user_context, iree_task_t* task,
+    iree_task_submission_t* pending_submission);
+
+// A function closure representing the function to call and its arguments.
+typedef struct {
+  // Function called per tile invocation.
+  iree_task_call_closure_fn_t fn;
+
+  // User-defined argument passed to task functions during invocation.
+  // Opaque pointer-sized values that could point to user data structures or
+  // contain embedded values. No lifetime management is performed by the task
+  // system and it is required that users ensure that the memory referenced is
+  // live until after the task has completed.
+  uintptr_t user_context;
+
+  // TODO(benvanik): cleanup function? right now assume arg is never freed.
+} iree_task_call_closure_t;
+
+// Binds a function pointer and the arguments it should be called with.
+// If the arguments represent pointers they must remain live until the task
+// has completed execution.
+static inline iree_task_call_closure_t iree_task_make_call_closure(
+    iree_task_call_closure_fn_t fn, uintptr_t user_context) {
+  iree_task_call_closure_t closure = {fn, user_context};
+  return closure;
+}
+
 // A task that will synchronously call a function from the executor and wait
 // for it to complete before continuing.
 //
@@ -274,11 +272,11 @@ typedef iree_alignas(iree_max_align_t) struct {
   iree_task_t header;
 
   // Function closure to call when the task is executed.
-  iree_task_closure_t closure;
+  iree_task_call_closure_t closure;
 } iree_task_call_t;
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
-                               iree_task_closure_t closure,
+                               iree_task_call_closure_t closure,
                                iree_task_call_t* out_task);
 
 //==============================================================================
@@ -465,6 +463,36 @@ typedef iree_alignas(iree_max_align_t) struct {
 } iree_task_dispatch_shard_state_t;
 
 //==============================================================================
+// Dispatch function closures
+//==============================================================================
+
+typedef iree_status_t(IREE_API_PTR* iree_task_dispatch_closure_fn_t)(
+    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    iree_task_submission_t* pending_submission);
+
+// A function closure representing the function to call and its arguments.
+typedef struct {
+  // Function called per tile invocation.
+  iree_task_dispatch_closure_fn_t fn;
+
+  // User-defined argument passed to task functions during invocation.
+  // Opaque pointer-sized values that could point to user data structures or
+  // contain embedded values. No lifetime management is performed by the task
+  // system and it is required that users ensure that the memory referenced is
+  // live until after the task has completed.
+  uintptr_t user_context;
+} iree_task_dispatch_closure_t;
+
+// Binds a function pointer and the arguments it should be called with.
+// If the arguments represent pointers they must remain live until the task
+// has completed execution.
+static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
+    iree_task_dispatch_closure_fn_t fn, uintptr_t user_context) {
+  iree_task_dispatch_closure_t closure = {fn, user_context};
+  return closure;
+}
+
+//==============================================================================
 // IREE_TASK_TYPE_DISPATCH
 //==============================================================================
 
@@ -490,7 +518,7 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_s {
   iree_task_t header;
 
   // Function closure to call per tile.
-  iree_task_closure_t closure;
+  iree_task_dispatch_closure_t closure;
 
   // Workgroup size for each invocation. Passed on to tiles without
   // modification and not used for scheduling.
@@ -523,16 +551,15 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_s {
 } iree_task_dispatch_t;
 
 void iree_task_dispatch_initialize(iree_task_scope_t* scope,
-                                   iree_task_closure_t closure,
+                                   iree_task_dispatch_closure_t closure,
                                    const uint32_t workgroup_size[3],
                                    const uint32_t workgroup_count[3],
                                    iree_task_dispatch_t* out_task);
 
-void iree_task_dispatch_initialize_indirect(iree_task_scope_t* scope,
-                                            iree_task_closure_t closure,
-                                            const uint32_t workgroup_size[3],
-                                            const uint32_t* workgroup_count_ptr,
-                                            iree_task_dispatch_t* out_task);
+void iree_task_dispatch_initialize_indirect(
+    iree_task_scope_t* scope, iree_task_dispatch_closure_t closure,
+    const uint32_t workgroup_size[3], const uint32_t* workgroup_count_ptr,
+    iree_task_dispatch_t* out_task);
 
 //==============================================================================
 // IREE_TASK_TYPE_DISPATCH_SLICE
@@ -569,7 +596,7 @@ typedef iree_alignas(iree_max_align_t) struct {
   // tile which would likely be a cache miss as we fan out to other cores.
 
   // Function closure to call per tile (same as the closure in the dispatch).
-  iree_task_closure_t closure;
+  iree_task_dispatch_closure_t closure;
 
   // Base workgroup ID for the slice range.
   uint32_t workgroup_base[3];
