@@ -31,7 +31,8 @@ python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
 
 # Print NVIDIA GPU information inside the docker
-nvidia-smi
+dpkg -l | grep nvidia
+nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
