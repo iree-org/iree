@@ -44,7 +44,7 @@ extern "C" {
 //
 // Thread-compatible; designed to be used from a single thread producing the
 // submission.
-typedef struct {
+typedef struct iree_task_submission_s {
   // List of tasks that are ready for execution immediately. Upon submission to
   // a queue the tasks will be passed on to the executor with no delay.
   //
