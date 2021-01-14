@@ -66,8 +66,6 @@ cc_library(
         "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Tosa",
-        "@llvm-project//mlir:TosaTransforms",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",

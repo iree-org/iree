@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRStandard
     MLIRSupport
+    MLIRTosaToLinalg
     MLIRTensor
     MLIRTransformUtils
     MLIRTransforms

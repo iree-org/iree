@@ -49,7 +49,6 @@ iree_cc_library(
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
     MLIRSupport
-    MLIRTosaToLinalg
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM
