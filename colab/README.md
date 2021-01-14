@@ -15,12 +15,11 @@ Shows off some concepts of the low level IREE python bindings
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/low_level_invoke_function.ipynb)
 
-### [mnist_tensorflow\.ipynb](mnist_tensorflow.ipynb)
+### [mnist_training\.ipynb](mnist_training.ipynb)
 
-Trains a TensorFlow 2.0 model for recognizing handwritten digits and runs it
-using IREE
+Compile, train and execute a TensorFlow Keras neural network with IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/mnist_tensorflow.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/mnist_training.ipynb)
 
 ### [resnet\.ipynb](resnet.ipynb)
 
