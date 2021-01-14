@@ -31,7 +31,6 @@ python3 --version
 
 # Print NVIDIA GPU information inside the docker
 nvidia-smi
-dmesg | grep NVRM
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 

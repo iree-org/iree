@@ -32,7 +32,6 @@ python3 -c 'import tensorflow as tf; print(tf.__version__)'
 
 # Print NVIDIA GPU information inside the docker
 nvidia-smi
-dmesg | grep NVRM
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
