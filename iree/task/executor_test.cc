@@ -24,7 +24,7 @@ namespace {
 
 static thread_local volatile uint64_t xxx = 0;
 
-static void simulate_work(iree_task_tile_context_t* tile_context) {
+static void simulate_work(const iree_task_tile_context_t* tile_context) {
   iree_prng_splitmix64_state_t state;
   iree_prng_splitmix64_initialize(xxx, &state);
   bool slow = false;  // tile_context->workgroup_xyz[0] % 3 == 1;
@@ -74,27 +74,27 @@ TEST(ExecutorTest, Any) {
 
   //
   iree_task_call_t call0;
-  iree_task_call_initialize(
-      &scope_a,
-      iree_task_make_closure(
-          [](uintptr_t user_context, uintptr_t task_context) {
-            IREE_TRACE_SCOPE0("call0");
-            EXPECT_EQ(0, user_context);
-            return iree_ok_status();
-          },
-          0),
-      &call0);
+  iree_task_call_initialize(&scope_a,
+                            iree_task_make_call_closure(
+                                [](uintptr_t user_context, iree_task_t* task,
+                                   iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE0("call0");
+                                  EXPECT_EQ(0, user_context);
+                                  return iree_ok_status();
+                                },
+                                0),
+                            &call0);
 
   const uint32_t workgroup_size_0[3] = {256, 1, 1};
   const uint32_t workgroup_count_0[3] = {32, 4, 2};
   iree_task_dispatch_t dispatch0;
   iree_task_dispatch_initialize(
       &scope_a,
-      iree_task_make_closure(
-          [](uintptr_t user_context, uintptr_t task_context) {
+      iree_task_make_dispatch_closure(
+          [](uintptr_t user_context,
+             const iree_task_tile_context_t* tile_context,
+             iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile0");
-            iree_task_tile_context_t* tile_context =
-                (iree_task_tile_context_t*)task_context;
             EXPECT_EQ(0, user_context);
             simulate_work(tile_context);
             iree_atomic_fetch_add_int32(&tile_context->statistics->reserved, 1,
@@ -110,11 +110,11 @@ TEST(ExecutorTest, Any) {
   iree_task_dispatch_t dispatch1;
   iree_task_dispatch_initialize(
       &scope_a,
-      iree_task_make_closure(
-          [](uintptr_t user_context, uintptr_t task_context) {
+      iree_task_make_dispatch_closure(
+          [](uintptr_t user_context,
+             const iree_task_tile_context_t* tile_context,
+             iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile1");
-            iree_task_tile_context_t* tile_context =
-                (iree_task_tile_context_t*)task_context;
             EXPECT_EQ(0, user_context);
             simulate_work(tile_context);
             iree_atomic_fetch_add_int32(&tile_context->statistics->reserved, 1,
@@ -127,16 +127,16 @@ TEST(ExecutorTest, Any) {
 
   //
   iree_task_call_t call1;
-  iree_task_call_initialize(
-      &scope_a,
-      iree_task_make_closure(
-          [](uintptr_t user_context, uintptr_t task_context) {
-            IREE_TRACE_SCOPE0("call1");
-            EXPECT_EQ(1, user_context);
-            return iree_ok_status();
-          },
-          1),
-      &call1);
+  iree_task_call_initialize(&scope_a,
+                            iree_task_make_call_closure(
+                                [](uintptr_t user_context, iree_task_t* task,
+                                   iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE0("call1");
+                                  EXPECT_EQ(1, user_context);
+                                  return iree_ok_status();
+                                },
+                                1),
+                            &call1);
 
 #if 1
   // no barrier between dispatches; fanout

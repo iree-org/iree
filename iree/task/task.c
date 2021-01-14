@@ -144,7 +144,7 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 //==============================================================================
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
-                               iree_task_closure_t closure,
+                               iree_task_call_closure_t closure,
                                iree_task_call_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_CALL, scope, &out_task->header);
   out_task->closure = closure;
@@ -154,8 +154,8 @@ iree_status_t iree_task_call_execute(
     iree_task_call_t* task, iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      task->closure.fn(task->closure.user_context, /*task_context=*/0);
+  iree_status_t status = task->closure.fn(task->closure.user_context,
+                                          &task->header, pending_submission);
 
   iree_task_retire(&task->header, pending_submission);
   IREE_TRACE_ZONE_END(z0);
@@ -332,10 +332,9 @@ void iree_task_dispatch_statistics_merge(
 // IREE_TASK_TYPE_DISPATCH
 //==============================================================================
 
-static void iree_task_dispatch_initialize_base(iree_task_scope_t* scope,
-                                               iree_task_closure_t closure,
-                                               const uint32_t workgroup_size[3],
-                                               iree_task_dispatch_t* out_task) {
+static void iree_task_dispatch_initialize_base(
+    iree_task_scope_t* scope, iree_task_dispatch_closure_t closure,
+    const uint32_t workgroup_size[3], iree_task_dispatch_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_DISPATCH, scope, &out_task->header);
   out_task->closure = closure;
   memcpy(out_task->workgroup_size, workgroup_size,
@@ -345,7 +344,7 @@ static void iree_task_dispatch_initialize_base(iree_task_scope_t* scope,
 }
 
 void iree_task_dispatch_initialize(iree_task_scope_t* scope,
-                                   iree_task_closure_t closure,
+                                   iree_task_dispatch_closure_t closure,
                                    const uint32_t workgroup_size[3],
                                    const uint32_t workgroup_count[3],
                                    iree_task_dispatch_t* out_task) {
@@ -354,11 +353,10 @@ void iree_task_dispatch_initialize(iree_task_scope_t* scope,
          sizeof(out_task->workgroup_count.value));
 }
 
-void iree_task_dispatch_initialize_indirect(iree_task_scope_t* scope,
-                                            iree_task_closure_t closure,
-                                            const uint32_t workgroup_size[3],
-                                            const uint32_t* workgroup_count_ptr,
-                                            iree_task_dispatch_t* out_task) {
+void iree_task_dispatch_initialize_indirect(
+    iree_task_scope_t* scope, iree_task_dispatch_closure_t closure,
+    const uint32_t workgroup_size[3], const uint32_t* workgroup_count_ptr,
+    iree_task_dispatch_t* out_task) {
   iree_task_dispatch_initialize_base(scope, closure, workgroup_size, out_task);
   out_task->header.flags |= IREE_TASK_FLAG_DISPATCH_INDIRECT;
   out_task->workgroup_count.ptr = workgroup_count_ptr;
@@ -668,8 +666,8 @@ iree_status_t iree_task_dispatch_slice_execute(
         IREE_TRACE_ZONE_APPEND_VALUE(z_tile, z);
         // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-        iree_status_t status = task->closure.fn(task->closure.user_context,
-                                                (uintptr_t)&tile_context);
+        iree_status_t status = task->closure.fn(
+            task->closure.user_context, &tile_context, pending_submission);
 
         IREE_TRACE_ZONE_END(z_tile);
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
@@ -783,8 +781,9 @@ iree_status_t iree_task_dispatch_shard_execute(
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
       // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-      iree_status_t status = dispatch_task->closure.fn(
-          dispatch_task->closure.user_context, (uintptr_t)&tile_context);
+      iree_status_t status =
+          dispatch_task->closure.fn(dispatch_task->closure.user_context,
+                                    &tile_context, pending_submission);
 
       IREE_TRACE_ZONE_END(z_tile);
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
