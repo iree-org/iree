@@ -58,11 +58,11 @@ struct TileAndDistributeOnTensorsPattern
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
-    SmallVector<Value, 4> tensorResults;
-    if (failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)))
+    linalg::TiledLinalgOp tiledLinalgOp;
+    if (failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp)))
       return failure();
     // TODO: Wrap in sequentialized SPMD loops.
-    rewriter.replaceOp(op, tensorResults);
+    rewriter.replaceOp(op, tiledLinalgOp.tensorResults);
     return success();
   }
 };

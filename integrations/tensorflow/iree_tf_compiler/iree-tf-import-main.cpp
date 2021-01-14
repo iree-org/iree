@@ -111,9 +111,9 @@ static OwningModuleRef importSavedModelV1(
   std::vector<std::string> exportedNamesVector =
       absl::StrSplit(savedModelExportedNames, ',', absl::SkipEmpty());
 
+  tensorflow::MLIRImportOptions import_options;
   auto loadedModule = ConvertSavedModelV1ToMlir(
-      bundle, absl::MakeSpan(exportedNamesVector), &context,
-      /*upgrade_legacy=*/false);
+      bundle, absl::MakeSpan(exportedNamesVector), &context, import_options);
 
   if (!loadedModule.ok()) {
     llvm::errs() << "Error performing initial import from SavedModel to MLIR. "

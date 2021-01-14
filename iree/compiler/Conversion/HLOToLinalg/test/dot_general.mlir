@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-hlo-to-linalg-pipeline %s | IreeFileCheck %s
 
 module {
   // CHECK: func @dot_general

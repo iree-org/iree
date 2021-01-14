@@ -132,17 +132,17 @@ struct TileAndDistributeOnTensorsPattern
     MLIRContext *context = op->getContext();
     Location loc = op->getLoc();
     {
-      SmallVector<Value, 4> tensorResults;
+      linalg::TiledLinalgOp tiledLinalgOp;
       // Scoped within DispatchWorkgroupOp.
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPoint(clonedLinalgOp);
       if (failed(Base::matchAndRewriteBase(clonedLinalgOp, rewriter,
-                                           tensorResults))) {
+                                           tiledLinalgOp))) {
         // Need to erase on failure to avoid infinite loop.
         rewriter.eraseOp(dispatch);
         return failure();
       }
-      rewriter.replaceOp(clonedLinalgOp, tensorResults);
+      rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
     }
 
     // Add tie_shape for all outputs. This provides necessary information for

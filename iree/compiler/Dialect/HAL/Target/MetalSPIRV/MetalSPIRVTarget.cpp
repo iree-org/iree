@@ -79,7 +79,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
     SmallVector<StringRef, 8> entryPointNames;
-    if (auto scheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+    if (auto scheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
             iree_compiler::getEntryPointScheduleAttrName())) {
       // We have multiple entry points in this module. Make sure the order
       // specified in the schedule attribute is respected.

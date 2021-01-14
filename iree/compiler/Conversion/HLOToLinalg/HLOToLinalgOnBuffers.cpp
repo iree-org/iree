@@ -1084,19 +1084,20 @@ struct DynamicTensorFromElementsOpConversion
   }
 };
 
-/// Converts linalg.matmul on tensors to linalg.matmul on buffers.
+/// Converts linalg.matmul-ish on tensors to linalg.matmul-ish on buffers.
+template <typename LinalgOpTy>
 struct MatmulOnTensorConversion
-    : public ConvertToLinalgBufferOp<MatmulOnTensorConversion,
-                                     linalg::MatmulOp> {
-  using ConvertToLinalgBufferOp<MatmulOnTensorConversion,
-                                linalg::MatmulOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(linalg::MatmulOp op, ArrayRef<Value> inputBuffers,
+    : public ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+                                     LinalgOpTy> {
+  using ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+                                LinalgOpTy>::ConvertToLinalgBufferOp;
+  LogicalResult apply(LinalgOpTy op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
     // The last one is a init tensor.
-    rewriter.create<linalg::MatmulOp>(op.getLoc(), inputBuffers.drop_back(1),
-                                      resultBuffers);
+    rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers.drop_back(1),
+                                resultBuffers);
     return success();
   }
 };
@@ -1490,7 +1491,8 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
   patterns.insert<ConvOpConversion, ConcatenateOpConversion,
-                  MatmulOnTensorConversion, DotGeneralOpConversion,
+                  MatmulOnTensorConversion<linalg::MatmulOp>,
+                  MatmulOnTensorConversion<linalg::BatchMatmulOp>,
                   DynamicTensorFromElementsOpConversion, InitTensorOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
