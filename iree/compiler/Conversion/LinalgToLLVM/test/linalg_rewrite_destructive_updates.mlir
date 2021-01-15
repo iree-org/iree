@@ -103,6 +103,7 @@ func @tile_from_pointwise_lhs() {
   // Inplace update (assume only parallel loops have been tiled).
   //      CHECK:     hal.interface.store.tensor.tile %[[RES]], @legacy_io::@ret0, base_offset = %{{[0-9a-z]*}},
   // CHECK-SAME:       offsets = [%[[I]], %[[J]]], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32>
+  %cst = constant 1.000000e+00 : f32
   %6 = scf.for %arg0 = %5 to %c2 step %c2 iter_args(%arg1 = %0) -> (tensor<2x4xf32>) {
     %7 = scf.for %arg2 = %4 to %c4 step %c4 iter_args(%arg3 = %arg1) -> (tensor<2x4xf32>) {
       %8 = subtensor %1[%arg0, 0] [1, 3] [1, 1] : tensor<2x3xf32> to tensor<1x3xf32>
@@ -110,7 +111,8 @@ func @tile_from_pointwise_lhs() {
       %shape = linalg.init_tensor [1, 3] : tensor<1x3xf32>
       %10 = linalg.generic #trait ins(%8 : tensor<1x3xf32>) outs(%shape : tensor<1x3xf32>) {
       ^bb0(%arg4: f32, %s: f32):
-        linalg.yield %arg4 : f32
+        %12 = addf %cst, %arg4 : f32
+        linalg.yield %12 : f32
       } -> tensor<1x3xf32>
 
       %11 = subtensor %arg3[%arg0, %arg2] [1, 1] [1, 1] : tensor<2x4xf32> to tensor<1x1xf32>
@@ -152,6 +154,7 @@ func @tile_from_pointwise_outs() {
   %c2 = constant 2 : index
   %c4 = constant 4 : index
   %c1 = constant 1 : index
+  %cst = constant 1.000000e+00 : f32
   // This is the `out` operand that gets through a pointwise generic and becomes
   // the outs operand of linalg.matmul. After tiling and fusion this is a
   // subtensor of the value produced by linalg.generic.
@@ -167,7 +170,8 @@ func @tile_from_pointwise_outs() {
   %shape = linalg.init_tensor [2, 4] : tensor<2x4xf32>
   %3 = linalg.generic #trait ins(%0 : tensor<2x4xf32>) outs(%shape : tensor<2x4xf32>) {
   ^bb0(%arg0: f32, %s: f32):
-    linalg.yield %arg0 : f32
+    %t = addf %cst, %arg0 : f32
+    linalg.yield %t : f32
   } -> tensor<2x4xf32>
 
   %4 = hal.interface.workgroup.id[0] : index
@@ -196,7 +200,8 @@ func @tile_from_pointwise_outs() {
       %10 = subtensor %0[%arg0, %arg2] [1, 1] [1, 1] : tensor<2x4xf32> to tensor<1x1xf32>
       %11 = linalg.generic #trait ins(%10 : tensor<1x1xf32>) outs(%10 : tensor<1x1xf32>) {
       ^bb0(%arg4: f32, %s: f32):
-        linalg.yield %arg4 : f32
+        %12 = addf %cst, %arg4 : f32
+        linalg.yield %12 : f32
       } -> tensor<1x1xf32>
       %13 = linalg.matmul ins(%8, %9 : tensor<1x3xf32>, tensor<3x1xf32>)
                          outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
