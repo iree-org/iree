@@ -68,33 +68,9 @@ static AffineExpr substWithMin(AffineExpr e, AffineExpr dim, AffineExpr min,
   return e;
 }
 
-/// Given the `lbVal`, `ubVal` and `stepVal` of a loop, append `lbVal` and
-/// `ubVal` to `dims` and `stepVal` to `symbols`.
-/// Create new AffineDimExpr (`%lb` and `%ub`) and AffineSymbolExpr (`%step`)
-/// with positions matching the newly appended values. Substitute occurrences of
-/// `dimExpr` by either the min expression (i.e. `%lb`) or the max expression
-/// (i.e. `%lb + %step * floordiv(%ub -1 - %lb, %step)`), depending on whether
-/// the induction variable is used with a positive or negative  coefficient.
-static AffineExpr substituteLoopInExpr(AffineExpr expr, AffineExpr dimExpr,
-                                       Value lbVal, Value ubVal, Value stepVal,
-                                       SmallVectorImpl<Value> &dims,
-                                       SmallVectorImpl<Value> &symbols) {
-  MLIRContext *ctx = lbVal.getContext();
-  AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(lbVal);
-  AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(ubVal);
-  AffineExpr step = getAffineSymbolExpr(symbols.size(), ctx);
-  symbols.push_back(stepVal);
-  LLVM_DEBUG(llvm::dbgs() << "Before: " << expr << "\n");
-  AffineExpr ee = substWithMin(expr, dimExpr, lb,
-                               lb + step * ((ub - 1) - lb).floorDiv(step));
-  LLVM_DEBUG(llvm::dbgs() << "After: " << ee << "\n");
-  return ee;
-}
-
 /// Traverse the `dims` and substitute known min or max expressions in place of
-/// induction variables in `exprs`.
+/// values whose range is known. We know the range of some operations based on
+/// their semantic.
 static AffineMap substitute(AffineMap map, SmallVectorImpl<Value> &dims,
                             SmallVectorImpl<Value> &symbols) {
   auto exprs = llvm::to_vector<4>(map.getResults());
@@ -111,19 +87,6 @@ static AffineMap substitute(AffineMap map, SmallVectorImpl<Value> &dims,
           LLVM_DEBUG(llvm::dbgs()
                      << "Subst: " << dim << " @ " << dimExpr << "\n");
           AffineExpr substitutedExpr;
-          if (auto forOp = scf::getForInductionVarOwner(dim))
-            substitutedExpr = substituteLoopInExpr(
-                expr, dimExpr, forOp.lowerBound(), forOp.upperBound(),
-                forOp.step(), dims, symbols);
-
-          if (auto parallelForOp = scf::getParallelForInductionVarOwner(dim))
-            for (unsigned idx = 0, e = parallelForOp.getNumLoops(); idx < e;
-                 ++idx)
-              substitutedExpr = substituteLoopInExpr(
-                  expr, dimExpr, parallelForOp.lowerBound()[idx],
-                  parallelForOp.upperBound()[idx], parallelForOp.step()[idx],
-                  dims, symbols);
-
           // TODO: Generalize IDs/Count by adding an interface to support more
           // kind of ID Ops.
           if (auto idOp =
@@ -137,9 +100,8 @@ static AffineMap substitute(AffineMap map, SmallVectorImpl<Value> &dims,
             AffineExpr ubExpr = getAffineDimExpr(dims.size(), map.getContext());
             dims.push_back(ub);
             substitutedExpr = substWithMin(expr, dimExpr, zero, ubExpr - 1);
-          }
-          if (auto countOp =
-                  dim.getDefiningOp<IREE::Flow::DispatchWorkgroupCountOp>()) {
+          } else if (auto countOp = dim.getDefiningOp<
+                                    IREE::Flow::DispatchWorkgroupCountOp>()) {
             auto parent =
                 countOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
             Value count =
@@ -259,59 +221,64 @@ static void replaceOpWithRegion(PatternRewriter &rewriter, Operation *op,
   rewriter.eraseOp(terminator);
 }
 
+/// Return true if we can prove that the we always run at least the first
+/// iteration of the ForOp.
+static bool alwaysRunsFirstIteration(scf::ForOp op) {
+  // Calculate the minimum value of ub - lb. If it is strictly positive it
+  // means the loop will always run at least once.
+  MLIRContext *ctx = op->getContext();
+  SmallVector<Value, 4> dims;
+  SmallVector<Value, 4> symbols;
+  AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
+  dims.push_back(op.lowerBound());
+  AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
+  dims.push_back(op.upperBound());
+  AffineExpr iterZero = ub - lb;
+  auto map = AffineMap::get(dims.size(), 0, iterZero);
+  AffineMap simplifiedMap = substitute(map, dims, symbols);
+  assert(simplifiedMap.getNumResults() == 1);
+  if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
+    if (cst.getValue() > 0) return true;
+  }
+  return false;
+}
+
+/// Return true if we can prove that the we never run more than one iteration of
+/// the ForOp.
+static bool neverRunsSecondIteration(scf::ForOp op) {
+  // Calculate the minimum of lb + step - ub. If it is positive it means the
+  // loop never run more than once.
+  MLIRContext *ctx = op->getContext();
+  SmallVector<Value, 4> dims;
+  SmallVector<Value, 4> symbols;
+  AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
+  dims.push_back(op.lowerBound());
+  AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
+  dims.push_back(op.upperBound());
+  AffineExpr step = getAffineDimExpr(dims.size(), ctx);
+  dims.push_back(op.step());
+  AffineExpr iterOne = lb + step - ub;
+  auto map = AffineMap::get(dims.size(), 0, iterOne);
+
+  AffineMap simplifiedMap = substitute(map, dims, symbols);
+  assert(simplifiedMap.getNumResults() == 1);
+  if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
+    if (cst.getValue() >= 0) return true;
+  }
+  return false;
+}
+
 /// Rewriting pattern that replaces single-iteration loops with their bodies.
 struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
-    bool alwaysRunFirstIteration = false;
-    bool neverRunSecondIteration = false;
-    MLIRContext *ctx = op->getContext();
-    // Calculate the minimum value of ub - lb. If it is strictly positive it
-    // means the loop will always run at least once.
-    {
-      SmallVector<Value, 4> dims;
-      SmallVector<Value, 4> symbols;
-      AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-      dims.push_back(op.lowerBound());
-      AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-      dims.push_back(op.upperBound());
-      AffineExpr iterZero = ub - lb;
-      auto map = AffineMap::get(dims.size(), 0, iterZero);
-      AffineMap simplifiedMap = substitute(map, dims, symbols);
-      assert(simplifiedMap.getNumResults() == 1);
-      if (auto cst =
-              simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
-        if (cst.getValue() > 0) alwaysRunFirstIteration = true;
-      }
-    }
-    // Calculate the minimum of lb + step - ub. If it is positive it means the
-    // loop never run more than once.
-    {
-      SmallVector<Value, 4> dims;
-      SmallVector<Value, 4> symbols;
-      AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-      dims.push_back(op.lowerBound());
-      AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-      dims.push_back(op.upperBound());
-      AffineExpr step = getAffineDimExpr(dims.size(), ctx);
-      dims.push_back(op.step());
-      AffineExpr iterOne = lb + step - ub;
-      auto map = AffineMap::get(dims.size(), 0, iterOne);
-
-      AffineMap simplifiedMap = substitute(map, dims, symbols);
-      assert(simplifiedMap.getNumResults() == 1);
-      if (auto cst =
-              simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
-        if (cst.getValue() >= 0) neverRunSecondIteration = true;
-      }
-    }
-
     // TODO: Handle the case where we know that the loop doesn't run more than
     // once but the loop may not run at least once by replace the `loop` with an
     // `if`.
-    if (!(alwaysRunFirstIteration && neverRunSecondIteration)) return failure();
+    if (!(alwaysRunsFirstIteration(op) && neverRunsSecondIteration(op)))
+      return failure();
 
     // The first iteration is always run and the second iteration is never run
     // so the loop always have 1 iteration. Inline its body and remove the loop.
