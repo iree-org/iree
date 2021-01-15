@@ -22,7 +22,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   %cst = constant 128 : index
   // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
   // CHECK: %[[TMP_BUF:.+]] = hal.allocator.allocate {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch"
-  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
     //  CHECK-DAG: %[[EXE_LAYOUT:.+]] = hal.executable_layout.lookup
@@ -130,7 +130,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
 func @static_tiled_dispatch(%arg0: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
   %c1024 = constant 1024 : index
   %c512 = constant 512 : index
-  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %1 = flow.ex.stream.fragment(
       %arg3 = %arg0 : tensor<7x4x24xf32>,
@@ -167,7 +167,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
 func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: index) -> tensor<?x?x1024xf32> {
   %c1024 = constant 1024 : index
   %c512 = constant 512 : index
-  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %2 = flow.ex.stream.fragment(
       %arg3 = %arg0 : tensor<7x?x24x?xf32>,

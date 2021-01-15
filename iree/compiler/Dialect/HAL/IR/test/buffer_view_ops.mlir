@@ -7,8 +7,8 @@
 // CHECK-LABEL: @buffer_view_const
 func @buffer_view_const() -> !hal.buffer_view {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
-  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
+  // CHECK: %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", Transfer : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
+  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", Transfer : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
   return %view : !hal.buffer_view
 }
 

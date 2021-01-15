@@ -4,9 +4,9 @@
 func @expand_buffer_view_const() -> !hal.buffer_view {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
   //      CHECK: [[CONST:%.+]] = iree.byte_buffer.constant : !iree.byte_buffer = dense<[4, 1, 2]> : tensor<3xi32>
-  // CHECK-NEXT: [[BUFFER:%.+]] = hal.allocator.map {{.+}}, "HostVisible|HostCoherent", "Transfer", [[CONST]][%c0, %c-1] : !iree.byte_buffer -> !hal.buffer
+  // CHECK-NEXT: [[BUFFER:%.+]] = hal.allocator.map {{.+}}, "HostVisible|HostCoherent", Transfer, [[CONST]][%c0, %c-1] : !iree.byte_buffer -> !hal.buffer
   // CHECK-NEXT: [[VIEW:%.+]] = hal.buffer_view.create [[BUFFER]], shape = [%c3], element_type = 16777248 : !hal.buffer_view
-  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
+  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", Transfer : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
   // CHECK-NEXT: return [[VIEW]]
   return %view : !hal.buffer_view
 }

@@ -24,8 +24,8 @@ func @make_buffer_barrier(%arg0 : !hal.buffer) -> tuple<i32, i32, !hal.buffer, i
 
 // CHECK-LABEL: @command_buffer_create
 func @command_buffer_create(%arg0 : !hal.device) {
-  // CHECK: %cmd = hal.command_buffer.create %arg0, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
-  %cmd = hal.command_buffer.create %arg0, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  // CHECK: %cmd = hal.command_buffer.create %arg0, OneShot, "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %arg0, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   return
 }
 
