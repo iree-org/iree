@@ -55,8 +55,11 @@ static iree_host_size_t iree_task_post_batch_select_random_worker(
 iree_host_size_t iree_task_post_batch_select_worker(
     iree_task_post_batch_t* post_batch, iree_task_affinity_set_t affinity_set) {
   if (post_batch->current_worker) {
-    // Posting from a worker - prefer sending right back to this worker.
-    if (affinity_set & post_batch->current_worker->worker_bit) {
+    // Posting from a worker - prefer sending right back to this worker if we
+    // haven't already scheduled for it.
+    if ((affinity_set & post_batch->current_worker->worker_bit) &&
+        !(post_batch->worker_pending_mask &
+          post_batch->current_worker->worker_bit)) {
       return iree_task_affinity_set_count_trailing_zeros(
           post_batch->current_worker->worker_bit);
     }
@@ -65,10 +68,13 @@ iree_host_size_t iree_task_post_batch_select_worker(
   // Prefer workers that are idle as though they'll need to wake up it is
   // guaranteed that they aren't working on something else and the latency of
   // waking should (hopefully) be less than the latency of waiting for a
-  // worker's queue to finish.
+  // worker's queue to finish. Note that we only consider workers idle if we
+  // ourselves in this batch haven't already queued work for them (as then they
+  // aren't going to be idle).
   iree_task_affinity_set_t worker_idle_mask =
       iree_atomic_task_affinity_set_load(
           &post_batch->executor->worker_idle_mask, iree_memory_order_relaxed);
+  worker_idle_mask &= ~post_batch->worker_pending_mask;
   iree_task_affinity_set_t idle_affinity_set = affinity_set & worker_idle_mask;
   if (idle_affinity_set) {
     return iree_task_post_batch_select_random_worker(post_batch,
