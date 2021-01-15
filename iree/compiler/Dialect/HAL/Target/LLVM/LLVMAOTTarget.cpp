@@ -229,6 +229,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
+    if(options_.addressSanitizer) {
+      for(auto &function : llvmModule->getFunctionList())
+        function.addFnAttr(llvm::Attribute::SanitizeAddress);
+    }
 
     // Try to grab a linker tool based on the options (and target environment).
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);

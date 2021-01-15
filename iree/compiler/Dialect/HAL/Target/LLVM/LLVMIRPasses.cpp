@@ -77,7 +77,6 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   llvm::StandardInstrumentations standardInstrumentations(
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
-  llvm::ModulePassManager modulePassManager;
 
   llvm::PassBuilder passBuilder(false, machine, options.pipelineTuningOptions,
                                 {}, &passInstrumentationCallbacks);
@@ -102,15 +101,16 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                           llvm::PassBuilder::OptimizationLevel Level) {
           modulePassManager.addPass(
               llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis, llvm::Module>());
-          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(CompileKernel, Recover));
-//                                                 ModuleUseAfterScope,
-//                                                 UseOdrIndicator));
+          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(CompileKernel, Recover,
+                                                 ModuleUseAfterScope,
+                                                 UseOdrIndicator));
           modulePassManager.addPass(createModuleToFunctionPassAdaptor(
               llvm::AddressSanitizerPass(CompileKernel, Recover, UseAfterScope)));
         });
   }
 
   if (options.optLevel != llvm::PassBuilder::OptimizationLevel::O0) {
+    llvm::ModulePassManager modulePassManager;
     modulePassManager =
         passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
     modulePassManager.run(*module, moduleAnalysisManager);
