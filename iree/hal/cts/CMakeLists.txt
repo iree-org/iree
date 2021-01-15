@@ -65,6 +65,18 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    event_test
+  SRCS
+    "event_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     semaphore_test
   SRCS
     "semaphore_test.cc"

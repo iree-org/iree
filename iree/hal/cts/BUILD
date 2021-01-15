@@ -65,6 +65,17 @@ cc_test(
 )
 
 cc_test(
+    name = "event_test",
+    srcs = ["event_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
     deps = [
