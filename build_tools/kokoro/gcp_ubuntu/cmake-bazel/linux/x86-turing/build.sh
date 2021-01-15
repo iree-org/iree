@@ -36,9 +36,6 @@ nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
-# Print SwiftShader git commit
-cat /swiftshader/git-commit
-
 # TODO(4195): TensorFlow integrations can only be built out-of-tree (and kokoro
 # does not support that).
 # Temporarily get around these conflicting restrictions by nesting the git
