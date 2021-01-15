@@ -95,6 +95,12 @@ bool iree_task_submission_is_empty(iree_task_submission_t* submission);
 void iree_task_submission_enqueue(iree_task_submission_t* submission,
                                   iree_task_t* task);
 
+// Enqueues all tasks in |list| to the pending |submission|.
+// Ownership of the tasks transfers to the submission and the |list| will be
+// reset upon return. Ready tasks may execute in any order.
+void iree_task_submission_enqueue_list(iree_task_submission_t* submission,
+                                       iree_task_list_t* list);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
