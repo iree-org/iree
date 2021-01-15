@@ -59,7 +59,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     VkPipeline* out_pipelines) {
   VkComputePipelineCreateInfo* create_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      logical_device->host_allocator(), sizeof(VkComputePipelineCreateInfo),
+      logical_device->host_allocator(),
+      pipeline_count * sizeof(VkComputePipelineCreateInfo),
       (void**)&create_infos));
 
   flatbuffers_string_vec_t entry_points_vec =
