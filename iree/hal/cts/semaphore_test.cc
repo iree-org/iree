@@ -217,6 +217,33 @@ TEST_P(SemaphoreTest, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
+TEST_P(SemaphoreTest, SubmitWithNoCommandBuffers) {
+  // No waits, one signal which we immediately wait on after submit.
+  iree_hal_submission_batch_t submission_batch;
+  submission_batch.wait_semaphores.count = 0;
+  submission_batch.wait_semaphores.semaphores = NULL;
+  submission_batch.wait_semaphores.payload_values = NULL;
+  submission_batch.command_buffer_count = 0;
+  submission_batch.command_buffers = NULL;
+  iree_hal_semaphore_t* signal_semaphore;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+  iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
+  submission_batch.signal_semaphores.count =
+      IREE_ARRAYSIZE(signal_semaphore_ptrs);
+  submission_batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
+  uint64_t payload_values[] = {1ull};
+  submission_batch.signal_semaphores.payload_values = payload_values;
+
+  IREE_ASSERT_OK(
+      iree_hal_device_queue_submit(device_, IREE_HAL_COMMAND_CATEGORY_DISPATCH,
+                                   /*queue_affinity=*/0,
+                                   /*batch_count=*/1, &submission_batch));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
+      signal_semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
+
+  iree_hal_semaphore_release(signal_semaphore);
+}
+
 TEST_P(SemaphoreTest, SubmitAndSignal) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
