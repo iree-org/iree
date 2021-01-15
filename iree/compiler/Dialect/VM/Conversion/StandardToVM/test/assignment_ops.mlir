@@ -12,7 +12,7 @@ module @my_module {
     // Note that in std, cmp returns an i1 and this relies on the dialect
     // conversion framework promoting that to i32.
     // CHECK: %[[CMP:[a-zA-Z0-9$._-]+]] = vm.cmp.eq.i32
-    %1 = cmpi "eq", %arg0, %arg1 : i32
+    %1 = cmpi eq, %arg0, %arg1 : i32
     // CHECK: vm.select.i32 %[[CMP]], %[[ARG0]], %[[ARG1]] : i32
     %2 = select %1, %arg0, %arg1 : i32
     return %2 : i32
@@ -33,7 +33,7 @@ module @my_module {
     // Note that in std, cmp returns an i1 and this relies on the dialect
     // conversion framework promoting that to i32.
     // CHECK: %[[CMP:[a-zA-Z0-9$._-]+]] = vm.cmp.eq.i32
-    %1 = cmpi "eq", %arg0, %arg1 : index
+    %1 = cmpi eq, %arg0, %arg1 : index
     // CHECK: vm.select.i32 %[[CMP]], %[[ARG0]], %[[ARG1]] : i32
     %2 = select %1, %arg0, %arg1 : index
     return %2 : index

@@ -41,7 +41,7 @@ module {
 // -----
 
 module {
-  //      CHECK:   %[[COND:.+]] = cmpf "olt", %{{.+}}, %{{.+}} : f32
+  //      CHECK:   %[[COND:.+]] = cmpf olt, %{{.+}}, %{{.+}} : f32
   // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
   func @reduction_entry() {
     %c0 = constant 0 : index
@@ -65,7 +65,7 @@ module {
 // -----
 
 module {
-  //      CHECK:   %[[COND:.+]] = cmpf "ogt", %{{.+}}, %{{.+}} : f32
+  //      CHECK:   %[[COND:.+]] = cmpf ogt, %{{.+}}, %{{.+}} : f32
   // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
   func @reduction_entry() {
     %c0 = constant 0 : index
@@ -89,7 +89,7 @@ module {
 // -----
 
 module {
-  //      CHECK:   %[[COND:.+]] = cmpf "ogt", %{{.+}}, %{{.+}} : f32
+  //      CHECK:   %[[COND:.+]] = cmpf ogt, %{{.+}}, %{{.+}} : f32
   // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
   func @reduction_entry() {
     %c0 = constant 0 : index
