@@ -179,6 +179,10 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createStripAndSplatConstantVariablesPass();
 
+/// Add patterns to fold AffineMinOp and ForOp by looking at the dispatch id
+/// range.
+std::unique_ptr<OperationPass<FuncOp>> createDispatchIDCanonicalizationPass();
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//

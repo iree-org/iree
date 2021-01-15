@@ -26,6 +26,7 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"
+    "DispatchIDCanonicalizations.cpp"
     "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
     "FlattenTuplesInCFG.cpp"

@@ -205,6 +205,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
         IREE::Flow::createRematerializeDispatchConstantsPass());
   }
 
+  // Try to fold For regions or affine.min based on the dispatch ID range.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createDispatchIDCanonicalizationPass());
+
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from
   // dispatchees.
