@@ -1062,18 +1062,16 @@ struct LinalgOpOnTensorConversion
 /// Converts linalg.matmul on tensors to linalg.matmul on buffers.
 struct DynamicTensorFromElementsOpConversion
     : public ConvertToLinalgBufferOp<DynamicTensorFromElementsOpConversion,
-                                     DynamicTensorFromElementsOp> {
-  using ConvertToLinalgBufferOp<
-      DynamicTensorFromElementsOpConversion,
-      DynamicTensorFromElementsOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(DynamicTensorFromElementsOp op,
-                      ArrayRef<Value> inputBuffers,
+                                     tensor::GenerateOp> {
+  using ConvertToLinalgBufferOp<DynamicTensorFromElementsOpConversion,
+                                tensor::GenerateOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(tensor::GenerateOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (op.getBody(0)->getOperations().size() != 1) {
       return op.emitError("expected only contain yield op");
     }
-    auto yieldOp = dyn_cast<YieldOp>(op.getBody(0)->getTerminator());
+    auto yieldOp = dyn_cast<tensor::YieldOp>(op.getBody(0)->getTerminator());
     if (!yieldOp) {
       return op.emitError("expected to use a yield op as the terminator");
     }
@@ -1533,7 +1531,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
                       IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp,
-                      DynamicTensorFromElementsOp>();
+                      tensor::GenerateOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();
