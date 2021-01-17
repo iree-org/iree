@@ -54,6 +54,28 @@ cc_test(
 )
 
 cc_test(
+    name = "descriptor_set_test",
+    srcs = ["descriptor_set_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "descriptor_set_layout_test",
+    srcs = ["descriptor_set_layout_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
     name = "driver_test",
     srcs = ["driver_test.cc"],
     deps = [
@@ -67,6 +89,17 @@ cc_test(
 cc_test(
     name = "event_test",
     srcs = ["event_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "executable_layout_test",
+    srcs = ["executable_layout_test.cc"],
     deps = [
         ":cts_test_base",
         "//iree/hal/testing:driver_registry",

@@ -53,6 +53,30 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    descriptor_set_test
+  SRCS
+    "descriptor_set_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    descriptor_set_layout_test
+  SRCS
+    "descriptor_set_layout_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     driver_test
   SRCS
     "driver_test.cc"
@@ -68,6 +92,18 @@ iree_cc_test(
     event_test
   SRCS
     "event_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    executable_layout_test
+  SRCS
+    "executable_layout_test.cc"
   DEPS
     ::cts_test_base
     iree::hal::testing::driver_registry

@@ -48,7 +48,7 @@ typedef struct {
   // same binding number in the executable interface.
   uint32_t binding;
   // Buffer bound to the binding number.
-  // May be nullptr if the binding is not used by the executable.
+  // May be NULL if the binding is not used by the executable.
   iree_hal_buffer_t* buffer;
   // Offset, in bytes, into the buffer that the binding starts at.
   // If the descriptor type is dynamic this will be added to the dynamic
