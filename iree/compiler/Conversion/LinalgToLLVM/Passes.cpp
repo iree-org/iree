@@ -47,25 +47,21 @@ static llvm::cl::opt<bool> fastExpConversion(
     llvm::cl::init(false));
 
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
-  // Linalg on tensors directly lowers to loops for now.
+  // Distribute linalg op among a 3d grid of parallel threads. Tile each
+  // workgroup thread memory then vectorize the linalg op.
+  passManager.addPass(createLinalgTileAndDistributePass());
   if (!clEnableLinalgOnTensors) {
-    // Distribute linalg op among a 3d grid of parallel threads. Tile each
-    // workgroup thread memory then vectorize the linalg op.
-
-    passManager.addPass(createLinalgTileAndDistributePass());
     passManager.addPass(createLegalizeNumWorkgroupsFnPass());
-
-    // Linalg.ConvOp -> (Img2Col packing + matmul).
-    // After convolution is tiled and distributed among workgroups its converted
-    // before vectorize workgroup workload.
-    if (convImg2ColConversion) {
-      passManager.addNestedPass<FuncOp>(
-          createConvImg2ColMatmulConversionPass());
-    }
-
-    passManager.addNestedPass<FuncOp>(
-        createLinalgTileAndVectorizeWorkgroupsPass());
   }
+  // Linalg.ConvOp -> (Img2Col packing + matmul).
+  // After convolution is tiled and distributed among workgroups its converted
+  // before vectorize workgroup workload.
+  if (convImg2ColConversion) {
+    passManager.addNestedPass<FuncOp>(createConvImg2ColMatmulConversionPass());
+  }
+
+  passManager.addNestedPass<FuncOp>(
+      createLinalgTileAndVectorizeWorkgroupsPass());
   passManager.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
 
   // Linalg -> SCF
@@ -112,6 +108,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
     passManager.addPass(createCopyRemovalPass());
     // passManager.addPass(createBufferHoistingPass());
     // TODO(nicolasvasilache): bug in buffer loop hoisting with

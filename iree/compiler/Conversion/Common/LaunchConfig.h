@@ -78,6 +78,14 @@ class LaunchConfig {
   /// Returns the number of subgroups to use.
   ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
 
+  /// First level of tiling (and fusion) happens in the Flow dialect with
+  /// dynamic tile sizes and represented at flow.dispatch.workgroup.size. The
+  /// launch config information is used to set the tile size to a static value
+  /// as decided here. Return the static value to use.
+  /// Returns llvm::None if the assumption here is violated.
+  Optional<SmallVector<int64_t, 4>> getWorkgroupTileSizes(
+      unsigned numWorkgroupDims) const;
+
   /// Returns true if tile sizes have been computed for the operation. If tile
   /// sizes arent set, it implies operation is not to be tiled.
   bool hasTileSizes(Operation *op, size_t level = 0) const {

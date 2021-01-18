@@ -41,6 +41,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+static unsigned kNumMaxParallelDims = 3;
+
 /// PatternRewriter that allows replacing only a subset of uses.
 /// Since this only adds a method, it can just be static_cast'ed to when
 /// applying a rewrite.
@@ -275,14 +277,9 @@ struct TileAndDistributeOnTensorsPattern
   }
 };
 
-static Value buildFlowWorkgroupIdOp(OpBuilder &b, unsigned dim) {
-  return b.create<IREE::Flow::DispatchWorkgroupIDOp>(
-      b.getInsertionPoint()->getLoc(), dim);
-}
-
-static Value buildFlowWorkgroupCountOp(OpBuilder &b, unsigned dim) {
-  return b.create<IREE::Flow::DispatchWorkgroupCountOp>(
-      b.getInsertionPoint()->getLoc(), dim);
+template <typename OpTy>
+static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
+  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
 // After outlining in dispatch region we can rewrite the dispatch ops with
@@ -344,9 +341,20 @@ static void legalizeDispatchWorkgroupOperands(
   dispatchOp.operandsMutable().assign(valuesDefinedAbove);
 }
 
-void DispatchLinalgOnTensorsPass::runOnOperation() {
-  if (tileSizes.empty()) return;
+/// Returns the number of consecutive outer loops that are "parallel". This is a
+/// copy of the function from
+/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
+/// here to avoid adding an build dependency.
+static unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return linalg::isParallelIteratorType(attr);
+      })
+      .size();
+}
 
+void DispatchLinalgOnTensorsPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   // `isEntryPoint` functions are the ones that are marked public.
   if (!funcOp.isPublic()) return;
@@ -361,22 +369,50 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         auto numParallelDims = parallelLoopRanges.size();
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
         for (size_t dim = 0;
-             dim < std::min(numParallelDims, static_cast<size_t>(3)); ++dim) {
+             dim < std::min<size_t>(numParallelDims, kNumMaxParallelDims);
+             ++dim) {
           procInfo[numParallelDims - dim - 1] = {
-              buildFlowWorkgroupIdOp(builder, dim),
-              buildFlowWorkgroupCountOp(builder, dim)};
+              buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupIDOp>(builder,
+                                                                    dim),
+              buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupCountOp>(builder,
+                                                                       dim)};
         }
         return procInfo;
       },
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
        linalg::DistributionMethod::Cyclic}};
 
+  // Use the workgroup size as a proxy for tile size here. At the flow level
+  // this represents the "workload" per processors and is not necessarily tied
+  // to the workgroup size specified by the backend.
   OwningRewritePatternList patterns;
   auto linalgTilingOptions =
       linalg::LinalgTilingOptions()
           .setDistributionOptions(workgroupDistributionOptions)
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizes(ArrayRef<int64_t>(tileSizes));
+          .setTileSizeComputationFunction(
+              [&](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
+                auto numTiledLoops = std::min<size_t>(
+                    getNumOuterParallelLoops(cast<linalg::LinalgOp>(op)),
+                    kNumMaxParallelDims);
+                SmallVector<Value, 4> useTileSizes(numTiledLoops);
+                if (!tileSizes.empty()) {
+                  useTileSizes.resize(
+                      std::min<size_t>(tileSizes.size(), numTiledLoops));
+                  return llvm::to_vector<4>(llvm::map_range(
+                      ArrayRef<int64_t>(tileSizes).take_front(
+                          std::min<size_t>(tileSizes.size(), numTiledLoops)),
+                      [&](int64_t t) -> Value {
+                        return builder.create<ConstantIndexOp>(op->getLoc(), t);
+                      }));
+                }
+                for (size_t dim = 0; dim < numTiledLoops; ++dim) {
+                  useTileSizes[numTiledLoops - dim - 1] =
+                      buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupSizeOp>(
+                          builder, dim);
+                }
+                return useTileSizes;
+              });
   assert(linalgTilingOptions.distribution.hasValue());
 
   patterns.insert<TileAndDistributeOnTensorsPattern>(

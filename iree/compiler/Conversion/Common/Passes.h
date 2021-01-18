@@ -23,6 +23,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 /// each entry point function. The function is defined, but is populated later.
 std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
 
+/// Pass to remove operations that have allocate semantics but have no
+/// uses. These arent removed by CSE.
+std::unique_ptr<OperationPass<>> createRemoveDeadMemAllocsPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 
