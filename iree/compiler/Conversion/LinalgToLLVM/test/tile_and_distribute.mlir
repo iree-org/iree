@@ -5,10 +5,10 @@ func @dynamic_matmul(%lhs: memref<?x?xf32>, %rhs: memref<?x?xf32>, %result: memr
   return
 }
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 2)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (2, s1 - s0 * 2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (2, s0 * -2 + s1)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 4)>
-// CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (4, s1 - s0 * 4)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (4, s0 * -4 + s1)>
 //     CHECK: func @dynamic_matmul(%[[LHS:.+]]: memref<?x?xf32>, %[[RHS:.+]]: memref<?x?xf32>, %[[RESULT:.+]]: memref<?x?xf32>)
 // CHECK-DAG: %[[CONST_0:.+]] = constant 0 : index
 // CHECK-DAG: %[[CONST_1:.+]] = constant 1 : index
