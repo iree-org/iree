@@ -324,6 +324,13 @@ void iree_task_barrier_initialize(iree_task_scope_t* scope,
                                   iree_task_t* const* dependent_tasks,
                                   iree_task_barrier_t* out_task);
 
+void iree_task_barrier_initialize_empty(iree_task_scope_t* scope,
+                                        iree_task_barrier_t* out_task);
+
+void iree_task_barrier_set_dependent_tasks(
+    iree_task_barrier_t* task, iree_host_size_t dependent_task_count,
+    iree_task_t* const* dependent_tasks);
+
 //==============================================================================
 // IREE_TASK_TYPE_FENCE
 //==============================================================================
