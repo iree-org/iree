@@ -31,6 +31,11 @@ void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
   out_task->type = type;
 }
 
+void iree_task_set_cleanup_fn(iree_task_t* task,
+                              iree_task_cleanup_fn_t cleanup_fn) {
+  task->cleanup_fn = cleanup_fn;
+}
+
 void iree_task_set_completion_task(iree_task_t* task,
                                    iree_task_t* completion_task) {
   assert(!task->completion_task);
@@ -48,7 +53,25 @@ bool iree_task_is_ready(iree_task_t* task) {
   return true;
 }
 
+static void iree_task_cleanup(iree_task_t* task, iree_status_t status) {
+  // Call the (optional) cleanup function.
+  // NOTE: this may free the memory of the task itself!
+  iree_task_pool_t* pool = task->pool;
+  if (task->cleanup_fn) {
+    task->cleanup_fn(task, iree_ok_status());
+  }
+
+  // Return the task to the pool it was allocated from.
+  // Some tasks are allocated as part of arenas/ringbuffers and won't have a
+  // pool as they'll be cleaned up as part of a larger operation.
+  if (pool) {
+    iree_task_pool_release(pool, task);
+  }
+}
+
 void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // NOTE: we always try adding to the head of the discard_worklist so that
   // we hopefully get some locality benefits. This models a DFS discard in
   // our non-recursive approach.
@@ -85,34 +108,26 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       break;
   }
 
-  // Release the task back to the pool it was allocated from, if any.
-  // Some tasks are allocated from arenas and may not be able to be freed
-  // individually.
-  if (task->pool) {
-    iree_task_pool_release(task->pool, task);
-  }
-
+  iree_task_cleanup(task, iree_status_from_code(IREE_STATUS_ABORTED));
   // NOTE: task is invalidated here and cannot be used!
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static void iree_task_retire(iree_task_t* task,
                              iree_task_submission_t* pending_submission) {
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
+  task->completion_task = NULL;
   if (completion_task &&
       iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count, 1,
                                   iree_memory_order_acq_rel) == 1) {
     // The completion task has retired and can now be made ready.
     iree_task_submission_enqueue(pending_submission, completion_task);
   }
-  task->completion_task = NULL;
 
-  // Return the task to the pool it was allocated from.
-  // Some tasks are allocated as part of arenas/ringbuffers and won't have a
-  // pool as they'll be cleaned up as part of a larger operation.
-  if (task->pool) {
-    iree_task_pool_release(task->pool, task);
-  }
+  iree_task_cleanup(task, iree_ok_status());
+  // NOTE: task is invalidated here and cannot be used!
 }
 
 //==============================================================================
@@ -129,7 +144,7 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 //==============================================================================
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
-                               iree_task_closure_t closure,
+                               iree_task_call_closure_t closure,
                                iree_task_call_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_CALL, scope, &out_task->header);
   out_task->closure = closure;
@@ -139,8 +154,8 @@ iree_status_t iree_task_call_execute(
     iree_task_call_t* task, iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      task->closure.fn(task->closure.user_context, /*task_context=*/0);
+  iree_status_t status = task->closure.fn(task->closure.user_context,
+                                          &task->header, pending_submission);
 
   iree_task_retire(&task->header, pending_submission);
   IREE_TRACE_ZONE_END(z0);
@@ -317,10 +332,9 @@ void iree_task_dispatch_statistics_merge(
 // IREE_TASK_TYPE_DISPATCH
 //==============================================================================
 
-static void iree_task_dispatch_initialize_base(iree_task_scope_t* scope,
-                                               iree_task_closure_t closure,
-                                               const uint32_t workgroup_size[3],
-                                               iree_task_dispatch_t* out_task) {
+static void iree_task_dispatch_initialize_base(
+    iree_task_scope_t* scope, iree_task_dispatch_closure_t closure,
+    const uint32_t workgroup_size[3], iree_task_dispatch_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_DISPATCH, scope, &out_task->header);
   out_task->closure = closure;
   memcpy(out_task->workgroup_size, workgroup_size,
@@ -330,7 +344,7 @@ static void iree_task_dispatch_initialize_base(iree_task_scope_t* scope,
 }
 
 void iree_task_dispatch_initialize(iree_task_scope_t* scope,
-                                   iree_task_closure_t closure,
+                                   iree_task_dispatch_closure_t closure,
                                    const uint32_t workgroup_size[3],
                                    const uint32_t workgroup_count[3],
                                    iree_task_dispatch_t* out_task) {
@@ -339,11 +353,10 @@ void iree_task_dispatch_initialize(iree_task_scope_t* scope,
          sizeof(out_task->workgroup_count.value));
 }
 
-void iree_task_dispatch_initialize_indirect(iree_task_scope_t* scope,
-                                            iree_task_closure_t closure,
-                                            const uint32_t workgroup_size[3],
-                                            const uint32_t* workgroup_count_ptr,
-                                            iree_task_dispatch_t* out_task) {
+void iree_task_dispatch_initialize_indirect(
+    iree_task_scope_t* scope, iree_task_dispatch_closure_t closure,
+    const uint32_t workgroup_size[3], const uint32_t* workgroup_count_ptr,
+    iree_task_dispatch_t* out_task) {
   iree_task_dispatch_initialize_base(scope, closure, workgroup_size, out_task);
   out_task->header.flags |= IREE_TASK_FLAG_DISPATCH_INDIRECT;
   out_task->workgroup_count.ptr = workgroup_count_ptr;
@@ -653,8 +666,8 @@ iree_status_t iree_task_dispatch_slice_execute(
         IREE_TRACE_ZONE_APPEND_VALUE(z_tile, z);
         // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-        iree_status_t status = task->closure.fn(task->closure.user_context,
-                                                (uintptr_t)&tile_context);
+        iree_status_t status = task->closure.fn(
+            task->closure.user_context, &tile_context, pending_submission);
 
         IREE_TRACE_ZONE_END(z_tile);
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
@@ -768,8 +781,9 @@ iree_status_t iree_task_dispatch_shard_execute(
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
       // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-      iree_status_t status = dispatch_task->closure.fn(
-          dispatch_task->closure.user_context, (uintptr_t)&tile_context);
+      iree_status_t status =
+          dispatch_task->closure.fn(dispatch_task->closure.user_context,
+                                    &tile_context, pending_submission);
 
       IREE_TRACE_ZONE_END(z_tile);
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) {

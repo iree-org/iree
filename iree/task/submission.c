@@ -63,3 +63,14 @@ void iree_task_submission_enqueue(iree_task_submission_t* submission,
     iree_task_list_push_front(&submission->ready_list, task);
   }
 }
+
+void iree_task_submission_enqueue_list(iree_task_submission_t* submission,
+                                       iree_task_list_t* list) {
+  iree_task_t* task = list->head;
+  list->head = list->tail = NULL;
+  while (task) {
+    iree_task_t* next = task->next_task;
+    iree_task_submission_enqueue(submission, task);
+    task = next;
+  }
+}
