@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 
+#include "iree/base/debugging.h"
 #include "iree/task/task_impl.h"
 
 //==============================================================================
@@ -38,7 +39,7 @@ void iree_task_set_cleanup_fn(iree_task_t* task,
 
 void iree_task_set_completion_task(iree_task_t* task,
                                    iree_task_t* completion_task) {
-  assert(!task->completion_task);
+  IREE_ASSERT(!task->completion_task);
   task->completion_task = completion_task;
   iree_atomic_fetch_add_int32(&completion_task->pending_dependency_count, 1,
                               iree_memory_order_seq_cst);
@@ -175,6 +176,25 @@ void iree_task_barrier_initialize(iree_task_scope_t* scope,
   out_task->dependent_tasks = dependent_tasks;
   for (iree_host_size_t i = 0; i < out_task->dependent_task_count; ++i) {
     iree_task_t* dependent_task = out_task->dependent_tasks[i];
+    iree_atomic_fetch_add_int32(&dependent_task->pending_dependency_count, 1,
+                                iree_memory_order_relaxed);
+  }
+}
+
+void iree_task_barrier_initialize_empty(iree_task_scope_t* scope,
+                                        iree_task_barrier_t* out_task) {
+  iree_task_initialize(IREE_TASK_TYPE_BARRIER, scope, &out_task->header);
+  out_task->dependent_task_count = 0;
+  out_task->dependent_tasks = NULL;
+}
+
+void iree_task_barrier_set_dependent_tasks(
+    iree_task_barrier_t* task, iree_host_size_t dependent_task_count,
+    iree_task_t* const* dependent_tasks) {
+  task->dependent_task_count = dependent_task_count;
+  task->dependent_tasks = dependent_tasks;
+  for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
+    iree_task_t* dependent_task = task->dependent_tasks[i];
     iree_atomic_fetch_add_int32(&dependent_task->pending_dependency_count, 1,
                                 iree_memory_order_relaxed);
   }
