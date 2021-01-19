@@ -23,7 +23,6 @@ package(
 
 exports_files([
     "run_lit.sh",
-    "sanitizer_suppressions.txt",
 ])
 
 cc_binary(
