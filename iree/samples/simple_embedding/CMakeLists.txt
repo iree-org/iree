@@ -33,8 +33,6 @@ iree_cc_test(
     simple_embedding_test
   SRCS
     "simple_embedding_test.cc"
-  DATA
-    iree::tools::sanitizer_suppressions.txt
   DEPS
     ::simple_embedding_test_bytecode_module_cc
     absl::core_headers
