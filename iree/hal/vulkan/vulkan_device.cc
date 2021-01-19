@@ -448,7 +448,7 @@ static void iree_hal_vulkan_device_initialize_command_queues(
     if (!(transfer_queue_set->queue_indices & (1ull << i))) continue;
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-        compute_queue_set->queue_family_index, i, device->fence_pool);
+        transfer_queue_set->queue_family_index, i, device->fence_pool);
     device->queues[device->queue_count++] = queue;
     device->transfer_queues[device->transfer_queue_count++] = queue;
   }

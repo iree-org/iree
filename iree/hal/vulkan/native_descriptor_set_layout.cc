@@ -56,18 +56,20 @@ static iree_status_t iree_hal_vulkan_create_descriptor_set_layout(
   }
 
   VkDescriptorSetLayoutBinding* native_bindings = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      logical_device->host_allocator(),
-      binding_count * sizeof(VkDescriptorSetLayoutBinding),
-      (void**)&native_bindings));
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    VkDescriptorSetLayoutBinding* native_binding = &native_bindings[i];
-    native_binding->binding = bindings[i].binding;
-    native_binding->descriptorType =
-        static_cast<VkDescriptorType>(bindings[i].type);
-    native_binding->descriptorCount = 1;
-    native_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    native_binding->pImmutableSamplers = NULL;
+  if (binding_count > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        logical_device->host_allocator(),
+        binding_count * sizeof(VkDescriptorSetLayoutBinding),
+        (void**)&native_bindings));
+    for (iree_host_size_t i = 0; i < binding_count; ++i) {
+      VkDescriptorSetLayoutBinding* native_binding = &native_bindings[i];
+      native_binding->binding = bindings[i].binding;
+      native_binding->descriptorType =
+          static_cast<VkDescriptorType>(bindings[i].type);
+      native_binding->descriptorCount = 1;
+      native_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+      native_binding->pImmutableSamplers = NULL;
+    }
   }
   create_info.bindingCount = (uint32_t)binding_count;
   create_info.pBindings = native_bindings;
