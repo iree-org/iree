@@ -37,6 +37,7 @@ nvidia-smi || true
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
+  --gpus all \
   gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:1592a4ffe32ca5643b27f59f3fc4052d96a5bea34a91e51703d882aa38c09ae5 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 

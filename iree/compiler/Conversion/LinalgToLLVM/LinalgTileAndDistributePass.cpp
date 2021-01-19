@@ -63,10 +63,10 @@ struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
     // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
     // erased.
     FuncOp funcOp = op->getParentOfType<FuncOp>();
-    SmallVector<Value, 4> tensorResults;
+    linalg::TiledLinalgOp tiledLinalgOp;
     if (!funcOp ||
-        failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
-        !tensorResults.empty() ||
+        failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp)) ||
+        !tiledLinalgOp.tensorResults.empty() ||
         (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
              rewriter, cast<linalg::LinalgOp>(op), funcOp,

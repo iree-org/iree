@@ -174,7 +174,9 @@ int main(int argc, char **argv) {
       return failure();
     }
     OpPrintingFlags printFlags;
-    printFlags.enableDebugInfo();
+    // TODO: Re-enable debug info once fix is landed (#4539):
+    // https://reviews.llvm.org/D94847
+    // printFlags.enableDebugInfo();
     printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";

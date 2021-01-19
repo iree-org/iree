@@ -262,10 +262,12 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
         llvmFuncOp.getArgument(kIndexPushConstant), llvmPushConstantOffset);
     Value llvmPushConstantValue =
         rewriter.create<LLVM::LoadOp>(loc, llvmPushConstantOffsetAddr);
-    Value indexValue = rewriter.create<LLVM::ZExtOp>(
-        loc, llvmTypeConverter->convertType(rewriter.getIndexType()),
-        llvmPushConstantValue);
-    rewriter.replaceOp(op, indexValue);
+    if (interfaceLoadConstantOp.result().getType().isIndex()) {
+      llvmPushConstantValue = rewriter.create<LLVM::ZExtOp>(
+          loc, llvmTypeConverter->convertType(rewriter.getIndexType()),
+          llvmPushConstantValue);
+    }
+    rewriter.replaceOp(op, llvmPushConstantValue);
     return success();
   }
 };
