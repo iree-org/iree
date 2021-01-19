@@ -52,7 +52,8 @@ static bool getUsesIfAllTransferOp(Value v,
 static Optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
-  } else if (type.isa<VectorType>()) {
+  }
+  if (type.isa<VectorType>()) {
     auto vecType = type.cast<VectorType>();
     auto elementType = vecType.getElementType();
     return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
@@ -186,39 +187,49 @@ class ProcessTransferRead final
   LogicalResult matchAndRewrite(
       vector::TransferReadOp read, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!memrefUsageAnalysis.transferConvert(read)) return failure();
-    vector::TransferReadOp::Adaptor adaptor(operands);
-    Value memref = adaptor.source();
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
+    if (!memrefUsageAnalysis.transferConvert(read)) {
+      return rewriter.notifyMatchFailure(
+          read, "cannot be vectorized per memref usage analysis");
+    }
+
     Location loc = read.getLoc();
-    Optional<unsigned> vecMemrefElemSize =
-        getBitWidth(memrefType.getElementType());
-    Optional<unsigned> readElemSize = getBitWidth(memrefType.getElementType());
-    Optional<unsigned> readVecSize = getBitWidth(read.getVectorType());
-    if (!vecMemrefElemSize || !readElemSize || !readVecSize) return failure();
-    unsigned ratio = *vecMemrefElemSize / *readElemSize;
+    vector::TransferReadOp::Adaptor adaptor(operands);
+
+    auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
+    auto readVectorType = read.getVectorType();
+    if (!scalarMemrefType || !vectorMemrefType) return failure();
+
+    Optional<unsigned> vectorMemrefElemSize =
+        getBitWidth(vectorMemrefType.getElementType());
+    Optional<unsigned> scalarMemrefElemSize =
+        getBitWidth(scalarMemrefType.getElementType());
+    Optional<unsigned> readVecSize = getBitWidth(readVectorType);
+    if (!vectorMemrefElemSize || !scalarMemrefElemSize || !readVecSize)
+      return failure();
+
+    unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     SmallVector<Value, 4> indices(adaptor.indices().begin(),
                                   adaptor.indices().end());
     indices.back() = rewriter.create<SignedDivIOp>(
         loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
-    if (*vecMemrefElemSize == *readVecSize) {
-      Type elemType = memrefType.getElementType();
-      Value newLoad = rewriter.create<LoadOp>(loc, elemType, memref, indices);
+    if (*vectorMemrefElemSize == *readVecSize) {
+      Type elemType = vectorMemrefType.getElementType();
+      Value newLoad =
+          rewriter.create<LoadOp>(loc, elemType, adaptor.source(), indices);
       Type serializedVecType =
           VectorType::get(read.getVectorType().getNumElements(),
                           read.getVectorType().getElementType());
       newLoad =
           rewriter.create<vector::BitCastOp>(loc, serializedVecType, newLoad);
-      newLoad = rewriter.create<vector::ShapeCastOp>(loc, read.getVectorType(),
-                                                     newLoad);
-      rewriter.replaceOp(read, newLoad);
+      rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+          read, read.getVectorType(), newLoad);
     } else {
-      Value newRead = rewriter.create<vector::TransferReadOp>(
-          loc, read.getVectorType(), memref, indices);
-      rewriter.replaceOp(read, newRead);
+      rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+          read, read.getVectorType(), adaptor.source(), indices);
     }
     return success();
   }
@@ -232,37 +243,47 @@ class ProcessTransferWrite final
   LogicalResult matchAndRewrite(
       vector::TransferWriteOp write, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!memrefUsageAnalysis.transferConvert(write)) return failure();
-    vector::TransferWriteOp::Adaptor adaptor(operands);
-    Value memref = adaptor.source();
-    auto memrefType = memref.getType().dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
+    if (!memrefUsageAnalysis.transferConvert(write)) {
+      return rewriter.notifyMatchFailure(
+          write, "cannot be vectorized per memref usage analysis");
+    }
+
     Location loc = write.getLoc();
-    Optional<unsigned> vecMemrefElemSize =
-        getBitWidth(memrefType.getElementType());
-    Optional<unsigned> writeElemSize = getBitWidth(memrefType.getElementType());
-    Optional<unsigned> writeVecSize = getBitWidth(write.getVectorType());
-    if (!vecMemrefElemSize || !writeElemSize || !writeVecSize) return failure();
-    unsigned ratio = *vecMemrefElemSize / *writeElemSize;
+    vector::TransferWriteOp::Adaptor adaptor(operands);
+
+    auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
+    auto writeVectorType = write.getVectorType();
+    if (!scalarMemrefType || !vectorMemrefType) return failure();
+
+    Optional<unsigned> vectorMemrefElemSize =
+        getBitWidth(vectorMemrefType.getElementType());
+    Optional<unsigned> scalarMemrefElemSize =
+        getBitWidth(scalarMemrefType.getElementType());
+    Optional<unsigned> writeVecSize = getBitWidth(writeVectorType);
+    if (!vectorMemrefElemSize || !scalarMemrefElemSize || !writeVecSize)
+      return failure();
+
+    unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     SmallVector<Value, 4> indices(adaptor.indices());
     indices.back() = rewriter.create<SignedDivIOp>(
         loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
-    if (*vecMemrefElemSize == *writeVecSize) {
-      Type serializedVecType =
-          VectorType::get(write.getVectorType().getNumElements(),
-                          write.getVectorType().getElementType());
+    if (*vectorMemrefElemSize == *writeVecSize) {
+      Type serializedVecType = VectorType::get(
+          writeVectorType.getNumElements(), writeVectorType.getElementType());
       Value data = rewriter.create<vector::ShapeCastOp>(loc, serializedVecType,
                                                         adaptor.vector());
       data = rewriter.create<vector::BitCastOp>(
-          loc, memrefType.getElementType(), data);
-      rewriter.create<StoreOp>(loc, data, memref, indices);
+          loc, vectorMemrefType.getElementType(), data);
+      rewriter.replaceOpWithNewOp<StoreOp>(write, data, adaptor.source(),
+                                           indices);
     } else {
-      rewriter.create<vector::TransferWriteOp>(loc, adaptor.vector(), memref,
-                                               indices);
+      rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+          write, adaptor.vector(), adaptor.source(), indices);
     }
-    rewriter.eraseOp(write);
     return success();
   }
 };
@@ -309,14 +330,13 @@ class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
-    Value newAlloc = rewriter.create<AllocOp>(alloc.getLoc(), *memrefType,
-                                              alloc.dynamicSizes());
-    rewriter.replaceOp(alloc, newAlloc);
+    rewriter.replaceOpWithNewOp<AllocOp>(alloc, *memrefType,
+                                         alloc.dynamicSizes());
     return success();
   }
 };
 
-class ProcessIreeBinding final
+class ProcessPlaceHolder final
     : public MemRefConversionPattern<IREE::PlaceholderOp> {
  public:
   using MemRefConversionPattern<IREE::PlaceholderOp>::MemRefConversionPattern;
@@ -327,11 +347,8 @@ class ProcessIreeBinding final
     if (!memrefType) return failure();
     auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
     if (!vecMemRef) return failure();
-    ValueRange dummyOperands;
-    Value newPlaceholder = rewriter.create<IREE::PlaceholderOp>(
-        placeholder.getLoc(), *vecMemRef, dummyOperands,
-        placeholder.getAttrs());
-    rewriter.replaceOp(placeholder, newPlaceholder);
+    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
+        placeholder, *vecMemRef, ValueRange(), placeholder.getAttrs());
     return success();
   }
 };
@@ -382,7 +399,7 @@ void VectorizeMemRefPass::runOnOperation() {
 
   OwningRewritePatternList patterns;
   patterns.insert<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
-                  ProcessAlloc, ProcessIreeBinding>(context,
+                  ProcessAlloc, ProcessPlaceHolder>(context,
                                                     *memrefUsageAnalysis);
 
   ConversionTarget target(*context);
