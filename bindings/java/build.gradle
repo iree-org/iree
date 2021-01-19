@@ -25,19 +25,22 @@ android {
 
         externalNativeBuild {
             cmake {
-                // This is being checked in for now with the hard-coded linux
-                // paths due to some complications with configuring
-                // cross-compilation.
-                arguments '-DIREE_HOST_C_COMPILER=/usr/bin/clang',
-                        '-DIREE_HOST_CXX_COMPILER=/usr/bin/clang++',
+                arguments '-DIREE_BUILD_JAVA_BINDINGS=ON',
+                        '-DIREE_HAL_DRIVERS_TO_BUILD=VMLA',
+
+                        // Disable all but the runtime components needed for the
+                        // java bindings.
                         '-DIREE_BUILD_COMPILER=OFF',
                         '-DIREE_ENABLE_MLIR=OFF',
                         '-DIREE_BUILD_TESTS=OFF',
                         '-DIREE_BUILD_SAMPLES=OFF',
-                        '-DIREE_BUILD_JAVA_BINDINGS=ON',
                         '-DIREE_BUILD_PYTHON_BINDINGS=OFF',
-                        '-DIREE_HAL_DRIVERS_TO_BUILD=VMLA',
-                        '-DIREE_TARGET_BACKENDS_TO_BUILD=VMLA'
+
+                        // TODO(#4520): This is being checked in for now with
+                        // the hard-coded linux paths due to complications
+                        // with configuring cross-compilation.
+                        '-DIREE_HOST_C_COMPILER=/usr/bin/clang',
+                        '-DIREE_HOST_CXX_COMPILER=/usr/bin/clang++'
             }
         }
     }
