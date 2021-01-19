@@ -57,8 +57,8 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRStandard
     MLIRSupport
-    MLIRTosaToLinalg
     MLIRTensor
+    MLIRTosaToLinalg
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle

@@ -28,8 +28,8 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRStandard
-    MLIRTosa
     MLIRSupport
+    MLIRTosa
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
     tensorflow::mlir_hlo

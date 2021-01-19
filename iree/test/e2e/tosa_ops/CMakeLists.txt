@@ -12,38 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_add_all_subdirs()
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_metal-spirv_metal
-  SRCS
-    "${_GLOB_X_MLIR}"
-  TARGET_BACKEND
-    metal-spirv
-  DRIVER
-    metal
-)
- 
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_dylib-llvm-aot_dylib
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
 )
