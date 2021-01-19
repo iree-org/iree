@@ -117,13 +117,13 @@ jobs:
           ${{ github.workspace }}\main_checkout\build_tools\github_actions\configure_dev_environment.ps1 -bashExePath C:\msys64\usr\bin\bash.exe
       - name: Report windows environment
         if: "contains(matrix.os, 'windows')"
-        shell: powershell
+        shell: bash
         run: |
           # Should display either an msys mount table or an "install from the windows store" banner
           echo "--- System path:"
-          $env:path -split ";"
+          echo "$PATH"
           echo "--- Result of asking bash to run 'mount' (should show msys mounts):"
-          bash -c mount
+          mount
 
       - name: Install cibuildwheel
         shell: bash

@@ -121,6 +121,7 @@ if is_windows:
          'TensorFlow, you are going to have a bad time. Suggest being explicit '
          'adding the correct directory to your path. I\'m really sorry. '
          'I didn\'t make this mess... just the messenger')
+  report(f'Full path = {os.environ.get("PATH")}')
 
 
 def invoke_generate():
