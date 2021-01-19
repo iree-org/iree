@@ -145,6 +145,16 @@ build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wvla
 
 ###############################################################################
+# Additional options for MacOS based clang builds.
+# Try to keep these scoped to exclusions for third_party code and prefer
+# fixing issues local to the project.
+###############################################################################
+
+build:macos_clang --config=generic_clang
+build:macos_clean --per_file_copt=tensorflow@-Wno-unused-variable
+build:macos_clean --per_file_copt=tensorflow@-Wno-range-loop-analysis
+
+###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################

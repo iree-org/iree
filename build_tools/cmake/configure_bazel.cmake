@@ -53,7 +53,7 @@ function(iree_configure_bazel)
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(_bazel_platform_config generic_clang)
   elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
-    set(_bazel_platform_config generic_clang)
+    set(_bazel_platform_config macos_clang)
   elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     message(WARNING "Configuring bazel build for GCC: This receives minimal testing (recommend clang)")
     set(_bazel_platform_config generic_gcc)
@@ -184,7 +184,7 @@ function(iree_add_bazel_invocation)
     WORKING_DIRECTORY "${IREE_BAZEL_SRC_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E echo
         "Starting bazel build of targets '${ARG_BAZEL_TARGETS}'"
-    COMMAND ${IREE_BAZEL_COMMAND} build ${ARG_BAZEL_TARGETS}
+    COMMAND ${IREE_BAZEL_COMMAND} build -k ${ARG_BAZEL_TARGETS}
     COMMAND ${CMAKE_COMMAND} -E echo "Bazel build complete."
   )
 
