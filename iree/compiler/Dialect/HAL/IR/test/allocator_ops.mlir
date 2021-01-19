@@ -45,8 +45,8 @@ func @allocator_allocate() -> !hal.buffer {
   %0 = constant 123 : index
   // CHECK-DAG: %[[AL:.+]] = "test_hal.allocator"
   %1 = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: %[[CB:.+]] = hal.allocator.allocate %[[AL]], "HostVisible|HostCoherent", "Transfer", %[[C123]] : !hal.buffer
-  %buffer = hal.allocator.allocate %1, "HostVisible|HostCoherent", "Transfer", %0 : !hal.buffer
+  // CHECK: %[[CB:.+]] = hal.allocator.allocate %[[AL]], "HostVisible|HostCoherent", Transfer, %[[C123]] : !hal.buffer
+  %buffer = hal.allocator.allocate %1, "HostVisible|HostCoherent", Transfer, %0 : !hal.buffer
   // CHECK-NEXT: return %[[CB]]
   return %buffer : !hal.buffer
 }
@@ -57,8 +57,8 @@ func @allocator_allocate() -> !hal.buffer {
 func @allocator_allocate_const() -> !hal.buffer {
   // CHECK-DAG: %[[AL:.+]] = "test_hal.allocator"
   %allocator = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: %[[CB:.+]] = hal.allocator.allocate.const %[[AL]], "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
-  %buffer = hal.allocator.allocate.const %allocator, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
+  // CHECK: %[[CB:.+]] = hal.allocator.allocate.const %[[AL]], "HostVisible|HostCoherent", Transfer : !hal.buffer = dense<123> : tensor<4x4xi32>
+  %buffer = hal.allocator.allocate.const %allocator, "HostVisible|HostCoherent", Transfer : !hal.buffer = dense<123> : tensor<4x4xi32>
   // CHECK-NEXT: return %[[CB]]
   return %buffer : !hal.buffer
 }
@@ -75,9 +75,9 @@ func @allocator_map_byte_buffer() -> !hal.buffer {
   %length = "test_hal.length"() : () -> index
   // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
   %allocator = "test_hal.allocator"() : () -> !hal.allocator
-  //      CHECK: = hal.allocator.map [[AL]], "HostVisible|HostCoherent", "Transfer", [[SOURCE]][
+  //      CHECK: = hal.allocator.map [[AL]], "HostVisible|HostCoherent", Transfer, [[SOURCE]][
   // CHECK-SAME:   [[OFFSET]], [[LENGTH]]
   // CHECK-SAME: ] : !iree.byte_buffer -> !hal.buffer
-  %buffer = hal.allocator.map %allocator, "HostVisible|HostCoherent", "Transfer", %source[%offset, %length] : !iree.byte_buffer -> !hal.buffer
+  %buffer = hal.allocator.map %allocator, "HostVisible|HostCoherent", Transfer, %source[%offset, %length] : !iree.byte_buffer -> !hal.buffer
   return %buffer : !hal.buffer
 }
