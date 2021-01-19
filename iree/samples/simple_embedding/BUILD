@@ -34,10 +34,6 @@ iree_bytecode_module(
 cc_test(
     name = "simple_embedding_test",
     srcs = ["simple_embedding_test.cc"],
-    data = [
-        # For AddressSanitizer when using Vulkan + a local Nvidia GPU
-        "//iree/tools:sanitizer_suppressions.txt",
-    ],
     deps = [
         ":simple_embedding_test_bytecode_module_cc",
         "//iree/base:api",
