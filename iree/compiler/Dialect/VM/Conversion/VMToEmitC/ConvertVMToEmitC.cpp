@@ -52,6 +52,38 @@ class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+// TODO(simon-camp) These conversions to macro calls should be deleted once
+// support for control flow ops has landed in the c module target
+template <typename SrcOpTy>
+class BinaryCheckOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  BinaryCheckOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    typename SrcOpTy::Adaptor srcAdaptor(
+        operands, op.getOperation()->getAttrDictionary());
+
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args = rewriter.getArrayAttr(
+        {IntegerAttr::get(rewriter.getIndexType(), 0),
+         IntegerAttr::get(rewriter.getIndexType(), 1), srcAdaptor.message()});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, mlir::TypeRange{}, callee,
+                                               args, templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
 template <typename SrcOpTy>
 class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
@@ -84,6 +116,12 @@ void populateVMToCPatterns(MLIRContext *context,
   // Arithmetic
   patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
                                                                "vm_add_i32");
+
+  // Check
+  // TODO(simon-camp) These conversions to macro calls should be deleted once
+  // support for control flow ops has landed in the c module target
+  patterns.insert<BinaryCheckOpConversion<IREE::VM::CheckEQOp>>(context,
+                                                                "VM_CHECK_EQ");
 
   // Compare
   patterns.insert<NoAttributeOpConversion<IREE::VM::CmpNEI32Op>>(
@@ -119,6 +157,11 @@ class ConvertVMToEmitCPass
 
     // Arithmetic
     target.addIllegalOp<IREE::VM::AddI32Op>();
+
+    // Check
+    // TODO(simon-camp) These conversions to macro calls should be deleted once
+    // support for control flow ops has landed in the c module target
+    target.addIllegalOp<IREE::VM::CheckEQOp>();
 
     // Compare
     target.addIllegalOp<IREE::VM::CmpNEI32Op>();
