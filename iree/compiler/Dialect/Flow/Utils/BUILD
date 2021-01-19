@@ -35,8 +35,8 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TosaDialect",
         "@mlir-hlo//:hlo",
     ],
 )
