@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests of end-to-end IREE support for individual ops in the XLA HLO dialect.
-# Each test file should have a name matching the corresponding XLA HLO op and test only the
+# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
+# Each test file should have a name matching the corresponding TOSA op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMLA backend.
-# See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
+# See https://google.github.io/iree/developing-iree/testing-guide#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
