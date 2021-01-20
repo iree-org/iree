@@ -151,8 +151,8 @@ build:generic_clang --copt=-Wvla
 ###############################################################################
 
 build:macos_clang --config=generic_clang
-build:macos_clang --per_file_copt=tensorflow@-Wno-unused-variable
-build:macos_clang --per_file_copt=tensorflow@-Wno-range-loop-analysis
+build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
+build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-range-loop-analysis
 
 ###############################################################################
 # Options for building with address sanitizer.
