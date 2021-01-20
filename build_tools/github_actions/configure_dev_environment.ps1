@@ -95,3 +95,7 @@ foreach ($entry in $vcvars) {
     }
   }
 }
+
+# Finally, emit the BAZEL_SH parameter. Because sometimes it doesn't respect
+# the path. Because... awesomeness.
+Add-Content $githubEnv "BAZEL_SH=$bashExePath" -Encoding utf8
