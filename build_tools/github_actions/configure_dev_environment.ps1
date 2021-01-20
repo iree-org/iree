@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Test me with something like:
+#
+#   $Env:GITHUB_ENV="ghenv.txt"
+#   $Env:GITHUB_PATH="ghpath.txt"
+#   .\configure_dev_environment.ps1 -bashExePath C:\tools\msys64\usr\bin\bash.exe
+
 param ([Parameter(Mandatory)]$bashExePath)
 
 # Resolve the items we need from the path prior to vcvars mangling it.
@@ -43,6 +49,12 @@ if (!($githubEnv)) {
   exit 1
 }
 Write-Output "++ GITHUB_ENV = $githubEnv"
+$githubPath = $Env:GITHUB_PATH
+if (!($githubPath)) {
+  Write-Error "-- Not running under GitHub Actions (no GITHUB_PATH var)"
+  exit 1
+}
+Write-Output "++ GITHUB_PATH = $githubPath"
 
 # Load it in a sub-shell and dump the variables.
 $vcvars = @(cmd.exe /c "call `"$vcvarsFile`" x64 > NUL && set")
@@ -52,10 +64,38 @@ foreach ($entry in $vcvars) {
     $value = "$($matches[2])"
 
     if($key -eq "Path") {
-      $value = "$pythonPath;$bashPath;$value"
-    }
+      # Accumulate the existing path.
+      $existingPathArray = @()
+      $env:Path.ToString().TrimEnd(';') -split ';' | ForEach-Object {
+        $existingPathArray += $_
+      }
 
-    Add-Content $githubEnv "$key=$value"
-    Write-Output ":: $key = $value"
+      # Process the new path.
+      $newPathArray = $value -split ';'
+      [array]::Reverse($newPathArray)
+
+      # In reverse order, tell GitHub to add any new entries to the path.
+      # This still may get the order slightly wrong if existing things were
+      # re-added, but we really have to draw the line somewhere...
+      foreach ($newPathEntry in $newPathArray) {
+        if (!$existingPathArray.Contains($newPathEntry)) {
+          Add-Content $githubPath "$newPathEntry" -Encoding utf8
+          Write-Output "++ PREPEND PATH: $newPathEntry"
+        }
+      }
+
+      # Note: High priority override path changes are applied in reverse order.
+      Add-Content $githubPath "$bashPath" -Encoding utf8
+      Write-Output "++ PREPEND PATH: $bashPath"
+      Add-Content $githubPath "$pythonPath" -Encoding utf8
+      Write-Output "++ PREPEND PATH: $pythonPath"
+    } else {
+      Add-Content $githubEnv "$key=$value" -Encoding utf8
+      Write-Output "++  $key = $value"
+    }
   }
 }
+
+# Finally, emit the BAZEL_SH parameter. Because sometimes it doesn't respect
+# the path. Because... awesomeness.
+Add-Content $githubEnv "BAZEL_SH=$bashExePath" -Encoding utf8

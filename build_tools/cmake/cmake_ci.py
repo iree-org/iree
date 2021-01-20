@@ -46,7 +46,7 @@ def display_help():
 
 mode = 'generate'
 if len(sys.argv) < 2:
-  print_help()
+  display_help()
   sys.exit(1)
 if sys.argv[1] == '--install':
   mode = 'install'
@@ -121,6 +121,7 @@ if is_windows:
          'TensorFlow, you are going to have a bad time. Suggest being explicit '
          'adding the correct directory to your path. I\'m really sorry. '
          'I didn\'t make this mess... just the messenger')
+  report(f'Full path = {os.environ.get("PATH")}')
 
 
 def invoke_generate():
