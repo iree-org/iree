@@ -208,6 +208,8 @@ if(${IREE_BUILD_COMPILER})
       MLIRShape
       MLIRStandard
       MLIRStandardToSPIRV
+      MLIRTosa
+      MLIRTosaTransforms
       MLIRTransforms
       MLIRVector
     PUBLIC

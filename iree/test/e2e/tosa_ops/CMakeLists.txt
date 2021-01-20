@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,24 +14,26 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_check_single_backend_test_suite(
   NAME
-    Utils
-  HDRS
-    "DispatchUtils.h"
-    "WorkloadUtils.h"
+    check_vulkan-spirv_vulkan
   SRCS
-    "DispatchUtils.cpp"
-    "WorkloadUtils.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRLinalg
-    MLIRStandard
-    MLIRSupport
-    MLIRTosa
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_hlo
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+)
+
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_check_single_backend_test_suite(
+  NAME
+    check_dylib-llvm-aot_dylib
+  SRCS
+    "${_GLOB_X_MLIR}"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
 )

@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -67,6 +68,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
+
+  // Convert TOSA ops to Linalg-on-tensor ops.
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
