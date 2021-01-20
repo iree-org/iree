@@ -501,9 +501,9 @@ module {
     %1 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x48xf32>
     %2 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<48x64xf32>
     %3 = hal.interface.load.tensor @legacy_io::@arg2, offset = %c0 : tensor<32x64xf32>
-    %4 = dynamic_tensor_from_elements  {
+    %4 = tensor.generate  {
     ^bb0(%arg0: index, %arg1: index):  // no predecessors
-      yield %cst : f32
+      tensor.yield %cst : f32
     } : tensor<32x64xf32>
     %5 = linalg.matmul ins(%1, %2 : tensor<32x48xf32>, tensor<48x64xf32>)
                        outs(%4 : tensor<32x64xf32>) -> tensor<32x64xf32>
