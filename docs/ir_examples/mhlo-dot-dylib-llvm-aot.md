@@ -1375,12 +1375,12 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb5
-  %10 = cmpi "slt", %9, %4 : index
+  %10 = cmpi slt, %9, %4 : index
   cond_br %10, ^bb2, ^bb6
 ^bb2:  // pred: ^bb1
   br ^bb3(%c0 : index)
 ^bb3(%11: index):  // 2 preds: ^bb2, ^bb4
-  %12 = cmpi "slt", %11, %c64 : index
+  %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb4, ^bb5
 ^bb4:  // pred: ^bb3
   store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
@@ -1392,17 +1392,17 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ^bb6:  // pred: ^bb1
   br ^bb7(%c0 : index)
 ^bb7(%15: index):  // 2 preds: ^bb6, ^bb32
-  %16 = cmpi "slt", %15, %4 : index
+  %16 = cmpi slt, %15, %4 : index
   cond_br %16, ^bb8, ^bb33
 ^bb8:  // pred: ^bb7
   br ^bb9(%c0 : index)
 ^bb9(%17: index):  // 2 preds: ^bb8, ^bb31
-  %18 = cmpi "slt", %17, %c64 : index
+  %18 = cmpi slt, %17, %c64 : index
   cond_br %18, ^bb10, ^bb32
 ^bb10:  // pred: ^bb9
   br ^bb11(%c0 : index)
 ^bb11(%19: index):  // 2 preds: ^bb10, ^bb30
-  %20 = cmpi "slt", %19, %c1024 : index
+  %20 = cmpi slt, %19, %c1024 : index
   cond_br %20, ^bb12, ^bb31
 ^bb12:  // pred: ^bb11
   %21 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%15)[%4]
@@ -1411,17 +1411,17 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%25: index):  // 2 preds: ^bb12, ^bb29
-  %26 = cmpi "slt", %25, %21 : index
+  %26 = cmpi slt, %25, %21 : index
   cond_br %26, ^bb14, ^bb30
 ^bb14:  // pred: ^bb13
   br ^bb15(%c0 : index)
 ^bb15(%27: index):  // 2 preds: ^bb14, ^bb28
-  %28 = cmpi "slt", %27, %c32 : index
+  %28 = cmpi slt, %27, %c32 : index
   cond_br %28, ^bb16, ^bb29
 ^bb16:  // pred: ^bb15
   br ^bb17(%c0 : index)
 ^bb17(%29: index):  // 2 preds: ^bb16, ^bb27
-  %30 = cmpi "slt", %29, %c32 : index
+  %30 = cmpi slt, %29, %c32 : index
   cond_br %30, ^bb18, ^bb28
 ^bb18:  // pred: ^bb17
   %31 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%21, %25)
@@ -1430,17 +1430,17 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb19(%c0 : index)
 ^bb19(%35: index):  // 2 preds: ^bb18, ^bb26
-  %36 = cmpi "slt", %35, %31 : index
+  %36 = cmpi slt, %35, %31 : index
   cond_br %36, ^bb20, ^bb27
 ^bb20:  // pred: ^bb19
   br ^bb21(%c0 : index)
 ^bb21(%37: index):  // 2 preds: ^bb20, ^bb25
-  %38 = cmpi "slt", %37, %c4 : index
+  %38 = cmpi slt, %37, %c4 : index
   cond_br %38, ^bb22, ^bb26
 ^bb22:  // pred: ^bb21
   br ^bb23(%c0 : index)
 ^bb23(%39: index):  // 2 preds: ^bb22, ^bb24
-  %40 = cmpi "slt", %39, %c4 : index
+  %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb24, ^bb25
 ^bb24:  // pred: ^bb23
   %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
@@ -1511,10 +1511,10 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
-  %10 = cmpi "slt", %9, %4 : index
+  %10 = cmpi slt, %9, %4 : index
   cond_br %10, ^bb2(%c0 : index), ^bb5(%c0 : index)
 ^bb2(%11: index):  // 2 preds: ^bb1, ^bb3
-  %12 = cmpi "slt", %11, %c64 : index
+  %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb3, ^bb4
 ^bb3:  // pred: ^bb2
   store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
@@ -1524,13 +1524,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %14 = addi %9, %c1 : index
   br ^bb1(%14 : index)
 ^bb5(%15: index):  // 2 preds: ^bb1, ^bb24
-  %16 = cmpi "slt", %15, %4 : index
+  %16 = cmpi slt, %15, %4 : index
   cond_br %16, ^bb6(%c0 : index), ^bb25
 ^bb6(%17: index):  // 2 preds: ^bb5, ^bb23
-  %18 = cmpi "slt", %17, %c64 : index
+  %18 = cmpi slt, %17, %c64 : index
   cond_br %18, ^bb7(%c0 : index), ^bb24
 ^bb7(%19: index):  // 2 preds: ^bb6, ^bb22
-  %20 = cmpi "slt", %19, %c1024 : index
+  %20 = cmpi slt, %19, %c1024 : index
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
   %21 = affine.min affine_map<()[s0, s1] -> (32, -s1 + s0)>()[%4, %15]
@@ -1539,13 +1539,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb9(%c0 : index)
 ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
-  %26 = cmpi "slt", %25, %21 : index
+  %26 = cmpi slt, %25, %21 : index
   cond_br %26, ^bb10(%c0 : index), ^bb22
 ^bb10(%27: index):  // 2 preds: ^bb9, ^bb20
-  %28 = cmpi "slt", %27, %c32 : index
+  %28 = cmpi slt, %27, %c32 : index
   cond_br %28, ^bb11(%c0 : index), ^bb21
 ^bb11(%29: index):  // 2 preds: ^bb10, ^bb19
-  %30 = cmpi "slt", %29, %c32 : index
+  %30 = cmpi slt, %29, %c32 : index
   cond_br %30, ^bb12, ^bb20
 ^bb12:  // pred: ^bb11
   %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
@@ -1554,13 +1554,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
-  %36 = cmpi "slt", %35, %31 : index
+  %36 = cmpi slt, %35, %31 : index
   cond_br %36, ^bb14(%c0 : index), ^bb19
 ^bb14(%37: index):  // 2 preds: ^bb13, ^bb17
-  %38 = cmpi "slt", %37, %c4 : index
+  %38 = cmpi slt, %37, %c4 : index
   cond_br %38, ^bb15(%c0 : index), ^bb18
 ^bb15(%39: index):  // 2 preds: ^bb14, ^bb16
-  %40 = cmpi "slt", %39, %c4 : index
+  %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb16, ^bb17
 ^bb16:  // pred: ^bb15
   %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
@@ -1631,10 +1631,10 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
-  %10 = cmpi "slt", %9, %4 : index
+  %10 = cmpi slt, %9, %4 : index
   cond_br %10, ^bb2(%c0 : index), ^bb5(%c0 : index)
 ^bb2(%11: index):  // 2 preds: ^bb1, ^bb3
-  %12 = cmpi "slt", %11, %c64 : index
+  %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb3, ^bb4
 ^bb3:  // pred: ^bb2
   store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
@@ -1644,13 +1644,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %14 = addi %9, %c1 : index
   br ^bb1(%14 : index)
 ^bb5(%15: index):  // 2 preds: ^bb1, ^bb24
-  %16 = cmpi "slt", %15, %4 : index
+  %16 = cmpi slt, %15, %4 : index
   cond_br %16, ^bb6(%c0 : index), ^bb25
 ^bb6(%17: index):  // 2 preds: ^bb5, ^bb23
-  %18 = cmpi "slt", %17, %c64 : index
+  %18 = cmpi slt, %17, %c64 : index
   cond_br %18, ^bb7(%c0 : index), ^bb24
 ^bb7(%19: index):  // 2 preds: ^bb6, ^bb22
-  %20 = cmpi "slt", %19, %c1024 : index
+  %20 = cmpi slt, %19, %c1024 : index
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
   %21 = affine.min affine_map<()[s0, s1] -> (32, -s1 + s0)>()[%4, %15]
@@ -1659,13 +1659,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb9(%c0 : index)
 ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
-  %26 = cmpi "slt", %25, %21 : index
+  %26 = cmpi slt, %25, %21 : index
   cond_br %26, ^bb10(%c0 : index), ^bb22
 ^bb10(%27: index):  // 2 preds: ^bb9, ^bb20
-  %28 = cmpi "slt", %27, %c32 : index
+  %28 = cmpi slt, %27, %c32 : index
   cond_br %28, ^bb11(%c0 : index), ^bb21
 ^bb11(%29: index):  // 2 preds: ^bb10, ^bb19
-  %30 = cmpi "slt", %29, %c32 : index
+  %30 = cmpi slt, %29, %c32 : index
   cond_br %30, ^bb12, ^bb20
 ^bb12:  // pred: ^bb11
   %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
@@ -1674,13 +1674,13 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
-  %36 = cmpi "slt", %35, %31 : index
+  %36 = cmpi slt, %35, %31 : index
   cond_br %36, ^bb14(%c0 : index), ^bb19
 ^bb14(%37: index):  // 2 preds: ^bb13, ^bb17
-  %38 = cmpi "slt", %37, %c4 : index
+  %38 = cmpi slt, %37, %c4 : index
   cond_br %38, ^bb15(%c0 : index), ^bb18
 ^bb15(%39: index):  // 2 preds: ^bb14, ^bb16
-  %40 = cmpi "slt", %39, %c4 : index
+  %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb16, ^bb17
 ^bb16:  // pred: ^bb15
   %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
@@ -3584,7 +3584,7 @@ module  {
     %c64 = constant 64 : index
     %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     %c0 = constant 0 : index
@@ -3613,7 +3613,7 @@ module  {
       hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -3632,7 +3632,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c64 = constant 64 : index
   %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   %c0 = constant 0 : index
@@ -3661,7 +3661,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -3680,7 +3680,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -3690,7 +3690,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -3709,7 +3709,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -3719,7 +3719,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -4085,7 +4085,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -4095,7 +4095,7 @@ module  {
       hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -4484,7 +4484,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -4494,7 +4494,7 @@ module  {
       hal.command_buffer.dispatch.symbol %arg3, @"mhlo-dot_linked_llvm_aot"::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -4883,7 +4883,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -4895,7 +4895,7 @@ module  {
       hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -4937,7 +4937,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -4949,7 +4949,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -4968,7 +4968,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -4980,7 +4980,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -5055,7 +5055,7 @@ module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
@@ -5433,7 +5433,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -5445,7 +5445,7 @@ module  {
       hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -5480,7 +5480,7 @@ module  {
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -5525,7 +5525,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -5540,7 +5540,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ^bb2:  // pred: ^bb0
   iree.unreachable
 ^bb3:  // pred: ^bb1
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -5591,7 +5591,7 @@ module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
@@ -5972,7 +5972,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -5987,7 +5987,7 @@ module  {
   ^bb2:  // pred: ^bb0
     iree.unreachable
   ^bb3:  // pred: ^bb1
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -6040,7 +6040,7 @@ func private @_device_match_id_0_initializer() -> i1 {
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -6049,7 +6049,7 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
   return %descriptor_set_layout : !hal.descriptor_set_layout
 }
 
@@ -6132,7 +6132,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -6141,7 +6141,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -6162,7 +6162,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
   %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -6171,7 +6171,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ^bb1:  // pred: ^bb0
   %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
   hal.ex.submit_and_wait %dev, %cmd
@@ -6254,7 +6254,7 @@ module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
@@ -6296,7 +6296,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -6305,7 +6305,7 @@ module  {
   ^bb1:  // pred: ^bb0
     %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
@@ -6351,7 +6351,7 @@ module  {
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
-    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+    %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
     return %descriptor_set_layout : !hal.descriptor_set_layout
   }
   hal.variable @_executable_layout_0 init(@_executable_layout_0_initializer) : !hal.executable_layout attributes {sym_visibility = "private"}
@@ -6393,7 +6393,7 @@ module  {
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
@@ -6402,7 +6402,7 @@ module  {
   ^bb1:  // pred: ^bb0
     %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
     hal.ex.submit_and_wait %dev, %cmd
