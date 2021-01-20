@@ -25,7 +25,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
-#include "iree/compiler/Dialect/VM/Target/common.h"
+#include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"

@@ -45,18 +45,18 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 std::vector<TestParams> GetModuleTestParams() {
   std::vector<TestParams> test_params;
 
-  // TODO(simon-camp) get these automatically
+  // TODO(simon-camp): get these automatically
   std::vector<ModuleDescription> modules = {
       {arithmetic_ops_descriptor_, arithmetic_ops_create}};
 
-  for (int i = 0; i < modules.size(); i++) {
+  for (size_t i = 0; i < modules.size(); i++) {
     iree_vm_native_module_descriptor_t descriptor = modules[i].descriptor;
     create_function_t function = modules[i].create_function;
 
     std::string module_name =
         std::string(descriptor.module_name.data, descriptor.module_name.size);
 
-    for (int i = 0; i < descriptor.export_count; i++) {
+    for (iree_host_size_t i = 0; i < descriptor.export_count; i++) {
       iree_vm_native_export_descriptor_t export_descriptor =
           descriptor.exports[i];
       std::string local_name = std::string(export_descriptor.local_name.data,

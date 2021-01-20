@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_TARGET_COMMON_H_
-#define IREE_COMPILER_DIALECT_VM_TARGET_COMMON_H_
+#ifndef IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_
+#define IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
@@ -40,4 +40,4 @@ Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_COMMON_H_
+#endif  // IREE_COMPILER_DIALECT_VM_TARGET_CALLINGCONVENTIONUTILS_H_

@@ -19,9 +19,9 @@ package(
 )
 
 cc_library(
-    name = "common",
-    srcs = ["common.cpp"],
-    hdrs = ["common.h"],
+    name = "CallingConventionUtils",
+    srcs = ["CallingConventionUtils.cpp"],
+    hdrs = ["CallingConventionUtils.h"],
     deps = [
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",

@@ -161,7 +161,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
   for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
-    // TODO(simon-camp) support function-level reflection attributes
+    // TODO(simon-camp): support function-level reflection attributes
     output << "{iree_make_cstring_view(\"" << exportOp.export_name()
            << "\"), 0, 0, 0, NULL},\n";
   }
@@ -201,7 +201,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "};\n";
   */
 
-  // TODO(simon-camp) generate boilerplate code
+  // TODO(simon-camp): generate boilerplate code
   //   * module struct
   //   * module state struct
   //   * function wrappers
@@ -232,7 +232,7 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   for (auto *op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
     if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
-      // TODO(simon-camp) reenable pass once support for control flow ops has
+      // TODO(simon-camp): reenable pass once support for control flow ops has
       // landed
       // op->getCanonicalizationPatterns(patterns, context);
       // target.setOpAction(OperationName(op->name, context),
@@ -257,7 +257,7 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
 
   if (optimize) {
     // TODO(benvanik): does this run until it quiesces?
-    // TODO(simon-camp) reenable pass once support for control flow ops has
+    // TODO(simon-camp): reenable pass once support for control flow ops has
     // landed
     // modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());

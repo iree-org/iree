@@ -52,7 +52,7 @@ class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
-// TODO(simon-camp) These conversions to macro calls should be deleted once
+// TODO(simon-camp): These conversions to macro calls should be deleted once
 // support for control flow ops has landed in the c module target
 template <typename SrcOpTy>
 class BinaryCheckOpConversion : public OpConversionPattern<SrcOpTy> {
@@ -118,7 +118,7 @@ void populateVMToCPatterns(MLIRContext *context,
                                                                "vm_add_i32");
 
   // Check
-  // TODO(simon-camp) These conversions to macro calls should be deleted once
+  // TODO(simon-camp): These conversions to macro calls should be deleted once
   // support for control flow ops has landed in the c module target
   patterns.insert<BinaryCheckOpConversion<IREE::VM::CheckEQOp>>(context,
                                                                 "VM_CHECK_EQ");
@@ -142,7 +142,7 @@ class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::emitc::EmitCDialect, iree_compiler::IREEDialect>();
+    registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
   void runOnOperation() override {
@@ -155,18 +155,18 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
 
-    // Arithmetic
+    // Arithmetic ops
     target.addIllegalOp<IREE::VM::AddI32Op>();
 
-    // Check
-    // TODO(simon-camp) These conversions to macro calls should be deleted once
+    // Check ops
+    // TODO(simon-camp): These conversions to macro calls should be deleted once
     // support for control flow ops has landed in the c module target
     target.addIllegalOp<IREE::VM::CheckEQOp>();
 
-    // Compare
+    // Compare ops
     target.addIllegalOp<IREE::VM::CmpNEI32Op>();
 
-    // Const
+    // Const ops
     target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     if (failed(

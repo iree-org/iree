@@ -24,11 +24,11 @@ endif()
 
 iree_cc_library(
   NAME
-    common
+    CallingConventionUtils
   HDRS
-    "common.h"
+    "CallingConventionUtils.h"
   SRCS
-    "common.cpp"
+    "CallingConventionUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR
