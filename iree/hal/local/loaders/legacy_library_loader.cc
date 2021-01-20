@@ -95,7 +95,7 @@ typedef struct {
   // Temporary files created as part of extraction.
   // Strings are allocated from the host allocator.
   iree_host_size_t temp_file_count;
-  const char* temp_files[8];
+  iree_string_view_t temp_files[8];
 
   // Loaded platform dynamic library.
   iree::DynamicLibrary* library;
@@ -120,11 +120,6 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
   // that to disk (maybe just windows/mac).
   IREE_ASSIGN_OR_RETURN(auto library_temp_path,
                         iree::file_io::GetTempFile("dylib_executable"));
-  IREE_RETURN_IF_ERROR(iree_allocator_clone(
-      host_allocator,
-      iree_make_const_byte_span(library_temp_path.data(),
-                                library_temp_path.size()),
-      (void**)&executable->temp_files[executable->temp_file_count++]));
 
 // Add platform-specific file extensions so opinionated dynamic library
 // loaders are more likely to find the file:
@@ -133,6 +128,15 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
 #else
   library_temp_path += ".so";
 #endif  // IREE_PLATFORM_WINDOWS
+
+  iree_string_view_t library_temp_file = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_clone(host_allocator,
+                           iree_make_const_byte_span(library_temp_path.data(),
+                                                     library_temp_path.size()),
+                           (void**)&library_temp_file.data));
+  library_temp_file.size = library_temp_path.size();
+  executable->temp_files[executable->temp_file_count++] = library_temp_file;
 
   flatbuffers_uint8_vec_t embedded_library_vec =
       iree_DyLibExecutableDef_library_embedded_get(executable->def);
@@ -155,11 +159,14 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
         iree::file_path::DirectoryName(library_temp_path),
         absl::string_view(debug_database_filename,
                           flatbuffers_string_len(debug_database_filename)));
+    iree_string_view_t debug_database_file = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_allocator_clone(
         host_allocator,
         iree_make_const_byte_span(debug_database_path.data(),
                                   debug_database_path.size()),
-        (void**)&executable->temp_files[executable->temp_file_count++]));
+        (void**)&debug_database_file.data));
+    debug_database_file.size = debug_database_path.size();
+    executable->temp_files[executable->temp_file_count++] = debug_database_file;
     IREE_IGNORE_ERROR(iree::file_io::SetFileContents(
         debug_database_path,
         absl::string_view(
@@ -262,9 +269,10 @@ static void iree_hal_legacy_executable_destroy(
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   for (iree_host_size_t i = 0; i < executable->temp_file_count; ++i) {
-    const char* file_path = executable->temp_files[i];
-    iree::file_io::DeleteFile(file_path).IgnoreError();
-    iree_allocator_free(host_allocator, (void*)file_path);
+    iree_string_view_t file_path = executable->temp_files[i];
+    iree::file_io::DeleteFile(std::string(file_path.data, file_path.size))
+        .IgnoreError();
+    iree_allocator_free(host_allocator, (void*)file_path.data);
   }
 
   iree_hal_local_executable_deinitialize(
