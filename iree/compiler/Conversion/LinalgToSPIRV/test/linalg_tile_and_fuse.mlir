@@ -461,9 +461,9 @@ module attributes {
 }
 
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
-//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (8, s0 * -8 + s1)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 16)>
-//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (16, s1 - s0 * 16)>
+//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (16, s0 * -16 + s1)>
 //       CHECK: func @three_op_fusion
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
