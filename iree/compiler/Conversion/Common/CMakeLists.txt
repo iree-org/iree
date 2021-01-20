@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
+    MLIRSideEffectInterfaces
     MLIRStandard
     MLIRTransforms
     MLIRVector
