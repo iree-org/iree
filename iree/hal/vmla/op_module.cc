@@ -745,13 +745,11 @@ class VMLAModuleState final {
   // VMLA Ops: GEMM/GEMV
   //===--------------------------------------------------------------------===//
 
-  Status BatchMatMulF32F32F32(const vm::ref<Buffer>& lhs,
-                              iree_vmla_shape_t lhs_shape,
-                              const vm::ref<Buffer>& rhs,
-                              iree_vmla_shape_t rhs_shape,
-                              const vm::ref<Buffer>& dst,
-                              iree_vmla_shape_t dst_shape) {
-    IREE_TRACE_SCOPE0("VMLAModuleState::BatchMatMulF32F32F32");
+  template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
+  Status BatchMatMul(const vm::ref<Buffer>& lhs, iree_vmla_shape_t lhs_shape,
+                     const vm::ref<Buffer>& rhs, iree_vmla_shape_t rhs_shape,
+                     const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::BatchMatMul");
     // Compiler guarantees. Here for documentation purposes.
     assert(lhs_shape.size() == 3 && rhs_shape.size() == 3 &&
            dst_shape.size() == 3);
@@ -766,12 +764,12 @@ class VMLAModuleState final {
     size_t lhs_batch_stride = kernels::GetElementCount(lhs_batch_element_shape);
     size_t rhs_batch_stride = kernels::GetElementCount(rhs_batch_element_shape);
     size_t dst_batch_stride = kernels::GetElementCount(dst_batch_element_shape);
-    float* lhs_batch_base = lhs->As<float>().data();
-    float* rhs_batch_base = rhs->As<float>().data();
-    float* dst_batch_base = dst->As<float>().data();
+    LhsEl* lhs_batch_base = lhs->As<LhsEl>().data();
+    RhsEl* rhs_batch_base = rhs->As<RhsEl>().data();
+    DstEl* dst_batch_base = dst->As<DstEl>().data();
     int32_t batch_dim = lhs_shape[0];
     for (int i = 0; i < batch_dim; i++) {
-      kernels::MatMul::Buffers<float, float> buffers;
+      kernels::MatMul::Buffers<LhsEl, RhsEl, AccumEl, DstEl> buffers;
       buffers.lhs_buffer = absl::MakeSpan(lhs_batch_base + i * lhs_batch_stride,
                                           lhs_batch_stride);
       buffers.lhs_shape = lhs_batch_element_shape2;
@@ -1046,8 +1044,13 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("pooling.max.i32", &VMLAModuleState::PoolingMaxI32),
     vm::MakeNativeFunction("pooling.max.f32", &VMLAModuleState::PoolingMaxF32),
 
-    vm::MakeNativeFunction("batch.matmul.f32f32.f32",
-                           &VMLAModuleState::BatchMatMulF32F32F32),
+    vm::MakeNativeFunction(
+        "batch.matmul.f32f32.f32",
+        &VMLAModuleState::BatchMatMul<float, float, float, float>),
+
+    vm::MakeNativeFunction(
+        "batch.matmul.i32i32.i32",
+        &VMLAModuleState::BatchMatMul<int32_t, int32_t, int32_t, int32_t>),
 
     vm::MakeNativeFunction("conv.f32f32.f32", &VMLAModuleState::ConvF32F32F32)};
 

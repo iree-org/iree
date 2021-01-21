@@ -41,24 +41,40 @@ inline std::unique_ptr<MatMul::RuntimeState> MatMul::CreateRuntimeState() {
 }
 
 // Floating-point case.
-template <typename ACC, typename T>
+template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
 struct MakeRuyMulParamsImpl {
-  static_assert(std::is_floating_point<ACC>::value, "");
-  static_assert(std::is_floating_point<T>::value, "");
-  static void Run(const MatMul::Buffers<T, ACC>& buffers,
-                  ruy::MulParams<ACC, T>* mul_params) {
+  static_assert(std::is_floating_point<LhsEl>::value, "");
+  static_assert(std::is_floating_point<RhsEl>::value, "");
+  static_assert(std::is_floating_point<AccumEl>::value, "");
+  static_assert(std::is_floating_point<DstEl>::value, "");
+  static void Run(const MatMul::Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers,
+                  ruy::MulParams<AccumEl, DstEl>* mul_params) {
     mul_params->set_bias(buffers.bias_buffer.data());
   }
 };
 
-// Integer quantized case with downquantization to a destination T narrower than
-// int32.
-template <typename T>
-struct MakeRuyMulParamsImpl<std::int32_t, T> {
-  static_assert(std::is_integral<T>::value, "");
-  static_assert(sizeof(T) < sizeof(std::int32_t), "");
-  static void Run(const MatMul::Buffers<T, std::int32_t>& buffers,
-                  ruy::MulParams<std::int32_t, T>* mul_params) {
+// Raw integer case with int32 destination. This case does not support any
+// output operation besides bias-addition.
+template <typename LhsEl, typename RhsEl>
+struct MakeRuyMulParamsImpl<LhsEl, RhsEl, std::int32_t, std::int32_t> {
+  static void Run(
+      const MatMul::Buffers<LhsEl, RhsEl, std::int32_t, std::int32_t>& buffers,
+      ruy::MulParams<std::int32_t, std::int32_t>* mul_params) {
+    mul_params->set_bias(buffers.bias_buffer.data());
+  }
+};
+
+// Integer quantized case with downquantization to a destination DstEl narrower
+// than int32.
+template <typename LhsEl, typename RhsEl, typename DstEl>
+struct MakeRuyMulParamsImpl<LhsEl, RhsEl, std::int32_t, DstEl> {
+  static_assert(std::is_integral<LhsEl>::value, "");
+  static_assert(std::is_integral<RhsEl>::value, "");
+  static_assert(std::is_integral<DstEl>::value, "");
+  static_assert(sizeof(DstEl) < sizeof(std::int32_t), "");
+  static void Run(
+      const MatMul::Buffers<LhsEl, RhsEl, std::int32_t, DstEl>& buffers,
+      ruy::MulParams<std::int32_t, DstEl>* mul_params) {
     mul_params->set_bias(buffers.bias_buffer.data());
     if (buffers.multiplier_mantissa_buffer.size() == 1) {
       mul_params->set_multiplier_fixedpoint(
@@ -74,41 +90,32 @@ struct MakeRuyMulParamsImpl<std::int32_t, T> {
   }
 };
 
-// Raw integer case with int32 destination. This case does not support any
-// output operation besides bias-addition.
-template <>
-struct MakeRuyMulParamsImpl<std::int32_t, std::int32_t> {
-  static void Run(const MatMul::Buffers<std::int32_t, std::int32_t>& buffers,
-                  ruy::MulParams<std::int32_t, std::int32_t>* mul_params) {
-    mul_params->set_bias(buffers.bias_buffer.data());
-  }
-};
-
-template <typename ACC, typename T>
-void MakeRuyMulParams(const MatMul::Buffers<T, ACC>& buffers,
-                      ruy::MulParams<ACC, T>* mul_params) {
-  MakeRuyMulParamsImpl<ACC, T>::Run(buffers, mul_params);
+template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
+void MakeRuyMulParams(
+    const MatMul::Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers,
+    ruy::MulParams<AccumEl, DstEl>* mul_params) {
+  MakeRuyMulParamsImpl<LhsEl, RhsEl, AccumEl, DstEl>::Run(buffers, mul_params);
 }
 
-template <typename T, typename ACC>
+template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
 Status MatMul::Execute(RuntimeState* runtime_state,
-                       const Buffers<T, ACC>& buffers) {
-  ruy::Matrix<T> lhs;
+                       const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers) {
+  ruy::Matrix<LhsEl> lhs;
   lhs.set_data(buffers.lhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.lhs_shape[0], buffers.lhs_shape[1],
                         ruy::Order::kRowMajor, lhs.mutable_layout());
 
-  ruy::Matrix<T> rhs;
+  ruy::Matrix<RhsEl> rhs;
   rhs.set_data(buffers.rhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.rhs_shape[1], buffers.rhs_shape[0],
                         ruy::Order::kColMajor, rhs.mutable_layout());
 
-  ruy::Matrix<T> dst;
+  ruy::Matrix<DstEl> dst;
   dst.set_data(buffers.dst_buffer.data());
   ruy::MakeSimpleLayout(buffers.dst_shape[1], buffers.dst_shape[0],
                         ruy::Order::kColMajor, dst.mutable_layout());
 
-  ruy::MulParams<ACC, T> mul_params;
+  ruy::MulParams<AccumEl, DstEl> mul_params;
   MakeRuyMulParams(buffers, &mul_params);
 
   ruy::Mul(lhs, rhs, mul_params, &runtime_state->context, &dst);
