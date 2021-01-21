@@ -50,7 +50,6 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_ruy//ruy",
         "@com_google_ruy//ruy:context",
-        "@com_google_ruy//ruy:reference_mul",
         "@pffft",
     ],
 )

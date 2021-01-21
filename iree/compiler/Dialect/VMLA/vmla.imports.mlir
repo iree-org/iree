@@ -402,12 +402,6 @@ vm.import @batch.matmul.i32i32.i32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
-vm.import @batch.matmul.i8i8.i8(
-  %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i8 ...,
-  %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i8 ...,
-  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i8 ...
-)
-
 //===----------------------------------------------------------------------===//
 // VMLA Ops: reduction
 //===----------------------------------------------------------------------===//

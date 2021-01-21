@@ -764,7 +764,6 @@ class VMLAModuleState final {
     size_t lhs_batch_stride = kernels::GetElementCount(lhs_batch_element_shape);
     size_t rhs_batch_stride = kernels::GetElementCount(rhs_batch_element_shape);
     size_t dst_batch_stride = kernels::GetElementCount(dst_batch_element_shape);
-    std::cerr << lhs_batch_stride << "\n";
     LhsEl* lhs_batch_base = lhs->As<LhsEl>().data();
     RhsEl* rhs_batch_base = rhs->As<RhsEl>().data();
     DstEl* dst_batch_base = dst->As<DstEl>().data();
@@ -1052,11 +1051,6 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction(
         "batch.matmul.i32i32.i32",
         &VMLAModuleState::BatchMatMul<int32_t, int32_t, int32_t, int32_t>),
-
-    vm::MakeNativeFunction(
-        "batch.matmul.i8i8.i8",
-        // Note that accumulator is still i32
-        &VMLAModuleState::BatchMatMul<int8_t, int8_t, int32_t, int8_t>),
 
     vm::MakeNativeFunction("conv.f32f32.f32", &VMLAModuleState::ConvF32F32F32)};
 

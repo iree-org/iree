@@ -22,7 +22,6 @@
 #include "iree/base/status.h"
 #include "ruy/context.h"
 #include "ruy/mul_params.h"
-#include "ruy/reference_mul.h"
 #include "ruy/ruy.h"
 
 namespace iree {
@@ -103,25 +102,21 @@ Status MatMul::Execute(RuntimeState* runtime_state,
   lhs.set_data(buffers.lhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.lhs_shape[0], buffers.lhs_shape[1],
                         ruy::Order::kRowMajor, lhs.mutable_layout());
-  std::cerr << "LHS=\n" << lhs << "\n";
 
   ruy::Matrix<RhsEl> rhs;
   rhs.set_data(buffers.rhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.rhs_shape[1], buffers.rhs_shape[0],
                         ruy::Order::kColMajor, rhs.mutable_layout());
-  std::cerr << "RHS=\n" << rhs << "\n";
 
   ruy::Matrix<DstEl> dst;
   dst.set_data(buffers.dst_buffer.data());
   ruy::MakeSimpleLayout(buffers.dst_shape[1], buffers.dst_shape[0],
                         ruy::Order::kColMajor, dst.mutable_layout());
-  std::cerr << "DST=\n" << dst << "\n";
 
   ruy::MulParams<AccumEl, DstEl> mul_params;
   MakeRuyMulParams(buffers, &mul_params);
 
-  ruy::ReferenceMul(lhs, rhs, mul_params, &dst);
-  std::cerr << "DST=\n" << dst << "\n";
+  ruy::Mul(lhs, rhs, mul_params, &runtime_state->context, &dst);
 
   return OkStatus();
 }
