@@ -53,14 +53,28 @@ struct MakeRuyMulParamsImpl {
   }
 };
 
-// Integer quantized case with downquantization to a destination T narrower than
-// int32.
-template <typename T>
-struct MakeRuyMulParamsImpl<T, T, std::int32_t, T> {
-  static_assert(std::is_integral<T>::value, "");
-  static_assert(sizeof(T) < sizeof(std::int32_t), "");
-  static void Run(const MatMul::Buffers<T, T, std::int32_t, T>& buffers,
-                  ruy::MulParams<std::int32_t, T>* mul_params) {
+// Raw integer case with int32 destination. This case does not support any
+// output operation besides bias-addition.
+template <typename LhsEl, typename RhsEl>
+struct MakeRuyMulParamsImpl<LhsEl, RhsEl, std::int32_t, std::int32_t> {
+  static void Run(
+      const MatMul::Buffers<LhsEl, RhsEl, std::int32_t, std::int32_t>& buffers,
+      ruy::MulParams<std::int32_t, std::int32_t>* mul_params) {
+    mul_params->set_bias(buffers.bias_buffer.data());
+  }
+};
+
+// Integer quantized case with downquantization to a destination DstEl narrower
+// than int32.
+template <typename LhsEl, typename RhsEl, typename DstEl>
+struct MakeRuyMulParamsImpl<LhsEl, RhsEl, std::int32_t, DstEl> {
+  static_assert(std::is_integral<LhsEl>::value, "");
+  static_assert(std::is_integral<RhsEl>::value, "");
+  static_assert(std::is_integral<DstEl>::value, "");
+  static_assert(sizeof(DstEl) < sizeof(std::int32_t), "");
+  static void Run(
+      const MatMul::Buffers<LhsEl, RhsEl, std::int32_t, DstEl>& buffers,
+      ruy::MulParams<std::int32_t, DstEl>* mul_params) {
     mul_params->set_bias(buffers.bias_buffer.data());
     if (buffers.multiplier_mantissa_buffer.size() == 1) {
       mul_params->set_multiplier_fixedpoint(
@@ -73,18 +87,6 @@ struct MakeRuyMulParamsImpl<T, T, std::int32_t, T> {
       mul_params->set_multiplier_exponent_perchannel(
           buffers.multiplier_exponent_buffer.data());
     }
-  }
-};
-
-// Raw integer case with int32 destination. This case does not support any
-// output operation besides bias-addition.
-template <>
-struct MakeRuyMulParamsImpl<std::int32_t, std::int32_t, std::int32_t,
-                            std::int32_t> {
-  static void Run(const MatMul::Buffers<std::int32_t, std::int32_t,
-                                        std::int32_t, std::int32_t>& buffers,
-                  ruy::MulParams<std::int32_t, std::int32_t>* mul_params) {
-    mul_params->set_bias(buffers.bias_buffer.data());
   }
 };
 
