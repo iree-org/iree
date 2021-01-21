@@ -96,12 +96,10 @@ Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkgroupTileSizes(
     ArrayRef<int64_t> opFirstLevelTileSize(opTileSizesList.front());
     if (opFirstLevelTileSize.size() < numWorkgroupDims) return llvm::None;
     opFirstLevelTileSize = opFirstLevelTileSize.take_front(numWorkgroupDims);
-    if (workgroupTileSizes) {
-      if (workgroupTileSizes.getValue() != opFirstLevelTileSize) {
-        return llvm::None;
-      }
-    } else {
+    if (!workgroupTileSizes) {
       workgroupTileSizes = llvm::to_vector<4>(opFirstLevelTileSize);
+    } else if (workgroupTileSizes.getValue() != opFirstLevelTileSize) {
+      return llvm::None;
     }
   }
   return workgroupTileSizes;

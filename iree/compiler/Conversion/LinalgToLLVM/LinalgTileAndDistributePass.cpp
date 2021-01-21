@@ -119,9 +119,9 @@ void LinalgTileAndDistributePass::runOnOperation() {
              ArrayRef<Range> parallelLoopRanges) {
             auto numParallelDims = parallelLoopRanges.size();
             SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-            for (size_t dim = 0;
-                 dim < std::min(numParallelDims, static_cast<size_t>(3));
-                 ++dim) {
+            for (size_t dim = 0,
+                        e = std::min(numParallelDims, static_cast<size_t>(3));
+                 dim < e; ++dim) {
               procInfo[numParallelDims - dim - 1] = {
                   builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
                       loc, builder.getIndexType(), APInt(64, dim)),

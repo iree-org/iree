@@ -49,7 +49,7 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
 ///   }
 /// }
 ///
-/// return the list of linalg operations in the functions. If there are no
+/// Returns the list of linalg operations in the functions. If there are no
 /// `scf.for` operations in the function return the linalg operations in the
 /// body of the function if it has a single basic block. Return failure in all
 /// other cases.

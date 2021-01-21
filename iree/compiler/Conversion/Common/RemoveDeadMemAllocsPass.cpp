@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@
 // are dead.
 //
 //===----------------------------------------------------------------------===//
+
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -34,8 +35,9 @@ struct RemoveDeadMemAllocs : RewritePattern {
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>())
+    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
       return failure();
+    }
     if (!op->use_empty()) return failure();
     rewriter.eraseOp(op);
     return success();
