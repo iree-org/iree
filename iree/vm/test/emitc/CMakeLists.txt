@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,38 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (EmitC is only buildable with CMake)
-
 iree_add_all_subdirs()
 
-if(IREE_ENABLE_EMITC)
-  set(IREE_VM_CONDITIONAL_TARGETS
-    iree::compiler::Dialect::VM::Target::C
-  )
-endif()
+if(${IREE_ENABLE_EMITC})
 
-iree_cc_library(
+iree_cc_test(
   NAME
-    CallingConventionUtils
+    module_test
   HDRS
-    "CallingConventionUtils.h"
+    "arithmetic_ops.h"
+    "shims.h"
   SRCS
-    "CallingConventionUtils.cpp"
+    "module_test.cc"
   DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRSupport
-    iree::compiler::Dialect::VM::IR
+    absl::strings
+    iree::base::logging
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm::cc
+    ::arithmetic_ops_cc
+)
+
+iree_bytecode_module(
+  NAME
+    arithmetic_ops
+  SRC
+    "../arithmetic_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    init_targets
-  HDRS
-    "init_targets.h"
-  DEPS
-    iree::compiler::Dialect::VM::Target::Bytecode
-    ${IREE_VM_CONDITIONAL_TARGETS}
-  PUBLIC
-)
+endif()

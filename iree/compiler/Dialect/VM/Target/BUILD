@@ -19,6 +19,18 @@ package(
 )
 
 cc_library(
+    name = "CallingConventionUtils",
+    srcs = ["CallingConventionUtils.cpp"],
+    hdrs = ["CallingConventionUtils.h"],
+    deps = [
+        "//iree/compiler/Dialect/VM/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
     name = "init_targets",
     hdrs = ["init_targets.h"],
     deps = [

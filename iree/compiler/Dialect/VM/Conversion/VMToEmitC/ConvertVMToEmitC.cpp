@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
@@ -44,6 +45,38 @@ class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
 
     rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
                                                templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+// TODO(simon-camp): These conversions to macro calls should be deleted once
+// support for control flow ops has landed in the c module target
+template <typename SrcOpTy>
+class BinaryCheckOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  BinaryCheckOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    typename SrcOpTy::Adaptor srcAdaptor(
+        operands, op.getOperation()->getAttrDictionary());
+
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args = rewriter.getArrayAttr(
+        {IntegerAttr::get(rewriter.getIndexType(), 0),
+         IntegerAttr::get(rewriter.getIndexType(), 1), srcAdaptor.message()});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, mlir::TypeRange{}, callee,
+                                               args, templateArgs, operands);
 
     return success();
   }
@@ -84,6 +117,12 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
                                                                "vm_add_i32");
 
+  // Check
+  // TODO(simon-camp): These conversions to macro calls should be deleted once
+  // support for control flow ops has landed in the c module target
+  patterns.insert<BinaryCheckOpConversion<IREE::VM::CheckEQOp>>(context,
+                                                                "VM_CHECK_EQ");
+
   // Compare
   patterns.insert<NoAttributeOpConversion<IREE::VM::CmpNEI32Op>>(
       context, "vm_cmp_ne_i32");
@@ -103,7 +142,7 @@ class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::emitc::EmitCDialect>();
+    registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
   void runOnOperation() override {
@@ -113,15 +152,21 @@ class ConvertVMToEmitCPass
     populateVMToCPatterns(&getContext(), patterns);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
+    target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
 
-    // Arithmetic
+    // Arithmetic ops
     target.addIllegalOp<IREE::VM::AddI32Op>();
 
-    // Compare
+    // Check ops
+    // TODO(simon-camp): These conversions to macro calls should be deleted once
+    // support for control flow ops has landed in the c module target
+    target.addIllegalOp<IREE::VM::CheckEQOp>();
+
+    // Compare ops
     target.addIllegalOp<IREE::VM::CmpNEI32Op>();
 
-    // Const
+    // Const ops
     target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     if (failed(
