@@ -87,13 +87,13 @@ static void iree_hal_local_executable_cache_destroy(
 
 static bool iree_hal_local_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
-    iree_hal_executable_format_t format) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   iree_hal_local_executable_cache_t* executable_cache =
       iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
     if (iree_hal_executable_loader_query_support(
-            executable_cache->loaders[i], format,
-            IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT)) {
+            executable_cache->loaders[i], caching_mode, executable_format)) {
       return true;
     }
   }
@@ -102,25 +102,19 @@ static bool iree_hal_local_executable_cache_can_prepare_format(
 
 static iree_status_t iree_hal_local_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   iree_hal_local_executable_cache_t* executable_cache =
       iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
-    // TODO(benvanik): pass executable format through from the HAL.
-    // if (iree_hal_executable_loader_query_support(
-    //         executable_cache->loaders[i], executable_format,
-    //         IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT)) {
-    //   return iree_hal_executable_loader_try_load(
-    //       executable_cache->loaders[i], executable_layout,
-    //       executable_format, caching_mode, executable_data,
-    //       out_executable);
-    // }
+    if (iree_hal_executable_loader_query_support(
+            executable_cache->loaders[i], executable_spec->caching_mode,
+            executable_spec->executable_format)) {
+      return iree_hal_executable_loader_try_load(
+          executable_cache->loaders[i], executable_spec, out_executable);
+    }
     iree_status_t status = iree_hal_executable_loader_try_load(
-        executable_cache->loaders[i], executable_layout,
-        /*executable_format=*/0, caching_mode, executable_data, out_executable);
+        executable_cache->loaders[i], executable_spec, out_executable);
     if (iree_status_is_ok(status)) {
       // Executable was successfully loaded.
       return status;

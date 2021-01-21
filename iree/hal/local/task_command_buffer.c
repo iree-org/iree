@@ -750,10 +750,10 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
-  iree_host_size_t push_constant_count =
-      local_executable->layout->push_constants;
-  iree_hal_local_binding_mask_t used_binding_mask =
-      local_executable->layout->used_bindings;
+  iree_hal_local_executable_layout_t* local_layout =
+      local_executable->executable_layouts[entry_point];
+  iree_host_size_t push_constant_count = local_layout->push_constants;
+  iree_hal_local_binding_mask_t used_binding_mask = local_layout->used_bindings;
   iree_host_size_t used_binding_count =
       iree_math_count_ones_u64(used_binding_mask);
 

@@ -107,6 +107,9 @@ class WindowsLinkerTool : public LinkerTool {
     SmallVector<std::string, 8> flags = {
         getToolPath(),
 
+        // Hide the linker banner message printed each time.
+        "/nologo",
+
         // Useful when debugging linking/loading issues:
         // "/verbose",
 

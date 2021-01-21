@@ -65,8 +65,8 @@ void iree_hal_executable_loader_release(
 // features not available on the current host or runtime.
 bool iree_hal_executable_loader_query_support(
     iree_hal_executable_loader_t* executable_loader,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode);
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format);
 
 // Tries loading the |executable_data| provided in the given
 // |executable_format|. May fail even if the executable is valid if it requires
@@ -82,10 +82,7 @@ bool iree_hal_executable_loader_query_support(
 // given format.
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
@@ -97,15 +94,12 @@ typedef struct iree_hal_executable_loader_vtable_s {
 
   bool(IREE_API_PTR* query_support)(
       iree_hal_executable_loader_t* executable_loader,
-      iree_hal_executable_format_t executable_format,
-      iree_hal_executable_caching_mode_t caching_mode);
+      iree_hal_executable_caching_mode_t caching_mode,
+      iree_hal_executable_format_t executable_format);
 
   iree_status_t(IREE_API_PTR* try_load)(
       iree_hal_executable_loader_t* executable_loader,
-      iree_hal_executable_layout_t* executable_layout,
-      iree_hal_executable_format_t executable_format,
-      iree_hal_executable_caching_mode_t caching_mode,
-      iree_const_byte_span_t executable_data,
+      const iree_hal_executable_spec_t* executable_spec,
       iree_hal_executable_t** out_executable);
 } iree_hal_executable_loader_vtable_t;
 

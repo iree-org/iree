@@ -18,6 +18,13 @@
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 
+void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec) {
+  memset(out_spec, 0, sizeof(*out_spec));
+  out_spec->caching_mode =
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION;
+}
+
 #define _VTABLE_DISPATCH(executable_cache, method_name)                 \
   IREE_HAL_VTABLE_DISPATCH(executable_cache, iree_hal_executable_cache, \
                            method_name)
@@ -40,27 +47,27 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
 
 IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
-    iree_hal_executable_format_t format) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   IREE_ASSERT_ARGUMENT(executable_cache);
   return _VTABLE_DISPATCH(executable_cache, can_prepare_format)(
-      executable_cache, format);
+      executable_cache, caching_mode, executable_format);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* executable_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_cache);
-  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(executable_spec);
+  IREE_ASSERT_ARGUMENT(!executable_spec->executable_layout_count ||
+                       executable_spec->executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(executable_cache, prepare_executable)(
-      executable_cache, executable_layout, caching_mode, executable_data,
-      out_executable);
+      executable_cache, executable_spec, out_executable);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

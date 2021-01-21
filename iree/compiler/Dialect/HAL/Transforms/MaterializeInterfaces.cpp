@@ -468,7 +468,7 @@ class MaterializeInterfacesPass
       builder.setInsertionPointAfter(sourceOp);
       auto executableOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
-      executableOp.setPrivate();
+      executableOp.setVisibility(sourceOp.getVisibility());
 
       // Add IO ops to define the bindings and how parameters are passed.
       auto interfaceOp = declareInterfaceIO(sourceOp, executableOp);

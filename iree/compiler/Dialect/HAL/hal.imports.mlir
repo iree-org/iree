@@ -17,7 +17,7 @@ vm.import @ex.submit_and_wait(
 )
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Allocator
+// iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
 // Allocates a buffer from the allocator.
@@ -40,7 +40,7 @@ vm.import @allocator.wrap.byte_buffer(
 ) -> !vm.ref<!hal.buffer>
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Buffer
+// iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
 // Returns the allocator the buffer was allocated with.
@@ -106,7 +106,7 @@ vm.import @buffer.store(
 )
 
 //===----------------------------------------------------------------------===//
-// iree::hal::BufferView
+// iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
 
 // Creates a reference to a buffer with a particular shape and element type.
@@ -191,7 +191,7 @@ vm.import @buffer_view.trace(
 )
 
 //===----------------------------------------------------------------------===//
-// iree::hal::CommandBuffer
+// iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
 
 // Returns a command buffer from the device pool ready to begin recording.
@@ -291,7 +291,7 @@ vm.import @command_buffer.dispatch.indirect(
 )
 
 //===----------------------------------------------------------------------===//
-// iree::hal::DescriptorSet
+// iree_hal_descriptor_set_t
 //===----------------------------------------------------------------------===//
 
 // Creates a new immutable descriptor set based on the given layout.
@@ -305,7 +305,7 @@ vm.import @descriptor_set.create(
 ) -> !vm.ref<!hal.descriptor_set>
 
 //===----------------------------------------------------------------------===//
-// iree::hal::DescriptorSetLayout
+// iree_hal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
 
 // Creates a descriptor set layout that defines the bindings used within a set.
@@ -318,7 +318,7 @@ vm.import @descriptor_set_layout.create(
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Device
+// iree_hal_device_t
 //===----------------------------------------------------------------------===//
 
 // Returns the allocator that can be used to allocate buffers compatible with
@@ -336,38 +336,22 @@ vm.import @device.match.id(
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
-// iree::hal::ExecutableCache
+// iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
-// Creates an executable cache with the given identifier.
-vm.import @executable_cache.create(
+// Creates an executable for use with the specified device.
+vm.import @executable.create(
   %device : !vm.ref<!hal.device>,
-  %identifier : !vm.ref<!iree.byte_buffer>
-) -> !vm.ref<!hal.executable_cache>
-attributes {nosideeffects}
-
-// Returns the index of the preferred format of the cache from the given set
-// or -1 if none can be used. Preparation may still fail if the particular
-// version or features required by the executable are not supported.
-vm.import @executable_cache.select_format(
-  %executable_cache : !vm.ref<!hal.executable_cache>,
-  %available_formats : i32 ...
-) -> i32
-attributes {nosideeffects}
-
-// Caches an executable for use with the specified device.
-// The executable may be shared with other contexts but as it is immutable
-// this does not matter.
-vm.import @executable_cache.prepare(
-  %executable_cache : !vm.ref<!hal.executable_cache>,
-  %executable_layout : !vm.ref<!hal.executable_layout>,
-  %caching_mode : i32,
-  %executable_data : !vm.ref<!iree.byte_buffer>
+  %executable_format : i32,
+  // TODO(benvanik): replace executable format with a string.
+  // %executable_format : !vm.ref<!iree.byte_buffer>
+  %executable_data : !vm.ref<!iree.byte_buffer>,
+  %executable_layouts : !vm.ref<!hal.executable_layout>...
 ) -> !vm.ref<!hal.executable>
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
-// iree::hal::ExecutableLayout
+// iree_hal_executable_layout_t
 //===----------------------------------------------------------------------===//
 
 // Creates an executable layout from the given descriptor sets and push constant
@@ -380,7 +364,7 @@ vm.import @executable_layout.create(
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Semaphore
+// iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
 // Returns a semaphore from the device pool with the given initial value.

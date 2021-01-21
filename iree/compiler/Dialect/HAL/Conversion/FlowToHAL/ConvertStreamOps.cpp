@@ -347,28 +347,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
 
-  // TODO(benvanik): support multiple interfaces. We'd probably want to
-  // store each executable+interface as a variable, or follow interface
-  // references stored on entry points.
-  auto interfaceOp = executableOp.getFirstInterfaceOp();
-  auto executableLayout =
-      rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
-          dispatchOp.getLoc(),
-          IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
-          interfaceOp.getExecutableSetLayoutsAttr(),
-          interfaceOp.push_constantsAttr());
-
-  // Setup push constants for any dynamic values we need to pass across at
-  // runtime.
-  recordPushConstants(device, commandBuffer, dispatchOp, interfaceOp,
-                      executableLayout, rewriter);
-
-  // Setup bindings, right now pushed immediately but soon to be replaced
-  // with descriptor sets (or something better, anyway).
-  if (failed(recordPushBindings(device, commandBuffer, dispatchOp,
-                                executableLayout, bufferSet, rewriter))) {
-    return failure();
-  }
   // Marshal tensor operands/results in to the state so that backends can
   // read/write them as they need.
   SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> operandAdaptors;
@@ -407,7 +385,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.executableOp = executableOp;
   dispatchState.device = device;
   dispatchState.commandBuffer = commandBuffer;
-  dispatchState.executableLayout = executableLayout;
   for (auto dim : dispatchOp.workgroup_count()) {
     dispatchState.workgroupCount.push_back(rewriter.getRemappedValue(dim));
   }
@@ -429,11 +406,32 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       if (entryPointOps.empty()) {
         return dispatchOp.emitOpError() << "need at least one entry point";
       }
-      // Use the first (possibly only) entry point op. If the target split the
-      // original entry point into multiple entry points then it should
-      // sequence them together during the call to |recordDispatch| below.
-      dispatchState.entryPointOp = *entryPointOps.begin();
+      auto entryPointOp = *entryPointOps.begin();
+      auto interfaceOp =
+          dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
+              executableOp, entryPointOp.interfaceAttr()));
+      auto executableLayout =
+          rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
+              dispatchOp.getLoc(),
+              IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
+              interfaceOp.getExecutableSetLayoutsAttr(),
+              interfaceOp.push_constantsAttr());
 
+      // Setup push constants for any dynamic values we need to pass across at
+      // runtime.
+      recordPushConstants(device, commandBuffer, dispatchOp, interfaceOp,
+                          executableLayout, rewriter);
+
+      // Setup bindings, right now pushed immediately but soon to be replaced
+      // with descriptor sets (or something better, anyway).
+      if (failed(recordPushBindings(device, commandBuffer, dispatchOp,
+                                    executableLayout, bufferSet, rewriter))) {
+        return failure();
+      }
+
+      dispatchState.entryPointOp = entryPointOp;
+      dispatchState.interfaceOp = interfaceOp;
+      dispatchState.executableLayout = executableLayout;
       if (failed(targetBackend->recordDispatch(
               dispatchOp.getLoc(), dispatchState, switchRewriter))) {
         return dispatchOp.emitError()

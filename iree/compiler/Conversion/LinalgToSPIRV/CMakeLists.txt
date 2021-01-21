@@ -43,6 +43,7 @@ iree_cc_library(
     "KernelDispatchUtils.cpp"
     "LinalgTileAndFusePass.cpp"
     "MatMulVectorizationTest.cpp"
+    "MaterializeEntryPointsPass.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
     "Utils.cpp"
@@ -79,6 +80,7 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms

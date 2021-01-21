@@ -85,30 +85,43 @@ typedef struct {
 extern const iree_hal_local_executable_vtable_t iree_hal_vmla_executable_vtable;
 
 static iree_status_t iree_hal_vmla_executable_create(
-    iree_hal_executable_layout_t* base_layout, iree_vm_context_t* context,
-    iree_vm_module_t* bytecode_module, iree_hal_executable_t** out_executable) {
-  IREE_ASSERT_ARGUMENT(base_layout);
+    iree_vm_context_t* context, iree_vm_module_t* bytecode_module,
+    iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* executable_layouts,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(bytecode_module);
+  IREE_ASSERT_ARGUMENT(!executable_layout_count || executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_local_executable_layout_t* local_layout =
-      iree_hal_local_executable_layout_cast(base_layout);
-  IREE_ASSERT_ARGUMENT(local_layout);
-
-  iree_allocator_t host_allocator = local_layout->host_allocator;
-  iree_hal_vmla_executable_t* executable = NULL;
   iree_host_size_t entry_count =
       iree_vm_module_signature(bytecode_module).export_function_count;
+  if (entry_count != executable_layout_count) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable provides %zu entry points but caller "
+                            "provided %zu; must match",
+                            entry_count, executable_layout_count);
+  }
+
+  iree_hal_vmla_executable_t* executable = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable) + entry_count * sizeof(*executable->entry_fns);
+      sizeof(*executable) + entry_count * sizeof(*executable->entry_fns) +
+      executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_initialize(&iree_hal_vmla_executable_vtable,
-                                         local_layout, &executable->base);
+    iree_hal_local_executable_layout_t** executable_layouts_ptr =
+        (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
+                                               sizeof(*executable) +
+                                               entry_count *
+                                                   sizeof(
+                                                       *executable->entry_fns));
+    iree_hal_local_executable_initialize(
+        &iree_hal_vmla_executable_vtable, executable_layout_count,
+        executable_layouts, executable_layouts_ptr, host_allocator,
+        &executable->base);
     executable->context = context;
     iree_vm_context_retain(executable->context);
 
@@ -134,7 +147,7 @@ static void iree_hal_vmla_executable_destroy(
     iree_hal_executable_t* base_executable) {
   iree_hal_vmla_executable_t* executable =
       (iree_hal_vmla_executable_t*)base_executable;
-  iree_allocator_t host_allocator = executable->base.layout->host_allocator;
+  iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_vm_context_release(executable->context);
@@ -170,7 +183,7 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
   // deprecated and will be going away at some point. There's about 100
   // low-hanging branches we can hack at in the compiler before this extra
   // allocation matters :)
-  iree_allocator_t host_allocator = executable->base.layout->host_allocator;
+  iree_allocator_t host_allocator = executable->base.host_allocator;
   iree::hal::vmla::Interface interface;
   iree_vm_ref_t interface_ref = Interface_retain_ref(&interface);
   iree_host_size_t input_list_size = iree_vm_list_storage_size(
@@ -189,8 +202,8 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
   iree_vm_list_push_value(input_list, &workgroup_id_y);
   iree_vm_list_push_value(input_list, &workgroup_id_z);
 
-  iree_hal_local_executable_layout_t* local_layout = executable->base.layout;
-
+  iree_hal_local_executable_layout_t* local_layout =
+      executable->base.executable_layouts[ordinal];
   IREE_CHECK_OK(interface.SetConstants(
       absl::MakeConstSpan(call->push_constants, local_layout->push_constants)));
 
@@ -292,27 +305,25 @@ static void iree_hal_vmla_module_loader_destroy(
 
 static bool iree_hal_vmla_module_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   return executable_format == iree_hal_make_executable_format("VMLA");
 }
 
 static iree_status_t iree_hal_vmla_module_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   iree_hal_vmla_module_loader_t* executable_loader =
       (iree_hal_vmla_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify that we have a valid flatbuffer that contains a VMLA executable.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_vmla_executable_flatbuffer_verify(executable_data));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_vmla_executable_flatbuffer_verify(
+                                        executable_spec->executable_data));
   iree_VMLAExecutableDef_table_t executable_def =
-      iree_VMLAExecutableDef_as_root(executable_data.data);
+      iree_VMLAExecutableDef_as_root(executable_spec->executable_data.data);
   flatbuffers_uint8_vec_t bytecode_module_vec =
       iree_VMLAExecutableDef_bytecode_module_get(executable_def);
   iree_const_byte_span_t bytecode_module_data = iree_make_const_byte_span(
@@ -323,7 +334,7 @@ static iree_status_t iree_hal_vmla_module_loader_try_load(
   // ensures that the data remains valid for the duration the executable is
   // loaded. Otherwise, we clone it and let the bytecode module take ownership.
   iree_allocator_t bytecode_module_allocator;
-  if (iree_all_bits_set(caching_mode,
+  if (iree_all_bits_set(executable_spec->caching_mode,
                         IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA)) {
     // Zero-copy route.
     bytecode_module_allocator = iree_allocator_null();
@@ -347,8 +358,10 @@ static iree_status_t iree_hal_vmla_module_loader_try_load(
   // modules here for user-provided functions we'd mix them in here.
   iree_vm_context_t* context = NULL;
   if (iree_status_is_ok(status)) {
-    iree_vm_module_t* modules[2] = {executable_loader->vmla_module,
-                                    bytecode_module};
+    iree_vm_module_t* modules[2] = {
+        executable_loader->vmla_module,
+        bytecode_module,
+    };
     status = iree_vm_context_create_with_modules(
         executable_loader->instance, modules, IREE_ARRAYSIZE(modules),
         executable_loader->host_allocator, &context);
@@ -357,8 +370,10 @@ static iree_status_t iree_hal_vmla_module_loader_try_load(
   // Executable takes ownership of the entire context (including the bytecode
   // module, which itself may own the underlying allocation).
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vmla_executable_create(executable_layout, context,
-                                             bytecode_module, out_executable);
+    status = iree_hal_vmla_executable_create(
+        context, bytecode_module, executable_spec->executable_layout_count,
+        executable_spec->executable_layouts, executable_loader->host_allocator,
+        out_executable);
   }
 
   iree_vm_context_release(context);

@@ -35,6 +35,22 @@ class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // Byte buffers and host data
 //===----------------------------------------------------------------------===//
 
+def IREE_NullOp : IREE_PureOp<"null"> {
+  let summary = "a null type value";
+  let description = [{
+    Defines an SSA value that is lowered into dialects supporting
+    null/undefined/optional/etc values.
+  }];
+
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
+
 def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
   let summary = "constant host-side byte buffer";
   let description = [{

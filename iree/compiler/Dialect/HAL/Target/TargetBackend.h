@@ -189,6 +189,9 @@ class TargetBackend {
     // Note that many entry points may exist within a single executable.
     IREE::HAL::ExecutableEntryPointOp entryPointOp;
 
+    // ABI interface used by the |entryPointOp|.
+    IREE::HAL::InterfaceOp interfaceOp;
+
     // SSA value of the loaded hal.executable_layout reference.
     Value executableLayout;
 
@@ -337,6 +340,16 @@ class TargetBackend {
   }
 
  protected:
+  // Links all executables for the current target found in |moduleOp| into
+  // |linkedExecutableOp|. Functions will be cloned into |linkedModuleOp|.
+  LogicalResult linkExecutablesInto(
+      mlir::ModuleOp moduleOp,
+      ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
+      IREE::HAL::ExecutableOp linkedExecutableOp,
+      IREE::HAL::ExecutableTargetOp linkedTargetOp,
+      std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
+      OpBuilder &builder);
+
   // Calculates the workgroup size (x, y, z). These are the dimension numbers
   // for a single workgroup.
   virtual std::array<Value, 3> calculateDispatchWorkgroupSize(

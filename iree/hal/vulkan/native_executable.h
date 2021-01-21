@@ -32,9 +32,7 @@ extern "C" {
 iree_status_t iree_hal_vulkan_native_executable_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkPipelineCache pipeline_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable);
 
 // Returns the cached VkPipeline for the given executable |entry_ordinal|.
