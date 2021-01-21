@@ -95,11 +95,14 @@ static SmallVector<Type, 5> getABITypes(MLIRContext *context) {
 //                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
 //                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
 // ```
+//
+// Bump the benefit of the pattern to 100 to pick this pattern instead of a
+// competing pattern inserted by `populateStdToLLVMConversionPatterns`.
 class ConvertFunc : public ConvertToLLVMPattern {
  public:
   explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
-                             converter) {}
+                             converter, 100) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
