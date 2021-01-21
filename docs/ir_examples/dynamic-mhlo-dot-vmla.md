@@ -56,6 +56,14 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 }
 
 ```
+### IR Dump After TosaToLinalgOnTensors
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
 ### IR Dump After RemoveShapeConstraints
 ```
 func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
@@ -2006,6 +2014,7 @@ module  {
     vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
     vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
@@ -2238,6 +2247,7 @@ vm.module @module {
   vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
   vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
@@ -2469,6 +2479,7 @@ vm.module @module {
   vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
   vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+  vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
@@ -2729,6 +2740,7 @@ module  {
     vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
     vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
@@ -2947,6 +2959,7 @@ module  {
     vm.import @vmla.convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.conv.f32f32.f32(%input : !vm.ref<!vmla.buffer>, %input_shape : i32 ..., %filter : !vm.ref<!vmla.buffer>, %filter_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %window_strides : i32 ..., %padding : i32 ..., %lhs_dilation : i32 ..., %rhs_dilation : i32 ..., %feature_group_count : i32, %batch_group_count : i32) attributes {sym_visibility = "private"}
     vm.import @vmla.batch.matmul.f32f32.f32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
+    vm.import @vmla.batch.matmul.i32i32.i32(%lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ..., %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.reduce.sum.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...) attributes {sym_visibility = "private"}
