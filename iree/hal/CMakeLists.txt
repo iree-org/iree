@@ -60,6 +60,7 @@ iree_cc_library(
     absl::inlined_vector
     absl::span
     absl::strings
+    half::includes
     iree::base::api
     iree::base::core_headers
     iree::base::ref_ptr
