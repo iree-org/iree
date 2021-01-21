@@ -58,7 +58,7 @@ typedef struct iree_task_scope_s {
   // A permanent status code set when a task within the scope fails. All pending
   // tasks will be cancelled, though any in-flight tasks may continue executing
   // to completion.
-  iree_atomic_ptr_t permanent_status;
+  iree_atomic_intptr_t permanent_status;
 
   // Dispatch statistics aggregated from all dispatches in this scope. Updated
   // relatively infrequently and must not be used for task control as values

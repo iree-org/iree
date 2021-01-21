@@ -58,6 +58,16 @@ cc_library(
 )
 
 cc_test(
+    name = "atomics_test",
+    srcs = ["atomics_test.cc"],
+    deps = [
+        ":core_headers",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
     name = "math_test",
     srcs = ["math_test.cc"],
     deps = [
