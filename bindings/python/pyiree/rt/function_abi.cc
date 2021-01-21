@@ -590,7 +590,8 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
           throw RaiseValueError(
               "Could not deref result buffer view (wrong type?)");
         }
-        iree_hal_buffer* raw_buffer = iree_hal_buffer_view_buffer(buffer_view);
+        iree_hal_buffer_t* raw_buffer =
+            iree_hal_buffer_view_buffer(buffer_view);
         if (!raw_buffer) {
           throw RaiseValueError("Could not deref result buffer (wrong type?)");
         }
