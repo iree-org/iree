@@ -1052,6 +1052,14 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
         "batch.matmul.i32i32.i32",
         &VMLAModuleState::BatchMatMul<int32_t, int32_t, int32_t, int32_t>),
 
+    vm::MakeNativeFunction(
+        "batch.matmul.i8i8.i32",
+        &VMLAModuleState::BatchMatMul<int8_t, int8_t, int32_t, int32_t>),
+
+    vm::MakeNativeFunction(
+        "batch.matmul.i16i16.i32",
+        &VMLAModuleState::BatchMatMul<int16_t, int16_t, int32_t, int32_t>),
+
     vm::MakeNativeFunction("conv.f32f32.f32", &VMLAModuleState::ConvF32F32F32)};
 
 // Per-device VMLA module.
