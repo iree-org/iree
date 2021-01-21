@@ -51,6 +51,12 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
+### Install other dependencies
+
+```shell
+$ sudo apt install libxml2-dev # Required for LLVM
+```
+
 ## Clone and Build
 
 ### Clone
