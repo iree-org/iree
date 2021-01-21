@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Pass/Pass.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -22,6 +24,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 /// Pass to initialize the function that computes the number of workgroups for
 /// each entry point function. The function is defined, but is populated later.
 std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
+
+/// Pass to remove operations that have allocate semantics but have no
+/// uses. These arent removed by CSE.
+std::unique_ptr<OperationPass<>> createRemoveDeadMemAllocsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();

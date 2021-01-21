@@ -61,6 +61,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Frontload linalg-on-tensors transformations and dispatch region creation.
   if (clEnableLinalgOnTensorsDispatch) {
+    addHLOToLinalgOnTensorsPasses(passManager);
     passManager.addNestedPass<FuncOp>(
         createDispatchLinalgOnTensorsPass(clLinalgOnTensorsTileSizes));
   }
@@ -184,10 +185,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
-
-  if (clEnableLinalgOnTensorsDispatch) {
-    addHLOToLinalgOnTensorsPasses(passManager);
-  }
 
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only

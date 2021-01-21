@@ -79,6 +79,32 @@ ArrayRef<int64_t> LaunchConfig::getTileSizes(Operation *op,
   return t[level];
 }
 
+Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkgroupTileSizes(
+    unsigned numWorkgroupDims) const {
+  // The first level of tile + fuse happens at the flow level. So here need to
+  // just get the tile sizes that are decided by the launch config.  Check the
+  // tile sizes of all the operations and make sure they match upto
+  // `numWorkgroupDims`.
+  // TODO(ravishankarm): Not a great way of doing this. An alternative is to use
+  // a "rootOperation" and just return the tile sizes of the root
+  // operation. Currently the LaunchConfig has no concept of root operation, so
+  // avoiding this for now. Revisit if this doesnt work.
+  Optional<SmallVector<int64_t, 4>> workgroupTileSizes = llvm::None;
+  for (auto &it : tileSizes) {
+    TileSizesListTypeRef opTileSizesList(it.second);
+    if (opTileSizesList.empty()) return llvm::None;
+    ArrayRef<int64_t> opFirstLevelTileSize(opTileSizesList.front());
+    if (opFirstLevelTileSize.size() < numWorkgroupDims) return llvm::None;
+    opFirstLevelTileSize = opFirstLevelTileSize.take_front(numWorkgroupDims);
+    if (!workgroupTileSizes) {
+      workgroupTileSizes = llvm::to_vector<4>(opFirstLevelTileSize);
+    } else if (workgroupTileSizes.getValue() != opFirstLevelTileSize) {
+      return llvm::None;
+    }
+  }
+  return workgroupTileSizes;
+}
+
 void LaunchConfig::setTileSizes(Operation *op, TileSizesListType vTileSizes) {
   tileSizes[getOrSetNewKey(op, tileSizes.size())] = vTileSizes;
 }
@@ -116,46 +142,7 @@ void LaunchConfig::setVectorize(bool enableVectorize) {
 LogicalResult propogateRootOperationLaunchConfig(
     LaunchConfig &config, linalg::LinalgOp rootOperation,
     const linalg::LinalgDependenceGraph &dependenceGraph) {
-  // Check the dependencies going into and out of the root operation. For now
-  // only the following dependencies are supported
-  // - WAW dependencies going into the root operation.
-  // - RAW dependencies going out of the root operation.
-  // - WAW dependencies going out of the root operation.
-  // i.e. there are no RAW dependences going into the root operation.
-  auto inRAWDependencies = dependenceGraph.getDependencesInto(
-      rootOperation, linalg::LinalgDependenceGraph::RAW);
-  if (!inRAWDependencies.empty()) {
-    return rootOperation.getOperation()->emitError(
-        "unhandled fusion of root operation with producer");
-  }
   auto dependences = dependenceGraph.getDependentOperations(rootOperation);
-  unsigned numOuterParallel = getNumOuterParallelLoops(rootOperation);
-
-  // Check that for all dependences into and out of the root operation,
-  // - The result expressions of the indexing maps of the fused view in the
-  //   producer and consumer must match for the parallel loops.
-  for (auto dependence :
-       dependenceGraph.getDependentOperations(rootOperation)) {
-    unsigned viewIndex = dependence.indexingOpView->getOperandNumber();
-    AffineMap indexingMap = rootOperation.getIndexingMap(viewIndex);
-    linalg::LinalgOp fusedOp =
-        cast<linalg::LinalgOp>(dependence.dependentOpView->getOwner());
-    unsigned fusedViewIndex = dependence.dependentOpView->getOperandNumber();
-    AffineMap fusedIndexingMap = fusedOp.getIndexingMap(fusedViewIndex);
-    if (indexingMap.getNumResults() < numOuterParallel ||
-        fusedIndexingMap.getNumResults() < numOuterParallel ||
-        !llvm::all_of(
-            llvm::seq<unsigned>(0, numOuterParallel),
-            [&indexingMap, fusedIndexingMap](unsigned i) {
-              return indexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     fusedIndexingMap.getResult(i).isa<AffineDimExpr>() &&
-                     indexingMap.getResult(i) == fusedIndexingMap.getResult(i);
-            })) {
-      return rootOperation.getOperation()->emitError(
-          "unhandled fusion of root operation with all operations in the "
-          "dispatch region");
-    }
-  }
   // The dependent operations get the same tile size information as the root
   // operation. To propogate that information, just use the same key as the root
   // operation.

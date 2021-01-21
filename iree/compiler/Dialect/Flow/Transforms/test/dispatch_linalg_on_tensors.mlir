@@ -4,7 +4,6 @@
 
 // CHECK-LABEL: func @tensor
 func @tensor() -> tensor<2x4xf32> {
-  //  CHECK-DAG: %[[C2outer:.*]] = constant 2 : index
   //  CHECK-DAG: %[[C1wg:.*]] = constant 1 : index
   //  CHECK-DAG: %[[outerA:.*]] = iree.do_not_optimize{{.*}} : tensor<2x3xf32>
   //  CHECK-DAG: %[[outerB:.*]] = iree.do_not_optimize{{.*}} : tensor<3x4xf32>
@@ -16,23 +15,22 @@ func @tensor() -> tensor<2x4xf32> {
   %C = iree.unfoldable_constant dense<1000.0> : tensor<2x4xf32>
 
   // %[[C2]] will be handled by a later RematerializeDispatchConstants
-  //      CHECK: flow.dispatch.workgroups[%[[C1wg]], %[[C1wg]], %[[C1wg]]] (%[[C2outer]], %[[outerA]], %[[outerB]], %[[outerC]]) :
-  // CHECK-SAME:    (index, tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> tensor<2x4xf32> =
-  // CHECK-SAME:    (%[[C2:[0-9a-z]*]] : index,
-  // CHECK-SAME:     %[[A:[0-9a-z]*]] : !flow.dispatch.input<2x3xf32>,
+  //      CHECK: flow.dispatch.workgroups[%[[C1wg]], %[[C1wg]], %[[C1wg]]] (%[[outerA]], %[[outerB]], %[[outerC]]) :
+  // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> tensor<2x4xf32> =
+  // CHECK-SAME:    (%[[A:[0-9a-z]*]] : !flow.dispatch.input<2x3xf32>,
   // CHECK-SAME:     %[[B:[0-9a-z]*]] : !flow.dispatch.input<3x4xf32>,
   // CHECK-SAME:     %[[C:[0-9a-z]*]] : !flow.dispatch.input<2x4xf32>,
   // CHECK-SAME:     %[[OUT:[0-9a-z]*]] : !flow.dispatch.output<2x4xf32>) {
   //  CHECK-DAG:   %[[C0:.*]] = constant 0 : index
   //  CHECK-DAG:   %[[C1:.*]] = constant 1 : index
-  //  CHECK-DAG:   %[[C2inner:.*]] = constant 2 : index
+  //  CHECK-DAG:   %[[C2:.*]] = constant 2 : index
   //  CHECK-DAG:   %[[C3:.*]] = constant 3 : index
   //  CHECK-DAG:   %[[C4:.*]] = constant 4 : index
   //  CHECK-DAG:   %[[bix:.*]] = flow.dispatch.workgroup.id[0] : index
   //  CHECK-DAG:   %[[bdx:.*]] = flow.dispatch.workgroup.count[0] : index
   //  CHECK-DAG:   %[[biy:.*]] = flow.dispatch.workgroup.id[1] : index
   //  CHECK-DAG:   %[[bdy:.*]] = flow.dispatch.workgroup.count[1] : index
-  //      CHECK:   scf.for %[[I:.*]] = %[[biy]] to %[[C2inner]] step %[[bdy]] {
+  //      CHECK:   scf.for %[[I:.*]] = %[[biy]] to %[[C2]] step %[[bdy]] {
   // CHECK-NEXT:     %[[bix_scaled:.*]] = muli %[[bix]], %[[C2]] : index
   // CHECK-NEXT:     %[[bdx_scaled:.*]] = muli %[[bdx]], %[[C2]] : index
   // CHECK-NEXT:     scf.for %[[J:.*]] = %[[bix_scaled]] to %[[C4]] step %[[bdx_scaled]] {

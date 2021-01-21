@@ -196,6 +196,81 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
   return tiledAndFusedOps;
 }
 
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops) {
+  Region &region = funcOp.body();
+  if (!llvm::hasSingleElement(region)) {
+    return funcOp.emitError("unable dispatch function with multiple blocks");
+  }
+  Block *body = &region.front();
+  auto forOps = body->getOps<scf::ForOp>();
+  while (!forOps.empty()) {
+    if (!llvm::hasSingleElement(forOps)) return failure();
+    scf::ForOp forOp = *(forOps.begin());
+    tiledLoops.push_back(forOp.getOperation());
+    body = forOp.getBody();
+    forOps = body->getOps<scf::ForOp>();
+  }
+  linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+  return success();
+}
+
+namespace {
+static size_t kMaxHALDimensions = 3;
+
+/// Sets the flow.dispatch.workgroup_size operation to the constant value passed
+/// in as `tileSizes`. The number of entries in `tileSizes` is at least as much
+/// as the dimensionality of the workgroup. It is assumed that the inner-most
+/// loop is mapped to the fastest varying dimension in
+/// flow.dispatch.workgroup_size.
+class SetWorkgroupSizePattern
+    : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
+ public:
+  SetWorkgroupSizePattern(MLIRContext *context, ArrayRef<int64_t> tileSizesRef,
+                          PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit),
+        tileSizes(
+            llvm::to_vector<4>(tileSizesRef.size() > kMaxHALDimensions
+                                   ? tileSizesRef.take_front(kMaxHALDimensions)
+                                   : tileSizesRef)) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::InterfaceWorkgroupSizeOp workgroupSizeOp,
+      PatternRewriter &rewriter) const override {
+    int64_t dim = workgroupSizeOp.dimension().getSExtValue();
+    if (dim >= tileSizes.size()) {
+      return workgroupSizeOp.emitRemark(
+          "expected at least as many static tile sizes as the workgroup "
+          "dimensionality");
+    }
+    rewriter.replaceOpWithNewOp<ConstantIndexOp>(
+        workgroupSizeOp, tileSizes[tileSizes.size() - 1 - dim]);
+    return success();
+  }
+
+ private:
+  SmallVector<int64_t, 4> tileSizes;
+};
+}  // namespace
+
+LogicalResult materializeStaticLaunchInformation(
+    FuncOp funcOp, const LaunchConfig &launchConfig, unsigned numTiledLoops) {
+  OwningRewritePatternList patterns;
+  Optional<SmallVector<int64_t, 4>> workgroupTileSizes =
+      launchConfig.getWorkgroupTileSizes(numTiledLoops);
+  if (!workgroupTileSizes) {
+    return funcOp.emitError(
+        "unable to find static values to use for flow.dispatch.workgroup_size");
+  }
+  patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
+                                           workgroupTileSizes.getValue());
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return failure();
+  }
+  return success();
+}
+
 LogicalResult tileAndFuseLinalgBufferOps(
     FuncOp funcOp, ArrayRef<linalg::LinalgOp> linalgOps,
     const linalg::LinalgDependenceGraph &dependenceGraph,

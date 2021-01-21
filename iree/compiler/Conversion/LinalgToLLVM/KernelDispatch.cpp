@@ -181,10 +181,9 @@ Optional<LaunchConfig> initCPULaunchConfig(
       return llvm::None;                                                     \
     }                                                                        \
     rootOperation = linalgOp;                                                \
-    config.setTileSizes(                                                     \
-        op,                                                                  \
-        TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op), \
-        0);                                                                  \
+    auto opTileSizes =                                                       \
+        TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op); \
+    config.setTileSizes(op, opTileSizes, 0);                                 \
     continue;                                                                \
   }
 
