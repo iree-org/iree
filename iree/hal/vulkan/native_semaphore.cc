@@ -43,7 +43,7 @@ typedef struct {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   VkSemaphore handle;
-  iree_atomic_ptr_t failure_status;
+  iree_atomic_intptr_t failure_status;
 } iree_hal_vulkan_native_semaphore_t;
 
 extern const iree_hal_semaphore_vtable_t
@@ -88,8 +88,8 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
                                  &semaphore->resource);
     semaphore->logical_device = logical_device;
     semaphore->handle = handle;
-    iree_atomic_store_ptr(&semaphore->failure_status, 0,
-                          iree_memory_order_release);
+    iree_atomic_store_intptr(&semaphore->failure_status, 0,
+                             iree_memory_order_release);
     *out_semaphore = (iree_hal_semaphore_t*)semaphore;
   } else {
     logical_device->syms()->vkDestroySemaphore(*logical_device, handle,
@@ -107,7 +107,7 @@ static void iree_hal_vulkan_native_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_free((iree_status_t)iree_atomic_load_ptr(
+  iree_status_free((iree_status_t)iree_atomic_load_intptr(
       &semaphore->failure_status, iree_memory_order_acquire));
   semaphore->logical_device->syms()->vkDestroySemaphore(
       *semaphore->logical_device, semaphore->handle,
@@ -137,7 +137,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_query(
       "vkGetSemaphoreCounterValue"));
 
   if (value > IREE_HAL_VULKAN_SEMAPHORE_MAX_VALUE) {
-    iree_status_t failure_status = (iree_status_t)iree_atomic_load_ptr(
+    iree_status_t failure_status = (iree_status_t)iree_atomic_load_intptr(
         &semaphore->failure_status, iree_memory_order_acquire);
     if (iree_status_is_ok(failure_status)) {
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -174,10 +174,9 @@ static void iree_hal_vulkan_native_semaphore_fail(
   // Try to set our local status - we only preserve the first failure so only
   // do this if we are going from a valid semaphore to a failed one.
   iree_status_t old_status = iree_ok_status();
-  if (!iree_atomic_compare_exchange_strong_ptr(
-          &semaphore->failure_status, (uintptr_t*)&old_status,
-          (uintptr_t)status, iree_memory_order_seq_cst,
-          iree_memory_order_seq_cst)) {
+  if (!iree_atomic_compare_exchange_strong_intptr(
+          &semaphore->failure_status, (intptr_t*)&old_status, (intptr_t)status,
+          iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
     // Previous status was not OK; drop our new status.
     IREE_IGNORE_ERROR(status);
     return;

@@ -82,6 +82,9 @@ typedef struct {
 // typedef __declspec(align(16)) struct {
 //   uint64_t __val[2];
 // } iree_atomic_int128_t;
+typedef struct {
+  intptr_t __val;
+} iree_atomic_intptr_t;
 
 #define iree_atomic_load_int32(object, order) \
   InterlockedExchangeAdd((volatile LONG*)object, 0)
@@ -163,6 +166,54 @@ static inline bool iree_atomic_compare_exchange_strong_int64_impl(
 
 #define iree_atomic_thread_fence(order) MemoryBarrier()
 
+// There are no pointer-width atomic ops in MSVC so we need to specialize based
+// on the pointer size.
+#if defined(IREE_PTR_SIZE_32)
+#define iree_atomic_load_intptr(object, order) \
+  (intptr_t) iree_atomic_load_int32((iree_atomic_int32_t*)(object), (order))
+#define iree_atomic_store_intptr(object, desired, order)             \
+  (intptr_t) iree_atomic_store_int32((iree_atomic_int32_t*)(object), \
+                                     (int32_t)(desired), (order))
+#define iree_atomic_fetch_add_intptr(object, operand, order)             \
+  (intptr_t) iree_atomic_fetch_add_int32((iree_atomic_int32_t*)(object), \
+                                         (int32_t)(operand), (order))
+#define iree_atomic_fetch_sub_intptr(object, operand, order)             \
+  (intptr_t) iree_atomic_fetch_sub_int32((iree_atomic_int32_t*)(object), \
+                                         (int32_t)(operand), (order))
+#define iree_atomic_exchange_intptr(object, desired, order)             \
+  (intptr_t) iree_atomic_exchange_int32((iree_atomic_int32_t*)(object), \
+                                        (int32_t)(desired), (order))
+#define iree_atomic_compare_exchange_strong_intptr(object, expected, desired, \
+                                                   order_succ, order_fail)    \
+  iree_atomic_compare_exchange_strong_int32(                                  \
+      (iree_atomic_int32_t*)(object), (int32_t*)(expected),                   \
+      (int32_t)(desired), (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak_intptr \
+  iree_atomic_compare_exchange_strong_intptr
+#else
+#define iree_atomic_load_intptr(object, order) \
+  (intptr_t) iree_atomic_load_int64((iree_atomic_int64_t*)(object), (order))
+#define iree_atomic_store_intptr(object, desired, order)             \
+  (intptr_t) iree_atomic_store_int64((iree_atomic_int64_t*)(object), \
+                                     (int64_t)(desired), (order))
+#define iree_atomic_fetch_add_intptr(object, operand, order)             \
+  (intptr_t) iree_atomic_fetch_add_int64((iree_atomic_int64_t*)(object), \
+                                         (int64_t)(operand), (order))
+#define iree_atomic_fetch_sub_intptr(object, operand, order)             \
+  (intptr_t) iree_atomic_fetch_sub_int64((iree_atomic_int64_t*)(object), \
+                                         (int64_t)(operand), (order))
+#define iree_atomic_exchange_intptr(object, desired, order)             \
+  (intptr_t) iree_atomic_exchange_int64((iree_atomic_int64_t*)(object), \
+                                        (int64_t)(desired), (order))
+#define iree_atomic_compare_exchange_strong_intptr(object, expected, desired, \
+                                                   order_succ, order_fail)    \
+  iree_atomic_compare_exchange_strong_int64(                                  \
+      (iree_atomic_int64_t*)(object), (int64_t*)(expected),                   \
+      (int64_t)(desired), (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak_intptr \
+  iree_atomic_compare_exchange_strong_intptr
+#endif  // IREE_PTR_SIZE_32
+
 //==============================================================================
 // C11 atomics using Clang builtins
 //==============================================================================
@@ -183,6 +234,7 @@ typedef _Atomic int32_t iree_atomic_int32_t;
 typedef _Atomic int64_t iree_atomic_int64_t;
 // TODO(#3453): check for __int128 support before using
 // typedef _Atomic __int128 iree_atomic_int128_t;
+typedef _Atomic intptr_t iree_atomic_intptr_t;
 
 #define iree_atomic_load_auto(object, order) \
   __c11_atomic_load((object), (order))
@@ -230,6 +282,7 @@ typedef enum iree_memory_order_e {
 typedef int32_t iree_atomic_int32_t;
 typedef int64_t iree_atomic_int64_t;
 // typedef __int128 iree_atomic_int128_t;
+typedef intptr_t iree_atomic_intptr_t;
 
 #ifdef __cplusplus
 // Equiv to C++ auto keyword in C++ mode.
@@ -313,35 +366,17 @@ typedef int64_t iree_atomic_int64_t;
 #define iree_atomic_compare_exchange_weak_int64 \
   iree_atomic_compare_exchange_weak_auto
 
+#define iree_atomic_load_intptr iree_atomic_load_auto
+#define iree_atomic_store_intptr iree_atomic_store_auto
+#define iree_atomic_fetch_add_intptr iree_atomic_fetch_add_auto
+#define iree_atomic_fetch_sub_intptr iree_atomic_fetch_sub_auto
+#define iree_atomic_exchange_intptr iree_atomic_exchange_auto
+#define iree_atomic_compare_exchange_strong_intptr \
+  iree_atomic_compare_exchange_strong_auto
+#define iree_atomic_compare_exchange_weak_intptr \
+  iree_atomic_compare_exchange_weak_auto
+
 #endif  // iree_atomic_load_auto
-
-//==============================================================================
-// Pointer-width atomics
-//==============================================================================
-
-#if defined(IREE_PTR_SIZE_32)
-typedef iree_atomic_int32_t iree_atomic_ptr_t;
-#define iree_atomic_load_ptr iree_atomic_load_int32
-#define iree_atomic_store_ptr iree_atomic_store_int32
-#define iree_atomic_fetch_add_ptr iree_atomic_fetch_add_int32
-#define iree_atomic_fetch_sub_ptr iree_atomic_fetch_sub_int32
-#define iree_atomic_exchange_ptr iree_atomic_exchange_int32
-#define iree_atomic_compare_exchange_strong_ptr \
-  iree_atomic_compare_exchange_strong_int32
-#define iree_atomic_compare_exchange_weak_ptr \
-  iree_atomic_compare_exchange_weak_int32
-#else
-typedef iree_atomic_int64_t iree_atomic_ptr_t;
-#define iree_atomic_load_ptr iree_atomic_load_int64
-#define iree_atomic_store_ptr iree_atomic_store_int64
-#define iree_atomic_fetch_add_ptr iree_atomic_fetch_add_int64
-#define iree_atomic_fetch_sub_ptr iree_atomic_fetch_sub_int64
-#define iree_atomic_exchange_ptr iree_atomic_exchange_int64
-#define iree_atomic_compare_exchange_strong_ptr \
-  iree_atomic_compare_exchange_strong_int64
-#define iree_atomic_compare_exchange_weak_ptr \
-  iree_atomic_compare_exchange_weak_int64
-#endif  // IREE_PTR_SIZE_32
 
 //==============================================================================
 // Reference count atomics
