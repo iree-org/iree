@@ -22,6 +22,7 @@
 #include "iree/base/status.h"
 #include "ruy/context.h"
 #include "ruy/mul_params.h"
+#include "ruy/reference_mul.h"
 #include "ruy/ruy.h"
 
 namespace iree {
@@ -119,7 +120,7 @@ Status MatMul::Execute(RuntimeState* runtime_state,
   ruy::MulParams<AccumEl, DstEl> mul_params;
   MakeRuyMulParams(buffers, &mul_params);
 
-  ruy::Mul(lhs, rhs, mul_params, &runtime_state->context, &dst);
+  ruy::ReferenceMul(lhs, rhs, mul_params, &dst);
   std::cerr << "DST=\n" << dst << "\n";
 
   return OkStatus();
