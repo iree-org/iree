@@ -282,9 +282,6 @@ class TensorList final : public RefObject<TensorList> {
       }
 
       iree_hal_buffer_t* tensor_buffer = iree_hal_buffer_view_buffer(tensor);
-      iree_hal_buffer_mapping_t tensor_mapping;
-      iree_device_size_t tensor_byte_size =
-          iree_hal_buffer_byte_length(tensor_buffer);
       IREE_RETURN_IF_ERROR(
           iree_hal_buffer_read_data(tensor_buffer, 0, block_begin, block_size));
     }
