@@ -46,8 +46,8 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   memset(scope->name, 0xCD, sizeof(scope->name));
 
   // In most cases the status will have been consumed by the scope owner.
-  iree_status_t status = (iree_status_t)iree_atomic_exchange_ptr(
-      &scope->permanent_status, (uintptr_t)NULL, iree_memory_order_acquire);
+  iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+      &scope->permanent_status, (intptr_t)NULL, iree_memory_order_acquire);
   IREE_IGNORE_ERROR(status);
 
   iree_notification_deinitialize(&scope->idle_notification);
@@ -65,9 +65,9 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
       z0, iree_status_code_string(iree_status_code(new_status)));
 
   iree_status_t old_status = iree_ok_status();
-  if (!iree_atomic_compare_exchange_strong_ptr(
-          &scope->permanent_status, (uintptr_t*)&old_status,
-          (uintptr_t)new_status, iree_memory_order_seq_cst,
+  if (!iree_atomic_compare_exchange_strong_intptr(
+          &scope->permanent_status, (intptr_t*)&old_status,
+          (intptr_t)new_status, iree_memory_order_seq_cst,
           iree_memory_order_seq_cst)) {
     // Previous status was not OK; drop our new status.
     IREE_IGNORE_ERROR(new_status);
@@ -93,8 +93,8 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
 iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
   iree_status_t old_status = iree_ok_status();
   iree_status_t new_status = iree_ok_status();
-  while (!iree_atomic_compare_exchange_strong_ptr(
-      &scope->permanent_status, (uintptr_t*)&old_status, (uintptr_t)new_status,
+  while (!iree_atomic_compare_exchange_strong_intptr(
+      &scope->permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
       iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
     // Previous status was not OK; we have it now though and can try again.
     new_status = iree_status_from_code(iree_status_code(new_status));
