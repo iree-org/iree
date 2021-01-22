@@ -41,6 +41,15 @@ iree_cc_library(
     "target_platform.h"
   DEPS
     absl::core_headers
+    iree::base::internal::atomics
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    target_platform
+  HDRS
+    "target_platform.h"
   PUBLIC
 )
 
