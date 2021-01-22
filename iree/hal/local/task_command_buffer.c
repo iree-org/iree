@@ -622,14 +622,14 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
   if (IREE_UNLIKELY(offset + values_length >=
-                    IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT)) {
+                    sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "push constant range %zu (length=%zu) out of range",
                             offset, values_length);
   }
 
-  memcpy(&command_buffer->state.push_constants[offset], values,
-         values_length * sizeof(uint32_t));
+  memcpy((uint8_t*)&command_buffer->state.push_constants + offset, values,
+         values_length);
 
   return iree_ok_status();
 }

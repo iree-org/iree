@@ -322,8 +322,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
 // Pushes an inline set of constants that can be accessed by subsequent
 // dispatches using a compatible executable layout.
 //
-// Push constants are always 4-byte values and treated as opaque, meaning that
-// they may be bit-casted floats, bit-packed booleans, etc.
+// Push constants are treated as opaque bytes, meaning that they may be
+// bit-casted floats, bit-packed booleans, etc. |offset| and |values_length| are
+// in bytes.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
