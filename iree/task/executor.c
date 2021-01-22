@@ -57,6 +57,8 @@ iree_status_t iree_task_executor_create(
   executor->scheduling_mode = scheduling_mode;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
   iree_atomic_task_slist_initialize(&executor->incoming_waiting_slist);
+  iree_atomic_store_int32(&executor->submission_epoch, 0,
+                          iree_memory_order_seq_cst);
   iree_slim_mutex_initialize(&executor->coordinator_mutex);
   iree_slim_mutex_initialize(&executor->wait_mutex);
 
@@ -291,6 +293,10 @@ void iree_task_executor_merge_submission(iree_task_executor_t* executor,
   // be modified by other threads. We can no longer assume anything about the
   // submission lists and can only discard them.
   iree_task_submission_reset(submission);
+
+  // Bump submission epoch indicating that the executor state has changed.
+  iree_atomic_fetch_add_int32(&executor->submission_epoch, 1,
+                              iree_memory_order_release);
 }
 
 void iree_task_executor_submit(iree_task_executor_t* executor,
@@ -533,8 +539,10 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
   // We may be adding tasks/waiting/etc on each pass through coordination - to
   // ensure we completely drain the incoming queues and satisfied waits we loop
   // until there's nothing left to coordinate.
-  bool schedule_dirty = true;
-  do {
+  while (true) {
+    int32_t current_submission_epoch = iree_atomic_load_int32(
+        &executor->submission_epoch, iree_memory_order_acquire);
+
     // Check for incoming submissions and move their posted tasks into our
     // local lists. Any of the tasks here are ready to execute immediately and
     // ones we should be able to distribute to workers without delay. The
@@ -606,12 +614,16 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     // this.
     if (!iree_task_submission_is_empty(&pending_submission)) {
       iree_task_executor_merge_submission(executor, &pending_submission);
-      schedule_dirty = true;
-    } else {
-      schedule_dirty = false;
     }
-  } while (schedule_dirty);
 
+    if (current_submission_epoch ==
+        iree_atomic_load_int32(&executor->submission_epoch,
+                               iree_memory_order_acquire)) {
+      break;
+    }
+  }
+
+  IREE_ASSERT(!executor->incoming_ready_slist.impl.head);
   iree_slim_mutex_unlock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_END(z0);
 }

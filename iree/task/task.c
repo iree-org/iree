@@ -445,11 +445,11 @@ void iree_task_dispatch_issue_sliced(iree_task_dispatch_t* dispatch_task,
         workgroup_base[2] = slice_z * tiles_per_slice_z;
         uint32_t workgroup_range[3];
         workgroup_range[0] = iree_min(
-            workgroup_count[0], workgroup_base[0] + tiles_per_slice_x - 1);
+            workgroup_count[0] - 1, workgroup_base[0] + tiles_per_slice_x - 1);
         workgroup_range[1] = iree_min(
-            workgroup_count[1], workgroup_base[1] + tiles_per_slice_y - 1);
+            workgroup_count[1] - 1, workgroup_base[1] + tiles_per_slice_y - 1);
         workgroup_range[2] = iree_min(
-            workgroup_count[2], workgroup_base[2] + tiles_per_slice_z - 1);
+            workgroup_count[2] - 1, workgroup_base[2] + tiles_per_slice_z - 1);
 
         // Allocate and initialize the slice.
         iree_task_dispatch_slice_t* slice_task =

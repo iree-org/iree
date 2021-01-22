@@ -71,6 +71,9 @@ struct iree_task_executor_s {
   // A list of incoming wait tasks that need to be waited on. Order doesn't
   // really matter here as all tasks will be waited on simultaneously.
   iree_atomic_task_slist_t incoming_waiting_slist;
+  // Incremented each time new work is submitted to the executor. Used for
+  // change detection.
+  iree_atomic_int32_t submission_epoch;
 
   // Guards coordination logic; only one thread at a time may be acting as the
   // coordinator.

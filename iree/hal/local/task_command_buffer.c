@@ -775,6 +775,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
                                 iree_task_make_dispatch_closure(
                                     iree_hal_cmd_dispatch_tile, (uintptr_t)cmd),
                                 workgroup_size, workgroup_count, &cmd->task);
+  cmd->task.header.flags |= IREE_TASK_FLAG_DISPATCH_SLICED;
 
   // Copy only the push constant range used by the executable.
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);

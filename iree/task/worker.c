@@ -166,8 +166,9 @@ iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
 // Executes a task on a worker.
 // Only task types that are scheduled to workers are handled; all others must be
 // handled by the coordinator during scheduling.
-static iree_status_t iree_task_worker_execute(iree_task_worker_t* worker,
-                                              iree_task_t* task) {
+static iree_status_t iree_task_worker_execute(
+    iree_task_worker_t* worker, iree_task_t* task,
+    iree_task_submission_t* pending_submission) {
   // Execute the task and resolve the task and gather any tasks that are now
   // ready for submission to the executor. They'll be scheduled the next time
   // the coordinator runs.
@@ -176,22 +177,20 @@ static iree_status_t iree_task_worker_execute(iree_task_worker_t* worker,
   // BFS behavior at the cost of the additional merge overhead - it's probably
   // worth it?
   // TODO(benvanik): handle partial tasks and re-queuing.
-  iree_task_submission_t pending_submission;
-  iree_task_submission_initialize(&pending_submission);
   switch (task->type) {
     case IREE_TASK_TYPE_CALL: {
       IREE_RETURN_IF_ERROR(
-          iree_task_call_execute((iree_task_call_t*)task, &pending_submission));
+          iree_task_call_execute((iree_task_call_t*)task, pending_submission));
       break;
     }
     case IREE_TASK_TYPE_DISPATCH_SLICE: {
       IREE_RETURN_IF_ERROR(iree_task_dispatch_slice_execute(
-          (iree_task_dispatch_slice_t*)task, &pending_submission));
+          (iree_task_dispatch_slice_t*)task, pending_submission));
       break;
     }
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
       IREE_RETURN_IF_ERROR(iree_task_dispatch_shard_execute(
-          (iree_task_dispatch_shard_t*)task, &pending_submission));
+          (iree_task_dispatch_shard_t*)task, pending_submission));
       break;
     }
     default:
@@ -202,16 +201,14 @@ static iree_status_t iree_task_worker_execute(iree_task_worker_t* worker,
   // NOTE: task is invalidated here!
   task = NULL;
 
-  if (!iree_task_submission_is_empty(&pending_submission)) {
-    iree_task_executor_merge_submission(worker->executor, &pending_submission);
-  }
   return iree_ok_status();
 }
 
 // Pumps the worker thread once, processing a single task.
 // Returns true if pumping should continue as there are more tasks remaining or
 // false if the caller should wait for more tasks to be posted.
-static bool iree_task_worker_pump_once(iree_task_worker_t* worker) {
+static bool iree_task_worker_pump_once(
+    iree_task_worker_t* worker, iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Check the local work queue for any work we know we should start
@@ -252,7 +249,8 @@ static bool iree_task_worker_pump_once(iree_task_worker_t* worker) {
 
   // Execute the task (may call out to arbitrary user code and may submit more
   // tasks for execution).
-  iree_status_t status = iree_task_worker_execute(worker, task);
+  iree_status_t status =
+      iree_task_worker_execute(worker, task, pending_submission);
 
   // TODO(#4026): propagate failure to task scope.
   // We currently drop the error on the floor here; that's because the error
@@ -294,8 +292,18 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
                                             ~worker->worker_bit,
                                             iree_memory_order_seq_cst);
 
-    while (iree_task_worker_pump_once(worker)) {
+    iree_task_submission_t pending_submission;
+    iree_task_submission_initialize(&pending_submission);
+
+    while (iree_task_worker_pump_once(worker, &pending_submission)) {
       // All work done ^, which will return false when the worker should wait.
+    }
+
+    bool retry = false;
+    if (!iree_task_submission_is_empty(&pending_submission)) {
+      iree_task_executor_merge_submission(worker->executor,
+                                          &pending_submission);
+      retry = true;
     }
 
     // When we encounter a complete lack of work we can self-nominate to check
@@ -309,18 +317,22 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     iree_task_executor_coordinate(worker->executor, worker,
                                   /*speculative=*/true);
 
+    // We've finished all the work we have scheduled so set our idle flag. This
+    // ensures that if any other thread comes in and wants to give us work we
+    // will properly coordinate/wake below.
+    iree_atomic_task_affinity_set_fetch_or(&worker->executor->worker_idle_mask,
+                                           worker->worker_bit,
+                                           iree_memory_order_seq_cst);
+
     // If nothing has been enqueued since we started this loop (so even
     // coordination didn't find anything) we go idle. Otherwise we fall
     // through and try the loop again.
-    if (!iree_task_queue_is_empty(&worker->local_task_queue)) {
+    if (retry || !iree_task_queue_is_empty(&worker->local_task_queue)) {
       // Have more work to do; loop around to try another pump.
       iree_notification_cancel_wait(&worker->wake_notification);
     } else {
       IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
                                   "iree_task_worker_main_pump_wake_wait");
-      iree_atomic_task_affinity_set_fetch_or(
-          &worker->executor->worker_idle_mask, worker->worker_bit,
-          iree_memory_order_seq_cst);
       iree_notification_commit_wait(&worker->wake_notification, wait_token);
       IREE_TRACE_ZONE_END(z_wait);
     }
