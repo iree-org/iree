@@ -41,6 +41,10 @@
 // IREE_COMPILER_GCC_COMPAT
 // IREE_COMPILER_MSVC
 //
+// IREE_SANITIZER_ADDRESS
+// IREE_SANITIZER_MEMORY
+// IREE_SANITIZER_THREAD
+//
 // IREE_PLATFORM_ANDROID
 // IREE_PLATFORM_ANDROID_EMULATOR
 // IREE_PLATFORM_APPLE (IOS | MACOS)
@@ -139,6 +143,18 @@
 #else
 #error Unrecognized compiler.
 #endif  // compiler versions
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define IREE_SANITIZER_ADDRESS 1
+#endif  // __has_feature(address_sanitizer)
+#if __has_feature(memory_sanitizer)
+#define IREE_SANITIZER_MEMORY 1
+#endif  // __has_feature(memory_sanitizer)
+#if __has_feature(thread_sanitizer)
+#define IREE_SANITIZER_THREAD 1
+#endif  // __has_feature(thread_sanitizer)
+#endif  // defined(__has_feature)
 
 //==============================================================================
 // IREE_PLATFORM_ANDROID

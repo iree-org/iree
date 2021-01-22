@@ -53,8 +53,14 @@ cc_library(
         "target_platform.h",
     ],
     deps = [
+        "//iree/base/internal:atomics",
         "@com_google_absl//absl/base:core_headers",
     ],
+)
+
+cc_library(
+    name = "target_platform",
+    hdrs = ["target_platform.h"],
 )
 
 cc_test(
