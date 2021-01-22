@@ -117,6 +117,11 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
       iree_thread_qos_class_for_priority_class(params.priority_class);
   pthread_attr_set_qos_class_np(&thread_attr, qos_class, 0);
 
+  // Retain the thread for the thread itself; this way if the caller immediately
+  // releases the iree_thread_t handle the thread won't explode.
+  iree_thread_retain(thread);
+  *out_thread = thread;
+
   // Create the thread either suspended or running as the user requested.
   int rc;
   if (params.create_suspended) {
@@ -132,7 +137,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
   pthread_attr_destroy(&thread_attr);
   if (rc != 0) {
-    iree_allocator_free(allocator, thread);
+    iree_thread_release(thread);  // for self
+    iree_thread_release(thread);  // for caller
+    *out_thread = NULL;
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "thread creation failed with %d", rc);
@@ -143,12 +150,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
     iree_thread_request_affinity(thread, params.initial_affinity);
   }
 
-  // Retain the thread for the thread itself; this way if the caller immediately
-  // releases the iree_thread_t handle the thread won't explode.
-  iree_thread_retain(thread);
-
   IREE_TRACE_ZONE_END(z0);
-  *out_thread = thread;
   return iree_ok_status();
 }
 
