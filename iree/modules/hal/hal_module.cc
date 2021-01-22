@@ -216,6 +216,8 @@ class HALModuleState final {
 
     // TODO(benvanik): wrap when supported.
 
+    buffer_usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
+
     size_t buffer_length = source->data.data_length;
     if (length == -1) {
       length = static_cast<size_t>(buffer_length);
