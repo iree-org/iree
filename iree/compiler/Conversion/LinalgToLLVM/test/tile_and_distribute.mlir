@@ -5,10 +5,10 @@ func @dynamic_matmul(%lhs: memref<?x?xf32>, %rhs: memref<?x?xf32>, %result: memr
   return
 }
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 2)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (2, s1 - s0 * 2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (2, s0 * -2 + s1)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 4)>
-// CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (4, s1 - s0 * 4)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (4, s0 * -4 + s1)>
 //     CHECK: func @dynamic_matmul(%[[LHS:.+]]: memref<?x?xf32>, %[[RHS:.+]]: memref<?x?xf32>, %[[RESULT:.+]]: memref<?x?xf32>)
 // CHECK-DAG: %[[CONST_0:.+]] = constant 0 : index
 // CHECK-DAG: %[[CONST_1:.+]] = constant 1 : index
@@ -55,7 +55,7 @@ func @static_matmul(%lhs: memref<16x4xf32>, %rhs: memref<4x8xf32>, %result: memr
 //     CHECK:    %[[RESULT_SUBVIEW:.+]] = subview %[[RESULT]][%[[I]], %[[J]]] [2, 4] [1, 1]  : memref<16x8xf32> to memref<2x4xf32, #[[MAP3]]>
 //     CHECK:    linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]] : memref<2x1xf32, #[[MAP1]]>, memref<1x4xf32, #[[MAP3]]>) outs(%4 : memref<2x4xf32, #[[MAP3]]>)
 
-// ----
+// -----
 
 func @matmul_tensors() {
   %c2 = constant 2 : index
