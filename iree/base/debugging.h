@@ -29,6 +29,13 @@ extern "C" {
 #define IREE_ATTRIBUTE_ALWAYS_INLINE
 #endif  // IREE_COMPILER_*
 
+//===----------------------------------------------------------------------===//
+// Debugger interaction
+//===----------------------------------------------------------------------===//
+// NOTE: in general it's not a good idea to change program behavior when running
+// under a debugger as that then makes it harder to reproduce and successfully
+// debug issues that happen without the debugger.
+
 // Forces a break into an attached debugger.
 // May be ignored if no debugger is attached or raise a signal that gives the
 // option to attach a debugger.
@@ -56,6 +63,14 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
 #endif  // IREE_PLATFORM_WINDOWS
 }
 
+//===----------------------------------------------------------------------===//
+// IREE_ASSERT macros
+//===----------------------------------------------------------------------===//
+// These are no-oped in builds with NDEBUG defined (by default anything but
+// `-c dbg`/`-DCMAKE_BUILD_TYPE=Debug`). As with normal assert() ensure that
+// side-effecting behavior is avoided as the expression will not be evaluated
+// when the asserts are removed!
+
 #if !defined(NDEBUG)
 #define IREE_ASSERT(expr, ...)                      \
   {                                                 \
@@ -77,6 +92,54 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
 #define IREE_ASSERT_LE(lhs, rhs, ...) IREE_ASSERT_CMP(lhs, <=, rhs, __VA_ARGS__)
 #define IREE_ASSERT_GT(lhs, rhs, ...) IREE_ASSERT_CMP(lhs, >=, rhs, __VA_ARGS__)
 #define IREE_ASSERT_GE(lhs, rhs, ...) IREE_ASSERT_CMP(lhs, >, rhs, __VA_ARGS__)
+
+//===----------------------------------------------------------------------===//
+// Sanitizer interfaces
+//===----------------------------------------------------------------------===//
+// These provide hints to the various -fsanitize= features that help us indicate
+// what our code is doing to prevent false positives and gain additional
+// coverage. By default the sanitizers try to hook platform features like
+// mutexes and threads and our own implementations of those aren't automatically
+// picked up. In addition, specific uses of memory like arenas can thwart tools
+// like ASAN that try to detect accesses to freed memory because we are never
+// actually malloc()'ing and free()'ing and need to tell ASAN when blocks of
+// memory come into/outof the pool.
+//
+// The documentation on these interfaces is pretty sparse but it's possible to
+// find usage examples of the hooks in the compiler-provided hooks themselves.
+//
+// The headers can be viewed here:
+// https://github.com/llvm/llvm-project/tree/main/compiler-rt/include/sanitizer
+// And common interceptors here:
+// https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/tsan/rtl/tsan_interceptors_posix.cpp
+//
+// NOTE: don't assume the presence of a sanitizer implies clang+llvm+x86! GCC
+// supports all of the sanitizers and MSVC supports ASAN and almost all of them
+// can be used on non-x86 platforms.
+
+#if defined(IREE_SANITIZER_ADDRESS)
+#include <sanitizer/asan_interface.h>
+#endif  // IREE_SANITIZER_ADDRESS
+
+// For whenever we want to provide specialized msan/tsan hooks:
+//   #if defined(IREE_SANITIZER_MEMORY)
+//   #include <sanitizer/msan_interface.h>
+//   #endif  // IREE_SANITIZER_MEMORY
+//   #if defined(IREE_SANITIZER_THREAD)
+//   #include <sanitizer/tsan_interface.h>
+//   #endif  // IREE_SANITIZER_THREAD
+
+// Suppresses leak detection false-positives in a region. May be nested.
+// Do not use this for any IREE-owned code: fix your leaks! This is useful when
+// third-party libraries or system calls may create false positives or just be
+// leaky such as GPU drivers and shader compilers (which are notoriously bad).
+#if defined(IREE_SANITIZER_ADDRESS)
+#define IREE_LEAK_CHECK_DISABLE_PUSH() __lsan_disable()
+#define IREE_LEAK_CHECK_DISABLE_POP() __lsan_enable()
+#else
+#define IREE_LEAK_CHECK_DISABLE_PUSH()
+#define IREE_LEAK_CHECK_DISABLE_POP()
+#endif  // IREE_SANITIZER_ADDRESS
 
 #ifdef __cplusplus
 }  // extern "C"

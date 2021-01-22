@@ -55,9 +55,14 @@
 #define IREE_PTR_GUARDED_BY(x)
 #endif  // __cplusplus
 
+// NOTE: we only support futex when not using tsan as we need to add annotations
+// for tsan to understand what we are doing.
+// https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface.h
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_SANITIZER_THREAD)
 #define IREE_PLATFORM_HAS_FUTEX 1
+#endif  // !IREE_SANITIZER_THREAD
 #endif  // IREE_PLATFORM_*
 
 #if defined(IREE_PLATFORM_APPLE)
