@@ -520,7 +520,8 @@ class HALModuleState final {
       uint32_t offset, absl::Span<const uint32_t> values) {
     ExDeferRelease(executable_layout);
     return iree_hal_command_buffer_push_constants(
-        command_buffer.get(), executable_layout.get(), offset, values.data(),
+        command_buffer.get(), executable_layout.get(),
+        offset * sizeof(uint32_t), values.data(),
         values.size() * sizeof(uint32_t));
   }
 
