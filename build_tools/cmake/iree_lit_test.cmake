@@ -13,6 +13,7 @@
 # limitations under the License.
 
 include(CMakeParseArguments)
+include(iree_installed_test)
 
 # iree_lit_test()
 #
@@ -73,9 +74,11 @@ function(iree_lit_test)
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
-  add_test(
-    NAME
-      ${_NAME_PATH}
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+
+  iree_add_installed_test(
+    TEST_NAME "${_NAME_PATH}"
+    LABELS "${_RULE_LABELS}"
     COMMAND
       # We run all our tests through a custom test runner to allow setup
       # and teardown.
@@ -83,16 +86,18 @@ function(iree_lit_test)
       "${CMAKE_SOURCE_DIR}/iree/tools/run_lit.${IREE_HOST_SCRIPT_EXT}"
       ${_TEST_FILE_PATH}
       ${_DATA_DEP_PATHS}
-    WORKING_DIRECTORY
-      "${CMAKE_BINARY_DIR}"
+    INSTALLED_COMMAND
+      # TODO: Make the lit runner be not a shell script and more cross-platform.
+      # Note that the data deps are not bundled: must be externally on the path.
+      bin/run_lit.${IREE_HOST_SCRIPT_EXT}
+      ${_TEST_FILE_PATH}
   )
-
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  iree_add_test_environment_properties(${_NAME_PATH})
 
+  install(FILES ${_TEST_FILE_PATH}
+    DESTINATION "tests/${_PACKAGE_PATH}"
+    COMPONENT Tests
+  )
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
 
