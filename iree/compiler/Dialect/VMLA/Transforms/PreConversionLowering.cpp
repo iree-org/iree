@@ -104,8 +104,9 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
     Value rhs = op.rhs();
     RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
-    Type elementType = lhsType.getElementType();
-    if (!lhsType || !rhsType) {
+    RankedTensorType dstType =
+        op.getResult().getType().dyn_cast<RankedTensorType>();
+    if (!lhsType || !rhsType || !dstType) {
       return rewriter.notifyMatchFailure(op, "requires ranked types");
     }
     mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
@@ -147,6 +148,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
                              SmallVectorImpl<Value> &outBatchingDimExtents) {
       outBatchingDimExtents.clear();
       RankedTensorType untransposedType = type;
+      Type elementType = type.getElementType();
       SmallVector<int64_t, 6> permutation;
       llvm::BitVector freeDims(untransposedType.getRank(), true);
       SmallVector<Value, 6> contractingDimExtents;
@@ -216,11 +218,13 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
     auto dstStaticShape = llvm::to_vector<6>(
         llvm::makeArrayRef({static_cast<int64_t>(-1), static_cast<int64_t>(-1),
                             static_cast<int64_t>(-1)}));
-    auto dstType = RankedTensorType::get(dstStaticShape, elementType);
+    auto dstElementType = dstType.getElementType();
     Value dst = rewriter.create<IREE::VMLA::BatchMatMulPseudoOp>(
-        op.getLoc(), dstType, lhs, rhs);
+        op.getLoc(), RankedTensorType::get(dstStaticShape, dstElementType), lhs,
+        rhs);
     RankedTensorType transposeType = RankedTensorType::get(
-        {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]}, elementType);
+        {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]},
+        dstElementType);
     auto transpose = rewriter.create<mhlo::TransposeOp>(
         op.getLoc(), transposeType, dst, make1DElementsAttr({0, 2, 1}));
     auto reshapeShape = batchingDimExtents;
