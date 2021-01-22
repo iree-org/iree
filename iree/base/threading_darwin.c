@@ -107,7 +107,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
 
   pthread_attr_t thread_attr;
   pthread_attr_init(&thread_attr);
-  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   if (params.stack_size) {
     pthread_attr_setstacksize(&thread_attr, params.stack_size);
   }
@@ -154,6 +154,17 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   return iree_ok_status();
 }
 
+static void iree_thread_delete(iree_thread_t* thread) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_thread_resume(thread);
+  pthread_join(thread->handle, NULL);
+
+  iree_allocator_free(thread->allocator, thread);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
 void iree_thread_retain(iree_thread_t* thread) {
   if (thread) {
     iree_atomic_ref_count_inc(&thread->ref_count);
@@ -162,7 +173,7 @@ void iree_thread_retain(iree_thread_t* thread) {
 
 void iree_thread_release(iree_thread_t* thread) {
   if (thread && iree_atomic_ref_count_dec(&thread->ref_count) == 1) {
-    iree_allocator_free(thread->allocator, thread);
+    iree_thread_delete(thread);
   }
 }
 

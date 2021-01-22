@@ -47,7 +47,7 @@ iree_status_t iree_task_worker_initialize(
     initial_state = IREE_TASK_WORKER_STATE_SUSPENDED;
   }
   iree_atomic_store_int32(&out_worker->state, initial_state,
-                          iree_memory_order_relaxed);
+                          iree_memory_order_seq_cst);
 
   iree_notification_initialize(&out_worker->wake_notification);
   iree_notification_initialize(&out_worker->state_notification);
@@ -125,7 +125,7 @@ void iree_task_worker_request_exit(iree_task_worker_t* worker) {
     case IREE_TASK_WORKER_STATE_ZOMBIE:
       // Worker already exited; reset state to ZOMBIE.
       iree_atomic_store_int32(&worker->state, IREE_TASK_WORKER_STATE_ZOMBIE,
-                              iree_memory_order_relaxed);
+                              iree_memory_order_seq_cst);
       break;
     default:
       // Worker now set to EXITING and should exit soon.
@@ -276,7 +276,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
   // Pump the thread loop to process more tasks.
   while (true) {
     // Check state to see if we've been asked to exit.
-    if (iree_atomic_load_int32(&worker->state, iree_memory_order_relaxed) ==
+    if (iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
         IREE_TASK_WORKER_STATE_EXITING) {
       // Thread exit requested - cancel pumping.
       // TODO(benvanik): complete tasks before exiting?
@@ -292,7 +292,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
         iree_notification_prepare_wait(&worker->wake_notification);
     iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_idle_mask,
                                             ~worker->worker_bit,
-                                            iree_memory_order_relaxed);
+                                            iree_memory_order_seq_cst);
 
     while (iree_task_worker_pump_once(worker)) {
       // All work done ^, which will return false when the worker should wait.
@@ -320,7 +320,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
                                   "iree_task_worker_main_pump_wake_wait");
       iree_atomic_task_affinity_set_fetch_or(
           &worker->executor->worker_idle_mask, worker->worker_bit,
-          iree_memory_order_relaxed);
+          iree_memory_order_seq_cst);
       iree_notification_commit_wait(&worker->wake_notification, wait_token);
       IREE_TRACE_ZONE_END(z_wait);
     }
@@ -353,7 +353,7 @@ static int iree_task_worker_main(iree_task_worker_t* worker) {
 
   IREE_TRACE_ZONE_END(thread_zone);
   iree_atomic_store_int32(&worker->state, IREE_TASK_WORKER_STATE_ZOMBIE,
-                          iree_memory_order_release);
+                          iree_memory_order_seq_cst);
   iree_notification_post(&worker->state_notification, IREE_ALL_WAITERS);
   return 0;
 }
