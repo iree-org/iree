@@ -505,8 +505,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
   command_buffer->syms->vkCmdPushConstants(
       command_buffer->handle,
       iree_hal_vulkan_native_executable_layout_handle(executable_layout),
-      VK_SHADER_STAGE_COMPUTE_BIT, (uint32_t)(offset * sizeof(uint32_t)),
-      (uint32_t)(values_length * sizeof(uint32_t)), values);
+      VK_SHADER_STAGE_COMPUTE_BIT, (uint32_t)offset, (uint32_t)values_length,
+      values);
 
   return iree_ok_status();
 }
