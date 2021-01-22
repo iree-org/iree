@@ -543,8 +543,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 // TODO(benvanik): clone buffer op.
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+    DeclareOpInterfaceMethods<OpAsmOpInterface>]> {
   let summary = [{buffer subspan operation}];
   let description = [{
     Returns a reference to a subspan of the buffer.
@@ -2178,7 +2177,8 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   }];
 }
 
-def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan"> {
+def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
+    MemoryEffects<[MemAlloc]>]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
     // TODO(benvanik): add description
@@ -2190,7 +2190,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan"> {
     Optional<HAL_DeviceSize>:$byte_length
   );
   let results = (outs
-    AnyType:$result
+    Res<AnyType, "", [MemAlloc]>:$result
   );
 
   let assemblyFormat = [{

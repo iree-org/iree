@@ -393,28 +393,28 @@ struct MatMul {
 
   static std::unique_ptr<RuntimeState> CreateRuntimeState();
 
-  template <typename T, typename ACC>
+  template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
   struct Buffers {
     ShapeSpan lhs_shape;
-    absl::Span<const T> lhs_buffer;
+    absl::Span<const LhsEl> lhs_buffer;
     ShapeSpan rhs_shape;
-    absl::Span<const T> rhs_buffer;
+    absl::Span<const RhsEl> rhs_buffer;
     ShapeSpan dst_shape;
-    absl::Span<T> dst_buffer;
+    absl::Span<DstEl> dst_buffer;
 
     // Optional bias buffer.
-    absl::Span<const ACC> bias_buffer;
+    absl::Span<const AccumEl> bias_buffer;
 
     // Fixed-point multiplier mantissa/exponent. May be a single value (for
     // uniform quantization) or one element per row of the destination matrix
     // for per-channel.
-    absl::Span<const ACC> multiplier_mantissa_buffer;
+    absl::Span<const AccumEl> multiplier_mantissa_buffer;
     absl::Span<const int32_t> multiplier_exponent_buffer;
   };
 
-  template <typename T, typename ACC>
+  template <typename LhsEl, typename RhsEl, typename AccumEl, typename DstEl>
   static Status Execute(RuntimeState* runtime_state,
-                        const Buffers<T, ACC>& buffers);
+                        const Buffers<LhsEl, RhsEl, AccumEl, DstEl>& buffers);
 };
 
 struct RuntimeState {

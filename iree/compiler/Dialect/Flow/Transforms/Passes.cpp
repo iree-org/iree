@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -60,6 +61,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Frontload linalg-on-tensors transformations and dispatch region creation.
   if (clEnableLinalgOnTensorsDispatch) {
+    addHLOToLinalgOnTensorsPasses(passManager);
     passManager.addNestedPass<FuncOp>(
         createDispatchLinalgOnTensorsPass(clLinalgOnTensorsTileSizes));
   }
@@ -67,6 +69,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
+
+  // Convert TOSA ops to Linalg-on-tensor ops.
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
@@ -180,10 +185,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
-
-  if (clEnableLinalgOnTensorsDispatch) {
-    addHLOToLinalgOnTensorsPasses(passManager);
-  }
 
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only

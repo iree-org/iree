@@ -17,13 +17,22 @@
 
 #include <stdint.h>
 
-// arithmetic
+// Arithmetic ops
 inline int32_t vm_add_i32(int32_t a, int32_t b) { return a + b; }
 
-// compare
+// Check ops
+// TODO(simon-camp): These macros should be removed once control flow ops are
+// supported in the c module target
+#define VM_CHECK_EQ(a, b, message)                                          \
+  if (a != b) {                                                             \
+    return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0, \
+                                iree_make_cstring_view("message"));         \
+  }
+
+// Compare ops
 inline int32_t vm_cmp_ne_i32(int32_t a, int32_t b) { return a != b ? 1 : 0; }
 
-// const
+// Const ops
 inline int32_t vm_const_i32(int32_t a) { return a; }
 
 #endif  // IREE_VM_C_FUNCS_H_

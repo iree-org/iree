@@ -26,6 +26,5 @@ iree_check_single_backend_test_suite(
     "dylib"
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
-    "-iree-flow-dispatch-linalg-on-tensors-tile-sizes=1,1"
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
 )

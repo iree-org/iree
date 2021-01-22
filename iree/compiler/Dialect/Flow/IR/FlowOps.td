@@ -436,7 +436,16 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs FLOW_Dim:$result);
 
+  let builders = [
+    OpBuilderDAG<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
 }
 
 def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [

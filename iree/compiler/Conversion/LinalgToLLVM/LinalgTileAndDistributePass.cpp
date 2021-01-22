@@ -46,81 +46,6 @@ struct LinalgTileAndDistributePass
 };
 }  // namespace
 
-namespace {
-template <typename LinalgOpTy>
-struct TileToCPUThreads : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
-  TileToCPUThreads(MLIRContext *context,
-                   const linalg::LinalgDependenceGraph &dependenceGraph,
-                   const CPUKernelDispatch &cpuKernelDispatch,
-                   linalg::LinalgTilingOptions options,
-                   linalg::LinalgMarker marker, PatternBenefit benefit = 1)
-      : Base(LinalgOpTy::getOperationName(), context, options, marker, benefit),
-        cpuKernelDispatch(cpuKernelDispatch) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
-    // erased.
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
-    linalg::TiledLinalgOp tiledLinalgOp;
-    if (!funcOp ||
-        failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp)) ||
-        !tiledLinalgOp.tensorResults.empty() ||
-        (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
-         failed(createNumWorkgroupsFromResultShape(
-             rewriter, cast<linalg::LinalgOp>(op), funcOp,
-             getNumWorkgroupsFnAttrName(),
-             cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(
-                 op))))) {
-      return failure();
-    }
-    rewriter.eraseOp(op);
-    return success();
-  }
-  CPUKernelDispatch cpuKernelDispatch;
-};
-
-template <typename LinalgOpTy>
-struct TileAndFuseToCPUThreads
-    : public linalg::LinalgTileAndFusePattern<LinalgOpTy> {
-  using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
-  TileAndFuseToCPUThreads(MLIRContext *context,
-                          const linalg::LinalgDependenceGraph &dependenceGraph,
-                          const CPUKernelDispatch &cpuKernelDispatch,
-                          linalg::LinalgTilingOptions tilingOptions,
-                          linalg::LinalgMarker marker,
-                          PatternBenefit benefit = 1)
-      : Base(context, dependenceGraph, tilingOptions,
-             linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
-             marker,
-             linalg::LinalgMarker(ArrayRef<Identifier>(),
-                                  Identifier::get(getDeleteMarker(), context)),
-             benefit),
-        dependenceGraph(dependenceGraph),
-        cpuKernelDispatch(cpuKernelDispatch) {}
-
-  virtual LogicalResult matchAndRewrite(Operation *op,
-                                        PatternRewriter &rewriter) const {
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
-    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-    if (!funcOp || !dependenceGraph.hasDependentOperations(linalgOp) ||
-        failed(Base::matchAndRewrite(op, rewriter)) ||
-        failed(createNumWorkgroupsFromResultShape(
-            rewriter, cast<linalg::LinalgOp>(op), funcOp,
-            getNumWorkgroupsFnAttrName().str(),
-            cpuKernelDispatch.getTileSizes<TilingLevel::WorkGroupTiles>(op)))) {
-      return failure();
-    }
-    return success();
-  }
-
-  const linalg::LinalgDependenceGraph &dependenceGraph;
-  CPUKernelDispatch cpuKernelDispatch;
-};
-
-}  // namespace
-
 Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
                                           ArrayRef<Value> boundingSubViewSize,
                                           OperationFolder *folder) {
@@ -153,45 +78,18 @@ void LinalgTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp module = getOperation();
 
-  static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-      [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-        auto numParallelDims = parallelLoopRanges.size();
-        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        for (size_t dim = 0;
-             dim < std::min(numParallelDims, static_cast<size_t>(3)); ++dim) {
-          procInfo[numParallelDims - dim - 1] = {
-              builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
-                  loc, builder.getIndexType(), APInt(64, dim)),
-              builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  loc, builder.getIndexType(), APInt(64, dim)),
-          };
-        }
-        return procInfo;
-      },
-      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
-    Region &body = funcOp.getBody();
-    if (!llvm::hasSingleElement(body.getBlocks())) {
-      funcOp.emitError("unhandled dispatch function with multiple blocks");
+    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    SmallVector<Operation *, 4> tiledLoops;
+    if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
       return signalPassFailure();
     }
-    Block &block = body.front();
-    auto linalgOps = block.getOps<linalg::LinalgOp>();
-    if (linalgOps.empty()) continue;
-
-    SmallVector<linalg::LinalgOp, 4> linalgOpsVec =
-        llvm::to_vector<4>(llvm::map_range(linalgOps, [](Operation *op) {
-          return cast<linalg::LinalgOp>(op);
-        }));
     linalg::Aliases aliases;
-    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
     Optional<LaunchConfig> launchConfigOpt =
-        initCPULaunchConfig(context, dependenceGraph, linalgOpsVec);
+        initCPULaunchConfig(context, dependenceGraph, linalgOps);
     if (!launchConfigOpt) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
@@ -215,11 +113,39 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
     });
 
-    TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
-                                             allocateThreadLocalMemory};
-    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOpsVec, dependenceGraph,
-                                          launchConfig, tileAndFuseOptions))) {
-      return signalPassFailure();
+    if (tiledLoops.empty()) {
+      linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
+          [](OpBuilder &builder, Location loc,
+             ArrayRef<Range> parallelLoopRanges) {
+            auto numParallelDims = parallelLoopRanges.size();
+            SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+            for (size_t dim = 0,
+                        e = std::min(numParallelDims, static_cast<size_t>(3));
+                 dim < e; ++dim) {
+              procInfo[numParallelDims - dim - 1] = {
+                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
+                      loc, builder.getIndexType(), APInt(64, dim)),
+                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
+                      loc, builder.getIndexType(), APInt(64, dim)),
+              };
+            }
+            return procInfo;
+          },
+          {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+           linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+           linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+      TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
+                                               allocateThreadLocalMemory};
+      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
+                                            launchConfig,
+                                            tileAndFuseOptions))) {
+        return signalPassFailure();
+      }
+    } else {
+      if (failed(materializeStaticLaunchInformation(funcOp, launchConfig,
+                                                    tiledLoops.size()))) {
+        return signalPassFailure();
+      }
     }
 
     launchConfig.finalize(funcOp);

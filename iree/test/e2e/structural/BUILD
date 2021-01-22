@@ -33,7 +33,6 @@ iree_check_single_backend_test_suite(
     srcs = [
         "gather_add.mlir",
         "matmul_add.mlir",
-        "slice_add.mlir",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
@@ -44,7 +43,6 @@ iree_check_single_backend_test_suite(
     srcs = [
         "gather_add.mlir",
         "matmul_add.mlir",
-        "slice_add.mlir",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
