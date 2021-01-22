@@ -35,12 +35,6 @@ android {
                         '-DIREE_BUILD_TESTS=OFF',
                         '-DIREE_BUILD_SAMPLES=OFF',
                         '-DIREE_BUILD_PYTHON_BINDINGS=OFF',
-
-                        // TODO(#4520): This is being checked in for now with
-                        // the hard-coded linux paths due to complications
-                        // with configuring cross-compilation.
-                        '-DIREE_HOST_C_COMPILER=/usr/bin/clang',
-                        '-DIREE_HOST_CXX_COMPILER=/usr/bin/clang++'
             }
         }
     }
