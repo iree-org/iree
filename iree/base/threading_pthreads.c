@@ -150,7 +150,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
 
   pthread_attr_t thread_attr;
   pthread_attr_init(&thread_attr);
-  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
   if (params.stack_size) {
     pthread_attr_setstacksize(&thread_attr, params.stack_size);
   }
@@ -197,6 +197,7 @@ static void iree_thread_delete(iree_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_thread_resume(thread);
+  pthread_join(thread->handle, NULL);
 
   iree_notification_deinitialize(&thread->suspend_barrier);
   iree_thread_override_list_deinitialize(&thread->qos_override_list);
