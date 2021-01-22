@@ -203,6 +203,7 @@ static void iree_thread_delete(iree_thread_t* thread) {
 
   iree_thread_resume(thread);
 
+  WaitForSingleObject(thread->handle, INFINITE);
   CloseHandle(thread->handle);
   iree_thread_override_list_deinitialize(&thread->qos_override_list);
   iree_allocator_free(thread->allocator, thread);
