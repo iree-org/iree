@@ -36,12 +36,6 @@ function(iree_check_test)
     return()
   endif()
 
-  # When *not* cross compiling, respect the IREE_BUILD_COMPILER option.
-  # Cross compilation uses its own "IREE_HOST_BUILD_COMPILER" option.
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
-    return()
-  endif()
-
   cmake_parse_arguments(
     _RULE
     ""

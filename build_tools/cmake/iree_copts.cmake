@@ -368,24 +368,6 @@ set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
-# Third party: flatbuffers
-#-------------------------------------------------------------------------------
-
-set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INCLUDE_DIRS
-  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
-)
-
-if(CMAKE_CROSSCOMPILING)
-  set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "" FORCE)
-else()
-  set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
-endif()
-
-#-------------------------------------------------------------------------------
 # Third party: flatcc
 #-------------------------------------------------------------------------------
 

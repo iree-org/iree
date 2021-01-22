@@ -35,11 +35,9 @@ function(iree_lit_test)
     return()
   endif()
 
-  # When *not* cross compiling, respect the IREE_BUILD_COMPILER option.
-  # Cross compilation uses its own "IREE_HOST_BUILD_COMPILER" option.
   # Note: lit tests are not *required* to be "compiler" tests, but we only use
   # them for compiler tests in practice.
-  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+  if(NOT IREE_BUILD_COMPILER)
     return()
   endif()
 

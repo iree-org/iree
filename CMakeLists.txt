@@ -33,8 +33,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Project component configuration
 #-------------------------------------------------------------------------------
 
-# Make sure to also update these options in
-# build_tools/cmake/iree_cross_compile.cmake
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
@@ -179,54 +177,6 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
-
-#-------------------------------------------------------------------------------
-# Cross compiling configuration
-#-------------------------------------------------------------------------------
-
-if(CMAKE_CROSSCOMPILING)
-  message(STATUS "Detected cross compilation mode; configuring IREE on host...")
-
-  # C/C++ compilers for host compilation.
-  # Note: we need to explicitly set this because IREE does not work well with
-  # GCC at the moment: https://github.com/google/iree/issues/1269
-  set(IREE_HOST_C_COMPILER "$ENV{IREE_HOST_C_COMPILER}" CACHE FILEPATH "C compiler for host compilation")
-  set(IREE_HOST_CXX_COMPILER "$ENV{IREE_HOST_CXX_COMPILER}" CACHE FILEPATH "C++ compiler for host compilation")
-
-  # Master configuration for the binary directory containing all artifacts
-  # compiled for host.
-  if(NOT IREE_HOST_BINARY_ROOT)
-    set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host" CACHE FILEPATH "directory containing host artifacts")
-  endif()
-
-  set(IREE_HOST_BUILD_COMPILER ON) # For iree-translate
-  set(IREE_HOST_ENABLE_LLVM ON)    # For iree-tblgen
-
-  # Set the host build directory for LLVM to our directory. Otherwise it will
-  # follow its own convention.
-  set(LLVM_NATIVE_BUILD
-      "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm"
-      CACHE FILEPATH "directory containing host artifacts for LLVM"
-  )
-
-  # And set host C/C++ compiler for LLVM. This makes cross compilation using
-  # Windows as the host platform nicer. Because we have various development
-  # evnironments on Windows (CMD, Cygwin, MSYS, etc.), LLVM can have problems
-  # figuring out the host triple and toolchain. We are passing in the host
-  # C/C++ compiler toolchain for IREE anyway; so we can give LLVM side some
-  # help here. This hides some complexity and ugliness from the users.
-  set(CROSS_TOOLCHAIN_FLAGS_NATIVE
-      "-DCMAKE_C_COMPILER=\"${IREE_HOST_C_COMPILER}\";-DCMAKE_CXX_COMPILER=\"${IREE_HOST_CXX_COMPILER}\""
-      CACHE FILEPATH "LLVM toolchain configuration for host build"
-  )
-
-  include(iree_cross_compile)
-
-  # Use another CMake invocation to configure a build for host.
-  iree_create_configuration(HOST)
-
-  message(STATUS "Done configuring IREE on host in ${IREE_HOST_BINARY_ROOT}")
-endif()
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -448,28 +398,18 @@ add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
-if(CMAKE_CROSSCOMPILING)
-  # We need flatc to generate some source code. When cross-compiling, we need
-  # to make sure the flatc binary is configured under host environment.
-  iree_declare_host_excutable(flatc "flatc" BUILDONLY)
-  iree_declare_host_excutable(flatcc_cli "flatcc_cli" BUILDONLY)
-
-  # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
-  # binary in BuildFlatBuffers().
-  iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
-
-  # Add a custom target to copy the flatc to the binary directory.
-  add_custom_target(iree_host_flatcc_cli
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli${IREE_HOST_EXECUTABLE_SUFFIX}"
-    DEPENDS iree_host_build_flatcc_cli
-    COMMENT "Installing host flatcc..."
-  )
-else()
-  # TODO: unify flatc and flatcc handling to the same mechanism.
-  add_executable(iree_host_flatcc_cli ALIAS flatcc_cli)
+# Configure flatcc_cli's executable for host/target builds:
+#   "flatcc_cli" target name (when building for host)
+#   "flatcc_d" executable name (when referencing from target build)
+# TODO(scotttodd): Uhhhh figure out a better way to manage this?
+#   cmake `install(RENAME ...)` doesn't work on targets...?
+#   cmake `install()` doesn't work with aliases...?
+#   custom target could copy files around and rename but that's hacky
+if(NOT CMAKE_CROSSCOMPILING)
+  add_executable(flatcc_d ALIAS flatcc_cli)
+  install(TARGETS flatcc_cli
+          COMPONENT flatcc_cli
+          RUNTIME DESTINATION bin)
 endif()
 
 if(${IREE_BUILD_COMPILER})
