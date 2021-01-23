@@ -129,6 +129,7 @@ iree_cc_test(
     "topology_test.cc"
   DEPS
     ::task
+    cpuinfo
     iree::base::api
     iree::testing::gtest
     iree::testing::gtest_main
