@@ -100,97 +100,6 @@ VkBuffer iree_hal_vulkan_vma_buffer_handle(iree_hal_buffer_t* base_buffer) {
   return buffer->handle;
 }
 
-static iree_status_t iree_hal_vulkan_vma_buffer_fill(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, const void* pattern,
-    iree_host_size_t pattern_length) {
-  iree_hal_buffer_mapping_t target_mapping;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      base_buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, byte_offset,
-      byte_length, &target_mapping));
-  iree_status_t status = iree_ok_status();
-  void* data_ptr = target_mapping.contents.data;
-  switch (pattern_length) {
-    case 1: {
-      uint8_t* data = (uint8_t*)data_ptr;
-      uint8_t value_bits = *(const uint8_t*)(pattern);
-      memset(data, value_bits, byte_length);
-      break;
-    }
-    case 2: {
-      uint16_t* data = (uint16_t*)data_ptr;
-      uint16_t value_bits = *(const uint16_t*)(pattern);
-      for (iree_device_size_t i = 0; i < byte_length / sizeof(uint16_t); ++i) {
-        data[i] = value_bits;
-      }
-      break;
-    }
-    case 4: {
-      uint32_t* data = (uint32_t*)data_ptr;
-      uint32_t value_bits = *(const uint32_t*)(pattern);
-      for (iree_device_size_t i = 0; i < byte_length / sizeof(uint32_t); ++i) {
-        data[i] = value_bits;
-      }
-      break;
-    }
-    default:
-      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "unsupported fill pattern length: %zu",
-                                pattern_length);
-      break;
-  }
-  iree_hal_buffer_flush_range(&target_mapping, byte_offset, byte_length);
-  iree_status_ignore(iree_hal_buffer_unmap_range(&target_mapping));
-  return status;
-}
-
-static iree_status_t iree_hal_vulkan_vma_buffer_read_data(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t source_offset,
-    void* target_buffer, iree_device_size_t data_length) {
-  iree_hal_buffer_mapping_t source_mapping;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_map_range(base_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                source_offset, data_length, &source_mapping));
-  memcpy(target_buffer, source_mapping.contents.data, data_length);
-  return iree_hal_buffer_unmap_range(&source_mapping);
-}
-
-static iree_status_t iree_hal_vulkan_vma_buffer_write_data(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t target_offset,
-    const void* source_buffer, iree_device_size_t data_length) {
-  iree_hal_buffer_mapping_t target_mapping;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      base_buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset,
-      data_length, &target_mapping));
-  memcpy(target_mapping.contents.data, source_buffer, data_length);
-  return iree_hal_buffer_unmap_range(&target_mapping);
-}
-
-static iree_status_t iree_hal_vulkan_vma_buffer_copy_data(
-    iree_hal_buffer_t* base_source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* base_target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t data_length) {
-  iree_hal_buffer_mapping_t source_mapping;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_map_range(base_source_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                source_offset, data_length, &source_mapping));
-  iree_hal_buffer_mapping_t target_mapping;
-  iree_status_t status = iree_hal_buffer_map_range(
-      base_target_buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset,
-      data_length, &target_mapping);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    IREE_IGNORE_ERROR(iree_hal_buffer_unmap_range(&source_mapping));
-    return status;
-  }
-
-  memcpy(target_mapping.contents.data, source_mapping.contents.data,
-         data_length);
-
-  IREE_IGNORE_ERROR(iree_hal_buffer_unmap_range(&source_mapping));
-  IREE_IGNORE_ERROR(iree_hal_buffer_unmap_range(&target_mapping));
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
@@ -251,10 +160,6 @@ static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
 
 const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
     /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
-    /*.fill=*/iree_hal_vulkan_vma_buffer_fill,
-    /*.read_data=*/iree_hal_vulkan_vma_buffer_read_data,
-    /*.write_data=*/iree_hal_vulkan_vma_buffer_write_data,
-    /*.copy_data=*/iree_hal_vulkan_vma_buffer_copy_data,
     /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
     /*.unmap_range=*/iree_hal_vulkan_vma_buffer_unmap_range,
     /*.invalidate_range=*/iree_hal_vulkan_vma_buffer_invalidate_range,
