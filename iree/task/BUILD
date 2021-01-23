@@ -111,7 +111,10 @@ cc_test(
 
 cc_test(
     name = "scope_test",
-    srcs = ["scope_test.cc"],
+    srcs = [
+        "scope_test.cc",
+        "task_impl.h",
+    ],
     deps = [
         ":task",
         "//iree/base:api",
