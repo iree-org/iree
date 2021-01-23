@@ -229,8 +229,8 @@ static bool iree_task_worker_pump_once(iree_task_worker_t* worker) {
     // first place (large uneven workloads for various workers, bad distribution
     // in the face of heterogenous multi-core architectures where some workers
     // complete tasks faster than others, etc).
-    task = iree_task_queue_append_from_lifo_slist(&worker->local_task_queue,
-                                                  &worker->mailbox_slist);
+    task = iree_task_queue_flush_from_lifo_slist(&worker->local_task_queue,
+                                                 &worker->mailbox_slist);
   }
 
   // If we ran out of work assigned to this specific worker try to steal some

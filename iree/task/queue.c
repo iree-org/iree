@@ -49,7 +49,7 @@ void iree_task_queue_append_from_lifo_list_unsafe(iree_task_queue_t* queue,
   iree_slim_mutex_unlock(&queue->mutex);
 }
 
-iree_task_t* iree_task_queue_append_from_lifo_slist(
+iree_task_t* iree_task_queue_flush_from_lifo_slist(
     iree_task_queue_t* queue, iree_atomic_task_slist_t* source_slist) {
   // Perform the flush and swap outside of the lock; acquiring the list is
   // atomic and then we own it exclusively.
