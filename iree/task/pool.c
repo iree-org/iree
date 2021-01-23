@@ -14,6 +14,7 @@
 
 #include "iree/task/pool.h"
 
+#include "iree/base/debugging.h"
 #include "iree/base/math.h"
 
 // Minimum byte size of a block in bytes, including the tasks as well as the
@@ -94,9 +95,11 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
   iree_task_t* head = (iree_task_t*)p;
   iree_task_t* tail = head;
   head->next_task = NULL;
+  head->pool = pool;
   for (iree_host_size_t i = 0; i < actual_capacity; ++i, p -= pool->task_size) {
     iree_task_t* task = (iree_task_t*)p;
     task->next_task = head;
+    task->pool = pool;
     head = task;
   }
 
@@ -289,6 +292,6 @@ iree_status_t iree_task_pool_acquire_many(iree_task_pool_t* pool,
 
 void iree_task_pool_release(iree_task_pool_t* pool, iree_task_t* task) {
   if (!pool) return;
-  assert(task->pool == pool);
+  IREE_ASSERT_EQ(task->pool, pool);
   iree_atomic_task_slist_push(&pool->available_slist, task);
 }
