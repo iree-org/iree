@@ -56,8 +56,7 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build .
-"${CMAKE_BIN?}" --install .
+"${CMAKE_BIN?}" --build . --target install
 # --------------------------------------------------------------------------- #
 
 cd ${ROOT_DIR?}

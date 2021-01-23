@@ -68,8 +68,7 @@ them from a binary distribution:
 
 ```shell
 $ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-host/install .
-$ cmake --build ../iree-build-host/
-$ cmake --install ../iree-build-host/
+$ cmake --build ../iree-build-host/ --target install
 ```
 
 ### Target configuration
