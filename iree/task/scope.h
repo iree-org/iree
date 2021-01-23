@@ -86,6 +86,20 @@ void iree_task_scope_initialize(iree_string_view_t name,
 // No tasks may be pending and the scope must be idle.
 void iree_task_scope_deinitialize(iree_task_scope_t* scope);
 
+// Returns the name of the scope. Informational only and may be the empty
+// string.
+iree_string_view_t iree_task_scope_name(iree_task_scope_t* scope);
+
+// Returns and resets the statistics for the scope.
+// Statistics may experience tearing (non-atomic update across fields) if this
+// is performed while tasks are in-flight.
+iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
+    iree_task_scope_t* scope);
+
+// Returns the permanent scope failure status to the caller (transfering
+// ownership). The scope will remain in a failed state with the status code.
+iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope);
+
 // Marks the scope as having been aborted by the user with IREE_STATUS_ABORTED.
 // All pending tasks will be dropped though in-flight tasks may complete
 // execution. Callers must use iree_task_scope_wait_idle to ensure the scope
@@ -101,16 +115,6 @@ void iree_task_scope_abort(iree_task_scope_t* scope);
 // marked as failing then the status is ignored.
 void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
                           iree_status_t status);
-
-// Returns the permanent scope failure status to the caller (transfering
-// ownership). The scope will remain in a failed state with the status code.
-iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope);
-
-// Returns and resets the statistics for the scope.
-// Statistics may experience tearing (non-atomic update across fields) if this
-// is performed while tasks are in-flight.
-iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
-    iree_task_scope_t* scope);
 
 // Returns true if the scope has no pending or in-flight tasks.
 //

@@ -113,6 +113,7 @@ iree_cc_test(
     scope_test
   SRCS
     "scope_test.cc"
+    "task_impl.h"
   DEPS
     ::task
     iree::base::api
