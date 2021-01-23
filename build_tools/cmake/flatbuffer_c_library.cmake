@@ -95,7 +95,7 @@ function(flatbuffer_c_library)
   endforeach()
   list(TRANSFORM _OUTS PREPEND "${CMAKE_CURRENT_BINARY_DIR}/")
 
-  iree_get_executable_path(_FLATCC_BIN flatcc_d)
+  iree_get_executable_path(_FLATCC_BIN iree-flatcc-cli)
   add_custom_command(
     OUTPUT
       ${_OUTS}

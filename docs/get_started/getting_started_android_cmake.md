@@ -67,7 +67,7 @@ Build and install at least the compiler tools on your host machine, or install
 them from a binary distribution:
 
 ```shell
-$ cmake -G Ninja -B ../iree-build-host/ .
+$ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-host/install .
 $ cmake --build ../iree-build-host/
 $ cmake --install ../iree-build-host/
 ```

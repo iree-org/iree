@@ -50,7 +50,8 @@ class UnixLinkerTool : public LinkerTool {
 #elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_64)
       toolchains_binary_path = "/toolchains/llvm/prebuilt/windows-x86_64/bin/";
 #else
-      // Unknown architecture/platform.
+      llvm::errs() << "Unknown architecture/platform combination"
+                   << "\n";
       return "";
 #endif  // IREE_PLATFORM_* && IREE_ARCH_*
 

@@ -398,17 +398,10 @@ add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
-# Configure flatcc_cli's executable for host/target builds:
-#   "flatcc_cli" target name (when building for host)
-#   "flatcc_d" executable name (when referencing from target build)
-# TODO(scotttodd): Uhhhh figure out a better way to manage this?
-#   cmake `install(RENAME ...)` doesn't work on targets...?
-#   cmake `install()` doesn't work with aliases...?
-#   custom target could copy files around and rename but that's hacky
-if(NOT CMAKE_CROSSCOMPILING)
-  add_executable(flatcc_d ALIAS flatcc_cli)
-  install(TARGETS flatcc_cli
-          COMPONENT flatcc_cli
+# TODO(scotttodd): Iterate some more and find a better place for this.
+if (NOT CMAKE_CROSSCOMPILING)
+  install(TARGETS iree-flatcc-cli
+          COMPONENT iree-flatcc-cli
           RUNTIME DESTINATION bin)
 endif()
 

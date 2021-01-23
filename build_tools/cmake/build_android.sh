@@ -43,15 +43,16 @@ cd ${ROOT_DIR?}
 
 if [ -d "build-host" ]
 then
-  echo "`build-host` directory already exists. Will use cached results there."
+  echo "build-host directory already exists. Will use cached results there."
 else
-  echo "`build-host` directory does not already exist. Creating a new one."
+  echo "build-host directory does not already exist. Creating a new one."
   mkdir build-host
 fi
 cd build-host
 
 # Configure, build, install.
 "${CMAKE_BIN?}" -G Ninja .. \
+  -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
@@ -66,9 +67,9 @@ cd ${ROOT_DIR?}
 
 if [ -d "build-android" ]
 then
-  echo "`build-android` directory already exists. Will use cached results there."
+  echo "build-android directory already exists. Will use cached results there."
 else
-  echo "`build-android` directory does not already exist. Creating a new one."
+  echo "build-android directory does not already exist. Creating a new one."
   mkdir build-android
 fi
 cd build-android
