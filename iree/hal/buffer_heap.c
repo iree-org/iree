@@ -72,88 +72,6 @@ static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_heap_buffer_fill(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, const void* pattern,
-    iree_host_size_t pattern_length) {
-  iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  switch (pattern_length) {
-    case 1: {
-      uint8_t* data = (uint8_t*)(buffer->data.data + byte_offset);
-      uint8_t value_bits = *(const uint8_t*)(pattern);
-      memset(data, value_bits, byte_length);
-      break;
-    }
-    case 2: {
-      uint16_t* data = (uint16_t*)(buffer->data.data + byte_offset);
-      uint16_t value_bits = *(const uint16_t*)(pattern);
-      for (iree_device_size_t i = 0; i < byte_length / sizeof(uint16_t); ++i) {
-        data[i] = value_bits;
-      }
-      break;
-    }
-    case 4: {
-      uint32_t* data = (uint32_t*)(buffer->data.data + byte_offset);
-      uint32_t value_bits = *(const uint32_t*)(pattern);
-      for (iree_device_size_t i = 0; i < byte_length / sizeof(uint32_t); ++i) {
-        data[i] = value_bits;
-      }
-      break;
-    }
-    default:
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unsupported fill pattern length: %zu",
-                              pattern_length);
-  }
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_heap_buffer_read_data(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t source_offset,
-    void* target_buffer, iree_device_size_t data_length) {
-  iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  memcpy(target_buffer, buffer->data.data + source_offset, data_length);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_heap_buffer_write_data(
-    iree_hal_buffer_t* base_buffer, iree_device_size_t target_offset,
-    const void* source_buffer, iree_device_size_t data_length) {
-  iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  memcpy(buffer->data.data + target_offset, source_buffer, data_length);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_heap_buffer_copy_data(
-    iree_hal_buffer_t* base_source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* base_target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t data_length) {
-  // target_buffer is a heap buffer - source_buffer may be anything.
-  iree_hal_heap_buffer_t* target_buffer =
-      (iree_hal_heap_buffer_t*)base_target_buffer;
-  void* target_ptr = target_buffer->data.data + target_offset;
-
-  // We can avoid jumping through a bunch of hoops if we see the source/target
-  // are from the same allocator (meaning they are both heap buffers).
-  if (iree_hal_buffer_allocator(base_source_buffer) ==
-      iree_hal_buffer_allocator(base_target_buffer)) {
-    // Both are definitely heap buffers.
-    iree_hal_heap_buffer_t* source_buffer =
-        (iree_hal_heap_buffer_t*)base_source_buffer;
-    memcpy(target_ptr, source_buffer->data.data + source_offset, data_length);
-    return iree_ok_status();
-  }
-
-  // target_buffer is a heap buffer, source_buffer is anything. Map so that
-  // we do the copy in the way most compatible with all backends.
-  iree_hal_buffer_mapping_t source_mapping;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_map_range(base_source_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                source_offset, data_length, &source_mapping));
-  memcpy(target_ptr, source_mapping.contents.data, data_length);
-  return iree_hal_buffer_unmap_range(&source_mapping);
-}
-
 static iree_status_t iree_hal_heap_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
@@ -197,10 +115,6 @@ static iree_status_t iree_hal_heap_buffer_flush_range(
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable = {
     .destroy = iree_hal_heap_buffer_destroy,
-    .fill = iree_hal_heap_buffer_fill,
-    .read_data = iree_hal_heap_buffer_read_data,
-    .write_data = iree_hal_heap_buffer_write_data,
-    .copy_data = iree_hal_heap_buffer_copy_data,
     .map_range = iree_hal_heap_buffer_map_range,
     .unmap_range = iree_hal_heap_buffer_unmap_range,
     .invalidate_range = iree_hal_heap_buffer_invalidate_range,
