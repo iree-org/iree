@@ -95,7 +95,7 @@ void iree_task_pool_deinitialize(iree_task_pool_t* pool);
 void iree_task_pool_trim(iree_task_pool_t* pool);
 
 // Acquires a task from the task pool. The returned task will have undefined
-// contents and must be intialized by the caller.
+// contents and must be initialized by the caller.
 iree_status_t iree_task_pool_acquire(iree_task_pool_t* pool,
                                      iree_task_t** out_task);
 
