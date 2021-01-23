@@ -63,27 +63,26 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 
+  iree_task_topology_t topology;
+  iree_task_topology_initialize(&topology);
+  if (absl::GetFlag(FLAGS_dylib_worker_count) > 0) {
+    iree_task_topology_initialize_from_group_count(
+        absl::GetFlag(FLAGS_dylib_worker_count), &topology);
+  } else {
+    iree_task_topology_initialize_from_unique_l2_cache_groups(
+        /*max_group_count=*/absl::GetFlag(FLAGS_dylib_max_worker_count),
+        &topology);
+  }
+
   iree_hal_executable_loader_t* dylib_loader = NULL;
   iree_status_t status =
       iree_hal_legacy_library_loader_create(allocator, &dylib_loader);
   iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
 
-  iree_task_topology_t* topology = NULL;
-  if (iree_status_is_ok(status)) {
-    if (absl::GetFlag(FLAGS_dylib_worker_count) > 0) {
-      status = iree_task_topology_from_group_count(
-          absl::GetFlag(FLAGS_dylib_worker_count), allocator, &topology);
-    } else {
-      status = iree_task_topology_from_unique_l2_cache_groups(
-          /*max_group_count=*/absl::GetFlag(FLAGS_dylib_max_worker_count),
-          allocator, &topology);
-    }
-  }
-
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_task_executor_create(IREE_TASK_SCHEDULING_MODE_RESERVED,
-                                       topology, allocator, &executor);
+                                       &topology, allocator, &executor);
   }
 
   if (iree_status_is_ok(status)) {
@@ -93,7 +92,7 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   }
 
   iree_task_executor_release(executor);
-  iree_task_topology_free(topology);
+  iree_task_topology_deinitialize(&topology);
   iree_hal_executable_loader_release(dylib_loader);
   return status;
 }

@@ -50,23 +50,23 @@ TEST(ExecutorTest, Any) {
 
   iree_allocator_t allocator = iree_allocator_system();
 
-  iree_task_topology_t* topology = NULL;
+  iree_task_topology_t topology;
 #if 1
-  IREE_CHECK_OK(iree_task_topology_from_physical_cores(
-      /*max_core_count=*/6, allocator, &topology));
+  iree_task_topology_initialize_from_physical_cores(
+      /*max_core_count=*/6, &topology);
 #elif 0
-  IREE_CHECK_OK(iree_task_topology_from_unique_l2_cache_groups(
-      /*max_group_count=*/6, allocator, &topology));
+  iree_task_topology_initialize_from_unique_l2_cache_groups(
+      /*max_group_count=*/6, &topology);
 #else
-  IREE_CHECK_OK(iree_task_topology_from_group_count(/*group_count=*/6,
-                                                    allocator, &topology));
+  iree_task_topology_initialize_from_group_count(/*group_count=*/6, &topology);
 #endif
+
   iree_task_executor_t* executor = NULL;
   iree_task_scheduling_mode_t scheduling_mode =
       IREE_TASK_SCHEDULING_MODE_RESERVED;
-  IREE_CHECK_OK(iree_task_executor_create(scheduling_mode, topology, allocator,
+  IREE_CHECK_OK(iree_task_executor_create(scheduling_mode, &topology, allocator,
                                           &executor));
-  iree_task_topology_free(topology);
+  iree_task_topology_deinitialize(&topology);
 
   //
   iree_task_scope_t scope_a;

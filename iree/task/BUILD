@@ -132,5 +132,6 @@ cc_test(
         "//iree/base:api",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
+        "@cpuinfo",
     ],
 )

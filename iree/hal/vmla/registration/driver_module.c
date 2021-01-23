@@ -52,6 +52,11 @@ static iree_status_t iree_hal_vmla_driver_factory_try_create(
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 
+  // NOTE: VMLA doesn't tile so we don't really need many workers - having
+  // multiple does make it easier to test overlapping execution, though.
+  iree_task_topology_t topology;
+  iree_task_topology_initialize_from_group_count(4, &topology);
+
   iree_vm_instance_t* instance = NULL;
   iree_status_t status = iree_vm_instance_create(allocator, &instance);
 
@@ -62,17 +67,10 @@ static iree_status_t iree_hal_vmla_driver_factory_try_create(
   }
   iree_hal_executable_loader_t* loaders[1] = {vmla_loader};
 
-  // NOTE: VMLA doesn't tile so we don't really need many workers - having
-  // multiple does make it easier to test overlapping execution, though.
-  iree_task_topology_t* topology = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_task_topology_from_group_count(4, allocator, &topology);
-  }
-
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_task_executor_create(IREE_TASK_SCHEDULING_MODE_RESERVED,
-                                       topology, allocator, &executor);
+                                       &topology, allocator, &executor);
   }
 
   if (iree_status_is_ok(status)) {
@@ -82,7 +80,7 @@ static iree_status_t iree_hal_vmla_driver_factory_try_create(
   }
 
   iree_task_executor_release(executor);
-  iree_task_topology_free(topology);
+  iree_task_topology_deinitialize(&topology);
   iree_hal_executable_loader_release(vmla_loader);
   iree_vm_instance_release(instance);
   return status;
