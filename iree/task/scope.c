@@ -14,6 +14,8 @@
 
 #include "iree/task/scope.h"
 
+#include "iree/base/debugging.h"
+
 void iree_task_scope_initialize(iree_string_view_t name,
                                 iree_task_scope_t* out_scope) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -36,9 +38,10 @@ void iree_task_scope_initialize(iree_string_view_t name,
 void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  assert(iree_task_scope_is_idle(scope) &&
-         "pending submissions must be aborted prior to deinitializing their "
-         "scope");
+  IREE_ASSERT(
+      iree_task_scope_is_idle(scope),
+      "pending submissions must be aborted prior to deinitializing their "
+      "scope");
 
   // Makes it easier to see if we were incorrectly using the name even after the
   // scope is deinitialized. Since scopes may be stack allocated we don't want
@@ -53,6 +56,29 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   iree_notification_deinitialize(&scope->idle_notification);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+iree_string_view_t iree_task_scope_name(iree_task_scope_t* scope) {
+  return iree_make_cstring_view(scope->name);
+}
+
+iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
+    iree_task_scope_t* scope) {
+  iree_task_dispatch_statistics_t result = scope->dispatch_statistics;
+  memset(&scope->dispatch_statistics, 0, sizeof(scope->dispatch_statistics));
+  return result;
+}
+
+iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
+  iree_status_t old_status = iree_ok_status();
+  iree_status_t new_status = iree_ok_status();
+  while (!iree_atomic_compare_exchange_strong_intptr(
+      &scope->permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
+      iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+    // Previous status was not OK; we have it now though and can try again.
+    new_status = iree_status_from_code(iree_status_code(old_status));
+  }
+  return old_status;
 }
 
 static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
@@ -73,8 +99,6 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
     IREE_IGNORE_ERROR(new_status);
   }
 
-  // TODO(#4026): poke to wake idle waiters.
-
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -90,25 +114,6 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
   iree_task_scope_try_set_status(scope, status);
 }
 
-iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
-  iree_status_t old_status = iree_ok_status();
-  iree_status_t new_status = iree_ok_status();
-  while (!iree_atomic_compare_exchange_strong_intptr(
-      &scope->permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
-      iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
-    // Previous status was not OK; we have it now though and can try again.
-    new_status = iree_status_from_code(iree_status_code(new_status));
-  }
-  return old_status;
-}
-
-iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
-    iree_task_scope_t* scope) {
-  iree_task_dispatch_statistics_t result = scope->dispatch_statistics;
-  memset(&scope->dispatch_statistics, 0, sizeof(scope->dispatch_statistics));
-  return result;
-}
-
 bool iree_task_scope_is_idle(iree_task_scope_t* scope) {
   return iree_atomic_load_int32(&scope->pending_submissions,
                                 iree_memory_order_relaxed) == 0;
@@ -118,11 +123,26 @@ iree_status_t iree_task_scope_wait_idle(iree_task_scope_t* scope,
                                         iree_time_t deadline_ns) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Wait for the scope to enter the idle state.
-  // NOTE: we are currently ignoring |deadline_ns|.
-  iree_notification_await(&scope->idle_notification,
-                          (iree_condition_fn_t)iree_task_scope_is_idle, scope);
+  iree_status_t status = iree_ok_status();
+  if (deadline_ns == IREE_TIME_INFINITE_PAST) {
+    // Polling for idle.
+    if (iree_task_scope_is_idle(scope)) {
+      status = iree_ok_status();
+    } else {
+      status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+  } else if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
+    // Wait for the scope to enter the idle state.
+    iree_notification_await(&scope->idle_notification,
+                            (iree_condition_fn_t)iree_task_scope_is_idle,
+                            scope);
+  } else {
+    // NOTE: we are currently ignoring |deadline_ns|.
+    // We need to support timeouts on iree_notification_t to support this.
+    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "scope-based waits do not yet support timeouts");
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
