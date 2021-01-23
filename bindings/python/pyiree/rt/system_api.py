@@ -25,7 +25,13 @@ and functions.
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
-__all__ = ["load_module", "load_modules", "Config", "SystemContext"]
+__all__ = [
+    "Config",
+    "load_module",
+    "load_modules",
+    "normalize_value",
+    "SystemContext",
+]
 
 import os
 import sys
@@ -33,6 +39,8 @@ import sys
 from typing import Optional, Sequence, Tuple
 
 from . import binding as _binding
+
+import numpy as np
 
 # Typing aliases (largely used for documentation).
 AnyModule = _binding.VmModule
@@ -125,6 +133,40 @@ def _get_global_config():
   return _global_config
 
 
+def _normalize_numpy(array, normalize_bitwidth=False):
+  if np.isscalar(array):
+    array = np.array(array)
+
+  # IREE models booleans as int8s.
+  if array.dtype == np.bool:
+    array = array.astype(np.int8)
+
+  if normalize_bitwidth:
+    if array.dtype == np.float16 or array.dtype == np.float64:
+      array = array.astype(np.float32)
+    if array.dtype == np.int16 or array.dtype == np.int64:
+      array = array.astype(np.int32)
+  return array
+
+
+def normalize_value(value, normalize_bitwidth=False):
+  """Normalizes the given value for use with IREE."""
+  if isinstance(value, np.ndarray):
+    return _normalize_numpy(value, normalize_bitwidth)
+  elif isinstance(value, (bool, int, float, list, tuple)):
+    # Always use normalize_input=True for Python inputs.
+    return _normalize_numpy(np.array(value), normalize_bitwidth=True)
+  elif hasattr(value, "numpy"):
+    # Converts TensorFlow and Torch tensors.
+    return _normalize_numpy(value.numpy(), normalize_bitwidth)
+  elif value is None:
+    # Exclude None from falling through to np.array conversion.
+    return value
+  else:
+    # Converts JAX DeviceArrays.
+    return _normalize_numpy(np.array(value), normalize_bitwidth)
+
+
 class BoundFunction:
   """Wraps a VmFunction, VmContext and ABI into a pythonic function."""
 
@@ -137,6 +179,10 @@ class BoundFunction:
     self._serialized_outputs = None
 
   def __call__(self, *args, **kwargs):
+    # Convert tensors, device arrays, ints, ... to IREE-friendly inputs.
+    args = [normalize_value(value) for value in args]
+    kwargs = {k: normalize_value(v) for k, v in kwargs.items()}
+
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
     # flag that can allow it to be overridden.
@@ -271,6 +317,6 @@ def load_modules(*modules, config: Optional[Config] = None):
   return bound_modules
 
 
-def load_module(module, **kwargs):
+def load_module(module, config: Optional[Config] = None):
   """Loads a module into a new or shared context and returns them."""
-  return load_modules(module, **kwargs)[0]
+  return load_modules(module, config=config)[0]
