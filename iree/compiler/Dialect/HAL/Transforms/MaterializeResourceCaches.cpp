@@ -140,7 +140,18 @@ class MaterializeResourceCachesPass
   VariableOp defineExecutableLayoutOp(Location loc,
                                       ArrayAttr setLayoutsArrayAttr,
                                       IntegerAttr pushConstantsAttr) {
-    auto existingIt = executableLayoutCache_.find(setLayoutsArrayAttr);
+    // Push constants are optional but we always provide the value.
+    if (!pushConstantsAttr) {
+      pushConstantsAttr =
+          IntegerAttr::get(IntegerType::get(loc.getContext(), 32), 0);
+    }
+
+    // We key the layout cache on all attributes that compose an executable
+    // layout.
+    auto cacheKey = ArrayAttr::get({setLayoutsArrayAttr, pushConstantsAttr},
+                                   loc.getContext());
+
+    auto existingIt = executableLayoutCache_.find(cacheKey);
     if (existingIt != executableLayoutCache_.end()) {
       return existingIt->second;
     }
@@ -163,7 +174,7 @@ class MaterializeResourceCachesPass
         loc, symbolName, /*isMutable=*/false, layoutType,
         StringRef(initializerName), llvm::None);
     variableOp.setPrivate();
-    executableLayoutCache_.try_emplace(setLayoutsArrayAttr, variableOp);
+    executableLayoutCache_.try_emplace(cacheKey, variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
@@ -178,10 +189,6 @@ class MaterializeResourceCachesPass
       setLayoutValues.push_back(setLayoutValue);
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    // Push constants are optional but we always provide the value.
-    if (!pushConstantsAttr) {
-      pushConstantsAttr = blockBuilder.getI32IntegerAttr(0);
-    }
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
         loc, layoutType, deviceValue, setLayoutValues, pushConstantsAttr);
     blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
