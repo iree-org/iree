@@ -325,6 +325,10 @@ iree_hal_driver_registry_try_create_by_name(
   if (hit_driver_id != IREE_HAL_DRIVER_ID_INVALID) {
     status = hit_factory->try_create(hit_factory->self, hit_driver_id,
                                      allocator, out_driver);
+  } else {
+    status =
+        iree_make_status(IREE_STATUS_NOT_FOUND, "no driver '%.*s' registered",
+                         (int)driver_name.size, driver_name.data);
   }
 
   iree_slim_mutex_unlock(&registry->mutex);
