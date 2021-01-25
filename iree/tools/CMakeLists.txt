@@ -325,6 +325,16 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
+      iree-translate
+    OUT
+      iree-translate
+    DEPS
+      ::iree_translate_main
+    HOSTONLY
+  )
+
+  iree_cc_binary(
+    NAME
       iree-opt
     OUT
       iree-opt
@@ -381,18 +391,3 @@ if(${IREE_BUILD_COMPILER})
     )
   endif()
 endif(${IREE_BUILD_COMPILER})
-
-# If cross-compiling, we need to declare iree-translate under host configuration
-# unconditionally because we need to run it on host to generate VM modules
-# for tests.
-if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
-  iree_cc_binary(
-    NAME
-      iree-translate
-    OUT
-      iree-translate
-    DEPS
-      ::iree_translate_main
-    HOSTONLY
-  )
-endif()

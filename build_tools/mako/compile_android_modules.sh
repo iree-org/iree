@@ -19,7 +19,7 @@
 #
 # The scripts is used for benchmarking automation, and it assumes:
 #   1) ANDROID_NDK env is set.
-#   2) IREE is built to Android in `build/` directory. E.g., build with
+#   2) IREE is built for the host in `build-host`, e.g. build with
 #      build_tools/cmake/build_android.sh script.
 
 set -e
@@ -50,8 +50,6 @@ if [[ -z "${model}" ]]; then
   exit 1
 fi
 
-export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
-
 IFS=',' read -ra targets_array <<< "$targets"
 for target in "${targets_array[@]}"
 do
@@ -65,7 +63,7 @@ do
     *)
       ;;
   esac
-  build/host/iree/tools/iree-translate \
+  build-host/iree/tools/iree-translate \
     --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends="${target}" \
     "${extra_flags[@]}" \
