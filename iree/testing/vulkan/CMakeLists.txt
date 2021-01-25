@@ -51,7 +51,7 @@ iree_cc_library(
     imgui::imgui
     iree::base::api
     iree::base::logging
-    iree::hal::vulkan::api
+    iree::hal::vulkan
     SDL2::SDL2
     Vulkan::Vulkan
 )
