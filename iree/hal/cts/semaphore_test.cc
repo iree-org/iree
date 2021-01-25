@@ -85,6 +85,11 @@ TEST_P(SemaphoreTest, EmptyWait) {
       device_, IREE_HAL_WAIT_MODE_ANY, NULL, IREE_TIME_INFINITE_FUTURE));
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_deadline(
       device_, IREE_HAL_WAIT_MODE_ALL, NULL, IREE_TIME_INFINITE_FUTURE));
+
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_timeout(
+      device_, IREE_HAL_WAIT_MODE_ANY, NULL, IREE_DURATION_INFINITE));
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores_with_timeout(
+      device_, IREE_HAL_WAIT_MODE_ALL, NULL, IREE_DURATION_INFINITE));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
@@ -97,6 +102,11 @@ TEST_P(SemaphoreTest, WaitAlreadySignaled) {
       semaphore, 1ull, IREE_TIME_INFINITE_FUTURE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait_with_deadline(
       semaphore, 2ull, IREE_TIME_INFINITE_FUTURE));
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_timeout(semaphore, 1ull,
+                                                      IREE_DURATION_INFINITE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait_with_timeout(semaphore, 2ull,
+                                                      IREE_DURATION_INFINITE));
 
   iree_hal_semaphore_release(semaphore);
 }
