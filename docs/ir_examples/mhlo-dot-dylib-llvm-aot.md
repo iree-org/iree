@@ -794,9 +794,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
   %cst = constant 0.000000e+00 : f32
-  %2 = dynamic_tensor_from_elements  {
+  %2 = tensor.generate   {
   ^bb0(%arg0: index, %arg1: index):  // no predecessors
-    yield %cst : f32
+    tensor.yield %cst : f32
   } : tensor<32x64xf32>
   %3 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%2 : tensor<32x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
@@ -816,9 +816,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-  %2 = dynamic_tensor_from_elements  {
+  %2 = tensor.generate   {
   ^bb0(%arg0: index, %arg1: index):  // no predecessors
-    yield %cst : f32
+    tensor.yield %cst : f32
   } : tensor<32x64xf32>
   %3 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%2 : tensor<32x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
@@ -838,9 +838,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-  %2 = dynamic_tensor_from_elements  {
+  %2 = tensor.generate   {
   ^bb0(%arg0: index, %arg1: index):  // no predecessors
-    yield %cst : f32
+    tensor.yield %cst : f32
   } : tensor<32x64xf32>
   %3 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%2 : tensor<32x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
@@ -860,9 +860,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-  %2 = dynamic_tensor_from_elements  {
+  %2 = tensor.generate   {
   ^bb0(%arg0: index, %arg1: index):  // no predecessors
-    yield %cst : f32
+    tensor.yield %cst : f32
   } : tensor<32x64xf32>
   %3 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%2 : tensor<32x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
@@ -882,9 +882,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
   %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-  %2 = dynamic_tensor_from_elements  {
+  %2 = tensor.generate   {
   ^bb0(%arg0: index, %arg1: index):  // no predecessors
-    yield %cst : f32
+    tensor.yield %cst : f32
   } : tensor<32x64xf32>
   %3 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%2 : tensor<32x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
@@ -1024,8 +1024,8 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c64 = constant 64 : index
-  %c0 = constant 0 : index
   %c4 = constant 4 : index
+  %c0 = constant 0 : index
   %c32 = constant 32 : index
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1084,8 +1084,8 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c64 = constant 64 : index
-  %c0 = constant 0 : index
   %c4 = constant 4 : index
+  %c0 = constant 0 : index
   %c32 = constant 32 : index
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
@@ -1541,7 +1541,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %20 = cmpi slt, %19, %c1024 : index
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
-  %21 = affine.min affine_map<()[s0, s1] -> (32, -s1 + s0)>()[%4, %15]
+  %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
   %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
@@ -1661,7 +1661,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %20 = cmpi slt, %19, %c1024 : index
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
-  %21 = affine.min affine_map<()[s0, s1] -> (32, -s1 + s0)>()[%4, %15]
+  %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
   %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
@@ -1909,7 +1909,7 @@ module  {
     %158 = llvm.mlir.constant(32 : index) : i64
     %159 = llvm.mlir.constant(-1 : index) : i64
     %160 = llvm.mul %152, %159  : i64
-    %161 = llvm.add %160, %67  : i64
+    %161 = llvm.add %67, %160  : i64
     %162 = llvm.icmp "slt" %158, %161 : i64
     %163 = llvm.select %162, %158, %161 : i1, i64
     %164 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2321,7 +2321,7 @@ module  {
     %158 = llvm.mlir.constant(32 : index) : i64
     %159 = llvm.mlir.constant(-1 : index) : i64
     %160 = llvm.mul %152, %159  : i64
-    %161 = llvm.add %160, %67  : i64
+    %161 = llvm.add %67, %160  : i64
     %162 = llvm.icmp "slt" %158, %161 : i64
     %163 = llvm.select %162, %158, %161 : i1, i64
     %164 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2697,7 +2697,7 @@ module  {
   ^bb8:  // pred: ^bb7
     %123 = llvm.mlir.constant(-1 : index) : i64
     %124 = llvm.mul %117, %123  : i64
-    %125 = llvm.add %124, %45  : i64
+    %125 = llvm.add %45, %124  : i64
     %126 = llvm.icmp "slt" %8, %125 : i64
     %127 = llvm.select %126, %8, %125 : i1, i64
     %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3039,7 +3039,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
     ^bb8:  // pred: ^bb7
       %123 = llvm.mlir.constant(-1 : index) : i64
       %124 = llvm.mul %117, %123  : i64
-      %125 = llvm.add %124, %45  : i64
+      %125 = llvm.add %45, %124  : i64
       %126 = llvm.icmp "slt" %8, %125 : i64
       %127 = llvm.select %126, %8, %125 : i1, i64
       %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3389,7 +3389,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3889,7 +3889,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4288,7 +4288,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4687,7 +4687,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5237,7 +5237,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5776,7 +5776,7 @@ module  {
         ^bb8:  // pred: ^bb7
           %123 = llvm.mlir.constant(-1 : index) : i64
           %124 = llvm.mul %117, %123  : i64
-          %125 = llvm.add %124, %45  : i64
+          %125 = llvm.add %45, %124  : i64
           %126 = llvm.icmp "slt" %8, %125 : i64
           %127 = llvm.select %126, %8, %125 : i1, i64
           %128 = llvm.extractvalue %66[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
