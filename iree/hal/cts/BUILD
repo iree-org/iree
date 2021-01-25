@@ -116,3 +116,14 @@ cc_test(
         "//iree/testing:gtest_main",
     ],
 )
+
+cc_test(
+    name = "semaphore_submission_test",
+    srcs = ["semaphore_submission_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
