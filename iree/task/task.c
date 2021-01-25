@@ -140,6 +140,11 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
   iree_task_initialize(IREE_TASK_TYPE_NOP, scope, &out_task->header);
 }
 
+void iree_task_nop_retire(iree_task_nop_t* task,
+                          iree_task_submission_t* pending_submission) {
+  iree_task_retire(&task->header, pending_submission);
+}
+
 //==============================================================================
 // IREE_TASK_TYPE_CALL
 //==============================================================================
