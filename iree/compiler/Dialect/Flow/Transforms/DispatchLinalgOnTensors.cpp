@@ -243,10 +243,6 @@ struct TileAndDistributeOnTensorsPattern
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
 
-    // Temporary to only accept a MatmulOp root and fuse other ops into it.
-    // TODO(nicolasvasilache): remove this limitation.
-    if (!isa<linalg::MatmulOp>(op)) return failure();
-
     linalg::LinalgOp clonedLinalgOp;
     IREE::Flow::DispatchWorkgroupsOp dispatchOp =
         buildOperandLessFlowDispatchWorkgroupOp(rewriter, linalgOp,
@@ -295,7 +291,6 @@ static void legalizeDispatchWorkgroupOperands(
 
   llvm::SetVector<Value> valuesSet;
   mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
-  ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
 
   auto getUsesOfValueOutsideOfDispatchOp =
       [&](Value v) -> SmallVector<Operation *, 4> {
@@ -304,6 +299,26 @@ static void legalizeDispatchWorkgroupOperands(
       if (!dispatchOp->isAncestor(user)) res.push_back(user);
     return res;
   };
+
+  // Go through the captured values and check for any `init_tensor`. These can
+  // be pulled into the dispatch region
+  BlockAndValueMapping map;
+  for (Value operand : valuesSet) {
+    auto initTensorOp = operand.getDefiningOp<linalg::InitTensorOp>();
+    if (!initTensorOp) continue;
+    auto clonedOp =
+        cast<linalg::InitTensorOp>(b.clone(*initTensorOp.getOperation(), map));
+    auto outsideUses = getUsesOfValueOutsideOfDispatchOp(operand);
+    operand.replaceAllUsesExcept(
+        clonedOp.getResult(),
+        SmallPtrSet<Operation *, 8>(outsideUses.begin(), outsideUses.end()));
+  }
+
+  // Recompute the values captured from outside.
+  valuesSet.clear();
+  mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
+  ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
+
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
   for (Value operand : valuesDefinedAbove) {
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
