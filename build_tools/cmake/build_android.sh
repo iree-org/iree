@@ -17,7 +17,7 @@
 # not clear build directories.
 #
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
-# Android binaries (e.g. tests) will be built in build-android/
+# Android binaries (e.g. tests) will be built in build-android/.
 
 set -x
 set -e
