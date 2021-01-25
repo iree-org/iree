@@ -221,6 +221,9 @@ void iree_task_executor_schedule_ready_tasks(
   while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
     switch (task->type) {
       case IREE_TASK_TYPE_NOP:
+        // Doesn't do anything; just retire and continue on to any dependents.
+        iree_task_nop_retire((iree_task_nop_t*)task, pending_submission);
+        break;
       case IREE_TASK_TYPE_CALL:
       case IREE_TASK_TYPE_DISPATCH_SLICE: {
         // Generic routing to workers for tasks that should always run there.
