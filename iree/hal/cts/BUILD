@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Conformance Test Suite (CTS) for HAL implementations.
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
