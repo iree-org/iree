@@ -45,6 +45,9 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   addIllegalOp<IREE::VMLA::BatchMatMulPseudoOp>();
   addIllegalOp<IREE::VMLA::SortPseudoOp>();
   addIllegalOp<IREE::VMLA::FftPseudoOp>();
+  addIllegalOp<IREE::VMLA::IfftPseudoOp>();
+  addIllegalOp<IREE::VMLA::RfftPseudoOp>();
+  addIllegalOp<IREE::VMLA::IrfftPseudoOp>();
 
   // Allow other ops to pass through so long as their type is valid (not a
   // tensor, basically).
