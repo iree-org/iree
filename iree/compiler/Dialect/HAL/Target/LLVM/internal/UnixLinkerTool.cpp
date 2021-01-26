@@ -33,25 +33,35 @@ class UnixLinkerTool : public LinkerTool {
   std::string getToolPath() const override {
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
+
     if (targetTriple.isAndroid()) {
       char *androidNDKPath = std::getenv("ANDROID_NDK");
       if (!androidNDKPath) return toolPath;
-// TODO(ataei, benvanik): Windows cross-linking android NDK support.
-#if defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_LINUX)
-      return llvm::Twine(androidNDKPath)
-          .concat("/toolchains/llvm/prebuilt/linux-x86_64/bin/")
-          // TODO(ataei): Set target archicture and ABI from targetTriple.
-          .concat("aarch64-linux-android30-clang++")
-          .str();
-#elif defined(IREE_ARCH_X86_64) && defined(IREE_PLATFORM_APPLE)
-      return llvm::Twine(androidNDKPath)
-          .concat("/toolchains/llvm/prebuilt/darwin-x86_64/bin/")
-          .concat("aarch64-linux-android30-clang++")
-          .str();
+
+      // Select prebuilt toolchain based on host architecture/platform:
+      // https://developer.android.com/ndk/guides/other_build_systems
+      std::string toolchains_binary_path;
+#if defined(IREE_PLATFORM_LINUX) && defined(IREE_ARCH_X86_64)
+      toolchains_binary_path = "/toolchains/llvm/prebuilt/linux-x86_64/bin/";
+#elif defined(IREE_PLATFORM_APPLE) && defined(IREE_ARCH_X86_64)
+      toolchains_binary_path = "/toolchains/llvm/prebuilt/darwin-x86_64/bin/";
+#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_32)
+      toolchains_binary_path = "/toolchains/llvm/prebuilt/windows/bin/";
+#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_64)
+      toolchains_binary_path = "/toolchains/llvm/prebuilt/windows-x86_64/bin/";
 #else
-      return toolPath;
-#endif  // IREE_ARCH_X86_64 && IREE_PLATFORM_LINUX
+      llvm::errs() << "Unknown architecture/platform combination"
+                   << "\n";
+      return "";
+#endif  // IREE_PLATFORM_* && IREE_ARCH_*
+
+      // TODO(ataei): Set target architecture and ABI from targetTriple.
+      return llvm::Twine(androidNDKPath)
+          .concat(toolchains_binary_path)
+          .concat("aarch64-linux-android30-clang++")
+          .str();
     }
+
 // TODO(ataei, benvanik): Windows cross-linking discovery support.
 #if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
 #define UNIX_SYS_LINKER_PATH_LENGTH 255

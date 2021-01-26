@@ -14,7 +14,10 @@
 
 # Cross-compile the IREE project towards Android with CMake. Designed for CI,
 # but can be run manually. This uses previously cached build results and does
-# not clear the build directory.
+# not clear build directories.
+#
+# Host binaries (e.g. compiler tools) will be built and installed in build-host/
+# Android binaries (e.g. tests) will be built in build-android/.
 
 set -x
 set -e
@@ -30,30 +33,54 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 
-"$CMAKE_BIN" --version
+"${CMAKE_BIN?}" --version
 ninja --version
 
 cd ${ROOT_DIR?}
-if [ -d "build" ]
+
+# --------------------------------------------------------------------------- #
+# Build for the host.
+
+if [ -d "build-host" ]
 then
-  echo "Build directory already exists. Will use cached results there."
+  echo "build-host directory already exists. Will use cached results there."
 else
-  echo "Build directory does not already exist. Creating a new one."
-  mkdir build
+  echo "build-host directory does not already exist. Creating a new one."
+  mkdir build-host
 fi
+cd build-host
 
-cd build
+# Configure, build, install.
+"${CMAKE_BIN?}" -G Ninja .. \
+  -DCMAKE_INSTALL_PREFIX=./install \
+  -DIREE_BUILD_COMPILER=ON \
+  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_SAMPLES=OFF
+"${CMAKE_BIN?}" --build . --target install
+# --------------------------------------------------------------------------- #
 
-# Configure towards 64-bit Android 10.
-"$CMAKE_BIN" -G Ninja .. \
-  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI="$ANDROID_ABI" \
+cd ${ROOT_DIR?}
+
+# --------------------------------------------------------------------------- #
+# Build for the target (Android).
+
+if [ -d "build-android" ]
+then
+  echo "build-android directory already exists. Will use cached results there."
+else
+  echo "build-android directory does not already exist. Creating a new one."
+  mkdir build-android
+fi
+cd build-android
+
+# Configure towards 64-bit Android 10, then build.
+"${CMAKE_BIN?}" -G Ninja .. \
+  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK?}/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI="${ANDROID_ABI?}" \
   -DANDROID_PLATFORM=android-29 \
+  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_TESTS=ON \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HOST_C_COMPILER=$(which clang) \
-  -DIREE_HOST_CXX_COMPILER=$(which clang++)
-
-# TODO(#2494): Invoke once after fixing the flaky build failure in GCP.
-"$CMAKE_BIN" --build . || "$CMAKE_BIN" --build .
+  -DIREE_BUILD_SAMPLES=OFF
+"${CMAKE_BIN?}" --build .

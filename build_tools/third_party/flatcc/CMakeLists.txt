@@ -14,7 +14,6 @@
 
 set(FLATCC_ROOT "${IREE_ROOT_DIR}/third_party/flatcc/")
 
-# NOTE: we exclude JSON parsing/printing to avoid additional dependencies.
 external_cc_library(
   PACKAGE
     flatcc
@@ -55,3 +54,22 @@ external_cc_library(
     "include/flatcc/reflection/flatbuffers_common_reader.h"
   PUBLIC
 )
+
+# Define our own binary target for the CLI, for host builds only.
+# flatcc's `flatcc_cli` target renames itself to `flatcc` or `flatcc_d`
+# depending on the build configuration, so we prefer to just set our own name.
+if(NOT CMAKE_CROSSCOMPILING)
+  add_executable(iree-flatcc-cli
+    "${FLATCC_ROOT}/src/cli/flatcc_cli.c"
+  )
+
+  target_link_libraries(iree-flatcc-cli
+    flatcc
+  )
+
+  target_include_directories(iree-flatcc-cli SYSTEM
+    PUBLIC
+      "${FLATCC_ROOT}/include"
+      "${FLATCC_ROOT}/config"
+  )
+endif()
