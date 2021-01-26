@@ -332,6 +332,28 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "NULL,\n"
          << "};\n";
 
+  // create
+  /*
+  static iree_status_t add_module_create(iree_allocator_t allocator,
+                                       iree_vm_module_t** out_module) {
+  // NOTE: this module has neither shared or per-context module state.
+  iree_vm_module_t interface;
+  IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
+  return iree_vm_native_module_create(&interface, &add_module_descriptor_,
+                                      allocator, out_module);
+}
+  */
+  output
+      << "static iree_status_t " << moduleName
+      << "_create(iree_allocator_t allocator, iree_vm_module_t** "
+         "out_module) {\n"
+      << "iree_vm_module_t interface;\n"
+      << "IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));\n"
+      << "return iree_vm_native_module_create(&interface, "
+         "&"
+      << descriptorName << ", allocator, out_module);\n"
+      << "}\n";
+
   // TODO(simon-camp): generate boilerplate code
   //   * interface functions
   //      * create

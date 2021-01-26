@@ -17,13 +17,4 @@
 
 #include "iree/vm/test/emitc/arithmetic_ops.module"
 
-static iree_status_t arithmetic_ops_create(iree_allocator_t allocator,
-                                           iree_vm_module_t** out_module) {
-  // NOTE: this module has neither shared or per-context module state.
-  iree_vm_module_t interface;
-  IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
-  return iree_vm_native_module_create(&interface, &arithmetic_ops_descriptor_,
-                                      allocator, out_module);
-}
-
 #endif  // IREE_VM_TEST_EMITC_ARITHMETIC_OPS_H_

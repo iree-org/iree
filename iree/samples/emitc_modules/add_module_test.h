@@ -16,12 +16,3 @@
 
 // This would be generated together with the functions in the header
 #include "iree/samples/emitc_modules/add_module.module"
-
-static iree_status_t add_module_create(iree_allocator_t allocator,
-                                       iree_vm_module_t** out_module) {
-  // NOTE: this module has neither shared or per-context module state.
-  iree_vm_module_t interface;
-  IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
-  return iree_vm_native_module_create(&interface, &add_module_descriptor_,
-                                      allocator, out_module);
-}
