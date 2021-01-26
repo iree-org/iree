@@ -20,6 +20,10 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
+// TODO(scotttodd): command_buffer_recording_test
+// TODO(scotttodd): command_buffer_dispatch_test
+// TODO(scotttodd): command_buffer_fill_test
+
 namespace iree {
 namespace hal {
 namespace cts {
