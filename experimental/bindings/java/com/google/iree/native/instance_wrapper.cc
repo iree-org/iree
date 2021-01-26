@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/java/com/google/iree/native/instance_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/instance_wrapper.h"
 
 #include <mutex>
 

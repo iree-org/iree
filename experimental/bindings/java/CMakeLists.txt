@@ -13,3 +13,7 @@
 # limitations under the License.
 
 add_subdirectory(com/google/iree/native)
+
+if (${IREE_BUILD_TESTS})
+  add_subdirectory(com/google/iree/tests)
+endif()
