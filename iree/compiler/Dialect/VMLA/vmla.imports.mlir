@@ -353,6 +353,22 @@ vm.import @fft.f32(
   %real_dst : !vm.ref<!vmla.buffer>,
   %imag_dst : !vm.ref<!vmla.buffer>)
 
+vm.import @ifft.f32(
+  %real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ...,
+  %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ...,
+  %real_dst : !vm.ref<!vmla.buffer>,
+  %imag_dst : !vm.ref<!vmla.buffer>)
+
+vm.import @rfft.f32(
+  %real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ...,
+  %real_dst : !vm.ref<!vmla.buffer>,
+  %imag_dst : !vm.ref<!vmla.buffer>)
+
+vm.import @irfft.f32(
+  %real_src : !vm.ref<!vmla.buffer>, %real_src_shape : i32 ...,
+  %imag_src : !vm.ref<!vmla.buffer>, %imag_src_shape : i32 ...,
+  %real_dst : !vm.ref<!vmla.buffer>)
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: conversion
 //===----------------------------------------------------------------------===//
@@ -399,6 +415,18 @@ vm.import @batch.matmul.f32f32.f32(
 vm.import @batch.matmul.i32i32.i32(
   %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ...,
   %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+
+vm.import @batch.matmul.i8i8.i32(
+  %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i8 ...,
+  %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i8 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+
+vm.import @batch.matmul.i16i16.i32(
+  %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i16 ...,
+  %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i16 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 

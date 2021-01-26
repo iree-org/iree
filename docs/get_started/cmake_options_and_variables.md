@@ -127,71 +127,8 @@ if `IREE_MLIR_DEP_MODE` is set to `INSTALLED`.
 
 ## Cross-compilation
 
-[TODO(#2111): The following explanation is developer oriented. Move it to the
-developer build doc once we've created that.]
-
-Cross-compilation involves both a *host* platform and a *target* platform. One
-invokes compiler toolchains on the host platform to generate libraries and
-executables that can be run on the target platform.
-
-IREE uses tools to programmatically generate C/C++ source code from some
-domain-specific descriptions. For example, `flatc` is used to generate C/C++
-code from FlatBuffer schemas. These tools should be compiled for the host
-platform so that we can invoke them during build process. This requires
-cross-compilation for IREE to (conceptually) happen in two stages: first compile
-build tools under host platform, and then use these host tools together with
-cross-compiling toolchains to generate artifacts for the target platform. (The
-build system dependency graph may not have such clear two-stage separation.)
-
-CMake cannot handle multiple compiler toolchains in one CMake invocation. So the
-above conceptual two-stage compilation happens in two separate CMake
-invocations.
-
-When CMake is invoked with a toolchain file, e.g.,
-[`android.toolchain.cmake`](https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake),
-we get the compiler toolchain for the target platform from the toolchain file.
-IREE under the hood will
-[create another CMake invocation](https://github.com/google/iree/blob/main/build_tools/cmake/iree_cross_compile.cmake)
-using host platform's compiler toolchain. The inner CMake invocation will be
-placed under `IREE_HOST_BINARY_ROOT`.
-
-The tricky part is to set up target artifacts' dependencies on host executables.
-Normally in CMake we define targets and `target_link_libraries` to express the
-dependency relationship between targets. The optimal way is to
-[`export`](https://cmake.org/cmake/help/latest/command/export.html) targets
-under host configuration and then
-[`import`](https://cmake.org/cmake/help/latest/command/add_executable.html?highlight=import#imported-executables)
-into target configuration. But that is not playing well with LLVM's TableGen
-configurations. LLVM's cross-compilation uses on files for dependencies. So here
-we need to do the same. This results in reverting the relationship between IREE
-artifact output names (e.g., `iree-translate`) and IREE package-prefixed CMake
-target names (e.g., `iree_tools_iree-translate`).
-
-When not cross-compiling, IREE uses the CMake target names as the real unique
-identification inside CMake for defining the object and expressing dependencies;
-the artifact output names are just used for naming the build artifacts. When
-cross-compiling, it's the artifact names being load-bearing. The artifact names
-are used to express dependencies across CMake invocation boundary (remember that
-we cannot access targets defined in another CMake invocation); the
-package-prefixed CMake target names are just custom targets depending on the
-host artifact.
-
-#### `IREE_HOST_BINARY_ROOT`:FILEPATH
-
-Specifies the root directory for containing all host CMake invocation artifacts.
-This defaults to `CMAKE_BINARY_DIR/host` if missing.
-
-#### `IREE_HOST_C_COMPILER`:STRING
-
-Specifies the C compiler for host compilation.
-
-#### `IREE_HOST_CXX_COMPILER`:STRING
-
-Specifies the C++ compiler for host compilation.
-
-#### `IREE_HOST_<option>`:BOOL
-
-For each option described in "IREE-specific CMake Options and Variables", you
-can use the `IREE_HOST_<option>` counterpart to control the feature when
-compiling under host configuration. For example, `IREE_HOST_BUILD_TESTS` will
-enables all tests for the host configuration.
+When cross compiling (using a toolchain file like
+[`android.toolchain.cmake`](https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake)),
+first build and install IREE's tools for your host configuration, then use the
+`IREE_HOST_BINARY_ROOT` CMake option to point the cross compiled build at the
+host tools.

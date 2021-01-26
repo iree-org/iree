@@ -147,7 +147,7 @@ LogicalResult propogateRootOperationLaunchConfig(
   // operation. To propogate that information, just use the same key as the root
   // operation.
   for (auto dependence : dependences) {
-    config.setSameConfig(rootOperation, dependence.dependentOpView->getOwner());
+    config.setSameConfig(rootOperation, dependence.getDependentOp());
   }
   return success();
 }
