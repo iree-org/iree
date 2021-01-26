@@ -615,57 +615,35 @@ LogicalResult PadOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// mhlo.slice conversion patterns.
+// subtensor conversion patterns.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.slice operation to linalg.subview + linalg.copy
-struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
-  SliceOpConversion(MLIRContext *context,
-                    TensorToBufferMap const &resultTensorToBufferMap,
-                    PatternBenefit benefit = 1)
-      : OpConversionPattern<mhlo::SliceOp>(context, benefit),
-        resultTensorToBufferMap(resultTensorToBufferMap) {}
+/// Extracts int64_t values from the assumed ArrayAttr of IntegerAttr.
+static SmallVector<int64_t, 4> extractFromI64ArrayAttr(Attribute attr) {
+  return llvm::to_vector<4>(llvm::map_range(
+      attr.cast<ArrayAttr>(),
+      [](Attribute a) -> int64_t { return a.cast<IntegerAttr>().getInt(); }));
+}
 
-  LogicalResult matchAndRewrite(
-      mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
-      ConversionPatternRewriter &rewriter) const override {
+/// Converts subtensor operation to subview + linalg.copy
+struct SubTensorOpConversion
+    : public ConvertToLinalgBufferOp<SubTensorOpConversion, SubTensorOp> {
+  using ConvertToLinalgBufferOp<SubTensorOpConversion,
+                                SubTensorOp>::ConvertToLinalgBufferOp;
+
+  LogicalResult apply(SubTensorOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
-    auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
-    if (!argType || !argType.hasStaticShape()) {
-      return op.emitError("expected static shape");
-    }
-
-    auto resultShape = op.getResult().getType().cast<ShapedType>().getShape();
-    SmallVector<Value, 3> offsets, sizes, strides;
-    for (int i = 0, e = argType.getRank(); i < e; ++i) {
-      Value startIndex = rewriter.create<ConstantIndexOp>(
-          loc, op.start_indices().getValue<int64_t>(i));
-      offsets.push_back(startIndex);
-      Value size = rewriter.create<ConstantIndexOp>(loc, resultShape[i]);
-      sizes.push_back(size);
-      Value stride = rewriter.create<ConstantIndexOp>(
-          loc, op.strides().getValue<int64_t>(i));
-      strides.push_back(stride);
-    }
-    auto subViewOp = rewriter.create<SubViewOp>(loc, inputBuffers[0], offsets,
-                                                sizes, strides);
-
-    // If the result of the subview is already mapped to a buffer, a copy is
-    // required from the buffer above into the mapped buffer.
-    if (Value bufferForResult =
-            resultTensorToBufferMap.lookup(op.getResult())) {
-      rewriter.create<linalg::CopyOp>(loc, subViewOp, bufferForResult);
-      rewriter.replaceOp(op, bufferForResult);
-    } else {
-      rewriter.replaceOp(op, subViewOp.getResult());
-    }
-
+    auto subViewOp = rewriter.create<SubViewOp>(
+        loc, inputBuffers[0], extractFromI64ArrayAttr(op.static_offsets()),
+        extractFromI64ArrayAttr(op.static_sizes()),
+        extractFromI64ArrayAttr(op.static_strides()), op.offsets(), op.sizes(),
+        op.strides());
+    rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
     return success();
   }
-
- private:
-  TensorToBufferMap const &resultTensorToBufferMap;
 };
 }  // namespace
 
@@ -1495,7 +1473,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
                   PadOpConversion, ReduceOpConversion, ReduceWindowOpConversion,
-                  SliceOpConversion, TensorReshapeOpConversion>(
+                  SubTensorOpConversion, TensorReshapeOpConversion>(
       context, resultTensorToBufferMap);
   // Reduce region operation conversions.
   patterns.insert<ReduceRegionXLAOpConversion<mhlo::AddOp>,
@@ -1530,8 +1508,8 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
-                      IREE::HAL::InterfaceStoreTensorOp, tensor::ExtractOp,
-                      tensor::GenerateOp>();
+                      IREE::HAL::InterfaceStoreTensorOp, SubTensorOp,
+                      tensor::ExtractOp, tensor::GenerateOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();
