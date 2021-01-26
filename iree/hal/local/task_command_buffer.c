@@ -705,9 +705,9 @@ typedef struct {
   iree_task_dispatch_t task;
   iree_hal_local_executable_t* executable;
   iree_host_size_t ordinal;
-  iree_hal_executable_binding_ptr_t* restrict bindings;
-  iree_device_size_t* restrict binding_lengths;
-  uint32_t* restrict push_constants;
+  iree_hal_executable_binding_ptr_t* IREE_RESTRICT bindings;
+  iree_device_size_t* IREE_RESTRICT binding_lengths;
+  uint32_t* IREE_RESTRICT push_constants;
 } iree_hal_cmd_dispatch_t;
 
 static iree_status_t iree_hal_cmd_dispatch_tile(
