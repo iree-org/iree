@@ -160,8 +160,7 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
   LogicalResult matchAndRewrite(
       mhlo::SliceOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
-    auto loc = op.getLoc();
-    auto argType = args[0].getType().template dyn_cast<RankedTensorType>();
+    auto argType = args[0].getType().dyn_cast<RankedTensorType>();
     if (!argType) {
       return rewriter.notifyMatchFailure(op, "expected ranked tensor type");
     }
@@ -175,11 +174,10 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
       staticSizes.push_back((limit - offset) / stride);
       staticStrides.push_back(stride);
     }
-    auto subTensorOp = rewriter.create<SubTensorOp>(
-        loc, args[0], staticOffsets, staticSizes, staticStrides,
+    rewriter.replaceOpWithNewOp<SubTensorOp>(
+        op, args[0], staticOffsets, staticSizes, staticStrides,
         /*offsets=*/ValueRange{},
         /*sizes=*/ValueRange{}, /*strides=*/ValueRange{});
-    rewriter.replaceOp(op, subTensorOp.getResult());
     return success();
   }
 };
