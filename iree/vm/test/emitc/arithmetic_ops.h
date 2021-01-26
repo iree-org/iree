@@ -18,22 +18,6 @@
 #include "iree/vm/test/emitc/arithmetic_ops.module"
 #include "iree/vm/test/emitc/shims.h"
 
-struct arithmetic_ops_s;
-struct arithmetic_ops_state_s;
-typedef struct arithmetic_ops_s arithmetic_ops_t;
-typedef struct arithmetic_ops_state_s arithmetic_ops_state_t;
-
-static iree_status_t arithmetic_ops_test_add_i32(
-    iree_vm_stack_t* stack, arithmetic_ops_t* module,
-    arithmetic_ops_state_t* module_state) {
-  return arithmetic_ops_test_add_i32_impl();
-}
-
-static const iree_vm_native_export_descriptor_t arithmetic_ops_exports_[] = {
-    {iree_make_cstring_view("test_add_i32"), iree_make_cstring_view("0."), 0,
-     NULL},
-};
-
 static const iree_vm_native_function_ptr_t arithmetic_ops_funcs_[] = {
     {(iree_vm_native_function_shim_t)call_0___shim,
      (iree_vm_native_function_target_t)arithmetic_ops_test_add_i32},

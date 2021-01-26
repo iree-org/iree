@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
+#include "iree/compiler/Dialect/VM/Target/CallingConventionUtils.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -54,6 +55,53 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
             "// interface\n"
             "//"
          << std::string(77, '=') << "\n";
+}
+
+static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
+                                            llvm::raw_ostream &output) {
+  // TODO(simon-camp): Support stateful modules
+  std::string moduleName = moduleOp.getName().str();
+
+  output << "struct " << moduleName << "_s;\n";
+  output << "struct " << moduleName << "_state_s;\n";
+  output << "typedef struct " << moduleName << "_s " << moduleName << "_t;\n";
+  output << "typedef struct " << moduleName << "_state_s " << moduleName
+         << "_state_t;\n";
+
+  output << "\n";
+
+  return success();
+}
+
+static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
+                                          mlir::emitc::CppEmitter &emitter,
+                                          llvm::raw_ostream &output) {
+  return mlir::emitc::interleaveCommaWithError(
+      funcOp.getArguments(), output, [&](auto arg) -> LogicalResult {
+        if (failed(emitter.emitType(arg.getType()))) {
+          return failure();
+        }
+        output << " " << emitter.getOrCreateName(arg);
+        return success();
+      });
+}
+
+static LogicalResult printFuncOpResults(IREE::VM::FuncOp &funcOp,
+                                        mlir::emitc::CppEmitter &emitter,
+                                        llvm::raw_ostream &output,
+                                        std::vector<std::string> &resultNames) {
+  return mlir::emitc::interleaveCommaWithError(
+      llvm::zip(funcOp.getType().getResults(), resultNames), output,
+      [&](std::tuple<Type, std::string> tuple) -> LogicalResult {
+        Type type = std::get<0>(tuple);
+        std::string resultName = std::get<1>(tuple);
+
+        if (failed(emitter.emitType(type))) {
+          return failure();
+        }
+        output << " *" << resultName;
+        return success();
+      });
 }
 
 static LogicalResult translateCallOpToC(mlir::emitc::CppEmitter &emitter,
@@ -104,14 +152,9 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
 
   output << "iree_status_t " << functionName << "(";
 
-  mlir::emitc::interleaveCommaWithError(
-      funcOp.getArguments(), output, [&](auto arg) -> LogicalResult {
-        if (failed(emitter.emitType(arg.getType()))) {
-          return failure();
-        }
-        output << " " << emitter.getOrCreateName(arg);
-        return success();
-      });
+  if (failed(printFuncOpArguments(funcOp, emitter, output))) {
+    return failure();
+  }
 
   if (funcOp.getNumResults() > 0) {
     output << ", ";
@@ -119,23 +162,13 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
 
   std::vector<std::string> resultNames;
   for (size_t idx = 0; idx < funcOp.getNumResults(); idx++) {
-    std::string resultName("out");
-    resultName.append(std::to_string(idx));
+    std::string resultName = "out" + std::to_string(idx);
     resultNames.push_back(resultName);
   }
 
-  mlir::emitc::interleaveCommaWithError(
-      llvm::zip(funcOp.getType().getResults(), resultNames), output,
-      [&](std::tuple<Type, std::string> tuple) -> LogicalResult {
-        Type type = std::get<0>(tuple);
-        std::string resultName = std::get<1>(tuple);
-
-        if (failed(emitter.emitType(type))) {
-          return failure();
-        }
-        output << " *" << resultName;
-        return success();
-      });
+  if (failed(printFuncOpResults(funcOp, emitter, output, resultNames))) {
+    return failure();
+  }
 
   output << ") {\n";
 
@@ -151,30 +184,96 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
 }
 
 static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
+                                            mlir::emitc::CppEmitter &emitter,
                                             llvm::raw_ostream &output) {
+  SymbolTable symbolTable(moduleOp);
   std::string moduleName = moduleOp.getName().str();
+
+  if (failed(printStructDefinitions(moduleOp, output))) {
+    return failure();
+  }
+
+  // function wrapper
+  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+    output << "static iree_status_t "
+           << buildFunctionName(moduleOp, funcOp, /*implSufffix=*/false) << "("
+           << "iree_vm_stack_t* stack, " << moduleName << "_t* module, "
+           << moduleName << "_state_t* module_state";
+
+    if (funcOp.getNumArguments() > 0) {
+      output << ", ";
+    }
+
+    if (failed(printFuncOpArguments(funcOp, emitter, output))) {
+      return failure();
+    }
+
+    if (funcOp.getNumResults() > 0) {
+      output << ", ";
+    }
+
+    std::vector<std::string> resultNames;
+    for (size_t idx = 0; idx < funcOp.getNumResults(); idx++) {
+      std::string resultName = "out" + std::to_string(idx);
+      resultNames.push_back(resultName);
+    }
+
+    if (failed(printFuncOpResults(funcOp, emitter, output, resultNames))) {
+      return failure();
+    }
+    output << ") {\n"
+           << "return "
+           << buildFunctionName(moduleOp, funcOp, /*implSufffix=*/true) << "(";
+
+    std::vector<std::string> argNames;
+    for (Value &argument : funcOp.getArguments()) {
+      std::string argName = emitter.getOrCreateName(argument).str();
+      argNames.push_back(argName);
+    }
+
+    output << llvm::join(argNames, ", ");
+
+    if (funcOp.getNumResults() > 0) {
+      output << ", ";
+    }
+
+    output << llvm::join(resultNames, ", ");
+
+    output << ");\n}\n";
+  }
+
+  auto printCStringView = [](std::string s) -> std::string {
+    return "iree_make_cstring_view(\"" + s + "\")";
+  };
 
   // exports
   std::string exportName = moduleName + "_exports_";
-  // TODO(marbre/simon-camp): Fix generating the calling_convention.
-  /*
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
   for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
+    auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+    if (!funcOp) {
+      return exportOp.emitError("Couldn't find referenced FuncOp");
+    }
+    auto callingConvention = makeCallingConventionString(funcOp);
+    if (!callingConvention) {
+      return exportOp.emitError(
+          "Couldn't create calling convention string for referenced FuncOp");
+    }
+
     // TODO(simon-camp): support function-level reflection attributes
-    output << "{iree_make_cstring_view(\"" << exportOp.export_name()
-           << "\"), 0, 0, 0, NULL},\n";
+    output << "{" << printCStringView(exportOp.export_name().str()) << ", "
+           << printCStringView(callingConvention.getValue()) << ", 0, NULL},\n";
   }
   output << "};\n";
   output << "\n";
-  */
 
   // imports
   std::string importName = moduleName + "_imports_";
   output << "static const iree_vm_native_import_descriptor_t " << importName
          << "[] = {\n";
   for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
-    output << "{iree_make_cstring_view(\"" << importOp.getName() << "\")},\n";
+    output << "{" << printCStringView(importOp.getName().str()) << "},\n";
   }
   output << "};\n";
   output << "\n";
@@ -202,9 +301,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   */
 
   // TODO(simon-camp): generate boilerplate code
-  //   * module struct
-  //   * module state struct
-  //   * function wrappers
   //   * function table
   //   * interface functions
   //      * create
@@ -323,7 +419,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printModuleComment(moduleOp, output);
 
   // generate module descriptors
-  if (failed(buildModuleDescriptors(moduleOp, output))) {
+  if (failed(buildModuleDescriptors(moduleOp, emitter, output))) {
     return failure();
   }
 
