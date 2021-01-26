@@ -408,7 +408,7 @@ static inline uint64_t iree_prng_xoroshiro128starstar_next_uint64(
 // capitalize on it!
 typedef iree_alignas(iree_max_align_t) struct {
   uint8_t value[16];  // first to ensure alignment
-  uint8_t remaining;  // number of remaining valid values in the state
+  int8_t remaining;   // number of remaining valid values in the state
 } iree_prng_minilcg128_state_t;
 
 #define IREE_PRNG_MINILCG_INIT_MUL_CONSTANT 13
@@ -431,7 +431,7 @@ static inline void iree_prng_minilcg128_initialize(
 
 static inline uint8_t iree_prng_minilcg128_next_uint8(
     iree_prng_minilcg128_state_t* state) {
-  if (IREE_UNLIKELY(--state->remaining == 0)) {
+  if (IREE_UNLIKELY(--state->remaining < 0)) {
 #if defined(IREE_ARCH_ARM_64)
     uint8x16_t kmul = vdupq_n_u8(IREE_PRNG_MINILCG_NEXT_MUL_CONSTANT);
     uint8x16_t kadd = vdupq_n_u8(IREE_PRNG_MINILCG_NEXT_ADD_CONSTANT);
@@ -442,9 +442,9 @@ static inline uint8_t iree_prng_minilcg128_next_uint8(
                         IREE_PRNG_MINILCG_NEXT_ADD_CONSTANT;
     }
 #endif  // IREE_ARCH_ARM_64
-    state->remaining = 16;
+    state->remaining = 15;
   }
-  return state->value[16 - state->remaining + 1];
+  return state->value[16 - state->remaining - 1];
 }
 
 #endif  // IREE_BASE_MATH_H_
