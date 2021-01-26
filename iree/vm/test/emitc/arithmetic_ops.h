@@ -16,28 +16,6 @@
 #define IREE_VM_TEST_EMITC_ARITHMETIC_OPS_H_
 
 #include "iree/vm/test/emitc/arithmetic_ops.module"
-#include "iree/vm/test/emitc/shims.h"
-
-static const iree_vm_native_function_ptr_t arithmetic_ops_funcs_[] = {
-    {(iree_vm_native_function_shim_t)call_0___shim,
-     (iree_vm_native_function_target_t)arithmetic_ops_test_add_i32},
-};
-
-static_assert(IREE_ARRAYSIZE(arithmetic_ops_funcs_) ==
-                  IREE_ARRAYSIZE(arithmetic_ops_exports_),
-              "function pointer table must be 1:1 with exports");
-
-static const iree_vm_native_module_descriptor_t arithmetic_ops_descriptor_ = {
-    iree_make_cstring_view("arithmetic_ops"),
-    IREE_ARRAYSIZE(arithmetic_ops_imports_),
-    arithmetic_ops_imports_,
-    IREE_ARRAYSIZE(arithmetic_ops_exports_),
-    arithmetic_ops_exports_,
-    IREE_ARRAYSIZE(arithmetic_ops_funcs_),
-    arithmetic_ops_funcs_,
-    0,
-    NULL,
-};
 
 static iree_status_t arithmetic_ops_create(iree_allocator_t allocator,
                                            iree_vm_module_t** out_module) {

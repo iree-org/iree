@@ -73,6 +73,25 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
+static LogicalResult printShim(IREE::VM::FuncOp &funcOp,
+                               llvm::raw_ostream &output) {
+  auto callingConvention = makeCallingConventionString(funcOp);
+  if (!callingConvention) {
+    return funcOp.emitError("Couldn't create calling convention string");
+  }
+  auto s = callingConvention.getValue();
+  output << "call_";
+  if (s.size() == 0) {
+    output << "0_";
+  } else {
+    std::replace(s.begin(), s.end(), '.', '_');
+    output << s;
+  }
+  output << "_shim";
+
+  return success();
+}
+
 static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
                                           mlir::emitc::CppEmitter &emitter,
                                           llvm::raw_ostream &output) {
@@ -280,15 +299,29 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
   // functions
   std::string functionName = moduleName + "_funcs_";
+  output << "static const iree_vm_native_function_ptr_t " << functionName
+         << "[] = {\n";
+  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+    output << "{"
+           << "(iree_vm_native_function_shim_t)";
+
+    if (failed(printShim(funcOp, output))) {
+      return funcOp.emitError("Couldn't create calling convention string");
+    }
+    output << ", "
+           << "(iree_vm_native_function_target_t)"
+           << buildFunctionName(moduleOp, funcOp, /*implSufffix=*/false)
+           << "},\n";
+  }
+  output << "};\n";
+  output << "\n";
 
   // module descriptor
   // TODO(simon-camp): support module-level reflection attributes
-  // TODO(marbre/simon-camp): Renable after fix generating the export descriptor
-  /*
   std::string descriptorName = moduleName + "_descriptor_";
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
-         << "iree_make_cstring_view(\"" << moduleName << "\"),\n"
+         << printCStringView(moduleName) << ",\n"
          << "IREE_ARRAYSIZE(" << importName << "),\n"
          << importName << ",\n"
          << "IREE_ARRAYSIZE(" << exportName << "),\n"
@@ -298,10 +331,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "0,\n"
          << "NULL,\n"
          << "};\n";
-  */
 
   // TODO(simon-camp): generate boilerplate code
-  //   * function table
   //   * interface functions
   //      * create
   //      * destroy
@@ -395,6 +426,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printInclude("iree/vm/native_module.h");
   printInclude("iree/vm/ref.h");
   printInclude("iree/vm/stack.h");
+  printInclude("iree/vm/test/emitc/shims.h");
   output << "\n";
 
   printInclude("iree/vm/c_funcs.h");
