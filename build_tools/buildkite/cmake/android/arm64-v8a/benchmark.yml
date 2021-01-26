@@ -24,7 +24,6 @@ steps:
       - "build=true"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "model-artifacts.tgz"
 
   - wait
@@ -45,7 +44,6 @@ steps:
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 
@@ -65,7 +63,6 @@ steps:
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 
