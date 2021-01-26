@@ -100,7 +100,7 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       // TODO(benvanik): signal as error.
       // iree_task_fence_t* fence_task = (iree_task_fence_t*)task;
       iree_atomic_fetch_sub_int32(&task->scope->pending_submissions, 1,
-                                  iree_memory_order_relaxed);
+                                  iree_memory_order_release);
       break;
     }
     case IREE_TASK_TYPE_WAIT:
@@ -117,6 +117,9 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
 
 static void iree_task_retire(iree_task_t* task,
                              iree_task_submission_t* pending_submission) {
+  IREE_ASSERT_EQ(0, iree_atomic_load_int32(&task->pending_dependency_count,
+                                           iree_memory_order_acquire));
+
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
   task->completion_task = NULL;
@@ -160,10 +163,16 @@ iree_status_t iree_task_call_execute(
     iree_task_call_t* task, iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Execute the user callback.
+  // Note that this may enqueue more nested tasks, including tasks that prevent
+  // this task from retiring.
   iree_status_t status = task->closure.fn(task->closure.user_context,
                                           &task->header, pending_submission);
+  if (iree_atomic_load_int32(&task->header.pending_dependency_count,
+                             iree_memory_order_acquire) == 0) {
+    iree_task_retire(&task->header, pending_submission);
+  }
 
-  iree_task_retire(&task->header, pending_submission);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -232,7 +241,7 @@ void iree_task_fence_initialize(iree_task_scope_t* scope,
                                 iree_task_fence_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_FENCE, scope, &out_task->header);
   iree_atomic_fetch_add_int32(&scope->pending_submissions, 1,
-                              iree_memory_order_relaxed);
+                              iree_memory_order_release);
 }
 
 void iree_task_fence_retire(iree_task_fence_t* task,
@@ -408,6 +417,14 @@ void iree_task_dispatch_issue_sliced(iree_task_dispatch_t* dispatch_task,
     memcpy(workgroup_count, dispatch_task->workgroup_count.value,
            sizeof(workgroup_count));
   }
+  uint32_t total_workgroup_count =
+      workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
+  if (total_workgroup_count == 0) {
+    // No workgroups to execute - bail early.
+    iree_task_dispatch_retire(dispatch_task, pending_submission);
+    IREE_TRACE_ZONE_END(z0);
+    return;
+  }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   char xyz_string[32];
@@ -449,12 +466,15 @@ void iree_task_dispatch_issue_sliced(iree_task_dispatch_t* dispatch_task,
         workgroup_base[1] = slice_y * tiles_per_slice_y;
         workgroup_base[2] = slice_z * tiles_per_slice_z;
         uint32_t workgroup_range[3];
-        workgroup_range[0] = iree_min(
-            workgroup_count[0], workgroup_base[0] + tiles_per_slice_x - 1);
-        workgroup_range[1] = iree_min(
-            workgroup_count[1], workgroup_base[1] + tiles_per_slice_y - 1);
-        workgroup_range[2] = iree_min(
-            workgroup_count[2], workgroup_base[2] + tiles_per_slice_z - 1);
+        workgroup_range[0] = iree_min(workgroup_count[0],
+                                      workgroup_base[0] + tiles_per_slice_x) -
+                             1;
+        workgroup_range[1] = iree_min(workgroup_count[1],
+                                      workgroup_base[1] + tiles_per_slice_y) -
+                             1;
+        workgroup_range[2] = iree_min(workgroup_count[2],
+                                      workgroup_base[2] + tiles_per_slice_z) -
+                             1;
 
         // Allocate and initialize the slice.
         iree_task_dispatch_slice_t* slice_task =
@@ -789,10 +809,10 @@ iree_status_t iree_task_dispatch_shard_execute(
       // TODO(benvanik): faster math here, especially knowing we pull off N
       // sequential indices per reservation.
       uint32_t tile_i = tile_index;
-      tile_context.workgroup_xyz[0] = tile_i % (workgroup_count_x + 1);
-      tile_i /= (workgroup_count_x + 1);
-      tile_context.workgroup_xyz[1] = tile_i % (workgroup_count_y + 1);
-      tile_i /= (workgroup_count_y + 1);
+      tile_context.workgroup_xyz[0] = tile_i % workgroup_count_x;
+      tile_i /= workgroup_count_x;
+      tile_context.workgroup_xyz[1] = tile_i % workgroup_count_y;
+      tile_i /= workgroup_count_y;
       tile_context.workgroup_xyz[2] = tile_i;
 
       IREE_TRACE_ZONE_BEGIN_NAMED(z_tile,

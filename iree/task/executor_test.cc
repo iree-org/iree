@@ -123,7 +123,7 @@ TEST(ExecutorTest, Any) {
           },
           0),
       workgroup_size_1, workgroup_count_1, &dispatch1);
-  // dispatch1.header.flags |= IREE_TASK_FLAG_DISPATCH_SLICED;
+  dispatch1.header.flags |= IREE_TASK_FLAG_DISPATCH_SLICED;
 
   //
   iree_task_call_t call1;
@@ -155,9 +155,9 @@ TEST(ExecutorTest, Any) {
 #endif
 
   // fence
-  iree_task_fence_t fence0;
-  iree_task_fence_initialize(&scope_a, &fence0);
-  iree_task_set_completion_task(&call1.header, &fence0.header);
+  iree_task_fence_t* fence0 = NULL;
+  IREE_CHECK_OK(iree_task_executor_acquire_fence(executor, &scope_a, &fence0));
+  iree_task_set_completion_task(&call1.header, &fence0->header);
 
   //
   iree_task_submission_t sub0;

@@ -116,7 +116,7 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
 
 bool iree_task_scope_is_idle(iree_task_scope_t* scope) {
   return iree_atomic_load_int32(&scope->pending_submissions,
-                                iree_memory_order_relaxed) == 0;
+                                iree_memory_order_acquire) == 0;
 }
 
 iree_status_t iree_task_scope_wait_idle(iree_task_scope_t* scope,
