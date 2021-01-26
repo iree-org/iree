@@ -124,6 +124,24 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    task_tests
+  SRCS
+    "task_test_barrier.cc"
+    "task_test_call.cc"
+    "task_test_dispatch.cc"
+    "task_test_fence.cc"
+    "task_test_nop.cc"
+    "task_test_wait.cc"
+  DEPS
+    ::task
+    iree::base::api
+    iree::task::testing::task_test
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     topology_test
   SRCS
     "topology_test.cc"

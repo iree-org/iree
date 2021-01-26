@@ -50,8 +50,8 @@ struct iree_task_executor_s {
   // Pools of transient dispatch tasks shared across all workers.
   // Depending on configuration the task pool may allocate after creation using
   // the allocator provided upon executor creation.
-  iree_task_pool_t slice_task_pool;
-  iree_task_pool_t shard_task_pool;
+  iree_task_pool_t fence_task_pool;
+  iree_task_pool_t dispatch_task_pool;
 
   // A list of incoming tasks that are ready to execute immediately.
   // The list is LIFO and we require that task lists are reversed by the
@@ -126,9 +126,13 @@ void iree_task_executor_schedule_ready_tasks(
 // |current_worker| will be NULL if called from a non-worker thread and
 // otherwise be the current worker; used to avoid round-tripping through the
 // whole system to post to oneself.
+//
+// If the |current_worker| has no more work remaining and |wait_on_idle| is set
+// then the calling thread may wait on any pending wait tasks until one resolves
+// or more work is scheduled for the worker.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker,
-                                   bool speculative);
+                                   bool wait_on_idle);
 
 // Tries to steal an entire task from a sibling worker (based on topology).
 // Returns a task that is available (has not yet begun processing at all).

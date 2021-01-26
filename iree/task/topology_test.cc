@@ -133,7 +133,7 @@ static void EnsureTopologyValid(iree_host_size_t max_group_count,
   EXPECT_LE(iree_task_topology_group_count(topology),
             iree_task_topology_group_capacity(topology));
   EXPECT_LE(iree_task_topology_group_count(topology), max_group_count);
-  EXPECT_GE(1, iree_task_topology_group_count(topology));
+  EXPECT_GE(iree_task_topology_group_count(topology), 1);
   for (iree_host_size_t i = 0; i < iree_task_topology_group_count(topology);
        ++i) {
     const iree_task_topology_group_t* group =

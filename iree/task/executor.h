@@ -319,6 +319,11 @@ void iree_task_executor_retain(iree_task_executor_t* executor);
 // Releases the given |executor| from the caller.
 void iree_task_executor_release(iree_task_executor_t* executor);
 
+// Acquires a fence for the given |scope| from the executor fence pool.
+iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
+                                               iree_task_scope_t* scope,
+                                               iree_task_fence_t** out_fence);
+
 // TODO(benvanik): scheduling mode mutation, compute quota control, etc.
 
 // Submits a batch of tasks for execution.
