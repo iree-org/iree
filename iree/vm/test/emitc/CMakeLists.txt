@@ -20,7 +20,6 @@ iree_cc_test(
   NAME
     module_test
   HDRS
-    "arithmetic_ops.h"
     "shims.h"
   SRCS
     "module_test.cc"

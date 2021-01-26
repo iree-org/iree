@@ -32,7 +32,6 @@ if(${IREE_ENABLE_EMITC})
       add_module_test_hdrs
     HDRS
       "add_module_test.h"
-      "add_mlir_generated.h"
     DEPS
       ::add_module_cc
       iree::base::api
