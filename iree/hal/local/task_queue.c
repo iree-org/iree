@@ -427,11 +427,18 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   // NOTE: if we fail from here on we must drop the retire_cmd arena.
   iree_status_t status = iree_ok_status();
 
+  // A fence we'll use to detect when the entire submission has completed.
+  // TODO(benvanik): fold into the retire command.
+  iree_task_fence_t* fence = NULL;
+  status =
+      iree_task_executor_acquire_fence(queue->executor, &queue->scope, &fence);
+  iree_task_set_completion_task(&retire_cmd->task.header, &fence->header);
+
   // Task to fork and wait for unsatisfied semaphore dependencies.
   // This is optional and only required if we have previous submissions still
   // in-flight - if the queue is empty then we can directly schedule the waits.
   iree_hal_task_queue_wait_cmd_t* wait_cmd = NULL;
-  if (batch->wait_semaphores.count > 0) {
+  if (iree_status_is_ok(status) && batch->wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
         &queue->scope, &batch->wait_semaphores, &retire_cmd->arena, &wait_cmd);
   }

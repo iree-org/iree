@@ -112,6 +112,10 @@ static iree_status_t iree_task_topology_ensure_cpuinfo_available() {
   return iree_ok_status();
 }
 
+static bool iree_task_topology_is_cpuinfo_available() {
+  return cpuinfo_initialize();
+}
+
 // Returns the core of the calling thread or NULL if not supported.
 // We wrap this here because cpuinfo only returns non-NULL on linux.
 static const struct cpuinfo_core* iree_task_topology_get_current_core() {
@@ -295,7 +299,7 @@ void iree_task_topology_initialize_from_physical_cores_with_uarch(
 void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
-  if (!iree_task_topology_ensure_cpuinfo_available()) {
+  if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_core_count, out_topology);
     return;
   }
@@ -338,7 +342,7 @@ void iree_task_topology_initialize_from_physical_cores_with_filter(
 
 void iree_task_topology_initialize_from_unique_l2_cache_groups(
     iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
-  if (!iree_task_topology_ensure_cpuinfo_available()) {
+  if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_group_count, out_topology);
     return;
   }

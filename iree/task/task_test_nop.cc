@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/flags.h"
+#include "iree/task/testing/task_test.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
-extern "C" int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  iree_flags_parse_checked(&argc, &argv);
+namespace {
 
-  return RUN_ALL_TESTS();
+class TaskNopTest : public TaskTest {};
+
+TEST_F(TaskNopTest, Issue) {
+  iree_task_nop_t task;
+  iree_task_nop_initialize(&scope_, &task);
+  IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
 }
+
+}  // namespace
