@@ -18,6 +18,8 @@
 
 #include <io.h>
 
+#include <atomic>
+
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
