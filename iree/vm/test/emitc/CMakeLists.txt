@@ -19,8 +19,6 @@ if(${IREE_ENABLE_EMITC})
 iree_cc_test(
   NAME
     module_test
-  HDRS
-    "shims.h"
   SRCS
     "module_test.cc"
   DEPS
@@ -30,6 +28,8 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::cc
+    iree::vm::c_funcs
+    iree::vm::shims
     ::arithmetic_ops_cc
 )
 

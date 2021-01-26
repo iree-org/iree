@@ -448,7 +448,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printInclude("iree/vm/native_module.h");
   printInclude("iree/vm/ref.h");
   printInclude("iree/vm/stack.h");
-  printInclude("iree/vm/test/emitc/shims.h");
+  printInclude("iree/vm/shims.h");
   output << "\n";
 
   printInclude("iree/vm/c_funcs.h");

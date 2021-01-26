@@ -306,3 +306,10 @@ cc_library(
         "c_funcs.h",
     ],
 )
+
+cc_library(
+    name = "shims",
+    hdrs = [
+        "shims.h",
+    ],
+)
