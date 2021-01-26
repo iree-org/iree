@@ -35,7 +35,7 @@ TEST_F(TaskWaitTest, IssueSignaled) {
   iree_event_deinitialize(&event);
 }
 
-TEST_F(TaskWaitTest, IssueUnsignaled) {
+TEST_F(TaskWaitTest, DISABLED_IssueUnsignaled) {
   iree_event_t event;
   iree_event_initialize(/*initial_state=*/false, &event);
 
