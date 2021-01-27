@@ -72,7 +72,7 @@ def aot(function, *args, **options):
 # A more JAX-native approach to jitting would be desireable here, however
 # implementing that reasonably would require using JAX internals, particularly
 # jax.linear_util.WrappedFun and helpers. The following is sufficient for many
-# usecases for the time being however.
+# usecases for the time being.
 
 
 class _JittedFunction:
@@ -100,7 +100,8 @@ class _JittedFunction:
     module = rt.load_module(cpp_vm_module, config=self._driver_config)
 
     # Get the output tree so it can be reconstructed from the outputs of the
-    # compiled module.
+    # compiled module. Duplicating execution here isn't ideal, and could
+    # probably be avoided using internal APIs.
     args, kwargs = jax.tree_unflatten(in_tree, args_flat)
     _, out_tree = jax.tree_flatten(self._function(*args, **kwargs))
 
