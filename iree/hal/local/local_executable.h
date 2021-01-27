@@ -31,7 +31,7 @@ typedef struct {
   iree_hal_vec3_t workgroup_count;
   iree_hal_executable_push_constants_ptr_t push_constants;
   const iree_hal_executable_binding_ptr_t* bindings;
-  const iree_host_size_t* binding_lengths;
+  const iree_device_size_t* binding_lengths;
 } iree_hal_local_executable_call_t;
 
 typedef struct {

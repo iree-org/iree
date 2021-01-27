@@ -706,7 +706,7 @@ typedef struct {
   iree_hal_local_executable_t* executable;
   iree_host_size_t ordinal;
   iree_hal_executable_binding_ptr_t* IREE_RESTRICT bindings;
-  iree_host_size_t* IREE_RESTRICT binding_lengths;
+  iree_device_size_t* IREE_RESTRICT binding_lengths;
   uint32_t* IREE_RESTRICT push_constants;
 } iree_hal_cmd_dispatch_t;
 
@@ -793,7 +793,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
   // kept valid for the duration they may be in use.
   cmd->bindings = (iree_hal_executable_binding_ptr_t*)cmd_ptr;
   cmd_ptr += used_binding_count * sizeof(*cmd->bindings);
-  cmd->binding_lengths = (iree_host_size_t*)cmd_ptr;
+  cmd->binding_lengths = (iree_device_size_t*)cmd_ptr;
   cmd_ptr += used_binding_count * sizeof(*cmd->binding_lengths);
   iree_host_size_t binding_base = 0;
   for (iree_host_size_t i = 0; i < used_binding_count; ++i) {
