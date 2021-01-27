@@ -152,6 +152,10 @@ def _normalize_numpy(array: np.ndarray,
 
 def normalize_value(value: Any) -> Optional[np.ndarray]:
   """Normalizes the given value for input to (or comparison with) IREE."""
+  if value is None:
+    # Exclude None from falling through to blanket np.array conversion.
+    return value
+
   if isinstance(value, np.ndarray):
     return _normalize_numpy(value)
   elif isinstance(value, (bool, int, float, list, tuple)):
@@ -160,9 +164,6 @@ def normalize_value(value: Any) -> Optional[np.ndarray]:
   elif hasattr(value, "numpy"):
     # Converts TensorFlow and Torch tensors.
     return _normalize_numpy(value.numpy())
-  elif value is None:
-    # Exclude None from falling through to np.array conversion.
-    return value
   else:
     # Converts JAX DeviceArrays.
     return _normalize_numpy(np.array(value))
