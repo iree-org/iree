@@ -56,9 +56,9 @@ Builds the IREE debugger app. Defaults to `OFF`.
 
 Builds the IREE python bindings. Defaults to `OFF`.
 
-#### `IREE_BUILD_JAVA_BINDINGS`:BOOL
+#### `IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS`:BOOL
 
-Builds the IREE java bindings. Defaults to `OFF`.
+Builds the experimental java bindings. Defaults to `OFF`.
 
 #### `IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER`:BOOL
 

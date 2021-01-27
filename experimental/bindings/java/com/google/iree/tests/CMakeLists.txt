@@ -31,8 +31,8 @@ if(${IREE_BUILD_COMPILER})
      SRCS
       "integration_test.cc"
     DEPS
-       bindings::java::com::google::iree::native::cc_wrappers
-       bindings::javatests::com::google::iree::simple_mul_bytecode_module_cc
+       experimental::bindings::java::com::google::iree::native::cc_wrappers
+       experimental::bindings::java::com::google::iree::tests::simple_mul_bytecode_module_cc
        iree::base::status
   )
 endif()

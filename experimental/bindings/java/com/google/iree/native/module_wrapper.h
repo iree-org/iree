@@ -12,28 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
-#define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
+#ifndef IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_MODULE_WRAPPER_H_
+#define IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_MODULE_WRAPPER_H_
 
 #include "iree/base/status.h"
-#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 
 namespace iree {
 namespace java {
 
-class InstanceWrapper {
+class ModuleWrapper {
  public:
-  Status Create();
+  Status Create(const uint8_t* flatbuffer_data, iree_host_size_t length);
 
-  iree_vm_instance_t* instance() const;
+  iree_vm_module_t* module() const;
 
-  ~InstanceWrapper();
+  iree_string_view_t name() const;
+
+  iree_vm_module_signature_t signature() const;
+
+  ~ModuleWrapper();
 
  private:
-  iree_vm_instance_t* instance_ = nullptr;
+  iree_vm_module_t* module_ = nullptr;
 };
 
 }  // namespace java
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
+#endif  // IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_MODULE_WRAPPER_H_

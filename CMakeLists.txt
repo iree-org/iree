@@ -42,7 +42,6 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
-option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -80,6 +79,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -454,11 +454,6 @@ if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
 endif()
 
-if(${IREE_BUILD_JAVA_BINDINGS})
-  add_subdirectory(bindings/java)
-  add_subdirectory(bindings/javatests)
-endif()
-
 add_subdirectory(iree/tools)
 
 # Order constraint: The python bindings install tools targets from iree/tools
@@ -484,6 +479,10 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
+  add_subdirectory(experimental/bindings/java)
 endif()
 
 if(${IREE_ENABLE_TENSORFLOW})
