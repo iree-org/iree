@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
-#define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
+#ifndef IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
+#define IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 
 #include <vector>
 
-#include "bindings/java/com/google/iree/native/function_wrapper.h"
-#include "bindings/java/com/google/iree/native/instance_wrapper.h"
-#include "bindings/java/com/google/iree/native/module_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/function_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/instance_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/module_wrapper.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
@@ -62,4 +62,4 @@ class ContextWrapper {
 }  // namespace java
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
+#endif  // IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_

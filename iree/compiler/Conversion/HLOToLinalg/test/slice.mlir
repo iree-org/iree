@@ -1,9 +1,8 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-pipeline -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
 
 module {
-  // CHECK_LABEL: @slice_whole_buffer
-  //  CHECK-NOT: subview
-  //      CHECK: linalg.copy
+  // CHECK-LABEL: @slice_whole_buffer
+  //   CHECK-NOT: subtensor
   func @slice_whole_buffer()
     attributes {signature = (tensor<3x4xi32>) -> (tensor<3x4xi32>)} {
     %c0 = constant 0 : index
@@ -25,11 +24,8 @@ module {
 // -----
 
 module {
-  //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 * 4 + d1 + 4)>
-  //      CHECK: @slice_whole_stride
-  //  CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3x4xi32>
-  //      CHECK: subview %[[IN]][1, 0] [1, 4] [1, 1]  : memref<3x4xi32> to memref<1x4xi32, #[[MAP]]>
-  //      CHECK: linalg.copy
+  // CHECK-LABEL: @slice_whole_stride
+  //       CHECK: subtensor %{{.*}}[1, 0] [1, 4] [1, 1] : tensor<3x4xi32> to tensor<1x4xi32>
   func @slice_whole_stride()
     attributes {signature = (tensor<3x4xi32>) -> (tensor<1x4xi32>)} {
     %c0 = constant 0 : index
@@ -51,11 +47,8 @@ module {
 // -----
 
 module {
-  //      CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0 * 4 + d1 + 5)>
-  //      CHECK: @slice_stride_part
-  //  CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3x4xi32>
-  //       CHECK: subview %[[IN]][1, 1] [1, 2] [1, 1]  : memref<3x4xi32> to memref<1x2xi32, #[[MAP]]>
-  //       CHECK: linalg.copy
+  // CHECK-LABEL: @slice_stride_part
+  //       CHECK: subtensor %{{.*}}[1, 1] [1, 2] [1, 1]  : tensor<3x4xi32> to tensor<1x2xi32>
   func @slice_stride_part()
     attributes {signature = (tensor<3x4xi32>) -> (tensor<1x2xi32>)} {
     %c0 = constant 0 : index

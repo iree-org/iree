@@ -14,7 +14,7 @@
 
 #include <jni.h>
 
-#include "bindings/java/com/google/iree/native/module_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/module_wrapper.h"
 
 #define JNI_FUNC extern "C" JNIEXPORT
 #define JNI_PREFIX(METHOD) Java_com_google_iree_Module_##METHOD

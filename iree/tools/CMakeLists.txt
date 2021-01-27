@@ -390,4 +390,33 @@ if(${IREE_BUILD_COMPILER})
       DEPENDS FileCheck
     )
   endif()
+
+  # General test dependency binary/scripts installed.
+  install(
+    PROGRAMS
+      IreeFileCheck.bat
+      run_lit.bat
+      run_lit.ps1
+      run_lit.sh
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
+
+  # Rename IreeFileCheck.sh -> IreeFileCheck in lieu of symlink (as is used in
+  # the build tree).
+  install(
+    PROGRAMS
+      IreeFileCheck.sh
+    DESTINATION "tests/bin"
+    RENAME "IreeFileCheck"
+    COMPONENT Tests
+  )
+
+  # Bundle the FileCheck binary from LLVM into our tests/bin directory so
+  # installed FileCheck tests are hermetic.
+  install(
+    TARGETS FileCheck
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
 endif(${IREE_BUILD_COMPILER})

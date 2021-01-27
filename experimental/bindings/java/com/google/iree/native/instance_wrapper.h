@@ -12,22 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/java/com/google/iree/native/function_wrapper.h"
+#ifndef IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
+#define IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
+
+#include "iree/base/status.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace java {
 
-iree_vm_function_t* FunctionWrapper::function() const {
-  return function_.get();
-}
+class InstanceWrapper {
+ public:
+  Status Create();
 
-iree_string_view_t FunctionWrapper::name() const {
-  return iree_vm_function_name(function_.get());
-}
+  iree_vm_instance_t* instance() const;
 
-iree_vm_function_signature_t FunctionWrapper::signature() const {
-  return iree_vm_function_signature(function_.get());
-}
+  ~InstanceWrapper();
+
+ private:
+  iree_vm_instance_t* instance_ = nullptr;
+};
 
 }  // namespace java
 }  // namespace iree
+
+#endif  // IREE_EXPERIMENTAL_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_INSTANCE_WRAPPER_H_
