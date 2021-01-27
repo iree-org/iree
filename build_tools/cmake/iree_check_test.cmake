@@ -36,6 +36,12 @@ function(iree_check_test)
     return()
   endif()
 
+  # On the host, only build check tests if the compiler is enabled.
+  # When cross compiling, assume the host tools were already built.
+  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
