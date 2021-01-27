@@ -747,7 +747,8 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
     outputs = []
     for detail in self._interpreter.get_output_details():
       # Normalize for comparison with IREE.
-      value = rt.normalize_value(self._interpreter.get_tensor(detail["index"]))
+      value = tf_utils.convert_to_numpy(
+          self._interpreter.get_tensor(detail["index"]))
       if self._output_names is not None:
         name = detail["name"]
         if name not in self._output_names:

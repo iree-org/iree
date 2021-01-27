@@ -133,40 +133,28 @@ def _get_global_config():
   return _global_config
 
 
-def _normalize_numpy(array: np.ndarray,
-                     single_precision: bool = False) -> np.ndarray:
-  if np.isscalar(array):
-    array = np.array(array)
-
-  # IREE models booleans as int8s.
-  if array.dtype == np.bool:
-    array = array.astype(np.int8)
-
-  if single_precision:
-    if array.dtype == np.float16 or array.dtype == np.float64:
-      array = array.astype(np.float32)
-    if array.dtype == np.int16 or array.dtype == np.int64:
-      array = array.astype(np.int32)
-  return array
-
-
 def normalize_value(value: Any) -> Optional[np.ndarray]:
   """Normalizes the given value for input to (or comparison with) IREE."""
   if value is None:
-    # Exclude None from falling through to blanket np.array conversion.
+    # Exclude None from falling through to blanket np.asarray conversion.
     return value
 
-  if isinstance(value, np.ndarray):
-    return _normalize_numpy(value)
-  elif isinstance(value, (bool, int, float, list, tuple)):
-    # Always use 32-bits to represent Python inputs.
-    return _normalize_numpy(np.array(value), single_precision=True)
-  elif hasattr(value, "numpy"):
-    # Converts TensorFlow and Torch tensors.
-    return _normalize_numpy(value.numpy())
-  else:
-    # Converts JAX DeviceArrays.
-    return _normalize_numpy(np.array(value))
+  array = np.asarray(value)
+  if isinstance(value, (bool, int, float, list, tuple)):
+    # Manually convert ints and floats to 32 bits.
+    if array.dtype == np.float64:
+      array = array.astype(np.float32)
+    elif array.dtype == np.int64:
+      array = array.astype(np.int32)
+
+  # IREE models booleans as i8s.
+  # TODO: This cast should be moved into the function abi. If it's possible to
+  # tell that the result should have boolean type from the IR, then the return
+  # type should also be recast to np.bool at that level.
+  if array.dtype == np.bool:
+    array = array.astype(np.int8)
+
+  return array
 
 
 class BoundFunction:
