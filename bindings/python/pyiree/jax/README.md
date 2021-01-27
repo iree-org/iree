@@ -48,7 +48,7 @@ doc, and then ensure the following environment variables are set:
 
 ```shell
 export ANDROID_NDK=# NDK install location
-export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
+export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++"
 ```
 
 The code below assumes that you have `flax` installed.
