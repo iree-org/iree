@@ -325,6 +325,16 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
+      iree-translate
+    OUT
+      iree-translate
+    DEPS
+      ::iree_translate_main
+    HOSTONLY
+  )
+
+  iree_cc_binary(
+    NAME
       iree-opt
     OUT
       iree-opt
@@ -380,19 +390,33 @@ if(${IREE_BUILD_COMPILER})
       DEPENDS FileCheck
     )
   endif()
-endif(${IREE_BUILD_COMPILER})
 
-# If cross-compiling, we need to declare iree-translate under host configuration
-# unconditionally because we need to run it on host to generate VM modules
-# for tests.
-if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
-  iree_cc_binary(
-    NAME
-      iree-translate
-    OUT
-      iree-translate
-    DEPS
-      ::iree_translate_main
-    HOSTONLY
+  # General test dependency binary/scripts installed.
+  install(
+    PROGRAMS
+      IreeFileCheck.bat
+      run_lit.bat
+      run_lit.ps1
+      run_lit.sh
+    DESTINATION "tests/bin"
+    COMPONENT Tests
   )
-endif()
+
+  # Rename IreeFileCheck.sh -> IreeFileCheck in lieu of symlink (as is used in
+  # the build tree).
+  install(
+    PROGRAMS
+      IreeFileCheck.sh
+    DESTINATION "tests/bin"
+    RENAME "IreeFileCheck"
+    COMPONENT Tests
+  )
+
+  # Bundle the FileCheck binary from LLVM into our tests/bin directory so
+  # installed FileCheck tests are hermetic.
+  install(
+    TARGETS FileCheck
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
+endif(${IREE_BUILD_COMPILER})

@@ -21,10 +21,6 @@ experimental
 # from root works.
 third_party
 
-# TODO: enable this when Java bindings are wired up.
-bindings/java
-bindings/javatests
-
 # Ignore the bazel directories when this directory is used as a local repository.
 bazel-*
 

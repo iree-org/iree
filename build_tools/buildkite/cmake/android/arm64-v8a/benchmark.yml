@@ -19,12 +19,11 @@ steps:
       - "gsutil cp gs://iree-model-artifacts/iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz ."
       - "tar -xzf iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz"
       - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec build_tools/mako/compile_android_modules.sh --model=tmp/iree/modules/MobileBertSquad/iree_input.mlir --targets=vulkan-spirv,vmla,dylib-llvm-aot --prefix=mobile-bert"
-      - "tar -czvf model-artifacts.tgz build/iree/tools/iree-benchmark-module mobile-bert-*.vmfb tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile"
+      - "tar -czvf model-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert-*.vmfb tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile"
     agents:
       - "build=true"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "model-artifacts.tgz"
 
   - wait
@@ -34,7 +33,7 @@ steps:
       - "buildkite-agent artifact download --step build model-artifacts.tgz ./"
       - "tar xzvf model-artifacts.tgz"
       - "adb shell mkdir -p /data/local/tmp/benchmark_tmpdir"
-      - "adb push build/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
+      - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push mobile-bert-*.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile /data/local/tmp/benchmark_tmpdir"
       - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=5538704950034432 --model=mobile-bert --git_hash=$(git rev-parse HEAD)"
@@ -45,7 +44,6 @@ steps:
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 
@@ -54,7 +52,7 @@ steps:
       - "buildkite-agent artifact download --step build model-artifacts.tgz ./"
       - "tar xzvf model-artifacts.tgz"
       - "adb shell mkdir -p /data/local/tmp/benchmark_tmpdir"
-      - "adb push build/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
+      - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push mobile-bert-*.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile /data/local/tmp/benchmark_tmpdir"
       - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=4699630718681088 --model=mobile-bert --git_hash=$(git rev-parse HEAD)"
@@ -65,7 +63,6 @@ steps:
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    branches: "main"
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 

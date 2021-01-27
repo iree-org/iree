@@ -61,15 +61,28 @@ You may also want to add the folder to the `PATH` environment variable.
 
 ## Configure and build
 
-### Configure on Linux
+### Host configuration
+
+Build and install at least the compiler tools on your host machine, or install
+them from a binary distribution:
+
+```shell
+$ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-host/install .
+$ cmake --build ../iree-build-host/ --target install
+```
+
+### Target configuration
+
+Build the runtime using the Android NDK toolchain:
 
 ```shell
 $ cmake -G Ninja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
+  -DIREE_HOST_BINARY_ROOT=../iree-build-host/install
   -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
-  -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++` \
+  -DIREE_BUILD_COMPILER=OFF -DIREE_ENABLE_MLIR=OFF -DIREE_BUILD_SAMPLES=OFF \
   .
+$ cmake --build ../iree-build-android/
 ```
 
 *   The above configures IREE to cross-compile towards 64-bit
@@ -81,38 +94,6 @@ $ cmake -G Ninja -B ../iree-build-android/ \
     for your target device. You can also refer to Android NDK's
     [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
     more toolchain arguments.
-*   Building IREE compilers and samples for Android is not supported at the
-    moment.
-*   We define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE has
-    [unstable support for GCC](https://github.com/google/iree/issues/1269).
-
-### Configure on Windows
-
-On Windows, we will need the full path to the `cl.exe` compiler. This can be
-obtained by
-[opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt)
-and running `where cl.exe`. Then in a command prompt (`cmd.exe`):
-
-```cmd
-> cmake -G Ninja -B ../iree-build-android/  \
-    -DCMAKE_TOOLCHAIN_FILE="%ANDROID_NDK%/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
-    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
-    -DIREE_HOST_C_COMPILER="<full-path-to-cl.exe>" \
-    -DIREE_HOST_CXX_COMPILER="<full-path-to-cl.exe>" \
-    -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc" \
-    .
-```
-
-*   See the Linux section in the above for explanations of the used arguments.
-*   We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot
-    yet properly detect host triple from the Android CMake toolchain file.
-
-### Build all targets
-
-```shell
-$ cmake --build ../iree-build-android/
-```
 
 ## Test on Android
 
@@ -148,7 +129,7 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Assuming in IREE source root
-$ ../iree-build-android/host/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
@@ -186,7 +167,7 @@ Android since 7, but Android 10 is our primary target at the moment.
 Translate a source MLIR into IREE module:
 
 ```shell
-$ ../iree-build-android/host/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     $PWD/iree/tools/test/simple.mlir \
@@ -259,22 +240,10 @@ $ adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
 
 ### Dylib LLVM AOT backend
 
-To compile an IREE module using the Dylib LLVM ahead-of-time (AOT) backend for
-a target Android device (e.g. Android 10 AArch64) we need to use the
-corresponding standalone toolchain which can be found in `ANDROID_NDK`.
-Set the AOT linker path environment variable:
-
-```shell
-$ export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
-```
-
-`-static-libstdc++` is needed because some dynamic libraries would not be able
-to open.
-
 Translate a source MLIR into an IREE module:
 
 ```shell
-$ ../iree-build-android/host/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \

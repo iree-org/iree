@@ -14,11 +14,11 @@
 
 #include <memory>
 
-#include "bindings/java/com/google/iree/native/context_wrapper.h"
-#include "bindings/java/com/google/iree/native/function_wrapper.h"
-#include "bindings/java/com/google/iree/native/instance_wrapper.h"
-#include "bindings/java/com/google/iree/native/module_wrapper.h"
-#include "bindings/javatests/com/google/iree/simple_mul_bytecode_module.h"
+#include "experimental/bindings/java/com/google/iree/native/context_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/function_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/instance_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/module_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/tests/simple_mul_bytecode_module.h"
 #include "iree/base/flags.h"
 
 namespace iree {

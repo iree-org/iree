@@ -82,11 +82,15 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
           "unable to promote ops with multiple fusable dependences");
     }
     auto dependence = dependences.front();
-    unsigned producerIdx = dependence.dependentOpView->getOperandNumber();
+    Optional<unsigned> producerIdx = dependence.getDependentOpViewOperandNum();
+    if (!producerIdx) {
+      return op.emitError(
+          "expected dependent view in producer to be an operand");
+    }
     linalg::LinalgOp consumer =
-        cast<linalg::LinalgOp>(dependence.indexingOpView->getOwner());
-    unsigned consumerIdx = dependence.indexingOpView->getOperandNumber();
-    Value consumerView = consumer.getShapedOperand(consumerIdx);
+        cast<linalg::LinalgOp>(dependence.getIndexingOp());
+    unsigned consumerIdx = dependence.getIndexingOpViewOperandNum().getValue();
+    Value consumerView = dependence.getIndexingValue();
     Value promotedView = nullptr;
 
     // If the view is already promoted, reuse that. The assumption is that the
@@ -96,7 +100,7 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
     } else if (dependence.dependenceType ==
                linalg::LinalgDependenceGraph::RAW) {
       SubViewOp promotedViewProducer =
-          op.getShapedOperand(producerIdx).getDefiningOp<SubViewOp>();
+          op.getShapedOperand(*producerIdx).getDefiningOp<SubViewOp>();
       assert(promotedViewProducer &&
              "expected producer to be a subview op as well");
       Optional<linalg::PromotionInfo> promotionInfo =
@@ -110,7 +114,7 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
       promotedViews.insert(promotedView);
     }
     if (!promotedView) continue;
-    op.getOperation()->setOperand(producerIdx, promotedView);
+    op.getOperation()->setOperand(*producerIdx, promotedView);
   }
   return success();
 }

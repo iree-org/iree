@@ -45,3 +45,11 @@ compile_commands.json
 # Pyenv files
 .python-version
 .venv
+
+# Android Studio / Gradle files
+.cxx
+.gradle
+gradlew
+gradlew.bat
+gradle/
+local.properties

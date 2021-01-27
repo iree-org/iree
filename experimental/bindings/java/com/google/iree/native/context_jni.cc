@@ -16,10 +16,10 @@
 
 #include <vector>
 
-#include "bindings/java/com/google/iree/native/context_wrapper.h"
-#include "bindings/java/com/google/iree/native/function_wrapper.h"
-#include "bindings/java/com/google/iree/native/instance_wrapper.h"
-#include "bindings/java/com/google/iree/native/module_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/context_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/function_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/instance_wrapper.h"
+#include "experimental/bindings/java/com/google/iree/native/module_wrapper.h"
 #include "iree/base/logging.h"
 
 #define JNI_FUNC extern "C" JNIEXPORT
