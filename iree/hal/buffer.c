@@ -14,6 +14,8 @@
 
 #include "iree/hal/buffer.h"
 
+#include <inttypes.h>
+
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/detail.h"
@@ -176,7 +178,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address off the end of the valid buffer range "
-        "(offset=%zu, length=%zu, buffer byte_length=%zu)",
+        "(offset=%" PRIu64 ", length=%" PRIu64 ", buffer byte_length=%" PRIu64
+        ")",
         byte_offset, byte_length, iree_hal_buffer_byte_length(buffer));
   }
 
@@ -191,7 +194,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_validate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address outside of the valid buffer range "
-        "(offset=%zu, length=%zu, end(inc)=%zu, buffer byte_length=%zu)",
+        "(offset=%" PRIu64 ", length=%" PRIu64 ", end(inc)=%" PRIu64
+        ", buffer byte_length=%" PRIu64 ")",
         byte_offset, byte_length, end - 1, iree_hal_buffer_byte_length(buffer));
   }
 
@@ -210,7 +214,8 @@ static iree_status_t iree_hal_buffer_calculate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address off the end of the valid buffer "
-        "range (offset=%zu, length=%zu, buffer byte_length=%zu)",
+        "range (offset=%" PRIu64 ", length=%" PRIu64
+        ", buffer byte_length=%" PRIu64 ")",
         offset, length, max_length);
   }
 
@@ -242,8 +247,8 @@ static iree_status_t iree_hal_buffer_calculate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address outside of the valid buffer "
-        "range (offset=%zu, adjusted_length=%zu, end=%zu, buffer "
-        "byte_length=%zu)",
+        "range (offset=%" PRIu64 ", adjusted_length=%" PRIu64 ", end=%" PRIu64
+        ", buffer byte_length=%" PRIu64 ")",
         offset, adjusted_length, end, max_length);
   }
 
@@ -415,7 +420,8 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "attempting to fill a range with %zu byte values "
-                            "that is not aligned (offset=%zu, length=%zu)",
+                            "that is not aligned (offset=%" PRIu64
+                            ", length=%" PRIu64 ")",
                             pattern_length, byte_offset, byte_length);
   }
 
@@ -640,10 +646,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map_range(
       (iree_hal_buffer_mapping_impl_t*)out_buffer_mapping;
   buffer_mapping->backing_buffer = buffer;
   buffer_mapping->allowed_access = memory_access;
+  iree_device_size_t data_length;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_calculate_range(
       iree_hal_buffer_byte_offset(buffer), iree_hal_buffer_byte_length(buffer),
-      byte_offset, byte_length, &buffer_mapping->byte_offset,
-      &buffer_mapping->contents.data_length));
+      byte_offset, byte_length, &buffer_mapping->byte_offset, &data_length));
+  buffer_mapping->contents.data_length = data_length;
 
   // TODO(benvanik): add mode arg to the HAL API.
   iree_hal_mapping_mode_t mapping_mode = IREE_HAL_MAPPING_MODE_SCOPED;
@@ -713,9 +720,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_mapping_subspan(
   memset(out_span, 0, sizeof(*out_span));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
       buffer_mapping->allowed_access, memory_access));
+  iree_device_size_t data_length;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_calculate_range(
       0, buffer_mapping->contents.data_length, byte_offset, byte_length,
-      &byte_offset, &out_span->data_length));
+      &byte_offset, &data_length));
+  out_span->data_length = data_length;
   out_span->data = buffer_mapping->contents.data + byte_offset;
   return iree_ok_status();
 }
