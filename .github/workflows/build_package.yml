@@ -32,7 +32,7 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         build_package:
-          - py-compiler-pkg
+          - main-dist
           - py-runtime-pkg
           - py-xla-compiler-tools-pkg
           - py-tflite-compiler-tools-pkg
@@ -42,7 +42,7 @@ jobs:
         include:
           # Windows packages.
           - os: windows-2019
-            build_package: py-compiler-pkg
+            build_package: main-dist
             experimental: true
             needs_bazel: false
           - os: windows-2019
@@ -63,7 +63,7 @@ jobs:
             needs_bazel: true
           # Macos packages.
           - os: macos-latest
-            build_package: py-compiler-pkg
+            build_package: main-dist
             experimental: true
             needs_bazel: false
           - os: macos-latest
@@ -85,7 +85,7 @@ jobs:
     env:
       CIBW_BUILD_VERBOSITY: 1
       # Note that on Linux, we run under docker with an altered path.
-      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout"
+      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output"
       CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout"
       CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout'"
 
@@ -142,31 +142,22 @@ jobs:
           EOF
           cat ./main_checkout/version_info.json
 
-      # Compiler wheels are not python version specific, so we just shard and
-      # build once for an examplar version of python. This could save a bit of
-      # time by not building IREE's runtime, but it is small compared to
-      # the compiler build.
-      - name: Build compiler wheels
-        if: "matrix.build_package == 'py-compiler-pkg'"
+      # The main distribution builds the main binary package, tests and compiler
+      # wheels (which are OS but not python version specific). The latter is
+      # purely opportunistic: it adds incrementally to the former and would
+      # otherwise take additional runner hours to build.
+      - name: Build core installation and compiler wheels
+        if: "matrix.build_package == 'main-dist'"
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
           package_dir="./iree-install/python_packages/iree_compiler"
-          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
-            rm -Rf ./iree-install && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DIREE_BUILD_COMPILER=ON \
-              -DIREE_BUILD_PYTHON_BINDINGS=ON \
-              -DIREE_BUILD_SAMPLES=OFF && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-compiler-stripped"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py main-dist"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( File a bug.
+          # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir wheelhouse $package_dir
+          python -m cibuildwheel --output-dir bindist $package_dir
 
       # Runtime wheels are version specific, so we build one for each python
       # version. We do this serially by deleting the CMakeCache and install
@@ -178,20 +169,11 @@ jobs:
         run: |
           # Just need to build for one examplar python3 variant.
           package_dir="./iree-install/python_packages/iree_rt"
-          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
-            rm -Rf ./iree-install && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DIREE_BUILD_COMPILER=OFF \
-              -DIREE_BUILD_PYTHON_BINDINGS=ON \
-              -DIREE_BUILD_SAMPLES=OFF && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-rt-stripped"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( File a bug.
+          # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir wheelhouse $package_dir
+          python -m cibuildwheel --output-dir bindist $package_dir
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
@@ -202,20 +184,11 @@ jobs:
           # Just need to build for one examplar python3 variant.
           export CIBW_BUILD="cp38-*"
           package_dir="./iree-install/python_packages/iree_tools_xla"
-          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
-            rm -Rf ./iree-install && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DIREE_BUILD_XLA_COMPILER=ON \
-              -DIREE_BUILD_PYTHON_BINDINGS=ON \
-              -DIREE_BUILD_SAMPLES=OFF && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-tools-xla-stripped"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( File a bug.
+          # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir wheelhouse $package_dir
+          python -m cibuildwheel --output-dir bindist $package_dir
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
@@ -227,20 +200,11 @@ jobs:
           export CIBW_BUILD="cp38-*"
 
           package_dir="./iree-install/python_packages/iree_tools_tflite"
-          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
-            rm -Rf ./iree-install && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DIREE_BUILD_TFLITE_COMPILER=ON \
-              -DIREE_BUILD_PYTHON_BINDINGS=ON \
-              -DIREE_BUILD_SAMPLES=OFF && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-tools-tflite-stripped"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( File a bug.
+          # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir wheelhouse $package_dir
+          python -m cibuildwheel --output-dir bindist $package_dir
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
@@ -252,26 +216,18 @@ jobs:
           export CIBW_BUILD="cp38-*"
 
           package_dir="./iree-install/python_packages/iree_tools_tf"
-          export CIBW_BEFORE_BUILD="rm -f ./iree-build/CMakeCache.txt && \
-            rm -Rf ./iree-install && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              -B./iree-build -DCMAKE_INSTALL_PREFIX=./iree-install \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DIREE_BUILD_TENSORFLOW_COMPILER=ON \
-              -DIREE_BUILD_PYTHON_BINDINGS=ON \
-              -DIREE_BUILD_SAMPLES=OFF && \
-            python ./main_checkout/build_tools/cmake/cmake_ci.py \
-              --build ./iree-build --target install-IreePythonPackage-tools-tf-stripped"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( File a bug.
+          # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir wheelhouse $package_dir
+          python -m cibuildwheel --output-dir bindist $package_dir
 
       - uses: actions/upload-artifact@v2
         with:
-          path: ./wheelhouse/*.whl
+          path: ./bindist/*
           retention-days: 5
 
+      # TODO: Upload the tar.bz2 files too when ready
       - name: Upload Release Assets
         if: github.event.inputs.release_id != ''
         id: upload-release-assets
@@ -280,4 +236,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
-          assets_path: ./wheelhouse/*.whl
+          assets_path: ./bindist/*
