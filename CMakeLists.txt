@@ -385,6 +385,7 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
@@ -411,7 +412,6 @@ if(${IREE_BUILD_COMPILER})
 endif()
 
 if(${IREE_BUILD_TESTS})
-  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
   enable_testing(iree)
 endif()
 
