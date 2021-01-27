@@ -25,7 +25,7 @@ void iree_task_scope_initialize(iree_string_view_t name,
   iree_host_size_t name_length =
       iree_min(name.size, IREE_ARRAYSIZE(out_scope->name) - 1);
   memcpy(out_scope->name, name.data, name_length);
-  out_scope->name[name.size] = 0;
+  out_scope->name[name_length] = 0;
 
   // TODO(benvanik): pick trace colors based on name hash.
   IREE_TRACE(out_scope->task_trace_color = 0xFFFF0000u);
