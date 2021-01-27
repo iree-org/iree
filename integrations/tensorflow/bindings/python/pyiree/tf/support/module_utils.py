@@ -746,7 +746,8 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
     # Extract the outputs from the TFLite interpreter.
     outputs = []
     for detail in self._interpreter.get_output_details():
-      value = tf_utils.normalize_numpy(
+      # Normalize for comparison with IREE.
+      value = tf_utils.convert_to_numpy(
           self._interpreter.get_tensor(detail["index"]))
       if self._output_names is not None:
         name = detail["name"]
