@@ -85,7 +85,7 @@ class _JittedFunction:
 
   def _get_signature(self, args_flat):
     args_flat = [rt.normalize_value(arg) for arg in args_flat]
-    return tuple([(arg.shape, arg.dtype) for arg in args_flat])
+    return tuple((arg.shape, arg.dtype) for arg in args_flat)
 
   def _wrap_and_compile(self, signature, args_flat, in_tree):
     """Compiles the function for the given signature."""
