@@ -26,10 +26,10 @@ and functions.
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
 __all__ = [
-    "Config",
     "load_module",
     "load_modules",
     "normalize_value",
+    "Config",
     "SystemContext",
 ]
 
