@@ -118,7 +118,7 @@ static void iree_task_post_batch_wake_workers(
       int offset = iree_task_affinity_set_count_trailing_zeros(resume_mask) + 1;
       int resume_index = worker_index + offset;
       worker_index += offset + 1;
-      resume_mask = resume_mask >> (offset + 1);
+      resume_mask = iree_shr(resume_mask, offset + 1);
       iree_thread_resume(executor->workers[resume_index].thread);
     }
   }
@@ -137,7 +137,7 @@ static void iree_task_post_batch_wake_workers(
     int offset = iree_task_affinity_set_count_trailing_zeros(wake_mask);
     int wake_index = worker_index + offset;
     worker_index += offset + 1;
-    wake_mask = wake_mask >> (offset + 1);
+    wake_mask = iree_shr(wake_mask, offset + 1);
 
     // Wake workers if they are waiting - workers are the only thing that can
     // wait on this notification so this should almost always be either free (an
@@ -166,7 +166,7 @@ bool iree_task_post_batch_submit(iree_task_post_batch_t* post_batch) {
     int offset = iree_task_affinity_set_count_trailing_zeros(worker_mask);
     int target_index = worker_index + offset;
     worker_index += offset + 1;
-    worker_mask = worker_mask >> (offset + 1);
+    worker_mask = iree_shr(worker_mask, offset + 1);
 
     iree_task_worker_t* worker = &post_batch->executor->workers[target_index];
     iree_task_list_t* target_pending_lifo =

@@ -651,7 +651,7 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     int offset = iree_task_affinity_set_count_trailing_zeros(mask);
     int victim_index = (worker_index + offset) % executor->worker_count;
     worker_index += offset + 1;
-    mask = mask >> (offset + 1);
+    mask = iree_shr(mask, offset + 1);
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
 
     // Policy: steal a chunk of tasks at the tail of the victim queue.
