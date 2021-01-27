@@ -108,7 +108,7 @@ class _JittedFunction:
     self._memoized_signatures[signature] = (binary, module, out_tree)
 
   def _get_compiled_artifacts(self, args, kwargs):
-    """Returns the binary, rt module, out_tree, and flat converted inputs."""
+    """Returns the binary, loaded rt module and out_tree."""
     args_flat, in_tree = jax.tree_flatten((args, kwargs))
     signature = self._get_signature(args_flat)
 
