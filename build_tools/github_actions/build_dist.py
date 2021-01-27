@@ -95,6 +95,15 @@ except FileNotFoundError:
   }
 
 
+def remove_cmake_cache():
+  cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+  if os.path.exists(cache_file):
+    print(f"Removing {cache_file}")
+    os.remove(cache_file)
+  else:
+    print(f"Not removing cache file (does not exist): {cache_file}")
+
+
 def build_main_dist():
   """Builds the main distribution binaries.
 
@@ -103,7 +112,7 @@ def build_main_dist():
   """
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  shutil.rmtree(os.path.join(BUILD_DIR, "CMakeCache.txt"), ignore_errors=True)
+  remove_cmake_cache()
 
   # CMake configure.
   print("*** Configuring ***")
@@ -153,7 +162,7 @@ def build_py_runtime_pkg():
   """
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  shutil.rmtree(os.path.join(BUILD_DIR, "CMakeCache.txt"), ignore_errors=True)
+  remove_cmake_cache()
 
   # CMake configure.
   print("*** Configuring ***")
@@ -184,7 +193,7 @@ def build_py_xla_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_xla package."""
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  shutil.rmtree(os.path.join(BUILD_DIR, "CMakeCache.txt"), ignore_errors=True)
+  remove_cmake_cache()
 
   # CMake configure.
   print("*** Configuring ***")
@@ -215,7 +224,7 @@ def build_py_tflite_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tflite package."""
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  shutil.rmtree(os.path.join(BUILD_DIR, "CMakeCache.txt"), ignore_errors=True)
+  remove_cmake_cache()
 
   # CMake configure.
   print("*** Configuring ***")
@@ -246,7 +255,7 @@ def build_py_tf_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tf package."""
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  shutil.rmtree(os.path.join(BUILD_DIR, "CMakeCache.txt"), ignore_errors=True)
+  remove_cmake_cache()
 
   # CMake configure.
   print("*** Configuring ***")
