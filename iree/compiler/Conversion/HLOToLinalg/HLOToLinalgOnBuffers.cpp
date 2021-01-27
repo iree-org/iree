@@ -636,11 +636,9 @@ struct SubTensorOpConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
-    auto subViewOp = rewriter.create<SubViewOp>(
-        loc, inputBuffers[0], extractFromI64ArrayAttr(op.static_offsets()),
-        extractFromI64ArrayAttr(op.static_sizes()),
-        extractFromI64ArrayAttr(op.static_strides()), op.offsets(), op.sizes(),
-        op.strides());
+    auto subViewOp =
+        rewriter.create<SubViewOp>(loc, inputBuffers[0], op.getMixedOffsets(),
+                                   op.getMixedSizes(), op.getMixedStrides());
     rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
     return success();
   }

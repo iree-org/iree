@@ -175,9 +175,13 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
       staticStrides.push_back(stride);
     }
     rewriter.replaceOpWithNewOp<SubTensorOp>(
-        op, args[0], staticOffsets, staticSizes, staticStrides,
+        op, op.getType(), args[0],
         /*offsets=*/ValueRange{},
-        /*sizes=*/ValueRange{}, /*strides=*/ValueRange{});
+        /*sizes=*/ValueRange{},
+        /*strides=*/ValueRange{}, rewriter.getI64ArrayAttr(staticOffsets),
+        rewriter.getI64ArrayAttr(staticSizes),
+        rewriter.getI64ArrayAttr(staticStrides));
+
     return success();
   }
 };
