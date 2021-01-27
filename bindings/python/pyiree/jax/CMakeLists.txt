@@ -17,5 +17,7 @@ iree_py_library(
     jax
   SRCS
     "__init__.py"
-    "jax.py"
+    "frontend.py"
 )
+
+# TODO: Add test for frontend_test.py when the CI can run it.

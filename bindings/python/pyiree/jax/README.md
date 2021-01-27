@@ -8,7 +8,7 @@ A local JAX installation is necessary in addition to IREE's Python requirements:
 python -m pip install jax jaxlib
 ```
 
-## Just In Time Compilation
+## Just In Time Compilation with Runtime Bindings
 
 A just-in-time compilation decorator similar to `jax.jit` is provided by
 `iree.jax.jit`:
@@ -16,6 +16,7 @@ A just-in-time compilation decorator similar to `jax.jit` is provided by
 ```python
 import pyiree as iree
 import pyiree.jax
+
 import jax
 import jax.numpy as jnp
 
@@ -32,7 +33,14 @@ x = jnp.zeros((1, 784))
 linear_relu_layer([w, b], x)
 ```
 
-## Example: Compile a MLP for Android
+## Ahead of Time Compilation
+
+An ahead-of-time compilation function provides a lower-level API for compiling a
+function with a specific input signature without creating the runtime bindings
+for execution within Python. This is primarily useful for targeting other
+runtime environments like Android.
+
+### Example: Compile a MLP and run it on Android
 
 Install the Android NDK according to the
 [Android Getting Started](https://google.github.io/iree/get-started/getting-started-android-cmake)
@@ -42,6 +50,8 @@ doc, and then ensure the following environment variables are set:
 export ANDROID_NDK=# NDK install location
 export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
 ```
+
+The code below assumes that you have `flax` installed.
 
 ```python
 import pyiree as iree

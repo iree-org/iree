@@ -24,6 +24,9 @@ except ModuleNotFoundError as e:
   raise ModuleNotFoundError("pyiree.jax requires 'jax' and 'jaxlib' to be "
                             "installed in your python environment.") from e
 
+# pytype thinks pyiree.jax is jax.
+# pytype: disable=module-attr
+
 __all__ = [
     "aot",
     "is_available",
@@ -80,10 +83,9 @@ class _JittedFunction:
     self._options = options
     self._memoized_signatures = {}
 
-  def _flatten_and_convert(self, args, kwargs):
-    args_flat, in_tree = jax.tree_flatten((args, kwargs))
+  def _get_signature(self, args_flat):
     args_flat = [rt.normalize_value(arg) for arg in args_flat]
-    return args_flat, in_tree
+    return tuple([(arg.shape, arg.dtype) for arg in args_flat])
 
   def _wrap_and_compile(self, signature, args_flat, in_tree):
     """Compiles the function for the given signature."""
@@ -106,16 +108,21 @@ class _JittedFunction:
 
   def _get_compiled_artifacts(self, args, kwargs):
     """Returns the binary, rt module, out_tree, and flat converted inputs."""
-    args_flat, in_tree = self._flatten_and_convert(args, kwargs)
-    signature = tuple([(arg.shape, arg.dtype) for arg in args_flat])
+    args_flat, in_tree = jax.tree_flatten((args, kwargs))
+    signature = self._get_signature(args_flat)
 
     if signature not in self._memoized_signatures:
       self._wrap_and_compile(signature, args_flat, in_tree)
-    return *self._memoized_signatures[signature], args_flat
+    return self._memoized_signatures[signature]
 
   def __call__(self, *args, **kwargs):
     """Executes the function on the provided inputs, compiling if necessary."""
-    _, module, out_tree, args_flat = self._get_compiled_artifacts(args, kwargs)
+    args_flat, _ = jax.tree_flatten((args, kwargs))
+    # Use the uncompiled function if the inputs are being traced.
+    if any(issubclass(type(arg), jax.core.Tracer) for arg in args_flat):
+      return self._function(*args, **kwargs)
+
+    _, module, out_tree = self._get_compiled_artifacts(args, kwargs)
     results = module.main(*args_flat)
     if not isinstance(results, tuple):
       results = (results,)
@@ -123,7 +130,7 @@ class _JittedFunction:
 
   def get_binary(self, *args, **kwargs):
     """Gets the IREE-compiled binary for the given inputs."""
-    binary, _, _, _ = self._get_compiled_artifacts(args, kwargs)
+    binary, _, _ = self._get_compiled_artifacts(args, kwargs)
     return binary
 
 

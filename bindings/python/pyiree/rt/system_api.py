@@ -36,7 +36,7 @@ __all__ = [
 import os
 import sys
 
-from typing import Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
 from . import binding as _binding
 
@@ -133,7 +133,8 @@ def _get_global_config():
   return _global_config
 
 
-def _normalize_numpy(array, normalize_bitwidth=False):
+def _normalize_numpy(array: np.ndarray,
+                     single_precision: bool = False) -> np.ndarray:
   if np.isscalar(array):
     array = np.array(array)
 
@@ -141,7 +142,7 @@ def _normalize_numpy(array, normalize_bitwidth=False):
   if array.dtype == np.bool:
     array = array.astype(np.int8)
 
-  if normalize_bitwidth:
+  if single_precision:
     if array.dtype == np.float16 or array.dtype == np.float64:
       array = array.astype(np.float32)
     if array.dtype == np.int16 or array.dtype == np.int64:
@@ -149,22 +150,22 @@ def _normalize_numpy(array, normalize_bitwidth=False):
   return array
 
 
-def normalize_value(value, normalize_bitwidth=False):
-  """Normalizes the given value for use with IREE."""
+def normalize_value(value: Any) -> Optional[np.ndarray]:
+  """Normalizes the given value for input to (or comparison with) IREE."""
   if isinstance(value, np.ndarray):
-    return _normalize_numpy(value, normalize_bitwidth)
+    return _normalize_numpy(value)
   elif isinstance(value, (bool, int, float, list, tuple)):
-    # Always use normalize_input=True for Python inputs.
-    return _normalize_numpy(np.array(value), normalize_bitwidth=True)
+    # Always use 32-bits to represent Python inputs.
+    return _normalize_numpy(np.array(value), single_precision=True)
   elif hasattr(value, "numpy"):
     # Converts TensorFlow and Torch tensors.
-    return _normalize_numpy(value.numpy(), normalize_bitwidth)
+    return _normalize_numpy(value.numpy())
   elif value is None:
     # Exclude None from falling through to np.array conversion.
     return value
   else:
     # Converts JAX DeviceArrays.
-    return _normalize_numpy(np.array(value), normalize_bitwidth)
+    return _normalize_numpy(np.array(value))
 
 
 class BoundFunction:
