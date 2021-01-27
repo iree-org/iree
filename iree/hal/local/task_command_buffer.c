@@ -800,7 +800,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
     int mask_offset = iree_math_count_trailing_zeros_u64(used_binding_mask);
     int binding_ordinal = binding_base + mask_offset;
     binding_base += mask_offset + 1;
-    used_binding_mask = used_binding_mask >> (mask_offset + 1);
+    used_binding_mask = iree_shr(used_binding_mask, mask_offset + 1);
     cmd->bindings[i] = command_buffer->state.bindings[binding_ordinal];
     cmd->binding_lengths[i] =
         command_buffer->state.binding_lengths[binding_ordinal];

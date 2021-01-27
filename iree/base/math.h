@@ -44,6 +44,9 @@
 #pragma intrinsic(_BitScanForward)
 #endif  // IREE_COMPILER_MSVC
 
+#define iree_shr(value, shamt) \
+  (((shamt) < sizeof(value) * 8) ? ((value) >> (shamt)) : 0)
+
 //==============================================================================
 // Bitwise rotation (aka circular shifts)
 //==============================================================================
