@@ -23,7 +23,7 @@ namespace {
 
 class TaskWaitTest : public TaskTest {};
 
-TEST_F(TaskWaitTest, IssueSignaled) {
+TEST_F(TaskWaitTest, DISABLED_IssueSignaled) {
   iree_event_t event;
   iree_event_initialize(/*initial_state=*/true, &event);
 
