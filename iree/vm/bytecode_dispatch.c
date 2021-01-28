@@ -1360,7 +1360,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             list, index, IREE_VM_VALUE_TYPE_I64, &value));
-        *result = value.i32;
+        *result = value.i64;
       });
 
       DISPATCH_OP(EXT_I64, ListSetI64, {
