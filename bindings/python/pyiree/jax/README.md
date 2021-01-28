@@ -44,11 +44,10 @@ runtime environments like Android.
 
 Install the Android NDK according to the
 [Android Getting Started](https://google.github.io/iree/get-started/getting-started-android-cmake)
-doc, and then ensure the following environment variables are set:
+doc, and then ensure the following environment variable is set:
 
 ```shell
 export ANDROID_NDK=# NDK install location
-export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++"
 ```
 
 The code below assumes that you have `flax` installed.
@@ -61,6 +60,10 @@ import jax
 import jax.numpy as jnp
 import flax
 from flax import linen as nn
+
+import os
+# Configure the linker to target Android.
+os.environ["IREE_LLVMAOT_LINKER_PATH"] = "${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++"
 
 
 class MLP(nn.Module):
