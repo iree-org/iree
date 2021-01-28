@@ -32,6 +32,8 @@ struct cpuinfo_core;
 typedef uint64_t iree_task_topology_group_mask_t;
 
 #define IREE_TASK_TOPOLOGY_GROUP_MASK_ALL UINT64_MAX
+#define IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT \
+  (sizeof(iree_task_topology_group_mask_t) * 8)
 
 // Information about a particular group within the topology.
 // Groups may be of varying levels of granularity even within the same topology

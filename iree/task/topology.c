@@ -190,7 +190,10 @@ static uint64_t iree_task_topology_calculate_cache_bits(
   uint64_t mask = 0;
   for (uint32_t processor_i = 0; processor_i < cache->processor_count;
        ++processor_i) {
-    mask |= 1ull << (cache->processor_start + processor_i);
+    uint32_t i = cache->processor_start + processor_i;
+    if (i < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+      mask |= 1ull << i;
+    }
   }
   return mask;
 }
@@ -299,6 +302,7 @@ void iree_task_topology_initialize_from_physical_cores_with_uarch(
 void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
   if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_core_count, out_topology);
     return;
