@@ -36,7 +36,7 @@ __all__ = [
 import os
 import sys
 
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from . import binding as _binding
 
@@ -133,19 +133,10 @@ def _get_global_config():
   return _global_config
 
 
-def normalize_value(value: Any) -> Optional[np.ndarray]:
-  """Normalizes the given value for input to (or comparison with) IREE."""
-  if value is None:
-    # Exclude None from falling through to blanket np.asarray conversion.
-    return value
-
-  array = np.asarray(value)
-  if isinstance(value, (bool, int, float, list, tuple)):
-    # Manually convert ints and floats to 32 bits.
-    if array.dtype == np.float64:
-      array = array.astype(np.float32)
-    elif array.dtype == np.int64:
-      array = array.astype(np.int32)
+def _bool_to_int8(
+    array: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+  if not isinstance(array, np.ndarray):
+    return array
 
   # IREE models booleans as i8s.
   # TODO: This cast should be moved into the function abi. If it's possible to
@@ -153,6 +144,26 @@ def normalize_value(value: Any) -> Optional[np.ndarray]:
   # type should also be recast to np.bool at that level.
   if array.dtype == np.bool:
     array = array.astype(np.int8)
+  return array
+
+
+def normalize_value(
+    value: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+  """Normalizes the given value for input to (or comparison with) IREE."""
+  if value is None:
+    # Exclude None from falling through to blanket np.asarray conversion.
+    return value
+
+  if isinstance(value, (list, tuple)):
+    return value
+
+  array = np.asarray(value)
+  if isinstance(value, (bool, int, float)):
+    # Manually convert ints and floats to 32 bits.
+    if array.dtype == np.float64:
+      array = array.astype(np.float32)
+    elif array.dtype == np.int64:
+      array = array.astype(np.int32)
 
   return array
 
@@ -172,6 +183,8 @@ class BoundFunction:
     # Convert tensors, device arrays, ints, ... to IREE-friendly inputs.
     args = [normalize_value(value) for value in args]
     kwargs = {k: normalize_value(v) for k, v in kwargs.items()}
+    args = [_bool_to_int8(value) for value in args]
+    kwargs = {k: _bool_to_int8(v) for k, v in kwargs.items()}
 
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy

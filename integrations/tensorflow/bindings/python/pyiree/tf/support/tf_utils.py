@@ -236,11 +236,16 @@ def check_same(ref: Any, tar: Any, rtol: float,
 
   # Base check for numpy arrays.
   elif isinstance(ref, np.ndarray):
-    if ref.dtype != tar.dtype:
+    # Ignore np.bool != np.int8 because the IREE python runtime awkwardly
+    # returns np.int8s instead of np.bools.
+    if ref.dtype != tar.dtype and not (
+        (ref.dtype == np.bool and tar.dtype == np.int8) or
+        (ref.dtype == np.int8 and tar.dtype == np.bool)):
       error = ("Expected ref and tar to have the same dtype, but got "
                f"'{ref.dtype}' and '{tar.dtype}'")
       logging.error(error)
       return False, error
+
     if ref.size == tar.size == 0:
       return True, None
 
