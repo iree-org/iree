@@ -42,7 +42,6 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:hlo",
         "@mlir-hlo//:legalize_to_linalg",
-        "@mlir-hlo//:map_lmhlo_to_scalar_op",
     ],
 )
 

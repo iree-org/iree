@@ -343,11 +343,8 @@ LogicalResult convertInterfaceLoadTensorOp(
                                   loadOp.queryBindingOp(), /*typeErase=*/true);
   Value buffer = phOp.getResult();
   Value subview =
-      b.create<SubViewOp>(loadOp->getLoc(), buffer,
-                          extractFromI64ArrayAttr(loadOp.static_offsets()),
-                          extractFromI64ArrayAttr(loadOp.static_sizes()),
-                          extractFromI64ArrayAttr(loadOp.static_strides()),
-                          loadOp.offsets(), loadOp.sizes(), loadOp.strides());
+      b.create<SubViewOp>(loadOp->getLoc(), buffer, loadOp.getMixedOffsets(),
+                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
   bvm.map(loadOp.result(), subview);
   // TODO(nicolasvasilache): kill tie_shape with fire.
   mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), subview, bvm);
@@ -417,12 +414,9 @@ LogicalResult convertInterfaceStoreTensorOp(
       createPlaceholderOp(b, storeOp.getLoc(), storeOp, storeOp.operand(),
                           storeOp.queryBindingOp(), /*typeErase=*/true);
   Value buffer = phOp.getResult();
-  Value subview = b.create<SubViewOp>(
-      storeOp->getLoc(), buffer,
-      extractFromI64ArrayAttr(storeOp.static_offsets()),
-      extractFromI64ArrayAttr(storeOp.static_sizes()),
-      extractFromI64ArrayAttr(storeOp.static_strides()), storeOp.offsets(),
-      storeOp.sizes(), storeOp.strides());
+  Value subview =
+      b.create<SubViewOp>(storeOp->getLoc(), buffer, storeOp.getMixedOffsets(),
+                          storeOp.getMixedSizes(), storeOp.getMixedStrides());
   b.create<linalg::CopyOp>(storeOp->getLoc(),
                            iterativeLookup(bvm, storeOp.operand()), subview);
   storeOp->erase();

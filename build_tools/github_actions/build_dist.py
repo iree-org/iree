@@ -47,9 +47,12 @@ a directory and:
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
   python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py
+  py-xla-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py
+  py-tflite-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py
+  py-tf-compiler-tools-pkg
 
 
 That is not a perfect approximation but is close.
@@ -81,14 +84,14 @@ INSTALL_TARGET = ("install"
 
 # Load version info.
 def load_version_info():
-  with open(os.path.join(IREESRC_DIR, 'version_info.json'), 'rt') as f:
+  with open(os.path.join(IREESRC_DIR, "version_info.json"), "rt") as f:
     return json.load(f)
 
 
 try:
   version_info = load_version_info()
 except FileNotFoundError:
-  print('version_info.json found. Using defaults')
+  print("version_info.json found. Using defaults")
   version_info = {
       "package-version": "0.1dev1",
       "package-suffix": "-dev",
