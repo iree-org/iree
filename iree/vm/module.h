@@ -91,6 +91,11 @@ typedef struct {
 static_assert(sizeof(iree_vm_function_t) <= 2 * sizeof(void*),
               "Must remain small as stored on the stack");
 
+// Returns true if the |function| is null (didn't exist, etc).
+static inline bool iree_vm_function_is_null(iree_vm_function_t function) {
+  return function.module == NULL;
+}
+
 // Describes the expected calling convention and arguments/results of a
 // function.
 typedef struct {
