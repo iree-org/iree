@@ -171,6 +171,7 @@ void iree_task_topology_initialize_from_unique_l2_cache_groups(
 
 // TODO(benvanik): more? or just make users implement as desired? Ideas:
 // - _from_unique_l2_cache_groups but with a min/max count (N% utilization)
+// - cluster filtering (big/little cores on ARM)
 
 #ifdef __cplusplus
 }  // extern "C"
