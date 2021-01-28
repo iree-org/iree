@@ -102,6 +102,24 @@ struct DispatchLinalgOnTensorsPass
       llvm::cl::init(false)};
 };
 
+/// Returns the number of consecutive outer loops that are "parallel". This is a
+/// copy of the function from
+/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
+/// here to avoid adding an build dependency.
+static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return linalg::isParallelIteratorType(attr);
+      })
+      .size();
+}
+
+/// Returns the number of loops of the operation that are to be tiled.
+static size_t getNumTilableLoops(linalg::LinalgOp op) {
+  return std::min<size_t>(getNumOuterParallelLoops(op), kNumMaxParallelDims);
+}
+
 // Creates a flow.dispatch.workgroup op without arguments.
 // All the necessary operands are transiently captured and rewritten late as
 // operands. This greatly simplifies transformations into the resulting op.
@@ -109,9 +127,12 @@ static IREE::Flow::DispatchWorkgroupsOp buildOperandLessFlowDispatchWorkgroupOp(
     PatternRewriter &rewriter, linalg::LinalgOp root,
     linalg::LinalgOp &clonedRoot) {
   Location loc = root->getLoc();
-  // TODO(nicolasvasilache): for now this is a 3-D grid of 1's.
-  // In the future make constant and bind late into backend-specific values.
-  SmallVector<Value, 1> count(3, rewriter.create<ConstantIndexOp>(loc, 1));
+  Value one = rewriter.create<ConstantIndexOp>(loc, 1);
+  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
+      root.createLoopRanges(rewriter, loc), [](Range r) { return r.size; }));
+  count.resize(getNumTilableLoops(root));
+  count = llvm::to_vector<4>(llvm::reverse(count));
+  count.resize(kNumMaxParallelDims, one);
 
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, count, root->getResultTypes(), ValueRange{});
@@ -369,19 +390,6 @@ static void legalizeDispatchWorkgroupOperands(
   dispatchOp.operandsMutable().assign(valuesDefinedAbove);
 }
 
-/// Returns the number of consecutive outer loops that are "parallel". This is a
-/// copy of the function from
-/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
-/// here to avoid adding an build dependency.
-static unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
-      .size();
-}
-
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   // `isEntryPoint` functions are the ones that are marked public.
@@ -420,9 +428,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(
               [&](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
-                auto numTiledLoops = std::min<size_t>(
-                    getNumOuterParallelLoops(cast<linalg::LinalgOp>(op)),
-                    kNumMaxParallelDims);
+                auto numTiledLoops =
+                    getNumTilableLoops(cast<linalg::LinalgOp>(op));
                 SmallVector<Value, 4> useTileSizes(numTiledLoops);
                 if (!tileSizes.empty()) {
                   useTileSizes.resize(

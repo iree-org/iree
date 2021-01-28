@@ -1307,6 +1307,16 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
+  // For now assume that the workload is at max 3D. So arguments to the region
+  // are workload along x, y and z.
+  std::unique_ptr<Region> region;
+  SmallVector<OpAsmParser::OperandType, 4> regionOperands;
+  SmallVector<Type, 4> regionTypes;
+  OptionalParseResult parseResult =
+      parser.parseOptionalRegion(region, regionOperands, regionTypes);
+  if (!parseResult.hasValue()) return success();
+  if (failed(*parseResult)) return failure();
+  result->addRegion(std::move(region));
   return success();
 }
 
@@ -1316,6 +1326,37 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
+  if (op.num_workgroups_region().empty()) return;
+  p.printRegion(op.num_workgroups_region().front());
+}
+
+static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
+  Region *region = op.getBody();
+  // When there is no region, nothing to verify.
+  if (!region) return success();
+
+  if (!llvm::hasSingleElement(*region)) {
+    return op.emitOpError() << "expected a single region";
+  }
+  if (region->getNumArguments() != 3) {
+    return op.emitOpError(
+        "expected three arguments for num_workgroups_region for workload along "
+        "x, y, and z");
+  }
+  for (BlockArgument &blockArg : region->getArguments()) {
+    if (!blockArg.getType().isa<IndexType>()) {
+      return op.emitOpError(
+          "expected arguments to num_workgroups_region be index type");
+    }
+  }
+  // Check that the last statement in the block is `hal.yield` operation.
+  // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::YieldOp">
+  // should generate this check, but it doesnt.
+  auto yieldOp = dyn_cast<YieldOp>(region->front().getTerminator());
+  if (!yieldOp || yieldOp.values().size() != 3) {
+    return op.emitOpError("expected operation to yield 3 values");
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

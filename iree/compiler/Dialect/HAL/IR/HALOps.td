@@ -1840,14 +1840,35 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
+def HAL_YieldOp : HAL_Op<"yield", [NoSideEffect, Terminator]> {
+  let summary = [{yield values from within regions in hal ops}];
+  let description = [{
+    Yields values to the immediately enclaosing hal op
+  }];
+  let arguments = (ins Variadic<AnyType>:$values);
+  let assemblyFormat = "$values attr-dict `:` type($values)";
+}
+
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
     HasParent<"IREE::HAL::ExecutableTargetOp">,
+    IsolatedFromAbove
   ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
+
+    The optional `num_workgroups_region` region represents the
+    computation that returns the number of workgroups to use. The
+    arguments to the region represents the workload along x, y and
+    z. It returns the number of workgroups along x, y, and z.
+
+    TODO(ravishankarm): In reality there is no need to define what the
+    arguments represent. They could be any values that are needed to
+    compute the number of workgroups. Its unclear what these are in
+    general and how to plumb them through. So for now just accepting
+    the workload along x, y, and z.
   }];
 
   let arguments = (ins
@@ -1857,6 +1878,37 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     TypeAttr:$signature,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
+
+  let regions = (region VariadicRegion<SizedRegion<1>>:$num_workgroups_region);
+
+  let builders = [
+    OpBuilderDAG<
+      (ins "::llvm::StringRef":$sym_name, "::llvm::APInt":$ordinal,
+        "::llvm::StringRef":$interface,"::mlir::TypeAttr":$signature,
+        "::mlir::ArrayAttr":$workgroup_size),
+       [{build($_builder, $_state, sym_name, ordinal, interface, signature,
+            workgroup_size, 0);}]>,
+    OpBuilderDAG<
+      (ins "::mlir::StringAttr":$sym_name, "::mlir::IntegerAttr":$ordinal,
+        "::mlir::FlatSymbolRefAttr":$interface, "::mlir::TypeAttr":$signature,
+        "::mlir::ArrayAttr":$workgroup_size),
+      [{build($_builder, $_state, sym_name, ordinal, interface, signature,
+          workgroup_size, 0);}]>
+  ];
+
+  let verifier = [{ return verifyExecutableEntryPointOp(*this); }];
+
+  let extraClassDeclaration = [{
+    Region *getBody() {
+      auto regions = num_workgroups_region();
+      if (!regions.empty()) return &regions.front();
+      return nullptr;
+    }
+    Block* getBlock() {
+      if (Region *region = getBody()) return &region->front();
+      return nullptr;
+    }
+  }];
 }
 
 def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [

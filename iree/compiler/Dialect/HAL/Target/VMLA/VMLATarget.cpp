@@ -55,14 +55,15 @@ class VMLATargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    IREE::VMLA::buildVMLATransformPassPipeline(passManager);
+    OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+    IREE::VMLA::buildVMLATransformPassPipeline(nestedModulePM);
 
     // TODO(#614): remove this when the std->vm conversion isn't looking for
     // iree.module.export.
-    passManager.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
+    nestedModulePM.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
 
     IREE::VM::buildVMTransformPassPipeline(
-        passManager, IREE::VM::getTargetOptionsFromFlags());
+        nestedModulePM, IREE::VM::getTargetOptionsFromFlags());
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
