@@ -113,7 +113,7 @@ static iree_status_t iree_task_topology_ensure_cpuinfo_available() {
 }
 
 static bool iree_task_topology_is_cpuinfo_available() {
-  return cpuinfo_initialize();
+  return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
 }
 
 // Returns the core of the calling thread or NULL if not supported.
@@ -346,8 +346,10 @@ void iree_task_topology_initialize_from_physical_cores_with_filter(
 
 void iree_task_topology_initialize_from_unique_l2_cache_groups(
     iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
-  if (!iree_task_topology_is_cpuinfo_available()) {
-    iree_task_topology_initialize_fallback(max_group_count, out_topology);
+  if (!iree_task_topology_is_cpuinfo_available() ||
+      !cpuinfo_get_l2_caches_count()) {
+    iree_task_topology_initialize_from_physical_cores(max_group_count,
+                                                      out_topology);
     return;
   }
 

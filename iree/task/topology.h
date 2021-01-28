@@ -169,8 +169,11 @@ void iree_task_topology_initialize_from_physical_cores_with_filter(
 void iree_task_topology_initialize_from_unique_l2_cache_groups(
     iree_host_size_t max_group_count, iree_task_topology_t* out_topology);
 
-// TODO(benvanik): more? or just make users implement as desired? Ideas:
+// TODO(#4654): more helpers and better defaults for the platforms we support.
+// Users can always make their own but just using these is the common path.
+// Ideas:
 // - _from_unique_l2_cache_groups but with a min/max count (N% utilization)
+// - cluster filtering (big/little cores on ARM)
 
 #ifdef __cplusplus
 }  // extern "C"
