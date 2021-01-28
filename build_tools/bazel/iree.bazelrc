@@ -188,6 +188,15 @@ build:tsan --linkopt=-fsanitize=thread
 build:tsan --cc_output_directory_tag=tsan
 build:tsan --copt=-DTHREAD_SANITIZER
 
+# UBSAN (undefined behavior sanitizer)
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+build:ubsan --config=sanitizer
+build:ubsan --features=ubsan
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --linkopt=-fsanitize=undefined
+build:ubsan --linkopt=-lubsan
+build:ubsan --cc_output_directory_tag=ubsan
+
 # Don't strip debug info
 build:sanitizer --strip=never
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
