@@ -27,14 +27,14 @@ cc_library(
         "FunctionUtils.cpp",
         "GetNumWorkgroups.cpp",
         "MarkerUtils.cpp",
-        "MatmulCodegenStrategy.cpp",
+        "TransformUtils.cpp",
     ],
     hdrs = [
         "ForOpCanonicalization.h",
         "FunctionUtils.h",
         "GetNumWorkgroups.h",
         "MarkerUtils.h",
-        "MatmulCodegenStrategy.h",
+        "TransformUtils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",

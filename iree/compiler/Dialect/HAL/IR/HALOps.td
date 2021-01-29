@@ -2334,7 +2334,7 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
 
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrRanks() {
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
       return {resultRank, resultRank, resultRank};
     }
@@ -2412,7 +2412,7 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
 
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrRanks() {
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned rank = operand().getType().cast<ShapedType>().getRank();
       return {rank, rank, rank};
     }

@@ -38,10 +38,10 @@ void PlanConvLoopOrderPass::runOnFunction() {
   auto context = funcOp.getContext();
 
   auto marker = Identifier::get("generalized_from_conv", context);
-  linalg::LinalgMarker firstStepMarker(
+  linalg::LinalgTransformationFilter firstStepMarker(
       /*matchDisjunction=*/ArrayRef<Identifier>(),
       /*replacement=*/marker);
-  linalg::LinalgMarker secondStepMarker(
+  linalg::LinalgTransformationFilter secondStepMarker(
       /*matchDisjunction=*/marker,
       /*replacement=*/llvm::None);
 

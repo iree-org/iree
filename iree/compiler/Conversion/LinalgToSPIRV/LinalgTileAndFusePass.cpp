@@ -57,15 +57,15 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Returns a Linalg marker that replaces existing markers.
-linalg::LinalgMarker getLinalgReplaceMarker(StringRef maker,
-                                            MLIRContext *context) {
-  return linalg::LinalgMarker(ArrayRef<Identifier>(),
-                              Identifier::get(maker, context));
+linalg::LinalgTransformationFilter getLinalgReplaceMarker(
+    StringRef maker, MLIRContext *context) {
+  return linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
+                                            Identifier::get(maker, context));
 }
 
 /// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
 /// it with `replaceMarker`.
-linalg::LinalgMarker getLinalgMatchAndReplaceMarker(
+linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, StringRef replaceMarker,
     MLIRContext *context) {
   SmallVector<Identifier, 2> markers;
@@ -73,7 +73,8 @@ linalg::LinalgMarker getLinalgMatchAndReplaceMarker(
   for (StringRef marker : matchMarkers) {
     markers.emplace_back(Identifier::get(marker, context));
   }
-  return linalg::LinalgMarker(markers, Identifier::get(replaceMarker, context));
+  return linalg::LinalgTransformationFilter(
+      markers, Identifier::get(replaceMarker, context));
 }
 
 /// Returns the distribution options for operations when targeting workgroups.
@@ -138,7 +139,7 @@ struct PromoteMatmulSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::MatmulOp> {
   PromoteMatmulSubviewsPattern(MLIRContext *context,
                                linalg::LinalgPromotionOptions options,
-                               linalg::LinalgMarker marker,
+                               linalg::LinalgTransformationFilter marker,
                                PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::MatmulOp>(
             context,
@@ -163,7 +164,7 @@ struct PromoteConvSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
   PromoteConvSubviewsPattern(MLIRContext *context,
                              linalg::LinalgPromotionOptions options,
-                             linalg::LinalgMarker marker,
+                             linalg::LinalgTransformationFilter marker,
                              PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::ConvOp>(
             context,
@@ -216,7 +217,7 @@ struct TileMatmulSubgroupPattern
   using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
   TileMatmulSubgroupPattern(MLIRContext *context,
                             linalg::LinalgTilingOptions options,
-                            linalg::LinalgMarker marker,
+                            linalg::LinalgTransformationFilter marker,
                             PatternBenefit benefit = 1)
       : Base(context, options, marker, benefit) {}
 };
@@ -329,8 +330,9 @@ static void populateVectorizationPatterns(MLIRContext *context,
                   linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgVectorizationPattern<linalg::FillOp>,
                   linalg::LinalgVectorizationPattern<linalg::GenericOp>>(
-      context,
-      linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
+      context, linalg::LinalgVectorizationOptions(),
+      linalg::LinalgTransformationFilter(
+          Identifier::get(getVectorizeMarker(), context)));
 }
 
 //====---------------------------------------------------------------------===//
@@ -387,10 +389,10 @@ static void applyVectorTransformation(FuncOp funcOp) {
 // Patterns to tile convolution window dimensions
 //====---------------------------------------------------------------------===//
 
-static void populateTilingConvFilterPatterns(MLIRContext *context,
-                                             OwningRewritePatternList &patterns,
-                                             const LaunchConfig &launchConfig,
-                                             linalg::LinalgMarker marker) {
+static void populateTilingConvFilterPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns,
+    const LaunchConfig &launchConfig,
+    linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&launchConfig](OpBuilder &builder, Operation *op) {
     SmallVector<Value, 4> tileSizes;
     ArrayRef<int64_t> fourthLevel = launchConfig.getTileSizes(op, 3);

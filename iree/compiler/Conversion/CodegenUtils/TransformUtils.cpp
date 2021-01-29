@@ -16,7 +16,7 @@
 // This code will be removed once this gets upstreamed to common mlir.
 // Please try to limit changes in this code only minor changes.
 
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -54,52 +54,11 @@
 using namespace mlir;          // NOLINT
 using namespace mlir::linalg;  // NOLINT
 
-#define DEBUG_TYPE "matmul-codegen-strategy"
+#define DEBUG_TYPE "linalg-transform-utils"
 
 //===----------------------------------------------------------------------===//
 // TODO: Cleanup and upstream these to go into core. Please ignore for now !
 //===----------------------------------------------------------------------===//
-static void hoistRedundantCopies(FuncOp func) {
-  bool changed = true;
-  while (changed) {
-    changed = false;
-    func.walk([&](linalg::FillOp op) {
-      auto loop = op->getParentOfType<scf::ForOp>();
-      if (!loop) return;
-
-      for (auto operand : op.getOperands())
-        if (!loop.isDefinedOutsideOfLoop(operand)) return;
-
-      // Hoist fill before.
-      op.getOperation()->moveBefore(loop);
-      changed = true;
-    });
-
-    func.walk([&](linalg::CopyOp op) {
-      auto loop = op->getParentOfType<scf::ForOp>();
-      if (!loop) return;
-
-      for (auto operand : op.getOperands())
-        if (!loop.isDefinedOutsideOfLoop(operand)) return;
-
-      Value sourceView = op.getInput(0);
-      while (auto subViewOp = sourceView.getDefiningOp<SubViewOp>())
-        sourceView = subViewOp.getViewSource();
-
-      // Source traces back to a block argument.
-      if (sourceView.isa<BlockArgument>()) {
-        op.getOperation()->moveBefore(loop);
-      } else {
-        assert(sourceView.getDefiningOp<ViewOp>() ||
-               sourceView.getDefiningOp<AllocOp>() ||
-               sourceView.getDefiningOp<AllocaOp>());
-        op.getOperation()->moveAfter(loop);
-      }
-      changed = true;
-    });
-  }
-}
-
 /// Substitute scf.for = %lb to %ub step %step by an AffineExpr expressing:
 ///   `%lb + %step * new_dim` where
 /// 1. the AffineExpr for %lb is either an AffineConstantExpr or an
@@ -205,82 +164,3 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
 //===----------------------------------------------------------------------===//
 // END TODO
 //===----------------------------------------------------------------------===//
-
-void MatmulCodegenStrategy::transform(FuncOp func) const {
-  MLIRContext *context = func.getContext();
-  // Emplace patterns one at a time while also maintaining a simple chained
-  // state transition.
-  unsigned stepCount = 0;
-  SmallVector<FrozenRewritePatternList, 4> stage1Patterns;
-  auto zeroState = Identifier::get(std::to_string(stepCount), context);
-  auto currentState = zeroState;
-  for (auto &t : transformationSequence) {
-    auto nextState = Identifier::get(std::to_string(++stepCount), context);
-    auto marker = (currentState == zeroState)
-                      ? linalg::LinalgMarker({}, nextState)
-                      : linalg::LinalgMarker(currentState, nextState);
-    stage1Patterns.emplace_back(t->buildRewritePatterns(context, marker));
-    currentState = nextState;
-  }
-
-  OwningRewritePatternList stage2Patterns =
-      linalg::getLinalgTilingCanonicalizationPatterns(context);
-  // Add extra patterns to canonicalize AffineMin in combination with scf loops
-  // operations after tiling.
-  stage2Patterns.insert<AffineMinCanonicalizationPattern,
-                        AffineMinSCFCanonicalizationPattern>(context);
-
-  auto stage3Transforms = [](Operation *op) {
-    promoteSingleIterationLoops(cast<FuncOp>(op));
-    return success();
-  };
-  linalg::applyStagedPatterns(func, stage1Patterns, std::move(stage2Patterns),
-                              stage3Transforms);
-
-  auto postStageTransforms = [this](Operation *op) {
-    // Run LICM and hoisting patterns after all the stages as we want to
-    // unrolling before moving transfer ops out of the loop.
-    if (hoistInvariantCode) {
-      PassManager pm(op->getContext());
-      pm.addPass(createLoopInvariantCodeMotionPass());
-      if (failed(pm.run(op->getParentOfType<ModuleOp>())))
-        llvm_unreachable("Unexpected failure in cleanup pass pipeline.");
-      hoistViewAllocOps(cast<FuncOp>(op));
-      hoistRedundantVectorTransfers(cast<FuncOp>(op));
-      hoistRedundantCopies(cast<FuncOp>(op));
-    }
-    OwningRewritePatternList patterns;
-    vector::populateVectorSlicesLoweringPatterns(patterns, op->getContext());
-    applyPatternsAndFoldGreedily(op, std::move(patterns));
-  };
-  postStageTransforms(func);
-  if (lowering != nullptr) lowering(func);
-}
-
-// Parametric lowering of vector contract for CPU target.
-static void cpuLowering(
-    FuncOp func, const vector::VectorTransformsOptions &vectorTransformsOptions,
-    const VectorTransferToSCFOptions &vectorToSCFOptions) {
-  // Programmatic controlled lowering of vector.contract only.
-  MLIRContext *context = func.getContext();
-  OwningRewritePatternList vectorContractLoweringPatterns;
-  vectorContractLoweringPatterns
-      .insert<ContractionOpToOuterProductOpLowering,
-              ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-          vectorTransformsOptions, context);
-
-  applyPatternsAndFoldGreedily(func, std::move(vectorContractLoweringPatterns));
-
-  // Programmatic controlled lowering of vector.transfer only.
-  OwningRewritePatternList vectorToLoopsPatterns;
-  populateVectorToSCFConversionPatterns(vectorToLoopsPatterns, context,
-                                        vectorToSCFOptions);
-  applyPatternsAndFoldGreedily(func, std::move(vectorToLoopsPatterns));
-}
-
-MatmulCodegenStrategy &MatmulCodegenStrategy::setDefaultCPULowering() {
-  auto lowering = [this](FuncOp func) {
-    cpuLowering(func, vectorTransformsOptions, vectorToSCFOptions);
-  };
-  return setLoweringFunction(lowering);
-}

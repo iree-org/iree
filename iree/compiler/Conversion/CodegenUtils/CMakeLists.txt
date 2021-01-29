@@ -22,13 +22,13 @@ iree_cc_library(
     "FunctionUtils.h"
     "GetNumWorkgroups.h"
     "MarkerUtils.h"
-    "MatmulCodegenStrategy.h"
+    "TransformUtils.h"
   SRCS
     "ForOpCanonicalization.cpp"
     "FunctionUtils.cpp"
     "GetNumWorkgroups.cpp"
     "MarkerUtils.cpp"
-    "MatmulCodegenStrategy.cpp"
+    "TransformUtils.cpp"
   DEPS
     LLVMSupport
     MLIRAffine

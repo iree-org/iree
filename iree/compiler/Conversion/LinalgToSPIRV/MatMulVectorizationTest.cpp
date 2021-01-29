@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -46,7 +46,7 @@ void MatMulTileAndVectorizeGPUPass::runOnFunction() {
   FuncOp fn = getFunction();
   SmallVector<uint32_t, 3> vUnrollSize(unrollSize.begin(), unrollSize.end());
   if (vUnrollSize.size() != 3) signalPassFailure();
-  MatmulCodegenStrategy strategy;
+  linalg::CodegenStrategy strategy;
   strategy
       .tile<linalg::MatmulOp>(
           linalg::LinalgTilingOptions()
@@ -55,9 +55,11 @@ void MatMulTileAndVectorizeGPUPass::runOnFunction() {
               //.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({wgTileSize, wgTileSize, wgTileSize}))
       .setHoistInvariantCode(enableLICM)
-      .vectorize<linalg::MatmulOp>()
-      .unrollVector<vector::ContractionOp>(
-          {vUnrollSize[0], vUnrollSize[1], vUnrollSize[2]});
+      .vectorize<linalg::LinalgOp>()
+      // TODO upstream to the core CodegenStrategy
+      // .unrollVector<vector::ContractionOp>(
+      //     {vUnrollSize[0], vUnrollSize[1], vUnrollSize[2]})
+      ;
   strategy.transform(fn);
 }
 

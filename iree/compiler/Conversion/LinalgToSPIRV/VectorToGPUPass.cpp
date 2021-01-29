@@ -22,13 +22,14 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -195,8 +196,9 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   OwningRewritePatternList vectorizationPatterns;
   vectorizationPatterns
       .insert<linalg::LinalgVectorizationPattern<linalg::CopyOp>>(
-          context, linalg::LinalgMarker(
-                       Identifier::get(getVectorizeMarker(), context), {}));
+          context, linalg::LinalgVectorizationOptions(),
+          linalg::LinalgTransformationFilter(
+              Identifier::get(getVectorizeMarker(), context), {}));
   applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
