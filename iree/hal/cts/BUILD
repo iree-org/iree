@@ -41,6 +41,17 @@ cc_test(
 )
 
 cc_test(
+    name = "buffer_mapping_test",
+    srcs = ["buffer_mapping_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
     name = "command_buffer_test",
     srcs = ["command_buffer_test.cc"],
     deps = [
