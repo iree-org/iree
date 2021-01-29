@@ -51,6 +51,7 @@ function(iree_check_test)
   # In the future, we should probably add some orthogonal options that give
   # more control (such as using tools from a binary release in a runtime-only
   # host build, or skipping check tests in an Android build).
+  # TODO(#4662): add flexible configurable options that cover more uses
   if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
     return()
   endif()
