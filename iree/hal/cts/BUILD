@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Conformance Test Suite (CTS) for HAL implementations.
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -34,6 +32,17 @@ cc_library(
 cc_test(
     name = "allocator_test",
     srcs = ["allocator_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "buffer_mapping_test",
+    srcs = ["buffer_mapping_test.cc"],
     deps = [
         ":cts_test_base",
         "//iree/hal/testing:driver_registry",
@@ -111,6 +120,17 @@ cc_test(
 cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal/testing:driver_registry",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "semaphore_submission_test",
+    srcs = ["semaphore_submission_test.cc"],
     deps = [
         ":cts_test_base",
         "//iree/hal/testing:driver_registry",

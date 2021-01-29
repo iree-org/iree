@@ -73,7 +73,6 @@ iree_hal_device_wait_semaphores_with_timeout(
     const iree_hal_semaphore_list_t* semaphore_list,
     iree_duration_t timeout_ns) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(semaphore_list);
   if (!semaphore_list || semaphore_list->count == 0) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, wait_semaphores_with_timeout)(
