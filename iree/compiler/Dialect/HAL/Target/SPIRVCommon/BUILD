@@ -22,7 +22,8 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND NOT ${IREE_TARGET_BACKEND_METAL-SPIRV})
+if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}" AND
+   NOT "${IREE_TARGET_BACKEND_METAL-SPIRV}")
   return()
 endif()
 """,
@@ -46,8 +47,8 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SPIRVConversion",
         "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:Support",
     ],

@@ -22,21 +22,22 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -122,7 +123,7 @@ class VectorTransferReadConversion
         loc, rewriter.getIndexType(), rewriter.getStringAttr("x"));
     Value index = rewriter.create<AddIOp>(loc, threadIndex, indices.back());
     indices.back() = index;
-    Value newOp = rewriter.create<LoadOp>(loc, op.memref(), indices);
+    Value newOp = rewriter.create<LoadOp>(loc, op.source(), indices);
     rewriter.replaceOp(op, ValueRange(newOp));
     return success();
   }
@@ -195,8 +196,9 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   OwningRewritePatternList vectorizationPatterns;
   vectorizationPatterns
       .insert<linalg::LinalgVectorizationPattern<linalg::CopyOp>>(
-          context, linalg::LinalgMarker(
-                       Identifier::get(getVectorizeMarker(), context), {}));
+          context, linalg::LinalgVectorizationOptions(),
+          linalg::LinalgTransformationFilter(
+              Identifier::get(getVectorizeMarker(), context), {}));
   applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
@@ -210,12 +212,12 @@ class VectorTransferReadToLoad
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
-        op.getMemRefType().getElementType() !=
+        op.getShapedType().getElementType() !=
             op.getVectorType().getElementType()) {
       return failure();
     }
     auto loc = op.getLoc();
-    Value newOp = rewriter.create<LoadOp>(loc, op.memref(), op.indices());
+    Value newOp = rewriter.create<LoadOp>(loc, op.source(), op.indices());
     newOp =
         rewriter.create<vector::BroadcastOp>(loc, op.getVectorType(), newOp);
     rewriter.replaceOp(op, newOp);
@@ -233,7 +235,7 @@ class VectorTransferWriteToStore
   LogicalResult matchAndRewrite(vector::TransferWriteOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
-        op.getMemRefType().getElementType() !=
+        op.getShapedType().getElementType() !=
             op.getVectorType().getElementType()) {
       return failure();
     }
@@ -241,7 +243,7 @@ class VectorTransferWriteToStore
     SmallVector<int64_t, 2> zero(op.getVectorType().getRank(), 0);
     Value scalarValue =
         rewriter.create<vector::ExtractOp>(loc, op.vector(), zero);
-    rewriter.create<StoreOp>(loc, scalarValue, op.memref(), op.indices());
+    rewriter.create<StoreOp>(loc, scalarValue, op.source(), op.indices());
     rewriter.eraseOp(op);
     return success();
   }

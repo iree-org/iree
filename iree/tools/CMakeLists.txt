@@ -21,23 +21,19 @@ add_subdirectory(utils)
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
-if(${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOT)
+if("${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
 endif()
-if(${IREE_TARGET_BACKEND_LLVM-IR})
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
-endif()
-if(${IREE_TARGET_BACKEND_METAL-SPIRV})
+if("${IREE_TARGET_BACKEND_METAL-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
 endif()
-if(${IREE_TARGET_BACKEND_VMLA})
+if("${IREE_TARGET_BACKEND_VMLA}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
 endif()
-if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
 endif()
@@ -82,6 +78,31 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-check-module
+  OUT
+    iree-check-module
+  SRCS
+    "iree-check-module-main.cc"
+  DEPS
+    iree::modules::check::native_module
+    absl::flags
+    absl::strings
+    iree::base::api
+    iree::base::core_headers
+    iree::base::file_io
+    iree::base::flags
+    iree::base::status
+    iree::base::tracing
+    iree::hal::drivers
+    iree::modules::hal
+    iree::testing::gtest
+    iree::tools::utils::vm_util
+    iree::vm::bytecode_module
+  TESTONLY
+)
+
+iree_cc_binary(
+  NAME
     iree-dump-module
   OUT
     iree-dump-module
@@ -114,7 +135,7 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-if(${IREE_ENABLE_MLIR})
+if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -130,9 +151,7 @@ if(${IREE_ENABLE_MLIR})
       MLIRTableGen
     HOSTONLY
   )
-endif()
 
-if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
       init_iree_passes_and_dialects
@@ -172,12 +191,12 @@ if(${IREE_BUILD_COMPILER})
       MLIRAffine
       MLIRAffineTransforms
       MLIRGPU
-      MLIRGPUToSPIRVTransforms
+      MLIRGPUToSPIRV
       MLIRIR
       MLIRLLVMIR
       MLIRLinalg
       MLIRLinalgToLLVM
-      MLIRLinalgToSPIRVTransforms
+      MLIRLinalgToSPIRV
       MLIRLinalgTransforms
       MLIRQuant
       MLIRSCF
@@ -188,7 +207,9 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTransforms
       MLIRShape
       MLIRStandard
-      MLIRStandardToSPIRVTransforms
+      MLIRStandardToSPIRV
+      MLIRTosa
+      MLIRTosaTransforms
       MLIRTransforms
       MLIRVector
     PUBLIC
@@ -255,7 +276,7 @@ if(${IREE_BUILD_COMPILER})
       "init_translations.h"
     DEPS
       iree::compiler::Translation::IREEVM
-      MLIRSPIRVSerialization
+      MLIRSPIRVTranslateRegistration
   )
 
   iree_cc_library(
@@ -300,6 +321,16 @@ if(${IREE_BUILD_COMPILER})
     INCLUDES
       "${IREE_EMITC_INCLUDES}"
     PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-translate
+    OUT
+      iree-translate
+    DEPS
+      ::iree_translate_main
+    HOSTONLY
   )
 
   iree_cc_binary(
@@ -349,25 +380,7 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
     HOSTONLY
   )
-endif(${IREE_BUILD_COMPILER})
 
-# If cross-compiling, we need to declare iree-translate under host configuration
-
-# unconditionally because we need to run it on host to generate VM modules
-# for tests.
-if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
-  iree_cc_binary(
-    NAME
-      iree-translate
-    OUT
-      iree-translate
-    DEPS
-      ::iree_translate_main
-    HOSTONLY
-  )
-endif()
-
-if(${IREE_ENABLE_MLIR})
   add_custom_target(IreeFileCheck ALL
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
   )
@@ -377,4 +390,33 @@ if(${IREE_ENABLE_MLIR})
       DEPENDS FileCheck
     )
   endif()
-endif()
+
+  # General test dependency binary/scripts installed.
+  install(
+    PROGRAMS
+      IreeFileCheck.bat
+      run_lit.bat
+      run_lit.ps1
+      run_lit.sh
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
+
+  # Rename IreeFileCheck.sh -> IreeFileCheck in lieu of symlink (as is used in
+  # the build tree).
+  install(
+    PROGRAMS
+      IreeFileCheck.sh
+    DESTINATION "tests/bin"
+    RENAME "IreeFileCheck"
+    COMPONENT Tests
+  )
+
+  # Bundle the FileCheck binary from LLVM into our tests/bin directory so
+  # installed FileCheck tests are hermetic.
+  install(
+    TARGETS FileCheck
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
+endif(${IREE_BUILD_COMPILER})

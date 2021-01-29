@@ -14,26 +14,39 @@
 
 #include "iree/hal/vulkan/vma_allocator.h"
 
-#include "absl/memory/memory.h"
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/buffer.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_buffer.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+using namespace iree::hal::vulkan;
 
-// static
-StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
-    VkPhysicalDevice physical_device,
-    const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance,
-    Options options) {
-  IREE_TRACE_SCOPE0("VmaAllocator::Create");
+typedef struct iree_hal_vulkan_vma_allocator_s {
+  iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
+  VmaAllocator vma;
+} iree_hal_vulkan_vma_allocator_t;
+
+extern const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable;
+
+static iree_hal_vulkan_vma_allocator_t* iree_hal_vulkan_vma_allocator_cast(
+    iree_hal_allocator_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_vulkan_vma_allocator_vtable);
+  return (iree_hal_vulkan_vma_allocator_t*)base_value;
+}
+
+iree_status_t iree_hal_vulkan_vma_allocator_create(
+    VkInstance instance, VkPhysicalDevice physical_device,
+    VkDeviceHandle* logical_device, VmaRecordSettings record_settings,
+    iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(physical_device);
+  IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(out_allocator);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   const auto& syms = logical_device->syms();
   VmaVulkanFunctions vulkan_fns;
+  memset(&vulkan_fns, 0, sizeof(vulkan_fns));
   vulkan_fns.vkGetPhysicalDeviceProperties =
       syms->vkGetPhysicalDeviceProperties;
   vulkan_fns.vkGetPhysicalDeviceMemoryProperties =
@@ -56,76 +69,110 @@ StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
   vulkan_fns.vkDestroyImage = syms->vkDestroyImage;
   vulkan_fns.vkCmdCopyBuffer = syms->vkCmdCopyBuffer;
 
-  VmaRecordSettings record_settings;
-#if VMA_RECORDING_ENABLED
-  record_settings.flags =
-      options.recording_flush_after_call ? VMA_RECORD_FLUSH_AFTER_CALL_BIT : 0;
-  record_settings.pFilePath = options.recording_file.c_str();
-#else
-  record_settings.flags = 0;
-  record_settings.pFilePath = nullptr;
-#endif  // VMA_RECORDING_ENABLED
-
-  VmaAllocatorCreateInfo create_info{};
+  VmaAllocatorCreateInfo create_info;
+  memset(&create_info, 0, sizeof(create_info));
   create_info.flags = 0;
   create_info.physicalDevice = physical_device;
   create_info.device = *logical_device;
   create_info.instance = instance;
   create_info.preferredLargeHeapBlockSize = 64 * 1024 * 1024;
   create_info.pAllocationCallbacks = logical_device->allocator();
-  create_info.pDeviceMemoryCallbacks = nullptr;
+  create_info.pDeviceMemoryCallbacks = NULL;
   create_info.frameInUseCount = 0;
-  create_info.pHeapSizeLimit = nullptr;
+  create_info.pHeapSizeLimit = NULL;
   create_info.pVulkanFunctions = &vulkan_fns;
   create_info.pRecordSettings = &record_settings;
-  ::VmaAllocator vma = VK_NULL_HANDLE;
-  VK_RETURN_IF_ERROR(vmaCreateAllocator(&create_info, &vma));
+  VmaAllocator vma = VK_NULL_HANDLE;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, VK_RESULT_TO_STATUS(vmaCreateAllocator(&create_info, &vma),
+                              "vmaCreateAllocator"));
 
-  auto allocator =
-      absl::WrapUnique(new VmaAllocator(physical_device, logical_device, vma));
-  // TODO(benvanik): query memory properties/types.
-  return allocator;
+  iree_allocator_t host_allocator = logical_device->host_allocator();
+  iree_hal_vulkan_vma_allocator_t* allocator = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, sizeof(*allocator), (void**)&allocator);
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
+                                 &allocator->resource);
+    allocator->host_allocator = host_allocator;
+    allocator->vma = vma;
+    *out_allocator = (iree_hal_allocator_t*)allocator;
+  } else {
+    vmaDestroyAllocator(vma);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
-VmaAllocator::VmaAllocator(VkPhysicalDevice physical_device,
-                           const ref_ptr<VkDeviceHandle>& logical_device,
-                           ::VmaAllocator vma)
-    : physical_device_(physical_device),
-      logical_device_(add_ref(logical_device)),
-      vma_(vma) {}
+static void iree_hal_vulkan_vma_allocator_destroy(
+    iree_hal_allocator_t* base_allocator) {
+  iree_hal_vulkan_vma_allocator_t* allocator =
+      iree_hal_vulkan_vma_allocator_cast(base_allocator);
+  iree_allocator_t host_allocator = allocator->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-VmaAllocator::~VmaAllocator() {
-  IREE_TRACE_SCOPE0("VmaAllocator::dtor");
-  vmaDestroyAllocator(vma_);
+  vmaDestroyAllocator(allocator->vma);
+  iree_allocator_free(host_allocator, allocator);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
-bool VmaAllocator::CanUseBufferLike(Allocator* source_allocator,
-                                    MemoryTypeBitfield memory_type,
-                                    BufferUsageBitfield buffer_usage,
-                                    BufferUsageBitfield intended_usage) const {
-  // TODO(benvanik): ensure there is a memory type that can satisfy the request.
-  return source_allocator == this;
+static iree_allocator_t iree_hal_vulkan_vma_allocator_host_allocator(
+    const iree_hal_allocator_t* base_allocator) {
+  iree_hal_vulkan_vma_allocator_t* allocator =
+      (iree_hal_vulkan_vma_allocator_t*)base_allocator;
+  return allocator->host_allocator;
 }
 
-bool VmaAllocator::CanAllocate(MemoryTypeBitfield memory_type,
-                               BufferUsageBitfield buffer_usage,
-                               size_t allocation_size) const {
-  // TODO(benvnik): ensure there is a memory type that can satisfy the request.
-  return true;
+static iree_hal_buffer_compatibility_t
+iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_usage_t intended_usage,
+    iree_device_size_t allocation_size) {
+  // TODO(benvanik): check to ensure the allocator can serve the memory type.
+
+  // Disallow usage not permitted by the buffer itself. Since we then use this
+  // to determine compatibility below we'll naturally set the right compat flags
+  // based on what's both allowed and intended.
+  intended_usage &= allowed_usage;
+
+  // All buffers can be allocated on the heap.
+  iree_hal_buffer_compatibility_t compatibility =
+      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
+
+  // Buffers can only be used on the queue if they are device visible.
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+    }
+    if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
+    }
+  }
+
+  return compatibility;
 }
 
-Status VmaAllocator::MakeCompatible(MemoryTypeBitfield* memory_type,
-                                    BufferUsageBitfield* buffer_usage) const {
-  // TODO(benvanik): mutate to match supported memory types.
-  return OkStatus();
+static iree_status_t iree_hal_vulkan_vma_allocator_make_compatible(
+    iree_hal_memory_type_t* memory_type,
+    iree_hal_memory_access_t* allowed_access,
+    iree_hal_buffer_usage_t* allowed_usage) {
+  // TODO(benvanik): remove this entirely!
+  // Host currently uses mapping to copy buffers, which is done a lot.
+  // We could probably remove this mutation by preventing copies in those cases
+  // or issuing small copy command buffers.
+  *allowed_usage |=
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_BUFFER_USAGE_MAPPING;
+  return iree_ok_status();
 }
 
-StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-    MemoryAccessBitfield allowed_access, size_t allocation_size,
-    VmaAllocationCreateFlags flags) {
-  IREE_TRACE_SCOPE0("VmaAllocator::AllocateInternal");
-
+static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
+    iree_hal_vulkan_vma_allocator_t* allocator,
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_memory_access_t allowed_access, size_t allocation_size,
+    VmaAllocationCreateFlags flags, iree_hal_buffer_t** out_buffer) {
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
@@ -133,22 +180,22 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
 
   VkBufferCreateInfo buffer_create_info;
   buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  buffer_create_info.pNext = nullptr;
+  buffer_create_info.pNext = NULL;
   buffer_create_info.flags = 0;
   buffer_create_info.size = allocation_size;
   buffer_create_info.usage = 0;
-  if (AllBitsSet(buffer_usage, BufferUsage::kTransfer)) {
+  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   }
-  if (AllBitsSet(buffer_usage, BufferUsage::kDispatch)) {
+  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
   }
   buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   buffer_create_info.queueFamilyIndexCount = 0;
-  buffer_create_info.pQueueFamilyIndices = nullptr;
+  buffer_create_info.pQueueFamilyIndices = NULL;
 
   VmaAllocationCreateInfo allocation_create_info;
   allocation_create_info.flags = flags;
@@ -157,9 +204,9 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
   allocation_create_info.preferredFlags = 0;
   allocation_create_info.memoryTypeBits = 0;  // Automatic selection.
   allocation_create_info.pool = VK_NULL_HANDLE;
-  allocation_create_info.pUserData = nullptr;
-  if (AllBitsSet(memory_type, MemoryType::kDeviceLocal)) {
-    if (AllBitsSet(memory_type, MemoryType::kHostVisible)) {
+  allocation_create_info.pUserData = NULL;
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device-local, host-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
       allocation_create_info.preferredFlags |=
@@ -171,7 +218,7 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
   } else {
-    if (AllBitsSet(memory_type, MemoryType::kDeviceVisible)) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
       // Host-local, device-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
     } else {
@@ -179,67 +226,68 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
     }
   }
-  if (AllBitsSet(memory_type, MemoryType::kHostCached)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
   }
-  if (AllBitsSet(memory_type, MemoryType::kHostCoherent)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     allocation_create_info.requiredFlags |=
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (AllBitsSet(memory_type, MemoryType::kTransient)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_TRANSIENT)) {
     allocation_create_info.preferredFlags |=
         VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
   }
-  if (AllBitsSet(buffer_usage, BufferUsage::kMapping)) {
+  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
-  VkBuffer buffer = VK_NULL_HANDLE;
+  VkBuffer handle = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VmaAllocationInfo allocation_info;
-  VK_RETURN_IF_ERROR(vmaCreateBuffer(vma_, &buffer_create_info,
-                                     &allocation_create_info, &buffer,
-                                     &allocation, &allocation_info));
+  VK_RETURN_IF_ERROR(vmaCreateBuffer(allocator->vma, &buffer_create_info,
+                                     &allocation_create_info, &handle,
+                                     &allocation, &allocation_info),
+                     "vmaCreateBuffer");
 
-  return make_ref<VmaBuffer>(this, memory_type, allowed_access, buffer_usage,
-                             allocation_size, 0, allocation_size, buffer,
-                             allocation, allocation_info);
+  return iree_hal_vulkan_vma_buffer_wrap(
+      (iree_hal_allocator_t*)allocator, memory_type, allowed_access,
+      allowed_usage, allocation_size,
+      /*byte_offset=*/0,
+      /*byte_length=*/allocation_size, allocator->vma, handle, allocation,
+      allocation_info, out_buffer);
 }
 
-StatusOr<ref_ptr<Buffer>> VmaAllocator::Allocate(
-    MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-    size_t allocation_size) {
-  IREE_TRACE_SCOPE0("VmaAllocator::Allocate");
-  return AllocateInternal(memory_type, buffer_usage, MemoryAccess::kAll,
-                          allocation_size, /*flags=*/0);
+static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_vulkan_vma_allocator_t* allocator =
+      iree_hal_vulkan_vma_allocator_cast(base_allocator);
+
+  // Coerce options into those required for use by VMA.
+  iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_ALL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_vma_allocator_make_compatible(
+      &memory_type, &allowed_access, &allowed_usage));
+
+  return iree_hal_vulkan_vma_allocator_allocate_internal(
+      allocator, memory_type, allowed_usage, allowed_access, allocation_size,
+      /*flags=*/0, out_buffer);
 }
 
-StatusOr<ref_ptr<Buffer>> VmaAllocator::AllocateConstant(
-    BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) {
-  IREE_TRACE_SCOPE0("VmaAllocator::AllocateConstant");
-  // TODO(benvanik): import memory to avoid the copy.
-  IREE_ASSIGN_OR_RETURN(
-      auto buffer,
-      AllocateInternal(MemoryType::kDeviceLocal | MemoryType::kHostVisible,
-                       buffer_usage,
-                       MemoryAccess::kRead | MemoryAccess::kDiscardWrite,
-                       source_buffer->byte_length(),
-                       /*flags=*/0));
-  IREE_RETURN_IF_ERROR(
-      buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
-  buffer->set_allowed_access(MemoryAccess::kRead);
-  return buffer;
+static iree_status_t iree_hal_vulkan_vma_allocator_wrap_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "wrapping of external buffers not supported");
 }
 
-StatusOr<ref_ptr<Buffer>> VmaAllocator::WrapMutable(
-    MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
-    BufferUsageBitfield buffer_usage, void* data, size_t data_length) {
-  IREE_TRACE_SCOPE0("VmaAllocator::WrapMutable");
-  // TODO(benvanik): import memory.
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "Wrapping host memory is not yet implemented";
-}
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable = {
+    /*.destroy=*/iree_hal_vulkan_vma_allocator_destroy,
+    /*.host_allocator=*/iree_hal_vulkan_vma_allocator_host_allocator,
+    /*.query_buffer_compatibility = */
+    iree_hal_vulkan_vma_allocator_query_buffer_compatibility,
+    /*.allocate_buffer=*/iree_hal_vulkan_vma_allocator_allocate_buffer,
+    /*.wrap_buffer=*/iree_hal_vulkan_vma_allocator_wrap_buffer,
+};

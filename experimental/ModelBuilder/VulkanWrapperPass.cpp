@@ -21,16 +21,16 @@
 
 #include <cstdint>
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 
 using namespace mlir;  // NOLINT
 
@@ -94,7 +94,7 @@ LogicalResult AddVulkanLaunchWrapper::declareVulkanLaunchFunc(Location loc) {
   vulkanLaunchTypes.insert(vulkanLaunchTypes.end(), args.begin(), args.end());
 
   // Declare vulkan launch function.
-  auto type = FunctionType::get(vulkanLaunchTypes, {}, loc->getContext());
+  auto type = FunctionType::get(loc->getContext(), vulkanLaunchTypes, {});
   FuncOp vkLaunch = builder.create<FuncOp>(loc, kVulkanLaunch, type);
   vkLaunch.setPrivate();
   return success();
@@ -144,12 +144,12 @@ void AddVulkanLaunchWrapper::convertGpuLaunchFunc(
   std::vector<char> binary;
   if (failed(createBinaryShader(module, binary))) return signalPassFailure();
 
-  FunctionType ft = FunctionType::get(args, {}, ctx);
+  FunctionType ft = FunctionType::get(ctx, args, {});
   std::string name = std::string(entryPoint.fn()) + "_wrapper";
   auto function = FuncOp::create(loc, name, ft);
   module.push_back(function);
   function.addEntryBlock();
-  function.setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));
+  function->setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));
 
   // Declare vulkan launch function.
   if (failed(declareVulkanLaunchFunc(loc))) return signalPassFailure();
@@ -171,12 +171,12 @@ void AddVulkanLaunchWrapper::convertGpuLaunchFunc(
       arguments);
 
   // Set SPIR-V binary shader data as an attribute.
-  vulkanLaunchCallOp.setAttr(
+  vulkanLaunchCallOp->setAttr(
       kSPIRVBlobAttrName,
       StringAttr::get({binary.data(), binary.size()}, loc->getContext()));
 
   // Set entry point name as an attribute.
-  vulkanLaunchCallOp.setAttr(
+  vulkanLaunchCallOp->setAttr(
       kSPIRVEntryPointAttrName,
       StringAttr::get(entryPoint.fn(), loc->getContext()));
 

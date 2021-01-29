@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
@@ -25,33 +26,82 @@ namespace iree_compiler {
 
 namespace {
 
-// Taken over from StandardToVM.
-// We need to replace the Op depending on the operand.
-// We could start with a conversion for IREE::VM::AddI32Op
-template <typename SrcOpTy, typename DstOpTy>
-class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+// Convert operations which don't have attributes
+template <typename SrcOpTy>
+class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
-  BinaryArithmeticOpConversion(MLIRContext *context, StringRef funcName)
+  NoAttributeOpConversion(MLIRContext *context, StringRef funcName)
       : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
 
  private:
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<Value> operands,
+      SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::Adaptor srcAdapter(operands);
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args;
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+// TODO(simon-camp): These conversions to macro calls should be deleted once
+// support for control flow ops has landed in the c module target
+template <typename SrcOpTy>
+class BinaryCheckOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  BinaryCheckOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    typename SrcOpTy::Adaptor srcAdaptor(
+        operands, op.getOperation()->getAttrDictionary());
 
     StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args =
-        rewriter.getArrayAttr({IntegerAttr::get(rewriter.getIndexType(), 0),
-                               IntegerAttr::get(rewriter.getIndexType(), 1)});
+    ArrayAttr args = rewriter.getArrayAttr(
+        {IntegerAttr::get(rewriter.getIndexType(), 0),
+         IntegerAttr::get(rewriter.getIndexType(), 1), srcAdaptor.message()});
     ArrayAttr templateArgs;
-    ValueRange dstOperands{srcAdapter.lhs(), srcAdapter.rhs()};
 
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
-                                         callee, args, templateArgs,
-                                         dstOperands);
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, mlir::TypeRange{}, callee,
+                                               args, templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+template <typename SrcOpTy>
+class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  ConstOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args = ArrayAttr::get({op.value()}, op.getContext());
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+                                               templateArgs, operands);
 
     return success();
   }
@@ -63,9 +113,23 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
-  patterns.insert<
-      BinaryArithmeticOpConversion<IREE::VM::AddI32Op, mlir::emitc::CallOp>>(
-      context, "vm_add_i32");
+  // Arithmetic
+  patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
+                                                               "vm_add_i32");
+
+  // Check
+  // TODO(simon-camp): These conversions to macro calls should be deleted once
+  // support for control flow ops has landed in the c module target
+  patterns.insert<BinaryCheckOpConversion<IREE::VM::CheckEQOp>>(context,
+                                                                "VM_CHECK_EQ");
+
+  // Compare
+  patterns.insert<NoAttributeOpConversion<IREE::VM::CmpNEI32Op>>(
+      context, "vm_cmp_ne_i32");
+
+  // Const
+  patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context,
+                                                           "vm_const_i32");
 }
 
 namespace IREE {
@@ -78,7 +142,7 @@ class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::emitc::EmitCDialect>();
+    registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
   void runOnOperation() override {
@@ -88,8 +152,22 @@ class ConvertVMToEmitCPass
     populateVMToCPatterns(&getContext(), patterns);
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
+    target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
+
+    // Arithmetic ops
     target.addIllegalOp<IREE::VM::AddI32Op>();
+
+    // Check ops
+    // TODO(simon-camp): These conversions to macro calls should be deleted once
+    // support for control flow ops has landed in the c module target
+    target.addIllegalOp<IREE::VM::CheckEQOp>();
+
+    // Compare ops
+    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
+
+    // Const ops
+    target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {

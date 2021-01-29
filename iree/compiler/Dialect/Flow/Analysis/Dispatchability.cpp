@@ -39,8 +39,8 @@ LogicalResult Dispatchability::annotateIR(ModuleOp moduleOp) {
   SymbolTable symbolTable(moduleOp);
   for (auto &funcDispatchability : dispatchability.funcDispatchability_) {
     auto funcOp = symbolTable.lookup<FuncOp>(funcDispatchability.first);
-    funcOp.setAttr("dispatchable",
-                   builder.getBoolAttr(funcDispatchability.second));
+    funcOp->setAttr("dispatchable",
+                    builder.getBoolAttr(funcDispatchability.second));
   }
 
   return success();

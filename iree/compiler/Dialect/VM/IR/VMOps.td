@@ -97,7 +97,7 @@ def VM_FuncOp : VM_Op<"func", [
   let builders = [
     OpBuilderDAG<(ins "StringRef":$name, "FunctionType":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-      CArg<"ArrayRef<MutableDictionaryAttr>", "{}">:$argAttrs)>,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>,
   ];
 
   let extraClassDeclaration = [{
@@ -187,7 +187,7 @@ def VM_ImportOp : VM_Op<"import", [
   let builders = [
     OpBuilderDAG<(ins "StringRef":$name, "FunctionType":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-      CArg<"ArrayRef<MutableDictionaryAttr>", "{}">:$argAttrs)>,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>,
   ];
 
   let extraClassDeclaration = [{
@@ -306,7 +306,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     StringRef getSymbolName() { return sym_name(); }
     Type getStorageType() { return type(); }
     bool isMutable() { return is_mutable(); }
-    void makeMutable() { setAttr("is_mutable", UnitAttr::get(getContext())); }
+    void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
     Optional<StringRef> getInitializerAttr() { return initializer(); }
     void clearInitializer() { removeAttr("initializer"); }
     Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }

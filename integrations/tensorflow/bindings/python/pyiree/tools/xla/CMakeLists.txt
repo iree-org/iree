@@ -23,6 +23,22 @@ iree_py_library(
 
 iree_symlink_tool(
   TARGET xla
-  FROM_TOOL_TARGET integrations_tensorflow_compiler_iree-import-xla
+  FROM_TOOL_TARGET iree_tf_compiler_iree-import-xla
   TO_EXE_NAME iree-import-xla
+)
+
+iree_py_install_package(
+  COMPONENT IreePythonPackage-tools-xla
+  PACKAGE_NAME iree_tools_xla
+  MODULE_PATH pyiree/tools/xla
+  DEPS
+    integrations_iree_tensorflow_importers
+)
+
+# Since imported, need to resolve the TARGET_FILE ourselves instead of
+# install TARGETS form.
+install(
+  PROGRAMS "$<TARGET_FILE:iree_tf_compiler_iree-import-xla>"
+  DESTINATION "${PY_INSTALL_MODULE_DIR}"
+  COMPONENT "${PY_INSTALL_COMPONENT}"
 )

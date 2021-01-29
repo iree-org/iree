@@ -29,7 +29,7 @@ namespace mlir {
 namespace iree_compiler {
 
 static llvm::cl::opt<bool> clEnableLinalgOnTensors(
-    "iree-llvm-experimental-linalg-on-tensors",
+    "iree-codegen-llvm-experimental-linalg-on-tensors",
     llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
     llvm::cl::init(false));
 
@@ -47,25 +47,21 @@ static llvm::cl::opt<bool> fastExpConversion(
     llvm::cl::init(false));
 
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
-  // Linalg on tensors directly lowers to loops for now.
+  // Distribute linalg op among a 3d grid of parallel threads. Tile each
+  // workgroup thread memory then vectorize the linalg op.
+  passManager.addPass(createLinalgTileAndDistributePass());
   if (!clEnableLinalgOnTensors) {
-    // Distribute linalg op among a 3d grid of parallel threads. Tile each
-    // workgroup thread memory then vectorize the linalg op.
-
-    passManager.addPass(createLinalgTileAndDistributePass());
     passManager.addPass(createLegalizeNumWorkgroupsFnPass());
-
-    // Linalg.ConvOp -> (Img2Col packing + matmul).
-    // After convolution is tiled and distributed among workgroups its converted
-    // before vectorize workgroup workload.
-    if (convImg2ColConversion) {
-      passManager.addNestedPass<FuncOp>(
-          createConvImg2ColMatmulConversionPass());
-    }
-
-    passManager.addNestedPass<FuncOp>(
-        createLinalgTileAndVectorizeWorkgroupsPass());
   }
+  // Linalg.ConvOp -> (Img2Col packing + matmul).
+  // After convolution is tiled and distributed among workgroups its converted
+  // before vectorize workgroup workload.
+  if (convImg2ColConversion) {
+    passManager.addNestedPass<FuncOp>(createConvImg2ColMatmulConversionPass());
+  }
+
+  passManager.addNestedPass<FuncOp>(
+      createLinalgTileAndVectorizeWorkgroupsPass());
   passManager.addNestedPass<FuncOp>(createPlanConvLoopOrderPass());
 
   // Linalg -> SCF
@@ -80,7 +76,11 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
   // (HAL, IREE, Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
-  passManager.addPass(createConvertToLLVMPass());
+  if (clEnableLinalgOnTensors) {
+    passManager.addPass(createConvertToLLVM2Pass());
+  } else {
+    passManager.addPass(createConvertToLLVMPass());
+  }
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -91,7 +91,8 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addPass(createDeclareNumWorkgroupsFnPass());
+  if (!clEnableLinalgOnTensors)
+    passManager.addPass(createDeclareNumWorkgroupsFnPass());
 
   passManager.addPass(createInlinerPass());
 
@@ -103,16 +104,16 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
 
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {
-    // TODO: implement and connect these.
-    passManager.addPass(createLinalgTileAndDistributeOnTensorsPass());
-    passManager.addPass(createLinalgRewriteDestructiveUpdatesPass());
+    passManager.addPass(createLinalgVectorizePass());
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
-    passManager.addPass(createLegalizeNumWorkgroupsFnPass());
+    passManager.addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
     passManager.addPass(createCopyRemovalPass());
-    passManager.addPass(createBufferHoistingPass());
-    passManager.addPass(createBufferLoopHoistingPass());
+    // passManager.addPass(createBufferHoistingPass());
+    // TODO(nicolasvasilache): bug in buffer loop hoisting with
+    // dynamic_linalg_matmul_on_tensors_fuse_0.mlir
+    // passManager.addPass(createBufferLoopHoistingPass());
     passManager.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());

@@ -28,7 +28,6 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-linalg-bufferize"
@@ -70,6 +69,9 @@ static bool hasDestructiveUpdateSubTensorUses(
       writes.push_back(subTensorInsertOp);
       continue;
     }
+    if (auto dimOp = dyn_cast<DimOp>(u.getOwner())) {
+      continue;
+    }
     LLVM_DEBUG(llvm::dbgs() << "found non-destructive update pattern use: "
                             << *(u.getOwner()) << "\n");
     return false;
@@ -78,7 +80,7 @@ static bool hasDestructiveUpdateSubTensorUses(
   // dominated by all SubTensorOp.
   if (writes.size() != 1) return false;
   // Small local dominance computation.
-  DominanceInfo domInfo(writes.front().getParentOp());
+  DominanceInfo domInfo(writes.front()->getParentOp());
   for (auto read : reads) {
     LLVM_DEBUG(llvm::dbgs() << "read: " << *read.getOperation() << "\n");
     if (!domInfo.properlyDominates(read.getOperation(), writes.front())) {

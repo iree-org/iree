@@ -3,14 +3,14 @@
 //      CHECK: hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout
 // CHECK-NEXT: func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
 // CHECK-NEXT:   %dev = hal.ex.shared_device : !hal.device
-// CHECK-NEXT:   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">] : !hal.descriptor_set_layout
+// CHECK-NEXT:   %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">] : !hal.descriptor_set_layout
 // CHECK-NEXT:   return %descriptor_set_layout : !hal.descriptor_set_layout
 // CHECK-NEXT: }
 
 // CHECK-LABEL: @descriptorSetLayoutLookup
 func @descriptorSetLayoutLookup(%arg0 : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK-NEXT: %[[LAYOUT:.+]] = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %0 = hal.descriptor_set_layout.lookup %arg0, "PushOnly", bindings = [
+  %0 = hal.descriptor_set_layout.lookup %arg0, PushOnly, bindings = [
     #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
     #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
   ] : !hal.descriptor_set_layout
@@ -77,7 +77,7 @@ func @sharedLayoutLookup(%arg0 : !hal.device) -> !hal.executable_layout {
 // CHECK: @otherDescriptorSetLayoutLookup
 func @otherDescriptorSetLayoutLookup(%arg0 : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK: %[[LAYOUT:.+]] = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %0 = hal.descriptor_set_layout.lookup %arg0, "PushOnly", bindings = [
+  %0 = hal.descriptor_set_layout.lookup %arg0, PushOnly, bindings = [
     #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
     #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
   ] : !hal.descriptor_set_layout

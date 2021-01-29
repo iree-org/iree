@@ -16,7 +16,7 @@
 #define IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETENVUTILS_H_
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 
 namespace mlir {
 namespace iree_compiler {

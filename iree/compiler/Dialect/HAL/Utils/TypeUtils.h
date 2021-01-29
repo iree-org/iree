@@ -16,8 +16,8 @@
 #define IREE_COMPILER_DIALECT_HAL_UTILS_TYPEUTILS_H_
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
 

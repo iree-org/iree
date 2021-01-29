@@ -127,7 +127,7 @@ iree_cc_binary(
     LLVMSupport
     MLIRExecutionEngine
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRGPUToVulkanTransforms
     MLIRIR
     MLIRLinalg
@@ -137,7 +137,7 @@ iree_cc_binary(
     MLIRPass
     MLIRSPIRV
     MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRSupport
     MLIRTargetLLVMIR
     MLIRTransformUtils
@@ -170,7 +170,7 @@ iree_cc_binary(
     MLIRPass
     MLIRSPIRV
     MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRTransformUtils
     MLIRVector
     experimental::ModelBuilder
@@ -202,7 +202,7 @@ iree_cc_binary(
     MLIRPass
     MLIRSPIRV
     MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    MLIRStandardToSPIRV
     MLIRTransformUtils
     MLIRVector
     experimental::ModelBuilder

@@ -18,8 +18,8 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,15 +31,15 @@ namespace Shape {
 
 LogicalResult TypeExpander::expandFunctionSignature(FuncOp funcOp,
                                                     OpBuilder &builder) const {
-  SmallVector<MutableDictionaryAttr, 4> origArgAttrs;
-  SmallVector<MutableDictionaryAttr, 4> origResultAttrs;
+  SmallVector<DictionaryAttr, 4> origArgAttrs;
+  SmallVector<DictionaryAttr, 4> origResultAttrs;
   funcOp.getAllArgAttrs(origArgAttrs);
   funcOp.getAllResultAttrs(origResultAttrs);
 
   SmallVector<Type, 4> argTypes;
-  SmallVector<MutableDictionaryAttr, 4> argAttrs;
+  SmallVector<DictionaryAttr, 4> argAttrs;
   SmallVector<Type, 4> resultTypes;
-  SmallVector<MutableDictionaryAttr, 4> resultAttrs;
+  SmallVector<DictionaryAttr, 4> resultAttrs;
 
   // Convert arguments.
   auto funcType = funcOp.getType();
@@ -80,7 +80,7 @@ LogicalResult TypeExpander::expandFunctionSignature(FuncOp funcOp,
 
   // Update function.
   auto newFuncType =
-      FunctionType::get(argTypes, resultTypes, funcOp.getContext());
+      FunctionType::get(funcOp.getContext(), argTypes, resultTypes);
   funcOp.setType(newFuncType);
   funcOp.setAllArgAttrs(argAttrs);
   funcOp.setAllResultAttrs(resultAttrs);

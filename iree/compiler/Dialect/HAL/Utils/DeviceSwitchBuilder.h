@@ -117,8 +117,6 @@ class DeviceSwitchBuilder {
         resultTypes_(resultTypes),
         device_(device),
         builder_(builder) {
-    // FIXME: Keep the same listener as the provided builder.
-    builder.setListener(nullptr);
   }
 
   // Pushes a new condition onto the stack and returns a builder that must have

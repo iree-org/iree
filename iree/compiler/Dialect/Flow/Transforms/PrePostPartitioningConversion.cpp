@@ -18,10 +18,12 @@
 #include "iree/compiler/Dialect/Flow/Conversion/StandardToFlow/ConvertStandardToFlow.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -33,16 +35,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 namespace {
-/// ExtractElementOp will be lowered to IREE::Flow::TensorLoadOp. If the type is
-/// i1, it's not valid to load. In this case, we need to cast it to i8 before
+/// tensor::ExtractOp will be lowered to IREE::Flow::TensorLoadOp. If the type
+/// is i1, it's not valid to load. In this case, we need to cast it to i8 before
 /// the load, and truncate the value after the load.
 struct ExtractElementOpPromotion
-    : public OpConversionPattern<ExtractElementOp> {
+    : public OpConversionPattern<tensor::ExtractOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      ExtractElementOp op, ArrayRef<Value> args,
+      tensor::ExtractOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
-    auto tensorType = op.getAggregate().getType().dyn_cast<TensorType>();
+    auto tensorType = op.tensor().getType().dyn_cast<TensorType>();
     if (!tensorType) {
       return rewriter.notifyMatchFailure(op, "expected tensor types");
     }
@@ -52,8 +54,8 @@ struct ExtractElementOpPromotion
     Location loc = op.getLoc();
     auto i8Type = rewriter.getIntegerType(8);
     auto i8Operand = rewriter.create<mhlo::ConvertOp>(loc, args[0], i8Type);
-    auto loadOp =
-        rewriter.create<ExtractElementOp>(loc, i8Type, i8Operand, op.indices());
+    auto loadOp = rewriter.create<tensor::ExtractOp>(loc, i8Type, i8Operand,
+                                                     op.indices());
     auto i1Type = rewriter.getI1Type();
     rewriter.replaceOpWithNewOp<TruncateIOp>(op, i1Type, loadOp.getResult());
     return success();

@@ -16,11 +16,11 @@
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
 
 #include "absl/types/optional.h"
-#include "bindings/python/pyiree/common/binding.h"
-#include "bindings/python/pyiree/rt/host_types.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "pyiree/rt/binding.h"
+#include "pyiree/rt/host_types.h"
 
 namespace iree {
 namespace python {

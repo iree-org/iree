@@ -92,7 +92,6 @@ jobs:
     steps:
       - name: Installing dependencies
         run: |
-          sudo add-apt-repository -y "deb http://mirror.enzu.com/ubuntu/ eoan main universe"
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
           wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format

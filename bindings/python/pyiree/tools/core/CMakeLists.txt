@@ -26,3 +26,18 @@ if(${IREE_BUILD_COMPILER})
     TO_EXE_NAME iree-translate
   )
 endif()
+
+iree_py_install_package(
+  AUGMENT_EXISTING_PACKAGE
+  COMPONENT IreePythonPackage-compiler
+  PACKAGE_NAME iree_compiler
+  MODULE_PATH pyiree/tools/core
+  DEPS
+    iree_tools_iree-translate
+)
+
+install(
+  TARGETS iree_tools_iree-translate
+  COMPONENT ${PY_INSTALL_COMPONENT}
+  DESTINATION "${PY_INSTALL_MODULE_DIR}"
+)

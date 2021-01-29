@@ -215,6 +215,16 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
   return iree_string_view_match_pattern_impl(value, pattern);
 }
 
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+iree_string_view_append_to_buffer(iree_string_view_t source_value,
+                                  iree_string_view_t* target_value,
+                                  char* buffer) {
+  memcpy(buffer, source_value.data, source_value.size);
+  target_value->data = buffer;
+  target_value->size = source_value.size;
+  return source_value.size;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_status_t canonical errors
 //===----------------------------------------------------------------------===//
@@ -1027,6 +1037,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
   return allocator.alloc(allocator.self,
                          IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING, byte_length,
                          out_ptr);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_clone(iree_allocator_t allocator,
+                     iree_const_byte_span_t source_bytes, void** out_ptr) {
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, source_bytes.data_length, out_ptr));
+  memcpy(*out_ptr, source_bytes.data, source_bytes.data_length);
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL

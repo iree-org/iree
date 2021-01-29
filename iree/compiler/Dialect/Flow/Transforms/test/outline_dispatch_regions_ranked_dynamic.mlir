@@ -19,7 +19,7 @@
 // CHECK-DAG: %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
 // CHECK-DAG: %[[D3:.+]] = dim %[[ARG0]], %[[C3]]
 // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 1024 : index
-// CHECK-DAG: %[[DISPATCH:.+]] = flow.dispatch @dynamicRankedShape_ex_dispatch_0::@dynamicRankedShape_ex_dispatch_0[%[[WORKLOAD0]] : index](%[[ARG0]], %[[D1]], %[[D3]]) : (tensor<7x?x24x?xf32>, index, index)
+// CHECK-DAG: %[[DISPATCH:.+]] = flow.dispatch @dynamicRankedShape_ex_dispatch_0::@dynamicRankedShape_ex_dispatch_0[%[[WORKLOAD0]]] (%[[ARG0]], %[[D1]], %[[D3]]) : (tensor<7x?x24x?xf32>, index, index)
 // CHECK-DAG: return %[[DISPATCH]]
 module @dynamicRankedShapeModule {
 func @dynamicRankedShape(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {

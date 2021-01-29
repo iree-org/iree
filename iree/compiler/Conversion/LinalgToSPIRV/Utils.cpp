@@ -25,7 +25,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
@@ -48,7 +48,7 @@ LogicalResult updateWorkGroupSize(FuncOp funcOp,
   SmallVector<int32_t, 3> workGroupSizeVec = llvm::to_vector<3>(llvm::map_range(
       workGroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
 
-  funcOp.setAttr(
+  funcOp->setAttr(
       spirv::getEntryPointABIAttrName(),
       spirv::getEntryPointABIAttr(workGroupSizeVec, funcOp.getContext()));
   return success();

@@ -35,14 +35,14 @@
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 
 #define DEBUG_TYPE "kernel-dispatch-utils"
 
@@ -209,8 +209,7 @@ static LogicalResult getConfigForCooperativeMatmul(
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
   ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType =
-      op.output_buffers().front().getType().cast<ShapedType>();
+  ShapedType outputType = op.outputs().front().getType().cast<ShapedType>();
 
   auto resourceLimits = targetEnv.getResourceLimits();
   Optional<SmallVector<int64_t, 4>> coopMatmulSize =
@@ -349,7 +348,7 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
                                            TileSizesListType &tileSizes,
                                            LaunchConfigInfo &config) {
   auto inputType = op.getInput(1).getType().cast<MemRefType>();
-  auto outputType = op.getOutputBufferType(0).cast<MemRefType>();
+  auto outputType = op.getOutputBufferTypes()[0].cast<MemRefType>();
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 

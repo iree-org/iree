@@ -20,9 +20,10 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -47,7 +48,8 @@ struct DynamicUpdateSliceOpLowering
         llvm::map_range(op.start_indices(), [&](Value tensorValue) {
           return rewriter.createOrFold<IndexCastOp>(
               op.getLoc(),
-              rewriter.createOrFold<ExtractElementOp>(op.getLoc(), tensorValue),
+              rewriter.createOrFold<tensor::ExtractOp>(op.getLoc(),
+                                                       tensorValue),
               rewriter.getIndexType());
         }));
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(

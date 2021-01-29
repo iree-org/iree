@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
 #include "iree/base/flags.h"
+#include "iree/testing/gtest.h"
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
+  iree_flags_parse_checked(&argc, &argv);
 
   return RUN_ALL_TESTS();
 }

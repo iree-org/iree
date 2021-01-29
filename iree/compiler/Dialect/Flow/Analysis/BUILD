@@ -37,6 +37,6 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@mlir-hlo//:hlo",
     ],
 )

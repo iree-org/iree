@@ -29,20 +29,20 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
+#include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
-#include "mlir/Conversion/VectorToSPIRV/ConvertVectorToSPIRV.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -114,10 +114,11 @@ spirv::GlobalVariableOp getPushConstantVariable(Block &body,
 /// `elementCount` 32-bit integer values in `block`.
 spirv::GlobalVariableOp getOrInsertPushConstantVariable(Location loc,
                                                         Block &block,
-                                                        unsigned elementCount) {
+                                                        unsigned elementCount,
+                                                        OpBuilder &b) {
   if (auto varOp = getPushConstantVariable(block, elementCount)) return varOp;
 
-  auto builder = OpBuilder::atBlockBegin(&block);
+  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto typeAttr =
       TypeAttr::get(getPushConstantStorageType(elementCount, builder));
   StringRef name = "__push_constant_var__";
@@ -139,7 +140,7 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
   }
 
   spirv::GlobalVariableOp varOp = getOrInsertPushConstantVariable(
-      loc, parent->getRegion(0).front(), elementCount);
+      loc, parent->getRegion(0).front(), elementCount, builder);
 
   auto i32Type = SPIRVTypeConverter::getIndexType(builder.getContext());
   Value zeroOp = spirv::ConstantOp::getZero(i32Type, loc, builder);
@@ -156,12 +157,12 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
 spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
                                                uint64_t id, unsigned set,
                                                unsigned binding, bool alias,
-                                               Block &block) {
+                                               Block &block, OpBuilder &b) {
   auto name = llvm::formatv("__resource_var_{0}__", id).str();
-  auto builder = OpBuilder::atBlockBegin(&block);
+  auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
-  if (alias) variable.setAttr("aliased", builder.getUnitAttr());
+  if (alias) variable->setAttr("aliased", builder.getUnitAttr());
   return variable;
 }
 
@@ -243,8 +244,8 @@ struct IREEPlaceholderConverter final
 /// in SPIR-V lowering, linalg.reshape becomes a no-op.
 // TODO(ravishankarm): Move this into MLIR Core.
 struct LinalgReshapeConverter final
-    : public SPIRVOpLowering<linalg::ReshapeOp> {
-  using SPIRVOpLowering<linalg::ReshapeOp>::SPIRVOpLowering;
+    : public OpConversionPattern<linalg::ReshapeOp> {
+  using OpConversionPattern<linalg::ReshapeOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       linalg::ReshapeOp reshapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -253,16 +254,36 @@ struct LinalgReshapeConverter final
   }
 };
 
+/// Base class for lowering to SPIR-V cooperative matrix ops.
+template <typename SourceOp>
+class CoopMatOpLowering : public OpConversionPattern<SourceOp> {
+ public:
+  CoopMatOpLowering(MLIRContext *context, SPIRVTypeConverter &converter,
+                    PatternBenefit benefit = 1)
+      : OpConversionPattern<SourceOp>(context, benefit), converter(converter) {}
+
+ protected:
+  // TODO: We explicitly keep a reference of the type converter instead of
+  // passing it to OpConversionPattern during construction. This effectively
+  // bypasses the dialect conversion framework's automation over type
+  // conversion. This is needed for now because upstream SPIRVTypeConverter does
+  // not support cooperative matrix well yet so the framework won't know how to
+  // generate cooperative matrix. We are manually constructing the cooperative
+  // matrix in patterns. This should be fixed when we upstream all cooperative
+  // matrix related code.
+  SPIRVTypeConverter &converter;
+};
+
 /// Convert subgroup level vector transfert to SPIR-V cooperative
 /// matrix load/store if those are supported.
 /// TODO(thomasraoux): Move to MLIR core once this is stable.
 template <typename OpTy>
-class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
+class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
  public:
   TransferToCoopMatLoadStore(
       MLIRContext *context, SPIRVTypeConverter &converter,
       const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
-      : SPIRVOpLowering<OpTy>(context, converter),
+      : CoopMatOpLowering<OpTy>(context, converter),
         cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
 
   LogicalResult matchAndRewrite(
@@ -271,6 +292,8 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
       return failure();
     auto loc = op.getLoc();
+    auto memrefType = op.getShapedType().template dyn_cast<MemRefType>();
+    if (!memrefType) return failure();
     auto vecType = op.getVectorType();
     if (vecType.getRank() != 2) return failure();
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
@@ -289,11 +312,11 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     for (auto i : op.indices())
       remappedIndices.push_back(rewriter.getRemappedValue(i));
     Value ptr = spirv::getElementPtr(
-        SPIRVOpLowering<OpTy>::typeConverter, op.getMemRefType(),
-        rewriter.getRemappedValue(op.memref()), remappedIndices, loc, rewriter);
+        CoopMatOpLowering<OpTy>::converter, memrefType,
+        rewriter.getRemappedValue(op.source()), remappedIndices, loc, rewriter);
     int64_t offset = 0;
     SmallVector<int64_t, 2> strides;
-    getStridesAndOffset(op.getMemRefType(), strides, offset);
+    getStridesAndOffset(memrefType, strides, offset);
     auto stride = strides[0];
     if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
     auto int32Type = rewriter.getI32Type();
@@ -339,12 +362,12 @@ void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
 /// Convert subgroup level vector contract to SPIR-V cooperative
 /// matrix matmuladd.
 class VectorContractToCoopMatmul final
-    : public SPIRVOpLowering<vector::ContractionOp> {
+    : public CoopMatOpLowering<vector::ContractionOp> {
  public:
   VectorContractToCoopMatmul(
       MLIRContext *context, SPIRVTypeConverter &converter,
       const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
-      : SPIRVOpLowering<vector::ContractionOp>(context, converter),
+      : CoopMatOpLowering<vector::ContractionOp>(context, converter),
         cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
 
   LogicalResult matchAndRewrite(
@@ -444,8 +467,8 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
   spirv::GlobalVariableOp varOp = insertResourceVariable(
       phOp.getLoc(), convertedType,
       reinterpret_cast<uint64_t>(phOp.getOperation()), bindingOp.set(),
-      bindingOp.binding(), aliasedResources.contains(phOp),
-      *moduleOp.getBody());
+      bindingOp.binding(), aliasedResources.contains(phOp), *moduleOp.getBody(),
+      rewriter);
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();
@@ -488,7 +511,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto aliasedResources = getAliasedResources(moduleOp);
   patterns.insert<IREEPlaceholderConverter>(typeConverter, context,
                                             std::move(aliasedResources));
-  patterns.insert<LinalgReshapeConverter>(context, typeConverter);
+  patterns.insert<LinalgReshapeConverter>(typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);

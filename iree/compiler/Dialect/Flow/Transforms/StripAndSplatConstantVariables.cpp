@@ -73,7 +73,7 @@ class StripAndSplatConstantVariablesPass
       auto newOp = builder.create<VariableOp>(
           op.getLoc(), op.sym_name(), op.is_mutable(), op.type(), newValue);
       newOp.setVisibility(op.getVisibility());
-      newOp.setAttr("noinline", UnitAttr::get(builder.getContext()));
+      newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
       op.erase();
 
       replaceIndex++;

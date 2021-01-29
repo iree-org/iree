@@ -244,27 +244,6 @@ function(iree_add_data_dependencies)
 endfunction()
 
 #-------------------------------------------------------------------------------
-# Executable dependencies
-#-------------------------------------------------------------------------------
-
-# iree_add_executable_dependencies
-#
-# Adds dependency on a target in a cross-compilation-aware way. This should
-# be used for depending on targets that are used as part of the build, such
-# as for generating files used for later build steps.
-#
-# Parameters:
-# EXECUTABLE: the executable to take on dependencies
-# DEPENDENCY: additional dependencies to append to target
-function(iree_add_executable_dependencies EXECUTABLE DEPENDENCY)
-  if(CMAKE_CROSSCOMPILING)
-    add_dependencies(${EXECUTABLE} iree_host_${DEPENDENCY})
-  else()
-    add_dependencies(${EXECUTABLE} ${DEPENDENCY})
-  endif()
-endfunction()
-
-#-------------------------------------------------------------------------------
 # Tool symlinks
 #-------------------------------------------------------------------------------
 
@@ -327,10 +306,10 @@ function(iree_add_test_environment_properties TEST_NAME)
   #
   # Tests which only depend on a compiler target backend or a runtime HAL
   # driver, but not both, should generally use a different method of filtering.
-  if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
   endif()
-  if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR NOT ${IREE_HAL_DRIVER_DYLIB})
+  if(NOT "${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}" OR NOT "${IREE_HAL_DRIVER_DYLIB}")
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMAOT_DISABLE=1")
   endif()
 endfunction()

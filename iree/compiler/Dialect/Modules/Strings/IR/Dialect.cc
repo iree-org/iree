@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
 
-#include "iree/compiler/Dialect/Modules/Strings/Conversion/StringsToVM.h"
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/Modules/Strings/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 #include "iree/compiler/Dialect/Modules/Strings/strings.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
@@ -50,11 +52,24 @@ class StringsToVMConversionInterface : public VMConversionDialectInterface {
   }
 };
 
+class StringsToHALConversionInterface : public HALConversionDialectInterface {
+ public:
+  using HALConversionDialectInterface::HALConversionDialectInterface;
+
+  void setupConversionTarget(ConversionTarget &target,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter) const override {
+    populateStringsToHALPatterns(getDialect()->getContext(), patterns,
+                                 typeConverter);
+  };
+};
+
 }  // namespace
 
 StringsDialect::StringsDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<StringsDialect>()) {
   addInterfaces<StringsToVMConversionInterface>();
+  addInterfaces<StringsToHALConversionInterface>();
 
   addTypes<StringType, StringTensorType>();
 

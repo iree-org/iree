@@ -17,10 +17,10 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

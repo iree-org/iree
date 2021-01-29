@@ -16,6 +16,23 @@
 set -e
 set -o pipefail
 
+EXPLICIT_PATH=""
+
+# First argument is the src file. Remaining arguments are tools that should
+# be on the path.
+src_file="$1"
+shift
+for tool_exe in "$@"
+do
+  EXEDIR="$(dirname $tool_exe)"
+  if ! [ -z "$cygpath" ]; then
+    EXEDIR="$($cygpath -u "$EXEDIR")"
+  fi
+  EXPLICIT_PATH="${EXEDIR}:${EXPLICIT_PATH}"
+done
+
+#### TODO: Remove all of this implicit path/runfiles stuff. The CMake rules
+#### pass explicit tools on the command line.
 if [ -z "${RUNFILES_DIR}" ]; then
   if [ -f "CMakeCache.txt" ]; then
     # If running under CMake/CTest in the build directory, just scope to the
@@ -56,21 +73,23 @@ function find_executables() {
 # it generically. run_lit expects that anything passed in the runfiles
 # can be found on the path for execution. So we just iterate over the
 # entries in the MANIFEST and extend the PATH.
-SUBPATH=""
 for runfile_path in $(find_executables "${RUNFILES_DIR}"); do
   # Prepend so that local things override.
   EXEDIR="$(dirname ${runfile_path})"
   if ! [ -z "$cygpath" ]; then
     EXEDIR="$($cygpath -u "$EXEDIR")"
   fi
-  SUBPATH="${EXEDIR}:$SUBPATH"
+  IMPLICIT_PATH="${EXEDIR}:$IMPLICIT_PATH"
 done
+#### END OF DEPRECATED IMPLICIT PATH DISCOVERY
 
-echo "run_lit.sh: $1"
+echo "run_lit.sh: $src_file"
 echo "PWD=$(pwd)"
+echo "EXPLICIT_PATH=$EXPLICIT_PATH"
+echo "IMPLICIT_PATH=$IMPLICIT_PATH"
 
 # For each "// RUN:" line, run the command.
-runline_matches="$(egrep "^// RUN: " "$1")"
+runline_matches="$(egrep "^// RUN: " "$src_file")"
 if [ -z "$runline_matches" ]; then
   echo "!!! No RUN lines found in test"
   exit 1
@@ -87,10 +106,10 @@ do
   fi
 
   # Substitute any embedded '%s' with the file name.
-  full_command="${command//\%s/$1}"
+  full_command="${command//\%s/$src_file}"
 
   # Run it.
-  export PATH="$SUBPATH:$PATH"
+  export PATH="$EXPLICIT_PATH:$IMPLICIT_PATH:$PATH"
   echo "RUNNING TEST: $full_command"
   echo "----------------"
   if eval "$full_command"; then

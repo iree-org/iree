@@ -16,7 +16,7 @@
 
 #include <vector>
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -63,7 +63,7 @@ DenseIntElementsAttr FlatbufferBuilder::getBufferAttr(MLIRContext *context) {
   // to unique and would let us get a mutable buffer out.
   return DenseIntElementsAttr::get(
       VectorType::get({static_cast<int64_t>(bufferData.size())},
-                      IntegerType::get(8, context)),
+                      IntegerType::get(context, 8)),
       std::move(bufferData));
 }
 

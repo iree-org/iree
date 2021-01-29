@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/rt/host_types.h"
+#include "pyiree/rt/host_types.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
-#include "bindings/python/pyiree/common/status_utils.h"
-#include "bindings/python/pyiree/rt/hal.h"
 #include "iree/base/signature_mangle.h"
 #include "pybind11/numpy.h"
+#include "pyiree/rt/hal.h"
+#include "pyiree/rt/status_utils.h"
 
 namespace iree {
 namespace python {
@@ -119,15 +119,14 @@ class PyMappedMemory {
     }
   };
 
-  PyMappedMemory(Description desc, iree_hal_mapped_memory_t mapped_memory,
+  PyMappedMemory(Description desc, iree_hal_buffer_mapping_t mapped_memory,
                  HalBuffer buffer)
       : desc_(std::move(desc)),
         mapped_memory_(mapped_memory),
         buf_(std::move(buffer)) {}
   ~PyMappedMemory() {
     if (buf_) {
-      CheckApiStatus(iree_hal_buffer_unmap(buf_.raw_ptr(), &mapped_memory_),
-                     "Error unmapping memory");
+      iree_hal_buffer_unmap_range(&mapped_memory_);
     }
   }
   PyMappedMemory(PyMappedMemory&& other)
@@ -139,8 +138,8 @@ class PyMappedMemory {
                                               HalBuffer buffer) {
     iree_device_size_t byte_length =
         iree_hal_buffer_byte_length(buffer.raw_ptr());
-    iree_hal_mapped_memory_t mapped_memory;
-    CheckApiStatus(iree_hal_buffer_map(
+    iree_hal_buffer_mapping_t mapped_memory;
+    CheckApiStatus(iree_hal_buffer_map_range(
                        buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
                        0 /* element_offset */, byte_length, &mapped_memory),
                    "Could not map memory");
@@ -160,7 +159,7 @@ class PyMappedMemory {
 
  private:
   Description desc_;
-  iree_hal_mapped_memory_t mapped_memory_;
+  iree_hal_buffer_mapping_t mapped_memory_;
   HalBuffer buf_;
 };
 

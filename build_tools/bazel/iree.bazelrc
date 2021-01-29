@@ -42,10 +42,6 @@ build --enable_runfiles
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
 
-# TensorFlow always sets these in OSS which makes it impossible to build TF
-# without them...
-build --define open_source_build=true
-
 ###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
@@ -87,12 +83,13 @@ build:generic_clang --per_file_copt=external/.*@-w
 # Would need to then make all the --copt below duplicated with --host_copt.
 build:generic_clang --host_copt=-w
 
-# LINT.IfChange(clang_diagnostics)
 # Set clang diagnostics. These largely match the set of warnings used within
 # Google. They have not been audited super carefully by the IREE team but are
 # generally thought to be a good set and consistency with those used internally
 # is very useful when importing. If you feel that some of these should be
 # different, please raise an issue!
+
+# Please keep these in sync with build_tools/cmake/iree_copts.cmake
 
 build:generic_clang --copt=-Wall
 
@@ -145,35 +142,71 @@ build:generic_clang --copt=-Wtautological-overlap-compare
 build:generic_clang --copt=-Wthread-safety
 build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
-build:generic_clang --copt=-Wno-unused-variable
 build:generic_clang --copt=-Wvla
-# LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/cmake/iree_copts.cmake:clang_diagnostics)
+
+###############################################################################
+# Additional options for MacOS based clang builds.
+# Try to keep these scoped to exclusions for third_party code and prefer
+# fixing issues local to the project.
+###############################################################################
+
+build:macos_clang --config=generic_clang
+build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
+build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-range-loop-analysis
 
 ###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################
 
-# Turn on asan. Some toolchains make use of the asan feature and we'll directly
-# set the appropriate opts.
+# ASAN (address sanitizer)
+# https://clang.llvm.org/docs/AddressSanitizer.html
+build:asan --config=sanitizer
 build:asan --features=asan
 build:asan --copt=-fsanitize=address
+build:asan --copt=-fsanitize-address-use-after-scope
 build:asan --linkopt=-fsanitize=address
+build:asan --cc_output_directory_tag=asan
+build:asan --copt=-DADDRESS_SANITIZER
+
+# MSAN (memory sanitizer)
+# https://clang.llvm.org/docs/MemorySanitizer.html
+build:msan --config=sanitizer
+build:msan --features=msan
+build:msan --copt=-fsanitize=memory
+build:msan --copt=-fsanitize-memory-track-origins
+build:msan --linkopt=-fsanitize=memory
+build:msan --cc_output_directory_tag=msan
+build:msan --copt=-DMEMORY_SANITIZER
+
+# TSAN (thread sanitizer)
+# https://clang.llvm.org/docs/ThreadSanitizer.html
+build:tsan --config=sanitizer
+build:tsan --features=tsan
+build:tsan --copt=-fsanitize=thread
+build:tsan --linkopt=-fsanitize=thread
+build:tsan --cc_output_directory_tag=tsan
+build:tsan --copt=-DTHREAD_SANITIZER
+
+# UBSAN (undefined behavior sanitizer)
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+build:ubsan --config=sanitizer
+build:ubsan --features=ubsan
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --linkopt=-fsanitize=undefined
+build:ubsan --linkopt=-lubsan
+build:ubsan --cc_output_directory_tag=ubsan
 
 # Don't strip debug info
-build:asan --strip=never
+build:sanitizer --strip=never
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
 # We don't use this in IREE (that's what linkstatic is for), but it could show
 # up in dependencies.
-build:asan --force_ignore_dash_static
-# asan tests tend to take longer, so increase the timeouts
-build:asan --test_timeout=120,600,1800,-1
-# Make the outputs easy to find
-build:asan --cc_output_directory_tag=asan
+build:sanitizer --force_ignore_dash_static
+# sanitizer tests tend to take longer, so increase the timeouts
+build:sanitizer --test_timeout=120,600,1800,-1
 # Get better stack traces
-build:asan --copt=-fno-omit-frame-pointer
-# This macro define is used by absl
-build:asan --copt=-DADDRESS_SANITIZER
+build:sanitizer --copt=-fno-omit-frame-pointer
 
 ###############################################################################
 # Architecture specific options
@@ -341,4 +374,9 @@ build:msvc2019 --per_file_copt=tensorflow@/Zc:preprocessor
 build:msvc --config=msvc2019
 build:windows --config=msvc
 
+###############################################################################
+# disable metal stuff for non Darwin platforms
+###############################################################################
+common:non_darwin --deleted_packages=//iree/hal/metal,//iree/hal/metal/registration
+build:non_darwin --test_tag_filters="-driver=metal"
 ###############################################################################

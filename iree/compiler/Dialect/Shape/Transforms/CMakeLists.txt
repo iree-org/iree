@@ -36,6 +36,7 @@ iree_cc_library(
     MLIRPass
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Plugins::VMLA::VMLAShapeBuilder

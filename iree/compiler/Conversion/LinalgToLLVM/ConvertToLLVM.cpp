@@ -29,6 +29,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -144,10 +145,10 @@ class ConvertWorkgroupInfoOpPattern : public ConvertToLLVMPattern {
       ConversionPatternRewriter &rewriter) const override {
     auto newFuncOp = cast<LLVM::LLVMFuncOp>(rewriter.getBlock()->getParentOp());
     auto xyzTy =
-        LLVM::LLVMType::getInt32Ty(rewriter.getContext()).getPointerTo();
+        LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 32));
     auto xyzArgument = newFuncOp.getArgument(ArgIndex);
     auto dimIndex = rewriter.createOrFold<LLVM::ConstantOp>(
-        op->getLoc(), LLVM::LLVMType::getInt64Ty(rewriter.getContext()),
+        op->getLoc(), IntegerType::get(rewriter.getContext(), 64),
         op->getAttrOfType<IntegerAttr>("dimension"));
     auto dimPtr = rewriter.createOrFold<LLVM::GEPOp>(
         op->getLoc(), xyzTy, xyzArgument, ValueRange{dimIndex});
@@ -170,7 +171,7 @@ bool operator<(IREE::HAL::InterfaceBindingOp aOp,
 
 // Change signature of entry function to func
 // clang-format off
-// entry_func(%packed_buffers_arg_ptr: !<llvm.int8**>, thread_idx: !llvm.i32, thread_idy: !llvm.i32, thread_idz: !llvm.i32) and lower IREE and HAL ops to
+// entry_func(%packed_buffers_arg_ptr: !<llvm.int8**>, thread_idx: i32, thread_idy: i32, thread_idz: i32) and lower IREE and HAL ops to
 // corresponding LLVMIR ops to construct memref descriptors and load
 // push_constant values.
 // clang-format on
@@ -212,7 +213,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     llvm::DenseMap<Operation *, IREE::HAL::InterfaceBindingOp> bufferBindingMap;
     for (auto bufferOp : bufferOps) {
       auto symbol = SymbolTable::lookupNearestSymbolFrom(
-          bufferOp, bufferOp.getAttrOfType<SymbolRefAttr>("binding"));
+          bufferOp, bufferOp->getAttrOfType<SymbolRefAttr>("binding"));
       bufferBindingMap[bufferOp] = cast<IREE::HAL::InterfaceBindingOp>(symbol);
     }
 
@@ -227,7 +228,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // A map from binding ops to their corresponding function argument indices.
     llvm::DenseMap<Operation *, unsigned> bindingArgMap;
     llvm::SmallVector<MemRefType, 4> inputMemRefTypes;
-    llvm::SmallVector<LLVM::LLVMType, 4> inputStructPtrs;
+    llvm::SmallVector<Type, 4> inputStructPtrs;
     unsigned argIndex = 0;
     for (auto bufferOp : bufferOps) {
       auto binding = bufferBindingMap[bufferOp];
@@ -242,22 +243,24 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
 
       auto memrefType = bufferOp.getType().dyn_cast_or_null<MemRefType>();
       inputMemRefTypes.push_back(memrefType);
-      auto elementType = typeConverter->convertType(memrefType.getElementType())
-                             .dyn_cast<LLVM::LLVMType>();
-      if (!elementType) return failure();
+      auto elementType =
+          typeConverter->convertType(memrefType.getElementType());
+      if (!elementType || !LLVM::isCompatibleType(elementType))
+        return failure();
       inputStructPtrs.push_back(
-          elementType.getPointerTo(memrefType.getMemorySpace()));
+          LLVM::LLVMPointerType::get(elementType, memrefType.getMemorySpace()));
     }
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     // clang-format off
-    // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i32*>, thread_idx: i32, thread_idy, thread_idz: i32)
+    // func foo(%packed_buffer_args: i8**>, %push_constant: i32*>, thread_idx: i32, thread_idy, thread_idz: i32)
     // clang-format on
     MLIRContext *context = rewriter.getContext();
-    auto packedBuffersArgsTy =
-        LLVM::LLVMType::getInt8PtrTy(context).getPointerTo();
-    auto pushConstantArgTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
-    auto xyzTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
+    auto packedBuffersArgsTy = LLVM::LLVMPointerType::get(
+        LLVM::LLVMPointerType::get(IntegerType::get(context, 8)));
+    auto pushConstantArgTy =
+        LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
+    auto xyzTy = LLVM::LLVMPointerType::get(IntegerType::get(context, 32));
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
     signatureConverter.addInputs(xyzTy);  // workgroup_id
@@ -287,14 +290,15 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                 newFuncOp.end());
     rewriter.applySignatureConversion(&newFuncOp.getBody(), signatureConverter);
 
-    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()),
+                                           rewriter.getListener());
 
     // Cast and unpack input packed_buffer_arguments and construct memref
     // descriptors.
     Value packedBuffersArgsPtr = builder.create<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMType::getStructTy(builder.getContext(), inputStructPtrs)
-            .getPointerTo(),
+        LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getLiteral(
+            builder.getContext(), inputStructPtrs)),
         newFuncOp.getArgument(0));
     Value packedBuffersArgs =
         builder.create<LLVM::LoadOp>(loc, packedBuffersArgsPtr);
@@ -321,7 +325,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Lower hal.interface.load.constant ops into llvm.getelementptr, llvm.load
     for (auto loadOp : loadOps) {
       Value offset = builder.create<LLVM::ConstantOp>(
-          loc, LLVM::LLVMType::getInt64Ty(context),
+          loc, IntegerType::get(context, 64),
           builder.getI64IntegerAttr(loadOp.offset().getZExtValue()));
       Value constPtr = builder.create<LLVM::GEPOp>(loc, pushConstantArgTy,
                                                    newFuncOp.getArgument(1),
@@ -390,8 +394,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToSCFConversionPatterns(patterns, &getContext());
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
-  populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
-
+  populateLinalgToLLVMConversionPatterns(converter, patterns);
   // The following patterns resolves dynamic shapes by substituting tie_shape
   // ops with an updated memref descriptors and replacing RankDimOp with
   // actual index loaded from memref<?xi32> that holds all dynamic shapes push
@@ -438,8 +441,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
 static PassRegistration<ConvertToLLVMPass> pass(
     "iree-codegen-convert-to-llvm",
     "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to "
-    "LLVMIR "
-    "dialect",
+    "LLVMIR dialect",
     [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler

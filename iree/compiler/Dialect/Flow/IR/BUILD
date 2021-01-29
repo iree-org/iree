@@ -52,8 +52,10 @@ cc_library(
         ":FlowOpInterfaceGen",
         ":FlowOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
@@ -72,7 +74,9 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
 
@@ -87,6 +91,8 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Shape/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -102,9 +108,10 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
 
@@ -118,8 +125,9 @@ iree_tablegen_doc(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )

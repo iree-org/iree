@@ -92,12 +92,14 @@ set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG
-    # LINT.IfChange(clang_diagnostics)
     # Set clang diagnostics. These largely match the set of warnings used within
     # Google. They have not been audited super carefully by the IREE team but
     # are generally thought to be a good set and consistency with those used
     # internally is very useful when importing. If you feel that some of these
     # should be different, please raise an issue!
+
+    # Please keep these in sync with build_tools/bazel/iree.bazelrc
+
     "-Wall"
 
     # Disable warnings we don't care about or that generally have a low
@@ -150,7 +152,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wthread-safety-beta"
     "-Wunused-comparison"
     "-Wvla"
-    # LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/bazel/iree.bazelrc:clang_diagnostics)
 
     # Turn off some additional warnings (CMake only)
     "-Wno-strict-prototypes"
@@ -165,6 +166,11 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-variable"
     "-Wno-undef"
     "-fvisibility=hidden"
+    # NOTE: The RTTI setting must match what LLVM was compiled with (defaults
+    # to RTTI disabled).
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
+    "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
+
   MSVC_OR_CLANG_CL
     # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
     # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
@@ -202,17 +208,11 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/c-runtime-library/secure-template-overloads
     "/D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES"
 
-    # Configure exception handling for standard C++ behavior.
-    # - /EHs enables C++ catch-style exceptions
-    # - /EHc breaks unwinding across extern C boundaries, dramatically reducing
-    #   unwind table size and associated exception handling overhead as the
-    #   compiler can assume no exception will ever be thrown within any function
-    #   annotated with extern "C".
-    # https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model
-    #
-    # TODO(benvanik): figure out if we need /EHs - we don't use exceptions in
-    # the runtime and I'm pretty sure LLVM doesn't use them either.
-    "/EHsc"
+    # Configure RTTI generation.
+    # - /GR - Enable generation of RTTI (default)
+    # - /GR- - Disables generation of RTTI
+    # https://docs.microsoft.com/en-us/cpp/build/reference/gr-enable-run-time-type-information?view=msvc-160
+    "/GR-"
 
     # Default max section count is 64k, which is woefully inadequate for some of
     # the insanely bloated tablegen outputs LLVM/MLIR produces. This cranks it
@@ -368,24 +368,6 @@ set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
-# Third party: flatbuffers
-#-------------------------------------------------------------------------------
-
-set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INCLUDE_DIRS
-  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
-)
-
-if(CMAKE_CROSSCOMPILING)
-  set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "" FORCE)
-else()
-  set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
-endif()
-
-#-------------------------------------------------------------------------------
 # Third party: flatcc
 #-------------------------------------------------------------------------------
 
@@ -416,7 +398,6 @@ set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
 set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_RTTI ON CACHE BOOL "" FORCE)
 
 # TODO(ataei): Use optional build time targets selection for LLVMAOT.
 set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV" CACHE STRING "" FORCE)

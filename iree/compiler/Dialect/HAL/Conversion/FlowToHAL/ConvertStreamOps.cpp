@@ -408,7 +408,9 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.device = device;
   dispatchState.commandBuffer = commandBuffer;
   dispatchState.executableLayout = executableLayout;
-  dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
+  for (auto dim : dispatchOp.workgroup_count()) {
+    dispatchState.workgroupCount.push_back(rewriter.getRemappedValue(dim));
+  }
   // TODO(benvanik): support extended push constants.
   dispatchState.basePushConstantOffset = 0;
   dispatchState.operands = operandAdaptors;

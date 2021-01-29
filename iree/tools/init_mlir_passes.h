@@ -28,8 +28,9 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Quant/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Tosa/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -80,6 +81,9 @@ inline void registerMlirPasses() {
   registerConvertStandardToSPIRVPass();
   registerLegalizeStandardForSPIRVPass();
   registerConvertLinalgToSPIRVPass();
+
+  // TOSA.
+  registerTosaToLinalgOnTensorsPass();
 }
 
 }  // namespace mlir

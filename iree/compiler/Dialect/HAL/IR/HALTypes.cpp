@@ -57,7 +57,7 @@ static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
   return success();
 }
 
-// LINT.IfChange(element_type)
+// Keep these in sync with iree/hal/api.h
 namespace {
 enum class NumericalType : uint32_t {
   kUnknown = 0x00,
@@ -90,12 +90,11 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   }
   return llvm::None;
 }
-// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/hal/api.h:element_type)
 
 IntegerAttr getElementTypeAttr(Type type) {
   auto elementType = getElementTypeValue(type);
   if (!elementType) return {};
-  return IntegerAttr::get(IntegerType::get(32, type.getContext()),
+  return IntegerAttr::get(IntegerType::get(type.getContext(), 32),
                           elementType.getValue());
 }
 

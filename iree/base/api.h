@@ -206,7 +206,7 @@ typedef size_t iree_host_size_t;
 // Size, in bytes, of a buffer on devices.
 typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
-#define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
+#define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
 // TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
 // TODO(benvanik): see if we can shove in static_asserts somehow?
@@ -231,6 +231,11 @@ static inline iree_host_size_t iree_math_align(iree_host_size_t value,
 
 #define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
 #define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
+
+// Returns true if any bit from |rhs| is set in |lhs|.
+#define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
+// Returns true iff all bits from |rhs| are set in |lhs|.
+#define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
@@ -294,6 +299,9 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
+#define iree_string_view_literal(str) \
+  { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
+
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool IREE_API_CALL
 iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
@@ -344,6 +352,13 @@ IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern);
 
+// Copies the string bytes into the target buffer and returns the number of
+// characters copied. Does not include a NUL terminator.
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+iree_string_view_append_to_buffer(iree_string_view_t source_value,
+                                  iree_string_view_t* target_value,
+                                  char* buffer);
+
 //===----------------------------------------------------------------------===//
 // IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
 //===----------------------------------------------------------------------===//
@@ -367,7 +382,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
 #if !defined(IREE_STATUS_MODE)
 #ifdef NDEBUG
 // Release mode: just source location.
-#define IREE_STATUS_MODE 1
+#define IREE_STATUS_MODE 2
 #else
 // Debug mode: annotations and stack traces.
 #define IREE_STATUS_MODE 3
@@ -436,7 +451,7 @@ typedef enum {
 // meaning `return iree_status_from_code(IREE_STATUS_INTERNAL);` (etc) is valid,
 // though not as useful as constructing via iree_make_status (which captures
 // additional info).
-typedef void* iree_status_t;
+typedef struct iree_status_handle_t* iree_status_t;
 
 // Returns an iree_status_t from the an iree_status_code_t.
 #define iree_status_from_code(code)                          \
@@ -801,6 +816,16 @@ typedef enum {
   IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
 } iree_allocation_mode_t;
 
+// TODO(benvanik): replace with a single method with the mode setting. This will
+// reduce the overhead to just two pointers per allocator (from 3) and allow us
+// to add more distinct behavior in the future. If we really wanted to stretch
+// we could turn it into a pointer and require the allocator live somewhere
+// (possibly in .text as a const static), but two pointers seems fine.
+typedef iree_status_t(IREE_API_PTR* iree_allocator_alloc_fn_t)(
+    void* self, iree_allocation_mode_t mode, iree_host_size_t byte_length,
+    void** out_ptr);
+typedef void(IREE_API_PTR* iree_allocator_free_fn_t)(void* self, void* ptr);
+
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
 // Pass the iree_allocator_system() macro to use the system allocator.
@@ -811,11 +836,9 @@ typedef struct {
   // Systems should align to 16 byte boundaries (or otherwise their natural
   // SIMD alignment). The runtime pools internally and small allocations
   // (usually) won't be made through this interface.
-  iree_status_t(IREE_API_PTR* alloc)(void* self, iree_allocation_mode_t mode,
-                                     iree_host_size_t byte_length,
-                                     void** out_ptr);
+  iree_allocator_alloc_fn_t alloc;
   // Frees |ptr| from a previous alloc call.
-  void(IREE_API_PTR* free)(void* self, void* ptr);
+  iree_allocator_free_fn_t free;
 } iree_allocator_t;
 
 // Allocates a block of |byte_length| bytes from the given allocator.
@@ -827,6 +850,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
 // If the reallocation fails then the original |out_ptr| is unmodified.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Duplicates the given byte block by allocating memory and copying it in.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_clone(iree_allocator_t allocator,
+                     iree_const_byte_span_t source_bytes, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
 IREE_API_EXPORT void IREE_API_CALL

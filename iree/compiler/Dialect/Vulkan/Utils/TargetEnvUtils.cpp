@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
-#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/IR/Builders.h"
 
 namespace mlir {

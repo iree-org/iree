@@ -84,11 +84,9 @@ Operation* ShapeDialect::materializeConstant(OpBuilder& builder,
   if (auto typeAttr = value.dyn_cast<TypeAttr>()) {
     auto rankedShape = typeAttr.getValue().cast<Shape::RankedShapeType>();
     return builder.create<Shape::ConstRankedShapeOp>(loc, rankedShape);
-  } else if (type.isa<IndexType>()) {
-    // Some folders materialize raw index types, which just become std
-    // constants.
-    return builder.create<ConstantOp>(loc, type, value);
   }
+  if (ConstantOp::isBuildableWith(value, type))
+    return builder.create<ConstantOp>(loc, type, value);
   return nullptr;
 }
 

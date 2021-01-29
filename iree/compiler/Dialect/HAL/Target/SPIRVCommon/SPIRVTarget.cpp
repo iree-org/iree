@@ -19,8 +19,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -58,7 +57,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
   // Attach SPIR-V target environment to the target's ModuleOp.
   // If we had multiple target environments we would generate one target op
   // per environment, with each setting its own environment attribute.
-  innerModuleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+  innerModuleOp->setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
 }
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
@@ -69,6 +68,15 @@ void SPIRVTargetBackend::buildTranslationPassPipeline(
 LogicalResult SPIRVTargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
     DeviceSwitchRewriter &switchRewriter) {
+  // TODO(#4140): remove this legacy path when linalg-on-tensors is used.
+  // In the linalg-on-tensors world where we are performing the tiling logic
+  // in the flow dialect we don't even really need the ability to override
+  // dispatch recording at all - just a way to allow targets to map workgroup
+  // counts from the N-dimensional flow workgroup counts to the 3D hal counts.
+  if (dispatchState.workgroupCount.size() == 3) {
+    return TargetBackend::recordDispatch(loc, dispatchState, switchRewriter);
+  }
+
   // Multiple entry points might be generated for a single dispatch function.
   // Under such circumstances, we will have a special attribute indicating the
   // schedule of the split entry points. Try to see if we can find such
@@ -84,7 +92,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
       assert(llvm::hasSingleElement(spvModuleOps));
       spvModuleOp = *spvModuleOps.begin();
-      entryPointScheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+      entryPointScheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
           iree_compiler::getEntryPointScheduleAttrName());
       break;
     }
@@ -119,7 +127,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
-          dispatchState.workload,
+          dispatchState.workgroupCount[0],
           dispatchState.commandBuffer,
       });
 
@@ -136,7 +144,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     spirv::FuncOp spvFuncOp = it.value();
 
     FlatSymbolRefAttr numWorkgroupsFnAttr =
-        spvFuncOp.getAttrOfType<FlatSymbolRefAttr>(
+        spvFuncOp->template getAttrOfType<FlatSymbolRefAttr>(
             getNumWorkgroupsFnAttrName());
     if (!numWorkgroupsFnAttr) {
       return spvFuncOp.emitError(
@@ -189,7 +197,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
 // query independently so that we don't need to lookup the value here.
 std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
     OpBuilder &builder) {
   // TODO(ravishankarm): possibly emit different recordDispatch logic if the
   // workgroup sizes differ among targets.
@@ -199,7 +207,7 @@ std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     if (matchPattern(executableTargetOp.target_backend_filter(),
                      filter_pattern())) {
       ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
-      assert(!innerModuleOp.getAttr(
+      assert(!innerModuleOp->getAttr(
           iree_compiler::getEntryPointScheduleAttrName()));
       auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
       assert(llvm::hasSingleElement(spvModuleOps));
@@ -213,7 +221,7 @@ std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
 
 std::array<Value, 3> SPIRVTargetBackend::calculateDispatchWorkgroupSize(
     Location loc, spirv::ModuleOp spvModuleOp, StringRef entryPointName,
-    Value workload, OpBuilder &builder) {
+    ValueRange workload, OpBuilder &builder) {
   std::array<Value, 3> workgroupSize;
   for (auto executionModeOp :
        spvModuleOp.getBlock().getOps<spirv::ExecutionModeOp>()) {

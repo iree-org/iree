@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -50,7 +51,7 @@ class CreateBenchmarkFuncs
         auto funcType =
             builder.getFunctionType({}, execFuncOp.getType().getResults());
         auto funcOp = builder.create<FuncOp>(loc, funcName, funcType);
-        funcOp.setAttr("iree.module.export", UnitAttr::get(&getContext()));
+        funcOp->setAttr("iree.module.export", UnitAttr::get(&getContext()));
         Block* block = funcOp.addEntryBlock();
 
         // Build the body of the FuncOp.
@@ -67,7 +68,8 @@ class CreateBenchmarkFuncs
         // calculate the workload from the results.
         auto dummyWorkload = blockBuilder.create<ConstantIndexOp>(loc, 0);
         auto dispatchOp = blockBuilder.create<DispatchOp>(
-            loc, dispatchEntryOp, dummyWorkload, funcType.getResults(), args);
+            loc, dispatchEntryOp, ValueRange{dummyWorkload},
+            funcType.getResults(), args);
         blockBuilder.create<mlir::ReturnOp>(loc, dispatchOp.getResults());
       }
     }
@@ -76,7 +78,7 @@ class CreateBenchmarkFuncs
     // clone the region. The CallOp is materialized in an earlier stage. We
     // don't expect to see it at flow level.
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-      if (!funcOp.getAttr("iree.module.export")) {
+      if (!funcOp->getAttr("iree.module.export")) {
         continue;
       }
       if (funcOp.getNumArguments() == 0) {
@@ -112,7 +114,7 @@ class CreateBenchmarkFuncs
           llvm::seq<unsigned>(0, clonedFuncOp.getNumArguments())));
       BlockAndValueMapping mapping;
       clonedFuncOp.cloneInto(newFuncOp, mapping);
-      newFuncOp.setAttr("iree.module.export", builder.getUnitAttr());
+      newFuncOp->setAttr("iree.module.export", builder.getUnitAttr());
       funcOp.removeAttr("iree.module.export");
     }
   }
@@ -128,7 +130,7 @@ class CreateBenchmarkFuncs
         moduleBuilder.create<VariableOp>(loc, name,
                                          /*isMutable=*/false, inputType, attr);
     variableOp.setPrivate();
-    variableOp.setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
+    variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
     auto lookupOp = blockBuilder.create<IREE::Flow::VariableLoadOp>(
         loc, inputType, variableOp.getName());
     return lookupOp.getResult();

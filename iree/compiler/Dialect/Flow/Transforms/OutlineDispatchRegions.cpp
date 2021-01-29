@@ -24,8 +24,8 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -78,7 +78,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
 
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), entryPointOp, regionOp.workload(),
+      regionOp.getLoc(), entryPointOp, ValueRange{regionOp.workload()},
       outlinedFuncOp.getType().getResults(), newArgs);
 
   if (traceDispatchTensors) {
@@ -120,7 +120,7 @@ FuncOp createRegionFunction(Location loc, StringRef functionName,
 
   // Clone region into the function body.
   auto functionType =
-      FunctionType::get(operandTypes, resultTypes, region.getContext());
+      FunctionType::get(region.getContext(), operandTypes, resultTypes);
   auto funcOp = FuncOp::create(loc, functionName, functionType);
   BlockAndValueMapping mapping;
   region.cloneInto(&funcOp.getBody(), mapping);
@@ -189,7 +189,9 @@ LogicalResult outlineDispatchRegion(
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
       regionOp.getLoc(), builder.getStringAttr(dispatchFuncOp.getName()),
-      builder.getSymbolRefAttr(dispatchFuncOp), IntegerAttr{});
+      builder.getSymbolRefAttr(dispatchFuncOp),
+      TypeAttr::get(dispatchFuncOp.getType()),
+      /*workgroup_rank=*/IntegerAttr{});
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, entryPointOp,

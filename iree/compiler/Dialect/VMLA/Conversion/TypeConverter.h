@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -40,7 +40,7 @@ class VMLATypeConverter : public TypeConverter {
     if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
       int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
       targetElementType =
-          IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+          IntegerType::get(sourceElementType.getContext(), targetByteWidth * 8);
     }
     return RankedTensorType::get(sourceType.getShape(), targetElementType);
   }

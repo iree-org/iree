@@ -543,8 +543,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 // TODO(benvanik): clone buffer op.
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+    DeclareOpInterfaceMethods<OpAsmOpInterface>]> {
   let summary = [{buffer subspan operation}];
   let description = [{
     Returns a reference to a subspan of the buffer.
@@ -2178,6 +2177,34 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   }];
 }
 
+def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
+    MemoryEffects<[MemAlloc]>]> {
+  let summary = [{returns an alias to a subspan of interface binding data}];
+  let description = [{
+    // TODO(benvanik): add description
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$byte_offset,
+    Optional<HAL_DeviceSize>:$byte_length
+  );
+  let results = (outs
+    Res<AnyType, "", [MemAlloc]>:$result
+  );
+
+  let assemblyFormat = [{
+    $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
+    attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
+  }];
+}
+
 def HAL_InterfaceLoadTensorOp : HAL_PureOp<"interface.load.tensor"> {
   let summary = [{loads a tensor from an executable IO binding}];
   let description = [{
@@ -2307,7 +2334,7 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
 
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrRanks() {
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
       return {resultRank, resultRank, resultRank};
     }
@@ -2325,6 +2352,10 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
       }
       return names;
     }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
   }];
 }
 
@@ -2381,7 +2412,7 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
 
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrRanks() {
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned rank = operand().getType().cast<ShapedType>().getRank();
       return {rank, rank, rank};
     }
@@ -2399,6 +2430,10 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
       }
       return names;
     }
+
+    /// Return the number of leading operands before the `offsets`, `sizes` and
+    /// and `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
   }];
 }
 //===----------------------------------------------------------------------===//

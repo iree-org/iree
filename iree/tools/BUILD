@@ -23,7 +23,6 @@ package(
 
 exports_files([
     "run_lit.sh",
-    "sanitizer_suppressions.txt",
 ])
 
 cc_binary(
@@ -45,6 +44,28 @@ cc_binary(
         "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary(
+    name = "iree-check-module",
+    testonly = True,
+    srcs = ["iree-check-module-main.cc"],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:core_headers",
+        "//iree/base:file_io",
+        "//iree/base:flags",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal/drivers",
+        "//iree/modules/check:native_module",
+        "//iree/modules/hal",
+        "//iree/testing:gtest",
+        "//iree/tools/utils:vm_util",
+        "//iree/vm:bytecode_module",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -97,7 +118,7 @@ cc_library(
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
-        "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
@@ -112,10 +133,10 @@ cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SDBM",
         "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:StandardToSPIRVConversions",
+        "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
     ],
@@ -154,13 +175,13 @@ cc_library(
     hdrs = ["init_targets.h"],
     local_defines = [
         "IREE_HAVE_LLVMAOT_TARGET",
-        "IREE_HAVE_LLVMIR_TARGET",
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
+        "IREE_HAVE_METALSPIRV_TARGET",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
-        "//iree/compiler/Dialect/HAL/Target/LLVM/IR:LLVMIR",
+        "//iree/compiler/Dialect/HAL/Target/LLVM",
+        "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],
@@ -184,8 +205,8 @@ cc_library(
     ],
     deps = [
         "@llvm-project//mlir:IR",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:lhlo",
     ],
 )
 
@@ -271,6 +292,7 @@ cc_binary(
     ],
     tags = ["hostonly"],
     deps = [
+        "//build_tools:default_linkopts",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",

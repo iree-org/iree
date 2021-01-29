@@ -15,8 +15,9 @@
 #ifndef IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 #define IREE_HAL_VULKAN_INTERNAL_VK_MEM_ALLOC_H_
 
-// NOTE: ensure our vulkan headers are used (as we define VK_NO_PROTOTYPES).
+// clang-format off: Must be included before all other headers:
 #include "iree/hal/vulkan/vulkan_headers.h"
+// clang-format on
 
 // Force all Vulkan calls to go through an indirect pVulkanFunctions interface.
 // https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/configuration.html

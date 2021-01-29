@@ -13,16 +13,17 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -219,8 +220,8 @@ class LegalizeInputTypesPass
 
       auto newFuncOp =
           cast<FuncOp>(moduleBuilder.cloneWithoutRegions(*oldFuncOp));
-      newFuncOp.setType(FunctionType::get(signature.getConvertedTypes(),
-                                          convertedResults, &getContext()));
+      newFuncOp.setType(FunctionType::get(
+          &getContext(), signature.getConvertedTypes(), convertedResults));
 
       BlockAndValueMapping mapping;
       if (failed(convertRegion(oldFuncOp.getBody(), newFuncOp.getBody(),

@@ -20,11 +20,12 @@ build/
 build-*/
 
 # Bazel artifacts
-/bazel-*
+**/bazel-*
 
 # Local-only config options
 configured.bazelrc
 user.bazelrc
+version_info.json
 
 # Dear ImGui Ini files
 imgui.ini
@@ -43,3 +44,12 @@ compile_commands.json
 
 # Pyenv files
 .python-version
+.venv
+
+# Android Studio / Gradle files
+.cxx
+.gradle
+gradlew
+gradlew.bat
+gradle/
+local.properties

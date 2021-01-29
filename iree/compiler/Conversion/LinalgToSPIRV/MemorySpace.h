@@ -24,7 +24,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MEMORYSPACE_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MEMORYSPACE_H_
 
-#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
+#include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 
 namespace mlir {
 namespace iree_compiler {

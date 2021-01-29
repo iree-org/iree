@@ -84,8 +84,8 @@ class OrdinalAllocationPass
       nextGlobalBytesOrdinal =
           llvm::alignTo(nextGlobalBytesOrdinal, storageSize);
       for (auto &globalOp : sizeGlobalOps.value()) {
-        globalOp.setAttr("ordinal",
-                         builder.getI32IntegerAttr(nextGlobalBytesOrdinal));
+        globalOp->setAttr("ordinal",
+                          builder.getI32IntegerAttr(nextGlobalBytesOrdinal));
         nextGlobalBytesOrdinal += storageSize;
       }
     }

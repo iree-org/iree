@@ -33,7 +33,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Project component configuration
 #-------------------------------------------------------------------------------
 
-# LINT.IfChange(iree_options)
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
@@ -43,8 +42,6 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
-option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
-option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -53,6 +50,11 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+
+# Properties controlling version and naming of release artifacts.
+set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
+set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
+set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
 
 # Master enable for tensorflow build support.
 # Note that this is a normal CMake variable used to gate build features (not
@@ -71,12 +73,19 @@ else()
   option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 endif()
 
-# LINT.ThenChange(
-#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
-#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
-# )
+#-------------------------------------------------------------------------------
+# Experimental project flags
+#-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
+option(IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER "Builds experimental Model-Builder sub-project." OFF)
+option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
+
+#-------------------------------------------------------------------------------
+# Derived flags based on primary options
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -106,25 +115,16 @@ endif()
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
   DyLib
-  LLVM
-  Metal
   VMLA
   Vulkan
 )
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-  # For cross compilation towards Android, we don't want LLVM JIT HAL driver.
-  if(ANDROID)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
-  endif()
 
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
-  else()
-    # And Metal isn't available on non-Apple platforms for sure.
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Metal)
   endif()
 endif()
 message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
@@ -138,13 +138,13 @@ endforeach()
 # Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   DYLIB-LLVM-AOT
-  LLVM-IR
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
@@ -164,6 +164,7 @@ endforeach()
 # Set IREE_TARGET_BACKEND_* based on configuration
 foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
+  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
@@ -172,54 +173,6 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
-
-#-------------------------------------------------------------------------------
-# Cross compiling configuration
-#-------------------------------------------------------------------------------
-
-if(CMAKE_CROSSCOMPILING)
-  message(STATUS "Detected cross compilation mode; configuring IREE on host...")
-
-  # C/C++ compilers for host compilation.
-  # Note: we need to explicitly set this because IREE does not work well with
-  # GCC at the moment: https://github.com/google/iree/issues/1269
-  set(IREE_HOST_C_COMPILER "$ENV{IREE_HOST_C_COMPILER}" CACHE FILEPATH "C compiler for host compilation")
-  set(IREE_HOST_CXX_COMPILER "$ENV{IREE_HOST_CXX_COMPILER}" CACHE FILEPATH "C++ compiler for host compilation")
-
-  # Master configuration for the binary directory containing all artifacts
-  # compiled for host.
-  if(NOT IREE_HOST_BINARY_ROOT)
-    set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host" CACHE FILEPATH "directory containing host artifacts")
-  endif()
-
-  set(IREE_HOST_BUILD_COMPILER ON) # For iree-translate
-  set(IREE_HOST_ENABLE_LLVM ON)    # For iree-tblgen
-
-  # Set the host build directory for LLVM to our directory. Otherwise it will
-  # follow its own convention.
-  set(LLVM_NATIVE_BUILD
-      "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm"
-      CACHE FILEPATH "directory containing host artifacts for LLVM"
-  )
-
-  # And set host C/C++ compiler for LLVM. This makes cross compilation using
-  # Windows as the host platform nicer. Because we have various development
-  # evnironments on Windows (CMD, Cygwin, MSYS, etc.), LLVM can have problems
-  # figuring out the host triple and toolchain. We are passing in the host
-  # C/C++ compiler toolchain for IREE anyway; so we can give LLVM side some
-  # help here. This hides some complexity and ugliness from the users.
-  set(CROSS_TOOLCHAIN_FLAGS_NATIVE
-      "-DCMAKE_C_COMPILER=\"${IREE_HOST_C_COMPILER}\";-DCMAKE_CXX_COMPILER=\"${IREE_HOST_CXX_COMPILER}\""
-      CACHE FILEPATH "LLVM toolchain configuration for host build"
-  )
-
-  include(iree_cross_compile)
-
-  # Use another CMake invocation to configure a build for host.
-  iree_create_configuration(HOST)
-
-  message(STATUS "Done configuring IREE on host in ${IREE_HOST_BINARY_ROOT}")
-endif()
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -254,10 +207,11 @@ include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
-include(iree_multipy)
+include(iree_python)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
+include(iree_run_binary_test)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -322,7 +276,7 @@ function(add_bundled_mlir_dependent_projects)
   endif()
 
   if(${IREE_BUILD_COMPILER})
-    add_subdirectory(third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
+    add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
   endif()
 endfunction()
 
@@ -331,7 +285,7 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
   # experimental model builder uses vulkan runner.
-  if(${IREE_BUILD_EXPERIMENTAL})
+  if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
     set(MLIR_VULKAN_RUNNER_ENABLED ON)
   endif()
 
@@ -427,11 +381,11 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
@@ -439,45 +393,26 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+# ruy must come after cpuinfo so it uses already-defined targets.
+add_subdirectory(third_party/ruy EXCLUDE_FROM_ALL)
 
-if(CMAKE_CROSSCOMPILING)
-  # We need flatc to generate some source code. When cross-compiling, we need
-  # to make sure the flatc binary is configured under host environment.
-  iree_declare_host_excutable(flatc "flatc" BUILDONLY)
-  iree_declare_host_excutable(flatcc_cli "flatcc_cli" BUILDONLY)
-
-  # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
-  # binary in BuildFlatBuffers().
-  iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
-
-  # Add a custom target to copy the flatc to the binary directory.
-  add_custom_target(iree_host_flatcc_cli
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli${IREE_HOST_EXECUTABLE_SUFFIX}"
-    DEPENDS iree_host_build_flatcc_cli
-    COMMENT "Installing host flatcc..."
-  )
-else()
-  # TODO: unify flatc and flatcc handling to the same mechanism.
-  add_executable(iree_host_flatcc_cli ALIAS flatcc_cli)
+# TODO(scotttodd): Iterate some more and find a better place for this.
+if (NOT CMAKE_CROSSCOMPILING)
+  install(TARGETS iree-flatcc-cli
+          COMPONENT iree-flatcc-cli
+          RUNTIME DESTINATION bin)
 endif()
 
 if(${IREE_BUILD_COMPILER})
-  add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
 endif()
 
 if(${IREE_BUILD_TESTS})
-  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
   enable_testing(iree)
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
-  # NOTE: The multipy defaults come from pybind's configuration and must come
-  # after. This should be pulled in locally at some point.
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-  iree_multipy_configure()
 endif()
 
 if(${IREE_TARGET_BACKEND_METAL-SPIRV})
@@ -506,48 +441,48 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
+add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
-
-if(${IREE_ENABLE_MLIR})
-  # The VM requires LLVM to build its op definitions.
-  add_subdirectory(iree/vm)
-endif()
+add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
-elseif(${IREE_ENABLE_MLIR})
-  # If not building the compiler, tablegen is still needed
-  # to generate vm ops so deep include it only.
-  add_subdirectory(iree/compiler/Dialect/IREE/Tools)
-  add_subdirectory(iree/compiler/Dialect/VM/Tools)
-endif()
-
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  add_subdirectory(bindings/python)
-endif()
-
-if(${IREE_BUILD_JAVA_BINDINGS})
-  add_subdirectory(bindings/java)
-  add_subdirectory(bindings/javatests)
 endif()
 
 add_subdirectory(iree/tools)
+
+# Order constraint: The python bindings install tools targets from iree/tools
+# and must come after it.
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(bindings/python)
+endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL})
-  add_subdirectory(experimental)
+if(${IREE_BUILD_EXPERIMENTAL_MODEL_BUILDER})
+  add_subdirectory(experimental/ModelBuilder)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
+  # NOTE: Currently liburing is only used by the experimental remoting
+  # support, so keeping it scoped here. If this broadens, then include along
+  # with other dependencies as normal.
+  if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    message(STATUS "Enabling liburing")
+    add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
+  endif()
+  add_subdirectory(experimental/remoting)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
+  add_subdirectory(experimental/bindings/java)
 endif()
 
 if(${IREE_ENABLE_TENSORFLOW})
   add_subdirectory(integrations/tensorflow)
-endif()
-
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  iree_complete_py_extension_link_options()
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

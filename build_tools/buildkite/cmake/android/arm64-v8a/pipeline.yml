@@ -16,7 +16,7 @@ steps:
   - label: "build"
     commands:
       - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
-      - "tar --exclude='build/host' --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build"
+      - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "build=true"
     env:
@@ -29,8 +29,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"
@@ -44,8 +44,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"
@@ -58,8 +58,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"
@@ -75,8 +75,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"
@@ -90,8 +90,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"
@@ -108,8 +108,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "find build/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build/"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "cd build-android/"
       - "ctest --output-on-failure"
     agents:
       - "test-android=true"

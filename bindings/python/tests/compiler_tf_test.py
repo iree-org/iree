@@ -49,12 +49,12 @@ class SimpleArithmeticModule(tf.Module):
 
 # TODO(laurenzo): More test cases needed (may need additional files).
 # Specifically, figure out how to test v1 models.
-class TfCompilerTest(unittest.TestCase):
+class TfCompilerTest(tf.test.TestCase):
 
   def testImportSavedModel(self):
     import_mlir = compile_saved_model(self.smdir,
                                       import_only=True).decode("utf-8")
-    self.assertIn("func @simple_matmul", import_mlir)
+    self.assertIn("sym_name = \"simple_matmul\"", import_mlir)
 
   def testCompileSavedModel(self):
     binary = compile_saved_model(self.smdir,
@@ -86,4 +86,4 @@ class TfCompilerTest(unittest.TestCase):
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.DEBUG)
-  unittest.main()
+  tf.test.main()

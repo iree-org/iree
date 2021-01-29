@@ -155,8 +155,9 @@ Normally, the IREE VM is expected to be integrated into applications and driving
 model execution. So its performance is of crucial importance. We strive to
 introduce as little overhead as possible and have several benchmark binaries
 dedicated for evaluating the VM's performance. These benchmark binaries are
-named as `*_benchmark` in the [`iree/vm/`](https://github.com/google/iree/tree/main/iree/vm)
-directory. They also use the Google Benchmark library as the above.
+named as `*_benchmark` in the
+[`iree/vm/`](https://github.com/google/iree/tree/main/iree/vm) directory. They
+also use the Google Benchmark library as the above.
 
 ## CPU Configuration
 

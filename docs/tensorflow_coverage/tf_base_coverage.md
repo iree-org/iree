@@ -2,10 +2,10 @@
 
 Tests of the `tf` , `tf.math` , `tf.nn` , `tf.signal` and `tf.strings` APIs.
 
-IREE has three backend
+IREE has three main backend
 [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target):
-`vmla` , `llvm-ir` and `vulkan-spirv`. We also test TFLite in our
-infrastructure for benchmarking purposes.
+`vmla` , `llvm` and `vulkan-spirv`. We also test TFLite in our infrastructure
+for benchmarking purposes.
 
 *Last Updated: 2020/12/8*
 

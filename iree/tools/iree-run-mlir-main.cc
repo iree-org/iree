@@ -197,7 +197,7 @@ StatusOr<std::string> PrepareModule(
 
   if (export_all_flag) {
     for (auto function : mlir_module->getOps<mlir::FuncOp>()) {
-      function.setAttr("iree.module.export", mlir::UnitAttr::get(&context));
+      function->setAttr("iree.module.export", mlir::UnitAttr::get(&context));
     }
   }
 

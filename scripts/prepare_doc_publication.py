@@ -85,17 +85,16 @@ PERMALINK_DICT = {
 NAVI_ORDER_DICT = {
     # Top level entries
     'index.md': 1,
-    # 'Using IREE' is 2.
-    # 'Getting Started' is 3.
-    # 'Developing IREE' is 4.
-    'design_roadmap.md': 5,
-    'objectives.md': 6,
-    'xla_op_coverage.md': 7,
-    # 'Tensorflow Coverage' is 8,
-    'iree_community.md': 9,
-    # 'Design Docs' is 10.
-    # 'IR Conversion Examples' is 11.
-    # 'Dialect Definitions' is 12.
+    # 'Getting Started' is 2.
+    # 'Developing IREE' is 3.
+    'design_roadmap.md': 4,
+    'objectives.md': 5,
+    'xla_op_coverage.md': 6,
+    # 'Tensorflow Coverage' is 7,
+    'iree_community.md': 8,
+    # 'Design Docs' is 9.
+    # 'IR Conversion Examples' is 10.
+    # 'Dialect Definitions' is 11.
 
     # Within 'Getting Started' use explicit ordering.
     # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'
@@ -122,9 +121,6 @@ NAVI_ORDER_DICT = {
     'e2e_benchmarking.md': 6,
     'repository_management.md': 7,
 
-    # Within 'Using IREE' use explicit ordering.
-    'using_colab.md': 1,
-
     # Within 'TensorFlow Coverage' use explicit ordering.
     'tf_base_coverage.md': 1,
     'tf_keras_coverage.md': 2,
@@ -145,7 +141,6 @@ DIRECTORY_TITLE_DICT = {
     'Dialects': 'Dialect Definitions',
     'get_started': 'Getting Started',
     'ir_examples': 'IR Conversion Examples',
-    'using_iree': 'Using IREE',
     'tensorflow_coverage': 'TensorFlow Coverage',
 }
 

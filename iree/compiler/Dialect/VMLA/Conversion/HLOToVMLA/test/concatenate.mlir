@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @concatenate_0
-func @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) attributes { sym_visibility = "private" } {
+func private @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) {
   // CHECK-SAME: %[[ARG0:.+]]:
   // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x3xi32>
   %c0 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
@@ -24,7 +24,7 @@ func @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) attributes { s
 // -----
 
 // CHECK-LABEL: @concatenate_1
-func @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) attributes { sym_visibility = "private" } {
+func private @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) {
   // CHECK-SAME: %[[ARG0:.+]]:
   // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x2xi32>
   %c0 = constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
@@ -47,7 +47,7 @@ func @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) attributes { sy
 // -----
 
 // CHECK-LABEL: @concatenate_2
-func @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) attributes { sym_visibility = "private" } {
+func private @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) {
   // CHECK-SAME: %[[ARG0:.+]]:
   // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x3xi32>
   %c0 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
@@ -77,7 +77,7 @@ func @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) attributes { sy
 // -----
 
 // CHECK-LABEL: @concatenate_3
-func @concatenate_3(%arg0: tensor<2x2xi32>) -> (tensor<4x2xi32>) attributes { sym_visibility = "private" } {
+func private @concatenate_3(%arg0: tensor<2x2xi32>) -> (tensor<4x2xi32>) {
   // CHECK-SAME: %[[ARG0:.+]]:
   // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x2xi32>
   %c0 = constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>

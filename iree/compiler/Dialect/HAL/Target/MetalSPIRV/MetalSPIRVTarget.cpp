@@ -23,11 +23,11 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -79,7 +79,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
     SmallVector<StringRef, 8> entryPointNames;
-    if (auto scheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+    if (auto scheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
             iree_compiler::getEntryPointScheduleAttrName())) {
       // We have multiple entry points in this module. Make sure the order
       // specified in the schedule attribute is respected.

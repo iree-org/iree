@@ -18,12 +18,15 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "DestructiveUpdateUtils.h"
     "DispatchConfig.h"
     "Passes.h"
   SRCS
     "CreateBenchmarkFuncs.cpp"
     "DeduplicateExecutables.cpp"
+    "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"
+    "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
@@ -32,11 +35,13 @@ iree_cc_library(
     "HoistUnstreamableOps.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyDispatchRegions2.cpp"
+    "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
     "MaterializeExportedReflection.cpp"
     "MergeExportedReflection.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineLargeConstantsPass.cpp"
+    "OutlineDispatchRegions2.cpp"
+    "OutlineLargeConstants.cpp"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "RematerializeDispatchConstants.cpp"
@@ -45,14 +50,19 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalg
+    MLIRLinalgTransforms
     MLIRPass
+    MLIRSCF
     MLIRShape
     MLIRShapeOpsTransforms
     MLIRStandard
     MLIRSupport
+    MLIRTensor
+    MLIRTosaToLinalg
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle
+    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion
@@ -60,6 +70,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Conversion
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms

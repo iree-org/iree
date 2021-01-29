@@ -28,9 +28,9 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -104,8 +104,9 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
     Value rhs = op.rhs();
     RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
-    Type elementType = lhsType.getElementType();
-    if (!lhsType || !rhsType) {
+    RankedTensorType dstType =
+        op.getResult().getType().dyn_cast<RankedTensorType>();
+    if (!lhsType || !rhsType || !dstType) {
       return rewriter.notifyMatchFailure(op, "requires ranked types");
     }
     mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
@@ -147,6 +148,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
                              SmallVectorImpl<Value> &outBatchingDimExtents) {
       outBatchingDimExtents.clear();
       RankedTensorType untransposedType = type;
+      Type elementType = type.getElementType();
       SmallVector<int64_t, 6> permutation;
       llvm::BitVector freeDims(untransposedType.getRank(), true);
       SmallVector<Value, 6> contractingDimExtents;
@@ -216,11 +218,13 @@ struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
     auto dstStaticShape = llvm::to_vector<6>(
         llvm::makeArrayRef({static_cast<int64_t>(-1), static_cast<int64_t>(-1),
                             static_cast<int64_t>(-1)}));
-    auto dstType = RankedTensorType::get(dstStaticShape, elementType);
+    auto dstElementType = dstType.getElementType();
     Value dst = rewriter.create<IREE::VMLA::BatchMatMulPseudoOp>(
-        op.getLoc(), dstType, lhs, rhs);
+        op.getLoc(), RankedTensorType::get(dstStaticShape, dstElementType), lhs,
+        rhs);
     RankedTensorType transposeType = RankedTensorType::get(
-        {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]}, elementType);
+        {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]},
+        dstElementType);
     auto transpose = rewriter.create<mhlo::TransposeOp>(
         op.getLoc(), transposeType, dst, make1DElementsAttr({0, 2, 1}));
     auto reshapeShape = batchingDimExtents;
@@ -373,13 +377,64 @@ class LowerFftOp : public OpRewritePattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(mhlo::FftOp op,
                                 PatternRewriter &rewriter) const override {
     auto tensor_type = op.operand().getType().cast<RankedTensorType>();
+    auto fft_type = op.fft_type();
+
+    if (fft_type == "RFFT") {
+      return ReplaceRfft(op, tensor_type, op.getOperand(), rewriter);
+    }
+
     auto real = rewriter.create<mhlo::RealOp>(op.getLoc(), op.getOperand());
     auto imag = rewriter.create<mhlo::ImagOp>(op.getLoc(), op.getOperand());
-    auto results = rewriter.create<VMLA::FftPseudoOp>(
-        op.getLoc(), real.getType(), imag.getType(), real, imag);
+
+    if (fft_type == "FFT") {
+      return ReplaceFftOpComplextoComplex<VMLA::FftPseudoOp>(
+          op, tensor_type, real, imag, rewriter);
+
+    } else if (fft_type == "IFFT") {
+      return ReplaceFftOpComplextoComplex<VMLA::IfftPseudoOp>(
+          op, tensor_type, real, imag, rewriter);
+
+    } else if (fft_type == "IRFFT") {
+      return ReplaceIrfft(op, tensor_type, real, imag, rewriter);
+    }
+    return rewriter.notifyMatchFailure(op, "FFT type not recognized");
+  }
+
+ private:
+  template <typename T>
+  LogicalResult ReplaceFftOpComplextoComplex(mhlo::FftOp op,
+                                             RankedTensorType tensor_type,
+                                             mhlo::RealOp real,
+                                             mhlo::ImagOp imag,
+                                             PatternRewriter &rewriter) const {
+    auto results = rewriter.create<T>(op.getLoc(), real.getType(),
+                                      imag.getType(), real, imag);
     auto complex_result = rewriter.create<mhlo::ComplexOp>(
-        op.getLoc(), tensor_type, results.real_out(), results.imag_out());
+        op.getLoc(), op.getType(), results.real_out(), results.imag_out());
     rewriter.replaceOp(op, {complex_result});
+    return success();
+  }
+
+  LogicalResult ReplaceRfft(mhlo::FftOp op, RankedTensorType input_tensor_type,
+                            mlir::Value real, PatternRewriter &rewriter) const {
+    RankedTensorType new_type =
+        RankedTensorType::get(op.getType().cast<ShapedType>().getShape(),
+                              input_tensor_type.getElementType());
+
+    auto results = rewriter.create<VMLA::RfftPseudoOp>(op.getLoc(), new_type,
+                                                       new_type, real);
+    auto complex_result = rewriter.create<mhlo::ComplexOp>(
+        op.getLoc(), op.getType(), results.real_out(), results.imag_out());
+    rewriter.replaceOp(op, {complex_result});
+    return success();
+  }
+
+  LogicalResult ReplaceIrfft(mhlo::FftOp op, RankedTensorType input_tensor_type,
+                             mhlo::RealOp real, mhlo::ImagOp imag,
+                             PatternRewriter &rewriter) const {
+    auto results = rewriter.create<VMLA::IrfftPseudoOp>(
+        op.getLoc(), op.getType(), real, imag);
+    rewriter.replaceOp(op, {results});
     return success();
   }
 };

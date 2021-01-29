@@ -4,7 +4,7 @@
 // CHECK-SAME: [[SRC:arg0]]: !vmla.buffer,
 // CHECK-SAME: [[INDICES:arg1]]: !vmla.buffer,
 // CHECK-SAME: [[UPDATES:arg2]]: !vmla.buffer
-func @scatter_update_1D(%arg0: tensor<8xi32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3xi32>) -> tensor<8xi32> attributes { sym_visibility = "private" } {
+func private @scatter_update_1D(%arg0: tensor<8xi32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3xi32>) -> tensor<8xi32> {
   // CHECK: [[BUFFER:%.+]] = vmla.buffer.alloc
   // CHECK: vmla.copy
   // CHECK-SAME: [[BUFFER]]
@@ -30,7 +30,7 @@ func @scatter_update_1D(%arg0: tensor<8xi32>, %arg1: tensor<3x1xi32>, %arg2: ten
 // -----
 
 // CHECK-LABEL: @scatter_update_2D
-func @scatter_update_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>, %arg2: tensor<3xi32>) -> tensor<4x3xi32> attributes { sym_visibility = "private" } {
+func private @scatter_update_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>, %arg2: tensor<3xi32>) -> tensor<4x3xi32> {
   // CHECK: [[BUFFER:%.+]] = vmla.buffer.alloc
   // CHECK: vmla.copy
   // CHECK-SAME: [[BUFFER]]
@@ -55,7 +55,7 @@ func @scatter_update_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>, %arg2: t
 // -----
 
 // CHECK-LABEL: @scatter_update_2D_slice
-func @scatter_update_2D_slice(%arg0: tensor<4x3xi32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3x3xi32>) -> tensor<4x3xi32> attributes { sym_visibility = "private" } {
+func private @scatter_update_2D_slice(%arg0: tensor<4x3xi32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3x3xi32>) -> tensor<4x3xi32> {
   // CHECK: [[BUFFER:%.+]] = vmla.buffer.alloc
   // CHECK: vmla.copy
   // CHECK-SAME: [[BUFFER]]

@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/rt/vm.h"
+#include "pyiree/rt/vm.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
-#include "bindings/python/pyiree/common/status_utils.h"
-#include "bindings/python/pyiree/rt/function_abi.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/api.h"
+#include "pyiree/rt/function_abi.h"
+#include "pyiree/rt/status_utils.h"
 
 namespace iree {
 namespace python {

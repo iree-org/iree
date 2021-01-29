@@ -100,6 +100,11 @@ std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection();
 // Dispatches (flow.dispatch.region)
 //===----------------------------------------------------------------------===//
 
+/// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
+/// A dispatch region is created for each tiled loop nest.
+std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
+    ArrayRef<int64_t> sizes = {});
+
 // Analyzes a module to identify which functions are dispatchable.
 // This information is cached on the module and is used by other FuncOp-scoped
 // passes to quickly access the module-level dispatchability information.
@@ -123,6 +128,10 @@ createRematerializeDispatchConstantsPass();
 
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
+
+// Injects tracing markers for dispatch operation tensor inputs and outputs.
+std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();
 
 // Exports all the dispatch functions to the module.
 std::unique_ptr<OperationPass<ModuleOp>> createCreateBenchmarkFuncs();

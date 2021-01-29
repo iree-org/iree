@@ -25,14 +25,22 @@ and functions.
 
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
-__all__ = ["load_module", "load_modules", "Config", "SystemContext"]
+__all__ = [
+    "load_module",
+    "load_modules",
+    "normalize_value",
+    "Config",
+    "SystemContext",
+]
 
 import os
 import sys
 
-from typing import Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from . import binding as _binding
+
+import numpy as np
 
 # Typing aliases (largely used for documentation).
 AnyModule = _binding.VmModule
@@ -125,6 +133,41 @@ def _get_global_config():
   return _global_config
 
 
+def _bool_to_int8(
+    array: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+  if not isinstance(array, np.ndarray):
+    return array
+
+  # IREE models booleans as i8s.
+  # TODO: This cast should be moved into the function abi. If it's possible to
+  # tell that the result should have boolean type from the IR, then the return
+  # type should also be recast to np.bool at that level.
+  if array.dtype == np.bool:
+    array = array.astype(np.int8)
+  return array
+
+
+def normalize_value(
+    value: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+  """Normalizes the given value for input to (or comparison with) IREE."""
+  if value is None:
+    # Exclude None from falling through to blanket np.asarray conversion.
+    return value
+
+  if isinstance(value, (list, tuple)):
+    return value
+
+  array = np.asarray(value)
+  if isinstance(value, (bool, int, float)):
+    # Manually convert ints and floats to 32 bits.
+    if array.dtype == np.float64:
+      array = array.astype(np.float32)
+    elif array.dtype == np.int64:
+      array = array.astype(np.int32)
+
+  return array
+
+
 class BoundFunction:
   """Wraps a VmFunction, VmContext and ABI into a pythonic function."""
 
@@ -137,6 +180,12 @@ class BoundFunction:
     self._serialized_outputs = None
 
   def __call__(self, *args, **kwargs):
+    # Convert tensors, device arrays, ints, ... to IREE-friendly inputs.
+    args = [normalize_value(value) for value in args]
+    kwargs = {k: normalize_value(v) for k, v in kwargs.items()}
+    args = [_bool_to_int8(value) for value in args]
+    kwargs = {k: _bool_to_int8(v) for k, v in kwargs.items()}
+
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
     # flag that can allow it to be overridden.
@@ -271,6 +320,6 @@ def load_modules(*modules, config: Optional[Config] = None):
   return bound_modules
 
 
-def load_module(module, **kwargs):
+def load_module(module, config: Optional[Config] = None):
   """Loads a module into a new or shared context and returns them."""
-  return load_modules(module, **kwargs)[0]
+  return load_modules(module, config=config)[0]

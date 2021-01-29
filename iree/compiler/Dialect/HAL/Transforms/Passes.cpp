@@ -38,7 +38,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<bool> linkExecutables{
       *this, "link-executables",
       llvm::cl::desc("Whether to link hal.executable ops together."),
-      llvm::cl::init(true)};
+      llvm::cl::init(false)};
 };
 
 }  // namespace

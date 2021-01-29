@@ -25,6 +25,8 @@ external_cc_library(
     "pffft.c"
   HDRS
     "pffft.h"
+  INCLUDES
+    ${PFFFT_ROOT}
 )
 
 external_cc_library(

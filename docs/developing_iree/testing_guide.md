@@ -11,7 +11,7 @@ should generally follow the style and best practices of that framework.
 
 ### Running a Test
 
-For the test https://github.com/google/iree/tree/main/iree/base/arena_test.cc
+For the test iree/base/arena_test.cc
 
 With CMake, run this from the build directory:
 
@@ -26,6 +26,13 @@ $ bazel test iree/base:arena_test
 ```
 
 ### Setting test environments
+
+Parallel testing for `ctest` can be enabled via the `CTEST_PARALLEL_LEVEL` 
+environment variable. For example:
+
+```shell
+$ export CTEST_PARALLEL_LEVEL=$(nproc)
+```
 
 To use the Vulkan backend as test driver, you may need to select between a
 Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware

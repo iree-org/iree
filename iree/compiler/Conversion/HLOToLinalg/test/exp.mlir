@@ -11,7 +11,7 @@ func @exp(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK-SAME: #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
 // CHECK-SAME:   ins(%{{[a-z0-9]*}} : tensor<2x2xf32>)
-// CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN:.+]]: f32):
+// CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN:.+]]: f32, %{{.*}}: f32):
 // CHECK-NEXT:   %[[RESULT:.+]] = exp %[[OPERAND_IN]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
 // CHECK-NEXT: } -> tensor<2x2xf32>

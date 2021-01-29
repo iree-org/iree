@@ -25,10 +25,9 @@ module attributes {
     }
     return
   }
-  func @parallel_4D__num_workgroups__
+  func private @parallel_4D__num_workgroups__
     (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
      !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -53,7 +52,7 @@ module attributes {
 //   CHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
 //       CHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
 //       CHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
-//       CHECK:     %[[COND:.+]] = cmpi "slt", %[[IV]], %[[UB]]
+//       CHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[UB]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
 //       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
@@ -92,10 +91,9 @@ module attributes {
     }
     return
   }
-  func @parallel_4D_static__num_workgroups__
+  func private @parallel_4D_static__num_workgroups__
     (!shapex.ranked_shape<[3,4,5,6]>, !shapex.ranked_shape<[3,4,5,6]>,
      !shapex.ranked_shape<[3,4,5,6]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -114,7 +112,7 @@ module attributes {
 //   CHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
 //       CHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
 //       CHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
-//       CHECK:     %[[COND:.+]] = cmpi "slt", %[[IV]], %[[C360]]
+//       CHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[C360]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[C120]]
 //       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[C120]]
@@ -161,10 +159,9 @@ module attributes {
      }
      return
   }
-  func @scalar_add__num_workgroups__
+  func private @scalar_add__num_workgroups__
     (!shapex.ranked_shape<[]>, !shapex.ranked_shape<[]>,
      !shapex.ranked_shape<[]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -203,7 +200,7 @@ module {
          %arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
       %c0 = constant 0 : index
       %cst = constant true
-      %0 = cmpi "eq", %arg5, %c0 : index
+      %0 = cmpi eq, %arg5, %c0 : index
       %1 = and %cst, %0 : i1
       %2 = select %1, %arg7, %arg8 : f32
       %3 = addf %arg6, %2 : f32
@@ -226,12 +223,12 @@ module {
 //       CHECK:     %[[UB1:.+]] = dim %{{.+}}, %[[C1]]
 //       CHECK:     %[[UB2:.+]] = dim %{{.+}}, %[[C2]]
 //       CHECK:     %[[UB:.+]] = muli %[[UB1]], %[[UB0]]
-//       CHECK:     %[[COND:.+]] = cmpi "slt", %{{.+}}, %[[UB]]
+//       CHECK:     %[[COND:.+]] = cmpi slt, %{{.+}}, %[[UB]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       %[[IV0:.+]] = divi_signed %{{.+}}, %[[UB1]]
 //       CHECK:       %[[IV1:.+]] = remi_signed %{{.+}}, %[[UB1]]
 //       CHECK:       scf.for %[[IV:.+]] = %{{.+}} to %[[UB2]]
-//       CHECK:         %[[ISZERO:.+]] = cmpi "eq", %[[IV]], %[[C0]]
+//       CHECK:         %[[ISZERO:.+]] = cmpi eq, %[[IV]], %[[C0]]
 
 // -----
 
@@ -294,8 +291,8 @@ module attributes {
 //       CHECK:   scf.for
 //   CHECK-DAG:     %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:     %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:     %[[INBOUNDY:.+]] = cmpi "slt", %[[TIDY]], %{{.*}}
-//       CHECK:     %[[INBOUNDX:.+]] = cmpi "slt", %[[TIDX]], %{{.*}}
+//       CHECK:     %[[INBOUNDY:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
+//       CHECK:     %[[INBOUNDX:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
 //       CHECK:     %[[COND:.+]] = and %[[INBOUNDY]], %[[INBOUNDX]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
@@ -400,10 +397,10 @@ module attributes {
 //   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK:         %[[C1:.+]] = cmpi "slt", %[[TIDZ]], %{{.*}}
-//       CHECK:         %[[C2:.+]] = cmpi "slt", %[[TIDY]], %{{.*}}
+//       CHECK:         %[[C1:.+]] = cmpi slt, %[[TIDZ]], %{{.*}}
+//       CHECK:         %[[C2:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
 //       CHECK:         %[[C3:.+]] = and %[[C1]], %[[C2]]
-//       CHECK:         %[[C4:.+]] = cmpi "slt", %[[TIDX]], %{{.*}}
+//       CHECK:         %[[C4:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
 //       CHECK:         %[[COND:.+]] = and %[[C3]], %[[C4]]
 //       CHECK:         scf.if %[[COND]]
 //       CHECK:           scf.for
@@ -493,8 +490,8 @@ module attributes {
 //       CHECK:       %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]]]
 //   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:       %[[C1:.+]] = cmpi "slt", %[[TIDY]], %{{.*}}
-//       CHECK:       %[[C2:.+]] = cmpi "slt", %[[TIDX]], %{{.*}}
+//       CHECK:       %[[C1:.+]] = cmpi slt, %[[TIDY]], %{{.*}}
+//       CHECK:       %[[C2:.+]] = cmpi slt, %[[TIDX]], %{{.*}}
 //       CHECK:       %[[COND:.+]] = and %[[C1]], %[[C2]]
 //       CHECK:       scf.if %[[COND]]
 //       CHECK:         scf.for

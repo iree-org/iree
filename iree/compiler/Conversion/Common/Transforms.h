@@ -34,6 +34,37 @@ namespace iree_compiler {
 void applyCanonicalizationPatternsForTiling(MLIRContext *context,
                                             Operation *op);
 
+/// Assuming that `funcOp` contains a single nested scf.for that represented the
+/// tiled+fused+distributed loops with the distribution being across workgroups,
+/// i.e.
+///
+/// scf.for ... {
+///   ...
+///   scf.for ... {
+///     ...
+///     linalg.
+///     ...
+///     linalg.
+///     ...
+///   }
+/// }
+///
+/// Returns the list of linalg operations in the functions. If there are no
+/// `scf.for` operations in the function return the linalg operations in the
+/// body of the function if it has a single basic block. Return failure in all
+/// other cases.
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops);
+
+/// Using linalg on tensors for dispatch region creation does first-level of
+/// tile (fuse and distribute) during dispatch region formation and dynamic tile
+/// sizes represented as `flow.dispatch.workgroup_size`. These get mapped to
+/// static tile sizes based on target architecture and computations in the
+/// dispatch region. Replace the dynamic tile size with static tiles.
+LogicalResult materializeStaticLaunchInformation(
+    FuncOp funcOp, const LaunchConfig &launchConfig, unsigned numTiledLoops);
+
 struct TileAndFuseOptions {
   linalg::LinalgLoopDistributionOptions distributionOptions;
   linalg::AllocBufferCallbackFn allocationFn = nullptr;

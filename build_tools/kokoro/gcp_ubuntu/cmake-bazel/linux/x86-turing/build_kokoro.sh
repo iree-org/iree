@@ -28,11 +28,17 @@ export PS4='[$(date -u "+%T %Z")] '
 
 source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
+# Print NVIDIA GPU information inside the VM
+dmesg | grep NVRM
+dpkg -l | grep nvidia
+nvidia-smi || true
+
 # Sets DOCKER_RUN_ARGS
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:1351b5befd1bc4b89fc6f203754a05accff204579f122ec1123e86ed7e2bd319 \
+  --gpus all \
+  gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:1592a4ffe32ca5643b27f59f3fc4052d96a5bea34a91e51703d882aa38c09ae5 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

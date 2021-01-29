@@ -30,6 +30,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
@@ -37,10 +38,10 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:legalize_to_linalg",
     ],
 )
 
@@ -72,8 +73,9 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:map_lmhlo_to_scalar_op",
     ],
 )

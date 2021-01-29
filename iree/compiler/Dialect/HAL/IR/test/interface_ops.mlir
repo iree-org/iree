@@ -44,3 +44,19 @@ func @interface_io_tiles() {
     offsets = [4], sizes = [7], strides = [1]: tensor<4xf32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @interface_io_subspan
+func @interface_io_subspan() {
+  %c8 = constant 8 : index
+  %c16 = constant 16 : index
+
+  // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?xi8>
+  %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?xi8>
+
+  // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8, %c16] : memref<16xi8>
+  %1 = hal.interface.binding.subspan @interface::@s0b0[%c8, %c16] : memref<16xi8>
+
+  return
+}

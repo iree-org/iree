@@ -16,7 +16,7 @@
 #define IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
-#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir {

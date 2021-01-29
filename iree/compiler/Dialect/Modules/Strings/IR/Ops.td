@@ -20,6 +20,8 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
+def STRINGS_ValueTensor : AnyTypeOf<[HAL_BufferView, AnyRankedTensor]>;
+
 def STRINGS_Dialect : Dialect {
   let name = "strings";
   let cppNamespace = "::mlir::iree_compiler::IREE::Strings";
@@ -38,7 +40,7 @@ def STRINGS_String : DialectType<
     STRINGS_Dialect,
     CPred<"$_self.isa<IREE::Strings::StringType>()">,
     "string"> {
-  let typeDescription = [{
+  let description = [{
     A string type containing a standard ASCII string.
   }];
 }
@@ -47,7 +49,7 @@ def STRINGS_StringTensor : DialectType<
     STRINGS_Dialect,
     CPred<"$_self.isa<IREE::Strings::StringTensorType>()">,
     "string_tensor"> {
-  let typeDescription = [{
+  let description = [{
     A tensor of string types.
   }];
 }
@@ -71,7 +73,7 @@ def STRINGS_ToStringTensorOp : Op<STRINGS_Dialect, "to_string_tensor", [NoSideEf
     Converts a hal buffer to a tensor of strings representation.
   }];
 
-  let arguments = (ins HAL_BufferView:$value);
+  let arguments = (ins STRINGS_ValueTensor:$value);
 
   let results = (outs
     STRINGS_StringTensor:$result
@@ -92,13 +94,13 @@ def STRINGS_StringTensorToStringOp : Op<STRINGS_Dialect, "string_tensor_to_strin
 }
 
 def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
-  let summary = [{gathers all the strings from a Tensor by id}];
+  let summary = "Gathers all the strings from a Tensor by index.";
   let description = [{
-    Gathers all the strings from a Tensor by ID.
+    Gathers all the strings from a Tensor by index values along the final axis.
   }];
 
   let arguments = (ins STRINGS_StringTensor:$dict,
-                  HAL_BufferView:$ids);
+                  STRINGS_ValueTensor:$indices);
 
   let results = (outs
     STRINGS_StringTensor:$result
@@ -106,9 +108,7 @@ def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
 }
 
 def STRINGS_ConcatOp : Op<STRINGS_Dialect, "concat", [NoSideEffect]> {
-  let summary = [{
-  concatenates the strings in the tensor along the last dimension
-  }];
+  let summary = "Concatenates a tensor of strings along the last dimension";
 
   let description = [{
     Concatenates the strings in the tensor along the last dimension.
@@ -122,7 +122,7 @@ def STRINGS_ConcatOp : Op<STRINGS_Dialect, "concat", [NoSideEffect]> {
 }
 
 def STRINGS_PrintOp : Op<STRINGS_Dialect, "print"> {
-  let summary = [{prints the contents of a string}];
+  let summary = "Prints the contents of a string.";
   let description = [{
     Prints the contents of a string.
   }];

@@ -23,11 +23,12 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -82,11 +83,15 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
           "unable to promote ops with multiple fusable dependences");
     }
     auto dependence = dependences.front();
-    unsigned producerIdx = dependence.dependentOpView.operandIndex;
+    Optional<unsigned> producerIdx = dependence.getDependentOpViewOperandNum();
+    if (!producerIdx) {
+      return op.emitError(
+          "expected dependent view in producer to be an operand");
+    }
     linalg::LinalgOp consumer =
-        cast<linalg::LinalgOp>(dependence.indexingOpView.op);
-    unsigned consumerIdx = dependence.indexingOpView.operandIndex;
-    Value consumerView = consumer.getShapedOperand(consumerIdx);
+        cast<linalg::LinalgOp>(dependence.getIndexingOp());
+    unsigned consumerIdx = dependence.getIndexingOpViewOperandNum().getValue();
+    Value consumerView = dependence.getIndexingValue();
     Value promotedView = nullptr;
 
     // If the view is already promoted, reuse that. The assumption is that the
@@ -96,7 +101,7 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
     } else if (dependence.dependenceType ==
                linalg::LinalgDependenceGraph::RAW) {
       SubViewOp promotedViewProducer =
-          op.getShapedOperand(producerIdx).getDefiningOp<SubViewOp>();
+          op.getShapedOperand(*producerIdx).getDefiningOp<SubViewOp>();
       assert(promotedViewProducer &&
              "expected producer to be a subview op as well");
       Optional<linalg::PromotionInfo> promotionInfo =
@@ -110,7 +115,7 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
       promotedViews.insert(promotedView);
     }
     if (!promotedView) continue;
-    op.getOperation()->setOperand(producerIdx, promotedView);
+    op.getOperation()->setOperand(*producerIdx, promotedView);
   }
   return success();
 }
@@ -176,7 +181,7 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
   // Update the launch configuration.
   SmallVector<unsigned, 2> distributedLoops =
       llvm::to_vector<2>(tiledAndFusedOps->fusedLoopDims);
-  if (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+  if (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
       failed(createNumWorkgroupsFromResultShape(
           builder, fusableOps.back(), funcOp, getNumWorkgroupsFnAttrName(),
           tileSizes, distributedLoops))) {
@@ -194,6 +199,81 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
   setMarker(tiledAndFusedOps->op, getWorkgroupMarker());
 
   return tiledAndFusedOps;
+}
+
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops) {
+  Region &region = funcOp.body();
+  if (!llvm::hasSingleElement(region)) {
+    return funcOp.emitError("unable dispatch function with multiple blocks");
+  }
+  Block *body = &region.front();
+  auto forOps = body->getOps<scf::ForOp>();
+  while (!forOps.empty()) {
+    if (!llvm::hasSingleElement(forOps)) return failure();
+    scf::ForOp forOp = *(forOps.begin());
+    tiledLoops.push_back(forOp.getOperation());
+    body = forOp.getBody();
+    forOps = body->getOps<scf::ForOp>();
+  }
+  linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+  return success();
+}
+
+namespace {
+static size_t kMaxHALDimensions = 3;
+
+/// Sets the flow.dispatch.workgroup_size operation to the constant value passed
+/// in as `tileSizes`. The number of entries in `tileSizes` is at least as much
+/// as the dimensionality of the workgroup. It is assumed that the inner-most
+/// loop is mapped to the fastest varying dimension in
+/// flow.dispatch.workgroup_size.
+class SetWorkgroupSizePattern
+    : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
+ public:
+  SetWorkgroupSizePattern(MLIRContext *context, ArrayRef<int64_t> tileSizesRef,
+                          PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit),
+        tileSizes(
+            llvm::to_vector<4>(tileSizesRef.size() > kMaxHALDimensions
+                                   ? tileSizesRef.take_front(kMaxHALDimensions)
+                                   : tileSizesRef)) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::InterfaceWorkgroupSizeOp workgroupSizeOp,
+      PatternRewriter &rewriter) const override {
+    int64_t dim = workgroupSizeOp.dimension().getSExtValue();
+    if (dim >= tileSizes.size()) {
+      return workgroupSizeOp.emitRemark(
+          "expected at least as many static tile sizes as the workgroup "
+          "dimensionality");
+    }
+    rewriter.replaceOpWithNewOp<ConstantIndexOp>(
+        workgroupSizeOp, tileSizes[tileSizes.size() - 1 - dim]);
+    return success();
+  }
+
+ private:
+  SmallVector<int64_t, 4> tileSizes;
+};
+}  // namespace
+
+LogicalResult materializeStaticLaunchInformation(
+    FuncOp funcOp, const LaunchConfig &launchConfig, unsigned numTiledLoops) {
+  OwningRewritePatternList patterns;
+  Optional<SmallVector<int64_t, 4>> workgroupTileSizes =
+      launchConfig.getWorkgroupTileSizes(numTiledLoops);
+  if (!workgroupTileSizes) {
+    return funcOp.emitError(
+        "unable to find static values to use for flow.dispatch.workgroup_size");
+  }
+  patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
+                                           workgroupTileSizes.getValue());
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return failure();
+  }
+  return success();
 }
 
 LogicalResult tileAndFuseLinalgBufferOps(

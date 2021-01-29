@@ -46,8 +46,7 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
 //   type=value
 // Buffers should be in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
-// described in
-// https://github.com/google/iree/tree/main/iree/hal/api.h
+// described in iree/hal/api.h
 // Uses |allocator| to allocate the buffers.
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.

@@ -30,10 +30,11 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
 
-./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
+# Print NVIDIA GPU information inside the docker
+dpkg -l | grep nvidia
+nvidia-smi || true
 
-# Print SwiftShader git commit
-cat /swiftshader/git-commit
+./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # TODO(4195): TensorFlow integrations can only be built out-of-tree (and kokoro
 # does not support that).
@@ -68,4 +69,4 @@ cd ../iree-build/
 ninja
 
 echo "Testing with CTest"
-ctest -R 'tensorflow_e2e|bindings/python'
+ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/'

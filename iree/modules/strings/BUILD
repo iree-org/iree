@@ -1,3 +1,4 @@
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
@@ -31,6 +32,15 @@ cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+if (NOT ${IREE_BUILD_COMPILER})
+  return()
+endif()
+""",
+    inline = True,
+)
+
 cc_test(
     name = "strings_module_test",
     srcs = ["strings_module_test.cc"],
@@ -55,6 +65,7 @@ cc_test(
 
 iree_bytecode_module(
     name = "strings_module_test_module",
+    testonly = True,
     src = "strings_module_test.mlir",
     cc_namespace = "iree::strings_module_test",
     flags = ["-iree-mlir-to-vm-bytecode-module"],

@@ -47,9 +47,10 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(test_b, B);
 namespace {
 
 template <typename T>
-static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor) {
+static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor,
+                            const char* type_name) {
   if (descriptor->type == IREE_VM_REF_TYPE_NULL) {
-    descriptor->type_name = iree_make_cstring_view(typeid(T).name());
+    descriptor->type_name = iree_make_cstring_view(type_name);
     descriptor->offsetof_counter = T::offsetof_counter();
     descriptor->destroy = T::DirectDestroy;
     IREE_CHECK_OK(iree_vm_ref_register_type(descriptor));
@@ -57,8 +58,8 @@ static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor) {
 }
 
 static void RegisterRefTypes() {
-  RegisterRefType<A>(&test_a_descriptor);
-  RegisterRefType<B>(&test_b_descriptor);
+  RegisterRefType<A>(&test_a_descriptor, "AType");
+  RegisterRefType<B>(&test_b_descriptor, "BType");
 }
 
 template <typename T, typename V>

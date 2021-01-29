@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(CMAKE_CROSSCOMPILING)
-  iree_declare_host_excutable(generate_cc_embed_data "generate_cc_embed_data")
-else()
+if(NOT CMAKE_CROSSCOMPILING)
   add_executable(generate_cc_embed_data)
   target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data_main.cc)
   set_target_properties(generate_cc_embed_data PROPERTIES OUTPUT_NAME generate_cc_embed_data)

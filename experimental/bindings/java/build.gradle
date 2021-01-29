@@ -1,0 +1,61 @@
+repositories {
+    google()
+    jcenter()
+}
+
+buildscript {
+    repositories {
+        google()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.0.0'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 29
+
+    defaultConfig {
+        minSdkVersion 28
+        targetSdkVersion 29
+
+        externalNativeBuild {
+            cmake {
+                arguments '-DIREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS=ON',
+                        '-DIREE_HAL_DRIVERS_TO_BUILD=VMLA',
+
+                        // Disable all but the runtime components needed for the
+                        // java bindings.
+                        '-DIREE_BUILD_COMPILER=OFF',
+                        '-DIREE_ENABLE_MLIR=OFF',
+                        '-DIREE_BUILD_TESTS=OFF',
+                        '-DIREE_BUILD_SAMPLES=OFF',
+                        '-DIREE_BUILD_PYTHON_BINDINGS=OFF',
+
+                        // Run the commands at
+                        // https://google.github.io/iree/get-started/getting-started-android-cmake#configure-and-build
+                        // and update this flag to point to iree-build-host/install/.
+                        '-DIREE_HOST_BINARY_ROOT='
+            }
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['java/com/google/iree']
+            jni.srcDirs = ['java/com/google/iree/native']
+            manifest.srcFile 'com/google/iree/tests/TestManifest.xml'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            version "3.13.0+"
+            path "../../../CMakeLists.txt"
+        }
+    }
+}

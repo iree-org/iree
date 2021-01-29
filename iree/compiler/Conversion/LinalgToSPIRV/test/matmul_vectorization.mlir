@@ -38,10 +38,9 @@ module attributes {
                  outs(%ret0 : memref<4096x4096xf16>)
     return
   }
-  func @matmul_static_shape__num_workgroups__
+  func private @matmul_static_shape__num_workgroups__
     (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
      !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-    attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -269,7 +268,7 @@ module attributes {
 //  PROMOTE-DAG:  %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //  PROMOTE-DAG:  %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //  PROMOTE-DAG:  %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
-//  PROMOTE-DAG:  %[[C0:.+]] = constant 0
+//  PROMOTE-DAG:  %[[C0:.+]] = constant 0 : index
 //  PROMOTE-DAG:  %[[C2:.+]] = constant 2
 //  PROMOTE-DAG:  %[[C16:.+]] = constant 16
 //  PROMOTE-DAG:  %[[C32:.+]] = constant 32

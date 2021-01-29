@@ -42,18 +42,13 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
-    "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
-    "@llvm-project//mlir:SPIRVTranslateRegistration": [
-        "MLIRSPIRVSerialization"
-    ],
-    "@llvm-project//mlir:StandardToSPIRVConversions": [
-        "MLIRStandardToSPIRVTransforms"
-    ],
+    "@llvm-project//mlir:TosaDialect": ["MLIRTosa"],
     "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
+    "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
@@ -65,8 +60,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
-    "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
-    "@half//:half": ["half"],
+    "@cpuinfo//:cpuinfo": ["cpuinfo"],
+    "@half//:includes": ["half::includes"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 
@@ -124,7 +119,7 @@ def convert_external_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
+  if target.startswith("@mlir-hlo//"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_hlo"]
   if target.startswith("@com_google_ruy//ruy"):

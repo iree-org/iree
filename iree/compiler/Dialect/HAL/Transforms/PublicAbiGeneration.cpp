@@ -48,16 +48,16 @@ Type mapScalarType(MLIRContext *ctx, ScalarType scalarType) {
       return FloatType::getBF16(ctx);
     case ScalarType::kSint32:
     case ScalarType::kUint32:
-      return IntegerType::get(32, ctx);
+      return IntegerType::get(ctx, 32);
     case ScalarType::kSint64:
     case ScalarType::kUint64:
-      return IntegerType::get(64, ctx);
+      return IntegerType::get(ctx, 64);
     case ScalarType::kSint16:
     case ScalarType::kUint16:
-      return IntegerType::get(16, ctx);
+      return IntegerType::get(ctx, 16);
     case ScalarType::kSint8:
     case ScalarType::kUint8:
-      return IntegerType::get(8, ctx);
+      return IntegerType::get(ctx, 8);
     default:
       return nullptr;
   }
@@ -332,7 +332,7 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
       "iree.module.export",
       StringAttr::get((exportName + "$async").str(), ctx)));
 
-  auto asyncType = FunctionType::get(asyncInputTypes, resultTypes, ctx);
+  auto asyncType = FunctionType::get(ctx, asyncInputTypes, resultTypes);
   auto asyncName = (rawCalleeFuncOp.getName() + "$async").str();
   auto asyncFuncOp =
       moduleBuilder.create<FuncOp>(loc, asyncName, asyncType, asyncExportAttrs);
@@ -352,7 +352,7 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   syncExportAttrs.push_back(
       moduleBuilder.getNamedAttr("iree.abi.stub", UnitAttr::get(ctx)));
 
-  auto syncType = FunctionType::get(inputTypes, resultTypes, ctx);
+  auto syncType = FunctionType::get(ctx, inputTypes, resultTypes);
   auto syncName = (rawCalleeFuncOp.getName() + "$sync").str();
   auto syncFuncOp =
       moduleBuilder.create<FuncOp>(loc, syncName, syncType, syncExportAttrs);
@@ -381,7 +381,7 @@ LogicalResult generateAbiFunctions(FuncOp funcOp, StringRef exportName,
 }
 
 Optional<StringRef> getFuncOpExportName(FuncOp op) {
-  auto exportAttr = op.getAttr("iree.module.export");
+  auto exportAttr = op->getAttr("iree.module.export");
   if (!exportAttr) return llvm::None;
 
   if (exportAttr.isa<UnitAttr>()) {
@@ -402,21 +402,21 @@ class PublicABIGenerationPass
     for (auto &op : getOperation().getBody()->getOperations()) {
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
         // Skip functions we generate.
-        if (funcOp.getAttr("iree.abi.stub")) continue;
+        if (funcOp->getAttr("iree.abi.stub")) continue;
 
         // Any function marked for export, we redirect to export with a
         // '$raw' suffix and then generate ABI wrappers with the original name.
         Optional<StringRef> exportName = getFuncOpExportName(funcOp);
         if (!exportName) continue;
-        auto reflection = funcOp.getAttr("iree.reflection")
+        auto reflection = funcOp->getAttr("iree.reflection")
                               .dyn_cast_or_null<DictionaryAttr>();
         if (!reflection) continue;
 
         // Rename and remove reflection (it will go on the ABI entry point).
-        funcOp.setAttr("iree.module.export",
-                       StringAttr::get((*exportName + "$raw").str(), ctx));
+        funcOp->setAttr("iree.module.export",
+                        StringAttr::get((*exportName + "$raw").str(), ctx));
         funcOp.removeAttr("iree.reflection");
-        funcOp.setAttr("noinline", UnitAttr::get(ctx));
+        funcOp->setAttr("noinline", UnitAttr::get(ctx));
 
         if (reflection) {
           if (failed(generateAbiFunctions(funcOp, *exportName, reflection))) {

@@ -243,7 +243,7 @@ class VMLATargetBackend final : public TargetBackend {
 
   std::array<Value, 3> calculateDispatchWorkgroupCount(
       Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
       OpBuilder &builder) override {
     // For now we are not tiling and just dispatch everything as 1,1,1.
     auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);

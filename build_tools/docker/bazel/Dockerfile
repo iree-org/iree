@@ -14,14 +14,11 @@
 
 # An image for building IREE using bazel.
 
-ARG BAZEL_VERSION=3.3.1
-# Change to a new version if upgrading Bazel.
-ARG NEW_BAZEL_VERSION=3.3.1
+ARG BAZEL_VERSION=3.7.1
 
 FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-bazel
 WORKDIR /install-bazel
 ARG BAZEL_VERSION
-ARG NEW_BAZEL_VERSION
 
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
 # thing is then feel free. The warning complains about parsing apt-key output,
@@ -34,22 +31,12 @@ RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
     | tee /etc/apt/sources.list.d/bazel.list \
   && apt-get update \
-  # Install Bazel pinned at the version we want. Optionally install an
-  # additional version of Bazel to ease upgrades (modify NEW_BAZEL_VERSION
-  # above). Bazel does some shenanigans to select the correct version based on
-  # your .bazelversion file. When upgrading, we therefore need to have both the
-  # old and new version. When the versions are the same this second installation
-  # is effectively a noop.
-  && apt-get install -y "bazel=${BAZEL_VERSION?}" "bazel-${NEW_BAZEL_VERSION?}"
+  && apt-get install -y "bazel=${BAZEL_VERSION?}"
 
 FROM gcr.io/iree-oss/base@sha256:9b73f4e2b1239f65a19f2022e54f4b15310b805570831fbe2cf8b4dc928f1d10 AS final
 ARG BAZEL_VERSION
-ARG NEW_BAZEL_VERSION
 COPY --from=install-bazel \
-  /usr/bin/bazel \
-  "/usr/bin/bazel-${BAZEL_VERSION}" \
-  "/usr/bin/bazel-${NEW_BAZEL_VERSION}" \
-  /usr/bin/bazel-real \
+  /usr/bin/bazel* \
   /usr/bin/
 
 # TF requires python and numpy at configure time...

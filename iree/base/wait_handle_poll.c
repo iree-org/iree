@@ -56,13 +56,13 @@ static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
     // One or more events set.
     *out_signaled_count = rv;
     return iree_ok_status();
-  } else if (rv == 0) {
-    // Timeout; no events set.
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   } else if (IREE_UNLIKELY(rv < 0)) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "poll failure %d", errno);
   }
+  // rv == 0
+  // Timeout; no events set.
+  return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
 }
 #elif IREE_WAIT_API == IREE_WAIT_API_PPOLL
 static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
@@ -105,13 +105,13 @@ static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
     // One or more events set.
     *out_signaled_count = rv;
     return iree_ok_status();
-  } else if (rv == 0) {
-    // Timeout; no events set.
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-  } else {
+  } else if (rv < 0) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "ppoll failure %d", errno);
   }
+  // rv == 0
+  // Timeout; no events set.
+  return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
 }
 #else
 #error "unsupported IREE_WAIT_API value"

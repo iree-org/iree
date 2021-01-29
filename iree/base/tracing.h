@@ -32,6 +32,7 @@
 // enables the C++ when in a valid context. Do not use C++ features or include
 // other files that are not C-compatible.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -202,6 +203,14 @@ void iree_tracing_set_thread_name_impl(const char* name);
 
 typedef struct ___tracy_source_location_data iree_tracing_location_t;
 
+#ifdef __cplusplus
+#define iree_tracing_make_zone_ctx(zone_id) \
+  TracyCZoneCtx { zone_id, 1 }
+#else
+#define iree_tracing_make_zone_ctx(zone_id) \
+  (TracyCZoneCtx) { zone_id, 1 }
+#endif  // __cplusplus
+
 ABSL_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -221,6 +230,7 @@ void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
 void iree_tracing_mutex_terminate(uint32_t lock_id);
 void iree_tracing_mutex_before_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
 void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #endif  // IREE_TRACING_FEATURES
@@ -306,9 +316,13 @@ enum {
       file_name, file_name_length, line, function_name, function_name_length, \
       name, name_length)
 
+// Sets the dynamic color of the zone to an XXBBGGRR value.
+#define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xbgr) \
+  ___tracy_emit_zone_color(iree_tracing_make_zone_ctx(zone_id), color_xbgr);
+
 // Appends an integer value to the parent zone. May be called multiple times.
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value) \
-  ___tracy_emit_zone_value((struct ___tracy_c_zone_context){zone_id, 1}, value);
+  ___tracy_emit_zone_value(iree_tracing_make_zone_ctx(zone_id), value);
 
 // Appends a string value to the parent zone. May be called multiple times.
 // The |value| string will be copied into the trace buffer.
@@ -319,13 +333,13 @@ enum {
   (__VA_ARGS__)
 #define IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(zone_id, value) \
   IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, strlen(value))
-#define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length)  \
-  ___tracy_emit_zone_text((struct ___tracy_c_zone_context){zone_id, 1}, value, \
+#define IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(zone_id, value, value_length) \
+  ___tracy_emit_zone_text(iree_tracing_make_zone_ctx(zone_id), value,         \
                           value_length)
 
 // Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
 #define IREE_TRACE_ZONE_END(zone_id) \
-  ___tracy_emit_zone_end((struct ___tracy_c_zone_context){zone_id, 1})
+  ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id))
 
 // Ends the current zone before returning on a failure.
 // Sugar for IREE_TRACE_ZONE_END+IREE_RETURN_IF_ERROR.
@@ -393,8 +407,9 @@ enum {
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
+#define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
-#define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, value, value_length)
+#define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)

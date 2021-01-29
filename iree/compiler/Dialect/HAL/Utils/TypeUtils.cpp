@@ -25,7 +25,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -45,7 +45,7 @@ TensorType convertTensorTypeToABIType(TensorType sourceType) {
   if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
     int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
     targetElementType =
-        IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+        IntegerType::get(sourceElementType.getContext(), targetByteWidth * 8);
   }
   return RankedTensorType::get(sourceType.getShape(), targetElementType);
 }

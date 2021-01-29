@@ -24,8 +24,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
@@ -164,27 +164,23 @@ class BufferConstraintsAdaptor {
 class BufferBarrierType {
  public:
   static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-            BufferType::get(context),
-            IndexType::get(context),
-            IndexType::get(context),
-        },
-        context);
+    return TupleType::get(context, {
+                                       IntegerType::get(context, 32),
+                                       IntegerType::get(context, 32),
+                                       BufferType::get(context),
+                                       IndexType::get(context),
+                                       IndexType::get(context),
+                                   });
   }
 };
 
 class MemoryBarrierType {
  public:
   static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-        },
-        context);
+    return TupleType::get(context, {
+                                       IntegerType::get(context, 32),
+                                       IntegerType::get(context, 32),
+                                   });
   }
 };
 

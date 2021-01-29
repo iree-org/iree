@@ -15,10 +15,11 @@
 #include <limits>
 
 #include "iree/base/signature_mangle.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LogicalResult.h"
@@ -127,8 +128,8 @@ class MaterializeExportedReflectionPass
     auto builder = Builder(&getContext());
 
     // Only process exported functions that are not marked to omit an abi.
-    if (!func.getAttr("iree.module.export")) return;
-    if (func.getAttr("iree.abi.none")) return;
+    if (!func->getAttr("iree.module.export")) return;
+    if (func->getAttr("iree.abi.none")) return;
 
     // Arguments.
     for (int i = 0, e = funcType.getNumInputs(); i < e; ++i) {
@@ -140,7 +141,7 @@ class MaterializeExportedReflectionPass
             << " may not be invokable by standard tools";
         mangled = unrecognizedTypeAttr(builder, 'I');
       }
-      MutableDictionaryAttr l(
+      NamedAttrList l(
           func.getArgAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
       func.setArgAttr(i, "iree.reflection",
@@ -157,7 +158,7 @@ class MaterializeExportedReflectionPass
             << " may not be invokable by standard tools";
         mangled = unrecognizedTypeAttr(builder, 'R');
       }
-      MutableDictionaryAttr l(
+      NamedAttrList l(
           func.getResultAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
       func.setResultAttr(i, "iree.reflection",

@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Traits.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -254,10 +255,10 @@ class ConvertToExtentTensorOp
 // Currently, upstream shape lowering can use tensor<?xindex> to represent a
 // shape, and will insert tensor_cast ops to convert to specific extent tensor
 // types. However, not all tensor_cast ops are shape-related.
-class ConvertTensorCastOp : public OpConversionPattern<TensorCastOp> {
+class ConvertTensorCastOp : public OpConversionPattern<tensor::CastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      TensorCastOp op, ArrayRef<Value> operands,
+      tensor::CastOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (!operands[0].getType().isa<RankedShapeType>())
       return rewriter.notifyMatchFailure(op, "not a shape-related tensor_cast");

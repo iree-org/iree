@@ -12,47 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_metal-spirv_metal
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "exponential.mlir"
-    "gather.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    metal-spirv
-  DRIVER
-    metal
-)
-
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
@@ -62,9 +21,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
-    vmla
+    "vmla"
   DRIVER
-    vmla
+    "vmla"
 )
 
 iree_check_single_backend_test_suite(
@@ -115,9 +74,9 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    vulkan-spirv
+    "vulkan-spirv"
   DRIVER
-    vulkan
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
@@ -167,7 +126,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    dylib-llvm-aot
+    "dylib-llvm-aot"
   DRIVER
-    dylib
+    "dylib"
 )

@@ -21,6 +21,7 @@ from typing import Any, Callable, Sequence, Set, Tuple, Union
 
 from absl import logging
 import numpy as np
+from pyiree import rt
 import tensorflow.compat.v2 as tf
 
 InputGeneratorType = Callable[[Sequence[int], Union[tf.DType, np.dtype]],
@@ -87,25 +88,9 @@ def generate_inputs(
   return apply_function(spec, generate)
 
 
-def normalize_numpy(result: np.ndarray):
-  """Normalizes TF and TFLite's outputs to match IREE's"""
-  if np.isscalar(result):
-    result = np.array(result)
-  if result.dtype == np.bool:
-    # IREE interprets bools as int8s, so we modify this for comparison.
-    result = result.astype(dtype=np.int8)
-  return result
-
-
 def convert_to_numpy(values: Any) -> Any:
-  """Converts any tf.Tensor in values to numpy."""
-
-  def _convert_to_numpy(tensor: Any) -> Any:
-    if not isinstance(tensor, tf.Tensor):
-      return tensor
-    return normalize_numpy(tensor.numpy())
-
-  return apply_function(values, _convert_to_numpy)
+  """Converts any tf.Tensor, int, float, bool or list values to numpy."""
+  return apply_function(values, rt.normalize_value)
 
 
 def to_mlir_type(dtype: np.dtype) -> str:
@@ -251,11 +236,16 @@ def check_same(ref: Any, tar: Any, rtol: float,
 
   # Base check for numpy arrays.
   elif isinstance(ref, np.ndarray):
-    if ref.dtype != tar.dtype:
+    # Ignore np.bool != np.int8 because the IREE python runtime awkwardly
+    # returns np.int8s instead of np.bools.
+    if ref.dtype != tar.dtype and not (
+        (ref.dtype == np.bool and tar.dtype == np.int8) or
+        (ref.dtype == np.int8 and tar.dtype == np.bool)):
       error = ("Expected ref and tar to have the same dtype, but got "
                f"'{ref.dtype}' and '{tar.dtype}'")
       logging.error(error)
       return False, error
+
     if ref.size == tar.size == 0:
       return True, None
 

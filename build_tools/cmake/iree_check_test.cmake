@@ -36,6 +36,22 @@ function(iree_check_test)
     return()
   endif()
 
+  # Check tests require (by way of iree_bytecode_module) some tools.
+  #
+  # On the host, we can either build the tools directly, if IREE_BUILD_COMPILER
+  # is enabled, or reuse the tools from an existing build (or binary release).
+  #
+  # In some configurations (e.g. when cross compiling for Android), we can't
+  # always build the tools and may depend on them from a host build.
+  #
+  # For now we enable check tests:
+  #   On the host if IREE_BUILD_COMPILER is set
+  #   Always when cross compiling (assuming host tools exist)
+  #
+  # In the future, we should probably add some orthogonal options that give
+  # more control (such as using tools from a binary release in a runtime-only
+  # host build, or skipping check tests in an Android build).
+  # TODO(#4662): add flexible configurable options that cover more uses
   if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
     return()
   endif()
@@ -103,7 +119,7 @@ function(iree_check_test)
   add_dependencies(
     "${_NAME}"
     "${_MODULE_TARGET_NAME}"
-    iree_modules_check_iree-check-module
+    iree_tools_iree-check-module
   )
 
   iree_package_ns(_PACKAGE_NS)
@@ -123,7 +139,7 @@ function(iree_check_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_modules_check_iree-check-module>"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_tools_iree-check-module>"
         "--driver=${_RULE_DRIVER}"
         "${_ANDROID_REL_DIR}/${_MODULE_FILE_NAME}"
         ${_RULE_RUNNER_ARGS}
@@ -135,7 +151,7 @@ function(iree_check_test)
       _ENVIRONMENT_VARS
         TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
         TEST_DATA=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}
-        TEST_EXECUTABLE=$<TARGET_FILE:iree_modules_check_iree-check-module>
+        TEST_EXECUTABLE=$<TARGET_FILE:iree_tools_iree-check-module>
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
     iree_add_test_environment_properties(${_TEST_NAME})
@@ -145,7 +161,7 @@ function(iree_check_test)
         "${_TEST_NAME}"
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-        "$<TARGET_FILE:iree_modules_check_iree-check-module>"
+        "$<TARGET_FILE:iree_tools_iree-check-module>"
         "--driver=${_RULE_DRIVER}"
         "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
         ${_RULE_RUNNER_ARGS}
@@ -183,6 +199,10 @@ function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
+
+  # Note: we could check IREE_BUILD_COMPILER here, but cross compilation makes
+  # that a little tricky. Instead, we let iree_check_test handle the checks,
+  # meaning this function may run some configuration but generate no targets.
 
   cmake_parse_arguments(
     _RULE

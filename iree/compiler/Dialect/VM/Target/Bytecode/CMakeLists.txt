@@ -39,6 +39,7 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::VM::Analysis
     iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Target::CallingConventionUtils
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Utils
     iree::schemas::bytecode_module_def_c_fbs
