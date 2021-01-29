@@ -18,7 +18,7 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
-#include "iree/vm/c_funcs.h"
+#include "iree/vm/ops.h"
 
 //===----------------------------------------------------------------------===//
 // Register remapping utilities

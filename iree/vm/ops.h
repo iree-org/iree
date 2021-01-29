@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_C_FUNCS_H_
-#define IREE_VM_C_FUNCS_H_
+#ifndef IREE_VM_OPS_H_
+#define IREE_VM_OPS_H_
 
 #include <stdint.h>
 
@@ -48,4 +48,4 @@ inline int32_t vm_cmp_ne_i32(int32_t a, int32_t b) { return a != b ? 1 : 0; }
 // Const ops
 inline int32_t vm_const_i32(int32_t a) { return a; }
 
-#endif  // IREE_VM_C_FUNCS_H_
+#endif  // IREE_VM_OPS_H_
