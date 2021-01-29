@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
+from absl.testing import absltest
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -65,7 +64,7 @@ class SquareNode:
     return cls(*children)
 
 
-class JAXFrontendTest(unittest.TestCase):
+class JAXFrontendTest(absltest.TestCase):
 
   def test_aot_pytree(self):
 
@@ -202,15 +201,15 @@ class JAXFrontendTest(unittest.TestCase):
       return node.apply(z)
 
     expected_sqrt = apply_node._function(SqrtNode(2, 3), 4)
-    compied_sqrt = apply_node(SqrtNode(2, 3), 4)
-    np.testing.assert_allclose(compied_sqrt, expected_sqrt)
+    compiled_sqrt = apply_node(SqrtNode(2, 3), 4)
+    np.testing.assert_allclose(compiled_sqrt, expected_sqrt, **TOLERANCE)
 
     expected_square = apply_node._function(SquareNode(2, 3), 4)
-    compied_square = apply_node(SquareNode(2, 3), 4)
-    np.testing.assert_allclose(expected_square, expected_square)
+    compiled_square = apply_node(SquareNode(2, 3), 4)
+    np.testing.assert_allclose(compiled_square, expected_square, **TOLERANCE)
 
 
 if __name__ == "__main__":
   jax.tree_util.register_pytree_node_class(SqrtNode)
   jax.tree_util.register_pytree_node_class(SquareNode)
-  unittest.main()
+  absltest.main()
