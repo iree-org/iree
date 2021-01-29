@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the python bindings and tensorflow integrations on GPU within
-# gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia
+# Build and test the python bindings and frontend integrations on GPU within
+# gcr.io/iree-oss/cmake-bazel-frontends-nvidia
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -38,7 +38,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/cmake-bazel-tensorflow-nvidia@sha256:1592a4ffe32ca5643b27f59f3fc4052d96a5bea34a91e51703d882aa38c09ae5 \
+  gcr.io/iree-oss/cmake-bazel-frontends-nvidia@sha256:e71d77c2e8b886e99ffce2f50c73c5ae5e316bde23b54f0e6090bb04ce2d1bdf \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

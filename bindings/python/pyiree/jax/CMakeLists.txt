@@ -20,4 +20,9 @@ iree_py_library(
     "frontend.py"
 )
 
-# TODO: Add test for frontend_test.py when the CI can run it.
+iree_py_test(
+  NAME
+    frontend_test
+  SRCS
+    "frontend_test.py"
+)

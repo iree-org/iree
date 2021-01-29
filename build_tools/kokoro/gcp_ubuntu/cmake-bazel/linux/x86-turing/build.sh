@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the python bindings and tensorflow integrations on GPU.
+# Build and test the python bindings and frontend integrations on GPU.
 
 set -e
 set -x
@@ -29,6 +29,7 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
+python3 -c 'import jax; print(jax.__version__)'
 
 # Print NVIDIA GPU information inside the docker
 dpkg -l | grep nvidia
@@ -62,6 +63,7 @@ echo "Configuring CMake"
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
    -DIREE_BUILD_DEBUGGER=OFF \
+   -DIREE_BUILD_XLA_COMPILER=ON \
    -DIREE_BUILD_TENSORFLOW_COMPILER=ON .
 
 echo "Building with Ninja"
