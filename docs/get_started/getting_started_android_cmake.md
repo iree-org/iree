@@ -71,6 +71,9 @@ $ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-hos
 $ cmake --build ../iree-build-host/ --target install
 ```
 
+Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then
+the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
+
 ### Target configuration
 
 Build the runtime using the Android NDK toolchain:
@@ -78,9 +81,12 @@ Build the runtime using the Android NDK toolchain:
 ```shell
 $ cmake -G Ninja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT=../iree-build-host/install
-  -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
-  -DIREE_BUILD_COMPILER=OFF -DIREE_ENABLE_MLIR=OFF -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
+  -DANDROID_ABI="arm64-v8a" \
+  -DANDROID_PLATFORM=android-29 \
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_ENABLE_MLIR=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
   .
 $ cmake --build ../iree-build-android/
 ```

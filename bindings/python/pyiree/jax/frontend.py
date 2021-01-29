@@ -83,9 +83,9 @@ class _JittedFunction:
     self._options = options
     self._memoized_signatures = {}
 
-  def _get_signature(self, args_flat):
+  def _get_signature(self, args_flat, in_tree):
     args_flat = [rt.normalize_value(arg) for arg in args_flat]
-    return tuple((arg.shape, arg.dtype) for arg in args_flat)
+    return tuple((arg.shape, arg.dtype) for arg in args_flat) + (in_tree,)
 
   def _wrap_and_compile(self, signature, args_flat, in_tree):
     """Compiles the function for the given signature."""
@@ -110,7 +110,7 @@ class _JittedFunction:
   def _get_compiled_artifacts(self, args, kwargs):
     """Returns the binary, loaded rt module and out_tree."""
     args_flat, in_tree = jax.tree_flatten((args, kwargs))
-    signature = self._get_signature(args_flat)
+    signature = self._get_signature(args_flat, in_tree)
 
     if signature not in self._memoized_signatures:
       self._wrap_and_compile(signature, args_flat, in_tree)

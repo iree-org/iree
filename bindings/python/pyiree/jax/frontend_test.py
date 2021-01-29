@@ -31,6 +31,40 @@ def normal(shape):
   return np.random.normal(0, 1, shape).astype(np.float32)
 
 
+class SqrtNode:
+
+  def __init__(self, x, y):
+    self.x = x
+    self.y = y
+
+  def apply(self, z):
+    return self.x * jnp.sqrt(self.y * z)
+
+  def tree_flatten(self):
+    return ((self.x, self.y), None)
+
+  @classmethod
+  def tree_unflatten(cls, aux_data, children):
+    return cls(*children)
+
+
+class SquareNode:
+
+  def __init__(self, x, y):
+    self.x = x
+    self.y = y
+
+  def apply(self, z):
+    return self.x * (self.y * z)**2
+
+  def tree_flatten(self):
+    return ((self.x, self.y), None)
+
+  @classmethod
+  def tree_unflatten(cls, aux_data, children):
+    return cls(*children)
+
+
 class JAXFrontendTest(unittest.TestCase):
 
   def test_aot_pytree(self):
@@ -161,6 +195,22 @@ class JAXFrontendTest(unittest.TestCase):
 
     self.assertEqual(add_sqrt_four(2), 4)
 
+  def test_jit_pytree_method(self):
+
+    @iree.jax.jit
+    def apply_node(node, z):
+      return node.apply(z)
+
+    expected_sqrt = apply_node._function(SqrtNode(2, 3), 4)
+    compied_sqrt = apply_node(SqrtNode(2, 3), 4)
+    np.testing.assert_allclose(compied_sqrt, expected_sqrt)
+
+    expected_square = apply_node._function(SquareNode(2, 3), 4)
+    compied_square = apply_node(SquareNode(2, 3), 4)
+    np.testing.assert_allclose(expected_square, expected_square)
+
 
 if __name__ == "__main__":
+  jax.tree_util.register_pytree_node_class(SqrtNode)
+  jax.tree_util.register_pytree_node_class(SquareNode)
   unittest.main()
