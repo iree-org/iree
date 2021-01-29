@@ -62,8 +62,9 @@ void LinalgVectorizationPass::runOnFunction() {
         .insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
                 linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
                 linalg::LinalgVectorizationPattern<linalg::GenericOp>>(
-            context, linalg::LinalgMarker(ArrayRef<Identifier>(
-                         Identifier::get(getWorkgroupMarker(), context))));
+            context, linalg::LinalgVectorizationOptions(),
+            linalg::LinalgTransformationFilter(ArrayRef<Identifier>(
+                Identifier::get(getWorkgroupMarker(), context))));
     applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
     LLVM_DEBUG({

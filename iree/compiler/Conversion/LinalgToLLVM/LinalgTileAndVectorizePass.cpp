@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -31,7 +32,8 @@ template <typename LinalgOpTy>
 struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
   TileWorkgroups(MLIRContext *context, linalg::LinalgTilingOptions options,
-                 linalg::LinalgMarker marker, PatternBenefit benefit = 1)
+                 linalg::LinalgTransformationFilter marker,
+                 PatternBenefit benefit = 1)
       : Base(LinalgOpTy::getOperationName(), context, options, marker,
              benefit) {}
   LogicalResult matchAndRewrite(Operation *op,
@@ -77,7 +79,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
               return TileSizeFn::get<TilingLevel::Level1Tiles>(
                   cpuKernelDispatch, builder, operation);
             }),
-        linalg::LinalgMarker(
+        linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupMarker(), context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
@@ -96,7 +98,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
               return TileSizeFn::get<TilingLevel::Level2Tiles>(
                   cpuKernelDispatch, builder, operation);
             }),
-        linalg::LinalgMarker(
+        linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
@@ -120,8 +122,9 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     vectorizationPatterns
         .insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
                 linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>>(
-            context, linalg::LinalgMarker(
-                         Identifier::get(getVectorizeMarker(), context)));
+            context, linalg::LinalgVectorizationOptions(),
+            linalg::LinalgTransformationFilter(
+                Identifier::get(getVectorizeMarker(), context)));
     applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
   }
 

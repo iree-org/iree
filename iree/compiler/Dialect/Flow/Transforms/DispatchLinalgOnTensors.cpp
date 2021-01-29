@@ -234,7 +234,7 @@ struct TileAndDistributeOnTensorsPattern
     : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
   TileAndDistributeOnTensorsPattern(linalg::LinalgTilingOptions options,
-                                    linalg::LinalgMarker marker,
+                                    linalg::LinalgTransformationFilter marker,
                                     PatternBenefit benefit = 1)
       : Base(options, marker, benefit) {}
 
@@ -418,8 +418,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   patterns.insert<TileAndDistributeOnTensorsPattern>(
       linalgTilingOptions,
       // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
-      linalg::LinalgMarker(ArrayRef<Identifier>(),
-                           Identifier::get("workgroup", context)));
+      linalg::LinalgTransformationFilter(
+          ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
 
   // Add canonicalization patterns.
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);

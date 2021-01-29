@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -50,7 +51,7 @@ struct TileAndDistributeOnTensorsPattern
     : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
   TileAndDistributeOnTensorsPattern(linalg::LinalgTilingOptions options,
-                                    linalg::LinalgMarker marker,
+                                    linalg::LinalgTransformationFilter marker,
                                     PatternBenefit benefit = 1)
       : Base(options, marker, benefit) {}
 
@@ -108,8 +109,9 @@ void LinalgTileAndDistributeOnTensorsPass::runOnOperation() {
     // SPMD loops.
     patterns.insert<TileAndDistributeOnTensorsPattern>(
         linalgTilingOptions,
-        linalg::LinalgMarker(ArrayRef<Identifier>(),
-                             Identifier::get(getWorkgroupMarker(), context)));
+        linalg::LinalgTransformationFilter(
+            ArrayRef<Identifier>(),
+            Identifier::get(getWorkgroupMarker(), context)));
     // Add canonicalization patterns.
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
     patterns.insert<AffineMinCanonicalizationPattern>(context);
