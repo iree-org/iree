@@ -65,11 +65,24 @@ typedef struct iree_task_scope_s {
   // are undefined in the case of failure and may tear.
   iree_task_dispatch_statistics_t dispatch_statistics;
 
+  // A mutex used to guard the pending_submissions.
+  // We need a mutex here so that we can ensure proper ordering with respect to
+  // the pending_submissions changes and the idle_notification: if we were to
+  // decrement the pending_submissions to 0 ("going idle") there's a race that
+  // can happen where another thread may come in and observe that prior to the
+  // idle_notification being notified. If that thread happens to be destroying
+  // the scope then boom.
+  //
+  // Thankfully we insert fences fairly infrequently, the contention is low,
+  // and iree_slim_mutex_t is a futex so this isn't much more expensive than
+  // just having an atomic variable.
+  iree_slim_mutex_t mutex;
+
   // A count of pending submissions within this scope. 0 indicates idle.
   // Each submission has a fence that references this value and decrements it
   // as it is reached indicating that all memory used by all tasks within that
   // submission is available for reuse.
-  iree_atomic_int32_t pending_submissions;
+  uint32_t pending_submissions;
 
   // A notification signaled when the scope transitions to having no pending
   // tasks or completes all pending tasks after a failure.
@@ -115,6 +128,14 @@ void iree_task_scope_abort(iree_task_scope_t* scope);
 // marked as failing then the status is ignored.
 void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
                           iree_status_t status);
+
+// Notifies the scope that a new execution task assigned to the scope has begun.
+// The scope is considered active until it is notified execution has completed
+// with iree_task_scope_end.
+void iree_task_scope_begin(iree_task_scope_t* scope);
+
+// Notifies the scope that a previously begun execution task has completed.
+void iree_task_scope_end(iree_task_scope_t* scope);
 
 // Returns true if the scope has no pending or in-flight tasks.
 //

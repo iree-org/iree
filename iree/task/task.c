@@ -99,8 +99,7 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
     case IREE_TASK_TYPE_FENCE: {
       // TODO(benvanik): signal as error.
       // iree_task_fence_t* fence_task = (iree_task_fence_t*)task;
-      iree_atomic_fetch_sub_int32(&task->scope->pending_submissions, 1,
-                                  iree_memory_order_release);
+      iree_task_scope_end(task->scope);
       break;
     }
     case IREE_TASK_TYPE_WAIT:
@@ -240,20 +239,14 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
 void iree_task_fence_initialize(iree_task_scope_t* scope,
                                 iree_task_fence_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_FENCE, scope, &out_task->header);
-  iree_atomic_fetch_add_int32(&scope->pending_submissions, 1,
-                              iree_memory_order_release);
+  iree_task_scope_begin(scope);
 }
 
 void iree_task_fence_retire(iree_task_fence_t* task,
                             iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_scope_t* scope = task->header.scope;
-  if (iree_atomic_fetch_sub_int32(&scope->pending_submissions, 1,
-                                  iree_memory_order_acq_rel) == 1) {
-    // All submissions have completed in this scope - notify any waiters.
-    iree_notification_post(&scope->idle_notification, IREE_ALL_WAITERS);
-  }
+  iree_task_scope_end(task->header.scope);
 
   iree_task_retire(&task->header, pending_submission);
   IREE_TRACE_ZONE_END(z0);
