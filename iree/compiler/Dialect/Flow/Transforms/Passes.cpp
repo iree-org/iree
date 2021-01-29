@@ -158,7 +158,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // during dispatch/stream formation versus having such a large phase
   // ordering constraint.
   //----------------------------------------------------------------------------
-  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  SmallVector<std::string> doNotRecurseOpNames = {"flow.dispatch.workgroups"};
+  passManager.addNestedPass<FuncOp>(
+      Shape::createTieDynamicShapesPass(doNotRecurseOpNames));
   passManager.addNestedPass<FuncOp>(
       Shape::createMaterializeShapeCalculationsPass());
   passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());

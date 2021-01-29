@@ -25,16 +25,40 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
+// Return true if `op` has a proper ancestor whose op name is in `opNames`.
+static bool hasProperAncestorWithOpName(Operation *op,
+                                        const DenseSet<StringRef> &opNames) {
+  while ((op = op->getParentOp())) {
+    if (opNames.contains(op->getName().getStringRef())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace {
 
 class TieDynamicShapesPass
     : public PassWrapper<TieDynamicShapesPass, FunctionPass> {
+ public:
+  TieDynamicShapesPass() = default;
+  TieDynamicShapesPass(const TieDynamicShapesPass &) {}
+  explicit TieDynamicShapesPass(ArrayRef<std::string> doNotRecurseOpNames_) {
+    doNotRecurseOpNames = doNotRecurseOpNames_;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
 
   void runOnFunction() override {
+    DenseSet<StringRef> doNotRecurseOpNameSet;
+    for (auto &s : doNotRecurseOpNames) {
+      doNotRecurseOpNameSet.insert(s);
+    }
     getFunction().walk([&](Operation *nestedOp) {
+      if (hasProperAncestorWithOpName(nestedOp, doNotRecurseOpNameSet)) {
+        return;
+      }
       for (auto result : nestedOp->getResults()) {
         rewriteOperationResult(nestedOp, result);
       }
@@ -67,14 +91,22 @@ class TieDynamicShapesPass
     tieOp.getOperation()->replaceUsesOfWith(tieOp, result);
     getShapeOp.getOperation()->replaceUsesOfWith(tieOp, result);
   }
+
+  ListOption<std::string> doNotRecurseOpNames{
+      *this, "do-not-recurse-op-names",
+      llvm::cl::desc("comma separated list of op names (e.g. "
+                     "`my_dialect.my_op,my_dialect.my_other_op`) whose regions "
+                     "should not have their ops tied"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
 
 }  // namespace
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass() {
-  return std::make_unique<Shape::TieDynamicShapesPass>();
+std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass(
+    ArrayRef<std::string> doNotRecurseOpNames) {
+  return std::make_unique<Shape::TieDynamicShapesPass>(doNotRecurseOpNames);
 }
 
 static PassRegistration<Shape::TieDynamicShapesPass> pass(
