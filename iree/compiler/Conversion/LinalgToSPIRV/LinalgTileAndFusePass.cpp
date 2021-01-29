@@ -438,23 +438,17 @@ void LinalgTileAndFusePass::runOnOperation() {
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
-    Region &body = funcOp.getBody();
-    if (!llvm::hasSingleElement(body.getBlocks())) {
-      funcOp.emitError("unhandled dispatch function with multiple blocks");
+    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    SmallVector<Operation *, 4> tiledLoops;
+
+    if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
       return signalPassFailure();
     }
-    Block &block = body.front();
-    auto linalgOps = block.getOps<linalg::LinalgOp>();
-    if (linalgOps.empty()) continue;
 
-    SmallVector<linalg::LinalgOp, 4> linalgOpsVec =
-        llvm::to_vector<4>(llvm::map_range(linalgOps, [](Operation *op) {
-          return cast<linalg::LinalgOp>(op);
-        }));
     linalg::Aliases aliases;
-    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
     Optional<LaunchConfig> launchConfigOpt =
-        initGPULaunchConfig(context, dependenceGraph, options, linalgOpsVec);
+        initGPULaunchConfig(context, dependenceGraph, options, linalgOps);
     if (!launchConfigOpt) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
@@ -480,11 +474,33 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    TileAndFuseOptions tileAndFuseOptions = {getWorkgroupDistributionOptions(),
-                                             allocateWorkgroupMemory};
-    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOpsVec, dependenceGraph,
-                                          launchConfig, tileAndFuseOptions)) ||
-        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
+    if (tiledLoops.empty()) {
+      TileAndFuseOptions tileAndFuseOptions = {
+          getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
+      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
+                                            launchConfig,
+                                            tileAndFuseOptions))) {
+        return signalPassFailure();
+      }
+    } else {
+      ArrayRef<int64_t> workgroupSize = launchConfig.getWorkgroupSize();
+      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup = llvm::to_vector<4>(
+          llvm::reverse(workgroupSize.take_front(tiledLoops.size())));
+      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
+          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
+                                               defaultWorkloadPerWorkgroup);
+      if (!workloadPerWorkgroup) {
+        funcOp.emitOpError("unable to find workload per workgroup");
+        return signalPassFailure();
+      }
+      if (failed(materializeStaticLaunchInformation(
+              funcOp, workloadPerWorkgroup.getValue()))) {
+        funcOp.emitOpError("failed to set tile size to constant value");
+        return signalPassFailure();
+      }
+    }
+
+    if (failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
       return signalPassFailure();
     }
 

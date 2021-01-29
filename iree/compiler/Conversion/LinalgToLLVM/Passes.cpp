@@ -100,15 +100,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   // HLO -> Linalg on buffers.
   if (clEnableLLVMLinalgOnTensors) {
     nestedModulePM.addPass(createLinalgVectorizePass());
-    nestedModulePM.addPass(createLinalgLLVMBufferizePass());
-    nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
-    nestedModulePM.addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
-    nestedModulePM.addPass(createCopyRemovalPass());
-    // nestedModulePM.addPass(createBufferHoistingPass());
-    // TODO(nicolasvasilache): bug in buffer loop hoisting with
-    // dynamic_linalg_matmul_on_tensors_fuse_0.mlir
-    // nestedModulePM.addPass(createBufferLoopHoistingPass());
+    addLinalgBufferizePasses(nestedModulePM);
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     // Propagates dynamic shapes computation on tensors.

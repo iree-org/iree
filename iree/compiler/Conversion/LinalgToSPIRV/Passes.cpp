@@ -25,6 +25,7 @@
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
@@ -53,6 +54,11 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
+    "iree-codegen-spirv-experimental-linalg-on-tensors",
+    llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
+    llvm::cl::init(false));
 
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
@@ -105,41 +111,44 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  //===--------------------------------------------------------------------===//
-  // Legalize the function that computes the number of workgroups to be runnable
-  // on the host.
-  //
-  // Post-conditions:
-  //   - The shape of the values created from `iree.placeholder` operations are
-  //     tied to the arguments of the function.
-  //===--------------------------------------------------------------------===//
-  pm.addPass(createLegalizeNumWorkgroupsFnPass());
+  if (!clEnableLinalgOnTensorsSPIRV) {
+    //===--------------------------------------------------------------------===//
+    // Legalize the function that computes the number of workgroups to be
+    // runnable on the host.
+    //
+    // Post-conditions:
+    //   - The shape of the values created from `iree.placeholder` operations
+    //   are
+    //     tied to the arguments of the function.
+    //===--------------------------------------------------------------------===//
+    pm.addPass(createLegalizeNumWorkgroupsFnPass());
 
-  //===--------------------------------------------------------------------===//
-  // Resolve shape related ops.
-  //
-  // Pre-conditions:
-  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
-  //     appropriate shape.
-  //   - No shapex.get_ranked_shape ops exist.
-  //   - Shape folding and canonicalization has been done.
-  // Post-conditions:
-  //   - shapex.tie_shape and other shapex ops are all converted away.
-  //   - std.dim ops are traced back and replaced by the corresponding
-  //     hal.inteface.load.constant op. There are no std.dim ops left
-  //     in the IR.
-  //===--------------------------------------------------------------------===//
-  pm.addNestedPass<FuncOp>(createResolveShapeOpsPass());
+    //===--------------------------------------------------------------------===//
+    // Resolve shape related ops.
+    //
+    // Pre-conditions:
+    //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+    //     appropriate shape.
+    //   - No shapex.get_ranked_shape ops exist.
+    //   - Shape folding and canonicalization has been done.
+    // Post-conditions:
+    //   - shapex.tie_shape and other shapex ops are all converted away.
+    //   - std.dim ops are traced back and replaced by the corresponding
+    //     hal.inteface.load.constant op. There are no std.dim ops left
+    //     in the IR.
+    //===--------------------------------------------------------------------===//
+    pm.addNestedPass<FuncOp>(createResolveShapeOpsPass());
 
-  //===--------------------------------------------------------------------===//
-  // Legalize the function that computes the number of workgroups to be runnable
-  // on the host.
-  //
-  // Post-conditions:
-  //   - The dead `iree.placeholder` operations are removed after shape
-  //     resolution.
-  //===--------------------------------------------------------------------===//
-  pm.addPass(createLegalizeNumWorkgroupsFnPass());
+    //===--------------------------------------------------------------------===//
+    // Legalize the function that computes the number of workgroups to be
+    // runnable on the host.
+    //
+    // Post-conditions:
+    //   - The dead `iree.placeholder` operations are removed after shape
+    //     resolution.
+    //===--------------------------------------------------------------------===//
+    pm.addPass(createLegalizeNumWorkgroupsFnPass());
+  }
 
   //===--------------------------------------------------------------------===//
   // Prepare stdandard ops for SPIR-V conversion.
@@ -199,7 +208,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //     that returns the number of workgroups.
   //   - The entry point function gets an attribute `vkspv.num_workgroups_fn` to
   //     record which function in the module returns the number of workgroups.
-  pm.addPass(createDeclareNumWorkgroupsFnPass());
+  if (!clEnableLinalgOnTensorsSPIRV)
+    pm.addPass(createDeclareNumWorkgroupsFnPass());
 
   //===--------------------------------------------------------------------===//
   // Inline the impl dispatch function into the wrapper dispatch function.
@@ -208,34 +218,45 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.addPass(createInlinerPass());
 
-  //===--------------------------------------------------------------------===//
-  // Inject shape calculation for output buffers.
-  //
-  // Pre-conditions:
-  //   - All transformations altering the tensor-level shapes have been done.
-  //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
-  //     use which associates them to their shape.
-  //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
-  //     and will be resolved.
-  // Post-conditions:
-  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
-  //     appropriate shape.
-  //   - No shapex.get_ranked_shape ops exist.
-  //   - Shape folding and canonicalization has been done.
-  //===--------------------------------------------------------------------===//
-  pm.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
-  pm.addNestedPass<FuncOp>(Shape::createMaterializeShapeCalculationsPass());
-  pm.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+  if (clEnableLinalgOnTensorsSPIRV) {
+    addLinalgBufferizePasses(pm, [](OpBuilder &builder, Location loc,
+                                    ArrayRef<Value> dynamicSizes,
+                                    MemRefType allocationType) {
+      MemRefType allocType = MemRefType::get(allocationType.getShape(),
+                                             allocationType.getElementType(),
+                                             {}, getWorkgroupMemorySpace());
+      return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+    });
+  } else {
+    //===--------------------------------------------------------------------===//
+    // Inject shape calculation for output buffers.
+    //
+    // Pre-conditions:
+    //   - All transformations altering the tensor-level shapes have been done.
+    //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
+    //     use which associates them to their shape.
+    //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
+    //     and will be resolved.
+    // Post-conditions:
+    //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+    //     appropriate shape.
+    //   - No shapex.get_ranked_shape ops exist.
+    //   - Shape folding and canonicalization has been done.
+    //===--------------------------------------------------------------------===//
+    pm.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+    pm.addNestedPass<FuncOp>(Shape::createMaterializeShapeCalculationsPass());
+    pm.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
 
-  //===--------------------------------------------------------------------===//
-  // Convert XLA HLO ops to Linalg ops with buffer semantics.
-  //
-  // Post-conditions:
-  //   - All XLA HLO ops are converted.
-  //   - All Linalg ops are operating on buffers.
-  //===--------------------------------------------------------------------===//
-  pm.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-  addHLOToLinalgOnBuffersPasses(pm);
+    //===--------------------------------------------------------------------===//
+    // Convert XLA HLO ops to Linalg ops with buffer semantics.
+    //
+    // Post-conditions:
+    //   - All XLA HLO ops are converted.
+    //   - All Linalg ops are operating on buffers.
+    //===--------------------------------------------------------------------===//
+    pm.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+    addHLOToLinalgOnBuffersPasses(pm);
+  }
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to SPIR-V ops.
