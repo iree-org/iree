@@ -168,6 +168,7 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "generated/bytecode_op_table.h"
   DEPS
+    ::c_funcs
     ::vm
     iree::base::api
     iree::base::core_headers

@@ -186,6 +186,7 @@ cc_library(
         "bytecode_module.h",
     ],
     deps = [
+        ":c_funcs",
         ":vm",
         "//iree/base:api",
         "//iree/base:core_headers",
@@ -297,7 +298,7 @@ endif()
 )
 
 #===------------------------------------------------------------------------===#
-# Emit-C modules
+# Common VM c functions
 #===------------------------------------------------------------------------===#
 
 cc_library(
