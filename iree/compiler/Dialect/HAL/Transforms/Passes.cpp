@@ -114,6 +114,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // Run our own CSE on variable loads before moving on.
+  // When specifying side effects can help MLIR's core CSE pass eliminate
+  // redundant loads we can remove this.
+  passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
+
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<ExecutableOp>(
         createSerializeExecutablesPass(targetOptions));

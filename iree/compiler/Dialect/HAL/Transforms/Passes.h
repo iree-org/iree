@@ -126,6 +126,10 @@ createMaterializeConstantPoolBuffersPass();
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
     TargetOptions executableOptions);
 
+// Eliminates redundant 'load's of variables within functions with no 'store'.
+// TODO(#1124): replace with memory side effects once supported upstream.
+std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass();
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
