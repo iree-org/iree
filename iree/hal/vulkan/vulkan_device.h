@@ -15,159 +15,31 @@
 #ifndef IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 #define IREE_HAL_VULKAN_VULKAN_DEVICE_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include <functional>
-#include <memory>
-
-#include "absl/container/inlined_vector.h"
-#include "absl/types/span.h"
-#include "iree/base/memory.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/debug_capture_manager.h"
-#include "iree/hal/device.h"
-#include "iree/hal/driver.h"
-#include "iree/hal/semaphore.h"
-#include "iree/hal/vulkan/descriptor_pool_cache.h"
+#include "iree/hal/api.h"
+#include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
-#include "iree/hal/vulkan/handle_util.h"
-#include "iree/hal/vulkan/vma_allocator.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// A set of queues within a specific queue family on a VkDevice.
-struct QueueSet {
-  // The index of a particular queue family on a VkPhysicalDevice, as described
-  // by vkGetPhysicalDeviceQueueFamilyProperties.
-  uint32_t queue_family_index;
+// Creates a device that owns and manages its own VkDevice.
+//
+// The |driver| will be retained for as long as the device is live such that if
+// the driver owns the |instance| provided it is ensured to be valid. |driver|
+// may be NULL if there is no parent driver to retain (such as when wrapping
+// existing VkInstances provided by the application).
+iree_status_t iree_hal_vulkan_device_create(
+    iree_hal_driver_t* driver, iree_string_view_t identifier,
+    iree_hal_vulkan_features_t enabled_features,
+    const iree_hal_vulkan_device_options_t* options,
+    iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
+    VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device);
 
-  // Bitfield of queue indices within the queue family at |queue_family_index|.
-  uint64_t queue_indices;
-};
-
-class VulkanDevice final : public Device {
- public:
-  struct Options {
-    // Extensibility descriptions for the device.
-    ExtensibilitySpec extensibility_spec;
-
-    // Options for Vulkan Memory Allocator (VMA).
-    VmaAllocator::Options vma_options;
-
-    // Uses timeline semaphore emulation even if native support exists.
-    bool force_timeline_semaphore_emulation = false;
-  };
-
-  // Creates a device that manages its own VkDevice.
-  static StatusOr<ref_ptr<VulkanDevice>> Create(
-      ref_ptr<Driver> driver, VkInstance instance,
-      const DeviceInfo& device_info, VkPhysicalDevice physical_device,
-      Options options, const ref_ptr<DynamicSymbols>& syms,
-      DebugCaptureManager* debug_capture_manager);
-
-  // Creates a device that wraps an externally managed VkDevice.
-  static StatusOr<ref_ptr<VulkanDevice>> Wrap(
-      ref_ptr<Driver> driver, VkInstance instance,
-      const DeviceInfo& device_info, VkPhysicalDevice physical_device,
-      VkDevice logical_device, Options options,
-      const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
-      const ref_ptr<DynamicSymbols>& syms);
-
-  ~VulkanDevice() override;
-
-  std::string DebugString() const override;
-
-  const ref_ptr<DynamicSymbols>& syms() const {
-    return logical_device_->syms();
-  }
-
-  Allocator* allocator() const override { return allocator_.get(); }
-
-  absl::Span<CommandQueue*> dispatch_queues() const override {
-    return absl::MakeSpan(dispatch_queues_);
-  }
-
-  absl::Span<CommandQueue*> transfer_queues() const override {
-    return absl::MakeSpan(transfer_queues_);
-  }
-
-  ref_ptr<ExecutableCache> CreateExecutableCache() override;
-
-  StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings) override;
-
-  StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
-      absl::Span<DescriptorSetLayout* const> set_layouts,
-      size_t push_constants) override;
-
-  StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
-      DescriptorSetLayout* set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
-
-  StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) override;
-
-  StatusOr<ref_ptr<Event>> CreateEvent() override;
-
-  StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
-  Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                           Time deadline_ns) override;
-  StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                 Time deadline_ns) override;
-
-  Status WaitIdle(Time deadline_ns) override;
-
- private:
-  VulkanDevice(
-      ref_ptr<Driver> driver, const DeviceInfo& device_info,
-      VkPhysicalDevice physical_device, ref_ptr<VkDeviceHandle> logical_device,
-      std::unique_ptr<Allocator> allocator,
-      absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
-      ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
-      ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-      ref_ptr<TimePointSemaphorePool> semaphore_pool,
-      ref_ptr<TimePointFencePool> fence_pool,
-      DebugCaptureManager* debug_capture_manager);
-
-  Status WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                        Time deadline_ns, VkSemaphoreWaitFlags wait_flags);
-
-  bool emulating_timeline_semaphores() const {
-    return semaphore_pool_ != nullptr;
-  }
-
-  ref_ptr<Driver> driver_;
-  VkPhysicalDevice physical_device_;
-  ref_ptr<VkDeviceHandle> logical_device_;
-
-  std::unique_ptr<Allocator> allocator_;
-
-  mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues_;
-  mutable absl::InlinedVector<CommandQueue*, 4> dispatch_queues_;
-  mutable absl::InlinedVector<CommandQueue*, 4> transfer_queues_;
-
-  ref_ptr<DescriptorPoolCache> descriptor_pool_cache_;
-
-  ref_ptr<VkCommandPoolHandle> dispatch_command_pool_;
-  ref_ptr<VkCommandPoolHandle> transfer_command_pool_;
-
-  // Fields used for emulated timeline semaphores.
-  ref_ptr<TimePointSemaphorePool> semaphore_pool_;
-  ref_ptr<TimePointFencePool> fence_pool_;
-
-  DebugCaptureManager* debug_capture_manager_ = nullptr;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_VULKAN_DEVICE_H_

@@ -21,6 +21,18 @@ package(
 )
 
 cc_library(
+    name = "atomics",
+    hdrs = [
+        "atomics_clang.h",
+        "atomics_gcc.h",
+        "atomics_msvc.h",
+    ],
+    deps = [
+        "//iree/base:target_platform",
+    ],
+)
+
+cc_library(
     name = "file_handle_win32",
     srcs = ["file_handle_win32.cc"],
     hdrs = ["file_handle_win32.h"],

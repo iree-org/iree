@@ -14,7 +14,6 @@
 
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
-#include "iree/hal/vulkan/status_util.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -58,8 +57,8 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   VkApplicationInfo app_info = GetApplicationInfo();
   VkInstanceCreateInfo create_info = GetInstanceCreateInfo(&app_info);
   VkInstance instance = VK_NULL_HANDLE;
-  VK_CHECK_OK(
-      syms->vkCreateInstance(&create_info, /*pAllocator=*/nullptr, &instance));
+  ASSERT_EQ(VK_SUCCESS, syms->vkCreateInstance(
+                            &create_info, /*pAllocator=*/nullptr, &instance));
 
   IREE_ASSERT_OK(syms->LoadFromInstance(instance));
 

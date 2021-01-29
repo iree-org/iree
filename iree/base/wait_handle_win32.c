@@ -422,6 +422,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
 
 iree_status_t iree_event_initialize(bool initial_state,
                                     iree_event_t* out_event) {
+  memset(out_event, 0, sizeof(*out_event));
   iree_wait_primitive_value_t value;
   memset(&value, 0, sizeof(value));
   value.win32.handle =

@@ -29,16 +29,15 @@ if(${IREE_HAL_DRIVER_VMLA})
 
 cc_library(
     name = "registration",
-    srcs = ["driver_module.cc"],
+    srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAL_HAVE_VMLA_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base:flags",
-        "//iree/base:status",
         "//iree/hal:api",
-        "//iree/hal/vmla",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:vmla_module_loader",
     ],
 )
 

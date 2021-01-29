@@ -15,113 +15,29 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include "iree/hal/command_buffer.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
-#include "iree/hal/vulkan/descriptor_set_arena.h"
-#include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
-#include "iree/hal/vulkan/native_descriptor_set.h"
-#include "iree/hal/vulkan/native_event.h"
-#include "iree/hal/vulkan/pipeline_executable.h"
-#include "iree/hal/vulkan/pipeline_executable_layout.h"
-#include "iree/hal/vulkan/vma_buffer.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// Command buffer implementation that directly maps to VkCommandBuffer.
-// This records the commands on the calling thread without additional threading
-// indirection.
-class DirectCommandBuffer final : public CommandBuffer {
- public:
-  DirectCommandBuffer(CommandBufferModeBitfield mode,
-                      CommandCategoryBitfield command_categories,
-                      ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
-                      ref_ptr<VkCommandPoolHandle> command_pool,
-                      VkCommandBuffer command_buffer);
-  ~DirectCommandBuffer() override;
+// Creates a command buffer that directly records into a VkCommandBuffer.
+iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree::hal::vulkan::VkCommandPoolHandle* command_pool,
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
+    iree_hal_command_buffer_t** out_command_buffer);
 
-  VkCommandBuffer handle() const { return command_buffer_; }
+// Returns the native Vulkan VkCommandBuffer handle.
+VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
+    iree_hal_command_buffer_t* command_buffer);
 
-  bool is_recording() const override { return is_recording_; }
-
-  Status Begin() override;
-  Status End() override;
-
-  Status ExecutionBarrier(
-      ExecutionStageBitfield source_stage_mask,
-      ExecutionStageBitfield target_stage_mask,
-      absl::Span<const MemoryBarrier> memory_barriers,
-      absl::Span<const BufferBarrier> buffer_barriers) override;
-  Status SignalEvent(Event* event,
-                     ExecutionStageBitfield source_stage_mask) override;
-  Status ResetEvent(Event* event,
-                    ExecutionStageBitfield source_stage_mask) override;
-  Status WaitEvents(absl::Span<Event*> events,
-                    ExecutionStageBitfield source_stage_mask,
-                    ExecutionStageBitfield target_stage_mask,
-                    absl::Span<const MemoryBarrier> memory_barriers,
-                    absl::Span<const BufferBarrier> buffer_barriers) override;
-
-  Status FillBuffer(Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length, const void* pattern,
-                    size_t pattern_length) override;
-  Status DiscardBuffer(Buffer* buffer) override;
-  Status UpdateBuffer(const void* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length) override;
-  Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
-                    Buffer* target_buffer, device_size_t target_offset,
-                    device_size_t length) override;
-
-  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
-                       absl::Span<const uint32_t> values) override;
-
-  Status PushDescriptorSet(
-      ExecutableLayout* executable_layout, int32_t set,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
-  Status BindDescriptorSet(
-      ExecutableLayout* executable_layout, int32_t set,
-      DescriptorSet* descriptor_set,
-      absl::Span<const device_size_t> dynamic_offsets) override;
-
-  Status Dispatch(Executable* executable, int32_t entry_point,
-                  std::array<uint32_t, 3> workgroups) override;
-  Status DispatchIndirect(Executable* executable, int32_t entry_point,
-                          Buffer* workgroups_buffer,
-                          device_size_t workgroups_offset) override;
-
- private:
-  const ref_ptr<DynamicSymbols>& syms() const { return command_pool_->syms(); }
-
-  StatusOr<NativeEvent*> CastEvent(Event* event) const;
-  StatusOr<VmaBuffer*> CastBuffer(Buffer* buffer) const;
-  StatusOr<NativeDescriptorSet*> CastDescriptorSet(
-      DescriptorSet* descriptor_set) const;
-  StatusOr<PipelineExecutableLayout*> CastExecutableLayout(
-      ExecutableLayout* executable_layout) const;
-  StatusOr<PipelineExecutable*> CastExecutable(Executable* executable) const;
-
-  bool is_recording_ = false;
-  ref_ptr<VkCommandPoolHandle> command_pool_;
-  VkCommandBuffer command_buffer_;
-
-  // TODO(b/140026716): may grow large - should try to reclaim or reuse.
-  DescriptorSetArena descriptor_set_arena_;
-
-  // The current descriptor set group in use by the command buffer, if any.
-  // This must remain valid until all in-flight submissions of the command
-  // buffer complete.
-  DescriptorSetGroup descriptor_set_group_;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_DIRECT_COMMAND_BUFFER_H_

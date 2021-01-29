@@ -52,7 +52,9 @@
 // TODO(benvanik): EPOLL on android/linux/bsd/etc.
 // TODO(benvanik): KQUEUE on mac/ios.
 // KQUEUE is not implemented yet. Use POLL for mac/ios
-#if !defined(IREE_PLATFORM_APPLE) && !defined(__EMSCRIPTEN__)
+// Android ppoll requires API version >= 21
+#if !defined(IREE_PLATFORM_APPLE) && !defined(__EMSCRIPTEN__) && \
+    (!defined(__ANDROID_API__) || __ANDROID_API__ >= 21)
 #define IREE_WAIT_API IREE_WAIT_API_PPOLL
 #else
 #define IREE_WAIT_API IREE_WAIT_API_POLL

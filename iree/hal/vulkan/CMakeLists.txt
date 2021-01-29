@@ -20,135 +20,63 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    api
-  HDRS
-    "api.h"
-  SRCS
-    "api.cc"
-  DEPS
-    ::utils
-    ::vulkan
-    iree::base::api
-    iree::base::tracing
-    iree::hal::api
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    utils
-  HDRS
-    "debug_reporter.h"
-    "dynamic_symbol_tables.h"
-    "dynamic_symbols.h"
-    "extensibility_util.h"
-    "handle_util.h"
-    "renderdoc_capture_manager.h"
-    "status_util.h"
-    "timepoint_util.h"
-    "vulkan_headers.h"
-  SRCS
-    "debug_reporter.cc"
-    "dynamic_symbols.cc"
-    "extensibility_util.cc"
-    "renderdoc_capture_manager.cc"
-    "status_util.cc"
-    "timepoint_util.cc"
-  DEPS
-    Vulkan::Headers
-    absl::core_headers
-    absl::memory
-    absl::span
-    absl::strings
-    absl::synchronization
-    iree::base::core_headers
-    iree::base::dynamic_library
-    iree::base::intrusive_list
-    iree::base::logging
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::time
-    iree::base::tracing
-    iree::hal
-    renderdoc_api::renderdoc_app
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    dynamic_symbols_test
-  SRCS
-    "dynamic_symbols_test.cc"
-  DEPS
-    ::utils
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=vulkan"
-)
-
-iree_cc_library(
-  NAME
-    vma_allocator
-  HDRS
-    "vma_allocator.h"
-    "vma_buffer.h"
-  SRCS
-    "internal_vk_mem_alloc.cc"
-    "internal_vk_mem_alloc.h"
-    "vma_allocator.cc"
-    "vma_buffer.cc"
-  DEPS
-    ::utils
-    absl::flat_hash_map
-    absl::memory
-    absl::synchronization
-    iree::base::core_headers
-    iree::base::logging
-    iree::base::status
-    iree::base::tracing
-    iree::hal
-    vulkan_memory_allocator
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     vulkan
   HDRS
-    "descriptor_pool_cache.h"
-    "descriptor_set_arena.h"
-    "direct_command_buffer.h"
-    "direct_command_queue.h"
-    "emulated_timeline_semaphore.h"
-    "native_descriptor_set.h"
-    "native_event.h"
-    "native_timeline_semaphore.h"
-    "pipeline_cache.h"
-    "pipeline_executable.h"
-    "pipeline_executable_layout.h"
-    "serializing_command_queue.h"
+    "api.h"
     "vulkan_device.h"
     "vulkan_driver.h"
   SRCS
+    "api.cc"
+    "command_queue.h"
+    "debug_reporter.cc"
+    "debug_reporter.h"
     "descriptor_pool_cache.cc"
+    "descriptor_pool_cache.h"
     "descriptor_set_arena.cc"
+    "descriptor_set_arena.h"
     "direct_command_buffer.cc"
+    "direct_command_buffer.h"
     "direct_command_queue.cc"
-    "emulated_timeline_semaphore.cc"
+    "direct_command_queue.h"
+    "emulated_semaphore.cc"
+    "emulated_semaphore.h"
+    "extensibility_util.cc"
+    "extensibility_util.h"
+    "handle_util.h"
+    "internal_vk_mem_alloc.cc"
+    "internal_vk_mem_alloc.h"
     "native_descriptor_set.cc"
+    "native_descriptor_set.h"
+    "native_descriptor_set_layout.cc"
+    "native_descriptor_set_layout.h"
     "native_event.cc"
-    "native_timeline_semaphore.cc"
-    "pipeline_cache.cc"
-    "pipeline_executable.cc"
-    "pipeline_executable_layout.cc"
+    "native_event.h"
+    "native_executable.cc"
+    "native_executable.h"
+    "native_executable_layout.cc"
+    "native_executable_layout.h"
+    "native_semaphore.cc"
+    "native_semaphore.h"
+    "nop_executable_cache.cc"
+    "nop_executable_cache.h"
     "serializing_command_queue.cc"
+    "serializing_command_queue.h"
+    "status_util.c"
+    "status_util.h"
+    "timepoint_util.cc"
+    "timepoint_util.h"
+    "vma_allocator.cc"
+    "vma_allocator.h"
+    "vma_buffer.cc"
+    "vma_buffer.h"
     "vulkan_device.cc"
     "vulkan_driver.cc"
+    "vulkan_headers.h"
   DEPS
-    ::utils
-    ::vma_allocator
+    ::dynamic_symbols
+    Vulkan::Headers
     absl::core_headers
+    absl::flat_hash_map
     absl::inlined_vector
     absl::memory
     absl::span
@@ -159,12 +87,49 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::flatcc
     iree::base::intrusive_list
+    iree::base::logging
     iree::base::ref_ptr
     iree::base::status
-    iree::base::time
+    iree::base::synchronization
     iree::base::tracing
-    iree::hal
-    iree::hal::command_buffer_validation
+    iree::hal::api
     iree::schemas::spirv_executable_def_c_fbs
+    vulkan_memory_allocator
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dynamic_symbols
+  HDRS
+    "dynamic_symbol_tables.h"
+    "dynamic_symbols.h"
+  SRCS
+    "dynamic_symbols.cc"
+    "vulkan_headers.h"
+  DEPS
+    Vulkan::Headers
+    absl::core_headers
+    absl::memory
+    absl::span
+    absl::strings
+    iree::base::core_headers
+    iree::base::dynamic_library
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_symbols_test
+  SRCS
+    "dynamic_symbols_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=vulkan"
 )

@@ -19,19 +19,27 @@
 #include "iree/hal/vulkan/vulkan_headers.h"
 // clang-format on
 
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+// Converts a VkResult to an iree_status_t.
+//
+// Usage:
+//   iree_status_t status = VK_RESULT_TO_STATUS(vkDoThing(...));
+#define VK_RESULT_TO_STATUS(expr, ...) \
+  iree_hal_vulkan_result_to_status((expr), __FILE__, __LINE__)
 
 // IREE_RETURN_IF_ERROR but implicitly converts the VkResult return value to
 // a Status.
 //
 // Usage:
-//   VK_RETURN_IF_ERROR(vkDoThing(...));
-#define VK_RETURN_IF_ERROR(expr) \
-  IREE_RETURN_IF_ERROR(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
+//   VK_RETURN_IF_ERROR(vkDoThing(...), "message");
+#define VK_RETURN_IF_ERROR(expr, ...) \
+  IREE_RETURN_IF_ERROR(               \
+      iree_hal_vulkan_result_to_status(expr, __FILE__, __LINE__), __VA_ARGS__)
 
 // IREE_CHECK_OK but implicitly converts the VkResults return value to a
 // Status and checks that it is OkStatus.
@@ -39,7 +47,7 @@ namespace vulkan {
 // Usage:
 //   VK_CHECK_OK(vkDoThing(...));
 #define VK_CHECK_OK(expr) \
-  IREE_CHECK_OK(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
+  IREE_CHECK_OK(iree_hal_vulkan_result_to_status(expr, __FILE__, __LINE__))
 
 // Converts a VkResult to a Status object.
 //
@@ -81,10 +89,11 @@ namespace vulkan {
 // - VK_ERROR_NOT_PERMITTED_EXT           -> PermissionDeniedError("VK...")
 // - VK_ERROR_INVALID_DEVICE_ADDRESS_EXT  -> OutOfRangeError("VK...")
 // - VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT -> InternalError("VK...")
-Status VkResultToStatus(VkResult result, SourceLocation loc);
+iree_status_t iree_hal_vulkan_result_to_status(VkResult result,
+                                               const char* file, uint32_t line);
 
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_STATUS_UTIL_H_

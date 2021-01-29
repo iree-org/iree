@@ -327,9 +327,9 @@ inline internal::IsOkMatcherGenerator IsOk() {
 // Macros for testing the results of functions that return iree::Status or
 // iree::StatusOr<T> (for any type T).
 #define IREE_EXPECT_OK(rexpr) \
-  EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
+  EXPECT_THAT(rexpr, ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
 #define IREE_ASSERT_OK(rexpr) \
-  ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
+  ASSERT_THAT(rexpr, ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
 #define IREE_EXPECT_STATUS_IS(expected_code, expr)     \
   EXPECT_THAT(expr, ::iree::testing::status::StatusIs( \
                         static_cast<::iree::StatusCode>(expected_code)))

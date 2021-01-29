@@ -168,9 +168,8 @@ int iree::IreeMain(int argc, char** argv) {
   // Setup Vulkan
   iree_hal_vulkan_features_t iree_vulkan_features =
       static_cast<iree_hal_vulkan_features_t>(
-          IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
-          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+          IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS |
+          IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
   std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
@@ -275,28 +274,32 @@ int iree::IreeMain(int argc, char** argv) {
   // Load symbols from our static `vkGetInstanceProcAddr` for IREE to use.
   iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
   IREE_CHECK_OK(iree_hal_vulkan_syms_create(
-      reinterpret_cast<void*>(&vkGetInstanceProcAddr), &iree_vk_syms));
+      reinterpret_cast<void*>(&vkGetInstanceProcAddr), iree_allocator_system(),
+      &iree_vk_syms));
   // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
-  iree_hal_vulkan_driver_options_t options;
-  options.api_version = VK_API_VERSION_1_0;
-  options.features = static_cast<iree_hal_vulkan_features_t>(
-      IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-      IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+  iree_string_view_t driver_identifier = iree_make_cstring_view("vulkan");
+  iree_hal_vulkan_driver_options_t driver_options;
+  driver_options.api_version = VK_API_VERSION_1_0;
+  driver_options.requested_features = static_cast<iree_hal_vulkan_features_t>(
+      IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
   IREE_CHECK_OK(iree_hal_vulkan_driver_create_using_instance(
-      options, iree_vk_syms, g_Instance, &iree_vk_driver));
+      driver_identifier, &driver_options, iree_vk_syms, g_Instance,
+      iree_allocator_system(), &iree_vk_driver));
   // Create a device sharing our VkDevice and queue. This makes capturing with
   // vendor tools easier because we will have sync compute residing in the
   // rendered frame.
+  iree_string_view_t device_identifier = iree_make_cstring_view("vulkan");
   iree_hal_vulkan_queue_set_t compute_queue_set;
   compute_queue_set.queue_family_index = g_QueueFamily;
   compute_queue_set.queue_indices = 1 << 0;
   iree_hal_vulkan_queue_set_t transfer_queue_set;
   transfer_queue_set.queue_indices = 0;
   iree_hal_device_t* iree_vk_device = nullptr;
-  IREE_CHECK_OK(iree_hal_vulkan_driver_wrap_device(
-      iree_vk_driver, g_PhysicalDevice, g_Device, compute_queue_set,
-      transfer_queue_set, &iree_vk_device));
+  IREE_CHECK_OK(iree_hal_vulkan_wrap_device(
+      device_identifier, &driver_options.device_options, iree_vk_syms,
+      g_Instance, g_PhysicalDevice, g_Device, &compute_queue_set,
+      &transfer_queue_set, iree_allocator_system(), &iree_vk_device));
   // Create a HAL module using the HAL device.
   iree_vm_module_t* hal_module = nullptr;
   IREE_CHECK_OK(iree_hal_module_create(iree_vk_device, iree_allocator_system(),

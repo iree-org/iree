@@ -590,7 +590,8 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
           throw RaiseValueError(
               "Could not deref result buffer view (wrong type?)");
         }
-        iree_hal_buffer* raw_buffer = iree_hal_buffer_view_buffer(buffer_view);
+        iree_hal_buffer_t* raw_buffer =
+            iree_hal_buffer_view_buffer(buffer_view);
         if (!raw_buffer) {
           throw RaiseValueError("Could not deref result buffer (wrong type?)");
         }
@@ -675,10 +676,10 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
             kScalarTypeToHalElementType[static_cast<unsigned>(
                 desc.scalar.type)]);
         iree_hal_buffer_view_t* buffer_view;
-        CheckApiStatus(iree_hal_buffer_view_create(
-                           raw_buffer, dims.data(), dims.size(), element_type,
-                           iree_allocator_system(), &buffer_view),
-                       "Error allocating buffer_view");
+        CheckApiStatus(
+            iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                        element_type, &buffer_view),
+            "Error allocating buffer_view");
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
             iree_hal_buffer_view_move_ref(buffer_view);
@@ -763,10 +764,10 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   absl::InlinedVector<int, 5> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
-  CheckApiStatus(iree_hal_buffer_view_create(
-                     raw_buffer, dims.data(), dims.size(), element_type,
-                     iree_allocator_system(), &buffer_view),
-                 "Error allocating buffer_view");
+  CheckApiStatus(
+      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
+                                  element_type, &buffer_view),
+      "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
   CheckApiStatus(iree_vm_list_push_ref_move(f_args.raw_ptr(), &buffer_view_ref),

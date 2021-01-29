@@ -15,32 +15,23 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_EVENT_H_
 #define IREE_HAL_VULKAN_NATIVE_EVENT_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include "iree/hal/event.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/handle_util.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// An event implemented with the native VkEvent type.
-class NativeEvent final : public Event {
- public:
-  NativeEvent(ref_ptr<VkDeviceHandle> logical_device, VkEvent handle);
-  ~NativeEvent() override;
+// Creates a native Vulkan VkEvent object.
+iree_status_t iree_hal_vulkan_native_event_create(
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree_hal_event_t** out_event);
 
-  VkEvent handle() const { return handle_; }
+// Returns Vulkan event handle.
+VkEvent iree_hal_vulkan_native_event_handle(const iree_hal_event_t* event);
 
- private:
-  ref_ptr<VkDeviceHandle> logical_device_;
-  VkEvent handle_;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_NATIVE_EVENT_H_
