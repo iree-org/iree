@@ -454,7 +454,7 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
     for (size_t ordinal = 0;
-         ordinal < iree_vm_InternalFunctionDef_vec_len(exported_functions);
+         ordinal < iree_vm_ExportFunctionDef_vec_len(exported_functions);
          ++ordinal) {
       iree_vm_ExportFunctionDef_table_t export_def =
           iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);

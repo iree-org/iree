@@ -42,6 +42,7 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
+
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
@@ -65,6 +66,8 @@ if(${IREE_BUILD_TENSORFLOW_COMPILER} OR
    ${IREE_BUILD_XLA_COMPILER})
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
+
+option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
 if(${IREE_ENABLE_TENSORFLOW})
@@ -456,6 +459,10 @@ add_subdirectory(iree/tools)
 # and must come after it.
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
+endif()
+
+if(${IREE_BUILD_BINDINGS_TFLITE})
+  add_subdirectory(bindings/tflite)
 endif()
 
 if(${IREE_BUILD_SAMPLES})
