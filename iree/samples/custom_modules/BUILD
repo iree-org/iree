@@ -23,7 +23,8 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_HAL_DRIVER_VMLA})
+if(NOT "${IREE_TARGET_BACKEND_VMLA}" OR
+   NOT "${IREE_HAL_DRIVER_VMLA}")
   return()
 endif()
 """,

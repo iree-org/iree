@@ -21,13 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/api_detail.h"
-#include "iree/hal/device.h"
 #include "iree/vm/native_module_cc.h"
-
-namespace iree {
-namespace hal {
-namespace {
 
 //===----------------------------------------------------------------------===//
 // Type registration
@@ -41,36 +35,61 @@ static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_layout_descriptor =
     {0};
 static iree_vm_ref_type_descriptor_t iree_hal_device_descriptor = {0};
+static iree_vm_ref_type_descriptor_t iree_hal_event_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_cache_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
     0};
 static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
 
+#define IREE_VM_REGISTER_HAL_C_TYPE(type, name, destroy_fn, descriptor)   \
+  descriptor.type_name = iree_make_cstring_view(name);                    \
+  descriptor.offsetof_counter = offsetof(iree_hal_resource_t, ref_count); \
+  descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                 \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
 
-  IREE_VM_REGISTER_CC_TYPE(Allocator, "hal.allocator",
-                           iree_hal_allocator_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(Buffer, "hal.buffer", iree_hal_buffer_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(iree_hal_buffer_view, "hal.buffer_view",
-                           iree_hal_buffer_view_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(CommandBuffer, "hal.command_buffer",
-                           iree_hal_command_buffer_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(DescriptorSet, "hal.descriptor_set",
-                           iree_hal_descriptor_set_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(DescriptorSetLayout, "hal.descriptor_set_layout",
-                           iree_hal_descriptor_set_layout_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(Device, "hal.device", iree_hal_device_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(Executable, "hal.executable",
-                           iree_hal_executable_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(ExecutableCache, "hal.executable_cache",
-                           iree_hal_executable_cache_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(ExecutableLayout, "hal.executable_layout",
-                           iree_hal_executable_layout_descriptor);
-  IREE_VM_REGISTER_CC_TYPE(Semaphore, "hal.semaphore",
-                           iree_hal_semaphore_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_allocator_t, "hal.allocator",
+                              iree_hal_allocator_destroy,
+                              iree_hal_allocator_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_t, "hal.buffer",
+                              iree_hal_buffer_destroy,
+                              iree_hal_buffer_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_view_t, "hal.buffer_view",
+                              iree_hal_buffer_view_destroy,
+                              iree_hal_buffer_view_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_command_buffer_t, "hal.command_buffer",
+                              iree_hal_command_buffer_destroy,
+                              iree_hal_command_buffer_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_t, "hal.descriptor_set",
+                              iree_hal_descriptor_set_destroy,
+                              iree_hal_descriptor_set_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_layout_t,
+                              "hal.descriptor_set_layout",
+                              iree_hal_descriptor_set_layout_destroy,
+                              iree_hal_descriptor_set_layout_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_device_t, "hal.device",
+                              iree_hal_device_destroy,
+                              iree_hal_device_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_event_t, "hal.event",
+                              iree_hal_event_destroy,
+                              iree_hal_event_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_executable_t, "hal.executable",
+                              iree_hal_executable_destroy,
+                              iree_hal_executable_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(
+      iree_hal_executable_cache_t, "hal.executable_cache",
+      iree_hal_executable_cache_destroy, iree_hal_executable_cache_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_executable_layout_t,
+                              "hal.executable_layout",
+                              iree_hal_executable_layout_destroy,
+                              iree_hal_executable_layout_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_semaphore_t, "hal.semaphore",
+                              iree_hal_semaphore_destroy,
+                              iree_hal_semaphore_descriptor);
 
   has_registered = true;
   return iree_ok_status();
@@ -90,6 +109,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set,
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
                              iree_hal_descriptor_set_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_cache,
                              iree_hal_executable_cache_t);
@@ -97,21 +117,27 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_layout,
                              iree_hal_executable_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
+namespace iree {
+namespace hal {
+namespace {
+
 //===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
 class HALModuleState final {
  public:
-  HALModuleState(iree_allocator_t allocator, ref_ptr<Device> shared_device,
-                 ref_ptr<ExecutableCache> executable_cache)
-      : allocator_(allocator), shared_device_(std::move(shared_device)) {}
+  HALModuleState(iree_allocator_t allocator, iree_hal_device_t* shared_device)
+      : allocator_(allocator), shared_device_(shared_device) {
+    iree_hal_device_retain(shared_device_);
+  }
 
   ~HALModuleState() {
     for (auto& ref : deferred_releases_) {
       iree_vm_ref_release(&ref);
     }
     deferred_releases_.clear();
+    iree_hal_device_release(shared_device_);
   }
 
   //===--------------------------------------------------------------------===//
@@ -121,8 +147,7 @@ class HALModuleState final {
   // using these APIs are not forward compatible.
 
   StatusOr<vm::ref<iree_hal_device_t>> ExSharedDevice() {
-    return vm::retain_ref(
-        reinterpret_cast<iree_hal_device_t*>(shared_device_.get()));
+    return vm::retain_ref(shared_device_);
   }
 
   template <typename T>
@@ -137,8 +162,8 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::ExSubmitAndWait");
 
     vm::ref<iree_hal_semaphore_t> semaphore;
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-        device.get(), 0ull, iree_allocator_system(), &semaphore));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_semaphore_create(device.get(), 0ull, &semaphore));
 
     iree_hal_submission_batch_t batch;
     memset(&batch, 0, sizeof(batch));
@@ -168,7 +193,7 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::Allocator
+  // iree_hal_allocator_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_buffer_t>> AllocatorAllocate(
@@ -190,6 +215,8 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::AllocatorWrapByteBuffer");
 
     // TODO(benvanik): wrap when supported.
+
+    buffer_usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
 
     size_t buffer_length = source->data.data_length;
     if (length == -1) {
@@ -216,7 +243,7 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::Buffer
+  // iree_hal_buffer_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_allocator_t>> BufferAllocator(
@@ -230,7 +257,7 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::BufferSubspan");
     vm::ref<iree_hal_buffer_t> target_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
-        source_buffer.get(), source_offset, length, allocator_, &target_buffer))
+        source_buffer.get(), source_offset, length, &target_buffer))
         << "Subspan of an existing buffer (source_offset=" << source_offset
         << ", length=" << length << ")";
     return target_buffer;
@@ -306,16 +333,15 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::BufferView
+  // iree_hal_buffer_view_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewCreate(
       const vm::ref<iree_hal_buffer_t>& buffer, absl::Span<const int32_t> shape,
       iree_hal_element_type_t element_type) {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(buffer.get(), shape.data(),
-                                                     shape.size(), element_type,
-                                                     allocator_, &buffer_view))
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+        buffer.get(), shape.data(), shape.size(), element_type, &buffer_view))
         << "Failed to create buffer view";
     return std::move(buffer_view);
   }
@@ -326,7 +352,7 @@ class HALModuleState final {
     vm::ref<iree_hal_buffer_view_t> new_buffer_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_subview(
         buffer_view.get(), indices.data(), indices.size(), lengths.data(),
-        lengths.size(), allocator_, &new_buffer_view))
+        lengths.size(), &new_buffer_view))
         << "Failed to create subview";
     return std::move(new_buffer_view);
   }
@@ -429,7 +455,7 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::CommandBuffer
+  // iree_hal_command_buffer_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_command_buffer_t>> CommandBufferCreate(
@@ -438,8 +464,7 @@ class HALModuleState final {
       iree_hal_command_category_t command_categories) {
     vm::ref<iree_hal_command_buffer_t> command_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-        device.get(), modes, command_categories, iree_allocator_system(),
-        &command_buffer))
+        device.get(), modes, command_categories, &command_buffer))
         << "Failed to create command buffer";
     return command_buffer;
   }
@@ -497,14 +522,15 @@ class HALModuleState final {
       uint32_t offset, absl::Span<const uint32_t> values) {
     ExDeferRelease(executable_layout);
     return iree_hal_command_buffer_push_constants(
-        command_buffer.get(), executable_layout.get(), offset, values.data(),
+        command_buffer.get(), executable_layout.get(),
+        offset * sizeof(uint32_t), values.data(),
         values.size() * sizeof(uint32_t));
   }
 
   Status CommandBufferPushDescriptorSet(
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_executable_layout_t>& executable_layout,
-      int32_t set, absl::Span<const int32_t> binding_ordinals,
+      uint32_t set, absl::Span<const uint32_t> binding_ordinals,
       absl::Span<const vm::ref<iree_hal_buffer_t>> binding_buffers,
       absl::Span<const int32_t> binding_offsets,
       absl::Span<const int32_t> binding_lengths) {
@@ -526,7 +552,7 @@ class HALModuleState final {
   Status CommandBufferBindDescriptorSet(
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_executable_layout_t>& executable_layout,
-      int32_t set, const vm::ref<iree_hal_descriptor_set_t>& descriptor_set,
+      uint32_t set, const vm::ref<iree_hal_descriptor_set_t>& descriptor_set,
       absl::Span<const int32_t> dynamic_offsets) {
     ExDeferRelease(executable_layout);
     ExDeferRelease(descriptor_set);
@@ -565,16 +591,16 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::DescriptorSet
+  // iree_hal_descriptor_set_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_descriptor_set_t>> DescriptorSetCreate(
       const vm::ref<iree_hal_device_t>& device,
       const vm::ref<iree_hal_descriptor_set_layout_t>& set_layout,
-      absl::Span<const int32_t> binding_ordinals,
+      absl::Span<const uint32_t> binding_ordinals,
       absl::Span<const vm::ref<iree_hal_buffer_t>> binding_buffers,
-      absl::Span<const int32_t> binding_offsets,
-      absl::Span<const int32_t> binding_lengths) {
+      absl::Span<const uint32_t> binding_offsets,
+      absl::Span<const uint32_t> binding_lengths) {
     absl::InlinedVector<iree_hal_descriptor_set_binding_t, 4> binding_structs(
         binding_ordinals.size());
     for (int i = 0; i < binding_ordinals.size(); ++i) {
@@ -587,18 +613,18 @@ class HALModuleState final {
     vm::ref<iree_hal_descriptor_set_t> descriptor_set;
     IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_create(
         device.get(), set_layout.get(), binding_structs.size(),
-        binding_structs.data(), allocator_, &descriptor_set));
+        binding_structs.data(), &descriptor_set));
     return std::move(descriptor_set);
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::DescriptorSetLayout
+  // iree_hal_descriptor_set_layout_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_descriptor_set_layout_t>> DescriptorSetLayoutCreate(
       const vm::ref<iree_hal_device_t>& device,
       iree_hal_descriptor_set_layout_usage_type_t usage_type,
-      absl::Span<const std::tuple<int32_t, iree_hal_descriptor_type_t,
+      absl::Span<const std::tuple<uint32_t, iree_hal_descriptor_type_t,
                                   iree_hal_memory_access_t>>
           bindings) {
     // TODO(benvanik): custom marshaling for the structs.
@@ -611,12 +637,12 @@ class HALModuleState final {
     vm::ref<iree_hal_descriptor_set_layout_t> descriptor_set_layout;
     IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_layout_create(
         device.get(), usage_type, binding_structs.size(),
-        binding_structs.data(), allocator_, &descriptor_set_layout));
+        binding_structs.data(), &descriptor_set_layout));
     return std::move(descriptor_set_layout);
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::Device
+  // iree_hal_device_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_allocator_t>> DeviceAllocator(
@@ -634,7 +660,11 @@ class HALModuleState final {
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::ExecutableCache
+  // iree_hal_event_t
+  //===--------------------------------------------------------------------===//
+
+  //===--------------------------------------------------------------------===//
+  // iree_hal_executable_cache_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_executable_cache_t>> ExecutableCacheCreate(
@@ -642,7 +672,7 @@ class HALModuleState final {
     vm::ref<iree_hal_executable_cache_t> executable_cache;
     IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
         device.get(), iree_string_view_t{identifier.data(), identifier.size()},
-        allocator_, &executable_cache));
+        &executable_cache));
     return std::move(executable_cache);
   }
 
@@ -666,12 +696,12 @@ class HALModuleState final {
     vm::ref<iree_hal_executable_t> executable;
     IREE_RETURN_IF_ERROR(iree_hal_executable_cache_prepare_executable(
         executable_cache.get(), executable_layout.get(), caching_mode,
-        executable_data->data, allocator_, &executable));
+        executable_data->data, &executable));
     return std::move(executable);
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::ExecutableLayout
+  // iree_hal_executable_layout_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_executable_layout_t>> ExecutableLayoutCreate(
@@ -684,19 +714,19 @@ class HALModuleState final {
         reinterpret_cast<iree_hal_descriptor_set_layout_t**>(
             const_cast<vm::ref<iree_hal_descriptor_set_layout_t>*>(
                 set_layouts.data())),
-        push_constants, allocator_, &executable_layout));
+        push_constants, &executable_layout));
     return std::move(executable_layout);
   }
 
   //===--------------------------------------------------------------------===//
-  // iree::hal::Semaphore
+  // iree_hal_semaphore_t
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_semaphore_t>> SemaphoreCreate(
       const vm::ref<iree_hal_device_t>& device, uint32_t initial_value) {
     vm::ref<iree_hal_semaphore_t> semaphore;
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(device.get(), initial_value,
-                                                   allocator_, &semaphore));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_semaphore_create(device.get(), initial_value, &semaphore));
     return std::move(semaphore);
   }
 
@@ -738,7 +768,7 @@ class HALModuleState final {
 
  private:
   iree_allocator_t allocator_;
-  ref_ptr<Device> shared_device_;
+  iree_hal_device_t* shared_device_ = NULL;
 
   std::vector<iree_vm_ref_t> deferred_releases_;
 };
@@ -846,33 +876,31 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
 
 class HALModule final : public vm::NativeModule<HALModuleState> {
  public:
-  HALModule(iree_allocator_t allocator, ref_ptr<Device> shared_device)
+  HALModule(iree_allocator_t allocator, iree_hal_device_t* shared_device)
       : vm::NativeModule<HALModuleState>(
             "hal", allocator, absl::MakeConstSpan(kHALModuleFunctions)),
-        shared_device_(std::move(shared_device)) {}
-  ~HALModule() = default;
+        shared_device_(shared_device) {
+    iree_hal_device_retain(shared_device_);
+  }
+
+  ~HALModule() { iree_hal_device_release(shared_device_); }
 
   Status Initialize() {
     IREE_TRACE_SCOPE0("HALModule::Initialize");
-
-    executable_cache_ = shared_device_->CreateExecutableCache();
-
     return OkStatus();
   }
 
   StatusOr<std::unique_ptr<HALModuleState>> CreateState(
       iree_allocator_t allocator) override {
     IREE_TRACE_SCOPE0("HALModule::CreateState");
-    auto state = std::make_unique<HALModuleState>(
-        allocator, add_ref(shared_device_), add_ref(executable_cache_));
+    auto state = std::make_unique<HALModuleState>(allocator, shared_device_);
     // TODO(benvanik): allocate context-specific variables (allocator pool,
     // etc).
     return state;
   }
 
  private:
-  ref_ptr<Device> shared_device_;
-  ref_ptr<ExecutableCache> executable_cache_;
+  iree_hal_device_t* shared_device_ = NULL;
 };
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -881,8 +909,7 @@ iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = nullptr;
-  auto module = std::make_unique<HALModule>(
-      allocator, add_ref(reinterpret_cast<Device*>(device)));
+  auto module = std::make_unique<HALModule>(allocator, device);
   IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return iree_ok_status();

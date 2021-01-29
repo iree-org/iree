@@ -61,7 +61,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
     "@cpuinfo//:cpuinfo": ["cpuinfo"],
-    "@half//:half": ["half"],
+    "@half//:includes": ["half::includes"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 

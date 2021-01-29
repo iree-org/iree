@@ -39,14 +39,6 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_metal-spirv_metal",
-    srcs = [
-    ],
-    driver = "metal",
-    target_backend = "metal-spirv",
-)
-
-iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = [
     ],
@@ -66,7 +58,6 @@ test_suite(
     name = "check",
     tests = [
         ":check_dylib-llvm-aot_dylib",
-        ":check_metal-spirv_metal",
         ":check_vmla_vmla",
         ":check_vulkan-spirv_vulkan",
     ],

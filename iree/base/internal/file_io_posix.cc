@@ -135,6 +135,7 @@ std::string GetTempPath() {
 #endif
 }
 
+// TODO(#3845): remove this when dylibs no longer need temp files.
 StatusOr<std::string> GetTempFile(absl::string_view base_name) {
   IREE_TRACE_SCOPE0("file_io::GetTempFile");
 

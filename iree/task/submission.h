@@ -44,7 +44,7 @@ extern "C" {
 //
 // Thread-compatible; designed to be used from a single thread producing the
 // submission.
-typedef struct {
+typedef struct iree_task_submission_s {
   // List of tasks that are ready for execution immediately. Upon submission to
   // a queue the tasks will be passed on to the executor with no delay.
   //
@@ -94,6 +94,12 @@ bool iree_task_submission_is_empty(iree_task_submission_t* submission);
 // still be defined. The submission takes ownership of the |task|.
 void iree_task_submission_enqueue(iree_task_submission_t* submission,
                                   iree_task_t* task);
+
+// Enqueues all tasks in |list| to the pending |submission|.
+// Ownership of the tasks transfers to the submission and the |list| will be
+// reset upon return. Ready tasks may execute in any order.
+void iree_task_submission_enqueue_list(iree_task_submission_t* submission,
+                                       iree_task_list_t* list);
 
 #ifdef __cplusplus
 }  // extern "C"

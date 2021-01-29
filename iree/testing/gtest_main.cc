@@ -16,8 +16,8 @@
 #include "iree/testing/gtest.h"
 
 extern "C" int main(int argc, char** argv) {
-  iree_flags_parse_checked(&argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
+  iree_flags_parse_checked(&argc, &argv);
 
   return RUN_ALL_TESTS();
 }

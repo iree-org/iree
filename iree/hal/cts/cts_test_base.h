@@ -19,13 +19,10 @@
 #include <mutex>
 #include <set>
 
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-
-// TODO(3934): rebase this all on the C API.
-#include "iree/hal/driver.h"
 
 namespace iree {
 namespace hal {
@@ -34,60 +31,102 @@ namespace cts {
 // Common setup for tests parameterized across all registered drivers.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
  protected:
-  // Per-test-suite set-up. This is called before the first test in this test
-  // suite. We use it to set up drivers that must be reused between test cases
-  // to work around issues with driver lifetimes (specifically SwiftShader for
-  // Vulkan).
-  //
-  // TODO(#3933): this is a very nasty hack that indicates a serious issue. If
-  // we have to do it here in our test suite it means that every user of IREE
-  // will also have to do something like it. We should be reusing all drivers
-  // across tests in a suite (removing the vulkan-specific behavior here) but
-  // ALSO need a test that tries to create a driver twice.
-  static void SetUpTestSuite() {
-    iree_hal_driver_t* driver = NULL;
-    iree_status_t status = iree_hal_driver_registry_try_create_by_name(
-        iree_hal_driver_registry_default(), iree_make_cstring_view("vulkan"),
-        iree_allocator_system(), &driver);
-    if (iree_status_consume_code(status) == IREE_STATUS_OK) {
-      shared_drivers_["vulkan"] =
-          assign_ref(reinterpret_cast<iree::hal::Driver*>(driver));
-    }
-  }
-
-  // Per-test-suite tear-down. This is called after the last test in this test
-  // suite. We use it to destruct driver handles before program exit. This
-  // avoids us to rely on static object destruction happening after main(). It
-  // can cause unexpected problems when the driver also want to perform clean up
-  // at that time.
-  static void TearDownTestSuite() { shared_drivers_.clear(); }
-
-  static std::map<std::string, ref_ptr<Driver>> shared_drivers_;
-
   virtual void SetUp() {
     const std::string& driver_name = GetParam();
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
-    auto driver_or = GetDriver(driver_name);
-    if (IsUnavailable(driver_or.status())) {
-      IREE_LOG(WARNING) << "Skipping test as driver is unavailable: "
-                        << driver_or.status();
+    iree_hal_driver_t* driver;
+    iree_status_t status = TryGetDriver(driver_name, &driver);
+    if (iree_status_is_unavailable(status)) {
+      iree_status_free(status);
+      IREE_LOG(WARNING) << "Skipping test as driver is unavailable";
       GTEST_SKIP();
       return;
     }
-    IREE_ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
-    IREE_LOG(INFO) << "Creating default device...";
-    IREE_ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
-    IREE_LOG(INFO) << "Created device '" << device_->info().name() << "'";
+    driver_ = driver;
+
+    iree_hal_device_t* device;
+    status = iree_hal_driver_create_default_device(
+        driver_, iree_allocator_system(), &device);
+    if (iree_status_is_unavailable(status)) {
+      iree_status_free(status);
+      IREE_LOG(WARNING) << "Skipping test as driver is unavailable";
+      GTEST_SKIP();
+      return;
+    }
+    IREE_ASSERT_OK(status);
+    iree_status_free(status);
+    device_ = device;
+
+    device_allocator_ = iree_hal_device_allocator(device_);
+    iree_hal_allocator_retain(device_allocator_);
   }
 
-  ref_ptr<Driver> driver_;
-  ref_ptr<Device> device_;
+  virtual void TearDown() {
+    if (device_allocator_) {
+      iree_hal_allocator_release(device_allocator_);
+      device_allocator_ = nullptr;
+    }
+    if (device_) {
+      iree_hal_device_release(device_);
+      device_ = nullptr;
+    }
+    if (driver_) {
+      iree_hal_driver_release(driver_);
+      driver_ = nullptr;
+    }
+  }
+
+  // Submits |command_buffer| to the device and waits for it to complete before
+  // returning.
+  iree_status_t SubmitCommandBufferAndWait(
+      iree_hal_command_category_t command_categories,
+      iree_hal_command_buffer_t* command_buffer) {
+    iree_hal_semaphore_t* signal_semaphore = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+
+    iree_hal_submission_batch_t submission_batch;
+
+    // No wait semaphores.
+    submission_batch.wait_semaphores.count = 0;
+    submission_batch.wait_semaphores.semaphores = NULL;
+    submission_batch.wait_semaphores.payload_values = NULL;
+
+    iree_hal_command_buffer_t* command_buffer_ptrs[] = {command_buffer};
+    submission_batch.command_buffer_count = IREE_ARRAYSIZE(command_buffer_ptrs);
+    submission_batch.command_buffers = command_buffer_ptrs;
+
+    // One signal semaphore from 0 -> 1.
+    iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
+    uint64_t payload_values[] = {1ull};
+    submission_batch.signal_semaphores.count =
+        IREE_ARRAYSIZE(signal_semaphore_ptrs);
+    submission_batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
+    submission_batch.signal_semaphores.payload_values = payload_values;
+
+    iree_status_t status =
+        iree_hal_device_queue_submit(device_, command_categories,
+                                     /*queue_affinity=*/0,
+                                     /*batch_count=*/1, &submission_batch);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_semaphore_wait_with_deadline(signal_semaphore, 1ull,
+                                                     IREE_TIME_INFINITE_FUTURE);
+    }
+
+    iree_hal_semaphore_release(signal_semaphore);
+    return status;
+  }
+
+  iree_hal_driver_t* driver_ = nullptr;
+  iree_hal_device_t* device_ = nullptr;
+  iree_hal_allocator_t* device_allocator_ = nullptr;
 
  private:
   // Gets a HAL driver with the provided name, if available.
-  static StatusOr<ref_ptr<Driver>> GetDriver(const std::string& driver_name) {
+  static iree_status_t TryGetDriver(const std::string& driver_name,
+                                    iree_hal_driver_t** out_driver) {
     static std::set<std::string> unavailable_driver_names;
 
     // If creation failed before, don't try again.
@@ -96,15 +135,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       return UnavailableErrorBuilder(IREE_LOC) << "Driver unavailable";
     }
 
-    // Reuse an existing driver if possible.
-    auto found_it = shared_drivers_.find(driver_name);
-    if (found_it != shared_drivers_.end()) {
-      IREE_LOG(INFO) << "Reusing existing driver '" << driver_name << "'...";
-      return add_ref(found_it->second);
-    }
-
     // No existing driver, attempt to create.
-    IREE_LOG(INFO) << "Creating driver '" << driver_name << "'...";
     iree_hal_driver_t* driver = NULL;
     iree_status_t status = iree_hal_driver_registry_try_create_by_name(
         iree_hal_driver_registry_default(),
@@ -113,12 +144,12 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     if (iree_status_is_unavailable(status)) {
       unavailable_driver_names.insert(driver_name);
     }
-    IREE_RETURN_IF_ERROR(status);
-    return assign_ref(reinterpret_cast<iree::hal::Driver*>(driver));
+    if (iree_status_is_ok(status)) {
+      *out_driver = driver;
+    }
+    return status;
   }
 };
-
-std::map<std::string, ref_ptr<Driver>> CtsTestBase::shared_drivers_;
 
 struct GenerateTestName {
   template <class ParamType>

@@ -15,25 +15,18 @@
 #ifndef IREE_HAL_VULKAN_VMA_ALLOCATOR_H_
 #define IREE_HAL_VULKAN_VMA_ALLOCATOR_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include <memory>
-
-#include "iree/base/status.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-class VmaBuffer;
-
-// A HAL allocator using the Vulkan Memory Allocator (VMA) to manage memory.
+// Creates a VMA-based allocator that performs internal suballocation and a
+// bunch of other fancy things.
+//
+// This uses the Vulkan Memory Allocator (VMA) to manage memory.
 // VMA (//third_party/vulkan_memory_allocator) provides dlmalloc-like behavior
 // with suballocations made with various policies (best fit, first fit, etc).
 // This reduces the number of allocations we need from the Vulkan implementation
@@ -47,78 +40,13 @@ class VmaBuffer;
 // More information:
 //   https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 //   https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/
-class VmaAllocator final : public Allocator {
- public:
-  struct Options {
-#if VMA_RECORDING_ENABLED
-    // File path to write a CSV containing the VMA recording.
-    std::string recording_file = "";
+iree_status_t iree_hal_vulkan_vma_allocator_create(
+    VkInstance instance, VkPhysicalDevice physical_device,
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    VmaRecordSettings record_settings, iree_hal_allocator_t** out_allocator);
 
-    // Flush the VMA recording file after every call (useful if crashing or
-    // not exiting cleanly).
-    bool recording_flush_after_call = false;
-#endif  // VMA_RECORDING_ENABLED
-  };
-
-  static StatusOr<std::unique_ptr<VmaAllocator>> Create(
-      VkPhysicalDevice physical_device,
-      const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance,
-      Options options);
-
-  ~VmaAllocator() override;
-
-  const ref_ptr<DynamicSymbols>& syms() const {
-    return logical_device_->syms();
-  }
-
-  ::VmaAllocator vma() const { return vma_; }
-
-  bool CanUseBufferLike(Allocator* source_allocator,
-                        MemoryTypeBitfield memory_type,
-                        BufferUsageBitfield buffer_usage,
-                        BufferUsageBitfield intended_usage) const override;
-
-  bool CanAllocate(MemoryTypeBitfield memory_type,
-                   BufferUsageBitfield buffer_usage,
-                   size_t allocation_size) const override;
-
-  Status MakeCompatible(MemoryTypeBitfield* memory_type,
-                        BufferUsageBitfield* buffer_usage) const override;
-
-  StatusOr<ref_ptr<Buffer>> Allocate(MemoryTypeBitfield memory_type,
-                                     BufferUsageBitfield buffer_usage,
-                                     size_t allocation_size) override;
-
-  StatusOr<ref_ptr<Buffer>> AllocateConstant(
-      BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) override;
-
-  StatusOr<ref_ptr<Buffer>> WrapMutable(MemoryTypeBitfield memory_type,
-                                        MemoryAccessBitfield allowed_access,
-                                        BufferUsageBitfield buffer_usage,
-                                        void* data,
-                                        size_t data_length) override;
-
- private:
-  VmaAllocator(VkPhysicalDevice physical_device,
-               const ref_ptr<VkDeviceHandle>& logical_device,
-               ::VmaAllocator vma);
-
-  StatusOr<ref_ptr<VmaBuffer>> AllocateInternal(
-      MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
-      MemoryAccessBitfield allowed_access, size_t allocation_size,
-      VmaAllocationCreateFlags flags);
-
-  VkPhysicalDevice physical_device_;
-  ref_ptr<VkDeviceHandle> logical_device_;
-
-  // Internally synchronized. We could externally synchronize if we thought it
-  // was worth it, however I'm not sure we'd be able to do much better with the
-  // current Allocator API.
-  ::VmaAllocator vma_;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_VMA_ALLOCATOR_H_

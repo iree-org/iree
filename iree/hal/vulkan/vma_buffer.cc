@@ -14,148 +14,154 @@
 
 #include "iree/hal/vulkan/vma_buffer.h"
 
-#include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
-#include "iree/hal/vulkan/vma_allocator.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+typedef struct iree_hal_vulkan_vma_buffer_s {
+  iree_hal_buffer_t base;
 
-VmaBuffer::VmaBuffer(VmaAllocator* allocator, MemoryTypeBitfield memory_type,
-                     MemoryAccessBitfield allowed_access,
-                     BufferUsageBitfield usage, device_size_t allocation_size,
-                     device_size_t byte_offset, device_size_t byte_length,
-                     VkBuffer buffer, VmaAllocation allocation,
-                     VmaAllocationInfo allocation_info)
-    : Buffer(allocator, memory_type, allowed_access, usage, allocation_size,
-             byte_offset, byte_length),
-      vma_(allocator->vma()),
-      buffer_(buffer),
-      allocation_(allocation),
-      allocation_info_(allocation_info) {
-  // TODO(benvanik): set debug name instead and use the
-  //     VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT flag.
-  vmaSetAllocationUserData(vma_, allocation_, this);
+  VmaAllocator vma;
+  VkBuffer handle;
+  VmaAllocation allocation;
+  VmaAllocationInfo allocation_info;
+} iree_hal_vulkan_vma_buffer_t;
+
+extern const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable;
+
+static iree_hal_vulkan_vma_buffer_t* iree_hal_vulkan_vma_buffer_cast(
+    iree_hal_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_vulkan_vma_buffer_vtable);
+  return (iree_hal_vulkan_vma_buffer_t*)base_value;
 }
 
-VmaBuffer::~VmaBuffer() {
-  IREE_TRACE_SCOPE0("VmaBuffer::dtor");
-  vmaDestroyBuffer(vma_, buffer_, allocation_);
-}
+iree_status_t iree_hal_vulkan_vma_buffer_wrap(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    VmaAllocator vma, VkBuffer handle, VmaAllocation allocation,
+    VmaAllocationInfo allocation_info, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(vma);
+  IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(allocation);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
-                           const void* pattern, device_size_t pattern_length) {
-  IREE_ASSIGN_OR_RETURN(
-      auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, byte_offset,
-                                       byte_length));
-  void* data_ptr = static_cast<void*>(mapping.mutable_data());
-  switch (pattern_length) {
-    case 1: {
-      uint8_t* data = static_cast<uint8_t*>(data_ptr);
-      uint8_t value_bits = *static_cast<const uint8_t*>(pattern);
-      std::fill_n(data, byte_length, value_bits);
-      break;
-    }
-    case 2: {
-      uint16_t* data = static_cast<uint16_t*>(data_ptr);
-      uint16_t value_bits = *static_cast<const uint16_t*>(pattern);
-      std::fill_n(data, byte_length / sizeof(uint16_t), value_bits);
-      break;
-    }
-    case 4: {
-      uint32_t* data = static_cast<uint32_t*>(data_ptr);
-      uint32_t value_bits = *static_cast<const uint32_t*>(pattern);
-      std::fill_n(data, byte_length / sizeof(uint32_t), value_bits);
-      break;
-    }
-    default:
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Unsupported scalar data size: " << pattern_length;
+  iree_hal_vulkan_vma_buffer_t* buffer = NULL;
+  iree_status_t status =
+      iree_allocator_malloc(iree_hal_allocator_host_allocator(allocator),
+                            sizeof(*buffer), (void**)&buffer);
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_vulkan_vma_buffer_vtable,
+                                 &buffer->base.resource);
+    buffer->base.allocator = allocator;
+    buffer->base.allocated_buffer = &buffer->base;
+    buffer->base.allocation_size = allocation_size;
+    buffer->base.byte_offset = byte_offset;
+    buffer->base.byte_length = byte_length;
+    buffer->base.memory_type = memory_type;
+    buffer->base.allowed_access = allowed_access;
+    buffer->base.allowed_usage = allowed_usage;
+    buffer->vma = vma;
+    buffer->handle = handle;
+    buffer->allocation = allocation;
+    buffer->allocation_info = allocation_info;
+
+    // TODO(benvanik): set debug name instead and use the
+    //     VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT flag.
+    vmaSetAllocationUserData(buffer->vma, buffer->allocation, buffer);
+
+    *out_buffer = &buffer->base;
+  } else {
+    vmaDestroyBuffer(vma, handle, allocation);
   }
-  return OkStatus();
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
-Status VmaBuffer::ReadDataImpl(device_size_t source_offset, void* data,
-                               device_size_t data_length) {
-  IREE_ASSIGN_OR_RETURN(
-      auto mapping,
-      MapMemory<uint8_t>(MemoryAccess::kRead, source_offset, data_length));
-  std::memcpy(data, mapping.data(), mapping.byte_length());
-  return OkStatus();
+static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  vmaDestroyBuffer(buffer->vma, buffer->handle, buffer->allocation);
+  iree_allocator_free(host_allocator, buffer);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
-Status VmaBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
-                                device_size_t data_length) {
-  IREE_ASSIGN_OR_RETURN(auto mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
-                                           target_offset, data_length));
-  std::memcpy(mapping.mutable_data(), data, mapping.byte_length());
-  return OkStatus();
+VkBuffer iree_hal_vulkan_vma_buffer_handle(iree_hal_buffer_t* base_buffer) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  return buffer->handle;
 }
 
-Status VmaBuffer::CopyDataImpl(device_size_t target_offset,
-                               Buffer* source_buffer,
-                               device_size_t source_offset,
-                               device_size_t data_length) {
-  // This is pretty terrible. Let's not do this.
-  // TODO(benvanik): a way for allocators to indicate transfer compat.
-  IREE_ASSIGN_OR_RETURN(auto source_mapping,
-                        source_buffer->MapMemory<uint8_t>(
-                            MemoryAccess::kRead, source_offset, data_length));
-  IREE_CHECK_EQ(data_length, source_mapping.size());
-  IREE_ASSIGN_OR_RETURN(auto target_mapping,
-                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
-                                           target_offset, data_length));
-  IREE_CHECK_EQ(data_length, target_mapping.size());
-  std::memcpy(target_mapping.mutable_data(), source_mapping.data(),
-              data_length);
-  return OkStatus();
-}
+static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
+    iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
+    void** out_data_ptr) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
 
-Status VmaBuffer::MapMemoryImpl(MappingMode mapping_mode,
-                                MemoryAccessBitfield memory_access,
-                                device_size_t local_byte_offset,
-                                device_size_t local_byte_length,
-                                void** out_data) {
   uint8_t* data_ptr = nullptr;
   VK_RETURN_IF_ERROR(
-      vmaMapMemory(vma_, allocation_, reinterpret_cast<void**>(&data_ptr)));
-  *out_data = data_ptr + local_byte_offset;
+      vmaMapMemory(buffer->vma, buffer->allocation, (void**)&data_ptr),
+      "vmaMapMemory");
+  *out_data_ptr = data_ptr + local_byte_offset;
 
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for
   // heap buffers we could reallocate them such that ASAN yells, but that
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
-  if (AnyBitSet(memory_access & MemoryAccess::kDiscard)) {
-    std::memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
+  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
+    memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
 
-  return OkStatus();
+  return iree_ok_status();
 }
 
-Status VmaBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
-                                  device_size_t local_byte_length, void* data) {
-  vmaUnmapMemory(vma_, allocation_);
-  return OkStatus();
+static void iree_hal_vulkan_vma_buffer_unmap_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length, void* data_ptr) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  vmaUnmapMemory(buffer->vma, buffer->allocation);
 }
 
-Status VmaBuffer::InvalidateMappedMemoryImpl(device_size_t local_byte_offset,
-                                             device_size_t local_byte_length) {
-  vmaInvalidateAllocation(vma_, allocation_, local_byte_offset,
-                          local_byte_length);
-  return OkStatus();
+static iree_status_t iree_hal_vulkan_vma_buffer_invalidate_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  VK_RETURN_IF_ERROR(
+      vmaInvalidateAllocation(buffer->vma, buffer->allocation,
+                              local_byte_offset, local_byte_length),
+      "vmaInvalidateAllocation");
+  return iree_ok_status();
 }
 
-Status VmaBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
-                                        device_size_t local_byte_length) {
-  vmaFlushAllocation(vma_, allocation_, local_byte_offset, local_byte_length);
-  return OkStatus();
+static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length) {
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(base_buffer);
+  VK_RETURN_IF_ERROR(vmaFlushAllocation(buffer->vma, buffer->allocation,
+                                        local_byte_offset, local_byte_length),
+                     "vmaFlushAllocation");
+  return iree_ok_status();
 }
 
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
+    /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
+    /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
+    /*.unmap_range=*/iree_hal_vulkan_vma_buffer_unmap_range,
+    /*.invalidate_range=*/iree_hal_vulkan_vma_buffer_invalidate_range,
+    /*.flush_range=*/iree_hal_vulkan_vma_buffer_flush_range,
+};

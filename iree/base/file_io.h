@@ -49,6 +49,7 @@ Status MoveFile(const std::string& source_path,
 // Gets a platform and environment-dependent path for temporary files.
 std::string GetTempPath();
 
+// TODO(#3845): remove this when dylibs no longer need temp files.
 // Gets a temporary file name and returns its absolute path.
 // The particular path chosen is platform and environment-dependent.
 // Unique characters will be automatically inserted after |base_name|.

@@ -19,13 +19,9 @@ iree_cc_library(
     cts_test_base
   HDRS
     "cts_test_base.h"
-  DATA
-    iree::tools::sanitizer_suppressions.txt
   DEPS
-    iree::base::status
-    iree::hal
+    iree::base::api
     iree::hal::api
-    iree::hal::testing::driver_registry
     iree::testing::gtest
   TESTONLY
   PUBLIC
@@ -38,20 +34,6 @@ iree_cc_test(
     "allocator_test.cc"
   DEPS
     ::cts_test_base
-    iree::base::status
-    iree::hal::testing::driver_registry
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    buffer_test
-  SRCS
-    "buffer_test.cc"
-  DEPS
-    ::cts_test_base
-    iree::base::status
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -64,7 +46,6 @@ iree_cc_test(
     "command_buffer_test.cc"
   DEPS
     ::cts_test_base
-    iree::base::status
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -72,12 +53,23 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
-    command_queue_test
+    descriptor_set_test
   SRCS
-    "command_queue_test.cc"
+    "descriptor_set_test.cc"
   DEPS
     ::cts_test_base
-    iree::base::status
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    descriptor_set_layout_test
+  SRCS
+    "descriptor_set_layout_test.cc"
+  DEPS
+    ::cts_test_base
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
@@ -88,6 +80,30 @@ iree_cc_test(
     driver_test
   SRCS
     "driver_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    event_test
+  SRCS
+    "event_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    executable_layout_test
+  SRCS
+    "executable_layout_test.cc"
   DEPS
     ::cts_test_base
     iree::hal::testing::driver_registry

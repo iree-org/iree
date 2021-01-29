@@ -15,33 +15,24 @@
 #ifndef IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_H_
 #define IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_H_
 
-// clang-format off: Must be included before all other headers:
-#include "iree/hal/vulkan/vulkan_headers.h"
-// clang-format on
-
-#include "iree/hal/descriptor_set.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vulkan/handle_util.h"
 
-namespace iree {
-namespace hal {
-namespace vulkan {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-// A DescriptorSet implemented with the native VkDescriptorSet type.
-class NativeDescriptorSet final : public DescriptorSet {
- public:
-  NativeDescriptorSet(ref_ptr<VkDeviceHandle> logical_device,
-                      VkDescriptorSet handle);
-  ~NativeDescriptorSet() override;
+// Creates a native Vulkan VkDescriptorSet object.
+iree_status_t iree_hal_vulkan_native_descriptor_set_create(
+    iree::hal::vulkan::VkDeviceHandle* logical_device, VkDescriptorSet handle,
+    iree_hal_descriptor_set_t** out_descriptor_set);
 
-  VkDescriptorSet handle() const { return handle_; }
+// Returns the native Vulkan VkDescriptorSet handle.
+VkDescriptorSet iree_hal_vulkan_native_descriptor_set_handle(
+    iree_hal_descriptor_set_t* base_descriptor_set);
 
- private:
-  ref_ptr<VkDeviceHandle> logical_device_;
-  VkDescriptorSet handle_;
-};
-
-}  // namespace vulkan
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_VULKAN_NATIVE_DESCRIPTOR_SET_H_

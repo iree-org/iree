@@ -159,26 +159,54 @@ build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-range-loop-an
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################
 
-# Turn on asan. Some toolchains make use of the asan feature and we'll directly
-# set the appropriate opts.
+# ASAN (address sanitizer)
+# https://clang.llvm.org/docs/AddressSanitizer.html
+build:asan --config=sanitizer
 build:asan --features=asan
 build:asan --copt=-fsanitize=address
+build:asan --copt=-fsanitize-address-use-after-scope
 build:asan --linkopt=-fsanitize=address
+build:asan --cc_output_directory_tag=asan
+build:asan --copt=-DADDRESS_SANITIZER
+
+# MSAN (memory sanitizer)
+# https://clang.llvm.org/docs/MemorySanitizer.html
+build:msan --config=sanitizer
+build:msan --features=msan
+build:msan --copt=-fsanitize=memory
+build:msan --copt=-fsanitize-memory-track-origins
+build:msan --linkopt=-fsanitize=memory
+build:msan --cc_output_directory_tag=msan
+build:msan --copt=-DMEMORY_SANITIZER
+
+# TSAN (thread sanitizer)
+# https://clang.llvm.org/docs/ThreadSanitizer.html
+build:tsan --config=sanitizer
+build:tsan --features=tsan
+build:tsan --copt=-fsanitize=thread
+build:tsan --linkopt=-fsanitize=thread
+build:tsan --cc_output_directory_tag=tsan
+build:tsan --copt=-DTHREAD_SANITIZER
+
+# UBSAN (undefined behavior sanitizer)
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+build:ubsan --config=sanitizer
+build:ubsan --features=ubsan
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --linkopt=-fsanitize=undefined
+build:ubsan --linkopt=-lubsan
+build:ubsan --cc_output_directory_tag=ubsan
 
 # Don't strip debug info
-build:asan --strip=never
+build:sanitizer --strip=never
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
 # We don't use this in IREE (that's what linkstatic is for), but it could show
 # up in dependencies.
-build:asan --force_ignore_dash_static
-# asan tests tend to take longer, so increase the timeouts
-build:asan --test_timeout=120,600,1800,-1
-# Make the outputs easy to find
-build:asan --cc_output_directory_tag=asan
+build:sanitizer --force_ignore_dash_static
+# sanitizer tests tend to take longer, so increase the timeouts
+build:sanitizer --test_timeout=120,600,1800,-1
 # Get better stack traces
-build:asan --copt=-fno-omit-frame-pointer
-# This macro define is used by absl
-build:asan --copt=-DADDRESS_SANITIZER
+build:sanitizer --copt=-fno-omit-frame-pointer
 
 ###############################################################################
 # Architecture specific options

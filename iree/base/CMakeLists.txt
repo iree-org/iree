@@ -35,26 +35,22 @@ iree_cc_library(
   HDRS
     "alignment.h"
     "atomics.h"
-    "bitfield.h"
     "debugging.h"
     "math.h"
     "memory.h"
     "target_platform.h"
   DEPS
     absl::core_headers
-    absl::span
+    iree::base::internal::atomics
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_library(
   NAME
-    bitfield_test
-  SRCS
-    "bitfield_test.cc"
-  DEPS
-    ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
+    target_platform
+  HDRS
+    "target_platform.h"
+  PUBLIC
 )
 
 iree_cc_library(
@@ -102,6 +98,17 @@ iree_cc_test(
     "atomic_slist_test.cc"
   DEPS
     ::atomic_slist
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    atomics_test
+  SRCS
+    "atomics_test.cc"
+  DEPS
+    ::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -434,27 +441,6 @@ iree_cc_test(
     "synchronization_test.cc"
   DEPS
     ::synchronization
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    time
-  HDRS
-    "time.h"
-  DEPS
-    ::api
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    time_test
-  SRCS
-    "time_test.cc"
-  DEPS
-    ::time
     iree::testing::gtest
     iree::testing::gtest_main
 )

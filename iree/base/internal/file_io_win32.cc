@@ -18,6 +18,8 @@
 
 #include <io.h>
 
+#include <atomic>
+
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
@@ -112,6 +114,7 @@ std::string GetTempPath() {
   return temp_path;
 }
 
+// TODO(#3845): remove this when dylibs no longer need temp files.
 StatusOr<std::string> GetTempFile(absl::string_view base_name) {
   IREE_TRACE_SCOPE0("file_io::GetTempFile");
 
@@ -120,6 +123,8 @@ StatusOr<std::string> GetTempFile(absl::string_view base_name) {
       file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
 
   if (::_mktemp(&template_path[0]) != nullptr) {
+    static std::atomic<int> next_id{0};
+    template_path += std::to_string(next_id++);
     return template_path;  // Should have been modified by _mktemp.
   } else {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)

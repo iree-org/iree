@@ -14,50 +14,36 @@
 
 #include "iree/task/topology.h"
 
+#include <assert.h>
 #include <cpuinfo.h>
 #include <stdio.h>
 
+#include "iree/base/debugging.h"
 #include "iree/base/math.h"
 #include "iree/base/tracing.h"
+#include "iree/task/tuning.h"
 
-struct iree_task_topology_s {
-  iree_allocator_t allocator;
-  iree_host_size_t group_capacity;
-  iree_host_size_t group_count;
-  iree_task_topology_group_t groups[0];
-};
-
-iree_status_t iree_task_topology_allocate(iree_host_size_t group_capacity,
-                                          iree_allocator_t allocator,
-                                          iree_task_topology_t** out_topology) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_host_size_t topology_size =
-      sizeof(iree_task_topology_t) +
-      group_capacity * sizeof(iree_task_topology_group_t);
-
-  iree_task_topology_t* topology = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, topology_size, (void**)&topology));
-  topology->allocator = allocator;
-  topology->group_capacity = group_capacity;
-  topology->group_count = 0;
-
-  *out_topology = topology;
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+void iree_task_topology_group_initialize(
+    uint8_t group_index, iree_task_topology_group_t* out_group) {
+  memset(out_group, 0, sizeof(*out_group));
+  out_group->group_index = group_index;
+  snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name), "worker[%u]",
+           group_index);
+  iree_thread_affinity_set_any(&out_group->ideal_thread_affinity);
+  out_group->constructive_sharing_mask = IREE_TASK_TOPOLOGY_GROUP_MASK_ALL;
 }
 
-void iree_task_topology_free(iree_task_topology_t* topology) {
-  if (!topology) return;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_allocator_free(topology->allocator, topology);
-  IREE_TRACE_ZONE_END(z0);
+void iree_task_topology_initialize(iree_task_topology_t* out_topology) {
+  IREE_ASSERT_ARGUMENT(out_topology);
+  memset(out_topology, 0, sizeof(*out_topology));
+}
+
+void iree_task_topology_deinitialize(iree_task_topology_t* topology) {
+  IREE_ASSERT_ARGUMENT(topology);
 }
 
 iree_status_t iree_task_topology_parse(iree_string_view_t value,
-                                       iree_allocator_t allocator,
-                                       iree_task_topology_t** out_topology) {
+                                       iree_task_topology_t* out_topology) {
   // TODO(benvanik): define a format that is generally useful alongside cpuinfo.
   // Maybe colon-separated group-id values from thread affinities? Like:
   //   0.0:0.2:0.4:0.8 to indicate cores 0,2,4,8 on group 0
@@ -73,6 +59,11 @@ bool iree_task_topology_format(const iree_task_topology_t* topology,
   return false;
 }
 
+iree_host_size_t iree_task_topology_group_capacity(
+    const iree_task_topology_t* topology) {
+  return IREE_ARRAYSIZE(topology->groups);
+}
+
 iree_host_size_t iree_task_topology_group_count(
     const iree_task_topology_t* topology) {
   return topology->group_count;
@@ -86,7 +77,7 @@ const iree_task_topology_group_t* iree_task_topology_get_group(
 
 iree_status_t iree_task_topology_push_group(
     iree_task_topology_t* topology, const iree_task_topology_group_t* group) {
-  if (topology->group_count + 1 > topology->group_capacity) {
+  if (topology->group_count + 1 > IREE_ARRAYSIZE(topology->groups)) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "group capacity exceeded");
   }
@@ -97,27 +88,18 @@ iree_status_t iree_task_topology_push_group(
   return iree_ok_status();
 }
 
-iree_status_t iree_task_topology_from_group_count(
-    iree_host_size_t group_count, iree_allocator_t allocator,
-    iree_task_topology_t** out_topology) {
+void iree_task_topology_initialize_from_group_count(
+    iree_host_size_t group_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_topology_t* topology = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_topology_allocate(group_count, allocator, &topology));
-
+  iree_task_topology_initialize(out_topology);
   for (iree_host_size_t i = 0; i < group_count; ++i) {
-    iree_task_topology_group_t* group = &topology->groups[i];
-    group->group_index = i;
-    snprintf(group->name, IREE_ARRAYSIZE(group->name), "worker[%d]", (int)i);
-    iree_thread_affinity_set_any(&group->ideal_thread_affinity);
-    group->constructive_sharing_mask = IREE_TASK_TOPOLOGY_GROUP_MASK_ALL;
+    iree_task_topology_group_t* group = &out_topology->groups[i];
+    iree_task_topology_group_initialize(i, group);
   }
-  topology->group_count = group_count;
+  out_topology->group_count = group_count;
 
-  *out_topology = topology;
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 // Runs the cpuinfo initializer which caches its result on the first call.
@@ -128,6 +110,10 @@ static iree_status_t iree_task_topology_ensure_cpuinfo_available() {
                             "cpuinfo failed to initialize");
   }
   return iree_ok_status();
+}
+
+static bool iree_task_topology_is_cpuinfo_available() {
+  return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
 }
 
 // Returns the core of the calling thread or NULL if not supported.
@@ -204,7 +190,10 @@ static uint64_t iree_task_topology_calculate_cache_bits(
   uint64_t mask = 0;
   for (uint32_t processor_i = 0; processor_i < cache->processor_count;
        ++processor_i) {
-    mask |= 1ull << (cache->processor_start + processor_i);
+    uint32_t i = cache->processor_start + processor_i;
+    if (i < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+      mask |= 1ull << i;
+    }
   }
   return mask;
 }
@@ -227,10 +216,7 @@ static uint64_t iree_task_topology_calculate_constructive_sharing_mask(
 static void iree_task_topology_group_initialize_from_core(
     uint32_t group_index, const struct cpuinfo_core* core,
     iree_task_topology_group_t* out_group) {
-  memset(out_group, 0, sizeof(*out_group));
-  out_group->group_index = group_index;
-  snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name), "worker[%u]",
-           group_index);
+  iree_task_topology_group_initialize(group_index, out_group);
 
   // Guess: always pick the first processor in a core.
   // When pinning to threads we'll take into account whether the core is SMT
@@ -273,18 +259,30 @@ static void iree_task_topology_fixup_constructive_sharing_masks(
   }
 }
 
+// Initializes |out_topology| with a standardized behavior when cpuinfo is not
+// available (unsupported arch, failed to query, etc).
+static void iree_task_topology_initialize_fallback(
+    iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  // TODO(benvanik): implement our own query... but that seems not so great.
+  // For now we default to a single group: if a user wants more then they can
+  // either get cpuinfo working for their platform or manually construct the
+  // topology themselves.
+  iree_host_size_t group_count = 1;
+  iree_task_topology_initialize_from_group_count(group_count, out_topology);
+  IREE_TRACE_ZONE_END(z0);
+}
+
 // Matches all cores.
 static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
                                                uintptr_t user_data) {
   return true;
 }
 
-iree_status_t iree_task_topology_from_physical_cores(
-    iree_host_size_t max_core_count, iree_allocator_t allocator,
-    iree_task_topology_t** out_topology) {
-  return iree_task_topology_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_all, 0, max_core_count, allocator,
-      out_topology);
+void iree_task_topology_initialize_from_physical_cores(
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  iree_task_topology_initialize_from_physical_cores_with_filter(
+      iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
 }
 
 // Matches only cores with the uarch as specified in |user_data|.
@@ -293,21 +291,24 @@ static bool iree_task_topology_core_filter_uarch(
   return core->uarch == user_data;
 }
 
-iree_status_t iree_task_topology_from_physical_cores_with_uarch(
+void iree_task_topology_initialize_from_physical_cores_with_uarch(
     uint32_t cpuinfo_uarch, iree_host_size_t max_core_count,
-    iree_allocator_t allocator, iree_task_topology_t** out_topology) {
-  return iree_task_topology_from_physical_cores_with_filter(
+    iree_task_topology_t* out_topology) {
+  iree_task_topology_initialize_from_physical_cores_with_filter(
       iree_task_topology_core_filter_uarch, cpuinfo_uarch, max_core_count,
-      allocator, out_topology);
+      out_topology);
 }
 
-iree_status_t iree_task_topology_from_physical_cores_with_filter(
+void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
-    iree_host_size_t max_core_count, iree_allocator_t allocator,
-    iree_task_topology_t** out_topology) {
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  if (!iree_task_topology_is_cpuinfo_available()) {
+    iree_task_topology_initialize_fallback(max_core_count, out_topology);
+    return;
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_topology_ensure_cpuinfo_available());
 
   // Count cores that match the filter.
   iree_host_size_t core_count = 0;
@@ -317,17 +318,15 @@ iree_status_t iree_task_topology_from_physical_cores_with_filter(
   }
   core_count = iree_min(core_count, max_core_count);
 
-  iree_task_topology_t* topology = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_topology_allocate(core_count, allocator, &topology));
+  iree_task_topology_initialize(out_topology);
 
   // Build each core up to the max allowed.
   // TODO(benvanik): if our group_count <= core_count/2 then distribute better;
   // for now we just do a straight-line through (cores 0-N) when instead we may
   // want to take advantage of L3 cache info (half of groups on one L3 cache,
   // half of groups on another, etc).
-  topology->group_count = core_count;
-  for (uint32_t core_i = 0, group_i = 0; group_i < topology->group_count;
+  out_topology->group_count = core_count;
+  for (uint32_t core_i = 0, group_i = 0; group_i < out_topology->group_count;
        ++core_i) {
     // Rotate the core ID so that we avoid setting the affinity to the calling
     // thread which we assume is something the user has plans for and doesn't
@@ -335,31 +334,31 @@ iree_status_t iree_task_topology_from_physical_cores_with_filter(
     const struct cpuinfo_core* core =
         cpuinfo_get_core(iree_task_topology_rotate_from_base_core(core_i));
     if (filter_fn(core, filter_fn_data)) {
-      iree_task_topology_group_initialize_from_core(group_i, core,
-                                                    &topology->groups[group_i]);
+      iree_task_topology_group_initialize_from_core(
+          group_i, core, &out_topology->groups[group_i]);
       ++group_i;
     }
   }
 
-  iree_task_topology_fixup_constructive_sharing_masks(topology);
-  *out_topology = topology;
+  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
-iree_status_t iree_task_topology_from_unique_l2_cache_groups(
-    iree_host_size_t max_group_count, iree_allocator_t allocator,
-    iree_task_topology_t** out_topology) {
+void iree_task_topology_initialize_from_unique_l2_cache_groups(
+    iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
+  if (!iree_task_topology_is_cpuinfo_available() ||
+      !cpuinfo_get_l2_caches_count()) {
+    iree_task_topology_initialize_from_physical_cores(max_group_count,
+                                                      out_topology);
+    return;
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_topology_ensure_cpuinfo_available());
 
   iree_host_size_t cache_count = cpuinfo_get_l2_caches_count();
   cache_count = iree_min(cache_count, max_group_count);
 
-  iree_task_topology_t* topology = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_topology_allocate(cache_count, allocator, &topology));
+  iree_task_topology_initialize(out_topology);
 
   // TODO(benvanik): iree_task_topology_rotate_from_base_core to offset all of
   // the selection here (while still preserving the cache groups). May need to
@@ -369,19 +368,17 @@ iree_status_t iree_task_topology_from_unique_l2_cache_groups(
   // TODO(benvanik): if our group_count <= cache_count/2 then distribute better;
   // we could use l3 cache in addition to ensure we are selecting cores that do
   // (or do not) share.
-  topology->group_count = cache_count;
-  for (uint32_t cache_i = 0, group_i = 0; group_i < topology->group_count;
+  out_topology->group_count = cache_count;
+  for (uint32_t cache_i = 0, group_i = 0; group_i < out_topology->group_count;
        ++cache_i) {
     const struct cpuinfo_cache* cache = cpuinfo_get_l2_cache(cache_i);
     const struct cpuinfo_core* core =
         cpuinfo_get_processor(cache->processor_start)->core;
-    iree_task_topology_group_initialize_from_core(group_i, core,
-                                                  &topology->groups[group_i]);
+    iree_task_topology_group_initialize_from_core(
+        group_i, core, &out_topology->groups[group_i]);
     ++group_i;
   }
 
-  iree_task_topology_fixup_constructive_sharing_masks(topology);
-  *out_topology = topology;
+  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }

@@ -24,7 +24,7 @@ namespace {
 
 class HalMappedMemory {
  public:
-  HalMappedMemory(iree_hal_mapped_memory_t mapped_memory,
+  HalMappedMemory(iree_hal_buffer_mapping_t mapped_memory,
                   iree_hal_buffer_view_t* bv)
       : mapped_memory_(mapped_memory), bv_(bv) {
     iree_hal_buffer_view_retain(bv_);
@@ -32,7 +32,7 @@ class HalMappedMemory {
   ~HalMappedMemory() {
     if (bv_) {
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv_);
-      IREE_CHECK_OK(iree_hal_buffer_unmap(buffer, &mapped_memory_));
+      iree_hal_buffer_unmap_range(&mapped_memory_);
       iree_hal_buffer_view_release(bv_);
     }
   }
@@ -44,10 +44,10 @@ class HalMappedMemory {
   static HalMappedMemory Create(HalBufferView& bv) {
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv.raw_ptr());
     iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
-    iree_hal_mapped_memory_t mapped_memory;
-    CheckApiStatus(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                       0 /* element_offset */, byte_length,
-                                       &mapped_memory),
+    iree_hal_buffer_mapping_t mapped_memory;
+    CheckApiStatus(iree_hal_buffer_map_range(
+                       buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                       0 /* element_offset */, byte_length, &mapped_memory),
                    "Could not map memory");
     return HalMappedMemory(mapped_memory, bv.raw_ptr());
   }
@@ -81,7 +81,7 @@ class HalMappedMemory {
   }
 
  private:
-  iree_hal_mapped_memory_t mapped_memory_;
+  iree_hal_buffer_mapping_t mapped_memory_;
   iree_hal_buffer_view_t* bv_;
 };
 
@@ -167,9 +167,6 @@ void SetupHalBindings(pybind11::module m) {
   py::class_<HalMappedMemory>(m, "MappedMemory", py::buffer_protocol())
       .def_buffer(&HalMappedMemory::ToBufferInfo);
   py::class_<HalBuffer>(m, "HalBuffer")
-      .def_static("allocate_heap", &HalBuffer::AllocateHeapBuffer,
-                  py::arg("memory_type"), py::arg("usage"),
-                  py::arg("allocation_size"))
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
            py::arg("byte_length"))
       .def("create_view", &HalBuffer::CreateView, py::arg("shape"),
