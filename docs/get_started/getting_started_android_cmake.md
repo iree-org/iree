@@ -90,7 +90,7 @@ Build the runtime using the Android NDK toolchain:
 ```shell
 $ cmake -G Ninja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT=../iree-build-host/install \
+  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
   -DANDROID_ABI="arm64-v8a" \
   -DANDROID_PLATFORM=android-29 \
   -DIREE_BUILD_COMPILER=OFF \
