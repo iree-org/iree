@@ -20,10 +20,13 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class AllocatorTest : public CtsTestBase {
- protected:
-  static constexpr iree_device_size_t kAllocationSize = 1024;
-};
+namespace {
+
+constexpr iree_device_size_t kAllocationSize = 1024;
+
+}  // namespace
+
+class AllocatorTest : public CtsTestBase {};
 
 // All allocators must support some baseline capabilities.
 //

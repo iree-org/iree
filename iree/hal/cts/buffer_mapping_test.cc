@@ -22,10 +22,13 @@ namespace cts {
 
 using ::testing::ContainerEq;
 
-class BufferMappingTest : public CtsTestBase {
- protected:
-  static constexpr iree_device_size_t kAllocationSize = 64;
-};
+namespace {
+
+constexpr iree_device_size_t kAllocationSize = 1024;
+
+}  // namespace
+
+class BufferMappingTest : public CtsTestBase {};
 
 // TODO(scotttodd): move this check to SetUp() and skip tests if not supported
 //   or add general support for optional features/tests into the CTS framework?
