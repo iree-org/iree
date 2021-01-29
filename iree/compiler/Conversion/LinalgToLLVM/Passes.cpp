@@ -96,12 +96,6 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
 
   passManager.addPass(createInlinerPass());
 
-  // Propagates dynamic shapes computation on tensors.
-  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
-  passManager.addNestedPass<FuncOp>(
-      Shape::createMaterializeShapeCalculationsPass());
-  passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
-
   // HLO -> Linalg on buffers.
   if (clEnableLinalgOnTensors) {
     passManager.addPass(createLinalgVectorizePass());
@@ -116,6 +110,12 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     // passManager.addPass(createBufferLoopHoistingPass());
     passManager.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
+    // Propagates dynamic shapes computation on tensors.
+    passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+    passManager.addNestedPass<FuncOp>(
+        Shape::createMaterializeShapeCalculationsPass());
+    passManager.addNestedPass<FuncOp>(
+        Shape::createHoistShapeCalculationsPass());
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(passManager);
   }

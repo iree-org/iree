@@ -37,7 +37,11 @@ createExpandFunctionRankedShapeDimsPass();
 
 // For any dynamically shaped edges in a function, introduces an appropriate
 // get_ranked_shape and corresponding tie_shape op to make the association.
-std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass();
+//
+// Any op contained in a region transitively owned by an op with a name in
+// `doNotRecurseOpNames` is not tied.
+std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass(
+    ArrayRef<std::string> doNotRecurseOpNames = {});
 
 // Materializes shape calculations for any get_ranked_shape ops.
 std::unique_ptr<OperationPass<FuncOp>> createMaterializeShapeCalculationsPass();
