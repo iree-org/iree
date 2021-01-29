@@ -21,17 +21,19 @@
 // Native integer arithmetic
 //===------------------------------------------------------------------===//
 
-int32_t vm_add_i32(int32_t lhs, int32_t rhs) { return lhs + rhs; }
-int32_t vm_sub_i32(int32_t lhs, int32_t rhs) { return lhs - rhs; }
-int32_t vm_mul_i32(int32_t lhs, int32_t rhs) { return lhs * rhs; }
-int32_t vm_div_i32s(int32_t lhs, int32_t rhs) { return lhs / rhs; }
-uint32_t vm_div_i32u(uint32_t lhs, uint32_t rhs) { return lhs / rhs; }
-int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) { return lhs % rhs; }
-uint32_t vm_rem_i32u(uint32_t lhs, uint32_t rhs) { return lhs % rhs; }
-uint32_t vm_not_i32(uint32_t operand) { return ~operand; }
-int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
-int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
-int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
+static inline int32_t vm_add_i32(int32_t lhs, int32_t rhs) { return lhs + rhs; }
+static inline int32_t vm_sub_i32(int32_t lhs, int32_t rhs) { return lhs - rhs; }
+static inline int32_t vm_mul_i32(int32_t lhs, int32_t rhs) { return lhs * rhs; }
+// clang-format off
+static inline int32_t vm_div_i32s(int32_t lhs, int32_t rhs) { return lhs / rhs; }
+static inline uint32_t vm_div_i32u(uint32_t lhs, uint32_t rhs) { return lhs / rhs; }
+static inline int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) { return lhs % rhs;}
+static inline uint32_t vm_rem_i32u(uint32_t lhs, uint32_t rhs) { return lhs % rhs; }
+// clang-format on
+static inline uint32_t vm_not_i32(uint32_t operand) { return ~operand; }
+static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
+static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
+static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
