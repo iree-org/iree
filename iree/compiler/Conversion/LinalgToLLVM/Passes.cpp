@@ -77,12 +77,10 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
+
   // OpPassManager& llvmPassManager = nestedModulePM.nest<ModuleOp>();
-  if (clEnableLLVMLinalgOnTensors) {
-    nestedModulePM.addPass(createConvertToLLVM2Pass());
-  } else {
-    nestedModulePM.addPass(createConvertToLLVMPass());
-  }
+  nestedModulePM.addPass(createConvertToLLVMPass());
+
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

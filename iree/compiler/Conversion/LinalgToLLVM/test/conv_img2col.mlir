@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-convert-to-llvm -split-input-file --iree-codegen-linalg-to-llvm-conv-img2col-conversion-pass %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-codegen-linalg-to-llvm-conv-img2col-conversion-pass %s | IreeFileCheck %s
 
 func @conv_16433136(%arg0: memref<1x16x16x4xf32>, %arg1: memref<3x3x4x16xf32>, %arg2: memref<1x14x14x16xf32>) {
     linalg.conv(%arg1, %arg0, %arg2)  : memref<3x3x4x16xf32>, memref<1x16x16x4xf32>, memref<1x14x14x16xf32>
