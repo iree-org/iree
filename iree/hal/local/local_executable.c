@@ -16,17 +16,30 @@
 
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
-    iree_hal_local_executable_layout_t* layout,
+    iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* source_executable_layouts,
+    iree_hal_local_executable_layout_t** target_executable_layouts,
+    iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable) {
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
-  out_base_executable->layout = layout;
-  iree_hal_executable_layout_retain((iree_hal_executable_layout_t*)layout);
+  out_base_executable->host_allocator = host_allocator;
+
+  out_base_executable->executable_layout_count = executable_layout_count;
+  out_base_executable->executable_layouts = target_executable_layouts;
+  for (iree_host_size_t i = 0; i < executable_layout_count; ++i) {
+    target_executable_layouts[i] =
+        (iree_hal_local_executable_layout_t*)source_executable_layouts[i];
+    iree_hal_executable_layout_retain(source_executable_layouts[i]);
+  }
 }
 
 void iree_hal_local_executable_deinitialize(
     iree_hal_local_executable_t* base_executable) {
-  iree_hal_executable_layout_release(
-      (iree_hal_executable_layout_t*)base_executable->layout);
+  for (iree_host_size_t i = 0; i < base_executable->executable_layout_count;
+       ++i) {
+    iree_hal_executable_layout_release(
+        (iree_hal_executable_layout_t*)base_executable->executable_layouts[i]);
+  }
 }
 
 iree_hal_local_executable_t* iree_hal_local_executable_cast(

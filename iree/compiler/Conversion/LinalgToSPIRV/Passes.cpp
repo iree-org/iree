@@ -245,6 +245,14 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //   - The module contains the final spv.module ready for serialization.
   //===--------------------------------------------------------------------===//
   addLinalgToSPIRVPasses(pm, options);
+
+  // HACK: SplitDispatchFunctionPass inserts spv.EntryPoints but does not tell
+  // the HAL about them. We need to find those new entry points and materialize
+  // hal.executable.entry_point ops so that we have a consistent view of the
+  // executable.
+  // SplitDispatchFunctionPass can hopefully go away with linalg-on-tensors
+  // and we can remove this.
+  pm.addPass(createMaterializeEntryPointsPass());
 }
 
 static PassPipelineRegistration<> linalgToSPIRVPipeline(

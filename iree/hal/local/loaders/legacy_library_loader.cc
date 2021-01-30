@@ -34,7 +34,8 @@
 // names on functions with internal linkage), however we shouldn't need to
 // bounds check anything within the flatbuffer after this succeeds.
 static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
-    iree_const_byte_span_t flatbuffer_data) {
+    iree_const_byte_span_t flatbuffer_data,
+    iree_host_size_t expected_entry_point_count) {
   // Special handling for valid but mismatching flatbuffers.
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16 ||
       !flatbuffers_has_identifier(flatbuffer_data.data,
@@ -59,6 +60,13 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
   flatbuffers_string_vec_t entry_points_vec =
       iree_DyLibExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  if (entry_point_count != expected_entry_point_count) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable provides %zu entry points but caller "
+                            "provided %zu; must match",
+                            entry_point_count, expected_entry_point_count);
+  }
+
   for (size_t i = 0; i < entry_point_count; ++i) {
     if (!flatbuffers_string_len(
             flatbuffers_string_vec_at(entry_points_vec, i))) {
@@ -200,32 +208,44 @@ static iree_status_t iree_hal_legacy_executable_resolve_symbols(
 }
 
 static iree_status_t iree_hal_legacy_executable_create(
-    iree_hal_executable_layout_t* base_layout,
     iree_DyLibExecutableDef_table_t executable_def,
-    iree_hal_executable_t** out_executable) {
-  IREE_ASSERT_ARGUMENT(base_layout);
+    iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* executable_layouts,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_def);
+  IREE_ASSERT_ARGUMENT(!executable_layout_count || executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_local_executable_layout_t* local_layout =
-      iree_hal_local_executable_layout_cast(base_layout);
-  IREE_ASSERT_ARGUMENT(local_layout);
 
   flatbuffers_string_vec_t entry_points_vec =
       iree_DyLibExecutableDef_entry_points_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
+  if (entry_point_count != executable_layout_count) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable provides %zu entry points but caller "
+                            "provided %zu; must match",
+                            entry_point_count, executable_layout_count);
+  }
 
   iree_hal_legacy_executable_t* executable = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable) + entry_point_count * sizeof(*executable->entry_fns);
-  iree_status_t status = iree_allocator_malloc(local_layout->host_allocator,
-                                               total_size, (void**)&executable);
+      sizeof(*executable) + entry_point_count * sizeof(*executable->entry_fns) +
+      executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_initialize(&iree_hal_legacy_executable_vtable,
-                                         local_layout, &executable->base);
+    iree_hal_local_executable_layout_t** executable_layouts_ptr =
+        (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
+                                               sizeof(*executable) +
+                                               entry_point_count *
+                                                   sizeof(
+                                                       *executable->entry_fns));
+    iree_hal_local_executable_initialize(
+        &iree_hal_legacy_executable_vtable, executable_layout_count,
+        executable_layouts, executable_layouts_ptr, host_allocator,
+        &executable->base);
     executable->def = executable_def;
     executable->entry_fn_count = entry_point_count;
   }
@@ -234,8 +254,8 @@ static iree_status_t iree_hal_legacy_executable_create(
     // Will scribble information into executable.
     // This is bad, but ehh all this is getting deleted soon and hopefully we
     // can avoid ever touching the disk at all.
-    status = iree_hal_legacy_executable_extract_and_load(
-        executable, local_layout->host_allocator);
+    status =
+        iree_hal_legacy_executable_extract_and_load(executable, host_allocator);
   }
   if (iree_status_is_ok(status)) {
     // Attempt to resolve symbols for all entry points.
@@ -255,7 +275,7 @@ static void iree_hal_legacy_executable_destroy(
     iree_hal_executable_t* base_executable) {
   iree_hal_legacy_executable_t* executable =
       (iree_hal_legacy_executable_t*)base_executable;
-  iree_allocator_t host_allocator = executable->base.layout->host_allocator;
+  iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
@@ -370,30 +390,33 @@ static void iree_hal_legacy_library_loader_destroy(
 
 static bool iree_hal_legacy_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   return executable_format == iree_hal_make_executable_format("DLIB");
 }
 
 static iree_status_t iree_hal_legacy_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
+  iree_hal_legacy_library_loader_t* executable_loader =
+      (iree_hal_legacy_library_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify and fetch the executable flatbuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_dylib_executable_flatbuffer_verify(executable_data));
+      z0, iree_hal_dylib_executable_flatbuffer_verify(
+              executable_spec->executable_data,
+              executable_spec->executable_layout_count));
   iree_DyLibExecutableDef_table_t executable_def =
-      iree_DyLibExecutableDef_as_root(executable_data.data);
+      iree_DyLibExecutableDef_as_root(executable_spec->executable_data.data);
 
   // Perform the load (and requisite disgusting hackery).
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_legacy_executable_create(executable_layout, executable_def,
-                                            out_executable));
+      z0, iree_hal_legacy_executable_create(
+              executable_def, executable_spec->executable_layout_count,
+              executable_spec->executable_layouts,
+              executable_loader->host_allocator, out_executable));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

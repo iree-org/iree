@@ -30,6 +30,22 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
+// iree.null
+//===----------------------------------------------------------------------===//
+
+class NullOpConversion : public OpConversionPattern<IREE::NullOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::NullOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::ConstRefZeroOp>(
+        op, IREE::VM::RefType::get(op.getType()));
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // iree.byte_buffer.*
 //===----------------------------------------------------------------------===//
 
@@ -71,6 +87,7 @@ class UnreachableOpConversion
 
 void populateIREEToVMPatterns(MLIRContext *context,
                               OwningRewritePatternList &patterns) {
+  patterns.insert<NullOpConversion>(context);
   patterns.insert<ByteBufferConstantOpConversion>(context);
   patterns.insert<UnreachableOpConversion>(context);
 }

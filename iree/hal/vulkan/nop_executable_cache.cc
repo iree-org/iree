@@ -77,22 +77,20 @@ static void iree_hal_vulkan_nop_executable_cache_destroy(
 
 static bool iree_hal_vulkan_nop_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
-    iree_hal_executable_format_t format) {
-  return format == kExecutableFormatSpirV;
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
+  return executable_format == kExecutableFormatSpirV;
 }
 
 static iree_status_t iree_hal_vulkan_nop_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   iree_hal_vulkan_nop_executable_cache_t* executable_cache =
       iree_hal_vulkan_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_vulkan_native_executable_create(
       executable_cache->logical_device,
-      /*pipeline_cache=*/VK_NULL_HANDLE, executable_layout, caching_mode,
-      executable_data, out_executable);
+      /*pipeline_cache=*/VK_NULL_HANDLE, executable_spec, out_executable);
 }
 
 const iree_hal_executable_cache_vtable_t

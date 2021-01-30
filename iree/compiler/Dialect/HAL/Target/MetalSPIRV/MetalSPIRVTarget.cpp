@@ -143,7 +143,7 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
 
     // 5. Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(),
+        targetOp.getLoc(), targetOp.sym_name(),
         static_cast<uint32_t>(IREE::HAL::ExecutableFormat::Metal),
         builder.getBufferAttr(executableBuilder.getContext()));
 

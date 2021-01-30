@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
@@ -98,6 +99,139 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
       sourceOp.getLoc(), name(), filter_pattern());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+}
+
+// Destructively merges |sourceModuleOp| into |targetModuleOp|.
+// |targetSymbolTable| is updated with the new symbols.
+static void mergeModuleInto(Operation *sourceModuleOp,
+                            Operation *targetModuleOp,
+                            DenseMap<StringRef, Operation *> &targetSymbolMap) {
+  auto &sourceBlock = sourceModuleOp->getRegion(0).front();
+  auto &targetBlock = targetModuleOp->getRegion(0).front();
+  auto allOps = llvm::to_vector<8>(
+      llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
+  for (auto &op : allOps) {
+    if (op->isKnownTerminator()) continue;
+    if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
+      if (targetSymbolMap.count(symbolInterface.getName())) {
+        // TODO(scotttodd): compare ops to ensure we aren't copying different
+        // things with the same name.
+        continue;
+      }
+      targetSymbolMap[symbolInterface.getName()] = op;
+    }
+    op->moveBefore(&targetBlock.back());
+  }
+
+  // Now that we're done cloning its ops, delete the original target op.
+  sourceModuleOp->erase();
+}
+
+// Replaces each usage of an entry point with its original symbol name with a
+// new symbol name.
+static void replaceEntryPointUses(
+    mlir::ModuleOp moduleOp,
+    const DenseMap<Attribute, Attribute> &replacements) {
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
+      auto it = replacements.find(dispatchOp.entry_point());
+      if (it != replacements.end()) {
+        dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
+      }
+    });
+  }
+}
+
+LogicalResult TargetBackend::linkExecutablesInto(
+    mlir::ModuleOp moduleOp,
+    ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
+    IREE::HAL::ExecutableOp linkedExecutableOp,
+    IREE::HAL::ExecutableTargetOp linkedTargetOp,
+    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
+    OpBuilder &builder) {
+  llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
+  int nextEntryPointOrdinal = 0;
+  DenseMap<StringRef, Operation *> symbolMap;
+  DenseMap<Attribute, Attribute> entryPointRefReplacements;
+  auto linkedExecutableBuilder =
+      OpBuilder::atBlockBegin(linkedExecutableOp.getBody());
+  auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
+  for (auto sourceExecutableOp : sourceExecutableOps) {
+    auto targetOps = llvm::to_vector<4>(
+        sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>());
+    for (auto targetOp : targetOps) {
+      // Only process targets matching our pattern.
+      if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
+        continue;
+      }
+
+      // Clone entry point ops and queue remapping ordinals and updating
+      // symbol refs.
+      for (auto entryPointOp :
+           targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+        // Lookup the interface used by this entry point.
+        auto sourceInterfaceOp =
+            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
+                sourceExecutableOp, entryPointOp.interfaceAttr());
+        assert(sourceInterfaceOp && "cannot find source interface");
+        IREE::HAL::InterfaceOp linkedInterfaceOp;
+        for (auto interfaceOp : linkedInterfaceOps) {
+          if (interfaceOp.isEquivalentTo(sourceInterfaceOp)) {
+            linkedInterfaceOp = interfaceOp;
+            break;
+          }
+        }
+        if (!linkedInterfaceOp) {
+          linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
+              linkedExecutableBuilder.clone(*sourceInterfaceOp));
+          linkedInterfaceOp.setName(
+              llvm::formatv("legacy_io_{0}", linkedInterfaceOps.size()).str());
+          linkedInterfaceOps.push_back(linkedInterfaceOp);
+        }
+
+        auto newEntryPointOp =
+            linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
+                entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
+                builder.getI32IntegerAttr(nextEntryPointOrdinal++),
+                builder.getSymbolRefAttr(linkedInterfaceOp.getName()),
+                entryPointOp.signatureAttr(), ArrayAttr{});
+
+        // Add to replacement table for fixing up dispatch calls referencing
+        // this entry point.
+        auto oldSymbolRefAttr =
+            builder.getSymbolRefAttr(sourceExecutableOp.getName(),
+                                     {builder.getSymbolRefAttr(targetOp),
+                                      builder.getSymbolRefAttr(entryPointOp)});
+        auto newSymbolRefAttr = builder.getSymbolRefAttr(
+            linkedExecutableOp.getName(),
+            {builder.getSymbolRefAttr(linkedTargetOp),
+             builder.getSymbolRefAttr(newEntryPointOp)});
+        entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
+      }
+
+      // Merge the existing module into the new linked module op.
+      auto sourceModuleOp = getInnerModuleFn(targetOp.getInnerModule());
+      auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
+      mergeModuleInto(sourceModuleOp, linkedModuleOp, symbolMap);
+
+      targetOp.erase();
+    }
+
+    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableTargetOp>().empty()) {
+      sourceExecutableOp.erase();
+    }
+  }
+
+  // Update references to @executable::@target::@entry symbols.
+  replaceEntryPointUses(moduleOp, entryPointRefReplacements);
+
+  // Remove if we didn't add anything.
+  if (linkedTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>().empty()) {
+    linkedTargetOp.erase();
+    linkedExecutableOp.erase();
+  }
+
+  return success();
 }
 
 std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupSize(

@@ -1251,13 +1251,6 @@ static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
 // hal.executable
 //===----------------------------------------------------------------------===//
 
-InterfaceOp ExecutableOp::getFirstInterfaceOp() {
-  auto interfaceOps = llvm::to_vector<1>(getBlock().getOps<InterfaceOp>());
-  assert(!interfaceOps.empty() &&
-         "executable must have at least one interface");
-  return interfaceOps.front();
-}
-
 void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);
@@ -1386,8 +1379,11 @@ static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               uint32_t format, std::vector<uint8_t> data) {
+                               StringRef symName, uint32_t format,
+                               std::vector<uint8_t> data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(symName));
   state.addAttribute(
       "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
   state.addAttribute("data",
@@ -1398,8 +1394,11 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 }
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               uint32_t format, DenseIntElementsAttr data) {
+                               StringRef symName, uint32_t format,
+                               DenseIntElementsAttr data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(symName));
   state.addAttribute(
       "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
   state.addAttribute("data", data);
@@ -1408,7 +1407,11 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
   OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
@@ -1423,7 +1426,8 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
 }
 
 static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
-  p << op.getOperationName();
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
@@ -1442,6 +1446,15 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 
   // TODO(benvanik): check export name conflicts.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.create
+//===----------------------------------------------------------------------===//
+
+void ExecutableCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), StringRef("exe"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1805,33 +1818,6 @@ static ParseResult parseInterfaceStoreTensorTileOp(OpAsmParser &parser,
   return parseOffsetsSizesAndStrides(parser, *result, segmentSizes,
                                      preResolutionFn, parseOffsetPrefix,
                                      parseSizePrefix, parseStridePrefix);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.create
-//===----------------------------------------------------------------------===//
-
-void ExecutableCacheCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), (StringRef("executable_cache_") + identifier()).str());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.select_format
-//===----------------------------------------------------------------------===//
-
-void ExecutableCacheSelectFormatOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "preferred_format");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.prepare
-//===----------------------------------------------------------------------===//
-
-void ExecutableCachePrepareOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), (StringRef("executable_") + executable()).str());
 }
 
 //===----------------------------------------------------------------------===//

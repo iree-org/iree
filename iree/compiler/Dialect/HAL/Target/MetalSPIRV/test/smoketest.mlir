@@ -17,6 +17,6 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // CHECK-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:   }
-// CHECK-NEXT:   hal.executable.binary attributes {
+// CHECK-NEXT:   hal.executable.binary @metal_spirv attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1297370181 : i32}

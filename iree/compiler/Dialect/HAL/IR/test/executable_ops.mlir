@@ -26,7 +26,7 @@ hal.executable @ex {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
   // CHECK: hal.executable.binary
-  hal.executable.binary attributes {
+  hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
     // CHECK-SAME: format = 1230128453 : i32
@@ -39,7 +39,7 @@ hal.executable @ex {
 // CHECK-LABEL: @ex_with_source
 hal.executable @ex_with_source {
   // CHECK-NEXT: hal.executable.binary
-  hal.executable.binary attributes {
+  hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
     // CHECK-SAME: format = 1230128453 : i32
@@ -64,10 +64,13 @@ hal.executable @ex_with_source {
 
 // -----
 
-// CHECK-LABEL: @executable_cache
-func @executable_cache(%arg0 : !hal.executable_cache, %arg1 : !hal.executable_layout) {
-  // CHECK: hal.executable_cache.prepare %arg0, layout = %arg1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
-  %executable_exe = hal.executable_cache.prepare %arg0, layout = %arg1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+// CHECK-LABEL: @executable_create
+// CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME: %[[LAYOUT0:.+]]: !hal.executable_layout,
+// CHECK-SAME: %[[LAYOUT1:.+]]: !hal.executable_layout
+func @executable_create(%device : !hal.device, %layout0 : !hal.executable_layout, %layout1 : !hal.executable_layout) {
+  // CHECK: = hal.executable.create %[[DEVICE]], @exe::@binary1, layouts = [%[[LAYOUT0]], %[[LAYOUT1]]] : !hal.executable
+  %0 = hal.executable.create %device, @exe::@binary1, layouts = [%layout0, %layout1] : !hal.executable
   return
 }
 

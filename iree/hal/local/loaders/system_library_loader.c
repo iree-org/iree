@@ -41,23 +41,29 @@ static const iree_hal_local_executable_vtable_t
 static iree_status_t iree_hal_system_executable_create(
     iree_hal_executable_layout_t* base_layout,
     const iree_hal_executable_library_header_t* library_header,
-    iree_hal_executable_t** out_executable) {
-  IREE_ASSERT_ARGUMENT(base_layout);
+    iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* executable_layouts,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(library_header);
+  IREE_ASSERT_ARGUMENT(!executable_layout_count || executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_local_executable_layout_t* local_layout =
-      iree_hal_local_executable_layout_cast(base_layout);
-  IREE_ASSERT_ARGUMENT(local_layout);
-
   iree_hal_system_executable_t* executable = NULL;
+  iree_host_size_t total_size =
+      sizeof(*executable) +
+      executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
   iree_status_t status = iree_allocator_malloc(
-      local_layout->host_allocator, sizeof(*executable), (void**)&executable);
+      host_allocator, sizeof(*executable), (void**)&executable);
   if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_initialize(&iree_hal_system_executable_vtable,
-                                         local_layout, &executable->base);
+    iree_hal_local_executable_layout_t** executable_layouts_ptr =
+        (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
+                                               sizeof(*executable));
+    iree_hal_local_executable_initialize(
+        &iree_hal_system_executable_vtable, executable_layout_count,
+        executable_layouts, executable_layouts_ptr, host_allocator,
+        &executable->base);
     executable->library.header = library_header;
     *out_executable = (iree_hal_executable_t*)executable;
   }
@@ -70,7 +76,7 @@ static void iree_hal_system_executable_destroy(
     iree_hal_executable_t* base_executable) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
-  iree_allocator_t host_allocator = executable->base.layout->host_allocator;
+  iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_local_executable_deinitialize(
@@ -167,17 +173,14 @@ static void iree_hal_system_library_loader_destroy(
 
 static bool iree_hal_system_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   return executable_format == iree_hal_make_executable_format("DYEX");
 }
 
 static iree_status_t iree_hal_system_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
