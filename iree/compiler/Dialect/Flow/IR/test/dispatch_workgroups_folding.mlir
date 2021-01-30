@@ -53,3 +53,18 @@ func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
   }
   return %0 : tensor<4x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @convertDimOfDispatchInputLoadToDispatchShape
+// CHECK-SAME:    %[[ARG:.*]]: !flow.dispatch.input<?xf32>) {
+func @convertDimOfDispatchInputLoadToDispatchShape(%arg0: !flow.dispatch.input<?xf32>) {
+  // CHECK-NEXT: %[[RANKED_SHAPE:.*]] = flow.dispatch.shape %[[ARG]]
+  // CHECK-NEXT: %[[DIM:.*]] = shapex.ranked_dim %[[RANKED_SHAPE]][0]
+  // CHECK-NEXT: "test.sink"(%[[DIM]]) : (index) -> ()
+  %tensor = flow.dispatch.input.load %arg0 : !flow.dispatch.input<?xf32> -> tensor<?xf32>
+  %c0 = constant 0 : index
+  %dim = dim %tensor, %c0 : tensor<?xf32>
+  "test.sink"(%dim) : (index) -> ()
+  return
+}
