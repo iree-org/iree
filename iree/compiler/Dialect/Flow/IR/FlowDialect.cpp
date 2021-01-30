@@ -54,6 +54,7 @@ FlowDialect::FlowDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
       >();
+  context->getOrLoadDialect("shapex");
 }
 
 Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
