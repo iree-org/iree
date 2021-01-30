@@ -15,7 +15,7 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree_tf_compiler/Passes.h"
+#include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree_tf_compiler/TF/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_device.h"
