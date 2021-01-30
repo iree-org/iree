@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake-bazel-tensorflow-vulkan@sha256:4f8366f0ac778db9e63d82d309b71ab379181a6699c254e08e1f8d71f43ffd6f AS final
-COPY --from=gcr.io/iree-oss/swiftshader@sha256:ccae32c83c89a31e8fc5542e480c29f28bbf4a3b3b80198c06b687a92c6813f3 \
-  /swiftshader /swiftshader
+FROM gcr.io/iree-oss/cmake-python@sha256:c1f05139fa478107bdd5889d6b3ca9f8a4bcf19e77e3e8058e2084367a1aa23d AS final
 
-# Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
-ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
+# Install bazel.
+COPY --from=gcr.io/iree-oss/bazel@sha256:5e52c7d43b6fdff35d884b8b8b92b1b6e2151d675019edc92f09018e558e0f94 \
+  /usr/bin/bazel* \
+  /usr/bin/
+
+# Install tensorflow.
+RUN python3 -m pip install tf-nightly==2.5.0.dev20201116
+
+# Install JAX.
+RUN python3 -m pip install --upgrade jax jaxlib flax

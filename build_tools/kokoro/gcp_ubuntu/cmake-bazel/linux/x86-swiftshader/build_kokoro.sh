@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the python bindings and tensorflow integrations within
-# gcr.io/iree-oss/cmake-bazel-tensorflow-swiftshader
+# Build and test the python bindings and frontend integrations within
+# gcr.io/iree-oss/cmake-bazel-frontends-swiftshader
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -32,7 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-bazel-tensorflow-swiftshader@sha256:9b000bf74bebc4f3dfd967d54ba6138e312771ebafe0a1a5c5856b668b490129 \
+  gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:1466d3658f872a0675b3ac605c2e577def880c7334738d677d5ef2f1c1291646 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
