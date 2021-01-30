@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@iree//iree:lit_test.bzl", "iree_lit_test_suite")
+iree_add_all_subdirs()
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = ["layering_check"],
-    licenses = ["notice"],  # Apache 2.0
-)
-
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
-    name = "lit",
-    srcs = glob(["*.mlir"]),
-    data = [
-        "//iree_tf_compiler:iree-tf-opt",
-        "@iree//iree/tools:IreeFileCheck",
-    ],
-    driver = "@iree//iree/tools:run_lit.sh",
+  NAME
+    lit
+  SRCS
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree_tf_compiler_iree-opt-tflite
 )

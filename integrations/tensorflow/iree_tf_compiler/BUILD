@@ -37,6 +37,23 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-opt-tflite",
+    srcs = ["iree-opt-tflite-main.cpp"],
+    deps = [
+        "//iree_tf_compiler/TFL",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TosaDialect",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+    ],
+)
+
+cc_binary(
     name = "iree-tf-import",
     srcs = ["iree-tf-import-main.cpp"],
     deps = [
@@ -63,17 +80,12 @@ cc_binary(
     name = "iree-import-tflite",
     srcs = ["iree-import-tflite-main.cpp"],
     deps = [
+        "//iree_tf_compiler/TFL",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:QuantOps",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
-        "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
     ],
 )
 
