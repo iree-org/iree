@@ -90,9 +90,10 @@ static LogicalResult allocateBuffersForResults(
     auto memrefType = MemRefType::get(tensorShape, tensorType.getElementType());
     SmallVector<Value, 4> dynOperands;
     for (auto dim : llvm::enumerate(tensorShape)) {
+      Value dimTensor = bvm.lookupOrNull(resultTensor);
+      if (!dimTensor) dimTensor = resultTensor;
       if (dim.value() == TensorType::kDynamicSize) {
-        dynOperands.push_back(
-            b.create<DimOp>(loc, bvm.lookup(resultTensor), dim.index()));
+        dynOperands.push_back(b.create<DimOp>(loc, dimTensor, dim.index()));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
@@ -177,8 +178,9 @@ static LogicalResult convertTransferOp(OpBuilder &b,
     SmallVector<Value, 4> dynOperands;
     for (size_t idx : llvm::seq(size_t(0), tensorShape.size())) {
       if (tensorType.isDynamicDim(idx)) {
-        dynOperands.push_back(
-            b.create<DimOp>(loc, bvm.lookup(outputTensor), idx));
+        Value tensor = bvm.lookupOrNull(outputTensor);
+        if (!tensor) tensor = outputTensor;
+        dynOperands.push_back(b.create<DimOp>(loc, tensor, idx));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);

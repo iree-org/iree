@@ -28,7 +28,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> clEnableLinalgOnTensors(
+static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
     "iree-codegen-llvm-experimental-linalg-on-tensors",
     llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
     llvm::cl::init(false));
@@ -50,7 +50,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
   passManager.addPass(createLinalgTileAndDistributePass());
-  if (!clEnableLinalgOnTensors) {
+  if (!clEnableLLVMLinalgOnTensors) {
     passManager.addPass(createLegalizeNumWorkgroupsFnPass());
   }
   // Linalg.ConvOp -> (Img2Col packing + matmul).
@@ -76,7 +76,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
   // (HAL, IREE, Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
-  if (clEnableLinalgOnTensors) {
+  if (clEnableLLVMLinalgOnTensors) {
     passManager.addPass(createConvertToLLVM2Pass());
   } else {
     passManager.addPass(createConvertToLLVMPass());
@@ -91,13 +91,13 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
-  if (!clEnableLinalgOnTensors)
+  if (!clEnableLLVMLinalgOnTensors)
     passManager.addPass(createDeclareNumWorkgroupsFnPass());
 
   passManager.addPass(createInlinerPass());
 
   // HLO -> Linalg on buffers.
-  if (clEnableLinalgOnTensors) {
+  if (clEnableLLVMLinalgOnTensors) {
     passManager.addPass(createLinalgVectorizePass());
     passManager.addPass(createLinalgLLVMBufferizePass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

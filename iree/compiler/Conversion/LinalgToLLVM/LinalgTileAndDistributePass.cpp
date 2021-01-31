@@ -142,8 +142,19 @@ void LinalgTileAndDistributePass::runOnOperation() {
         return signalPassFailure();
       }
     } else {
-      if (failed(materializeStaticLaunchInformation(funcOp, launchConfig,
-                                                    tiledLoops.size()))) {
+      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup(tiledLoops.size(), 1);
+      if (!defaultWorkloadPerWorkgroup.empty()) {
+        defaultWorkloadPerWorkgroup.back() = 4;
+      }
+      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
+          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
+                                               defaultWorkloadPerWorkgroup);
+      if (!workloadPerWorkgroup) {
+        funcOp.emitOpError("unable to find workload per workgroup");
+        return signalPassFailure();
+      }
+      if (failed(materializeStaticLaunchInformation(
+              funcOp, workloadPerWorkgroup.getValue()))) {
         return signalPassFailure();
       }
     }
