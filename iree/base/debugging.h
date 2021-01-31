@@ -43,12 +43,10 @@ extern "C" {
 // We implement this directly in the header with ALWAYS_INLINE so that the
 // stack doesn't get all messed up.
 IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
-#if defined(IREE_PLATFORM_WINDOWS)
-  __debugbreak();
-#elif defined(IREE_COMPILER_GCC_COMPAT)
-  // TODO(benvanik): test and make sure this works everywhere. It's clang
-  //                 builtin but only definitely works on OSX.
+#if defined(IREE_COMPILER_HAS_BUILTIN_DEBUG_TRAP)
   __builtin_debugtrap();
+#elif defined(IREE_PLATFORM_WINDOWS)
+  __debugbreak();
 #elif defined(IREE_ARCH_ARM_32)
   __asm__ volatile(".inst 0xe7f001f0");
 #elif defined(IREE_ARCH_ARM_64)
@@ -60,7 +58,7 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
 #else
   // NOTE: this is unrecoverable and debugging cannot continue.
   __builtin_trap();
-#endif  // IREE_PLATFORM_WINDOWS
+#endif  // IREE_COMPILER_HAS_BUILTIN_DEBUG_TRAP
 }
 
 //===----------------------------------------------------------------------===//
