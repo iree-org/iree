@@ -84,8 +84,10 @@ struct DispatchLinalgOnTensorsPass
                     AffineDialect, scf::SCFDialect, ShapeDialect>();
   }
   DispatchLinalgOnTensorsPass() = default;
-  DispatchLinalgOnTensorsPass(ArrayRef<int64_t> sizes) {
+  DispatchLinalgOnTensorsPass(ArrayRef<int64_t> sizes,
+                              bool enableFusion = false) {
     this->tileSizes = sizes;
+    this->enableFusion = enableFusion;
   };
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
   void runOnOperation() override;
@@ -94,6 +96,10 @@ struct DispatchLinalgOnTensorsPass
   ListOption<int64_t> tileSizes{
       *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+  Option<bool> enableFusion{
+      *this, "enable-fusion",
+      llvm::cl::desc("Enable fusion on linalg on tensors path"),
+      llvm::cl::init(false)};
 };
 
 // Creates a flow.dispatch.workgroup op without arguments.
@@ -235,13 +241,18 @@ struct TileAndDistributeOnTensorsPattern
   using Base = linalg::LinalgBaseTilingPattern;
   TileAndDistributeOnTensorsPattern(linalg::LinalgTilingOptions options,
                                     linalg::LinalgTransformationFilter marker,
+                                    bool enableFusion,
                                     PatternBenefit benefit = 1)
-      : Base(options, marker, benefit) {}
+      : Base(options, marker, benefit), enableFusion(enableFusion) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
+
+    // TODO(ravishankarm): Until fusion is handled properly, only tile and
+    // distribute for matmul operations.
+    if (enableFusion && !isa<linalg::MatmulOp>(op)) return failure();
 
     linalg::LinalgOp clonedLinalgOp;
     IREE::Flow::DispatchWorkgroupsOp dispatchOp =
@@ -271,6 +282,8 @@ struct TileAndDistributeOnTensorsPattern
     rewriter.replaceOp(op, shapedResults);
     return success();
   }
+
+  const bool enableFusion;
 };
 
 template <typename OpTy>
@@ -433,8 +446,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   patterns.insert<TileAndDistributeOnTensorsPattern>(
       linalgTilingOptions,
       // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
-      linalg::LinalgTransformationFilter(
-          ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
+      linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
+                                         Identifier::get("workgroup", context)),
+      enableFusion);
 
   // Add canonicalization patterns.
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
@@ -476,8 +490,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
-    ArrayRef<int64_t> sizes) {
-  return std::make_unique<DispatchLinalgOnTensorsPass>(sizes);
+    ArrayRef<int64_t> sizes, bool enableFusion) {
+  return std::make_unique<DispatchLinalgOnTensorsPass>(sizes, enableFusion);
 }
 
 static PassRegistration<DispatchLinalgOnTensorsPass> pass(
