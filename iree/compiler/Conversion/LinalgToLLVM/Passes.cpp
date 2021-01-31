@@ -114,13 +114,13 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     // Propagates dynamic shapes computation on tensors.
-    passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
-    passManager.addNestedPass<FuncOp>(
+    nestedModulePM.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+    nestedModulePM.addNestedPass<FuncOp>(
         Shape::createMaterializeShapeCalculationsPass());
-    passManager.addNestedPass<FuncOp>(
+    nestedModulePM.addNestedPass<FuncOp>(
         Shape::createHoistShapeCalculationsPass());
-    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-    addHLOToLinalgOnBuffersPasses(passManager);
+    nestedModulePM.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+    addHLOToLinalgOnBuffersPasses(nestedModulePM);
   }
   // Linalg -> LLVM passes.
   addLinalgToLLVMPasses(passManager);
