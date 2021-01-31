@@ -143,8 +143,9 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
     } else {
       SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup(tiledLoops.size(), 1);
-      if (!defaultWorkloadPerWorkgroup.empty())
+      if (!defaultWorkloadPerWorkgroup.empty()) {
         defaultWorkloadPerWorkgroup.back() = 4;
+      }
       Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
           launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
                                                defaultWorkloadPerWorkgroup);

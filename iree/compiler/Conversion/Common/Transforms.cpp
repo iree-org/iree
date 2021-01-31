@@ -224,7 +224,7 @@ LogicalResult getLinalgOps(FuncOp funcOp,
 namespace {
 static size_t kMaxHALDimensions = 3;
 
-/// Sets the hal.dispatch.workgroup.size operation to the constant value passed
+/// Sets the hal.interace.workgroup.size operation to the constant value passed
 /// in as `tileSizes`. The number of entries in `tileSizes` is at least as much
 /// as the dimensionality of the workgroup. It is assumed that the inner-most
 /// loop is mapped to the fastest varying dimension in
