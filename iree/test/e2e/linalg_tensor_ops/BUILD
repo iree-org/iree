@@ -27,8 +27,8 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_matmul_llvm-ir_llvm",
-    srcs = [glob(["*.mlir"])],
+    name = "check_llvm-ir_llvm",
+    srcs = glob(["*.mlir"]),
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
