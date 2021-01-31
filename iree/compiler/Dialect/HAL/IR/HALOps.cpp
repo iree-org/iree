@@ -1354,7 +1354,7 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
   auto returnOp = dyn_cast<ReturnOp>(region->front().getTerminator());
-  if (!returnOp || returnOp.values().size() != 3) {
+  if (!returnOp || returnOp.operands().size() != 3) {
     return op.emitOpError("expected operation to yield 3 values");
   }
   return success();

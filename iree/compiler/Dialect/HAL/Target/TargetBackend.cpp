@@ -271,7 +271,7 @@ static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
   auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
   // Verifier of EntryPointOp checks that the return has 3 values.
   SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
-      returnOp.values(), [&bvm](Value v) { return bvm.lookup(v); }));
+      returnOp.operands(), [&bvm](Value v) { return bvm.lookup(v); }));
   return {count[0], count[1], count[2]};
 }
 
