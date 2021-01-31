@@ -196,6 +196,31 @@ def MutableByteBufferType : DialectType<
 }
 
 //===----------------------------------------------------------------------===//
+// List types
+//===----------------------------------------------------------------------===//
+
+def AnyList : DialectType<
+    IREE_Dialect,
+    CPred<"$_self.isa<IREE::ListType>()">,
+    "list"> {
+  let description = [{
+    A resizable list of some type.
+  }];
+}
+
+class ListOf<Type type> :
+    Type<And<[
+      CPred<"$_self.isa<IREE::ListType>()">,
+      SubstLeaves<"$_self",
+                  "$_self.cast<IREE::ListType>().getElementType()",
+                  type.predicate>
+    ]>, "list<" # type.summary # ">"> {
+  // Set the builder call if the base type has a builder call.
+  string builderCall = !if(!empty(type.builderCall),
+                           "", "IREE::ListType::get(" # type.builderCall # ")");
+}
+
+//===----------------------------------------------------------------------===//
 // Common traits
 //===----------------------------------------------------------------------===//
 

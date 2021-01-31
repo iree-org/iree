@@ -29,7 +29,8 @@ namespace iree_compiler {
 
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<IREEDialect>()) {
-  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType, IREE::PtrType>();
+  addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
+           IREE::PtrType>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
@@ -57,20 +58,37 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
     return IREE::ByteBufferType::get(getContext());
   } else if (spec == "mutable_byte_buffer") {
     return IREE::MutableByteBufferType::get(getContext());
+  } else if (spec.consume_front("list")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed list type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    auto elementType = mlir::parseType(spec, getContext());
+    if (!elementType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid list element type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::ListType::getChecked(elementType, loc);
   }
   emitError(loc, "unknown IREE type: ") << spec;
   return Type();
 }
 
 void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
-  if (auto ptrType = type.dyn_cast<IREE::PtrType>())
+  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
     os << "ptr<" << ptrType.getTargetType() << ">";
-  else if (type.isa<IREE::ByteBufferType>())
+  } else if (type.isa<IREE::ByteBufferType>()) {
     os << "byte_buffer";
-  else if (type.isa<IREE::MutableByteBufferType>())
+  } else if (type.isa<IREE::MutableByteBufferType>()) {
     os << "mutable_byte_buffer";
-  else
+  } else if (auto listType = type.dyn_cast<IREE::ListType>()) {
+    os << "list<" << listType.getElementType() << ">";
+  } else {
     llvm_unreachable("unhandled IREE type");
+  }
 }
 
 }  // namespace iree_compiler

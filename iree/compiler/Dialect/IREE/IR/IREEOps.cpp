@@ -151,6 +151,64 @@ void UnfoldableConstantOp::getCanonicalizationPatterns(
   results.insert<ExpandUnfoldableConstantOp>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// Lists
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseListType(OpAsmParser &parser, Type &listType,
+                                 Type &elementType) {
+  if (failed(parser.parseType(listType))) {
+    return parser.emitError(parser.getCurrentLocation(),
+                            "expected !iree.list<> type");
+  }
+  elementType = listType.cast<ListType>().getElementType();
+  return success();
+}
+
+static ParseResult parseListType(OpAsmParser &parser, Type &listType,
+                                 SmallVectorImpl<Type> &elementTypes) {
+  if (failed(parser.parseType(listType))) {
+    return parser.emitError(parser.getCurrentLocation(),
+                            "expected !iree.list<> type");
+  }
+  for (size_t i = 0; i < elementTypes.size(); ++i) {
+    elementTypes[i] = listType.cast<ListType>().getElementType();
+  }
+  return success();
+}
+
+static void printListType(OpAsmPrinter &printer, Operation *, Type listType,
+                          Type elementType) {
+  printer.printType(listType);
+}
+
+static void printListType(OpAsmPrinter &printer, Operation *, Type listType,
+                          TypeRange elementTypes) {
+  printer.printType(listType);
+}
+
+static LogicalResult verifyListGetOp(ListGetOp &op) {
+  auto listType = op.list().getType().cast<IREE::ListType>();
+  auto elementType = listType.getElementType();
+  auto resultType = op.result().getType();
+  if (resultType != elementType) {
+    return op.emitError() << "list contains " << elementType
+                          << " and cannot be accessed as " << resultType;
+  }
+  return success();
+}
+
+static LogicalResult verifyListSetOp(ListSetOp &op) {
+  auto listType = op.list().getType().cast<IREE::ListType>();
+  auto elementType = listType.getElementType();
+  auto valueType = op.value().getType();
+  if (valueType != elementType) {
+    return op.emitError() << "list contains " << elementType
+                          << " and cannot be mutated as " << valueType;
+  }
+  return success();
+}
+
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
