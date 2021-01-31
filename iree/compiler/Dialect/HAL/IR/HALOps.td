@@ -1840,15 +1840,6 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def HAL_YieldOp : HAL_Op<"yield", [NoSideEffect, Terminator]> {
-  let summary = [{yield values from within regions in hal ops}];
-  let description = [{
-    Yields values to the immediately enclaosing hal op
-  }];
-  let arguments = (ins Variadic<AnyType>:$values);
-  let assemblyFormat = "$values attr-dict `:` type($values)";
-}
-
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
     HasParent<"IREE::HAL::ExecutableTargetOp">,
@@ -1859,7 +1850,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
 
-    The optional `num_workgroups_region` region represents the
+    The optional `workgroup_count_region` region represents the
     computation that returns the number of workgroups to use. The
     arguments to the region represents the workload along x, y and
     z. It returns the number of workgroups along x, y, and z.
@@ -1879,7 +1870,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
 
-  let regions = (region VariadicRegion<SizedRegion<1>>:$num_workgroups_region);
+  let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
 
   let builders = [
     OpBuilderDAG<
@@ -1900,7 +1891,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
 
   let extraClassDeclaration = [{
     Region *getBody() {
-      auto regions = num_workgroups_region();
+      auto regions = workgroup_count_region();
       if (!regions.empty()) return &regions.front();
       return nullptr;
     }

@@ -93,7 +93,7 @@ static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
   if (!entryPointOp)
     return funcOp.emitOpError("unable to find corresponding entry point op");
   if (entryPointOp.getBody())
-    return entryPointOp.emitOpError("cannot override num_workgroups_region");
+    return entryPointOp.emitOpError("cannot override workgroup_count_region");
   Location loc = entryPointOp.getLoc();
 
   OpBuilder::InsertionGuard guard(builder);
@@ -112,7 +112,7 @@ static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
   SmallVector<BlockArgument, 4> workload = llvm::to_vector<4>(
       entryBlock->addArguments({indexType, indexType, indexType}));
   // Make the number of workgroups workload / tile size.
-  SmallVector<Value, 4> yieldValues;
+  SmallVector<Value, 4> returnValues;
   Value one = builder.create<ConstantIndexOp>(loc, 1);
   assert(tileSizes.size() <= 3 &&
          "expected only three tile size values for num workgroups computation");
@@ -120,10 +120,10 @@ static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
     Value tsVal = builder.create<ConstantIndexOp>(loc, ts.value());
     Value tsMinusOne = builder.create<SubIOp>(loc, tsVal, one);
     Value num = builder.create<AddIOp>(loc, workload[ts.index()], tsMinusOne);
-    yieldValues.push_back(builder.create<SignedDivIOp>(loc, num, tsVal));
+    returnValues.push_back(builder.create<SignedDivIOp>(loc, num, tsVal));
   }
-  yieldValues.resize(3, one);
-  builder.create<IREE::HAL::YieldOp>(loc, yieldValues);
+  returnValues.resize(3, one);
+  builder.create<IREE::HAL::ReturnOp>(loc, returnValues);
   entryPointOp.erase();
   return success();
 }

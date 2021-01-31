@@ -1326,8 +1326,8 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
-  if (op.num_workgroups_region().empty()) return;
-  p.printRegion(op.num_workgroups_region().front());
+  if (op.workgroup_count_region().empty()) return;
+  p.printRegion(op.workgroup_count_region().front());
 }
 
 static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
@@ -1340,20 +1340,21 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
   }
   if (region->getNumArguments() != 3) {
     return op.emitOpError(
-        "expected three arguments for num_workgroups_region for workload along "
+        "expected three arguments for workgroup_count_region for workload "
+        "along "
         "x, y, and z");
   }
   for (BlockArgument &blockArg : region->getArguments()) {
     if (!blockArg.getType().isa<IndexType>()) {
       return op.emitOpError(
-          "expected arguments to num_workgroups_region be index type");
+          "expected arguments to workgroup_count_region be index type");
     }
   }
   // Check that the last statement in the block is `hal.yield` operation.
-  // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::YieldOp">
+  // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
-  auto yieldOp = dyn_cast<YieldOp>(region->front().getTerminator());
-  if (!yieldOp || yieldOp.values().size() != 3) {
+  auto returnOp = dyn_cast<ReturnOp>(region->front().getTerminator());
+  if (!returnOp || returnOp.values().size() != 3) {
     return op.emitOpError("expected operation to yield 3 values");
   }
   return success();

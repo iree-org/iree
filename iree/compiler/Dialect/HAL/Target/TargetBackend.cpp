@@ -268,10 +268,10 @@ static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
   for (Operation &op : body->without_terminator()) {
     builder.clone(op, bvm);
   }
-  auto yieldOp = cast<IREE::HAL::YieldOp>(body->getTerminator());
-  // Verifier of EntryPointOp checks that the yield has 3 values.
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  // Verifier of EntryPointOp checks that the return has 3 values.
   SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
-      yieldOp.values(), [&bvm](Value v) { return bvm.lookup(v); }));
+      returnOp.values(), [&bvm](Value v) { return bvm.lookup(v); }));
   return {count[0], count[1], count[2]};
 }
 
