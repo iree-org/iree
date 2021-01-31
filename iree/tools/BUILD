@@ -85,6 +85,7 @@ cc_library(
         "init_iree_passes.h",
     ],
     deps = [
+        "//iree/compiler/Bindings/TFLite/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
