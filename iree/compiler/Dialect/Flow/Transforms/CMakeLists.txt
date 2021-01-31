@@ -28,6 +28,7 @@ iree_cc_library(
     "DispatchConfig.cpp"
     "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
+    "ExpandVariableDynamicDims.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
