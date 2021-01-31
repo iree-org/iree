@@ -63,7 +63,7 @@ hal.executable @ex_with_num_workgroups_region {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
   // CHECK: hal.executable.binary
-  hal.executable.binary attributes {
+  hal.executable.binary @backend_binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,
     data = dense<1> : vector<128xi8>,
     // CHECK-SAME: format = 1230128453 : i32
