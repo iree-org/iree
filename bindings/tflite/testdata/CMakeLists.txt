@@ -25,4 +25,5 @@ iree_bytecode_module(
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vmla"
   PUBLIC
+  TESTONLY
 )

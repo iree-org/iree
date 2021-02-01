@@ -24,6 +24,7 @@ package(
 
 iree_bytecode_module(
     name = "add",
+    testonly = True,
     src = "add.mlir",
     cc_namespace = "iree::bindings::tflite::testdata",
     flags = [
