@@ -5,6 +5,8 @@
 // CHECK-LABEL: func @tensor
 func @tensor() -> tensor<2x4xf32> {
   //  CHECK-DAG: %[[C1wg:.*]] = constant 1 : index
+  //  CHECK-DAG: %[[C2wg:.*]] = constant 2 : index
+  //  CHECK-DAG: %[[C4wg:.*]] = constant 4 : index
   //  CHECK-DAG: %[[outerA:.*]] = iree.do_not_optimize{{.*}} : tensor<2x3xf32>
   //  CHECK-DAG: %[[outerB:.*]] = iree.do_not_optimize{{.*}} : tensor<3x4xf32>
   //  CHECK-DAG: %[[outerC:.*]] = iree.do_not_optimize{{.*}} : tensor<2x4xf32>
@@ -15,7 +17,7 @@ func @tensor() -> tensor<2x4xf32> {
   %C = iree.unfoldable_constant dense<1000.0> : tensor<2x4xf32>
 
   // %[[C2]] will be handled by a later RematerializeDispatchConstants
-  //      CHECK: flow.dispatch.workgroups[%[[C1wg]], %[[C1wg]], %[[C1wg]]] (%[[outerA]], %[[outerB]], %[[outerC]]) :
+  //      CHECK: flow.dispatch.workgroups[%[[C4wg]], %[[C2wg]], %[[C1wg]]] (%[[outerA]], %[[outerB]], %[[outerC]]) :
   // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> tensor<2x4xf32> =
   // CHECK-SAME:    (%[[A:[0-9a-z]*]] : !flow.dispatch.input<2x3xf32>,
   // CHECK-SAME:     %[[B:[0-9a-z]*]] : !flow.dispatch.input<3x4xf32>,

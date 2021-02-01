@@ -36,6 +36,43 @@ hal.executable @ex {
 
 // -----
 
+// CHECK-LABEL: @ex_with_workgroup_count_region
+hal.executable @ex_with_workgroup_count_region {
+  // CHECK: hal.executable.target @backend, filter="backend"
+  hal.executable.target @backend, filter="backend" {
+    // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
+    // CHECK-SAME:     interface = @interface
+    // CHECK-SAME:     ordinal = 0 : i32
+    // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
+    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.entry_point @entry0 attributes {
+      interface = @interface,
+      ordinal = 0 : i32,
+      signature = (tensor<4xf32>) -> tensor<4xf32>,
+      workgroup_size = [4 : index, 1 : index, 1 : index]
+    } {
+    ^bb0(%arg0: index, %arg1: index, %arg2: index):
+      hal.return %arg0, %arg1, %arg2 : index, index, index
+    }
+  }
+  // CHECK-DAG: hal.interface @interface
+  hal.interface @interface {
+    // CHECK-NEXT: hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    // CHECK-NEXT: hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  // CHECK: hal.executable.binary
+  hal.executable.binary @backend_binary attributes {
+    // CHECK-SAME: data = dense<1> : vector<128xi8>,
+    data = dense<1> : vector<128xi8>,
+    // CHECK-SAME: format = 1230128453 : i32
+    format = 1230128453 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @ex_with_source
 hal.executable @ex_with_source {
   // CHECK-NEXT: hal.executable.binary
