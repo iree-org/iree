@@ -423,11 +423,12 @@ operation that might exist in the same function in different ways. For example,
 while the former are to be executed collectively by workitems within a
 workgroup, the latter have to be executed by all workitems across workgroups.
 One way to distinguish these two operations is to use the marker mechanism in
-Linalg ([LinalgMarker][LinalgTilingPatterns]). This is a `StrAttr` whose value
-can be used to encode the scope of the operation. For example, in Snippet 7
-above, the tiled `linalg.matmul` operation has a marker `workgroup` to indicate
-that this operation needs to be executed by a workgroup in a collective manner.
-At this time, the code-generation pipeline uses only the `workgroup` marker.
+Linalg ([LinalgTransformationFilter][LinalgTilingPatterns]). This is a `StrAttr`
+whose value can be used to encode the scope of the operation. For example, in
+Snippet 7 above, the tiled `linalg.matmul` operation has a marker `workgroup` to
+indicate that this operation needs to be executed by a workgroup in a collective
+manner. At this time, the code-generation pipeline uses only the `workgroup`
+marker.
 
 __Roadmap Note__ : Markers are meant to be short-lived, ideally set and consumed
 within the same pass. In the current pipeline the lifetime spans passes to allow

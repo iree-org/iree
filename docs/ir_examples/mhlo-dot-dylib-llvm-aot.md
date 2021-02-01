@@ -1821,12 +1821,12 @@ module  {
     %82 = llvm.add %79, %81  : i64
     %83 = llvm.insertvalue %82, %74[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %84 = llvm.mlir.constant(1024 : i64) : i64
-    %85 = llvm.insertvalue %84, %83[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %86 = llvm.mlir.constant(1 : i64) : i64
-    %87 = llvm.insertvalue %86, %85[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %88 = llvm.insertvalue %67, %87[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %89 = llvm.mlir.constant(1024 : i64) : i64
-    %90 = llvm.insertvalue %89, %88[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %85 = llvm.mlir.constant(1 : i64) : i64
+    %86 = llvm.insertvalue %84, %83[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %87 = llvm.insertvalue %85, %86[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %88 = llvm.mlir.constant(1024 : i64) : i64
+    %89 = llvm.insertvalue %67, %87[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %90 = llvm.insertvalue %88, %89[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %91 = llvm.mlir.constant(64 : index) : i64
     %92 = llvm.mul %54, %91  : i64
     %93 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -1846,13 +1846,13 @@ module  {
     %107 = llvm.add %105, %106  : i64
     %108 = llvm.insertvalue %107, %99[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %109 = llvm.mlir.constant(64 : i64) : i64
-    %110 = llvm.insertvalue %109, %108[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %111 = llvm.mlir.constant(1 : i64) : i64
-    %112 = llvm.insertvalue %111, %110[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %110 = llvm.mlir.constant(1 : i64) : i64
+    %111 = llvm.insertvalue %109, %108[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %112 = llvm.insertvalue %110, %111[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %113 = llvm.mlir.constant(1024 : i64) : i64
-    %114 = llvm.insertvalue %113, %112[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %115 = llvm.mlir.constant(64 : i64) : i64
-    %116 = llvm.insertvalue %115, %114[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %114 = llvm.mlir.constant(64 : i64) : i64
+    %115 = llvm.insertvalue %113, %112[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %116 = llvm.insertvalue %114, %115[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %117 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %118 = llvm.extractvalue %43[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %119 = llvm.bitcast %118 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -1869,12 +1869,12 @@ module  {
     %130 = llvm.add %128, %129  : i64
     %131 = llvm.insertvalue %130, %123[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %132 = llvm.mlir.constant(64 : i64) : i64
-    %133 = llvm.insertvalue %132, %131[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %134 = llvm.mlir.constant(1 : i64) : i64
-    %135 = llvm.insertvalue %134, %133[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %136 = llvm.insertvalue %67, %135[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %137 = llvm.mlir.constant(64 : i64) : i64
-    %138 = llvm.insertvalue %137, %136[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %133 = llvm.mlir.constant(1 : i64) : i64
+    %134 = llvm.insertvalue %132, %131[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %135 = llvm.insertvalue %133, %134[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %136 = llvm.mlir.constant(64 : i64) : i64
+    %137 = llvm.insertvalue %67, %135[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %138 = llvm.insertvalue %136, %137[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb1(%49 : i64)
   ^bb1(%139: i64):  // 2 preds: ^bb0, ^bb4
     %140 = llvm.icmp "slt" %139, %67 : i64
@@ -1928,12 +1928,12 @@ module  {
     %177 = llvm.add %175, %176  : i64
     %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %179 = llvm.mlir.constant(32 : i64) : i64
-    %180 = llvm.insertvalue %179, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %181 = llvm.mlir.constant(1 : i64) : i64
-    %182 = llvm.insertvalue %181, %180[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %183 = llvm.insertvalue %163, %182[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %184 = llvm.mlir.constant(1024 : i64) : i64
-    %185 = llvm.insertvalue %184, %183[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %180 = llvm.mlir.constant(1 : i64) : i64
+    %181 = llvm.insertvalue %179, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %182 = llvm.insertvalue %180, %181[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %183 = llvm.mlir.constant(1024 : i64) : i64
+    %184 = llvm.insertvalue %163, %182[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %185 = llvm.insertvalue %183, %184[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %186 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %187 = llvm.extractvalue %116[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %188 = llvm.bitcast %187 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -1950,13 +1950,13 @@ module  {
     %199 = llvm.add %197, %198  : i64
     %200 = llvm.insertvalue %199, %192[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %201 = llvm.mlir.constant(32 : i64) : i64
-    %202 = llvm.insertvalue %201, %200[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %203 = llvm.mlir.constant(1 : i64) : i64
-    %204 = llvm.insertvalue %203, %202[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %202 = llvm.mlir.constant(1 : i64) : i64
+    %203 = llvm.insertvalue %201, %200[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %204 = llvm.insertvalue %202, %203[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %205 = llvm.mlir.constant(32 : i64) : i64
-    %206 = llvm.insertvalue %205, %204[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %207 = llvm.mlir.constant(64 : i64) : i64
-    %208 = llvm.insertvalue %207, %206[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %206 = llvm.mlir.constant(64 : i64) : i64
+    %207 = llvm.insertvalue %205, %204[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %208 = llvm.insertvalue %206, %207[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %209 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %210 = llvm.extractvalue %138[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %211 = llvm.bitcast %210 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -1973,12 +1973,12 @@ module  {
     %222 = llvm.add %220, %221  : i64
     %223 = llvm.insertvalue %222, %215[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %224 = llvm.mlir.constant(32 : i64) : i64
-    %225 = llvm.insertvalue %224, %223[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %226 = llvm.mlir.constant(1 : i64) : i64
-    %227 = llvm.insertvalue %226, %225[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %228 = llvm.insertvalue %163, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %229 = llvm.mlir.constant(64 : i64) : i64
-    %230 = llvm.insertvalue %229, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %225 = llvm.mlir.constant(1 : i64) : i64
+    %226 = llvm.insertvalue %224, %223[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %227 = llvm.insertvalue %225, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %228 = llvm.mlir.constant(64 : i64) : i64
+    %229 = llvm.insertvalue %163, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %230 = llvm.insertvalue %228, %229[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb9(%49 : i64)
   ^bb9(%231: i64):  // 2 preds: ^bb8, ^bb21
     %232 = llvm.icmp "slt" %231, %163 : i64
@@ -2012,12 +2012,12 @@ module  {
     %256 = llvm.add %254, %255  : i64
     %257 = llvm.insertvalue %256, %249[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %258 = llvm.mlir.constant(4 : i64) : i64
-    %259 = llvm.insertvalue %258, %257[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %260 = llvm.mlir.constant(1 : i64) : i64
-    %261 = llvm.insertvalue %260, %259[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %262 = llvm.insertvalue %242, %261[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %263 = llvm.mlir.constant(1024 : i64) : i64
-    %264 = llvm.insertvalue %263, %262[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %259 = llvm.mlir.constant(1 : i64) : i64
+    %260 = llvm.insertvalue %258, %257[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %261 = llvm.insertvalue %259, %260[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %262 = llvm.mlir.constant(1024 : i64) : i64
+    %263 = llvm.insertvalue %242, %261[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %264 = llvm.insertvalue %262, %263[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %265 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %266 = llvm.extractvalue %208[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %267 = llvm.bitcast %266 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2034,13 +2034,13 @@ module  {
     %278 = llvm.add %276, %277  : i64
     %279 = llvm.insertvalue %278, %271[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %280 = llvm.mlir.constant(4 : i64) : i64
-    %281 = llvm.insertvalue %280, %279[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %282 = llvm.mlir.constant(1 : i64) : i64
-    %283 = llvm.insertvalue %282, %281[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %281 = llvm.mlir.constant(1 : i64) : i64
+    %282 = llvm.insertvalue %280, %279[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %283 = llvm.insertvalue %281, %282[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %284 = llvm.mlir.constant(4 : i64) : i64
-    %285 = llvm.insertvalue %284, %283[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %286 = llvm.mlir.constant(64 : i64) : i64
-    %287 = llvm.insertvalue %286, %285[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %285 = llvm.mlir.constant(64 : i64) : i64
+    %286 = llvm.insertvalue %284, %283[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %287 = llvm.insertvalue %285, %286[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %288 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %289 = llvm.extractvalue %230[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %290 = llvm.bitcast %289 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2057,12 +2057,12 @@ module  {
     %301 = llvm.add %299, %300  : i64
     %302 = llvm.insertvalue %301, %294[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %303 = llvm.mlir.constant(4 : i64) : i64
-    %304 = llvm.insertvalue %303, %302[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %305 = llvm.mlir.constant(1 : i64) : i64
-    %306 = llvm.insertvalue %305, %304[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %307 = llvm.insertvalue %242, %306[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %308 = llvm.mlir.constant(64 : i64) : i64
-    %309 = llvm.insertvalue %308, %307[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %304 = llvm.mlir.constant(1 : i64) : i64
+    %305 = llvm.insertvalue %303, %302[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %306 = llvm.insertvalue %304, %305[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %307 = llvm.mlir.constant(64 : i64) : i64
+    %308 = llvm.insertvalue %242, %306[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %309 = llvm.insertvalue %307, %308[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb13(%49 : i64)
   ^bb13(%310: i64):  // 2 preds: ^bb12, ^bb18
     %311 = llvm.icmp "slt" %310, %242 : i64
@@ -2233,12 +2233,12 @@ module  {
     %82 = llvm.add %79, %81  : i64
     %83 = llvm.insertvalue %82, %74[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %84 = llvm.mlir.constant(1024 : i64) : i64
-    %85 = llvm.insertvalue %84, %83[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %86 = llvm.mlir.constant(1 : i64) : i64
-    %87 = llvm.insertvalue %86, %85[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %88 = llvm.insertvalue %67, %87[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %89 = llvm.mlir.constant(1024 : i64) : i64
-    %90 = llvm.insertvalue %89, %88[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %85 = llvm.mlir.constant(1 : i64) : i64
+    %86 = llvm.insertvalue %84, %83[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %87 = llvm.insertvalue %85, %86[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %88 = llvm.mlir.constant(1024 : i64) : i64
+    %89 = llvm.insertvalue %67, %87[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %90 = llvm.insertvalue %88, %89[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %91 = llvm.mlir.constant(64 : index) : i64
     %92 = llvm.mul %54, %91  : i64
     %93 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2258,13 +2258,13 @@ module  {
     %107 = llvm.add %105, %106  : i64
     %108 = llvm.insertvalue %107, %99[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %109 = llvm.mlir.constant(64 : i64) : i64
-    %110 = llvm.insertvalue %109, %108[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %111 = llvm.mlir.constant(1 : i64) : i64
-    %112 = llvm.insertvalue %111, %110[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %110 = llvm.mlir.constant(1 : i64) : i64
+    %111 = llvm.insertvalue %109, %108[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %112 = llvm.insertvalue %110, %111[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %113 = llvm.mlir.constant(1024 : i64) : i64
-    %114 = llvm.insertvalue %113, %112[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %115 = llvm.mlir.constant(64 : i64) : i64
-    %116 = llvm.insertvalue %115, %114[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %114 = llvm.mlir.constant(64 : i64) : i64
+    %115 = llvm.insertvalue %113, %112[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %116 = llvm.insertvalue %114, %115[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %117 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %118 = llvm.extractvalue %43[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %119 = llvm.bitcast %118 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2281,12 +2281,12 @@ module  {
     %130 = llvm.add %128, %129  : i64
     %131 = llvm.insertvalue %130, %123[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %132 = llvm.mlir.constant(64 : i64) : i64
-    %133 = llvm.insertvalue %132, %131[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %134 = llvm.mlir.constant(1 : i64) : i64
-    %135 = llvm.insertvalue %134, %133[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %136 = llvm.insertvalue %67, %135[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %137 = llvm.mlir.constant(64 : i64) : i64
-    %138 = llvm.insertvalue %137, %136[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %133 = llvm.mlir.constant(1 : i64) : i64
+    %134 = llvm.insertvalue %132, %131[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %135 = llvm.insertvalue %133, %134[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %136 = llvm.mlir.constant(64 : i64) : i64
+    %137 = llvm.insertvalue %67, %135[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %138 = llvm.insertvalue %136, %137[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb1(%49 : i64)
   ^bb1(%139: i64):  // 2 preds: ^bb0, ^bb4
     %140 = llvm.icmp "slt" %139, %67 : i64
@@ -2340,12 +2340,12 @@ module  {
     %177 = llvm.add %175, %176  : i64
     %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %179 = llvm.mlir.constant(32 : i64) : i64
-    %180 = llvm.insertvalue %179, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %181 = llvm.mlir.constant(1 : i64) : i64
-    %182 = llvm.insertvalue %181, %180[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %183 = llvm.insertvalue %163, %182[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %184 = llvm.mlir.constant(1024 : i64) : i64
-    %185 = llvm.insertvalue %184, %183[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %180 = llvm.mlir.constant(1 : i64) : i64
+    %181 = llvm.insertvalue %179, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %182 = llvm.insertvalue %180, %181[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %183 = llvm.mlir.constant(1024 : i64) : i64
+    %184 = llvm.insertvalue %163, %182[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %185 = llvm.insertvalue %183, %184[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %186 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %187 = llvm.extractvalue %116[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %188 = llvm.bitcast %187 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2362,13 +2362,13 @@ module  {
     %199 = llvm.add %197, %198  : i64
     %200 = llvm.insertvalue %199, %192[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %201 = llvm.mlir.constant(32 : i64) : i64
-    %202 = llvm.insertvalue %201, %200[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %203 = llvm.mlir.constant(1 : i64) : i64
-    %204 = llvm.insertvalue %203, %202[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %202 = llvm.mlir.constant(1 : i64) : i64
+    %203 = llvm.insertvalue %201, %200[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %204 = llvm.insertvalue %202, %203[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %205 = llvm.mlir.constant(32 : i64) : i64
-    %206 = llvm.insertvalue %205, %204[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %207 = llvm.mlir.constant(64 : i64) : i64
-    %208 = llvm.insertvalue %207, %206[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %206 = llvm.mlir.constant(64 : i64) : i64
+    %207 = llvm.insertvalue %205, %204[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %208 = llvm.insertvalue %206, %207[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %209 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %210 = llvm.extractvalue %138[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %211 = llvm.bitcast %210 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2385,12 +2385,12 @@ module  {
     %222 = llvm.add %220, %221  : i64
     %223 = llvm.insertvalue %222, %215[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %224 = llvm.mlir.constant(32 : i64) : i64
-    %225 = llvm.insertvalue %224, %223[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %226 = llvm.mlir.constant(1 : i64) : i64
-    %227 = llvm.insertvalue %226, %225[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %228 = llvm.insertvalue %163, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %229 = llvm.mlir.constant(64 : i64) : i64
-    %230 = llvm.insertvalue %229, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %225 = llvm.mlir.constant(1 : i64) : i64
+    %226 = llvm.insertvalue %224, %223[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %227 = llvm.insertvalue %225, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %228 = llvm.mlir.constant(64 : i64) : i64
+    %229 = llvm.insertvalue %163, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %230 = llvm.insertvalue %228, %229[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb9(%49 : i64)
   ^bb9(%231: i64):  // 2 preds: ^bb8, ^bb21
     %232 = llvm.icmp "slt" %231, %163 : i64
@@ -2424,12 +2424,12 @@ module  {
     %256 = llvm.add %254, %255  : i64
     %257 = llvm.insertvalue %256, %249[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %258 = llvm.mlir.constant(4 : i64) : i64
-    %259 = llvm.insertvalue %258, %257[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %260 = llvm.mlir.constant(1 : i64) : i64
-    %261 = llvm.insertvalue %260, %259[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %262 = llvm.insertvalue %242, %261[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %263 = llvm.mlir.constant(1024 : i64) : i64
-    %264 = llvm.insertvalue %263, %262[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %259 = llvm.mlir.constant(1 : i64) : i64
+    %260 = llvm.insertvalue %258, %257[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %261 = llvm.insertvalue %259, %260[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %262 = llvm.mlir.constant(1024 : i64) : i64
+    %263 = llvm.insertvalue %242, %261[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %264 = llvm.insertvalue %262, %263[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %265 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %266 = llvm.extractvalue %208[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %267 = llvm.bitcast %266 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2446,13 +2446,13 @@ module  {
     %278 = llvm.add %276, %277  : i64
     %279 = llvm.insertvalue %278, %271[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %280 = llvm.mlir.constant(4 : i64) : i64
-    %281 = llvm.insertvalue %280, %279[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %282 = llvm.mlir.constant(1 : i64) : i64
-    %283 = llvm.insertvalue %282, %281[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %281 = llvm.mlir.constant(1 : i64) : i64
+    %282 = llvm.insertvalue %280, %279[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %283 = llvm.insertvalue %281, %282[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %284 = llvm.mlir.constant(4 : i64) : i64
-    %285 = llvm.insertvalue %284, %283[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %286 = llvm.mlir.constant(64 : i64) : i64
-    %287 = llvm.insertvalue %286, %285[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %285 = llvm.mlir.constant(64 : i64) : i64
+    %286 = llvm.insertvalue %284, %283[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %287 = llvm.insertvalue %285, %286[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %288 = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %289 = llvm.extractvalue %230[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %290 = llvm.bitcast %289 : !llvm.ptr<f32> to !llvm.ptr<f32>
@@ -2469,12 +2469,12 @@ module  {
     %301 = llvm.add %299, %300  : i64
     %302 = llvm.insertvalue %301, %294[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %303 = llvm.mlir.constant(4 : i64) : i64
-    %304 = llvm.insertvalue %303, %302[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %305 = llvm.mlir.constant(1 : i64) : i64
-    %306 = llvm.insertvalue %305, %304[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %307 = llvm.insertvalue %242, %306[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %308 = llvm.mlir.constant(64 : i64) : i64
-    %309 = llvm.insertvalue %308, %307[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %304 = llvm.mlir.constant(1 : i64) : i64
+    %305 = llvm.insertvalue %303, %302[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %306 = llvm.insertvalue %304, %305[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %307 = llvm.mlir.constant(64 : i64) : i64
+    %308 = llvm.insertvalue %242, %306[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %309 = llvm.insertvalue %307, %308[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb13(%49 : i64)
   ^bb13(%310: i64):  // 2 preds: ^bb12, ^bb18
     %311 = llvm.icmp "slt" %310, %242 : i64
@@ -2622,9 +2622,9 @@ module  {
     %59 = llvm.add %56, %58  : i64
     %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %61 = llvm.mlir.constant(1024 : i64) : i64
-    %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %63 = llvm.mlir.constant(1 : i64) : i64
-    %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %62 = llvm.mlir.constant(1 : i64) : i64
+    %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %67 = llvm.mul %36, %20  : i64
@@ -2644,7 +2644,7 @@ module  {
     %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %82 = llvm.mlir.constant(64 : i64) : i64
     %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2662,7 +2662,7 @@ module  {
     %99 = llvm.add %97, %98  : i64
     %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb1(%6 : i64)
@@ -2716,7 +2716,7 @@ module  {
     %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %142 = llvm.mlir.constant(32 : i64) : i64
     %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2734,7 +2734,7 @@ module  {
     %159 = llvm.add %157, %158  : i64
     %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2752,7 +2752,7 @@ module  {
     %177 = llvm.add %175, %176  : i64
     %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb9(%6 : i64)
@@ -2786,7 +2786,7 @@ module  {
     %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %207 = llvm.mlir.constant(4 : i64) : i64
     %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2804,7 +2804,7 @@ module  {
     %224 = llvm.add %222, %223  : i64
     %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -2822,7 +2822,7 @@ module  {
     %242 = llvm.add %240, %241  : i64
     %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-    %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+    %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
     llvm.br ^bb13(%6 : i64)
@@ -2964,9 +2964,9 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %59 = llvm.add %56, %58  : i64
       %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %61 = llvm.mlir.constant(1024 : i64) : i64
-      %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %63 = llvm.mlir.constant(1 : i64) : i64
-      %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %62 = llvm.mlir.constant(1 : i64) : i64
+      %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %67 = llvm.mul %36, %20  : i64
@@ -2986,7 +2986,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %82 = llvm.mlir.constant(64 : i64) : i64
       %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3004,7 +3004,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %99 = llvm.add %97, %98  : i64
       %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       llvm.br ^bb1(%6 : i64)
@@ -3058,7 +3058,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %142 = llvm.mlir.constant(32 : i64) : i64
       %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3076,7 +3076,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %159 = llvm.add %157, %158  : i64
       %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3094,7 +3094,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %177 = llvm.add %175, %176  : i64
       %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       llvm.br ^bb9(%6 : i64)
@@ -3128,7 +3128,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %207 = llvm.mlir.constant(4 : i64) : i64
       %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3146,7 +3146,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %224 = llvm.add %222, %223  : i64
       %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3164,7 +3164,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %242 = llvm.add %240, %241  : i64
       %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-      %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+      %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
       llvm.br ^bb13(%6 : i64)
@@ -3314,9 +3314,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -3336,7 +3336,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3354,7 +3354,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -3408,7 +3408,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3426,7 +3426,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3444,7 +3444,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -3478,7 +3478,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3496,7 +3496,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3514,7 +3514,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -3814,9 +3814,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -3836,7 +3836,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3854,7 +3854,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -3908,7 +3908,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3926,7 +3926,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3944,7 +3944,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -3978,7 +3978,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -3996,7 +3996,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4014,7 +4014,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -4137,14 +4137,14 @@ module  {
 ### IR Dump After mlir::iree_compiler::IREE::HAL::LinkExecutablesPass
 ```
 module  {
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
@@ -4213,9 +4213,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -4235,7 +4235,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4253,7 +4253,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -4307,7 +4307,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4325,7 +4325,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4343,7 +4343,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -4377,7 +4377,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4395,7 +4395,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4413,7 +4413,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -4499,7 +4499,7 @@ module  {
     hal.device.switch(%dev : !hal.device)
     #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @"mhlo-dot_linked_llvm_aot"::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
@@ -4536,14 +4536,14 @@ module  {
 ### IR Dump After mlir::iree_compiler::IREE::HAL::ResolveEntryPointOrdinalsPass
 ```
 module  {
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
@@ -4612,9 +4612,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -4634,7 +4634,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4652,7 +4652,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -4706,7 +4706,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4724,7 +4724,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4742,7 +4742,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -4776,7 +4776,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4794,7 +4794,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -4812,7 +4812,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -4899,7 +4899,7 @@ module  {
     #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
       %0 = hal.command_buffer.device %arg3 : !hal.device
-      %exe = hal.executable.lookup %0, @"mhlo-dot_linked_llvm_aot" : !hal.executable
+      %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
       hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
@@ -4953,7 +4953,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
     %0 = hal.command_buffer.device %arg3 : !hal.device
-    %exe = hal.executable.lookup %0, @"mhlo-dot_linked_llvm_aot" : !hal.executable
+    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
@@ -4984,7 +4984,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
     #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
     %0 = hal.command_buffer.device %arg3 : !hal.device
-    %exe = hal.executable.lookup %0, @"mhlo-dot_linked_llvm_aot" : !hal.executable
+    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
@@ -5059,7 +5059,6 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ### IR Dump After mlir::iree_compiler::IREE::HAL::MaterializeResourceCachesPass
 ```
 module  {
-  hal.variable @"_executable_mhlo-dot_linked_llvm_aot" mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
@@ -5073,27 +5072,29 @@ module  {
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func private @_executable_cache_initializer() -> !hal.executable_cache {
+  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
     %dev = hal.ex.shared_device : !hal.device
-    %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
-    hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg0 = %executable_cache_default : !hal.executable_cache) {
-      %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-      %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %arg0, layout = %0, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-      hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-      hal.return
+    %0 = hal.device.switch(%dev : !hal.device) -> !hal.executable
+    #hal.device.match.id<"dylib*">(%arg0 = %dev : !hal.device) {
+      %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+      %exe = hal.executable.create %arg0, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+      hal.return %exe : !hal.executable
+    },
+    #hal.match.always() {
+      %1 = iree.null : !hal.executable
+      hal.return %1 : !hal.executable
     }
-    return %executable_cache_default : !hal.executable_cache
+    return %0 : !hal.executable
   }
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
@@ -5162,9 +5163,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -5184,7 +5185,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5202,7 +5203,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -5256,7 +5257,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5274,7 +5275,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5292,7 +5293,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -5326,7 +5327,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5344,7 +5345,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5362,7 +5363,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -5449,7 +5450,7 @@ module  {
     #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
       %1 = hal.command_buffer.device %arg3 : !hal.device
-      %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+      %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
       hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
@@ -5505,20 +5506,24 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func private @_executable_cache_initializer() -> !hal.executable_cache {
+func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
-  %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-  hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-  br ^bb3
+  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  br ^bb5(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
+  %true = constant true
+  cond_br %true, ^bb3, ^bb4
+^bb3:  // pred: ^bb2
+  %2 = iree.null : !hal.executable
+  br ^bb5(%2 : !hal.executable)
+^bb4:  // pred: ^bb2
   iree.unreachable
-^bb3:  // pred: ^bb1
-  return %executable_cache_default : !hal.executable_cache
+^bb5(%3: !hal.executable):  // 2 preds: ^bb1, ^bb3
+  return %3 : !hal.executable
 }
 
 ```
@@ -5542,7 +5547,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
 ^bb1:  // pred: ^bb0
   %c1 = constant 1 : index
   %2 = hal.command_buffer.device %cmd : !hal.device
-  %3 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+  %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   br ^bb3
 ^bb2:  // pred: ^bb0
@@ -5595,7 +5600,6 @@ module  {
     %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @"_executable_mhlo-dot_linked_llvm_aot" mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
@@ -5609,30 +5613,34 @@ module  {
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func private @_executable_cache_initializer() -> !hal.executable_cache {
+  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
     %dev = hal.ex.shared_device : !hal.device
-    %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-    hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-    br ^bb3
+    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    br ^bb5(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
+    %true = constant true
+    cond_br %true, ^bb3, ^bb4
+  ^bb3:  // pred: ^bb2
+    %2 = iree.null : !hal.executable
+    br ^bb5(%2 : !hal.executable)
+  ^bb4:  // pred: ^bb2
     iree.unreachable
-  ^bb3:  // pred: ^bb1
-    return %executable_cache_default : !hal.executable_cache
+  ^bb5(%3: !hal.executable):  // 2 preds: ^bb1, ^bb3
+    return %3 : !hal.executable
   }
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module  {
         func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
           %c1 = constant 1 : index
@@ -5701,9 +5709,9 @@ module  {
           %59 = llvm.add %56, %58  : i64
           %60 = llvm.insertvalue %59, %51[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %61 = llvm.mlir.constant(1024 : i64) : i64
-          %62 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %63 = llvm.mlir.constant(1 : i64) : i64
-          %64 = llvm.insertvalue %63, %62[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %62 = llvm.mlir.constant(1 : i64) : i64
+          %63 = llvm.insertvalue %61, %60[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %64 = llvm.insertvalue %62, %63[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %65 = llvm.insertvalue %45, %64[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %66 = llvm.insertvalue %61, %65[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %67 = llvm.mul %36, %20  : i64
@@ -5723,7 +5731,7 @@ module  {
           %81 = llvm.insertvalue %80, %73[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %82 = llvm.mlir.constant(64 : i64) : i64
           %83 = llvm.insertvalue %82, %81[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %84 = llvm.insertvalue %63, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %84 = llvm.insertvalue %62, %83[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %85 = llvm.insertvalue %61, %84[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %86 = llvm.insertvalue %82, %85[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %87 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5741,7 +5749,7 @@ module  {
           %99 = llvm.add %97, %98  : i64
           %100 = llvm.insertvalue %99, %92[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %101 = llvm.insertvalue %82, %100[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %102 = llvm.insertvalue %63, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %62, %101[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %103 = llvm.insertvalue %45, %102[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %104 = llvm.insertvalue %82, %103[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb1(%6 : i64)
@@ -5795,7 +5803,7 @@ module  {
           %141 = llvm.insertvalue %140, %133[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %142 = llvm.mlir.constant(32 : i64) : i64
           %143 = llvm.insertvalue %142, %141[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %144 = llvm.insertvalue %63, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.insertvalue %62, %143[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %145 = llvm.insertvalue %127, %144[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %146 = llvm.insertvalue %61, %145[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %147 = llvm.extractvalue %86[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5813,7 +5821,7 @@ module  {
           %159 = llvm.add %157, %158  : i64
           %160 = llvm.insertvalue %159, %152[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %161 = llvm.insertvalue %142, %160[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %162 = llvm.insertvalue %63, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %162 = llvm.insertvalue %62, %161[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %163 = llvm.insertvalue %142, %162[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %164 = llvm.insertvalue %82, %163[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %165 = llvm.extractvalue %104[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5831,7 +5839,7 @@ module  {
           %177 = llvm.add %175, %176  : i64
           %178 = llvm.insertvalue %177, %170[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %179 = llvm.insertvalue %142, %178[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %180 = llvm.insertvalue %63, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %180 = llvm.insertvalue %62, %179[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %181 = llvm.insertvalue %127, %180[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %182 = llvm.insertvalue %82, %181[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb9(%6 : i64)
@@ -5865,7 +5873,7 @@ module  {
           %206 = llvm.insertvalue %205, %198[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %207 = llvm.mlir.constant(4 : i64) : i64
           %208 = llvm.insertvalue %207, %206[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %209 = llvm.insertvalue %63, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %209 = llvm.insertvalue %62, %208[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %210 = llvm.insertvalue %192, %209[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %211 = llvm.insertvalue %61, %210[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %212 = llvm.extractvalue %164[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5883,7 +5891,7 @@ module  {
           %224 = llvm.add %222, %223  : i64
           %225 = llvm.insertvalue %224, %217[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %226 = llvm.insertvalue %207, %225[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %227 = llvm.insertvalue %63, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %227 = llvm.insertvalue %62, %226[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %228 = llvm.insertvalue %207, %227[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %229 = llvm.insertvalue %82, %228[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %230 = llvm.extractvalue %182[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
@@ -5901,7 +5909,7 @@ module  {
           %242 = llvm.add %240, %241  : i64
           %243 = llvm.insertvalue %242, %235[2] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %244 = llvm.insertvalue %207, %243[3, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
-          %245 = llvm.insertvalue %63, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
+          %245 = llvm.insertvalue %62, %244[4, 1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %246 = llvm.insertvalue %192, %245[3, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           %247 = llvm.insertvalue %82, %246[4, 0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
           llvm.br ^bb13(%6 : i64)
@@ -5989,7 +5997,7 @@ module  {
   ^bb1:  // pred: ^bb0
     %c1 = constant 1 : index
     %2 = hal.command_buffer.device %cmd : !hal.device
-    %3 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+    %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     br ^bb3
   ^bb2:  // pred: ^bb0
@@ -6044,6 +6052,15 @@ func private @_device_match_id_0_initializer() -> i1 {
 }
 
 ```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+```
+func private @_device_match_id_0_initializer() -> i1 {
+  %dev = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  return %0 : i1
+}
+
+```
 ### IR Dump After Canonicalizer
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
@@ -6054,6 +6071,15 @@ func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layo
 
 ```
 ### IR Dump After CSE
+```
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
+  %dev = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  return %descriptor_set_layout : !hal.descriptor_set_layout
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
 ```
 func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
   %dev = hal.ex.shared_device : !hal.device
@@ -6082,49 +6108,79 @@ func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 }
 
 ```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+```
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
+  %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
+  %dev = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
+  return %executable_layout : !hal.executable_layout
+}
+
+```
 ### IR Dump After Canonicalizer
 ```
-func private @_executable_cache_initializer() -> !hal.executable_cache {
+func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
-  %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-  hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-  return %executable_cache_default : !hal.executable_cache
+  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
-  iree.unreachable
+  %2 = iree.null : !hal.executable
+  br ^bb3(%2 : !hal.executable)
+^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+  return %3 : !hal.executable
 }
 
 ```
 ### IR Dump After CSE
 ```
-func private @_executable_cache_initializer() -> !hal.executable_cache {
+func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
   %dev = hal.ex.shared_device : !hal.device
-  %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
   %0 = hal.variable.load @_device_match_id_0 : i1
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-  hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-  return %executable_cache_default : !hal.executable_cache
+  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  br ^bb3(%exe : !hal.executable)
 ^bb2:  // pred: ^bb0
-  iree.unreachable
+  %2 = iree.null : !hal.executable
+  br ^bb3(%2 : !hal.executable)
+^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+  return %3 : !hal.executable
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+```
+func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  %dev = hal.ex.shared_device : !hal.device
+  %0 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  br ^bb3(%exe : !hal.executable)
+^bb2:  // pred: ^bb0
+  %2 = iree.null : !hal.executable
+  br ^bb3(%2 : !hal.executable)
+^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+  return %3 : !hal.executable
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::SerializeExecutablesPass
 ```
-hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io_0 {
+hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<6944xi8>, format = 1145850178 : i32} {
+  hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
   }
 }
 
@@ -6147,7 +6203,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -6177,7 +6233,37 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+  %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
+  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
+  hal.command_buffer.end %cmd
+  hal.ex.submit_and_wait %dev, %cmd
+  return %buffer : !hal.buffer
+^bb2:  // pred: ^bb0
+  iree.unreachable
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
+```
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  %c0 = constant 0 : index
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
+  %c8192 = constant 8192 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
+  hal.command_buffer.begin %cmd
+  %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %c131072), 1 = (%arg1, %c0, %c262144), 2 = (%buffer, %c0, %c8192)]
+  %1 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %1, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -6206,6 +6292,22 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 
 ```
 ### IR Dump After CSE
+```
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
+  return %view : !hal.buffer_view
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
 ```
 func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c32 = constant 32 : index
@@ -6236,6 +6338,20 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 
 ```
 ### IR Dump After CSE
+```
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::CSEVariableLoadsPass
 ```
 func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c0 = constant 0 : index
@@ -6258,7 +6374,6 @@ module  {
     %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @"_executable_mhlo-dot_linked_llvm_aot" mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
@@ -6272,27 +6387,28 @@ module  {
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func private @_executable_cache_initializer() -> !hal.executable_cache {
+  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
     %dev = hal.ex.shared_device : !hal.device
-    %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-    hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-    return %executable_cache_default : !hal.executable_cache
+    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
-    iree.unreachable
+    %2 = iree.null : !hal.executable
+    br ^bb3(%2 : !hal.executable)
+  ^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+    return %3 : !hal.executable
   }
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<6944xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -6311,7 +6427,7 @@ module  {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -6355,7 +6471,6 @@ module  {
     %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @"_executable_mhlo-dot_linked_llvm_aot" mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
     %dev = hal.ex.shared_device : !hal.device
@@ -6369,27 +6484,28 @@ module  {
     %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
     return %executable_layout : !hal.executable_layout
   }
-  hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
-  func private @_executable_cache_initializer() -> !hal.executable_cache {
+  hal.variable @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !hal.executable attributes {sym_visibility = "private"}
+  func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
     %dev = hal.ex.shared_device : !hal.device
-    %executable_cache_default = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
     %0 = hal.variable.load @_device_match_id_0 : i1
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_mhlo-dot_linked_llvm_aot = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @"mhlo-dot_linked_llvm_aot" : !hal.executable
-    hal.variable.store %executable_mhlo-dot_linked_llvm_aot, @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
-    return %executable_cache_default : !hal.executable_cache
+    %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+    br ^bb3(%exe : !hal.executable)
   ^bb2:  // pred: ^bb0
-    iree.unreachable
+    %2 = iree.null : !hal.executable
+    br ^bb3(%2 : !hal.executable)
+  ^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+    return %3 : !hal.executable
   }
-  hal.executable @"mhlo-dot_linked_llvm_aot" attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io_0 {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<6944xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -6408,7 +6524,7 @@ module  {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @"_executable_mhlo-dot_linked_llvm_aot" : !hal.executable
+    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier DispatchWrite, DispatchRead : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -6455,7 +6571,6 @@ module  {
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
       vm.return %0 : i32
     }
-    vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
     vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6480,29 +6595,23 @@ module  {
       %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
-    vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
-    vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
-    vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
+    vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-      %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %c1145850178 = vm.const.i32 1145850178 : i32
-      %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-      %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %ref_1 = vm.switch.ref %0[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-      %c7 = vm.const.i32 7 : i32
-      %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_2, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.return %ref_0 : !vm.ref<!hal.executable_cache>
+      %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+      %ref_0 = vm.call.variadic @hal.executable.create(%ref, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
-      %c2 = vm.const.i32 2 : i32
-      vm.fail %c2, "unreachable location reached"
+      %null = vm.const.ref.zero : !vm.ref<!hal.executable>
+      vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+    ^bb3(%0: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+      vm.return %0 : !vm.ref<!hal.executable>
     }
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %zero = vm.const.i32.zero : i32
@@ -6528,9 +6637,9 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %zero_7 = vm.const.i32.zero : i32
-      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_mhlo-dot_linked_llvm_aot, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %c8 = vm.const.i32 8 : i32
@@ -6609,9 +6718,7 @@ module  {
     vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.query(%semaphore : !vm.ref<!hal.semaphore>) -> (i32, i32) attributes {sym_visibility = "private"}
@@ -6633,7 +6740,6 @@ vm.module @module {
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
     vm.return %0 : i32
   }
-  vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
   vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6658,29 +6764,23 @@ vm.module @module {
     %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
-  vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
-  vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
-  vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
+  vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+  vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-    %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %c1145850178 = vm.const.i32 1145850178 : i32
-    %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-    %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-    %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-    %ref_1 = vm.switch.ref %0[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-    %c7 = vm.const.i32 7 : i32
-    %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_2, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-    vm.return %ref_0 : !vm.ref<!hal.executable_cache>
+    %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
-    %c2 = vm.const.i32 2 : i32
-    vm.fail %c2, "unreachable location reached"
+    %null = vm.const.ref.zero : !vm.ref<!hal.executable>
+    vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+  ^bb3(%0: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+    vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %zero = vm.const.i32.zero : i32
@@ -6706,9 +6806,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
+    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
     %zero_7 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_mhlo-dot_linked_llvm_aot, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %c8 = vm.const.i32 8 : i32
@@ -6787,9 +6887,7 @@ vm.module @module {
   vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.query(%semaphore : !vm.ref<!hal.semaphore>) -> (i32, i32) attributes {sym_visibility = "private"}
@@ -6810,7 +6908,6 @@ vm.module @module {
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
     vm.return %0 : i32
   }
-  vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.func private @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -6835,29 +6932,23 @@ vm.module @module {
     %ref_0 = vm.call.variadic @hal.executable_layout.create(%ref, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
-  vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-  vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
-  vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
+  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+  vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-    %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %c1145850178 = vm.const.i32 1145850178 : i32
-    %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-    %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-    %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-    %ref_1 = vm.switch.ref %0[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-    %c7 = vm.const.i32 7 : i32
-    %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_2, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-    vm.return %ref_0 : !vm.ref<!hal.executable_cache>
+    %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+    %ref_0 = vm.call.variadic @hal.executable.create(%ref, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
-    %c2 = vm.const.i32 2 : i32
-    vm.fail %c2, "unreachable location reached"
+    %null = vm.const.ref.zero : !vm.ref<!hal.executable>
+    vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+  ^bb3(%0: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+    vm.return %0 : !vm.ref<!hal.executable>
   }
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %zero = vm.const.i32.zero : i32
@@ -6883,9 +6974,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
+    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
     %zero_7 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_mhlo-dot_linked_llvm_aot, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %c8 = vm.const.i32 8 : i32
@@ -6964,9 +7055,7 @@ vm.module @module {
   vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.query(%semaphore : !vm.ref<!hal.semaphore>) -> (i32, i32) attributes {sym_visibility = "private"}
@@ -6980,8 +7069,8 @@ vm.module @module {
     vm.global.store.ref %ref, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %ref_0 = vm.call @_executable_layout_0_initializer() : () -> !vm.ref<!hal.executable_layout>
     vm.global.store.ref %ref_0, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-    %ref_1 = vm.call @_executable_cache_initializer() : () -> !vm.ref<!hal.executable_cache>
-    vm.global.store.ref %ref_1, @_executable_cache : !vm.ref<!hal.executable_cache>
+    %ref_1 = vm.call @_executable_dot_ex_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
+    vm.global.store.ref %ref_1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
     vm.return
   }
   vm.export @__init
@@ -6997,8 +7086,8 @@ vm.func @__init() {
   vm.global.store.ref %ref, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
   %ref_0 = vm.call @_executable_layout_0_initializer() : () -> !vm.ref<!hal.executable_layout>
   vm.global.store.ref %ref_0, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-  %ref_1 = vm.call @_executable_cache_initializer() : () -> !vm.ref<!hal.executable_cache>
-  vm.global.store.ref %ref_1, @_executable_cache : !vm.ref<!hal.executable_cache>
+  %ref_1 = vm.call @_executable_dot_ex_dispatch_0_initializer() : () -> !vm.ref<!hal.executable>
+  vm.global.store.ref %ref_1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
   vm.return
 }
 
@@ -7066,8 +7155,8 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
   vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -7079,26 +7168,21 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
 ```
 ### IR Dump After Canonicalizer
 ```
-vm.func private @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> {
+vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
   %c1145850178 = vm.const.i32 1145850178 : i32
-  %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-  %c7 = vm.const.i32 7 : i32
-  %c2 = vm.const.i32 2 : i32
+  %null = vm.const.ref.zero : !vm.ref<!hal.executable>
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-  %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-  %ref_0 = vm.call @hal.executable_cache.create(%ref, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-  %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-  %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-  %ref_1 = vm.switch.ref %0[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-  %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-  vm.global.store.ref %ref_2, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-  vm.return %ref_0 : !vm.ref<!hal.executable_cache>
+  %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+  %ref_0 = vm.call.variadic @hal.executable.create(%ref, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  vm.br ^bb3(%ref_0 : !vm.ref<!hal.executable>)
 ^bb2:  // pred: ^bb0
-  vm.fail %c2, "unreachable location reached"
+  vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+^bb3(%0: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+  vm.return %0 : !vm.ref<!hal.executable>
 }
 
 ```
@@ -7141,12 +7225,12 @@ vm.func private @_device_match_id_0_initializer() -> i32 {
 ```
 vm.func @__init() {
   %c1 = vm.const.i32 1 : i32
+  %c2 = vm.const.i32 2 : i32
+  %c7 = vm.const.i32 7 : i32
   %c6 = vm.const.i32 6 : i32
   %zero = vm.const.i32.zero : i32
   %c1145850178 = vm.const.i32 1145850178 : i32
-  %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-  %c7 = vm.const.i32 7 : i32
-  %c2 = vm.const.i32 2 : i32
+  %null = vm.const.ref.zero : !vm.ref<!hal.executable>
   %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
   %_utf8_dylib_971286B245550E6D = vm.const.ref.rodata @_utf8_dylib_971286B245550E6D : !vm.ref<!iree.byte_buffer>
   %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -7159,21 +7243,18 @@ vm.func @__init() {
   %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
   vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
   %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-  %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-  %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-  %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-  %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-  %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-  %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-  vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-  vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-  vm.return
+  %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+  %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
 ^bb2:  // pred: ^bb0
-  vm.fail %c2, "unreachable location reached"
+  vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+  vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+  vm.return
 }
 
 ```
@@ -7250,8 +7331,8 @@ vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.re
   %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
   vm.cond_br %_device_match_id_0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+  vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
   vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
   vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -7267,12 +7348,10 @@ module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_dylib_971286B245550E6D dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
-    vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-    vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
+    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -7297,8 +7376,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -7388,9 +7467,7 @@ module  {
     vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.query(%semaphore : !vm.ref<!hal.semaphore>) -> (i32, i32) attributes {sym_visibility = "private"}
@@ -7399,12 +7476,12 @@ module  {
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
       %c1145850178 = vm.const.i32 1145850178 : i32
-      %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %c7 = vm.const.i32 7 : i32
-      %c2 = vm.const.i32 2 : i32
+      %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_dylib_971286B245550E6D = vm.const.ref.rodata @_utf8_dylib_971286B245550E6D : !vm.ref<!iree.byte_buffer>
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -7417,21 +7494,18 @@ module  {
       %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
       vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-      %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-      vm.return
+      %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
+      vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+    ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.return
     }
     vm.export @__init
   }
@@ -7444,12 +7518,10 @@ module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_dylib_971286B245550E6D dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
-    vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-    vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
+    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -7474,8 +7546,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -7565,9 +7637,7 @@ module  {
     vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.query(%semaphore : !vm.ref<!hal.semaphore>) -> (i32, i32) attributes {sym_visibility = "private"}
@@ -7576,12 +7646,12 @@ module  {
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
       %c1145850178 = vm.const.i32 1145850178 : i32
-      %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %c7 = vm.const.i32 7 : i32
-      %c2 = vm.const.i32 2 : i32
+      %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_dylib_971286B245550E6D = vm.const.ref.rodata @_utf8_dylib_971286B245550E6D : !vm.ref<!iree.byte_buffer>
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -7594,21 +7664,18 @@ module  {
       %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
       vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-      %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-      vm.return
+      %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
+      vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+    ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.return
     }
     vm.export @__init
   }
@@ -7621,12 +7688,10 @@ module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_dylib_971286B245550E6D dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
-    vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-    vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
+    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -7651,8 +7716,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -7716,21 +7781,19 @@ module  {
     vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
       %c1145850178 = vm.const.i32 1145850178 : i32
-      %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %c7 = vm.const.i32 7 : i32
-      %c2 = vm.const.i32 2 : i32
+      %null = vm.const.ref.zero : !vm.ref<!hal.executable>
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_dylib_971286B245550E6D = vm.const.ref.rodata @_utf8_dylib_971286B245550E6D : !vm.ref<!iree.byte_buffer>
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_dylib_971286B245550E6D) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
@@ -7743,21 +7806,18 @@ module  {
       %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
       vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-      %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-      vm.return
+      %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
+      vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+    ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.return
     }
     vm.export @__init
   }
@@ -7769,12 +7829,10 @@ module  {
 vm.module @module {
   vm.global.i32 @_device_match_id_0 mutable : i32
   vm.rodata @_utf8_dylib_971286B245550E6D dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
-  vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-  vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-  vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
+  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -7795,8 +7853,8 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-    vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %c8 = vm.const.i32 8 : i32
@@ -7864,9 +7922,7 @@ vm.module @module {
   vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+  vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
@@ -7878,10 +7934,10 @@ vm.module @module {
     vm.global.store.i32 %0, @_device_match_id_0 : i32
     %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
+    %c7 = vm.const.i32 7 : i32
     %c6 = vm.const.i32 6 : i32
     %zero = vm.const.i32.zero : i32
-    %c7 = vm.const.i32 7 : i32
-    %c2 = vm.const.i32 2 : i32
     %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
     vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
     %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
@@ -7889,23 +7945,20 @@ vm.module @module {
     %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
     vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-    %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-    %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+    %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
     %c1145850178 = vm.const.i32 1145850178 : i32
-    %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-    %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-    %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-    %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-    %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-    vm.return
+    %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+    vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
   ^bb2:  // pred: ^bb0
-    vm.fail %c2, "unreachable location reached"
+    %null = vm.const.ref.zero : !vm.ref<!hal.executable>
+    vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+  ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+    vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    vm.return
   }
   vm.export @__init
 }
@@ -7917,12 +7970,10 @@ module  {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_dylib_971286B245550E6D dense<[100, 121, 108, 105, 98, 42]> : vector<6xi8>
-    vm.global.ref @"_executable_mhlo-dot_linked_llvm_aot" mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
-    vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
-    vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" opaque<"", "0xDEADBEEF"> : vector<6944xi8>
+    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -7943,8 +7994,8 @@ module  {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_mhlo-dot_linked_llvm_aot = vm.global.load.ref @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_mhlo-dot_linked_llvm_aot, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %c8 = vm.const.i32 8 : i32
@@ -8012,9 +8063,7 @@ module  {
     vm.import @hal.descriptor_set_layout.create(%device : !vm.ref<!hal.device>, %usage_type : i32, %bindings : tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.allocator(%device : !vm.ref<!hal.device>) -> !vm.ref<!hal.allocator> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.device.match.id(%device : !vm.ref<!hal.device>, %pattern : !vm.ref<!iree.byte_buffer>) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.create(%device : !vm.ref<!hal.device>, %identifier : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache> attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.executable.create(%device : !vm.ref<!hal.device>, %executable_format : i32, %executable_data : !vm.ref<!iree.byte_buffer>, %executable_layouts : !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
@@ -8026,10 +8075,10 @@ module  {
       vm.global.store.i32 %0, @_device_match_id_0 : i32
       %ref_0 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %c1 = vm.const.i32 1 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c7 = vm.const.i32 7 : i32
       %c6 = vm.const.i32 6 : i32
       %zero = vm.const.i32.zero : i32
-      %c7 = vm.const.i32 7 : i32
-      %c2 = vm.const.i32 2 : i32
       %ref_1 = vm.call.variadic @hal.descriptor_set_layout.create(%ref_0, %c1, [(%zero, %c7, %c1), (%c1, %c7, %c1), (%c2, %c7, %c6)]) : (!vm.ref<!hal.device>, i32, tuple<i32, i32, i32> ...) -> !vm.ref<!hal.descriptor_set_layout>
       vm.global.store.ref %ref_1, @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
       %_descriptor_set_layout_0 = vm.global.load.ref @_descriptor_set_layout_0 : !vm.ref<!hal.descriptor_set_layout>
@@ -8037,23 +8086,20 @@ module  {
       %ref_3 = vm.call.variadic @hal.executable_layout.create(%ref_2, [%_descriptor_set_layout_0], %zero) : (!vm.ref<!hal.device>, !vm.ref<!hal.descriptor_set_layout> ..., i32) -> !vm.ref<!hal.executable_layout>
       vm.global.store.ref %ref_3, @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_4 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
-      %ref_5 = vm.call @hal.executable_cache.create(%ref_4, %_utf8_default_7FD5254DFCA3A5D0) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable_cache>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+      %_dot_ex_dispatch_0_llvm_aot_binary_dylib = vm.const.ref.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib : !vm.ref<!iree.byte_buffer>
       %c1145850178 = vm.const.i32 1145850178 : i32
-      %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1145850178]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_mhlo-dot_linked_llvm_aot_binary_dylib = vm.const.ref.rodata @"_mhlo-dot_linked_llvm_aot_binary_dylib" : !vm.ref<!iree.byte_buffer>
-      %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_mhlo-dot_linked_llvm_aot_binary_dylib] else %null : !vm.ref<!iree.byte_buffer>
-      %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @"_executable_mhlo-dot_linked_llvm_aot" : !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
-      vm.return
+      %ref_5 = vm.call.variadic @hal.executable.create(%ref_4, %c1145850178, %_dot_ex_dispatch_0_llvm_aot_binary_dylib, [%_executable_layout_0]) : (!vm.ref<!hal.device>, i32, !vm.ref<!iree.byte_buffer>, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+      vm.br ^bb3(%ref_5 : !vm.ref<!hal.executable>)
     ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
+      %null = vm.const.ref.zero : !vm.ref<!hal.executable>
+      vm.br ^bb3(%null : !vm.ref<!hal.executable>)
+    ^bb3(%1: !vm.ref<!hal.executable>):  // 2 preds: ^bb1, ^bb2
+      vm.global.store.ref %1, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.return
     }
     vm.export @__init
   }
