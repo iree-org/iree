@@ -229,7 +229,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
-    if(options_.addressSanitizer) {
+    if (options_.addressSanitizer) {
       for(auto &function : llvmModule->getFunctionList())
         function.addFnAttr(llvm::Attribute::SanitizeAddress);
     }
