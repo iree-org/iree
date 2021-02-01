@@ -154,7 +154,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 //       CHECK:     %[[T1:.+]] = divi_signed %[[T0]], %[[C4]]
 //       CHECK:     %[[T2:.+]] = addi %[[ARG1]], %[[C1]]
 //       CHECK:     %[[T3:.+]] = divi_signed %[[T2]], %[[C2]]
-//       CHECK:     hal.yield %[[T1]], %[[T3]], %[[C1]]
+//       CHECK:     hal.return %[[T1]], %[[T3]], %[[C1]]
 //   CHECK-NOT:   hal.interface.workgroup.size
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
