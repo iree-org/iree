@@ -18,6 +18,7 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
+#include "iree/vm/ops.h"
 
 //===----------------------------------------------------------------------===//
 // Register remapping utilities
@@ -975,32 +976,32 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                            \
-    int32_t operand = VM_DecOperandRegI32("operand");     \
-    int32_t* result = VM_DecResultRegI32("result");       \
-    *result = (int32_t)(op((type)operand));               \
+#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, type, op_func) \
+  DISPATCH_OP(CORE, op_name, {                                 \
+    int32_t operand = VM_DecOperandRegI32("operand");          \
+    int32_t* result = VM_DecResultRegI32("result");            \
+    *result = (int32_t)(op_func((type)operand));               \
   });
 
-#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                             \
-    int32_t lhs = VM_DecOperandRegI32("lhs");              \
-    int32_t rhs = VM_DecOperandRegI32("rhs");              \
-    int32_t* result = VM_DecResultRegI32("result");        \
-    *result = (int32_t)(((type)lhs)op((type)rhs));         \
+#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, type, op_func) \
+  DISPATCH_OP(CORE, op_name, {                                  \
+    int32_t lhs = VM_DecOperandRegI32("lhs");                   \
+    int32_t rhs = VM_DecOperandRegI32("rhs");                   \
+    int32_t* result = VM_DecResultRegI32("result");             \
+    *result = (int32_t)(op_func((type)lhs, (type)rhs));         \
   });
 
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, int32_t, +);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, int32_t, -);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, int32_t, *);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, int32_t, /);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, uint32_t, /);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, int32_t, %);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, uint32_t, %);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, uint32_t, ~);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, uint32_t, &);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, uint32_t, |);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, uint32_t, ^);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, int32_t, vm_add_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, int32_t, vm_sub_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, int32_t, vm_mul_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, int32_t, vm_div_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, uint32_t, vm_div_i32u);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, int32_t, vm_rem_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, uint32_t, vm_rem_i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, uint32_t, vm_not_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, uint32_t, vm_and_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, uint32_t, vm_or_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, uint32_t, vm_xor_i32);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation

@@ -12,13 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_C_FUNCS_H_
-#define IREE_VM_C_FUNCS_H_
+#ifndef IREE_VM_OPS_H_
+#define IREE_VM_OPS_H_
 
 #include <stdint.h>
 
-// Arithmetic ops
-inline int32_t vm_add_i32(int32_t a, int32_t b) { return a + b; }
+//===------------------------------------------------------------------===//
+// Native integer arithmetic
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_add_i32(int32_t lhs, int32_t rhs) { return lhs + rhs; }
+static inline int32_t vm_sub_i32(int32_t lhs, int32_t rhs) { return lhs - rhs; }
+static inline int32_t vm_mul_i32(int32_t lhs, int32_t rhs) { return lhs * rhs; }
+// clang-format off
+static inline int32_t vm_div_i32s(int32_t lhs, int32_t rhs) { return lhs / rhs; }
+static inline uint32_t vm_div_i32u(uint32_t lhs, uint32_t rhs) { return lhs / rhs; }
+static inline int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) { return lhs % rhs;}
+static inline uint32_t vm_rem_i32u(uint32_t lhs, uint32_t rhs) { return lhs % rhs; }
+// clang-format on
+static inline uint32_t vm_not_i32(uint32_t operand) { return ~operand; }
+static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
+static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
+static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
@@ -35,4 +50,4 @@ inline int32_t vm_cmp_ne_i32(int32_t a, int32_t b) { return a != b ? 1 : 0; }
 // Const ops
 inline int32_t vm_const_i32(int32_t a) { return a; }
 
-#endif  // IREE_VM_C_FUNCS_H_
+#endif  // IREE_VM_OPS_H_

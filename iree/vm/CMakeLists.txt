@@ -168,6 +168,7 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "generated/bytecode_op_table.h"
   DEPS
+    ::ops
     ::vm
     iree::base::api
     iree::base::core_headers
@@ -265,9 +266,9 @@ endif()
 
 iree_cc_library(
   NAME
-    c_funcs
+    ops
   HDRS
-    "c_funcs.h"
+    "ops.h"
   PUBLIC
 )
 
