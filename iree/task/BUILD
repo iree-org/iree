@@ -147,7 +147,7 @@ cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
     tags = [
-        "notap",  # TODO(benvanik): Does not work on machines with large numbers of cores.
+        "noasan",  # TODO(benvanik): Does not work on machines with large numbers of cores.
     ],
     deps = [
         ":task",
