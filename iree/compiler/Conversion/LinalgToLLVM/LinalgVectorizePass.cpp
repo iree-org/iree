@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -73,6 +74,15 @@ void LinalgVectorizationPass::runOnFunction() {
       llvm::dbgs() << "\n\n";
     });
   }
+
+  // TODO: This should be a folding of Add into Contract in core but while they
+  // live in different dialects, it is not possible without unnatural
+  // dependencies.
+  funcOp.walk([&](Operation *op) {
+    if (auto contract = canonicalizeContractionAdd(op))
+      op->replaceAllUsesWith(contract);
+  });
+
   // Apply unrolling patterns.
   {
     OwningRewritePatternList vectorUnrollPatterns;

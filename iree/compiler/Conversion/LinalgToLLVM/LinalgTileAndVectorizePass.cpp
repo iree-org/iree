@@ -128,6 +128,14 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
   }
 
+  // TODO: This should be a folding of Add into Contract in core but while they
+  // live in different dialects, it is not possible without unnatural
+  // dependencies.
+  funcOp.walk([&](Operation *op) {
+    if (auto contract = canonicalizeContractionAdd(op))
+      op->replaceAllUsesWith(contract);
+  });
+
   // Apply vector specific operation lowering.
   {
     vector::VectorTransformsOptions vectorTransformsOptions =
