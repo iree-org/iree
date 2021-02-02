@@ -18,9 +18,7 @@
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
-
-// This would be generated together with the functions in the header
-#include "iree/vm/test/emitc/arithmetic_ops.h"
+#include "iree/vm/test/emitc/arithmetic_ops.module"
 
 namespace {
 

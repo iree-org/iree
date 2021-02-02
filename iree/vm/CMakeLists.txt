@@ -270,3 +270,11 @@ iree_cc_library(
     "c_funcs.h"
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    shims
+  HDRS
+    "shims.h"
+  PUBLIC
+)
