@@ -38,7 +38,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<bool> linkExecutables{
       *this, "link-executables",
       llvm::cl::desc("Whether to link hal.executable ops together."),
-      llvm::cl::init(false)};
+      llvm::cl::init(true)};
 };
 
 }  // namespace
@@ -113,6 +113,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  // Run our own CSE on variable loads before moving on.
+  // When specifying side effects can help MLIR's core CSE pass eliminate
+  // redundant loads we can remove this.
+  passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
 
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<ExecutableOp>(

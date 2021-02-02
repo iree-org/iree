@@ -1251,13 +1251,6 @@ static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
 // hal.executable
 //===----------------------------------------------------------------------===//
 
-InterfaceOp ExecutableOp::getFirstInterfaceOp() {
-  auto interfaceOps = llvm::to_vector<1>(getBlock().getOps<InterfaceOp>());
-  assert(!interfaceOps.empty() &&
-         "executable must have at least one interface");
-  return interfaceOps.front();
-}
-
 void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);
@@ -1314,6 +1307,16 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
+  // For now assume that the workload is at max 3D. So arguments to the region
+  // are workload along x, y and z.
+  std::unique_ptr<Region> region;
+  SmallVector<OpAsmParser::OperandType, 4> regionOperands;
+  SmallVector<Type, 4> regionTypes;
+  OptionalParseResult parseResult =
+      parser.parseOptionalRegion(region, regionOperands, regionTypes);
+  if (!parseResult.hasValue()) return success();
+  if (failed(*parseResult)) return failure();
+  result->addRegion(std::move(region));
   return success();
 }
 
@@ -1323,6 +1326,38 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
+  if (op.workgroup_count_region().empty()) return;
+  p.printRegion(op.workgroup_count_region().front());
+}
+
+static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
+  Region *region = op.getBody();
+  // When there is no region, nothing to verify.
+  if (!region) return success();
+
+  if (!llvm::hasSingleElement(*region)) {
+    return op.emitOpError() << "expected a single region";
+  }
+  if (region->getNumArguments() != 3) {
+    return op.emitOpError(
+        "expected three arguments for workgroup_count_region for workload "
+        "along "
+        "x, y, and z");
+  }
+  for (BlockArgument &blockArg : region->getArguments()) {
+    if (!blockArg.getType().isa<IndexType>()) {
+      return op.emitOpError(
+          "expected arguments to workgroup_count_region be index type");
+    }
+  }
+  // Check that the last statement in the block is `hal.yield` operation.
+  // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
+  // should generate this check, but it doesnt.
+  auto returnOp = dyn_cast<ReturnOp>(region->front().getTerminator());
+  if (!returnOp || returnOp.operands().size() != 3) {
+    return op.emitOpError("expected operation to yield 3 values");
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1386,8 +1421,11 @@ static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               uint32_t format, std::vector<uint8_t> data) {
+                               StringRef symName, uint32_t format,
+                               std::vector<uint8_t> data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(symName));
   state.addAttribute(
       "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
   state.addAttribute("data",
@@ -1398,8 +1436,11 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 }
 
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
-                               uint32_t format, DenseIntElementsAttr data) {
+                               StringRef symName, uint32_t format,
+                               DenseIntElementsAttr data) {
   ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(symName));
   state.addAttribute(
       "format", builder.getIntegerAttr(builder.getIntegerType(32), format));
   state.addAttribute("data", data);
@@ -1408,7 +1449,11 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
   OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
@@ -1423,7 +1468,8 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
 }
 
 static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
-  p << op.getOperationName();
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
@@ -1442,6 +1488,15 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 
   // TODO(benvanik): check export name conflicts.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.create
+//===----------------------------------------------------------------------===//
+
+void ExecutableCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), StringRef("exe"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1805,33 +1860,6 @@ static ParseResult parseInterfaceStoreTensorTileOp(OpAsmParser &parser,
   return parseOffsetsSizesAndStrides(parser, *result, segmentSizes,
                                      preResolutionFn, parseOffsetPrefix,
                                      parseSizePrefix, parseStridePrefix);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.create
-//===----------------------------------------------------------------------===//
-
-void ExecutableCacheCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), (StringRef("executable_cache_") + identifier()).str());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.select_format
-//===----------------------------------------------------------------------===//
-
-void ExecutableCacheSelectFormatOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "preferred_format");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable_cache.prepare
-//===----------------------------------------------------------------------===//
-
-void ExecutableCachePrepareOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), (StringRef("executable_") + executable()).str());
 }
 
 //===----------------------------------------------------------------------===//

@@ -45,39 +45,11 @@
 namespace mlir {
 namespace iree_compiler {
 
-// "TieShapeOp" combined with bvm make it necessary to iteratively lookup the
-// value.
-// TODO(nicolasvasilache): kill "TieShapeOp" with fire.
-static Value iterativeLookup(BlockAndValueMapping &bvm, Value v) {
-  while (true) {
-    Value nextV = bvm.lookupOrDefault(v);
-    if (nextV == v) return v;
-    v = nextV;
-  }
-  return v;
-}
-
-// Traverse all transitive "TieShapeOp" uses of `tensor`, map them to `memref`.
-// Replace all uses of any such transitive tensor in a "DimOp" by `memref`.
-// TODO(nicolasvasilache): kill "TieShapeOp" with fire.
-static void mapAllTieShapeUsesAndReplaceDimUsesOf(Value tensor, Value memref,
-                                                  BlockAndValueMapping &bvm) {
-  SmallVector<Value, 4> workList{tensor};
-  for (unsigned idx = 0; idx < workList.size() /*recompute: it grows*/; ++idx) {
-    // Update of DimOp uses must occur in 2 steps or use list gets messed up.
-    SmallVector<OpOperand *, 4> dimOps;
-    for (auto &use : workList[idx].getUses()) {
-      auto tieShapeOp = dyn_cast<Shape::TieShapeOp>(use.getOwner());
-      auto dimOp = dyn_cast<DimOp>(use.getOwner());
-      if (tieShapeOp) {
-        workList.push_back(tieShapeOp.getResult());
-        bvm.map(tieShapeOp.getResult(), memref);
-      } else if (dimOp) {
-        dimOps.push_back(&dimOp->getOpOperand(use.getOperandNumber()));
-      }
-    }
-    for (OpOperand *opOperand : dimOps) {
-      opOperand->set(memref);
+// Transfer all `dim` ops on `tensor` to `memref`.
+static void transferDimOpsToMemref(Value tensor, Value memref) {
+  for (OpOperand &opOperand : llvm::make_early_inc_range(tensor.getUses())) {
+    if (isa<DimOp>(opOperand.getOwner())) {
+      opOperand.set(memref);
     }
   }
 }
@@ -108,7 +80,7 @@ static LogicalResult allocateBuffersForResults(
     // TODO(nicolasvasilache): this may be too brutal and we may prefer to leave
     // this decision to a copy + alloc removal pass.
     if (resultTensor.getDefiningOp<linalg::LinalgOp>()) {
-      resultBuffers.push_back(iterativeLookup(bvm, resultTensor));
+      resultBuffers.push_back(bvm.lookup(resultTensor));
       continue;
     }
 
@@ -118,9 +90,10 @@ static LogicalResult allocateBuffersForResults(
     auto memrefType = MemRefType::get(tensorShape, tensorType.getElementType());
     SmallVector<Value, 4> dynOperands;
     for (auto dim : llvm::enumerate(tensorShape)) {
+      Value dimTensor = bvm.lookupOrNull(resultTensor);
+      if (!dimTensor) dimTensor = resultTensor;
       if (dim.value() == TensorType::kDynamicSize) {
-        dynOperands.push_back(b.create<DimOp>(
-            loc, iterativeLookup(bvm, resultTensor), dim.index()));
+        dynOperands.push_back(b.create<DimOp>(loc, dimTensor, dim.index()));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
@@ -128,13 +101,11 @@ static LogicalResult allocateBuffersForResults(
 
     // Additionally, if the output buffer is used, clone its value for now.
     if (op.payloadUsesValueFromOutputOperandIndex(resultIndex))
-      b.create<linalg::CopyOp>(loc, iterativeLookup(bvm, resultTensor), alloc);
+      b.create<linalg::CopyOp>(loc, bvm.lookup(resultTensor), alloc);
   }
   bvm.map(op->getResults(), resultBuffers);
-  // TODO(nicolasvasilache): kill tie_shape with fire.
   for (auto it : llvm::zip(op->getResults(), resultBuffers)) {
-    mapAllTieShapeUsesAndReplaceDimUsesOf(std::get<0>(it), std::get<1>(it),
-                                          bvm);
+    transferDimOpsToMemref(std::get<0>(it), std::get<1>(it));
   }
   return success();
 }
@@ -152,10 +123,8 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
 
   // Replace the results of the old op with the new output buffers.
   bvm.map(op.getOperation()->getResults(), outputs);
-  // TODO(nicolasvasilache): kill tie_shape with fire.
   for (auto it : llvm::zip(op.getOperation()->getResults(), outputs)) {
-    mapAllTieShapeUsesAndReplaceDimUsesOf(std::get<0>(it), std::get<1>(it),
-                                          bvm);
+    transferDimOpsToMemref(std::get<0>(it), std::get<1>(it));
   }
 }
 
@@ -173,7 +142,7 @@ LogicalResult convertAnyLinalgOp(OpBuilder &b, linalg::LinalgOp op,
   SmallVector<Value, 2> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
   for (Value v : op.getInputs()) {
-    newInputBuffers.push_back(iterativeLookup(bvm, v));
+    newInputBuffers.push_back(bvm.lookup(v));
   }
   SmallVector<Value, 2> newOutputBuffers;
   if (failed(allocateBuffersForResults(b, loc, op, newOutputBuffers, bvm))) {
@@ -209,13 +178,14 @@ static LogicalResult convertTransferOp(OpBuilder &b,
     SmallVector<Value, 4> dynOperands;
     for (size_t idx : llvm::seq(size_t(0), tensorShape.size())) {
       if (tensorType.isDynamicDim(idx)) {
-        dynOperands.push_back(
-            b.create<DimOp>(loc, bvm.lookup(outputTensor), idx));
+        Value tensor = bvm.lookupOrNull(outputTensor);
+        if (!tensor) tensor = outputTensor;
+        dynOperands.push_back(b.create<DimOp>(loc, tensor, idx));
       }
     }
     auto alloc = b.create<AllocOp>(loc, memrefType, dynOperands);
     bvm.map(op->getResult(0), alloc);
-    mapAllTieShapeUsesAndReplaceDimUsesOf(op->getResult(0), alloc, bvm);
+    transferDimOpsToMemref(op->getResult(0), alloc);
   }
 
   // Replace the tensor operand.
@@ -320,8 +290,7 @@ LogicalResult convertInterfaceLoadTensorOp(
                                   loadOp.queryBindingOp());
   Value buffer = phOp.getResult();
   bvm.map(loadOp.result(), buffer);
-  // TODO(nicolasvasilache): kill tie_shape with fire.
-  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), buffer, bvm);
+  transferDimOpsToMemref(loadOp.result(), buffer);
   return success();
 }
 
@@ -346,8 +315,7 @@ LogicalResult convertInterfaceLoadTensorOp(
       b.create<SubViewOp>(loadOp->getLoc(), buffer, loadOp.getMixedOffsets(),
                           loadOp.getMixedSizes(), loadOp.getMixedStrides());
   bvm.map(loadOp.result(), subview);
-  // TODO(nicolasvasilache): kill tie_shape with fire.
-  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), subview, bvm);
+  transferDimOpsToMemref(loadOp.result(), subview);
   return success();
 }
 
@@ -357,7 +325,7 @@ LogicalResult convertInterfaceLoadTensorOp(
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(loadOp);
   Location loc = loadOp.getLoc();
-  Value memref = iterativeLookup(bvm, loadOp.source());
+  Value memref = bvm.lookup(loadOp.source());
   Value res = !loadOp.offsets().empty()
                   ? b.create<SubViewOp>(loc, memref, loadOp.offsets(),
                                         loadOp.sizes(), loadOp.strides())
@@ -365,10 +333,9 @@ LogicalResult convertInterfaceLoadTensorOp(
                   // If the loadOp has no offsets/sizes and strides, it is the
                   // original op that "converts" a !flow.dispatch.input to a
                   // tensor. Just forward the subview.
-                  iterativeLookup(bvm, loadOp.source());
+                  bvm.lookup(loadOp.source());
   bvm.map(loadOp.result(), res);
-  // TODO(nicolasvasilache): kill tie_shape with fire.
-  mapAllTieShapeUsesAndReplaceDimUsesOf(loadOp.result(), res, bvm);
+  transferDimOpsToMemref(loadOp.result(), res);
   return success();
 }
 
@@ -390,8 +357,8 @@ LogicalResult convertInterfaceStoreTensorOp(
   auto phOp = createPlaceholderOp(b, storeOp.getLoc(), storeOp,
                                   storeOp.operand(), storeOp.queryBindingOp());
   Value buffer = phOp.getResult();
-  b.create<linalg::CopyOp>(storeOp->getLoc(),
-                           iterativeLookup(bvm, storeOp.operand()), buffer);
+  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.operand()),
+                           buffer);
   storeOp->erase();
   return success();
 }
@@ -417,8 +384,8 @@ LogicalResult convertInterfaceStoreTensorOp(
   Value subview =
       b.create<SubViewOp>(storeOp->getLoc(), buffer, storeOp.getMixedOffsets(),
                           storeOp.getMixedSizes(), storeOp.getMixedStrides());
-  b.create<linalg::CopyOp>(storeOp->getLoc(),
-                           iterativeLookup(bvm, storeOp.operand()), subview);
+  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.operand()),
+                           subview);
   storeOp->erase();
   return success();
 }
@@ -429,10 +396,10 @@ LogicalResult convertInterfaceStoreTensorOp(
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
   Value subview = b.create<SubViewOp>(
-      storeOp.getLoc(), iterativeLookup(bvm, storeOp.target()),
-      storeOp.offsets(), storeOp.sizes(), storeOp.strides());
-  b.create<linalg::CopyOp>(storeOp->getLoc(),
-                           iterativeLookup(bvm, storeOp.value()), subview);
+      storeOp.getLoc(), bvm.lookup(storeOp.target()), storeOp.offsets(),
+      storeOp.sizes(), storeOp.strides());
+  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.value()),
+                           subview);
   storeOp->erase();
   return success();
 }
@@ -500,31 +467,14 @@ void LinalgLLVMBufferizePass::runOnFunction() {
         MemRefType::get(tensorType.getShape(), tensorType.getElementType()),
         baseBuffer, op.byte_offset(), dynamicDims);
     bvm.map(op, view);
-    // TODO(nicolasvasilache): kill tie_shape with fire.
-    mapAllTieShapeUsesAndReplaceDimUsesOf(op, view, bvm);
-  });
-  // TODO(nicolasvasilache): kill tie_shape with fire.
-  funcOp.walk([&](Operation *op) {
-    if (!isa<Shape::TieShapeOp>(op) && !isa<IREE::Flow::DispatchTieShapeOp>(op))
-      return;
-    Operation *recOp = op;
-    Value recVal;
-    while (recOp) {
-      Shape::TieShapeOp tieShapeOp = dyn_cast<Shape::TieShapeOp>(recOp);
-      IREE::Flow::DispatchTieShapeOp dispatchTieShapeOp =
-          dyn_cast<IREE::Flow::DispatchTieShapeOp>(recOp);
-      if (tieShapeOp) {
-        recVal = tieShapeOp.operand();
-        recOp = recVal.getDefiningOp();
-      } else if (dispatchTieShapeOp) {
-        recVal = dispatchTieShapeOp.operand();
-        recOp = recVal.getDefiningOp();
-      } else {
-        break;
+    transferDimOpsToMemref(op, view);
+    // If there are any DispatchTieShapeOp's, then they will be on this op.
+    // Make sure to map them appropriately to the corresponding memref.
+    for (Operation *user : op->getUsers()) {
+      if (isa<IREE::Flow::DispatchTieShapeOp>(user)) {
+        bvm.map(user->getResult(0), view);
       }
     }
-    LLVM_DEBUG(llvm::dbgs() << "map " << *op << " to " << recVal << "\n");
-    bvm.map(op->getResult(0), recVal);
   });
   funcOp.walk([&](Operation *op) {
     if (auto loadOp = dyn_cast<IREE::HAL::InterfaceLoadTensorOp>(op)) {

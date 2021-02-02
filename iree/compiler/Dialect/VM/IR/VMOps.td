@@ -141,7 +141,8 @@ def VM_FuncOp : VM_Op<"func", [
 }
 
 def VM_ExportOp : VM_Op<"export", [
-    HasParent<"IREE::VM::ModuleOp">,
+    // TODO(#3968): working around iree.module.export hackability woes.
+    // HasParent<"IREE::VM::ModuleOp">,
   ]> {
   let summary = [{exports a function from the module}];
   let description = [{

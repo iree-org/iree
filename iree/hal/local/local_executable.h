@@ -36,7 +36,9 @@ typedef struct {
 
 typedef struct {
   iree_hal_resource_t resource;
-  iree_hal_local_executable_layout_t* layout;
+  iree_allocator_t host_allocator;
+  iree_host_size_t executable_layout_count;
+  iree_hal_local_executable_layout_t** executable_layouts;
 } iree_hal_local_executable_t;
 
 typedef struct {
@@ -47,9 +49,14 @@ typedef struct {
       const iree_hal_local_executable_call_t* call);
 } iree_hal_local_executable_vtable_t;
 
+// Callers must allocate memory for |target_executable_layouts| with at least
+// `executable_layout_count * sizeof(*target_executable_layouts)` bytes.
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
-    iree_hal_local_executable_layout_t* layout,
+    iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* source_executable_layouts,
+    iree_hal_local_executable_layout_t** target_executable_layouts,
+    iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable);
 
 void iree_hal_local_executable_deinitialize(

@@ -214,32 +214,11 @@ def HAL_AccessScopeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ExecutableCachingMode_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_ExecutableCachingMode_AliasProvidedData : BitEnumAttrCase<"AliasProvidedData", 0x0001>;
-def HAL_ExecutableCachingMode_AllowPersistentCaching : BitEnumAttrCase<"AllowPersistentCaching", 0x0002>;
-def HAL_ExecutableCachingMode_AllowOptimization : BitEnumAttrCase<"AllowOptimization", 0x0004>;
-def HAL_ExecutableCachingMode_EnableDebugging : BitEnumAttrCase<"EnableDebugging", 0x0008>;
-def HAL_ExecutableCachingMode_EnableCoverage : BitEnumAttrCase<"EnableCoverage", 0x0010>;
-def HAL_ExecutableCachingMode_EnableProfiling : BitEnumAttrCase<"EnableProfiling", 0x0020>;
-def HAL_ExecutableCachingModeBitfieldAttr :
-    BitEnumAttr<"ExecutableCachingModeBitfield", "valid ExecutableCachingMode", [
-      HAL_ExecutableCachingMode_None,
-      HAL_ExecutableCachingMode_AliasProvidedData,
-      HAL_ExecutableCachingMode_AllowPersistentCaching,
-      HAL_ExecutableCachingMode_AllowOptimization,
-      HAL_ExecutableCachingMode_EnableDebugging,
-      HAL_ExecutableCachingMode_EnableCoverage,
-      HAL_ExecutableCachingMode_EnableProfiling,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
 // Values are FourCC codes.
 // See iree/hal/executable_format.h for more info. Keep these in sync with the
 // codes there.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
 // integer values for inclusion here.
-//
 def HAL_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
 def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
 def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
@@ -370,21 +349,6 @@ def HAL_Executable : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
 }
 
-def HAL_ExecutableCache : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ExecutableCacheType>()">,
-    "executable_cache"> {
-  let description = [{
-    A cache of prepared executables for a particular device.
-    Caches may be shared across multiple devices from the same driver or
-    specific to individual devices. Caches may persist prepared executables
-    across process launches or reprepare them each run. Callers should assume
-    that the cache is a no-op and the returned Executables only live for as long
-    as the cache does.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::ExecutableCacheType>()";
-}
-
 def HAL_ExecutableLayout : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
@@ -430,7 +394,6 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Device,
   HAL_Event,
   HAL_Executable,
-  HAL_ExecutableCache,
   HAL_ExecutableLayout,
   HAL_RingBuffer,
   HAL_Semaphore,
@@ -564,15 +527,6 @@ def HAL_DescriptorSetLayoutBindingAttr :
 def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
-
-def HAL_SemaphoreValue : NamedTupleOf<[
-    NamedTupleElement<0, "semaphore", HAL_Semaphore>,
-    NamedTupleElement<1, "value", HAL_TimelineValue>
-  ], "SemaphoreValue"> {
-  let description = [{
-    A reference to a semaphore and associated payload value.
-  }];
-}
 
 //===----------------------------------------------------------------------===//
 // Expression matching attributes

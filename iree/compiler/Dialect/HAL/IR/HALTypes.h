@@ -112,12 +112,6 @@ class ExecutableType
   using Base::Base;
 };
 
-class ExecutableCacheType
-    : public Type::TypeBase<ExecutableCacheType, Type, TypeStorage> {
- public:
-  using Base::Base;
-};
-
 class ExecutableLayoutType
     : public Type::TypeBase<ExecutableLayoutType, Type, TypeStorage> {
  public:

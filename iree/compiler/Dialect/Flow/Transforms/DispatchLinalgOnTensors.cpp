@@ -84,8 +84,10 @@ struct DispatchLinalgOnTensorsPass
                     AffineDialect, scf::SCFDialect, ShapeDialect>();
   }
   DispatchLinalgOnTensorsPass() = default;
-  DispatchLinalgOnTensorsPass(ArrayRef<int64_t> sizes) {
+  DispatchLinalgOnTensorsPass(ArrayRef<int64_t> sizes,
+                              bool enableFusion = false) {
     this->tileSizes = sizes;
+    this->enableFusion = enableFusion;
   };
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
   void runOnOperation() override;
@@ -94,7 +96,29 @@ struct DispatchLinalgOnTensorsPass
   ListOption<int64_t> tileSizes{
       *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+  Option<bool> enableFusion{
+      *this, "enable-fusion",
+      llvm::cl::desc("Enable fusion on linalg on tensors path"),
+      llvm::cl::init(false)};
 };
+
+/// Returns the number of consecutive outer loops that are "parallel". This is a
+/// copy of the function from
+/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
+/// here to avoid adding an build dependency.
+static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return linalg::isParallelIteratorType(attr);
+      })
+      .size();
+}
+
+/// Returns the number of loops of the operation that are to be tiled.
+static size_t getNumTilableLoops(linalg::LinalgOp op) {
+  return std::min<size_t>(getNumOuterParallelLoops(op), kNumMaxParallelDims);
+}
 
 // Creates a flow.dispatch.workgroup op without arguments.
 // All the necessary operands are transiently captured and rewritten late as
@@ -103,9 +127,12 @@ static IREE::Flow::DispatchWorkgroupsOp buildOperandLessFlowDispatchWorkgroupOp(
     PatternRewriter &rewriter, linalg::LinalgOp root,
     linalg::LinalgOp &clonedRoot) {
   Location loc = root->getLoc();
-  // TODO(nicolasvasilache): for now this is a 3-D grid of 1's.
-  // In the future make constant and bind late into backend-specific values.
-  SmallVector<Value, 1> count(3, rewriter.create<ConstantIndexOp>(loc, 1));
+  Value one = rewriter.create<ConstantIndexOp>(loc, 1);
+  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
+      root.createLoopRanges(rewriter, loc), [](Range r) { return r.size; }));
+  count.resize(getNumTilableLoops(root));
+  count = llvm::to_vector<4>(llvm::reverse(count));
+  count.resize(kNumMaxParallelDims, one);
 
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, count, root->getResultTypes(), ValueRange{});
@@ -235,17 +262,18 @@ struct TileAndDistributeOnTensorsPattern
   using Base = linalg::LinalgBaseTilingPattern;
   TileAndDistributeOnTensorsPattern(linalg::LinalgTilingOptions options,
                                     linalg::LinalgTransformationFilter marker,
+                                    bool enableFusion,
                                     PatternBenefit benefit = 1)
-      : Base(options, marker, benefit) {}
+      : Base(options, marker, benefit), enableFusion(enableFusion) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
 
-    // Temporary to only accept a MatmulOp root and fuse other ops into it.
-    // TODO(nicolasvasilache): remove this limitation.
-    if (!isa<linalg::MatmulOp>(op)) return failure();
+    // TODO(ravishankarm): Until fusion is handled properly, only tile and
+    // distribute for matmul operations.
+    if (enableFusion && !isa<linalg::MatmulOp>(op)) return failure();
 
     linalg::LinalgOp clonedLinalgOp;
     IREE::Flow::DispatchWorkgroupsOp dispatchOp =
@@ -275,6 +303,8 @@ struct TileAndDistributeOnTensorsPattern
     rewriter.replaceOp(op, shapedResults);
     return success();
   }
+
+  const bool enableFusion;
 };
 
 template <typename OpTy>
@@ -295,7 +325,6 @@ static void legalizeDispatchWorkgroupOperands(
 
   llvm::SetVector<Value> valuesSet;
   mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
-  ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
 
   auto getUsesOfValueOutsideOfDispatchOp =
       [&](Value v) -> SmallVector<Operation *, 4> {
@@ -304,6 +333,26 @@ static void legalizeDispatchWorkgroupOperands(
       if (!dispatchOp->isAncestor(user)) res.push_back(user);
     return res;
   };
+
+  // Go through the captured values and check for any `init_tensor`. These can
+  // be pulled into the dispatch region
+  BlockAndValueMapping map;
+  for (Value operand : valuesSet) {
+    auto initTensorOp = operand.getDefiningOp<linalg::InitTensorOp>();
+    if (!initTensorOp) continue;
+    auto clonedOp =
+        cast<linalg::InitTensorOp>(b.clone(*initTensorOp.getOperation(), map));
+    auto outsideUses = getUsesOfValueOutsideOfDispatchOp(operand);
+    operand.replaceAllUsesExcept(
+        clonedOp.getResult(),
+        SmallPtrSet<Operation *, 8>(outsideUses.begin(), outsideUses.end()));
+  }
+
+  // Recompute the values captured from outside.
+  valuesSet.clear();
+  mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
+  ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
+
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
   for (Value operand : valuesDefinedAbove) {
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
@@ -339,19 +388,6 @@ static void legalizeDispatchWorkgroupOperands(
 
   // Set the operands.
   dispatchOp.operandsMutable().assign(valuesDefinedAbove);
-}
-
-/// Returns the number of consecutive outer loops that are "parallel". This is a
-/// copy of the function from
-/// iree/compiler/Conversion/CodegenUtils/FunctionUtils.h that is duplicated
-/// here to avoid adding an build dependency.
-static unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
-      .size();
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
@@ -392,9 +428,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(
               [&](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
-                auto numTiledLoops = std::min<size_t>(
-                    getNumOuterParallelLoops(cast<linalg::LinalgOp>(op)),
-                    kNumMaxParallelDims);
+                auto numTiledLoops =
+                    getNumTilableLoops(cast<linalg::LinalgOp>(op));
                 SmallVector<Value, 4> useTileSizes(numTiledLoops);
                 if (!tileSizes.empty()) {
                   useTileSizes.resize(
@@ -418,8 +453,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   patterns.insert<TileAndDistributeOnTensorsPattern>(
       linalgTilingOptions,
       // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
-      linalg::LinalgTransformationFilter(
-          ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
+      linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
+                                         Identifier::get("workgroup", context)),
+      enableFusion);
 
   // Add canonicalization patterns.
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
@@ -461,8 +497,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
-    ArrayRef<int64_t> sizes) {
-  return std::make_unique<DispatchLinalgOnTensorsPass>(sizes);
+    ArrayRef<int64_t> sizes, bool enableFusion) {
+  return std::make_unique<DispatchLinalgOnTensorsPass>(sizes, enableFusion);
 }
 
 static PassRegistration<DispatchLinalgOnTensorsPass> pass(

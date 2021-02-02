@@ -12,12 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/iree-oss/cmake-python@sha256:c1f05139fa478107bdd5889d6b3ca9f8a4bcf19e77e3e8058e2084367a1aa23d AS final
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
-# Install bazel.
-COPY --from=gcr.io/iree-oss/bazel@sha256:5e52c7d43b6fdff35d884b8b8b92b1b6e2151d675019edc92f09018e558e0f94 \
-  /usr/bin/bazel* \
-  /usr/bin/
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-# Install tensorflow.
-RUN python3 -m pip install tf-nightly==2.5.0.dev20201116
+# TODO(#3970): add.bin/json and import via the tflite importer path.
+
+iree_bytecode_module(
+    name = "add",
+    testonly = True,
+    src = "add.mlir",
+    cc_namespace = "iree::bindings::tflite::testdata",
+    flags = [
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vmla",
+    ],
+)

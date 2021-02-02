@@ -82,12 +82,41 @@ enum iree_hal_executable_caching_mode_e {
   // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING feature
   // and executables must support the ExecutableFeature::kProfiling feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1u << 5,
-  // Default caching mode.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT =
-      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
-      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION,
 };
 typedef uint32_t iree_hal_executable_caching_mode_t;
+
+// Defines an executable compilation specification.
+typedef struct {
+  // Specifies what caching the executable cache is allowed to perform and
+  // (if supported) which transformations on the executable contents are
+  // allowed.
+  iree_hal_executable_caching_mode_t caching_mode;
+
+  // Indicates the format of the data in |executable_data|.
+  iree_hal_executable_format_t executable_format;
+
+  // Opaque compiler-generated executable data.
+  // By default the memory storing the executable data is owned by the caller
+  // and not guaranteed to live beyond the preparation call.
+  //
+  // Callers can indicate that they guarantee the lifetime of the memory
+  // outlives the executable that will be created from it with the
+  // IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA flag, in which case
+  // the cache is allowed to retain the data for as long as there is a reference
+  // to any executable created using it still held by the caller.
+  iree_const_byte_span_t executable_data;
+
+  // A set of executable layouts for each entry point in the executable.
+  // The order matches that produced by the compiler. As multiple entry points
+  // may share the same layout some entries in this list may reference the same
+  // executable layout objects.
+  iree_host_size_t executable_layout_count;
+  iree_hal_executable_layout_t* const* executable_layouts;
+} iree_hal_executable_spec_t;
+
+// Initializes |out_spec| to the default values for normal executables. Callers
+// must override the fields as required.
+void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_cache_t
@@ -130,11 +159,17 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_cache_release(
 // required by the executable are not supported.
 IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
-    iree_hal_executable_format_t format);
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format);
 
-// Prepares an executable for use.
-// The provided |executable_data| will be used to either lookup a previously
-// prepared executable in the cache or prepare a new one.
+// Prepares the executable defined by |executable_spec| for use.
+// The provided |executable_data| (in a format defined by |executable_format|)
+// will be used to either lookup a previously prepared executable in the cache
+// or prepare a new one.
+//
+// Each entry point in the executable requires a corresponding value in
+// |executable_layouts| defining the layout used by the entry point. If multiple
+// entry points use the same layouts they can reuse the same values.
 //
 // Depending on the driver preparation may take a non-trivial amount of time
 // (such as when JITing/etc). As the cache is internally synchronized callers
@@ -143,9 +178,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* executable_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
@@ -160,13 +193,12 @@ typedef struct {
 
   bool(IREE_API_PTR* can_prepare_format)(
       iree_hal_executable_cache_t* executable_cache,
-      iree_hal_executable_format_t format);
+      iree_hal_executable_caching_mode_t caching_mode,
+      iree_hal_executable_format_t executable_format);
 
   iree_status_t(IREE_API_PTR* prepare_executable)(
       iree_hal_executable_cache_t* executable_cache,
-      iree_hal_executable_layout_t* executable_layout,
-      iree_hal_executable_caching_mode_t caching_mode,
-      iree_const_byte_span_t executable_data,
+      const iree_hal_executable_spec_t* executable_spec,
       iree_hal_executable_t** out_executable);
 } iree_hal_executable_cache_vtable_t;
 

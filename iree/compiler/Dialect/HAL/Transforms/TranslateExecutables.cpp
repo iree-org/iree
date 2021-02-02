@@ -40,7 +40,8 @@ class TranslateExecutablesPass
     for (auto &targetBackend :
          matchTargetBackends(executableOptions_.targets)) {
       auto pm = std::make_unique<OpPassManager>(
-          ModuleOp::getOperationName(), OpPassManager::Nesting::Implicit);
+          IREE::HAL::ExecutableTargetOp::getOperationName(),
+          OpPassManager::Nesting::Implicit);
       targetBackend->buildTranslationPassPipeline(*pm);
       pipelines_.push_back({std::move(targetBackend), std::move(pm)});
     }
@@ -65,8 +66,7 @@ class TranslateExecutablesPass
               targetOp.target_backend_filter().str())) {
         continue;
       }
-      if (failed(
-              runPipeline(*pipeline.passManager, targetOp.getInnerModule()))) {
+      if (failed(runPipeline(*pipeline.passManager, targetOp))) {
         targetOp.emitError() << "failed to run translation of source "
                                 "executable to target executable for backend "
                              << targetOp.target_backend_filter();

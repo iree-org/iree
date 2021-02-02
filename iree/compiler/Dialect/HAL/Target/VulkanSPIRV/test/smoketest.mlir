@@ -17,7 +17,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 // VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.binary attributes {
+// VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32}
 
@@ -45,6 +45,6 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 // VKSPV-DAG:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 // VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.binary attributes {
+// VKSPV-NEXT:   hal.executable.binary @vulkan_spirv attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {

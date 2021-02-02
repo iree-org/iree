@@ -740,7 +740,9 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
   // Annotations are disabled so we ignore this entirely.
   return base_status;
 #else
-  if (iree_string_view_is_empty(message)) return base_status;
+  if (iree_status_is_ok(base_status) || iree_string_view_is_empty(message)) {
+    return base_status;
+  }
   // If there's no storage yet we can just reuse normal allocation. Both that
   // and this do not copy |message|.
   iree_status_storage_t* storage = iree_status_storage(base_status);
@@ -784,6 +786,8 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   return base_status;
 #else
+  if (iree_status_is_ok(base_status)) return base_status;
+
   // If there's no storage yet we can just reuse normal allocation. Both that
   // and this do not copy |message|.
   iree_status_storage_t* storage = iree_status_storage(base_status);

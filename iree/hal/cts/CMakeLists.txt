@@ -41,6 +41,18 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    buffer_mapping_test
+  SRCS
+    "buffer_mapping_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     command_buffer_test
   SRCS
     "command_buffer_test.cc"
@@ -116,6 +128,18 @@ iree_cc_test(
     semaphore_test
   SRCS
     "semaphore_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::testing::driver_registry
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    semaphore_submission_test
+  SRCS
+    "semaphore_submission_test.cc"
   DEPS
     ::cts_test_base
     iree::hal::testing::driver_registry

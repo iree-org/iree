@@ -1827,7 +1827,6 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
-    IREE::HAL::InterfaceOp getFirstInterfaceOp();
   }];
 
   let verifier = [{ return verifyExecutableOp(*this); }];
@@ -1844,11 +1843,23 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
     HasParent<"IREE::HAL::ExecutableTargetOp">,
+    IsolatedFromAbove
   ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
+
+    The optional `workgroup_count_region` region represents the
+    computation that returns the number of workgroups to use. The
+    arguments to the region represents the workload along x, y and
+    z. It returns the number of workgroups along x, y, and z.
+
+    TODO(ravishankarm): In reality there is no need to define what the
+    arguments represent. They could be any values that are needed to
+    compute the number of workgroups. Its unclear what these are in
+    general and how to plumb them through. So for now just accepting
+    the workload along x, y, and z.
   }];
 
   let arguments = (ins
@@ -1858,6 +1869,37 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     TypeAttr:$signature,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size
   );
+
+  let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
+
+  let builders = [
+    OpBuilderDAG<
+      (ins "::llvm::StringRef":$sym_name, "::llvm::APInt":$ordinal,
+        "::llvm::StringRef":$interface,"::mlir::TypeAttr":$signature,
+        "::mlir::ArrayAttr":$workgroup_size),
+       [{build($_builder, $_state, sym_name, ordinal, interface, signature,
+            workgroup_size, 0);}]>,
+    OpBuilderDAG<
+      (ins "::mlir::StringAttr":$sym_name, "::mlir::IntegerAttr":$ordinal,
+        "::mlir::FlatSymbolRefAttr":$interface, "::mlir::TypeAttr":$signature,
+        "::mlir::ArrayAttr":$workgroup_size),
+      [{build($_builder, $_state, sym_name, ordinal, interface, signature,
+          workgroup_size, 0);}]>
+  ];
+
+  let verifier = [{ return verifyExecutableEntryPointOp(*this); }];
+
+  let extraClassDeclaration = [{
+    Region *getBody() {
+      auto regions = workgroup_count_region();
+      if (!regions.empty()) return &regions.front();
+      return nullptr;
+    }
+    Block* getBlock() {
+      if (Region *region = getBody()) return &region->front();
+      return nullptr;
+    }
+  }];
 }
 
 def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
@@ -1911,6 +1953,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableBinaryEndOp">,
+    Symbol,
   ]> {
   let summary = [{compiled executable binary data}];
   let description = [{
@@ -1922,6 +1965,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   }];
 
   let arguments = (ins
+    StrAttr:$sym_name,
     HAL_ExecutableFormatAttr:$format,
     HAL_ExecutableDataAttr:$data
     // TODO(benvanik): add compatibility and versioning attributes.
@@ -1931,8 +1975,8 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "uint32_t":$format, "std::vector<uint8_t>":$data)>,
-    OpBuilderDAG<(ins "uint32_t":$format, "DenseIntElementsAttr":$data)>,
+    OpBuilderDAG<(ins "StringRef":$name, "uint32_t":$format, "std::vector<uint8_t>":$data)>,
+    OpBuilderDAG<(ins "StringRef":$name, "uint32_t":$format, "DenseIntElementsAttr":$data)>,
   ];
 
   let extraClassDeclaration = [{
@@ -1954,6 +1998,42 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
   ]> {
   let summary = [{terminator pseudo-op for the executable binary op}];
   let assemblyFormat = "attr-dict";
+}
+
+def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{creates an executable}];
+  let description = [{
+    Creates a target-dependent executable cached on the provided device. Entry
+    points contained within the executable can be dispatched using the resulting
+    executable handle.
+
+    Depending on the driver creation may take a non-trivial amount of time
+    (such as when JITing/etc). As the cache is internally synchronized callers
+    can issue preparation requests from multiple threads - even for the same
+    executables - and calls will block until preparation completes.
+
+    ```mlir
+    %exe = hal.executable.create %device, @executable::@target,
+                                 layouts = [%exe_layout_0] : !hal.executable
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    SymbolRefAttr:$executable_target,
+    Variadic<HAL_ExecutableLayout>:$layouts
+  );
+  let results = (outs
+    HAL_Executable:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` $executable_target `,`
+    `layouts` `=` `[` $layouts `]`
+    attr-dict-with-keyword `:` type($result)
+  }];
 }
 
 def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
@@ -2434,117 +2514,6 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
     /// Return the number of leading operands before the `offsets`, `sizes` and
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
-  }];
-}
-//===----------------------------------------------------------------------===//
-// iree::hal::ExecutableCache
-//===----------------------------------------------------------------------===//
-
-def HAL_ExecutableCacheCreateOp : HAL_Op<"executable_cache.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{creates an executable cache}];
-  let description = [{
-    Caches may be shared across multiple devices from the same driver or
-    specific to individual devices. Caches may persist prepared executables
-    across process launches or re-prepare them each run. Callers should assume
-    that the cache is a no-op and the returned hal.executables only live for as
-    long as the cache does.
-
-    The term 'cache' here is rather optimistic - it's perfectly acceptable for
-    implementations to not cache at all and return new hal.executables for each
-    preparation (even for the same executable). Callers should expect such
-    behavior and try to retain the results of the preparation to reduce overhead
-    from re-preparing executables.
-
-    Currently caches are synchronous but the intent is to support asynchronous
-    compilation of multiple executables with semaphores used to indicate when
-    the executables are ready for use.
-
-    ```mlir
-    %cache = hal.executable_cache.create %device, identifier = "some_guid" : !hal.executable_cache
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    StrAttr:$identifier
-  );
-  let results = (outs
-    HAL_ExecutableCache:$result
-  );
-
-  let assemblyFormat = [{
-    $device `,` `identifier` `=` $identifier
-    attr-dict-with-keyword `:` type($result)
-  }];
-}
-
-def HAL_ExecutableCacheSelectFormatOp :
-  HAL_PureOp<"executable_cache.select_format", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{selects the preferred format from the given list}];
-  let description = [{
-    Returns the index of the preferred format of the cache from the given set or
-    -1 if none can be used. Preparation may still fail if the particular version
-    or features required by the executable are not supported.
-
-    ```mlir
-    // Returns indices 0 or 1 if either of the two inputs are usable or -1 otherwise.
-    %index = hal.executable_cache.select_format %cache, available_formats = [1447906369 : i32, 123482395 : i32] : i32
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_ExecutableCache:$executable_cache,
-    HAL_ExecutableFormatArrayAttr:$available_formats
-  );
-  let results = (outs
-    I32:$result
-  );
-
-  let assemblyFormat = [{
-    $executable_cache `,` `available_formats` `=` $available_formats
-    attr-dict-with-keyword `:` type($result)
-  }];
-}
-
-def HAL_ExecutableCachePrepareOp : HAL_PureOp<"executable_cache.prepare", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{synchronously prepares an executable for use}];
-  let description = [{
-    The provided spec and data will be used to either lookup a previously
-    prepared executable in the cache or prepare a new one.
-
-    Depending on the driver preparation may take a non-trivial amount of time
-    (such as when JITing/etc). As the cache is internally synchronized callers
-    can issue preparation requests from multiple threads - even for the same
-    executables - and calls will block until preparation completes.
-
-    ```mlir
-    %exe = hal.executable_cache.prepare %executable_cache,
-                                        layout = %layout,
-                                        caching_mode = "AllowPersistentCaching|AllowOptimization",
-                                        @executable : !hal.executable
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_ExecutableCache:$executable_cache,
-    HAL_ExecutableLayout:$executable_layout,
-    HAL_ExecutableCachingModeBitfieldAttr:$caching_mode,
-    FlatSymbolRefAttr:$executable
-  );
-  let results = (outs
-    HAL_Executable:$result
-  );
-
-  let assemblyFormat = [{
-    $executable_cache `,` `layout` `=` $executable_layout `,`
-    `caching_mode` `=` $caching_mode `,` $executable
-    attr-dict-with-keyword `:` type($result)
   }];
 }
 

@@ -37,8 +37,8 @@ void iree_hal_executable_loader_release(
 
 bool iree_hal_executable_loader_query_support(
     iree_hal_executable_loader_t* executable_loader,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode) {
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_hal_executable_format_t executable_format) {
   IREE_ASSERT_ARGUMENT(executable_loader);
   return executable_loader->vtable->query_support(
       executable_loader, executable_format, caching_mode);
@@ -46,15 +46,15 @@ bool iree_hal_executable_loader_query_support(
 
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_format_t executable_format,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_loader);
-  IREE_ASSERT_ARGUMENT(executable_data.data);
+  IREE_ASSERT_ARGUMENT(executable_spec);
+  IREE_ASSERT_ARGUMENT(!executable_spec->executable_layout_count ||
+                       executable_spec->executable_layouts);
+  IREE_ASSERT_ARGUMENT(!executable_spec->executable_data.data_length ||
+                       executable_spec->executable_data.data);
   IREE_ASSERT_ARGUMENT(out_executable);
-  return executable_loader->vtable->try_load(
-      executable_loader, executable_layout, executable_format, caching_mode,
-      executable_data, out_executable);
+  return executable_loader->vtable->try_load(executable_loader, executable_spec,
+                                             out_executable);
 }

@@ -52,11 +52,11 @@ static void iree_hal_vulkan_destroy_shader_module(
 
 static iree_status_t iree_hal_vulkan_create_pipelines(
     VkDeviceHandle* logical_device, VkPipelineCache pipeline_cache,
-    iree_hal_executable_layout_t* executable_layout,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_SpirVExecutableDef_table_t executable_def,
-    VkShaderModule shader_module, iree_host_size_t pipeline_count,
-    VkPipeline* out_pipelines) {
+    VkShaderModule shader_module, iree_host_size_t executable_layout_count,
+    iree_hal_executable_layout_t* const* executable_layouts,
+    iree_host_size_t pipeline_count, VkPipeline* out_pipelines) {
   VkComputePipelineCreateInfo* create_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       logical_device->host_allocator(),
@@ -81,8 +81,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     } else {
       create_info->flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     }
-    create_info->layout =
-        iree_hal_vulkan_native_executable_layout_handle(executable_layout);
+    create_info->layout = iree_hal_vulkan_native_executable_layout_handle(
+        executable_layouts[entry_ordinal]);
     create_info->basePipelineHandle = VK_NULL_HANDLE;
     create_info->basePipelineIndex = 0;
     VkPipelineShaderStageCreateInfo* stage_create_info = &create_info->stage;
@@ -119,7 +119,8 @@ static void iree_hal_vulkan_destroy_pipeline(VkDeviceHandle* logical_device,
 // names on functions with internal linkage), however we shouldn't need to
 // bounds check anything within the flatbuffer after this succeeds.
 static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
-    iree_const_byte_span_t flatbuffer_data) {
+    iree_const_byte_span_t flatbuffer_data,
+    iree_host_size_t expected_entry_point_count) {
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -144,6 +145,13 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   flatbuffers_string_vec_t entry_points_vec =
       iree_SpirVExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  if (entry_point_count != expected_entry_point_count) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable provides %zu entry points but caller "
+                            "provided %zu; must match",
+                            entry_point_count, expected_entry_point_count);
+  }
+
   for (size_t i = 0; i < entry_point_count; ++i) {
     if (!flatbuffers_string_len(
             flatbuffers_string_vec_at(entry_points_vec, i))) {
@@ -188,20 +196,21 @@ iree_hal_vulkan_native_executable_cast(iree_hal_executable_t* base_value) {
 iree_status_t iree_hal_vulkan_native_executable_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkPipelineCache pipeline_cache,
-    iree_hal_executable_layout_t* executable_layout,
-    iree_hal_executable_caching_mode_t caching_mode,
-    iree_const_byte_span_t executable_data,
+    const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(executable_spec);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify and fetch the executable flatbuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_spirv_executable_flatbuffer_verify(executable_data));
+      z0, iree_hal_spirv_executable_flatbuffer_verify(
+              executable_spec->executable_data,
+              executable_spec->executable_layout_count));
   iree_SpirVExecutableDef_table_t executable_def =
-      iree_SpirVExecutableDef_as_root(executable_data.data);
+      iree_SpirVExecutableDef_as_root(executable_spec->executable_data.data);
 
   // Create the shader module.
   flatbuffers_uint32_vec_t code_vec =
@@ -236,8 +245,9 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_create_pipelines(
-        logical_device, pipeline_cache, executable_layout, caching_mode,
-        executable_def, shader_module, executable->pipeline_count,
+        logical_device, pipeline_cache, executable_spec->caching_mode,
+        executable_def, shader_module, executable_spec->executable_layout_count,
+        executable_spec->executable_layouts, executable->pipeline_count,
         executable->pipelines);
   }
   iree_hal_vulkan_destroy_shader_module(logical_device, shader_module);

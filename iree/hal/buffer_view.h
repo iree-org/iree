@@ -172,6 +172,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
 
+// Performs a **metadata update-only** reshape.
+// The new rank and element count must match the existing values. The buffer
+// contents are left untouched; if the buffer is not dense this may make the
+// contents undefined.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_reshape(
+    iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank);
+
 // Returns the total number of elements stored in the view.
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view);

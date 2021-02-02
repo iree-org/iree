@@ -735,6 +735,17 @@ void DispatchShapeOp::getAsmResultNames(
   setNameFn(result(), "shape");
 }
 
+LogicalResult DispatchShapeOp::inferReturnTypes(
+    MLIRContext *context, Optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  auto dispatchTensorType = operands[0].getType().cast<DispatchTensorType>();
+  auto shape = dispatchTensorType.getShape();
+  auto rankedShapeType = Shape::RankedShapeType::get(shape, context);
+  inferredReturnTypes.assign({rankedShapeType});
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // flow.executable
 //===----------------------------------------------------------------------===//

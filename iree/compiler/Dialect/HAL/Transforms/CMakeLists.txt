@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
     "IdentifyConstantPools.cpp"
     "InlineDeviceSwitches.cpp"

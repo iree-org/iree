@@ -224,7 +224,7 @@ LogicalResult getLinalgOps(FuncOp funcOp,
 namespace {
 static size_t kMaxHALDimensions = 3;
 
-/// Sets the flow.dispatch.workgroup_size operation to the constant value passed
+/// Sets the hal.interace.workgroup.size operation to the constant value passed
 /// in as `tileSizes`. The number of entries in `tileSizes` is at least as much
 /// as the dimensionality of the workgroup. It is assumed that the inner-most
 /// loop is mapped to the fastest varying dimension in
@@ -232,44 +232,40 @@ static size_t kMaxHALDimensions = 3;
 class SetWorkgroupSizePattern
     : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
  public:
-  SetWorkgroupSizePattern(MLIRContext *context, ArrayRef<int64_t> tileSizesRef,
+  SetWorkgroupSizePattern(MLIRContext *context,
+                          ArrayRef<int64_t> workloadPerWorkgroupRef,
                           PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        tileSizes(
-            llvm::to_vector<4>(tileSizesRef.size() > kMaxHALDimensions
-                                   ? tileSizesRef.take_front(kMaxHALDimensions)
-                                   : tileSizesRef)) {}
+        workloadPerWorkgroup(llvm::to_vector<4>(
+            workloadPerWorkgroupRef.size() > kMaxHALDimensions
+                ? workloadPerWorkgroupRef.take_front(kMaxHALDimensions)
+                : workloadPerWorkgroupRef)) {}
 
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupSizeOp workgroupSizeOp,
       PatternRewriter &rewriter) const override {
     int64_t dim = workgroupSizeOp.dimension().getSExtValue();
-    if (dim >= tileSizes.size()) {
+    if (dim >= workloadPerWorkgroup.size()) {
       return workgroupSizeOp.emitRemark(
           "expected at least as many static tile sizes as the workgroup "
           "dimensionality");
     }
     rewriter.replaceOpWithNewOp<ConstantIndexOp>(
-        workgroupSizeOp, tileSizes[tileSizes.size() - 1 - dim]);
+        workgroupSizeOp,
+        workloadPerWorkgroup[workloadPerWorkgroup.size() - 1 - dim]);
     return success();
   }
 
  private:
-  SmallVector<int64_t, 4> tileSizes;
+  SmallVector<int64_t, 4> workloadPerWorkgroup;
 };
 }  // namespace
 
 LogicalResult materializeStaticLaunchInformation(
-    FuncOp funcOp, const LaunchConfig &launchConfig, unsigned numTiledLoops) {
+    FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup) {
   OwningRewritePatternList patterns;
-  Optional<SmallVector<int64_t, 4>> workgroupTileSizes =
-      launchConfig.getWorkgroupTileSizes(numTiledLoops);
-  if (!workgroupTileSizes) {
-    return funcOp.emitError(
-        "unable to find static values to use for flow.dispatch.workgroup_size");
-  }
   patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
-                                           workgroupTileSizes.getValue());
+                                           workloadPerWorkgroup);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }

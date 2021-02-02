@@ -79,8 +79,9 @@ ArrayRef<int64_t> LaunchConfig::getTileSizes(Operation *op,
   return t[level];
 }
 
-Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkgroupTileSizes(
-    unsigned numWorkgroupDims) const {
+Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkloadPerWorkgroup(
+    unsigned numWorkgroupDims,
+    ArrayRef<int64_t> defaultWorkloadPerWorkgroup) const {
   // The first level of tile + fuse happens at the flow level. So here need to
   // just get the tile sizes that are decided by the launch config.  Check the
   // tile sizes of all the operations and make sure they match upto
@@ -89,20 +90,25 @@ Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkgroupTileSizes(
   // a "rootOperation" and just return the tile sizes of the root
   // operation. Currently the LaunchConfig has no concept of root operation, so
   // avoiding this for now. Revisit if this doesnt work.
-  Optional<SmallVector<int64_t, 4>> workgroupTileSizes = llvm::None;
+  Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup = llvm::None;
   for (auto &it : tileSizes) {
     TileSizesListTypeRef opTileSizesList(it.second);
     if (opTileSizesList.empty()) return llvm::None;
     ArrayRef<int64_t> opFirstLevelTileSize(opTileSizesList.front());
     if (opFirstLevelTileSize.size() < numWorkgroupDims) return llvm::None;
     opFirstLevelTileSize = opFirstLevelTileSize.take_front(numWorkgroupDims);
-    if (!workgroupTileSizes) {
-      workgroupTileSizes = llvm::to_vector<4>(opFirstLevelTileSize);
-    } else if (workgroupTileSizes.getValue() != opFirstLevelTileSize) {
+    if (!workloadPerWorkgroup) {
+      workloadPerWorkgroup = llvm::to_vector<4>(opFirstLevelTileSize);
+    } else if (workloadPerWorkgroup.getValue() != opFirstLevelTileSize) {
       return llvm::None;
     }
   }
-  return workgroupTileSizes;
+  if (!workloadPerWorkgroup) {
+    assert(numWorkgroupDims == defaultWorkloadPerWorkgroup.size());
+    workloadPerWorkgroup = llvm::to_vector<4>(defaultWorkloadPerWorkgroup);
+  }
+  return workloadPerWorkgroup;
+  ;
 }
 
 void LaunchConfig::setTileSizes(Operation *op, TileSizesListType vTileSizes) {

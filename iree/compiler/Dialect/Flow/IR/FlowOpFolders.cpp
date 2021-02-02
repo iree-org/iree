@@ -290,6 +290,53 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.input.load
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Some linalg patterns, due to being upstream, tend to introduce `dim` ops.
+// These generally fold with upstream patterns when tensors are involved, but
+// when DispatchInputLoadOp's are involved (with dispatch tensor types),
+// then this starts to break down, which causes the `dim` ops to survive
+// arbitrarily late into the pipeline. Often, they keep alive
+// DispatchInputLoadOp's that would otherwise be dead!
+//
+// To fix this, we convert the `std.dim` ops to `flow.dispatch.shape` ops.
+// ```
+// dim(flow.dispatch.input.load(%x), %const)
+// ->
+// shapex.ranked_dim(flow.dispatch.shape(%x), %const)
+// ``
+struct ConvertDimOfDispatchInputLoadToDispatchShape
+    : public OpRewritePattern<DimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto dispatchInputLoad =
+        op.memrefOrTensor().getDefiningOp<DispatchInputLoadOp>();
+    if (!dispatchInputLoad) return failure();
+
+    Optional<int64_t> constantIndex = op.getConstantIndex();
+    if (!constantIndex.hasValue()) return failure();
+
+    auto rankedShape = rewriter.create<DispatchShapeOp>(
+        op.getLoc(), dispatchInputLoad.source());
+    rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(op, rankedShape,
+                                                    *constantIndex);
+    return success();
+  }
+};
+
+}  // namespace
+
+void DispatchInputLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ConvertDimOfDispatchInputLoadToDispatchShape>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//
 

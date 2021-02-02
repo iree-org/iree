@@ -37,6 +37,12 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
+// TODO(ravishankarm): Remove this option after addressing fusion.
+static llvm::cl::opt<bool> clLinalgOnTensorsEnableFusion(
+    "iree-flow-dispatch-linalg-on-tensors-enable-fusion",
+    llvm::cl::desc("Enable fusion on linalg on tensors path"),
+    llvm::cl::init(false));
+
 // TODO(benvanik): change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
@@ -62,8 +68,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Frontload linalg-on-tensors transformations and dispatch region creation.
   if (clEnableLinalgOnTensorsDispatch) {
     addHLOToLinalgOnTensorsPasses(passManager);
-    passManager.addNestedPass<FuncOp>(
-        createDispatchLinalgOnTensorsPass(clLinalgOnTensorsTileSizes));
+    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass(
+        clLinalgOnTensorsTileSizes, clLinalgOnTensorsEnableFusion));
   }
 
   // Flatten structured control flow to our CFG.
@@ -158,7 +164,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // during dispatch/stream formation versus having such a large phase
   // ordering constraint.
   //----------------------------------------------------------------------------
-  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  SmallVector<std::string> doNotRecurseOpNames = {"flow.dispatch.workgroups"};
+  passManager.addNestedPass<FuncOp>(
+      Shape::createTieDynamicShapesPass(doNotRecurseOpNames));
   passManager.addNestedPass<FuncOp>(
       Shape::createMaterializeShapeCalculationsPass());
   passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());

@@ -62,7 +62,8 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
     OpPassManager &passManager) {
-  buildSPIRVTransformPassPipeline(passManager, spvCodeGenOptions_);
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  buildSPIRVTransformPassPipeline(nestedModulePM, spvCodeGenOptions_);
 }
 
 LogicalResult SPIRVTargetBackend::recordDispatch(
@@ -161,8 +162,8 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
              << " that computes the number of workgroups to use";
     }
     workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-        loc, numWorkgroupsFn, dispatchState.executableOp.getFirstInterfaceOp(),
-        dispatchState.operands, dispatchState.results, rewriter);
+        loc, numWorkgroupsFn, dispatchState.interfaceOp, dispatchState.operands,
+        dispatchState.results, rewriter);
 
     if (llvm::any_of(workgroupCount,
                      [](Value v) -> bool { return v == nullptr; }))

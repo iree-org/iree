@@ -58,12 +58,16 @@ LogicalResult getLinalgOps(FuncOp funcOp,
                            SmallVectorImpl<Operation *> &tiledLoops);
 
 /// Using linalg on tensors for dispatch region creation does first-level of
-/// tile (fuse and distribute) during dispatch region formation and dynamic tile
-/// sizes represented as `flow.dispatch.workgroup_size`. These get mapped to
-/// static tile sizes based on target architecture and computations in the
-/// dispatch region. Replace the dynamic tile size with static tiles.
+/// tile (fuse and distribute) during dispatch region formation. At that point
+/// the workload per workgroup is set to the dynamic value represented by
+/// `flow.dispatch.workgroup.size` and is later lowered to
+/// `hal.dispatch.workgroup.size`. This method is to materialize the static
+/// information of the workload per workgroup determined based on target
+/// architecture.  Note that the value of hal.dispatch.workgroup.size is now
+/// different after this function is called and represents the actual value used
+/// at runtime.
 LogicalResult materializeStaticLaunchInformation(
-    FuncOp funcOp, const LaunchConfig &launchConfig, unsigned numTiledLoops);
+    FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup);
 
 struct TileAndFuseOptions {
   linalg::LinalgLoopDistributionOptions distributionOptions;

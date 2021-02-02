@@ -137,7 +137,17 @@ class HALModuleState final {
       iree_vm_ref_release(&ref);
     }
     deferred_releases_.clear();
+    iree_hal_executable_cache_release(executable_cache_);
     iree_hal_device_release(shared_device_);
+  }
+
+  Status Initialize() {
+    IREE_TRACE_SCOPE0("HALModuleState::Initialize");
+
+    IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
+        shared_device_, iree_string_view_empty(), &executable_cache_));
+
+    return OkStatus();
   }
 
   //===--------------------------------------------------------------------===//
@@ -664,39 +674,33 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   //===--------------------------------------------------------------------===//
-  // iree_hal_executable_cache_t
+  // iree_hal_executable_t
   //===--------------------------------------------------------------------===//
 
-  StatusOr<vm::ref<iree_hal_executable_cache_t>> ExecutableCacheCreate(
-      const vm::ref<iree_hal_device_t>& device, absl::string_view identifier) {
-    vm::ref<iree_hal_executable_cache_t> executable_cache;
-    IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
-        device.get(), iree_string_view_t{identifier.data(), identifier.size()},
-        &executable_cache));
-    return std::move(executable_cache);
-  }
+  StatusOr<vm::ref<iree_hal_executable_t>> ExecutableCreate(
+      const vm::ref<iree_hal_device_t>& device,
+      iree_hal_executable_format_t executable_format,
+      const vm::ref<iree_vm_ro_byte_buffer_t>& executable_data,
+      absl::Span<const vm::ref<iree_hal_executable_layout_t>>
+          executable_layouts) {
+    iree_hal_executable_spec_t spec;
+    iree_hal_executable_spec_initialize(&spec);
 
-  StatusOr<int32_t> ExecutableCacheSelectFormat(
-      const vm::ref<iree_hal_executable_cache_t>& executable_cache,
-      absl::Span<const iree_hal_executable_format_t> available_formats) {
-    for (int i = 0; i < available_formats.size(); ++i) {
-      if (iree_hal_executable_cache_can_prepare_format(executable_cache.get(),
-                                                       available_formats[i])) {
-        return i;
-      }
+    spec.executable_format = executable_format;
+    spec.executable_data = executable_data->data;
+
+    spec.executable_layout_count = executable_layouts.size();
+    iree_hal_executable_layout_t** executable_layouts_ptr =
+        (iree_hal_executable_layout_t**)iree_alloca(
+            sizeof(executable_layouts_ptr[0]) * executable_layouts.size());
+    for (size_t i = 0; i < executable_layouts.size(); ++i) {
+      executable_layouts_ptr[i] = executable_layouts[i].get();
     }
-    return -1;
-  }
+    spec.executable_layouts = executable_layouts_ptr;
 
-  StatusOr<vm::ref<iree_hal_executable_t>> ExecutableCachePrepare(
-      const vm::ref<iree_hal_executable_cache_t>& executable_cache,
-      const vm::ref<iree_hal_executable_layout_t>& executable_layout,
-      iree_hal_executable_caching_mode_t caching_mode,
-      const vm::ref<iree_vm_ro_byte_buffer_t>& executable_data) {
     vm::ref<iree_hal_executable_t> executable;
     IREE_RETURN_IF_ERROR(iree_hal_executable_cache_prepare_executable(
-        executable_cache.get(), executable_layout.get(), caching_mode,
-        executable_data->data, &executable));
+        executable_cache_, &spec, &executable));
     return std::move(executable);
   }
 
@@ -708,13 +712,17 @@ class HALModuleState final {
       const vm::ref<iree_hal_device_t>& device,
       absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
       int32_t push_constants) {
+    iree_hal_descriptor_set_layout_t** set_layouts_ptr =
+        (iree_hal_descriptor_set_layout_t**)iree_alloca(
+            sizeof(set_layouts_ptr[0]) * set_layouts.size());
+    for (size_t i = 0; i < set_layouts.size(); ++i) {
+      set_layouts_ptr[i] = set_layouts[i].get();
+    }
+
     vm::ref<iree_hal_executable_layout_t> executable_layout;
     IREE_RETURN_IF_ERROR(iree_hal_executable_layout_create(
-        device.get(), set_layouts.size(),
-        reinterpret_cast<iree_hal_descriptor_set_layout_t**>(
-            const_cast<vm::ref<iree_hal_descriptor_set_layout_t>*>(
-                set_layouts.data())),
-        push_constants, &executable_layout));
+        device.get(), set_layouts.size(), set_layouts_ptr, push_constants,
+        &executable_layout));
     return std::move(executable_layout);
   }
 
@@ -769,6 +777,7 @@ class HALModuleState final {
  private:
   iree_allocator_t allocator_;
   iree_hal_device_t* shared_device_ = NULL;
+  iree_hal_executable_cache_t* executable_cache_ = NULL;
 
   std::vector<iree_vm_ref_t> deferred_releases_;
 };
@@ -855,12 +864,8 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::DeviceAllocator),
     vm::MakeNativeFunction("device.match.id", &HALModuleState::DeviceMatchID),
 
-    vm::MakeNativeFunction("executable_cache.create",
-                           &HALModuleState::ExecutableCacheCreate),
-    vm::MakeNativeFunction("executable_cache.select_format",
-                           &HALModuleState::ExecutableCacheSelectFormat),
-    vm::MakeNativeFunction("executable_cache.prepare",
-                           &HALModuleState::ExecutableCachePrepare),
+    vm::MakeNativeFunction("executable.create",
+                           &HALModuleState::ExecutableCreate),
 
     vm::MakeNativeFunction("executable_layout.create",
                            &HALModuleState::ExecutableLayoutCreate),
@@ -894,8 +899,7 @@ class HALModule final : public vm::NativeModule<HALModuleState> {
       iree_allocator_t allocator) override {
     IREE_TRACE_SCOPE0("HALModule::CreateState");
     auto state = std::make_unique<HALModuleState>(allocator, shared_device_);
-    // TODO(benvanik): allocate context-specific variables (allocator pool,
-    // etc).
+    IREE_RETURN_IF_ERROR(state->Initialize());
     return state;
   }
 

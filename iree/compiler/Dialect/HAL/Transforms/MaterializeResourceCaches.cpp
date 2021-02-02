@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -43,12 +44,7 @@ class MaterializeResourceCachesPass
     auto moduleOp = getOperation();
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
-    // Declare executable variables so that we can reference them during lookup
-    // replacement.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
-    for (auto executableOp : executableOps) {
-      defineExecutableOp(executableOp);
-    }
 
     // Declare all layouts used by the executables. This will ensure that the
     // initialization order is correct as any executable layout needed (and its
@@ -61,6 +57,15 @@ class MaterializeResourceCachesPass
         defineExecutableLayoutOp(interfaceOp.getLoc(),
                                  interfaceOp.getExecutableSetLayoutsAttr(),
                                  interfaceOp.push_constantsAttr());
+      }
+    }
+
+    // Declare executable variables so that we can reference them during lookup
+    // replacement.
+    for (auto executableOp : executableOps) {
+      if (!defineExecutableOp(executableOp)) {
+        signalPassFailure();
+        return;
       }
     }
 
@@ -79,31 +84,9 @@ class MaterializeResourceCachesPass
         });
       }
     }
-
-    // Create the shared default executable cache we will use to prepare all
-    // of the executables.
-    //
-    // In the future we can instead cluster executables based on usage into
-    // multiple caches to speed up load time in models that may have different
-    // usage characteristics; for now this prepares all executables at startup.
-    if (!executableOps.empty()) {
-      defineExecutableCacheOp(executableOps);
-    }
   }
 
  private:
-  VariableOp defineExecutableOp(ExecutableOp executableOp) {
-    auto symbolName =
-        (StringRef("_executable_") + executableOp.sym_name()).str();
-
-    auto executableType = ExecutableType::get(executableOp.getContext());
-    auto variableOp = moduleBuilder.create<VariableOp>(
-        executableOp.getLoc(), symbolName, /*isMutable=*/true, executableType);
-    variableOp.setPrivate();
-    executableCache_.try_emplace(executableOp.sym_name(), variableOp);
-    return variableOp;
-  }
-
   VariableOp defineDescriptorSetLayoutOp(Location loc, ArrayAttr bindingsAttr) {
     auto existingIt = descriptorSetLayoutCache_.find(bindingsAttr);
     if (existingIt != descriptorSetLayoutCache_.end()) {
@@ -196,101 +179,104 @@ class MaterializeResourceCachesPass
     return variableOp;
   }
 
-  VariableOp defineExecutableCacheOp(ArrayRef<ExecutableOp> executableOps) {
-    auto loc = moduleBuilder.getUnknownLoc();
-
-    auto symbolName = std::string("_executable_cache");
+  VariableOp defineExecutableOp(ExecutableOp executableOp) {
+    auto loc = executableOp.getLoc();
+    auto symbolName =
+        (StringRef("_executable_") + executableOp.sym_name()).str();
     auto initializerName = symbolName + "_initializer";
 
-    auto executableCacheType = ExecutableCacheType::get(loc.getContext());
+    auto executableType = ExecutableType::get(executableOp.getContext());
     auto variableOp = moduleBuilder.create<VariableOp>(
-        loc, symbolName,
-        /*isMutable=*/false, executableCacheType, StringRef(initializerName),
-        llvm::None);
-
-    // TODO(#1146): we define this as public right now to ensure it remains
-    // after DCE.
-    // variableOp.setPublic();
+        loc, symbolName, /*isMutable=*/false, executableType,
+        StringRef(initializerName), llvm::None);
+    variableOp.setPrivate();
+    executableCache_.try_emplace(executableOp.sym_name(), variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName,
-        moduleBuilder.getFunctionType({}, {executableCacheType}));
+        moduleBuilder.getFunctionType({}, {executableType}));
     initializerOp.setPrivate();
     auto *block = initializerOp.addEntryBlock();
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto executableCacheValue =
-        blockBuilder.createOrFold<ExecutableCacheCreateOp>(
-            loc, executableCacheType, deviceValue,
-            blockBuilder.getStringAttr("default"));
 
     // Create a switch statement with a case for each backend.
     // Each case should then cache only executables which contain a matching
     // ExecutableTargetOp.
-    // Afterwards, we could inline and de-dup across switch cases.
-    DeviceSwitchBuilder switchBuilder(loc, /*resultTypes=*/TypeRange{},
+    // Afterwards, canonicalization will take care of de-duping/etc.
+    DeviceSwitchBuilder switchBuilder(loc,
+                                      /*resultTypes=*/TypeRange{executableType},
                                       deviceValue, blockBuilder);
     auto targetBackends = matchTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
+      // Skip executables with no matching target ops.
+      SmallVector<IREE::HAL::ExecutableTargetOp> executableTargetOps;
+      for (auto executableTargetOp :
+           executableOp.getOps<IREE::HAL::ExecutableTargetOp>()) {
+        if (TargetBackend::matchPattern(
+                executableTargetOp.target_backend_filter(),
+                targetBackend->filter_pattern())) {
+          executableTargetOps.push_back(executableTargetOp);
+        }
+      }
+      if (executableTargetOps.empty()) continue;
+
+      // TODO(benvanik): support multiple target executables by adding a device
+      // switch on supported format. This needs a new device match attr type.
+      if (executableTargetOps.size() > 1) {
+        executableOp.emitError()
+            << "multiple matching executable targets are not yet supported";
+        return nullptr;
+      }
+      auto executableTargetOp = executableTargetOps.front();
+
       auto *region = switchBuilder.addConditionRegion(
           IREE::HAL::DeviceMatchIDAttr::get(targetBackend->filter_pattern(),
                                             blockBuilder.getContext()),
-          {
-              executableCacheValue,
-          });
+          {deviceValue});
       auto &entryBlock = region->front();
-      auto executableCache = entryBlock.getArgument(0);
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+      auto caseDeviceValue = entryBlock.getArgument(0);
 
-      // TODO(benvanik): use targetOptions_ to determine these flags.
-      auto cachingMode = ExecutableCachingModeBitfield::AliasProvidedData |
-                         ExecutableCachingModeBitfield::AllowPersistentCaching |
-                         ExecutableCachingModeBitfield::AllowOptimization;
-      for (auto executableOp : executableOps) {
-        // Skip executables with no matching target ops.
-        auto executableTargetOps =
-            executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
-        bool hasMatchingTarget = false;
-        for (auto executableTargetOp : executableTargetOps) {
-          if (TargetBackend::matchPattern(
-                  executableTargetOp.target_backend_filter(),
-                  targetBackend->filter_pattern())) {
-            hasMatchingTarget = true;
-          }
-        }
-        if (!hasMatchingTarget) continue;
-
-        auto executableIt = executableCache_.find(executableOp.sym_name());
-        assert(executableIt != executableCache_.end() &&
-               "executable must have been cached");
-        auto executableVariableOp = executableIt->second;
-
-        // TODO(benvanik): support multiple interfaces. We'd probably want to
-        // store each executable+interface as a variable.
-        //
-        // This is *only* safe now because any backends that support multiple
-        // interfaces during compilation do *not* use layouts during executable
-        // cache preparation.
-        auto interfaceOp = executableOp.getFirstInterfaceOp();
-
+      // Gather each of the executable layouts needed for each entry point in
+      // the executable.
+      SmallVector<Value, 8> executableLayoutValues;
+      for (auto entryPointOp :
+           executableTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+        auto interfaceOp =
+            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
+                executableOp, entryPointOp.interface());
+        assert(interfaceOp && "must have an interface available");
         auto executableLayoutVariableOp = defineExecutableLayoutOp(
             executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
             interfaceOp.push_constantsAttr());
-        auto executableLayoutValue = caseBuilder.createOrFold<VariableLoadOp>(
-            loc, ExecutableLayoutType::get(loc.getContext()),
-            executableLayoutVariableOp.sym_name());
-        auto executableValue =
-            caseBuilder.createOrFold<ExecutableCachePrepareOp>(
-                loc, ExecutableType::get(loc.getContext()), executableCache,
-                executableLayoutValue, cachingMode, executableOp.sym_name());
-        caseBuilder.create<VariableStoreOp>(loc, executableValue,
-                                            executableVariableOp.sym_name());
+        executableLayoutValues.push_back(
+            caseBuilder.createOrFold<VariableLoadOp>(
+                loc, ExecutableLayoutType::get(loc.getContext()),
+                executableLayoutVariableOp.sym_name()));
       }
-      caseBuilder.create<IREE::HAL::ReturnOp>(loc);
-    }
-    switchBuilder.build();
 
-    blockBuilder.create<mlir::ReturnOp>(loc, executableCacheValue);
+      auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
+          loc, ExecutableType::get(loc.getContext()), caseDeviceValue,
+          SymbolRefAttr::get(executableOp.sym_name(),
+                             {SymbolRefAttr::get(executableTargetOp.sym_name(),
+                                                 loc.getContext())},
+                             loc.getContext()),
+          executableLayoutValues);
+
+      caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
+    }
+
+    auto *defaultRegion = switchBuilder.addConditionRegion(
+        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()), {});
+    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
+    auto nullValue =
+        defaultBuilder.createOrFold<IREE::NullOp>(loc, executableType);
+    defaultBuilder.create<IREE::HAL::ReturnOp>(loc, nullValue);
+
+    auto switchOp = switchBuilder.build();
+    auto executableValue = switchOp.getResult(0);
+    blockBuilder.create<mlir::ReturnOp>(loc, executableValue);
 
     return variableOp;
   }

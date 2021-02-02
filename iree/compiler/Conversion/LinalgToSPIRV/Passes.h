@@ -71,6 +71,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass();
 
+/// Pass that materializes new hal.executable.entry_point ops for
+/// spv.EntryPoints that are added by other passes.
+/// To be removed along with SplitDispatchFunctionPass.
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeEntryPointsPass();
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//

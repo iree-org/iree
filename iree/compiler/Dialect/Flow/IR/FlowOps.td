@@ -18,6 +18,7 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
@@ -450,6 +451,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
 def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<InferTypeOpInterface>
   ]> {
   let summary = [{returns the shape of a dispatch region input/output tensor}];
   let description = [{
@@ -522,6 +524,8 @@ def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
     ( `,` `strides` `=` `[` $strides^ `]` )?
     `:` type($source) `->` type($result) attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
