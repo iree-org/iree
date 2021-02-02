@@ -65,16 +65,17 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
   passManager.addPass(createCanonicalizerPass());
 
+  // Flatten structured control flow to our CFG.
+  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
+  passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
+
   // Frontload linalg-on-tensors transformations and dispatch region creation.
   if (clEnableLinalgOnTensorsDispatch) {
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass(
         clLinalgOnTensorsTileSizes, clLinalgOnTensorsEnableFusion));
   }
-
-  // Flatten structured control flow to our CFG.
-  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
 
   // Convert TOSA ops to Linalg-on-tensor ops.
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
@@ -209,10 +210,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Note that as we are rematerializing things here it's critical we do not run
   // the canonicalizer/CSE between now and when we outline - otherwise it'll
   // undo all of our work!
-  if (!clEnableLinalgOnTensorsDispatch) {
-    passManager.addNestedPass<FuncOp>(
-        IREE::Flow::createRematerializeDispatchConstantsPass());
-  }
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createRematerializeDispatchConstantsPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from
