@@ -411,7 +411,7 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
     ],
     "pow":
         tf_test_utils.unit_test_specs_from_signatures(
-            signature_shapes=BINARY_SIGNATURE_SHAPES,
+            signature_shapes=[[[1, 2, 2, 2], [1, 2, 2, 2]]],
             signature_dtypes=[tf.float32, tf.int32, tf.complex64],
             input_generators={
                 "positive_ndarange": lambda *args: tf_utils.ndarange(*args) + 1

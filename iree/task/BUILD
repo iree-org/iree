@@ -146,6 +146,9 @@ cc_test(
 cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
+    tags = [
+        "noasan",  # TODO(benvanik): Does not work on machines with large numbers of cores.
+    ],
     deps = [
         ":task",
         "//iree/base:api",

@@ -144,8 +144,6 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
   // just going to be passed to future invocations. We could move this to an
   // on-demand mapping when the user calls TfLiteTensorData but this at least
   // puts potential errors in the same easy to find place.
-  iree_device_size_t byte_offset = 0;
-  iree_device_size_t byte_length = IREE_WHOLE_BUFFER;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_hal_buffer_map_range(tensor->buffer, IREE_HAL_MEMORY_ACCESS_ALL, 0,
