@@ -750,6 +750,21 @@ LogicalResult ReduceWindowOpConversion::apply(
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+struct FillOpOnTensorConversion
+    : public ConvertToLinalgBufferOp<FillOpOnTensorConversion, linalg::FillOp> {
+  using ConvertToLinalgBufferOp<FillOpOnTensorConversion,
+                                linalg::FillOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(linalg::FillOp fillOp, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    if (!fillOp.hasTensorSemantics()) return failure();
+    rewriter.create<linalg::FillOp>(fillOp.getLoc(), resultBuffers[0],
+                                    fillOp.value());
+    return success();
+  }
+};
+
 template <typename LinalgOpTy>
 struct LinalgOpOnTensorConversion
     : public ConvertToLinalgBufferOp<LinalgOpOnTensorConversion<LinalgOpTy>,
@@ -839,8 +854,8 @@ struct MatmulOnTensorConversion
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
     // The last one is a init tensor.
-    rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers.drop_back(1),
-                                resultBuffers);
+    rewriter.create<LinalgOpTy>(
+        op.getLoc(), inputBuffers.drop_back(op.getNumResults()), resultBuffers);
     return success();
   }
 };
@@ -1234,11 +1249,12 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
   patterns.insert<ConvOpConversion, ConcatenateOpConversion,
-                  MatmulOnTensorConversion<linalg::MatmulOp>,
-                  MatmulOnTensorConversion<linalg::BatchMatmulOp>,
-                  DynamicTensorFromElementsOpConversion, InitTensorOpConversion,
+                  DynamicTensorFromElementsOpConversion,
+                  FillOpOnTensorConversion, InitTensorOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+                  MatmulOnTensorConversion<linalg::MatmulOp>,
+                  MatmulOnTensorConversion<linalg::BatchMatmulOp>,
                   PadOpConversion, ReduceWindowOpConversion,
                   SubTensorOpConversion, TensorReshapeOpConversion>(
       context, resultTensorToBufferMap);
