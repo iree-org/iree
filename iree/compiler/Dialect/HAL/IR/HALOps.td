@@ -2407,6 +2407,15 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
     AnyRankedTensor:$result
   );
 
+   let assemblyFormat = [{
+    $binding `,` `base_offset` `=` $base_offset `,` `offsets` `=`
+    custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+    `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+    `,` `strides` `=`
+    custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+    attr-dict `:` type($result)
+  }];
+
   let extraClassDeclaration = [{
     /// Returns the hal.interface.binding op associated with this op.
     /// Returns null op if not found.
@@ -2465,7 +2474,7 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
 
     Grammar:
     ```
-      `hal.interface.store.tensor.tile` $operand $binding `,`
+      `hal.interface.store.tensor.tile` $operand `,` $binding `,`
         `base_offset` `=` base_offset `,`
         `offsets` `=` `[` offset-list `]` `,`
         `sizes` `=` `[` size-list `]` `,`
@@ -2484,6 +2493,15 @@ def HAL_InterfaceStoreTensorTileOp :  HAL_Op<
     I64ArrayAttr:$static_sizes,
     I64ArrayAttr:$static_strides
   );
+
+  let assemblyFormat = [{
+    $operand `,` $binding `,` `base_offset` `=` $base_offset `,` `offsets` `=`
+    custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+    `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+    `,` `strides` `=`
+    custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+    attr-dict `:` type($operand)
+  }];
 
   let extraClassDeclaration = [{
     /// Returns the hal.interface.binding op associated with this op.
