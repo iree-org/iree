@@ -39,8 +39,8 @@ if(${IREE_ENABLE_EMITC})
       iree::testing::gtest
       iree::testing::gtest_main
       iree::vm
-      iree::vm::c_funcs
       iree::vm::cc
+      iree::vm::ops
       iree::vm::shims
   )
 endif()

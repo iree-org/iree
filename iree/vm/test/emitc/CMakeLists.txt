@@ -28,7 +28,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::cc
-    iree::vm::c_funcs
+    iree::vm::ops
     iree::vm::shims
     ::arithmetic_ops_cc
 )
