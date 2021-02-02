@@ -48,10 +48,18 @@ struct TfLiteTensor {
   iree_hal_buffer_mapping_t buffer_mapping;
 };
 
-// Initializes the static tensor fields from the given reflection attribute
-// value emitted by the compiler.
-iree_status_t _TfLiteTensorParseAttr(iree_string_view_t attr,
-                                     TfLiteTensor* out_tensor);
+// Parses a tfl.io.names value and sets the |tensor| name.
+iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,
+                                         iree_string_view_t attr,
+                                         iree_allocator_t allocator);
+
+// Parses a tfl.io.types value and sets the |tensor| type.
+iree_status_t _TfLiteTensorParseTypeAttr(TfLiteTensor* tensor,
+                                         iree_string_view_t attr);
+
+// Parses a tfl.io.quant value and sets the |tensor| quantization parameters.
+iree_status_t _TfLiteTensorParseQuantAttr(TfLiteTensor* tensor,
+                                          iree_string_view_t attr);
 
 // Reallocates and remaps the tensor buffer view if needed.
 // No-op if the buffer view is already allocated and its shape matches the
@@ -69,6 +77,6 @@ iree_status_t _TfLiteTensorBind(TfLiteTensor* tensor,
 void _TfLiteTensorDiscardBuffer(TfLiteTensor* tensor);
 
 // Resets the tensor back to its initial state (no buffers, etc).
-void _TfLiteTensorReset(TfLiteTensor* tensor);
+void _TfLiteTensorReset(TfLiteTensor* tensor, iree_allocator_t allocator);
 
 #endif  // IREE_BINDINGS_TFLITE_TENSOR_H_

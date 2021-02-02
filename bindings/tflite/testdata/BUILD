@@ -20,14 +20,37 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(#3970): add.bin/json and import via the tflite importer path.
-
 iree_bytecode_module(
-    name = "add",
+    name = "add_dynamic",
     testonly = True,
-    src = "add.mlir",
+    src = "add_dynamic.mlir",
     cc_namespace = "iree::bindings::tflite::testdata",
     flags = [
+        "-iree-tflite-bindings-support",
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vmla",
+    ],
+)
+
+iree_bytecode_module(
+    name = "add_multi",
+    testonly = True,
+    src = "add_multi.mlir",
+    cc_namespace = "iree::bindings::tflite::testdata",
+    flags = [
+        "-iree-tflite-bindings-support",
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vmla",
+    ],
+)
+
+iree_bytecode_module(
+    name = "add_static",
+    testonly = True,
+    src = "add_static.mlir",
+    cc_namespace = "iree::bindings::tflite::testdata",
+    flags = [
+        "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmla",
     ],
