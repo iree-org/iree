@@ -70,4 +70,5 @@ cd ../iree-build/
 ninja
 
 echo "Testing with CTest"
-ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/'
+ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/' \
+  --output-on-failure
