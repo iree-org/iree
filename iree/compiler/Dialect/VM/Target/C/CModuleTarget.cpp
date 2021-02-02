@@ -104,9 +104,9 @@ static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
 }
 
 // Function results get propagated through pointer arguments
-static LogicalResult printFuncOpResults(IREE::VM::FuncOp &funcOp,
-                                        mlir::emitc::CppEmitter &emitter,
-                                        std::vector<std::string> &resultNames) {
+static LogicalResult printFuncOpResults(
+    IREE::VM::FuncOp &funcOp, mlir::emitc::CppEmitter &emitter,
+    SmallVector<std::string, 4> &resultNames) {
   return mlir::emitc::interleaveCommaWithError(
       llvm::zip(funcOp.getType().getResults(), resultNames), emitter.ostream(),
       [&](std::tuple<Type, std::string> tuple) -> LogicalResult {
@@ -128,7 +128,7 @@ static LogicalResult translateCallOpToC(IREE::VM::CallOp callOp,
 
 static LogicalResult translateReturnOpToC(
     IREE::VM::ReturnOp returnOp, mlir::emitc::CppEmitter &emitter,
-    std::vector<std::string> resultNames) {
+    SmallVector<std::string, 4> resultNames) {
   for (std::tuple<Value, std::string> tuple :
        llvm::zip(returnOp.getOperands(), resultNames)) {
     Value operand = std::get<0>(tuple);
@@ -144,7 +144,7 @@ static LogicalResult translateReturnOpToC(
 
 static LogicalResult translateOpToC(Operation &op,
                                     mlir::emitc::CppEmitter &emitter,
-                                    std::vector<std::string> resultNames) {
+                                    SmallVector<std::string, 4> resultNames) {
   if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
     return translateCallOpToC(callOp, emitter);
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
@@ -177,7 +177,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     output << ", ";
   }
 
-  std::vector<std::string> resultNames;
+  SmallVector<std::string, 4> resultNames;
   for (unsigned int idx = 0; idx < funcOp.getNumResults(); idx++) {
     std::string resultName = "out" + std::to_string(idx);
     resultNames.push_back(resultName);
@@ -231,7 +231,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       output << ", ";
     }
 
-    std::vector<std::string> resultNames;
+    SmallVector<std::string, 4> resultNames;
     for (unsigned int idx = 0; idx < funcOp.getNumResults(); idx++) {
       std::string resultName = "out" + std::to_string(idx);
       resultNames.push_back(resultName);
@@ -246,7 +246,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                 /*implSufffix=*/true)
            << "(";
 
-    std::vector<std::string> argNames;
+    SmallVector<std::string, 4> argNames;
     for (Value &argument : funcOp.getArguments()) {
       std::string argName = emitter.getOrCreateName(argument).str();
       argNames.push_back(argName);
@@ -436,13 +436,13 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     output << "#include \"" << include << "\"\n";
   };
 
+  printInclude("iree/vm/c_funcs.h");
   printInclude("iree/vm/context.h");
   printInclude("iree/vm/instance.h");
   printInclude("iree/vm/native_module.h");
   printInclude("iree/vm/ref.h");
-  printInclude("iree/vm/stack.h");
   printInclude("iree/vm/shims.h");
-  printInclude("iree/vm/c_funcs.h");
+  printInclude("iree/vm/stack.h");
   output << "\n";
 
   printModuleComment(moduleOp, output);
