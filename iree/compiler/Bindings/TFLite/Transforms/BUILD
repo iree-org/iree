@@ -23,6 +23,7 @@ cc_library(
     srcs = [
         "MaterializeShapeSupport.cpp",
         "Passes.cpp",
+        "WrapEntryPoints.cpp",
     ],
     hdrs = [
         "Passes.h",

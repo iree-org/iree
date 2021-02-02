@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "MaterializeShapeSupport.cpp"
     "Passes.cpp"
+    "WrapEntryPoints.cpp"
   DEPS
     LLVMSupport
     MLIRIR
