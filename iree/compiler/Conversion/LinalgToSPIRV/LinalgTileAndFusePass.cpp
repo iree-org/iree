@@ -21,6 +21,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
@@ -592,6 +593,14 @@ void LinalgTileAndFusePass::runOnOperation() {
           llvm::dbgs() << "\n\n";
         });
       }
+
+      // TODO: This should be a folding of Add into Contract in core but while
+      // they live in different dialects, it is not possible without unnatural
+      // dependencies.
+      funcOp.walk([&](Operation *op) {
+        if (auto contract = canonicalizeContractionAdd(op))
+          op->replaceAllUsesWith(contract);
+      });
 
       applyVectorTransformation(funcOp);
     }

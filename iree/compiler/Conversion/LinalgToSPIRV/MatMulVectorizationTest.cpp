@@ -55,7 +55,7 @@ void MatMulTileAndVectorizeGPUPass::runOnFunction() {
               //.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({wgTileSize, wgTileSize, wgTileSize}))
       .setHoistInvariantCode(enableLICM)
-      .vectorize<linalg::LinalgOp>()
+      .vectorize<linalg::MatmulOp>()
       // TODO upstream to the core CodegenStrategy
       // .unrollVector<vector::ContractionOp>(
       //     {vUnrollSize[0], vUnrollSize[1], vUnrollSize[2]})
