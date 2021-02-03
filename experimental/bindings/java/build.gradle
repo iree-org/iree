@@ -39,10 +39,6 @@ android {
                         "-DIREE_BUILD_TESTS=OFF",
                         "-DIREE_BUILD_SAMPLES=OFF",
                         "-DIREE_BUILD_PYTHON_BINDINGS=OFF",
-
-                        // Run the commands at
-                        // https://google.github.io/iree/get-started/getting-started-android-cmake#configure-and-build
-                        // and update this flag to point to iree-build-host/install/.
                         "-DIREE_HOST_BINARY_ROOT=${hostInstallDir}"
             }
         }
