@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -29,7 +30,8 @@ std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass();
 
 /// Distributes linalg ops among hal.interface.workgroup logical threads.
-std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndDistributePass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLinalgTileAndDistributePass();
 
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
