@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree_tf_compiler/TFL/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
-#include "mlir/Dialect/Quant/QuantOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
@@ -27,9 +25,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
-#include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
-#include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
-#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -68,11 +63,6 @@ int main(int argc, char **argv) {
 
   // Initialize dialects.
   DialectRegistry registry;
-  registry.insert<mlir::TFL::TensorFlowLiteDialect>();
-  registry.insert<mlir::tosa::TosaDialect>();
-  registry.insert<quant::QuantizationDialect>();
-  registry.insert<TF::TensorFlowDialect>();
-  registry.insert<StandardOpsDialect>();
 
   // Convert the Module proto into MLIR.
   MLIRContext context;
@@ -124,10 +114,9 @@ int main(int argc, char **argv) {
   }
 
   // Run transformations.
-  mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
-  mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+  mlir::iree_integrations::TFL::buildTFLImportPassPipeline(pm);
   if (failed(pm.run(*module))) {
     llvm::errs() << "Running iree-import-tflite pass pipeline failed (see "
                     "diagnostics)\n";

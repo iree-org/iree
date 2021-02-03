@@ -55,10 +55,11 @@ if(${IREE_BUILD_TESTS})
       integrations_iree_tensorflow_test_tools
     BAZEL_TARGETS
       //iree_tf_compiler:iree-tf-opt
+      //iree_tf_compiler:iree-opt-tflite
     EXECUTABLE_PATHS
       iree_tf_compiler/iree-tf-opt
+      iree_tf_compiler/iree-opt-tflite
   )
-  add_subdirectory(iree_tf_compiler/test)
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
