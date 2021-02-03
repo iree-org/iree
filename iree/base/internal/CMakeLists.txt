@@ -61,22 +61,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    file_mapping_internal
-  SRCS
-    "file_mapping_posix.cc"
-    "file_mapping_win32.cc"
-  DEPS
-    ::file_handle_win32
-    absl::memory
-    absl::strings
-    iree::base::core_headers
-    iree::base::file_mapping_hdrs
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     ostringstream
   HDRS
     "ostringstream.h"

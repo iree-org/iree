@@ -63,22 +63,6 @@ cc_library(
 )
 
 cc_library(
-    name = "file_mapping_internal",
-    srcs = [
-        "file_mapping_posix.cc",
-        "file_mapping_win32.cc",
-    ],
-    deps = [
-        ":file_handle_win32",
-        "//iree/base:core_headers",
-        "//iree/base:file_mapping_hdrs",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
     name = "ostringstream",
     srcs = ["ostringstream.cc"],
     hdrs = ["ostringstream.h"],

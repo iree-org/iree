@@ -175,31 +175,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    file_mapping
-  HDRS
-    "file_mapping.h"
-  DEPS
-    ::status
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::internal::file_mapping_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_mapping_hdrs
-  HDRS
-    "file_mapping.h"
-  DEPS
-    ::status
-    absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     file_path
   HDRS
     "file_path.h"
