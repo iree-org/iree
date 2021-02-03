@@ -234,9 +234,9 @@ class IREEBenchmark {
       std::vector<RawSignatureParser::Description> input_descs;
       IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
       if (!input_descs.empty()) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Expect not to have input arguments for '" << function_name
-               << "'";
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "expect not to have input arguments for '%.*s'",
+                                (int)name.size, name.data);
       }
       std::vector<RawSignatureParser::Description> output_descs;
       IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));

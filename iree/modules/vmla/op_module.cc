@@ -140,17 +140,17 @@ void Interface::Reset() {
 
 StatusOr<uint32_t> Interface::GetConstant(uint32_t offset) const {
   if (offset >= kMaxConstants) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid constant offset=" << offset;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid constant offset=%u", offset);
   }
   return constants_[offset];
 }
 
 Status Interface::SetConstants(absl::Span<const uint32_t> values) {
   if (values.size() > kMaxConstants) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Constant value overflow; have " << values.size()
-           << " but max is " << kMaxConstants;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "constant value overflow; have %zu but max is %d",
+                            values.size(), kMaxConstants);
   }
   for (size_t i = 0; i < values.size(); ++i) {
     constants_[i] = values[i];
@@ -161,16 +161,16 @@ Status Interface::SetConstants(absl::Span<const uint32_t> values) {
 StatusOr<const Interface::Binding> Interface::GetBinding(
     uint32_t set, uint32_t binding) const {
   if (set >= kMaxSets || binding >= kMaxBindings) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid binding set=" << set << ", binding=" << binding;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid binding set=%u, binding=%u", set, binding);
   }
   return bindings_[set][binding];
 }
 
 Status Interface::SetBinding(uint32_t set, uint32_t binding, Binding value) {
   if (set >= kMaxSets || binding >= kMaxBindings) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid binding set=" << set << ", binding=" << binding;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid binding set=%u, binding=%u", set, binding);
   }
   bindings_[set][binding] = std::move(value);
   return OkStatus();
@@ -309,10 +309,10 @@ class VMLAModuleState final {
       std::memset(dst->data(), value->As<uint8_t>()[0], dst->size());
       return OkStatus();
     } else if (dst->size() % value->size() != 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Fill value length (" << value->size()
-             << ") must divide evenly into buffer length (" << dst->size()
-             << ")";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "fill value length (%zu) must divide evenly into buffer length (%zu)",
+          value->size(), dst->size());
     }
     auto value_bytes = value->As<uint8_t>();
     auto dst_bytes = dst->As<uint8_t>();
@@ -407,8 +407,8 @@ class VMLAModuleState final {
         return kernels::CompareGE::Execute<type>(                       \
             lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
       default:                                                          \
-        return InvalidArgumentErrorBuilder(IREE_LOC)                    \
-               << "Unsupported predicate " << predicate;                \
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,           \
+                                "unsupported predicate %d", predicate); \
     }                                                                   \
   }
   IREE_VMLA_COMPARE_OP(CmpI8, int8_t);
@@ -732,8 +732,8 @@ class VMLAModuleState final {
     IREE_TRACE_SCOPE0("VMLAModuleState::ConvF32F32F32");
     if (input_shape.size() != 4 || filter_shape.size() != 4 ||
         dst_shape.size() != 4) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expecting 4-d tensors for Conv2D kernel";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expecting 4-d tensors for Conv2D kernel");
     }
 
     const int32_t batch_size = input_shape[0];
@@ -1127,8 +1127,8 @@ class VMLAModule final : public vm::NativeModule<VMLAModuleState> {
 
 Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
   if (!out_module) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "out_module must not be null";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "out_module must not be null");
   }
   *out_module = nullptr;
   auto module = std::make_unique<VMLAModule>(allocator);

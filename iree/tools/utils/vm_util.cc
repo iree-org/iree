@@ -55,9 +55,10 @@ Status ParseInputSignature(
                            out_input_descs->push_back(desc);
                          });
   if (sig_parser.GetError()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Parsing function signature '" << sig_f.data
-           << "' failed getting input";
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "parsing function signature '%.*s' failed getting input",
+        (int)sig_f.size, sig_f.data);
   }
   return OkStatus();
 }
@@ -74,9 +75,10 @@ Status ParseOutputSignature(
                             out_output_descs->push_back(desc);
                           });
   if (sig_parser.GetError()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Parsing function signature '" << sig_f.data
-           << "' failed getting results";
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "parsing function signature '%.*s' failed getting input",
+        (int)sig_f.size, sig_f.data);
   }
   return OkStatus();
 }
@@ -88,9 +90,10 @@ Status ParseToVariantList(
     iree_vm_list_t** out_list) {
   *out_list = NULL;
   if (input_strings.size() != descs.size()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Signature mismatch; expected " << descs.size()
-           << " buffer strings but received " << input_strings.size();
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "signature mismatch; expected %zu buffer strings but received %zu",
+        descs.size(), input_strings.size());
   }
   vm::ref<iree_vm_list_t> variant_list;
   IREE_RETURN_IF_ERROR(
@@ -112,15 +115,19 @@ Status ParseToVariantList(
         input_view = absl::StripPrefix(input_view, "\"");
         input_view = absl::StripSuffix(input_view, "\"");
         if (!absl::ConsumePrefix(&input_view, "i32=")) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "Parsing '" << input_string
-                 << "'. Has i32 descriptor but does not start with 'i32='";
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "parsing '%.*s'; has i32 descriptor but does "
+                                  "not start with 'i32='",
+                                  (int)input_string.size(),
+                                  input_string.data());
         }
         iree_vm_value_t val = iree_vm_value_make_i32(0);
         if (!absl::SimpleAtoi(input_view, &val.i32)) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "Converting '" << input_view << "' to i32 when parsing '"
-                 << input_string << "'";
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "converting '%.*s' to i32 when parsing '%.*s'",
+              (int)input_view.size(), input_view.data(),
+              (int)input_string.size(), input_string.data());
         }
         IREE_RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
         break;
@@ -183,10 +190,10 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
         if (variant.type.value_type != IREE_VM_VALUE_TYPE_I32) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "variant " << i << " has value type "
-                 << static_cast<int>(variant.type.value_type)
-                 << " but descriptor information " << desc_str;
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "variant %d has value type %d but descriptor information %s", i,
+              (int)variant.type.value_type, desc_str.c_str());
         }
         if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
           return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -198,15 +205,15 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
       }
       case RawSignatureParser::Type::kBuffer: {
         if (!iree_vm_type_def_is_ref(&variant.type)) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "variant " << i << " has value type "
-                 << static_cast<int>(variant.type.value_type)
-                 << " but descriptor information " << desc_str;
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "variant %d has value type %d but descriptor information %s", i,
+              (int)variant.type.value_type, desc_str.c_str());
         }
         auto* buffer_view = iree_hal_buffer_view_deref(&variant.ref);
         if (!buffer_view) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "failed dereferencing variant " << i;
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "failed dereferencing variant %d", i);
         }
 
         std::string result_str(4096, '\0');

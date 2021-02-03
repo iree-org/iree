@@ -14,6 +14,8 @@
 
 #include "iree/modules/hal/hal_module.h"
 
+#include <inttypes.h>
+
 #include "absl/base/macros.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
@@ -234,10 +236,10 @@ class HALModuleState final {
     }
     if (length < 0 || offset < 0 || offset > buffer_length ||
         offset + length > buffer_length) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Byte range out of bounds (requested " << offset << "-"
-             << (offset + length - 1) << " of available " << buffer_length
-             << ")";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "byte range out of bounds (requested %d-%d of available %" PRIu64 ")",
+          offset, (offset + length - 1), buffer_length);
     }
 
     vm::ref<iree_hal_buffer_t> buffer;
@@ -313,8 +315,8 @@ class HALModuleState final {
 
     uint32_t target_buffer = 0;
     if (length > sizeof(target_buffer)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Length " << length << " exceeds max";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "length %d exceeds max", length);
     }
 
     IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(
@@ -332,8 +334,8 @@ class HALModuleState final {
         iree_hal_buffer_byte_length(target_buffer.get())) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "out of bounds store");
     } else if (length > sizeof(value)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Length " << length << " exceeds max";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "length %d exceeds max", length);
     }
 
     IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(

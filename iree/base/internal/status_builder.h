@@ -136,10 +136,6 @@ StatusBuilder&& StatusBuilder::operator<<(const T& value) && {
   return std::move(operator<<(value));
 }
 
-// Each of the functions below creates StatusBuilder with a canonical error.
-// The error code of the StatusBuilder matches the name of the function.
-StatusBuilder InvalidArgumentErrorBuilder(SourceLocation location);
-
 }  // namespace iree
 
 // Override the C macro with our C++ one.

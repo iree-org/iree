@@ -59,20 +59,22 @@ TEST(Status, StreamInsertionContinued) {
 }
 
 TEST(StatusBuilder, StreamInsertion) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  Status status = StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC)
+                  << "message";
   CHECK_STATUS_MESSAGE(status, "message");
 }
 
 TEST(StatusBuilder, StreamInsertionMultiple) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message"
-                                                        << " goes"
-                                                        << " like"
-                                                        << " this.";
+  Status status = StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC)
+                  << "message"
+                  << " goes"
+                  << " like"
+                  << " this.";
   CHECK_STATUS_MESSAGE(status, "message goes like this.");
 }
 
 TEST(StatusBuilder, StreamInsertionFlag) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC)
+  Status status = StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC)
                   << "message " << std::hex << 32;
   CHECK_STATUS_MESSAGE(status, "message 20");
 }
@@ -82,7 +84,8 @@ TEST(StatusMacro, ReturnIfError) {
     IREE_RETURN_IF_ERROR(status) << "annotation";
     return OkStatus();
   };
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  Status status = StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC)
+                  << "message";
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");
@@ -97,7 +100,8 @@ TEST(StatusMacro, ReturnIfErrorFormat) {
         << "extra annotation";
     return OkStatus();
   };
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  Status status = StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC)
+                  << "message";
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");
@@ -113,8 +117,8 @@ TEST(StatusMacro, AssignOrReturn) {
     (void)ret;
     return OkStatus();
   };
-  StatusOr<std::string> statusOr = InvalidArgumentErrorBuilder(IREE_LOC)
-                                   << "message";
+  StatusOr<std::string> statusOr =
+      StatusBuilder(StatusCode::kInvalidArgument, IREE_LOC) << "message";
   Status status = assignOrReturn(std::move(statusOr));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");

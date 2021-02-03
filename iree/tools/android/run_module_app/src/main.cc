@@ -75,8 +75,9 @@ class ModuleLoader {
     AAsset* asset =
         AAssetManager_open(asset_manager, file_name, AASSET_MODE_BUFFER);
     if (!asset) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "failed to open file '" << kModuleFileName << "' in assets";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "failed to open file '%s' in assets",
+                              kModuleFileName);
     }
 
     size_t size_in_bytes = AAsset_getLength(asset);

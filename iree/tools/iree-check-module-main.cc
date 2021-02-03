@@ -147,13 +147,15 @@ Status Run(std::string module_file_path, int* out_exit_code) {
       auto sig_str = sig_parser.FunctionSignatureToString(
           absl::string_view{sig_f.data, sig_f.size});
       if (!sig_str.has_value()) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Parsing function signature '" << sig_f.data << "': "
-               << sig_parser.GetError().value_or("<NO ERROR AND NO VALUE>");
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "parsing function signature '%.*s': ", (int)sig_f.size, sig_f.data);
       }
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected function with no inputs or outputs, but "
-             << export_name << "' has signature '" << sig_str.value() << "'";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected function with no inputs or outputs, "
+                              "but export '%.*s' has signature '%.*s'",
+                              (int)export_name.size(), export_name.data(),
+                              (int)sig_f.size, sig_f.data);
     }
 
     ::testing::RegisterTest(

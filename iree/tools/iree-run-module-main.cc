@@ -98,8 +98,8 @@ Status Run() {
   std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "No --entry_function= specified";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no --entry_function= specified");
   } else {
     IREE_RETURN_IF_ERROR(input_module->lookup_function(
         input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -115,9 +115,9 @@ Status Run() {
   vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
     if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of function_inputs and function_inputs_file "
-                "to be set";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected only one of function_inputs and "
+                              "function_inputs_file to be set");
     }
     IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
         input_descs, iree_hal_device_allocator(device),

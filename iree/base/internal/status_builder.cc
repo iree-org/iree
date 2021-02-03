@@ -70,8 +70,4 @@ void StatusBuilder::Flush() {
 
 bool StatusBuilder::ok() const { return status_.ok(); }
 
-StatusBuilder InvalidArgumentErrorBuilder(SourceLocation location) {
-  return StatusBuilder(StatusCode::kInvalidArgument, location);
-}
-
 }  // namespace iree

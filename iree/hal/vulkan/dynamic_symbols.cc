@@ -188,9 +188,9 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Instance must have been created and a default instance proc "
-              "lookup function is required";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "instance must have been created and a default "
+                            "instance proc lookup function is required");
   }
 
   // Setup the lookup methods first. The rest of the syms uses these to

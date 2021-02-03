@@ -290,9 +290,9 @@ Status EvaluateFunction(iree_vm_context_t* context,
   vm::ref<iree_vm_list_t> inputs;
   if (!function_inputs_file_flag.empty()) {
     if (!function_inputs_flag.empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of function_inputs and "
-                "function_inputs_file to be set";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected only one of function_inputs and "
+                              "function_inputs_file to be set");
     }
     IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
         input_descs, allocator, function_inputs_file_flag, &inputs));
