@@ -52,7 +52,7 @@ class Win32FileMapping : public FileMapping {
 }  // namespace
 
 // static
-StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
+StatusOr<std::unique_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
   IREE_TRACE_SCOPE0("FileMapping::Open");
 
   // Open the file for reading. Note that we only need to keep it open long
@@ -83,7 +83,8 @@ StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
            << "Failed to map view of file: " << file->path();
   }
 
-  auto result = make_ref<Win32FileMapping>(mapping_handle, data, file->size());
+  auto result =
+      std::make_unique<Win32FileMapping>(mapping_handle, data, file->size());
 
   // NOTE: file mappings hold references to the file, so we don't need to keep
   // the file around any longer than this function.

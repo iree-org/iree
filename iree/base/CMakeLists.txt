@@ -179,7 +179,6 @@ iree_cc_library(
   HDRS
     "file_mapping.h"
   DEPS
-    ::ref_ptr
     ::status
     absl::memory
     absl::span
@@ -194,7 +193,6 @@ iree_cc_library(
   HDRS
     "file_mapping.h"
   DEPS
-    ::ref_ptr
     ::status
     absl::span
   PUBLIC

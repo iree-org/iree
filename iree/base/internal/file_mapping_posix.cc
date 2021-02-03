@@ -84,7 +84,7 @@ class MMapMapping : public FileMapping {
 }  // namespace
 
 // static
-StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
+StatusOr<std::unique_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
   IREE_TRACE_SCOPE0("FileMapping::Open");
 
   // Open the file for reading. Note that we only need to keep it open long
@@ -99,7 +99,7 @@ StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
            << "Mapping failed on file (ensure uncompressed): " << file->path();
   }
 
-  return make_ref<MMapMapping>(data, file->size());
+  return std::make_unique<MMapMapping>(data, file->size());
 }
 
 }  // namespace iree

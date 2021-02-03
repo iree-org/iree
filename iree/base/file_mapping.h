@@ -16,20 +16,20 @@
 #define IREE_BASE_FILE_MAPPING_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "absl/types/span.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 
 namespace iree {
 
 // A memory-mapped file handle.
-class FileMapping : public RefObject<FileMapping> {
+class FileMapping {
  public:
   // Opens a file and maps it into the calling process memory.
   // The file will be opened for shared read access.
-  static StatusOr<ref_ptr<FileMapping>> OpenRead(std::string path);
+  static StatusOr<std::unique_ptr<FileMapping>> OpenRead(std::string path);
 
   virtual ~FileMapping() = default;
 

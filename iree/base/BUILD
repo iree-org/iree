@@ -187,7 +187,6 @@ cc_library(
     name = "file_mapping",
     hdrs = ["file_mapping.h"],
     deps = [
-        ":ref_ptr",
         ":status",
         "//iree/base/internal:file_mapping_internal",
         "@com_google_absl//absl/memory",
@@ -200,7 +199,6 @@ cc_library(
     name = "file_mapping_hdrs",
     hdrs = ["file_mapping.h"],
     deps = [
-        ":ref_ptr",
         ":status",
         "@com_google_absl//absl/types:span",
     ],
