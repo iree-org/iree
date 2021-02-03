@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_FLAGS_H_
-#define IREE_BASE_FLAGS_H_
+#ifndef IREE_BASE_INTERNAL_FLAGS_H_
+#define IREE_BASE_INTERNAL_FLAGS_H_
 
 #include "iree/base/api.h"
 
@@ -56,4 +56,4 @@ iree_status_t iree_flags_parse(int* argc, char*** argv);
 // typo and shut down your entire server/sandbox/Android app/etc.
 void iree_flags_parse_checked(int* argc, char*** argv);
 
-#endif  // IREE_BASE_FLAGS_H_
+#endif  // IREE_BASE_INTERNAL_FLAGS_H_

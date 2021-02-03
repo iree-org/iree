@@ -85,19 +85,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    flags
-  HDRS
-    "flags.h"
-  SRCS
-    "flags.cc"
-  DEPS
-    ::api
-    absl::flags_parse
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     flatcc
   HDRS
     "flatcc.h"

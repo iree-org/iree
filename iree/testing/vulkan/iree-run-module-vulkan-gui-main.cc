@@ -19,8 +19,8 @@
 
 // Other dependencies (helpers, etc.)
 #include "absl/flags/flag.h"
-#include "iree/base/flags.h"
 #include "iree/base/internal/file_io.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/internal/main.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/registration/driver_module.h"

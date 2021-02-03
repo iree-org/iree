@@ -16,8 +16,8 @@
 
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/flags.h"
 #include "iree/base/internal/file_io.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"

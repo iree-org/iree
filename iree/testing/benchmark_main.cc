@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "benchmark/benchmark.h"
-#include "iree/base/flags.h"
+#include "iree/base/internal/flags.h"
 
 namespace iree {
 

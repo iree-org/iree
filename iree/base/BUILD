@@ -107,16 +107,6 @@ cc_library(
 )
 
 cc_library(
-    name = "flags",
-    srcs = ["flags.cc"],
-    hdrs = ["flags.h"],
-    deps = [
-        ":api",
-        "@com_google_absl//absl/flags:parse",
-    ],
-)
-
-cc_library(
     name = "flatcc",
     hdrs = ["flatcc.h"],
     deps = [

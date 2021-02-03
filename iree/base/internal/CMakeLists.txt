@@ -149,6 +149,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    flags
+  HDRS
+    "flags.h"
+  SRCS
+    "flags.cc"
+  DEPS
+    absl::flags_parse
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     main
   HDRS
     "main.h"

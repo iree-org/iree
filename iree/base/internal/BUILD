@@ -140,6 +140,16 @@ cc_test(
 )
 
 cc_library(
+    name = "flags",
+    srcs = ["flags.cc"],
+    hdrs = ["flags.h"],
+    deps = [
+        "//iree/base:api",
+        "@com_google_absl//absl/flags:parse",
+    ],
+)
+
+cc_library(
     name = "main",
     srcs = [
         "main_posix.cc",
