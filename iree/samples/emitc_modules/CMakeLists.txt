@@ -27,31 +27,20 @@ if(${IREE_ENABLE_EMITC})
     PUBLIC
   )
 
-  iree_cc_library(
-    NAME
-      add_module_test_hdrs
-    HDRS
-      "add_module_test.h"
-      "add_mlir_generated.h"
-    DEPS
-      ::add_module_cc
-      iree::base::api
-      iree::vm
-    PUBLIC
-  )
-
   iree_cc_test(
     NAME
       add_module_test
     SRCS
       "add_module_test.cc"
     DEPS
-      ::add_module_test_hdrs
+      ::add_module_cc
       iree::base::api
       iree::base::status
       iree::testing::gtest
       iree::testing::gtest_main
       iree::vm
       iree::vm::cc
+      iree::vm::ops
+      iree::vm::shims
   )
 endif()

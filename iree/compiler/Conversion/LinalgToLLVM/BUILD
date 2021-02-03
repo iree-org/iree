@@ -23,7 +23,6 @@ cc_library(
     srcs = [
         "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
-        "ConvertToLLVM2.cpp",
         "KernelDispatch.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",

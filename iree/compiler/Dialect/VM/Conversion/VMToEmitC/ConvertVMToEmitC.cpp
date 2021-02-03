@@ -113,9 +113,29 @@ class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
-  // Arithmetic
+  // Native integer arithmetic ops
   patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
                                                                "vm_add_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::SubI32Op>>(context,
+                                                               "vm_sub_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::MulI32Op>>(context,
+                                                               "vm_mul_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::DivI32SOp>>(context,
+                                                                "vm_div_i32s");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::DivI32UOp>>(context,
+                                                                "vm_div_i32u");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::RemI32SOp>>(context,
+                                                                "vm_rem_i32s");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::RemI32UOp>>(context,
+                                                                "vm_rem_i32u");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::NotI32Op>>(context,
+                                                               "vm_not_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::AndI32Op>>(context,
+                                                               "vm_and_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::OrI32Op>>(context,
+                                                              "vm_or_i32");
+  patterns.insert<NoAttributeOpConversion<IREE::VM::XorI32Op>>(context,
+                                                               "vm_xor_i32");
 
   // Check
   // TODO(simon-camp): These conversions to macro calls should be deleted once
@@ -155,8 +175,18 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
 
-    // Arithmetic ops
+    // Native integer arithmetic ops
     target.addIllegalOp<IREE::VM::AddI32Op>();
+    target.addIllegalOp<IREE::VM::SubI32Op>();
+    target.addIllegalOp<IREE::VM::MulI32Op>();
+    target.addIllegalOp<IREE::VM::DivI32SOp>();
+    target.addIllegalOp<IREE::VM::DivI32UOp>();
+    target.addIllegalOp<IREE::VM::RemI32SOp>();
+    target.addIllegalOp<IREE::VM::RemI32UOp>();
+    target.addIllegalOp<IREE::VM::NotI32Op>();
+    target.addIllegalOp<IREE::VM::AndI32Op>();
+    target.addIllegalOp<IREE::VM::OrI32Op>();
+    target.addIllegalOp<IREE::VM::XorI32Op>();
 
     // Check ops
     // TODO(simon-camp): These conversions to macro calls should be deleted once

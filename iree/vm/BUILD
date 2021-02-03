@@ -186,6 +186,7 @@ cc_library(
         "bytecode_module.h",
     ],
     deps = [
+        ":ops",
         ":vm",
         "//iree/base:api",
         "//iree/base:core_headers",
@@ -297,12 +298,19 @@ endif()
 )
 
 #===------------------------------------------------------------------------===#
-# Emit-C modules
+# Common VM op implementations
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "c_funcs",
+    name = "ops",
     hdrs = [
-        "c_funcs.h",
+        "ops.h",
+    ],
+)
+
+cc_library(
+    name = "shims",
+    hdrs = [
+        "shims.h",
     ],
 )
