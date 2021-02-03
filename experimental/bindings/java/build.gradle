@@ -16,6 +16,10 @@ buildscript {
 
 apply plugin: 'com.android.library'
 
+def cmakeListDir = "${rootDir}/../../../"
+def hostBuildDir = "${cmakeListDir}/../iree-build-host"
+def hostInstallDir = "${hostBuildDir}/install"
+
 android {
     compileSdkVersion 29
 
@@ -25,21 +29,17 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments '-DIREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS=ON',
-                        '-DIREE_HAL_DRIVERS_TO_BUILD=VMLA',
+                arguments "-DIREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS=ON",
+                        "-DIREE_HAL_DRIVERS_TO_BUILD=VMLA",
 
                         // Disable all but the runtime components needed for the
                         // java bindings.
-                        '-DIREE_BUILD_COMPILER=OFF',
-                        '-DIREE_ENABLE_MLIR=OFF',
-                        '-DIREE_BUILD_TESTS=OFF',
-                        '-DIREE_BUILD_SAMPLES=OFF',
-                        '-DIREE_BUILD_PYTHON_BINDINGS=OFF',
-
-                        // Run the commands at
-                        // https://google.github.io/iree/get-started/getting-started-android-cmake#configure-and-build
-                        // and update this flag to point to iree-build-host/install/.
-                        '-DIREE_HOST_BINARY_ROOT='
+                        "-DIREE_BUILD_COMPILER=OFF",
+                        "-DIREE_ENABLE_MLIR=OFF",
+                        "-DIREE_BUILD_TESTS=OFF",
+                        "-DIREE_BUILD_SAMPLES=OFF",
+                        "-DIREE_BUILD_PYTHON_BINDINGS=OFF",
+                        "-DIREE_HOST_BINARY_ROOT=${hostInstallDir}"
             }
         }
     }
@@ -59,3 +59,34 @@ android {
         }
     }
 }
+
+// Task to cmake configure the host
+task cmakeConfigureHost(type: Exec) {
+    doFirst {
+        println "Configuring host tools with cmake..."
+    }
+    workingDir cmakeListDir
+    commandLine "cmake",
+            "-G" , "Ninja",
+            "-B", hostBuildDir ,
+            "-DIREE_TARGET_BACKENDS_TO_BUILD=vmla",
+            "-DIREE_HAL_DRIVERS_TO_BUILD=vmla",
+            "-DIREE_BUILD_COMPILER=ON",
+            "-DIREE_BUILD_TESTS=OFF ",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DCMAKE_INSTALL_PREFIX=${hostInstallDir}",
+            "."
+}
+
+// Task to cmake build the host
+task cmakeBuildHost(type: Exec) {
+    doFirst {
+        println "Building host tools with cmake..."
+    }
+    workingDir cmakeListDir
+    commandLine "cmake", "--build", hostBuildDir, "--target", "install"
+}
+
+// Build host tools before building the app
+preBuild.dependsOn cmakeBuildHost
+cmakeBuildHost.dependsOn cmakeConfigureHost
