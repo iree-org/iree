@@ -134,10 +134,12 @@ Status ParseToVariantList(
       }
       case RawSignatureParser::Type::kBuffer: {
         iree_hal_buffer_view_t* buffer_view = nullptr;
-        IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
-            iree_string_view_t{input_string.data(), input_string.size()},
-            allocator, iree_allocator_system(), &buffer_view))
-            << "Parsing value '" << input_string << "'";
+        IREE_RETURN_IF_ERROR(
+            iree_hal_buffer_view_parse(
+                iree_string_view_t{input_string.data(), input_string.size()},
+                allocator, iree_allocator_system(), &buffer_view),
+            "parsing value '%.*s'", (int)input_string.size(),
+            input_string.data());
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
         IREE_RETURN_IF_ERROR(
             iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
@@ -179,8 +181,8 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_list_t* variant_list, std::ostream* os) {
   for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant))
-        << "variant " << i << "not present";
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant),
+                         "variant %d not present", i);
 
     const auto& desc = descs[i];
     std::string desc_str;
@@ -244,14 +246,16 @@ Status CreateDevice(absl::string_view driver_name,
                     iree_hal_device_t** out_device) {
   IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
-      iree_hal_driver_registry_default(),
-      iree_string_view_t{driver_name.data(), driver_name.size()},
-      iree_allocator_system(), &driver))
-      << "Creating driver '" << driver_name << "'";
+  IREE_RETURN_IF_ERROR(
+      iree_hal_driver_registry_try_create_by_name(
+          iree_hal_driver_registry_default(),
+          iree_string_view_t{driver_name.data(), driver_name.size()},
+          iree_allocator_system(), &driver),
+      "creating driver '%.*s'", (int)driver_name.size(), driver_name.data());
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
-      driver, iree_allocator_system(), out_device))
-      << "Creating default device for driver '" << driver_name << "'";
+                           driver, iree_allocator_system(), out_device),
+                       "creating default device for driver '%.*s'",
+                       (int)driver_name.size(), driver_name.data());
   iree_hal_driver_release(driver);
   return OkStatus();
 }
@@ -259,19 +263,20 @@ Status CreateDevice(absl::string_view driver_name,
 Status CreateHalModule(iree_hal_device_t* device,
                        iree_vm_module_t** out_module) {
   IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), out_module))
-      << "Creating HAL module";
+      iree_hal_module_create(device, iree_allocator_system(), out_module),
+      "creating HAL module");
   return OkStatus();
 }
 
 Status LoadBytecodeModule(absl::string_view module_data,
                           iree_vm_module_t** out_module) {
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      iree_const_byte_span_t{
-          reinterpret_cast<const uint8_t*>(module_data.data()),
-          module_data.size()},
-      iree_allocator_null(), iree_allocator_system(), out_module))
-      << "Deserializing module";
+  IREE_RETURN_IF_ERROR(
+      iree_vm_bytecode_module_create(
+          iree_const_byte_span_t{
+              reinterpret_cast<const uint8_t*>(module_data.data()),
+              module_data.size()},
+          iree_allocator_null(), iree_allocator_system(), out_module),
+      "deserializing module");
   return OkStatus();
 }
 }  // namespace iree

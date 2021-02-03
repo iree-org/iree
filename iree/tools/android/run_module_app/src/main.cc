@@ -95,12 +95,12 @@ class ModuleLoader {
 };
 
 Status RunModule(const IreeModuleInvocation& invocation) {
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
-      << "registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+                       "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance))
-      << "creating instance";
+      iree_vm_instance_create(iree_allocator_system(), &instance),
+      "creating instance");
 
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(invocation.module, &input_module));
@@ -114,17 +114,18 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), iree_allocator_system(),
-      &context))
-      << "creating context";
+                           instance, modules.data(), modules.size(),
+                           iree_allocator_system(), &context),
+                       "creating context");
 
   const std::string& function_name = invocation.entry_function;
   iree_vm_function_t function;
-  IREE_RETURN_IF_ERROR(input_module->lookup_function(
-      input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{function_name.data(), function_name.size()},
-      &function))
-      << "looking up function '" << function_name << "'";
+  IREE_RETURN_IF_ERROR(
+      input_module->lookup_function(
+          input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          iree_string_view_t{function_name.data(), function_name.size()},
+          &function),
+      "looking up function '%s'", function_name.c_str());
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
   std::vector<RawSignatureParser::Description> input_descs;
@@ -144,14 +145,14 @@ Status RunModule(const IreeModuleInvocation& invocation) {
                                            iree_allocator_system(), &outputs));
 
   LOGI("Execute @%s", function_name.c_str());
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                      inputs.get(), outputs.get(),
-                                      iree_allocator_system()))
-      << "invoking function " << function_name;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), iree_allocator_system()),
+      "invoking function '%s'", function_name.c_str());
 
   std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss))
-      << "printing results";
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss),
+                       "printing results");
   LOGI("Execution Result:");
   LOGI("%s", oss.str().c_str());
 

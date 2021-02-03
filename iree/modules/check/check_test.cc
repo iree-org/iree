@@ -147,11 +147,13 @@ class CheckTest : public ::testing::Test {
 
   Status Invoke(absl::string_view function_name) {
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(check_module_->lookup_function(
-        check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
-        << "Exported function '" << function_name << "' not found";
+    IREE_RETURN_IF_ERROR(
+        check_module_->lookup_function(
+            check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+            iree_string_view_t{function_name.data(), function_name.size()},
+            &function),
+        "exported function '%.*s' not found", (int)function_name.size(),
+        function_name.data());
     // TODO(#2075): don't directly invoke native functions like this.
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, inputs_.get(),

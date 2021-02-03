@@ -70,12 +70,12 @@ Status GetModuleContentsFromFlags(std::string* out_contents) {
 Status Run() {
   IREE_TRACE_SCOPE0("iree-run-module");
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
-      << "registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+                       "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance))
-      << "creating instance";
+      iree_vm_instance_create(iree_allocator_system(), &instance),
+      "creating instance");
 
   std::string module_data;
   IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data));
@@ -91,9 +91,9 @@ Status Run() {
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), iree_allocator_system(),
-      &context))
-      << "creating context";
+                           instance, modules.data(), modules.size(),
+                           iree_allocator_system(), &context),
+                       "creating context");
 
   std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
@@ -101,11 +101,12 @@ Status Run() {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no --entry_function= specified");
   } else {
-    IREE_RETURN_IF_ERROR(input_module->lookup_function(
-        input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
-        << "looking up function '" << function_name << "'";
+    IREE_RETURN_IF_ERROR(
+        input_module->lookup_function(
+            input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+            iree_string_view_t{function_name.data(), function_name.size()},
+            &function),
+        "looking up function '%s'", function_name.c_str());
   }
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
@@ -136,13 +137,13 @@ Status Run() {
                                            iree_allocator_system(), &outputs));
 
   std::cout << "EXEC @" << function_name << "\n";
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                      inputs.get(), outputs.get(),
-                                      iree_allocator_system()))
-      << "invoking function " << function_name;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), iree_allocator_system()),
+      "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()))
-      << "printing results";
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()),
+                       "printing results");
 
   inputs.reset();
   outputs.reset();
