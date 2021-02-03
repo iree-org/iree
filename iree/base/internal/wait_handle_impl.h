@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_WAIT_HANDLE_IMPL_H_
-#define IREE_BASE_WAIT_HANDLE_IMPL_H_
+#ifndef IREE_BASE_INTERNAL_WAIT_HANDLE_IMPL_H_
+#define IREE_BASE_INTERNAL_WAIT_HANDLE_IMPL_H_
 
 //===----------------------------------------------------------------------===//
 // Platform overrides
@@ -66,6 +66,6 @@
 // Wait handle included with options set
 //===----------------------------------------------------------------------===//
 
-#include "iree/base/wait_handle.h"
+#include "iree/base/internal/wait_handle.h"
 
-#endif  // IREE_BASE_WAIT_HANDLE_IMPL_H_
+#endif  // IREE_BASE_INTERNAL_WAIT_HANDLE_IMPL_H_

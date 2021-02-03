@@ -49,10 +49,10 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal::atomic_slist
     iree::base::internal::prng
+    iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::threading
     iree::base::tracing
-    iree::base::wait_handle
   PUBLIC
 )
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // NOTE: must be first to ensure that we can define settings for all includes.
-#include "iree/base/wait_handle_impl.h"
+#include "iree/base/internal/wait_handle_impl.h"
 
 #if IREE_WAIT_API == IREE_WAIT_API_POLL || IREE_WAIT_API == IREE_WAIT_API_PPOLL
 
@@ -21,8 +21,8 @@
 #include <poll.h>
 #include <time.h>
 
+#include "iree/base/internal/wait_handle_posix.h"
 #include "iree/base/tracing.h"
-#include "iree/base/wait_handle_posix.h"
 
 //===----------------------------------------------------------------------===//
 // Platform utilities

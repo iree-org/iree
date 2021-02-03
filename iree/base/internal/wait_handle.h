@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_WAIT_HANDLE_H_
-#define IREE_BASE_WAIT_HANDLE_H_
+#ifndef IREE_BASE_INTERNAL_WAIT_HANDLE_H_
+#define IREE_BASE_INTERNAL_WAIT_HANDLE_H_
 
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
@@ -308,4 +308,4 @@ void iree_event_reset(iree_event_t* event);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_BASE_WAIT_HANDLE_H_
+#endif  // IREE_BASE_INTERNAL_WAIT_HANDLE_H_

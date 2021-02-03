@@ -13,10 +13,10 @@
 // limitations under the License.
 
 // NOTE: must be first to ensure that we can define settings for all includes.
-#include "iree/base/wait_handle_impl.h"
+#include "iree/base/internal/wait_handle_impl.h"
 
-#ifndef IREE_BASE_WAIT_HANDLE_POSIX_H_
-#define IREE_BASE_WAIT_HANDLE_POSIX_H_
+#ifndef IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_
+#define IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_
 
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
 #if !defined(IREE_PLATFORM_WINDOWS)
@@ -83,4 +83,4 @@ iree_status_t iree_wait_primitive_clear(iree_wait_handle_t* handle);
 
 #endif  // !IREE_PLATFORM_WINDOWS
 
-#endif  // IREE_BASE_WAIT_HANDLE_POSIX_H_
+#endif  // IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_

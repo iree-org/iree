@@ -289,35 +289,3 @@ else()
     PUBLIC
   )
 endif()
-
-iree_cc_library(
-  NAME
-    wait_handle
-  HDRS
-    "wait_handle.h"
-  SRCS
-    "wait_handle.c"
-    "wait_handle_epoll.c"
-    "wait_handle_impl.h"
-    "wait_handle_kqueue.c"
-    "wait_handle_poll.c"
-    "wait_handle_posix.c"
-    "wait_handle_posix.h"
-    "wait_handle_win32.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::tracing
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    wait_handle_test
-  SRCS
-    "wait_handle_test.cc"
-  DEPS
-    ::wait_handle
-    iree::testing::gtest
-    iree::testing::gtest_main
-)

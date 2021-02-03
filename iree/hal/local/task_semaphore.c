@@ -16,9 +16,9 @@
 
 #include <inttypes.h>
 
+#include "iree/base/internal/wait_handle.h"
 #include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
-#include "iree/base/wait_handle.h"
 
 // Sentinel used the semaphore has failed and an error status is set.
 #define IREE_HAL_TASK_SEMAPHORE_FAILURE_VALUE UINT64_MAX
