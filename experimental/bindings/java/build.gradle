@@ -69,6 +69,8 @@ task cmakeConfigureHost(type: Exec) {
     commandLine "cmake",
             "-G" , "Ninja",
             "-B", hostBuildDir ,
+            "-DIREE_TARGET_BACKENDS_TO_BUILD=vmla",
+            "-DIREE_HAL_DRIVERS_TO_BUILD=vmla",
             "-DIREE_BUILD_COMPILER=ON",
             "-DIREE_BUILD_TESTS=OFF ",
             "-DIREE_BUILD_SAMPLES=OFF",
