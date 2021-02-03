@@ -65,7 +65,7 @@ iree_cc_binary(
     absl::strings
     benchmark
     iree::base::flags
-    iree::base::file_io
+    iree::base::internal::file_io
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -89,8 +89,8 @@ iree_cc_binary(
     absl::strings
     iree::base::api
     iree::base::core_headers
-    iree::base::file_io
     iree::base::flags
+    iree::base::internal::file_io
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -110,7 +110,7 @@ iree_cc_binary(
     "iree-dump-module-main.cc"
   DEPS
     flatcc::runtime
-    iree::base::file_io
+    iree::base::internal::file_io
     iree::schemas::bytecode_module_def_c_fbs
 )
 
@@ -124,8 +124,8 @@ iree_cc_binary(
   DEPS
     absl::flags
     absl::strings
-    iree::base::file_io
     iree::base::flags
+    iree::base::internal::file_io
     iree::base::status
     iree::base::tracing
     iree::hal::drivers

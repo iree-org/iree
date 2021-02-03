@@ -33,9 +33,10 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:dynamic_library",
-        "//iree/base:file_io",
         "//iree/base:file_path",
         "//iree/base:flatcc",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/base:tracing",
         "//iree/hal:api",
         "//iree/hal/local",
@@ -52,9 +53,9 @@ cc_library(
     ],
     deps = [
         "//iree/base:api",
-        "//iree/base:file_io",
         "//iree/base:flatcc",
         "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/hal:api",
         "//iree/hal/local",
     ],

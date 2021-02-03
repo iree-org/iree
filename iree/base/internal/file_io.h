@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_FILE_IO_H_
-#define IREE_BASE_FILE_IO_H_
+#ifndef IREE_BASE_INTERNAL_FILE_IO_H_
+#define IREE_BASE_INTERNAL_FILE_IO_H_
 
 #include <string>
 
@@ -58,4 +58,4 @@ StatusOr<std::string> GetTempFile(absl::string_view base_name);
 }  // namespace file_io
 }  // namespace iree
 
-#endif  // IREE_BASE_FILE_IO_H_
+#endif  // IREE_BASE_INTERNAL_FILE_IO_H_

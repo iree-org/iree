@@ -67,16 +67,57 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    file_io
+  HDRS
+    "file_io.h"
+  DEPS
+    absl::memory
+    absl::span
+    absl::strings
+    iree::base::core_headers
+    iree::base::internal::file_io_internal
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_io_hdrs
+  HDRS
+    "file_io.h"
+  DEPS
+    absl::strings
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_io_test
+  SRCS
+    "file_io_test.cc"
+  DEPS
+    ::file_io
+    absl::strings
+    iree::base::file_path
+    iree::base::logging
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     file_io_internal
   SRCS
     "file_io_posix.cc"
     "file_io_win32.cc"
   DEPS
     ::file_handle_win32
+    ::file_io_hdrs
     absl::memory
     absl::strings
     iree::base::core_headers
-    iree::base::file_io_hdrs
     iree::base::file_path
     iree::base::status
     iree::base::tracing

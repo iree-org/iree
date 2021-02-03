@@ -65,6 +65,42 @@ cc_library(
 )
 
 cc_library(
+    name = "file_io",
+    hdrs = ["file_io.h"],
+    deps = [
+        "//iree/base:core_headers",
+        "//iree/base:status",
+        "//iree/base/internal:file_io_internal",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "file_io_hdrs",
+    hdrs = ["file_io.h"],
+    deps = [
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "file_io_test",
+    srcs = ["file_io_test.cc"],
+    deps = [
+        ":file_io",
+        "/iree/base:file_path",
+        "/iree/base:logging",
+        "/iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "file_io_internal",
     srcs = [
         "file_io_posix.cc",
@@ -72,8 +108,8 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
+        ":file_io_hdrs",
         "//iree/base:core_headers",
-        "//iree/base:file_io_hdrs",
         "//iree/base:file_path",
         "//iree/base:status",
         "//iree/base:tracing",

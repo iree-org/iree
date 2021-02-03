@@ -107,42 +107,6 @@ cc_library(
 )
 
 cc_library(
-    name = "file_io",
-    hdrs = ["file_io.h"],
-    deps = [
-        ":core_headers",
-        ":status",
-        "//iree/base/internal:file_io_internal",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_io_hdrs",
-    hdrs = ["file_io.h"],
-    deps = [
-        ":status",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "file_io_test",
-    srcs = ["file_io_test.cc"],
-    deps = [
-        ":file_io",
-        ":file_path",
-        ":logging",
-        ":status",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
     name = "file_path",
     srcs = ["file_path.cc"],
     hdrs = ["file_path.h"],

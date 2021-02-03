@@ -16,7 +16,7 @@
 
 #include <string>
 
-#include "iree/base/file_io.h"
+#include "iree/base/internal/file_io.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/testing/dynamic_library_test_library_embed.h"

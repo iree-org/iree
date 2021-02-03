@@ -85,47 +85,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    file_io
-  HDRS
-    "file_io.h"
-  DEPS
-    ::core_headers
-    ::status
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::internal::file_io_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_io_hdrs
-  HDRS
-    "file_io.h"
-  DEPS
-    ::status
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_io_test
-  SRCS
-    "file_io_test.cc"
-  DEPS
-    ::file_io
-    ::file_path
-    ::logging
-    ::status
-    absl::strings
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     file_path
   HDRS
     "file_path.h"

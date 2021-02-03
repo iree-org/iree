@@ -16,7 +16,7 @@
 #include <string>
 #include <utility>
 
-#include "iree/base/file_io.h"
+#include "iree/base/internal/file_io.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 
 // Today we just print to JSON. We could do something more useful (size
