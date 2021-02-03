@@ -35,6 +35,20 @@ static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
 static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
+//===------------------------------------------------------------------===//
+// Native bitwise shifts and rotates
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
+  return (int32_t)(operand << amount);
+};
+static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
+  return (int32_t)(operand >> amount);
+};
+static inline int32_t vm_shr_i32u(uint32_t operand, int8_t amount) {
+  return (int32_t)(operand >> amount);
+};
+
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
 // supported in the c module target
