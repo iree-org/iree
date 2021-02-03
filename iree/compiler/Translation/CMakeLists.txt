@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTranslation
+    iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM

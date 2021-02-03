@@ -298,21 +298,42 @@ static iree_status_t _TfLiteInterpreterAllocate(
 // model and prepares for allocation/invocation.
 static iree_status_t _TfLiteInterpreterPopulateIO(
     TfLiteInterpreter* interpreter) {
-  // TODO(#3978): actually read out io_attr attribute values and initialize.
-  // iree_vm_function_t main_fn = interpreter->model->exports._main;
-  // iree_string_view_t io_attr = iree_vm_function_reflection_attr(
-  //     &main_fn, iree_make_cstring_view("tflite_io"));
+  iree_vm_function_t main_fn = interpreter->model->exports._main;
+  iree_string_view_t io_names_attr = iree_vm_function_reflection_attr(
+      &main_fn, iree_make_cstring_view("tfl.io.names"));
+  iree_string_view_t io_types_attr = iree_vm_function_reflection_attr(
+      &main_fn, iree_make_cstring_view("tfl.io.types"));
+  iree_string_view_t io_quant_attr = iree_vm_function_reflection_attr(
+      &main_fn, iree_make_cstring_view("tfl.io.quant"));
 
   // Setup static tensor metadata.
   for (iree_host_size_t i = 0; i < interpreter->model->input_count; ++i) {
-    iree_string_view_t attr = iree_make_cstring_view("UNIMPLEMENTED");
-    IREE_RETURN_IF_ERROR(
-        _TfLiteTensorParseAttr(attr, &interpreter->input_tensors[i]));
+    TfLiteTensor* tensor = &interpreter->input_tensors[i];
+    memset(tensor, 0, sizeof(*tensor));
+    iree_string_view_t io_name_part = iree_string_view_empty();
+    iree_string_view_split(io_names_attr, ';', &io_name_part, &io_names_attr);
+    iree_string_view_t io_type_part = iree_string_view_empty();
+    iree_string_view_split(io_types_attr, ';', &io_type_part, &io_types_attr);
+    iree_string_view_t io_quant_part = iree_string_view_empty();
+    iree_string_view_split(io_quant_attr, ';', &io_quant_part, &io_quant_attr);
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseNameAttr(tensor, io_name_part,
+                                                    interpreter->allocator));
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseTypeAttr(tensor, io_type_part));
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseQuantAttr(tensor, io_quant_part));
   }
   for (iree_host_size_t i = 0; i < interpreter->model->output_count; ++i) {
-    iree_string_view_t attr = iree_make_cstring_view("UNIMPLEMENTED");
-    IREE_RETURN_IF_ERROR(
-        _TfLiteTensorParseAttr(attr, &interpreter->output_tensors[i]));
+    TfLiteTensor* tensor = &interpreter->output_tensors[i];
+    memset(tensor, 0, sizeof(*tensor));
+    iree_string_view_t io_name_part = iree_string_view_empty();
+    iree_string_view_split(io_names_attr, ';', &io_name_part, &io_names_attr);
+    iree_string_view_t io_type_part = iree_string_view_empty();
+    iree_string_view_split(io_types_attr, ';', &io_type_part, &io_types_attr);
+    iree_string_view_t io_quant_part = iree_string_view_empty();
+    iree_string_view_split(io_quant_attr, ';', &io_quant_part, &io_quant_attr);
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseNameAttr(tensor, io_name_part,
+                                                    interpreter->allocator));
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseTypeAttr(tensor, io_type_part));
+    IREE_RETURN_IF_ERROR(_TfLiteTensorParseQuantAttr(tensor, io_quant_part));
   }
 
   // Prepare the IO lists we use when calling into the model.
@@ -401,10 +422,10 @@ TFL_CAPI_EXPORT extern void TfLiteInterpreterDelete(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < interpreter->model->input_count; ++i) {
-    _TfLiteTensorReset(&interpreter->input_tensors[i]);
+    _TfLiteTensorReset(&interpreter->input_tensors[i], interpreter->allocator);
   }
   for (iree_host_size_t i = 0; i < interpreter->model->output_count; ++i) {
-    _TfLiteTensorReset(&interpreter->output_tensors[i]);
+    _TfLiteTensorReset(&interpreter->output_tensors[i], interpreter->allocator);
   }
   iree_vm_list_deinitialize(interpreter->input_list);
   iree_vm_list_deinitialize(interpreter->output_list);

@@ -33,29 +33,38 @@ limitations under the License.
 
 // Test model is available both on the filesystem and here for embedding testing
 // embedding the module directly in a binary.
-#include "bindings/tflite/testdata/add.h"
-#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_DATA \
-  iree::bindings::tflite::testdata::add_create()->data
-#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_SIZE \
-  iree::bindings::tflite::testdata::add_create()->size
+#include "bindings/tflite/testdata/add_dynamic.h"
+#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_DATA \
+  iree::bindings::tflite::testdata::add_dynamic_create()->data
+#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_SIZE \
+  iree::bindings::tflite::testdata::add_dynamic_create()->size
+#include "bindings/tflite/testdata/add_static.h"
+#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_DATA \
+  iree::bindings::tflite::testdata::add_static_create()->data
+#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_SIZE \
+  iree::bindings::tflite::testdata::add_static_create()->size
 
 // TODO(#3971): currently can't nicely load these due to cmake issues.
-#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_PATH \
+#define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_PATH \
   "tensorflow/lite/testdata/add.bin"
 
 namespace {
 
 TEST(CAPI, Version) { EXPECT_STRNE("", TfLiteVersion()); }
 
-// This is the original test, which is silly, because it uses dynamic shapes
-// even though the model has static shapes defined 🤦.
-TEST(CApiSimple, DISABLED_Smoke) {
+// The original test has been modified here because it uses dynamic shapes
+// even though the model has static shapes defined 🤦. IREE does not support
+// this misbehavior of compiling with static shapes and treating them as dynamic
+// at runtime.
+//
+// TODO(#3975): need to remove SIP stuff and pass buffer views.
+TEST(CApiSimple, DISABLED_DynamicSmoke) {
   // TODO(#3971): currently can't nicely load these due to cmake issues.
   // TfLiteModel* model =
-  //     TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_PATH);
-  TfLiteModel* model =
-      TfLiteModelCreate(IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_DATA,
-                        IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_SIZE);
+  // TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_PATH);
+  TfLiteModel* model = TfLiteModelCreate(
+      IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_DATA,
+      IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_SIZE);
   ASSERT_NE(model, nullptr);
 
   TfLiteInterpreterOptions* options = TfLiteInterpreterOptionsCreate();
@@ -129,10 +138,10 @@ TEST(CApiSimple, DISABLED_Smoke) {
 TEST(CApiSimple, StaticSmoke) {
   // TODO(#3971): currently can't nicely load these due to cmake issues.
   // TfLiteModel* model =
-  //     TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_PATH);
+  // TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_PATH);
   TfLiteModel* model =
-      TfLiteModelCreate(IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_DATA,
-                        IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_SIZE);
+      TfLiteModelCreate(IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_DATA,
+                        IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_SIZE);
   ASSERT_NE(model, nullptr);
 
   TfLiteInterpreterOptions* options = TfLiteInterpreterOptionsCreate();
@@ -160,8 +169,7 @@ TEST(CApiSimple, StaticSmoke) {
   EXPECT_EQ(TfLiteTensorDim(input_tensor, 3), 3);
   EXPECT_EQ(TfLiteTensorByteSize(input_tensor), sizeof(float) * 1 * 8 * 8 * 3);
   EXPECT_NE(TfLiteTensorData(input_tensor), nullptr);
-  // TODO(#3974): plumb through original tensor names.
-  // EXPECT_STREQ(TfLiteTensorName(input_tensor), "input");
+  EXPECT_STREQ(TfLiteTensorName(input_tensor), "input");
 
   TfLiteQuantizationParams input_params =
       TfLiteTensorQuantizationParams(input_tensor);
@@ -189,8 +197,7 @@ TEST(CApiSimple, StaticSmoke) {
   EXPECT_EQ(TfLiteTensorDim(output_tensor, 3), 3);
   EXPECT_EQ(TfLiteTensorByteSize(output_tensor), sizeof(float) * 1 * 8 * 8 * 3);
   EXPECT_NE(TfLiteTensorData(output_tensor), nullptr);
-  // TODO(#3974): plumb through original tensor names.
-  // EXPECT_STREQ(TfLiteTensorName(output_tensor), "output");
+  EXPECT_STREQ(TfLiteTensorName(output_tensor), "output");
 
   TfLiteQuantizationParams output_params =
       TfLiteTensorQuantizationParams(output_tensor);
@@ -308,8 +315,8 @@ TEST(CApiSimple, DISABLED_ErrorReporter) {
 
 TEST(CApiSimple, ValidModel) {
   TfLiteModel* model =
-      TfLiteModelCreate(IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_DATA,
-                        IREE_BINDINGS_TFLITE_TESTDATA_ADD_EMBEDDED_SIZE);
+      TfLiteModelCreate(IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_DATA,
+                        IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_SIZE);
   ASSERT_NE(model, nullptr);
   TfLiteModelDelete(model);
 }
@@ -317,7 +324,7 @@ TEST(CApiSimple, ValidModel) {
 // TODO(#3971): fix cmake data deps.
 TEST(CApiSimple, DISABLED_ValidModelFromFile) {
   TfLiteModel* model =
-      TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_PATH);
+      TfLiteModelCreateFromFile(IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_PATH);
   ASSERT_NE(model, nullptr);
   TfLiteModelDelete(model);
 }

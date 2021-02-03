@@ -38,14 +38,24 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
           op.initial_value(), llvm::to_vector<4>(op->getDialectAttrs()));
       return success();
     } else if (convertedType.isInteger(32)) {
+      auto convertedValue =
+          op.initial_value().hasValue()
+              ? rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                    op.initial_value().getValue().cast<IntegerAttr>().getInt()))
+              : Attribute{};
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          op.initial_value(), llvm::to_vector<4>(op->getDialectAttrs()));
+          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
       return success();
     } else if (convertedType.isInteger(64)) {
+      auto convertedValue =
+          op.initial_value().hasValue()
+              ? rewriter.getI64IntegerAttr(
+                    op.initial_value().getValue().cast<IntegerAttr>().getInt())
+              : Attribute{};
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          op.initial_value(), llvm::to_vector<4>(op->getDialectAttrs()));
+          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
       return success();
     }
     return op.emitOpError("unsupported variable type");

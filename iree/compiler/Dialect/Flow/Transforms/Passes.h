@@ -96,6 +96,9 @@ std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection();
 // expected.
 std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection();
 
+// Expands dynamic !shapex.ranked_shape dimensions in variables.
+std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
+
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.region)
 //===----------------------------------------------------------------------===//
@@ -193,6 +196,7 @@ inline void registerFlowPasses() {
   createPostPartitioningConversionPass();
   createMaterializeExportedReflection();
   createMergeExportedReflection();
+  createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegionsPass();
   createIdentifyDispatchRegions2Pass();

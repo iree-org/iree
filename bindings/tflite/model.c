@@ -66,8 +66,8 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
       z0,
       iree_vm_module_lookup_function_by_name(
           model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_make_cstring_view("_main"), &model->exports._main),
-      "unable to find '_main' export in module");
+          iree_make_cstring_view("_tflite_main"), &model->exports._main),
+      "unable to find '_tflite_main' export in module");
 
   // Get the input and output counts of the function; this is useful for being
   // able to preallocate storage when creating interpreters.
@@ -83,28 +83,28 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
   // was being silly and needed them ;)
   IREE_IGNORE_ERROR(iree_vm_module_lookup_function_by_name(
       model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_make_cstring_view("_query_input_shape"),
+      iree_make_cstring_view("_tflite_main_query_input_shape"),
       &model->exports._query_input_shape));
 
   // NOTE: the input shape resizing function is only required if the model has
   // dynamic shapes.
   IREE_IGNORE_ERROR(iree_vm_module_lookup_function_by_name(
       model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_make_cstring_view("_resize_input_shape"),
+      iree_make_cstring_view("_tflite_main_resize_input_shape"),
       &model->exports._resize_input_shape));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_vm_module_lookup_function_by_name(
           model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_make_cstring_view("_query_output_shape"),
+          iree_make_cstring_view("_tflite_main_query_output_shape"),
           &model->exports._query_output_shape),
-      "unable to find '_query_output_shape' export in module");
+      "unable to find '_tflite_main_query_output_shape' export in module");
 
   // It's OK for this to fail; the model may not have variables.
   IREE_IGNORE_ERROR(iree_vm_module_lookup_function_by_name(
       model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_make_cstring_view("_reset_variables"),
+      iree_make_cstring_view("_tflite_main_reset_variables"),
       &model->exports._reset_variables));
 
   IREE_TRACE_ZONE_END(z0);

@@ -92,7 +92,7 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
     FLOW_VariableRefAttr:$variable
   );
   let results = (outs
-    AnyRankedTensor:$result
+    AnyType:$result
   );
 
   let assemblyFormat = "$variable attr-dict `:` type($result)";
@@ -112,7 +112,7 @@ def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
     FLOW_VariablePtr:$variable
   );
   let results = (outs
-    AnyRankedTensor:$result
+    AnyType:$result
   );
 
   let assemblyFormat = "$variable attr-dict `:` type($variable) `->` type($result)";
@@ -129,7 +129,7 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$value,
+    AnyType:$value,
     FLOW_VariableRefAttr:$variable
   );
 
@@ -147,7 +147,7 @@ def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$value,
+    AnyType:$value,
     FLOW_VariablePtr:$variable
   );
 

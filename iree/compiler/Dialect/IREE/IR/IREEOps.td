@@ -177,4 +177,81 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
   let assemblyFormat = "attr-dict";
 }
 
+//===----------------------------------------------------------------------===//
+// Lists
+//===----------------------------------------------------------------------===//
+// NOTE: this type is mostly just a placeholder. Ideally we'd make this
+// immutable and have operations like iree.list.append/concat/etc the returned
+// new SSA values. This would make optimizing the list usage much easier and
+// enable hoisting/CSE of list access/mutation.
+
+def IREE_ListSizeOp : IREE_Op<"list.size"> {
+  let summary = [{the size of the list in elements}];
+  let description = [{
+    Returns the current size of the list in elements.
+  }];
+
+  let arguments = (ins
+    AnyList:$list
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type($list)";
+}
+
+def IREE_ListResizeOp : IREE_Op<"list.resize"> {
+  let summary = [{resizes the list to a new count in elements}];
+  let description = [{
+    Resizes the list to contain `new_size` elements. This will either truncate
+    the list if the existing size is greater than `new_size` or extend the list
+    with the default list value of the element type.
+  }];
+
+  let arguments = (ins
+    AnyList:$list,
+    Index:$new_size
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type($list)";
+}
+
+def IREE_ListGetOp : IREE_Op<"list.get"> {
+  let summary = [{element accessor}];
+  let description = [{
+    Returns the value of the element at the given index. Note that the value
+    may be null if the element is null or the type does not match.
+  }];
+
+  let arguments = (ins
+    AnyList:$list,
+    Index:$index
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` custom<ListType>(type($list), type($result))";
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def IREE_ListSetOp : IREE_Op<"list.set"> {
+  let summary = [{element mutator}];
+  let description = [{
+    Sets the element at the given index to the new value.
+  }];
+
+  let arguments = (ins
+    AnyList:$list,
+    Index:$index,
+    AnyType:$value
+  );
+
+  let assemblyFormat = "operands attr-dict `:` custom<ListType>(type($list), type($value))";
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
 #endif  // IREE_DIALECT_IREE_OPS

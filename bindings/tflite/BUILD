@@ -72,7 +72,9 @@ cc_test(
     # ],
     deps = [
         ":shim",
-        "//bindings/tflite/testdata:add_cc",
+        "//bindings/tflite/testdata:add_dynamic_cc",
+        "//bindings/tflite/testdata:add_multi_cc",
+        "//bindings/tflite/testdata:add_static_cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

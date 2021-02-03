@@ -22,6 +22,7 @@
 
 #include <cstdlib>
 
+#include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -38,6 +39,9 @@ namespace iree_compiler {
 
 // Registers IREE passes with the global registry.
 inline void registerAllIreePasses() {
+  IREE::TFLite::registerPasses();
+  IREE::TFLite::registerTransformPassPipeline();
+
   IREE::Flow::registerFlowPasses();
   IREE::Flow::registerFlowAnalysisTestPasses();
   IREE::HAL::registerHALPasses();

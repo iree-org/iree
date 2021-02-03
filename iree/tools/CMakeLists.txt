@@ -160,6 +160,7 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_passes.h"
     DEPS
       MLIRIR
+      iree::compiler::Bindings::TFLite::Transforms
       iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms

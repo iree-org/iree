@@ -121,7 +121,7 @@ class ConversionPass
     }
 
     OwningRewritePatternList conversionPatterns;
-    populateIREEToVMPatterns(context, conversionPatterns);
+    populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);
 

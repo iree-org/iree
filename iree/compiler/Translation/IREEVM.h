@@ -25,50 +25,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Performs initial dialect conversion to get the canonical input lowered into
-// the IREE execution/dataflow dialect.
-//
-// This will fail if we cannot support the input yet. The hope is that any
-// error that happens after this point is either backend-specific (like
-// unsupported SPIR-V lowering) or a bug.
-LogicalResult convertToFlowModule(ModuleOp moduleOp);
-
-// Runs the flow->HAL transform pipeline to lower a flow module and compile
-// executables for the specified target backends.
-LogicalResult convertToHALModule(ModuleOp moduleOp,
-                                 IREE::HAL::TargetOptions executableOptions);
-
-// Converts the lowered module to a canonical vm.module containing only vm ops.
-// This uses patterns to convert from standard ops and other dialects to their
-// vm ABI form.
-LogicalResult convertToVMModule(ModuleOp moduleOp,
-                                IREE::VM::TargetOptions targetOptions);
-
-// Translates an MLIR module containing a set of supported IREE input dialects
-// to an IREE VM bytecode module for loading at runtime.
-//
-// See iree/schemas/bytecode_module_def.fbs for the description of the
-// serialized module format.
-//
-// Exposed via the --iree-mlir-to-vm-bytecode-module translation.
-LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, bool addExportDispatchesPipeline,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-// Translates an MLIR module containing a set of supported IREE input dialects
-// to an IREE VM C module.
-//
-// Exposed via the --iree-mlir-to-vm-c-module translation.
-LogicalResult translateFromMLIRToVMCModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, llvm::raw_ostream &output);
-#endif  // IREE_HAVE_EMITC_DIALECT
-
-// TODO(benvanik): versions with multiple targets, etc.
-
 void registerIREEVMTransformPassPipeline();
 void registerIREEVMTranslation();
 

@@ -123,6 +123,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createMaterializeExportedReflection());
 
+  // Replaces variables with !shapex.ranked_shape types with individual
+  // variables for each dimension. This allows for constant dimensions to be
+  // DCE'd in following passes.
+  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
+
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:
   //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
