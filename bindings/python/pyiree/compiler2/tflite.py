@@ -100,6 +100,8 @@ def build_import_command_line(input_path: str,
   cl = [
       import_tool,
       input_path,
+      "--mlir-print-op-generic",
+      "--mlir-print-debuginfo",
   ]
   if options.import_only and options.output_file:
     # Import stage directly outputs.

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_PASSES_H_
-#define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_PASSES_H_
+#ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
+#define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 
 #include "iree_tf_compiler/dialect/tf_strings/conversion/convert_tf_strings_to_strings.h"
 #include "iree_tf_compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
@@ -91,4 +91,4 @@ inline void registerAllPasses() {
 }  // namespace iree_integrations
 }  // namespace mlir
 
-#endif  // IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_PASSES_H_
+#endif  // IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_

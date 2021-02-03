@@ -20,7 +20,7 @@
 // Since none of the TensorFlow imports come from an MLIR text form, it is a bit
 // of an odd fit for a *-translate style tool, which is why this diverges.
 
-#include "iree_tf_compiler/Passes.h"
+#include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"

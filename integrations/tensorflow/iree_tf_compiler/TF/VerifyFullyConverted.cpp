@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"

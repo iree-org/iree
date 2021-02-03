@@ -42,24 +42,24 @@ int main(int argc, char **argv) {
   static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
                                              cl::value_desc("filename"),
                                              cl::init("-"));
-  static llvm::cl::opt<std::string> saveTempTflInput(
+
+  static cl::opt<std::string> saveTempTflInput(
       "save-temp-tfl-input",
-      llvm::cl::desc("Save the TFL pipeline input to this file"),
-      llvm::cl::init(""));
-  static llvm::cl::opt<std::string> saveTempIreeImport(
+      cl::desc("Save the TFL pipeline input to this file"), cl::init(""));
+  static cl::opt<std::string> saveTempIreeImport(
       "save-temp-iree-input",
-      llvm::cl::desc("Save the resultant IR to this file (useful for saving an "
-                     "intermediate in a pipeline)"),
-      llvm::cl::init(""));
+      cl::desc("Save the resultant IR to this file (useful for saving an "
+               "intermediate in a pipeline)"),
+      cl::init(""));
 
   static cl::list<std::string> inputArrayFlag(
       "input-array",
-      llvm::cl::desc("Input tensor, if different from the default inputs"),
-      llvm::cl::ZeroOrMore);
+      cl::desc("Input tensor, if different from the default inputs"),
+      cl::ZeroOrMore);
   static cl::list<std::string> outputArrayFlag(
       "output-array",
-      llvm::cl::desc("Output tensor, if different from the default outputs"),
-      llvm::cl::ZeroOrMore);
+      cl::desc("Output tensor, if different from the default outputs"),
+      cl::ZeroOrMore);
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -112,8 +112,6 @@ int main(int argc, char **argv) {
       return failure();
     }
     OpPrintingFlags printFlags;
-    printFlags.enableDebugInfo();
-    printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";
     outputFile->keep();
