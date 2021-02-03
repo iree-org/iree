@@ -35,6 +35,7 @@ cc_library(
     ],
     hdrs = [
         "atomics.h",
+        "debugging.h",
     ],
     deps = [
         "//iree/base:core_headers",

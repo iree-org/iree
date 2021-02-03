@@ -34,7 +34,6 @@ iree_cc_library(
     core_headers
   HDRS
     "alignment.h"
-    "debugging.h"
     "math.h"
     "target_platform.h"
   DEPS

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_DEBUGGING_H_
-#define IREE_BASE_DEBUGGING_H_
+#ifndef IREE_BASE_INTERNAL_DEBUGGING_H_
+#define IREE_BASE_INTERNAL_DEBUGGING_H_
 
 #include "iree/base/target_platform.h"
 
@@ -143,4 +143,4 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break() {
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_DEBUGGING_H_
+#endif  // IREE_BASE_INTERNAL_DEBUGGING_H_

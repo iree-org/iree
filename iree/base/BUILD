@@ -46,7 +46,6 @@ cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
-        "debugging.h",
         "math.h",
         "target_platform.h",
     ],
