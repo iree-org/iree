@@ -15,6 +15,10 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_H_
 #define IREE_BASE_INTERNAL_STATUS_H_
 
+#ifndef __cplusplus
+#error iree::Status is only usable in C++ code.
+#endif  // !__cplusplus
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -216,8 +220,6 @@ class Status final {
   }
 
  private:
-  friend class StatusBuilder;
-
   iree_status_t value_ = iree_ok_status();
 };
 

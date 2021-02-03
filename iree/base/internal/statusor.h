@@ -15,13 +15,16 @@
 #ifndef IREE_BASE_INTERNAL_STATUSOR_H_
 #define IREE_BASE_INTERNAL_STATUSOR_H_
 
+#ifndef __cplusplus
+#error iree::StatusOr<T> is only usable in C++ code.
+#endif  // !__cplusplus
+
 #include <type_traits>
 #include <utility>
 
 #include "absl/base/attributes.h"
 #include "absl/utility/utility.h"
 #include "iree/base/internal/status.h"
-#include "iree/base/internal/status_builder.h"
 
 namespace iree {
 
@@ -66,7 +69,6 @@ template <typename T, typename U>
 using IsStatusOrDirectInitializationAmbiguous = absl::disjunction<
     std::is_same<StatusOr<T>, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<Status, std::remove_cv_t<std::remove_reference_t<U>>>,
-    std::is_same<StatusBuilder, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<absl::in_place_t,
                  std::remove_cv_t<std::remove_reference_t<U>>>,
     IsAmbiguousStatusOrForInitialization<T, U>>;
@@ -423,8 +425,6 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // IREE_CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
-  StatusOr(const StatusBuilder& builder) = delete;
-  StatusOr& operator=(const StatusBuilder& builder) = delete;
 
   // Similar to the `const T&` overload.
   //
@@ -434,8 +434,6 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // RValue versions of the operations declared above.
   StatusOr(Status&& status);
   StatusOr& operator=(Status&& status);
-  StatusOr(StatusBuilder&& builder);
-  StatusOr& operator=(StatusBuilder&& builder);
 
   // Constructs the inner value T in-place using the provided args, using the
   // T(args...) constructor.
@@ -545,10 +543,6 @@ template <typename T>
 StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
 
 template <typename T>
-StatusOr<T>::StatusOr(StatusBuilder&& builder)
-    : Base(static_cast<Status&&>(std::move(builder))) {}
-
-template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
   this->Assign(status);
   return *this;
@@ -557,12 +551,6 @@ StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
   this->Assign(std::move(status));
-  return *this;
-}
-
-template <typename T>
-StatusOr<T>& StatusOr<T>::operator=(StatusBuilder&& builder) {
-  this->Assign(builder.ToStatus());
   return *this;
 }
 

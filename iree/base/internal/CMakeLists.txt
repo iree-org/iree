@@ -163,16 +163,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    ostringstream
-  HDRS
-    "ostringstream.h"
-  SRCS
-    "ostringstream.cc"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     prng
   HDRS
     "prng.h"
@@ -197,14 +187,11 @@ iree_cc_library(
     status_internal
   HDRS
     "status.h"
-    "status_builder.h"
     "statusor.h"
   SRCS
     "status.cc"
-    "status_builder.cc"
     "statusor.cc"
   DEPS
-    ::ostringstream
     absl::core_headers
     absl::strings
     absl::utility

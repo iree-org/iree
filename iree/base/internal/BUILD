@@ -153,13 +153,6 @@ cc_library(
 )
 
 cc_library(
-    name = "ostringstream",
-    srcs = ["ostringstream.cc"],
-    hdrs = ["ostringstream.h"],
-    visibility = ["//visibility:private"],
-)
-
-cc_library(
     name = "prng",
     hdrs = ["prng.h"],
     deps = [
@@ -181,16 +174,13 @@ cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",
-        "status_builder.cc",
         "statusor.cc",
     ],
     hdrs = [
         "status.h",
-        "status_builder.h",
         "statusor.h",
     ],
     deps = [
-        ":ostringstream",
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:logging",

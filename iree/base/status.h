@@ -15,8 +15,13 @@
 #ifndef IREE_BASE_STATUS_H_
 #define IREE_BASE_STATUS_H_
 
+//==============================================================================
+// C++ wrappers and utilities
+//==============================================================================
+
+#ifdef __cplusplus
 #include "iree/base/internal/status.h"
-#include "iree/base/internal/status_builder.h"
 #include "iree/base/internal/statusor.h"
+#endif  // __cplusplus
 
 #endif  // IREE_BASE_STATUS_H_
