@@ -22,9 +22,9 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
-#include "iree/base/file_path.h"
 #include "iree/base/internal/file_handle_win32.h"
 #include "iree/base/internal/file_io.h"
+#include "iree/base/internal/file_path.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 

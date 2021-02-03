@@ -91,9 +91,9 @@ cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
-        "/iree/base:file_path",
-        "/iree/base:logging",
-        "/iree/base:status",
+        ":file_path",
+        "//iree/base:logging",
+        "//iree/base:status",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/strings",
@@ -109,12 +109,33 @@ cc_library(
     deps = [
         ":file_handle_win32",
         ":file_io_hdrs",
+        ":file_path",
         "//iree/base:core_headers",
-        "//iree/base:file_path",
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "file_path",
+    srcs = ["file_path.cc"],
+    hdrs = ["file_path.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "file_path_test",
+    srcs = [
+        "file_path_test.cc",
+    ],
+    deps = [
+        ":file_path",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 

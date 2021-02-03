@@ -95,35 +95,14 @@ cc_library(
     hdrs = ["dynamic_library.h"],
     deps = [
         ":core_headers",
-        ":file_path",
         ":logging",
         ":status",
         ":tracing",
         "//build_tools:default_linkopts",
+        "//iree/base/internal:file_path",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_path",
-    srcs = ["file_path.cc"],
-    hdrs = ["file_path.h"],
-    deps = [
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "file_path_test",
-    srcs = [
-        "file_path_test.cc",
-    ],
-    deps = [
-        ":file_path",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )
 

@@ -16,7 +16,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/file_path.h"
+#include "iree/base/internal/file_path.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"

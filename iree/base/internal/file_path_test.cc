@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/file_path.h"
+#include "iree/base/internal/file_path.h"
 
 #include "iree/testing/gtest.h"
 

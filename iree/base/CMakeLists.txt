@@ -73,37 +73,14 @@ iree_cc_library(
     "dynamic_library_win32.cc"
   DEPS
     ::core_headers
-    ::file_path
     ::logging
     ::status
     ::tracing
     absl::memory
     absl::span
     absl::strings
+    iree::base::internal::file_path
   PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_path
-  HDRS
-    "file_path.h"
-  SRCS
-    "file_path.cc"
-  DEPS
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_path_test
-  SRCS
-    "file_path_test.cc"
-  DEPS
-    ::file_path
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(

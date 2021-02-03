@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_FILE_PATH_H_
-#define IREE_BASE_FILE_PATH_H_
+#ifndef IREE_BASE_INTERNAL_FILE_PATH_H_
+#define IREE_BASE_INTERNAL_FILE_PATH_H_
 
 #include <string>
 
@@ -44,4 +44,4 @@ absl::string_view Extension(absl::string_view path);
 }  // namespace file_path
 }  // namespace iree
 
-#endif  // IREE_BASE_FILE_PATH_H_
+#endif  // IREE_BASE_INTERNAL_FILE_PATH_H_

@@ -98,8 +98,8 @@ iree_cc_test(
     "file_io_test.cc"
   DEPS
     ::file_io
+    ::file_path
     absl::strings
-    iree::base::file_path
     iree::base::logging
     iree::base::status
     iree::testing::gtest
@@ -115,13 +115,36 @@ iree_cc_library(
   DEPS
     ::file_handle_win32
     ::file_io_hdrs
+    ::file_path
     absl::memory
     absl::strings
     iree::base::core_headers
-    iree::base::file_path
     iree::base::status
     iree::base::tracing
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_path
+  HDRS
+    "file_path.h"
+  SRCS
+    "file_path.cc"
+  DEPS
+    absl::strings
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_path_test
+  SRCS
+    "file_path_test.cc"
+  DEPS
+    ::file_path
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
