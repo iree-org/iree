@@ -58,7 +58,7 @@ android {
 
     externalNativeBuild {
         cmake {
-            version "3.18.4+"
+            version "3.13.0+"
             path "../../../CMakeLists.txt"
         }
     }
@@ -70,7 +70,14 @@ task cmakeConfigureHost(type: Exec) {
         println "Configuring host tools with cmake..."
     }
     workingDir cmakeListDir
-    commandLine "cmake", "-G" , "Ninja",  "-B", hostBuildDir ,  "-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",  "-DCMAKE_INSTALL_PREFIX=${hostInstallDir}", "."
+    commandLine "cmake",
+            "-G" , "Ninja",
+            "-B", hostBuildDir ,
+            "-DIREE_BUILD_COMPILER=ON",
+            "-DIREE_BUILD_TESTS=OFF ",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DCMAKE_INSTALL_PREFIX=${hostInstallDir}",
+            "."
 }
 
 // Task to cmake build the host
