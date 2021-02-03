@@ -212,7 +212,6 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_assign(iree_vm_ref_t* ref,
                                                       iree_vm_ref_t* out_ref);
 
 // Moves one reference to another without changing the reference count.
-// Equivalent to an std::move of a ref_ptr.
 // |out_ref| will be released if it already contains a reference.
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
                                                     iree_vm_ref_t* out_ref);

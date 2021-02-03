@@ -72,7 +72,8 @@ class OpaqueType : public Type::TypeBase<OpaqueType, Type, TypeStorage> {
   using Base::Base;
 };
 
-/// A ref_ptr containing a reference to a ref-object-compatible type.
+/// A ref<T> containing a reference to a ref-object-compatible type.
+/// This models an iree_vm_ref_t intrusive reference counted object.
 class RefType : public Type::TypeBase<RefType, Type, detail::RefTypeStorage> {
  public:
   using Base::Base;

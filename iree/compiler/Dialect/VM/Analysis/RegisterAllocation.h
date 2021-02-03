@@ -29,12 +29,12 @@ namespace iree_compiler {
 // The VM contains multiple register banks:
 // - 32-bit integer registers
 //   - may be aliased as 64/128/etc-bit registers
-// - ref_ptr registers
+// - ref registers
 //
 // Registers are represented in bytecode as an N-bit integer with the high bit
-// indicating whether it is from the general (0b0) or ref_ptr bank (0b1).
+// indicating whether it is from the general (0b0) or ref bank (0b1).
 //
-// ref_ptr register ordinals also include a bit denoting whether the register
+// ref register ordinals also include a bit denoting whether the register
 // reference has move semantics. When set the VM can assume that the value is
 // no longer used in the calling code and that ownership can be transferred to
 // the receiving op/call. This allows reference count increment elision, though
