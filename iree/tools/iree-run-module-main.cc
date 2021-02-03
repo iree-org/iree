@@ -55,17 +55,16 @@ ABSL_FLAG(std::string, function_inputs_file, "",
 namespace iree {
 namespace {
 
-StatusOr<std::string> GetModuleContentsFromFlags() {
+Status GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = absl::GetFlag(FLAGS_module_file);
-  std::string contents;
   if (module_file == "-") {
-    contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                           std::istreambuf_iterator<char>()};
+    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
+                                std::istreambuf_iterator<char>()};
   } else {
-    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, &contents));
+    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, out_contents));
   }
-  return contents;
+  return OkStatus();
 }
 
 Status Run() {
@@ -78,7 +77,8 @@ Status Run() {
       iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
-  IREE_ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
+  std::string module_data;
+  IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data));
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
@@ -109,7 +109,8 @@ Status Run() {
   }
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  std::vector<RawSignatureParser::Description> input_descs;
+  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
 
   vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
@@ -118,18 +119,17 @@ Status Run() {
              << "Expected only one of function_inputs and function_inputs_file "
                 "to be set";
     }
-    IREE_ASSIGN_OR_RETURN(inputs,
-                          ParseToVariantListFromFile(
-                              input_descs, iree_hal_device_allocator(device),
-                              absl::GetFlag(FLAGS_function_inputs_file)));
+    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
+        input_descs, iree_hal_device_allocator(device),
+        absl::GetFlag(FLAGS_function_inputs_file), &inputs));
   } else {
-    IREE_ASSIGN_OR_RETURN(
-        inputs,
-        ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                           absl::GetFlag(FLAGS_function_inputs)));
+    IREE_RETURN_IF_ERROR(ParseToVariantList(
+        input_descs, iree_hal_device_allocator(device),
+        absl::MakeConstSpan(absl::GetFlag(FLAGS_function_inputs)), &inputs));
   }
 
-  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  std::vector<RawSignatureParser::Description> output_descs;
+  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
                                            output_descs.size(),

@@ -80,8 +80,9 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-StatusOr<int> Run(std::string module_file_path) {
+Status Run(std::string module_file_path, int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
+  *out_exit_code = 1;
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
       << "registering HAL types";
@@ -135,8 +136,10 @@ StatusOr<int> Run(std::string module_file_path) {
     }
 
     IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-    IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-    IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+    std::vector<RawSignatureParser::Description> input_descs;
+    IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
+    std::vector<RawSignatureParser::Description> output_descs;
+    IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
     if (!input_descs.empty() || !output_descs.empty()) {
       iree_string_view_t sig_f = iree_vm_function_reflection_attr(
           &function, iree_make_cstring_view("f"));
@@ -160,7 +163,7 @@ StatusOr<int> Run(std::string module_file_path) {
           return new CheckModuleTest(instance, modules, function);
         });
   }
-  int ret = RUN_ALL_TESTS();
+  *out_exit_code = RUN_ALL_TESTS();
 
   iree_vm_module_release(hal_module);
   iree_vm_module_release(check_module);
@@ -168,7 +171,7 @@ StatusOr<int> Run(std::string module_file_path) {
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 
-  return ret;
+  return OkStatus();
 }
 
 }  // namespace
@@ -187,12 +190,13 @@ extern "C" int main(int argc, char** argv) {
   }
   auto module_file_path = std::string(argv[1]);
 
-  auto ret_or = Run(std::move(module_file_path));
-  int ret = ret_or.ok() ? ret_or.value() : 1;
+  int exit_code = 1;
+  auto status = Run(std::move(module_file_path), &exit_code);
+  int ret = status.ok() ? exit_code : 1;
   if (absl::GetFlag(FLAGS_expect_failure)) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
-      std::cout << ret_or.status();
+      std::cout << status;
       return 1;
     }
     std::cout << "Test failed as expected\n";

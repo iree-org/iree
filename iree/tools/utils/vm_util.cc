@@ -43,46 +43,50 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   return OkStatus();
 }
 
-StatusOr<std::vector<RawSignatureParser::Description>> ParseInputSignature(
-    iree_vm_function_t& function) {
+Status ParseInputSignature(
+    iree_vm_function_t& function,
+    std::vector<RawSignatureParser::Description>* out_input_descs) {
+  out_input_descs->clear();
   iree_string_view_t sig_f =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
   RawSignatureParser sig_parser;
-  std::vector<RawSignatureParser::Description> input_descs;
   sig_parser.VisitInputs(absl::string_view{sig_f.data, sig_f.size},
                          [&](const RawSignatureParser::Description& desc) {
-                           input_descs.push_back(desc);
+                           out_input_descs->push_back(desc);
                          });
   if (sig_parser.GetError()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Parsing function signature '" << sig_f.data
            << "' failed getting input";
   }
-  return input_descs;
+  return OkStatus();
 }
 
-StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
-    const iree_vm_function_t& function) {
+Status ParseOutputSignature(
+    const iree_vm_function_t& function,
+    std::vector<RawSignatureParser::Description>* out_output_descs) {
+  out_output_descs->clear();
   iree_string_view_t sig_f =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
   RawSignatureParser sig_parser;
-  std::vector<RawSignatureParser::Description> output_descs;
   sig_parser.VisitResults(absl::string_view{sig_f.data, sig_f.size},
                           [&](const RawSignatureParser::Description& desc) {
-                            output_descs.push_back(desc);
+                            out_output_descs->push_back(desc);
                           });
   if (sig_parser.GetError()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Parsing function signature '" << sig_f.data
            << "' failed getting results";
   }
-  return output_descs;
+  return OkStatus();
 }
 
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+Status ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const absl::string_view> input_strings) {
+    absl::Span<const absl::string_view> input_strings,
+    iree_vm_list_t** out_list) {
+  *out_list = NULL;
   if (input_strings.size() != descs.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Signature mismatch; expected " << descs.size()
@@ -136,28 +140,30 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
                << "Unsupported signature type: " << desc_str;
     }
   }
-  return variant_list.release();
+  *out_list = variant_list.release();
+  return OkStatus();
 }
 
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+Status ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const std::string> input_strings) {
+    absl::Span<const std::string> input_strings, iree_vm_list_t** out_list) {
   absl::InlinedVector<absl::string_view, 4> input_views(input_strings.size());
   for (int i = 0; i < input_strings.size(); ++i) {
     input_views[i] = input_strings[i];
   }
-  return ParseToVariantList(descs, allocator, input_views);
+  return ParseToVariantList(descs, allocator, input_views, out_list);
 }
 
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
+Status ParseToVariantListFromFile(
     absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, const std::string& filename) {
+    iree_hal_allocator_t* allocator, const std::string& filename,
+    iree_vm_list_t** out_list) {
   std::string contents;
   IREE_RETURN_IF_ERROR(file_io::GetFileContents(filename, &contents));
   absl::InlinedVector<absl::string_view, 4> input_views(
       absl::StrSplit(contents, '\n', absl::SkipEmpty()));
-  return ParseToVariantList(descs, allocator, input_views);
+  return ParseToVariantList(descs, allocator, input_views, out_list);
 }
 
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,

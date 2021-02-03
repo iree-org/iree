@@ -55,19 +55,22 @@ class ModuleLoader {
   explicit ModuleLoader(android_app* app) : app_context_(app) {}
   ~ModuleLoader() = default;
 
-  StatusOr<IreeModuleInvocation> LoadModuleInvocation() {
+  Status LoadModuleInvocation(IreeModuleInvocation* out_invocation) {
     IreeModuleInvocation invocation = {};
-    IREE_ASSIGN_OR_RETURN(invocation.module, ReadFileAsset(kModuleFileName));
-    IREE_ASSIGN_OR_RETURN(invocation.entry_function,
-                          ReadFileAsset(kEntryFunctionFileName));
-    IREE_ASSIGN_OR_RETURN(invocation.inputs, ReadFileAsset(kInputsFileName));
-    IREE_ASSIGN_OR_RETURN(invocation.driver, ReadFileAsset(kDriverFileName));
-    return invocation;
+    IREE_RETURN_IF_ERROR(ReadFileAsset(kModuleFileName, &invocation.module));
+    IREE_RETURN_IF_ERROR(
+        ReadFileAsset(kEntryFunctionFileName, &invocation.entry_function));
+    IREE_RETURN_IF_ERROR(ReadFileAsset(kInputsFileName, &invocation.inputs));
+    IREE_RETURN_IF_ERROR(ReadFileAsset(kDriverFileName, &invocation.driver));
+    *out_invocation = std::move(invocation);
+    return OkStatus();
   }
 
  private:
   // Reads the given asset file and returns its contents.
-  StatusOr<std::string> ReadFileAsset(const char* file_name) {
+  Status ReadFileAsset(const char* file_name, std::string* out_contents) {
+    out_contents->clear();
+
     AAssetManager* asset_manager = app_context_->activity->assetManager;
     AAsset* asset =
         AAssetManager_open(asset_manager, file_name, AASSET_MODE_BUFFER);
@@ -83,7 +86,8 @@ class ModuleLoader {
     AAsset_read(asset, const_cast<char*>(contents.data()), size_in_bytes);
     AAsset_close(asset);
 
-    return contents;
+    *out_contents = std::move(contents);
+    return OkStatus();
   }
 
   android_app* app_context_;
@@ -122,16 +126,17 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       << "looking up function '" << function_name << "'";
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  std::vector<RawSignatureParser::Description> input_descs;
+  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
 
   absl::InlinedVector<absl::string_view, 4> input_views(
       absl::StrSplit(invocation.inputs, '\n', absl::SkipEmpty()));
-  IREE_ASSIGN_OR_RETURN(
-      auto inputs,
-      ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                         input_views));
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_RETURN_IF_ERROR(ParseToVariantList(
+      input_descs, iree_hal_device_allocator(device), input_views, &inputs));
 
-  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  std::vector<RawSignatureParser::Description> output_descs;
+  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
                                            output_descs.size(),
@@ -170,16 +175,16 @@ void RunModuleAppMain(android_app* app) {
       iree_hal_driver_registry_default()));
 
   ModuleLoader loader(app);
-  StatusOr<IreeModuleInvocation> invocation = loader.LoadModuleInvocation();
-  if (invocation.ok()) {
-    LOGI("entry function: '%s'", invocation->entry_function.c_str());
-    LOGI("inputs:\n%s", invocation->inputs.c_str());
-    LOGI("driver: '%s'", invocation->driver.c_str());
-    auto status = RunModule(invocation.value());
+  IreeModuleInvocation invocation;
+  auto status = loader.LoadModuleInvocation(&invocation);
+  if (status.ok()) {
+    LOGI("entry function: '%s'", invocation.entry_function.c_str());
+    LOGI("inputs:\n%s", invocation.inputs.c_str());
+    LOGI("driver: '%s'", invocation.driver.c_str());
+    status = RunModule(invocation);
     if (!status.ok()) LOGE("%s", status.ToString().c_str());
   } else {
-    LOGE("failed to load module invocation: %s",
-         invocation.status().ToString().c_str());
+    LOGE("failed to load module invocation: %s", status.ToString().c_str());
   }
 }
 
