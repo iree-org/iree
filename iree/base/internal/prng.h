@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_ARCH_ARM_64)

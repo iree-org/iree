@@ -15,7 +15,7 @@
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 
 #include "iree/base/alignment.h"
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/native_descriptor_set_layout.h"
 #include "iree/hal/vulkan/native_executable_layout.h"

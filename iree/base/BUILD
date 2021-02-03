@@ -46,7 +46,6 @@ cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
-        "math.h",
         "target_platform.h",
     ],
     deps = [
@@ -57,16 +56,6 @@ cc_library(
 cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],
-)
-
-cc_test(
-    name = "math_test",
-    srcs = ["math_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
 )
 
 #===------------------------------------------------------------------------===#

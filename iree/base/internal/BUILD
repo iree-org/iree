@@ -36,6 +36,7 @@ cc_library(
     hdrs = [
         "atomics.h",
         "debugging.h",
+        "math.h",
     ],
     deps = [
         "//iree/base:core_headers",
@@ -48,6 +49,16 @@ cc_test(
     deps = [
         ":internal",
         "//iree/base:core_headers",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "math_test",
+    srcs = ["math_test.cc"],
+    deps = [
+        ":internal",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -192,6 +203,7 @@ cc_library(
     name = "prng",
     hdrs = ["prng.h"],
     deps = [
+        ":internal",
         "//iree/base:core_headers",
     ],
 )

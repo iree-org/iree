@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "atomics.h"
     "debugging.h"
+    "math.h"
   SRCS
     "atomics_clang.h"
     "atomics_gcc.h"
@@ -37,6 +38,17 @@ iree_cc_test(
   DEPS
     ::internal
     iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    math_test
+  SRCS
+    "math_test.cc"
+  DEPS
+    ::internal
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -196,6 +208,7 @@ iree_cc_library(
   HDRS
     "prng.h"
   DEPS
+    ::internal
     iree::base::core_headers
   PUBLIC
 )

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_MATH_H_
-#define IREE_BASE_MATH_H_
+#ifndef IREE_BASE_INTERNAL_MATH_H_
+#define IREE_BASE_INTERNAL_MATH_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -272,4 +272,4 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 #endif  // 1
 }
 
-#endif  // IREE_BASE_MATH_H_
+#endif  // IREE_BASE_INTERNAL_MATH_H_
