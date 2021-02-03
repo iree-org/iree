@@ -30,7 +30,7 @@ namespace file_io {
 Status FileExists(const std::string& path);
 
 // Synchronously reads a file's contents into a string.
-StatusOr<std::string> GetFileContents(const std::string& path);
+Status GetFileContents(const std::string& path, std::string* out_contents);
 
 // Synchronously writes a string into a file, overwriting its contents.
 Status SetFileContents(const std::string& path, absl::string_view content);
@@ -53,7 +53,7 @@ std::string GetTempPath();
 // Gets a temporary file name and returns its absolute path.
 // The particular path chosen is platform and environment-dependent.
 // Unique characters will be automatically inserted after |base_name|.
-StatusOr<std::string> GetTempFile(absl::string_view base_name);
+Status GetTempFile(absl::string_view base_name, std::string* out_path);
 
 }  // namespace file_io
 }  // namespace iree

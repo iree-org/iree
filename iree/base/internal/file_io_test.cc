@@ -46,7 +46,8 @@ TEST(FileIo, GetSetContents) {
   auto to_write = GetUniqueContents(unique_name);
 
   IREE_ASSERT_OK(SetFileContents(path, to_write));
-  IREE_ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(path));
+  std::string read;
+  IREE_ASSERT_OK(GetFileContents(path, &read));
   EXPECT_EQ(to_write, read);
 }
 
@@ -74,7 +75,8 @@ TEST(FileIo, MoveFile) {
   IREE_EXPECT_OK(MoveFile(from_path, to_path));
   EXPECT_THAT(FileExists(from_path), StatusIs(StatusCode::kNotFound));
   IREE_EXPECT_OK(FileExists(to_path));
-  IREE_ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(to_path));
+  std::string read;
+  IREE_ASSERT_OK(GetFileContents(to_path, &read));
   EXPECT_EQ(to_write, read);
 }
 
@@ -84,7 +86,8 @@ TEST(FileIo, GetTempPath) {
 }
 
 TEST(FileIo, GetTempFile) {
-  IREE_ASSERT_OK_AND_ASSIGN(std::string path1, GetTempFile("foo"));
+  std::string path1;
+  IREE_ASSERT_OK(GetTempFile("foo", &path1));
   EXPECT_TRUE(path1.find("foo") != std::string::npos);
 
   // Should be able to set file contents at the given path.
@@ -95,7 +98,8 @@ TEST(FileIo, GetTempFile) {
   IREE_ASSERT_OK(SetFileContents(path1, to_write));
 
   // Create another temp file with the same base name, check for a unique path.
-  IREE_ASSERT_OK_AND_ASSIGN(std::string path2, GetTempFile("foo"));
+  std::string path2;
+  IREE_ASSERT_OK(GetTempFile("foo", &path2));
   EXPECT_TRUE(path2.find("foo") != std::string::npos);
   EXPECT_NE(path1, path2);
 }

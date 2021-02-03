@@ -33,15 +33,17 @@ class DynamicLibraryPosix : public DynamicLibrary {
     ::dlclose(library_);
   }
 
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names) {
+  static Status Load(absl::Span<const char* const> search_file_names,
+                     std::unique_ptr<DynamicLibrary>* out_library) {
     IREE_TRACE_SCOPE0("DynamicLibraryPosix::Load");
+    out_library->reset();
 
     for (int i = 0; i < search_file_names.size(); ++i) {
       void* library = ::dlopen(search_file_names[i], RTLD_LAZY | RTLD_LOCAL);
       if (library) {
-        return absl::WrapUnique(
+        out_library->reset(
             new DynamicLibraryPosix(search_file_names[i], library));
+        return OkStatus();
       }
     }
     return UnavailableErrorBuilder(IREE_LOC)
@@ -60,9 +62,9 @@ class DynamicLibraryPosix : public DynamicLibrary {
 };
 
 // static
-StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::Load(
-    absl::Span<const char* const> search_file_names) {
-  return DynamicLibraryPosix::Load(search_file_names);
+Status DynamicLibrary::Load(absl::Span<const char* const> search_file_names,
+                            std::unique_ptr<DynamicLibrary>* out_library) {
+  return DynamicLibraryPosix::Load(search_file_names, out_library);
 }
 
 }  // namespace iree

@@ -41,8 +41,9 @@ Status FileExists(const std::string& path) {
              : NotFoundErrorBuilder(IREE_LOC) << "'" << path << "'";
 }
 
-StatusOr<std::string> GetFileContents(const std::string& path) {
+Status GetFileContents(const std::string& path, std::string* out_contents) {
   IREE_TRACE_SCOPE0("file_io::GetFileContents");
+  *out_contents = std::string();
   std::unique_ptr<FILE, void (*)(FILE*)> file = {std::fopen(path.c_str(), "r"),
                                                  +[](FILE* file) {
                                                    if (file) fclose(file);
@@ -71,7 +72,8 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
     return UnavailableErrorBuilder(IREE_LOC)
            << "Unable to read entire file contents of '" << path << "'";
   }
-  return contents;
+  *out_contents = std::move(contents);
+  return OkStatus();
 }
 
 Status SetFileContents(const std::string& path, absl::string_view content) {
@@ -136,15 +138,18 @@ std::string GetTempPath() {
 }
 
 // TODO(#3845): remove this when dylibs no longer need temp files.
-StatusOr<std::string> GetTempFile(absl::string_view base_name) {
+Status GetTempFile(absl::string_view base_name, std::string* out_path) {
   IREE_TRACE_SCOPE0("file_io::GetTempFile");
+  *out_path = std::string();
 
   std::string temp_path = GetTempPath();
   std::string template_path =
       file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
 
   if (::mkstemp(&template_path[0]) != -1) {
-    return template_path;  // Should have been modified by mkstemp.
+    // Should have been modified by mkstemp.
+    *out_path = std::move(template_path);
+    return OkStatus();
   } else {
     return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
            << "Failed to create temp file with template '" << template_path

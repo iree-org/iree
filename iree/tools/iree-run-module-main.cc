@@ -63,7 +63,7 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
     contents = std::string{std::istreambuf_iterator<char>(std::cin),
                            std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
+    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, &contents));
   }
   return contents;
 }

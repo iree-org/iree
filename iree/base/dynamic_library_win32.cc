@@ -54,15 +54,17 @@ class DynamicLibraryWin : public DynamicLibrary {
     ::FreeLibrary(library_);
   }
 
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names) {
+  static Status Load(absl::Span<const char* const> search_file_names,
+                     std::unique_ptr<DynamicLibrary>* out_library) {
     IREE_TRACE_SCOPE();
+    out_library->reset();
 
     for (int i = 0; i < search_file_names.size(); ++i) {
       HMODULE library = ::LoadLibraryA(search_file_names[i]);
       if (library) {
-        return absl::WrapUnique(
+        out_library->reset(
             new DynamicLibraryWin(search_file_names[i], library));
+        return OkStatus();
       }
     }
 
@@ -147,9 +149,9 @@ class DynamicLibraryWin : public DynamicLibrary {
 };
 
 // static
-StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::Load(
-    absl::Span<const char* const> search_file_names) {
-  return DynamicLibraryWin::Load(search_file_names);
+Status DynamicLibrary::Load(absl::Span<const char* const> search_file_names,
+                            std::unique_ptr<DynamicLibrary>* out_library) {
+  return DynamicLibraryWin::Load(search_file_names, out_library);
 }
 
 }  // namespace iree

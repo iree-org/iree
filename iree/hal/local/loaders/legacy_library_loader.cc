@@ -126,8 +126,9 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
   // fdlopen, or android_dlopen_ext to avoid needing to write the file to disk.
   // Can fallback to memfd_create + dlopen where available, and fallback from
   // that to disk (maybe just windows/mac).
-  IREE_ASSIGN_OR_RETURN(auto library_temp_path,
-                        iree::file_io::GetTempFile("dylib_executable"));
+  std::string library_temp_path;
+  IREE_RETURN_IF_ERROR(
+      iree::file_io::GetTempFile("dylib_executable", &library_temp_path));
 
 // Add platform-specific file extensions so opinionated dynamic library
 // loaders are more likely to find the file:
@@ -153,8 +154,9 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
       absl::string_view(reinterpret_cast<const char*>(embedded_library_vec),
                         flatbuffers_uint8_vec_len(embedded_library_vec))));
 
-  IREE_ASSIGN_OR_RETURN(auto library,
-                        iree::DynamicLibrary::Load(library_temp_path.c_str()));
+  std::unique_ptr<iree::DynamicLibrary> library;
+  IREE_RETURN_IF_ERROR(
+      iree::DynamicLibrary::Load(library_temp_path.c_str(), &library));
 
   flatbuffers_string_t debug_database_filename =
       iree_DyLibExecutableDef_debug_database_filename_get(executable->def);

@@ -41,31 +41,34 @@ Status FileExists(const std::string& path) {
   return OkStatus();
 }
 
-StatusOr<std::string> GetFileContents(const std::string& path) {
+Status GetFileContents(const std::string& path, std::string* out_contents) {
   IREE_TRACE_SCOPE0("file_io::GetFileContents");
-  IREE_ASSIGN_OR_RETURN(
-      auto file,
-      FileHandle::OpenRead(std::move(path), FILE_FLAG_SEQUENTIAL_SCAN));
-  std::string result;
-  result.resize(file->size());
+  *out_contents = std::string();
+  std::unique_ptr<FileHandle> file;
+  IREE_RETURN_IF_ERROR(
+      FileHandle::OpenRead(std::move(path), FILE_FLAG_SEQUENTIAL_SCAN, &file));
+  std::string contents;
+  contents.resize(file->size());
   DWORD bytes_read = 0;
-  if (::ReadFile(file->handle(), const_cast<char*>(result.data()),
-                 static_cast<DWORD>(result.size()), &bytes_read,
+  if (::ReadFile(file->handle(), const_cast<char*>(contents.data()),
+                 static_cast<DWORD>(contents.size()), &bytes_read,
                  nullptr) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to read file span of " << result.size() << " bytes from '"
-           << path << "'";
+           << "Unable to read file span of " << contents.size()
+           << " bytes from '" << path << "'";
   } else if (bytes_read != file->size()) {
     return ResourceExhaustedErrorBuilder(IREE_LOC)
            << "Unable to read all " << file->size() << " bytes from '" << path
            << "' (got " << bytes_read << ")";
   }
-  return result;
+  *out_contents = contents;
+  return OkStatus();
 }
 
 Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_TRACE_SCOPE0("file_io::SetFileContents");
-  IREE_ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
+  std::unique_ptr<FileHandle> file;
+  IREE_RETURN_IF_ERROR(FileHandle::OpenWrite(std::move(path), 0, &file));
   if (::WriteFile(file->handle(), content.data(),
                   static_cast<DWORD>(content.size()), NULL, NULL) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
@@ -115,17 +118,20 @@ std::string GetTempPath() {
 }
 
 // TODO(#3845): remove this when dylibs no longer need temp files.
-StatusOr<std::string> GetTempFile(absl::string_view base_name) {
+Status GetTempFile(absl::string_view base_name, std::string* out_path) {
   IREE_TRACE_SCOPE0("file_io::GetTempFile");
+  *out_path = std::string();
 
   std::string temp_path = GetTempPath();
   std::string template_path =
       file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
 
   if (::_mktemp(&template_path[0]) != nullptr) {
+    // Should have been modified by _mktemp.
     static std::atomic<int> next_id{0};
     template_path += std::to_string(next_id++);
-    return template_path;  // Should have been modified by _mktemp.
+    *out_path = std::move(template_path);
+    return OkStatus();
   } else {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
            << "Unable to create temp file with template " << template_path;

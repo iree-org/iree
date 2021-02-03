@@ -95,8 +95,8 @@ StatusOr<int> Run(std::string module_file_path) {
     module_data = std::string{std::istreambuf_iterator<char>(std::cin),
                               std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(module_data,
-                          file_io::GetFileContents(module_file_path));
+    IREE_RETURN_IF_ERROR(
+        file_io::GetFileContents(module_file_path, &module_data));
   }
 
   iree_vm_module_t* input_module = nullptr;

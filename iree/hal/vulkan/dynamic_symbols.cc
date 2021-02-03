@@ -162,9 +162,9 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-  IREE_ASSIGN_OR_RETURN(
-      auto loader_library,
-      DynamicLibrary::Load(absl::MakeSpan(kVulkanLoaderSearchNames)));
+  std::unique_ptr<iree::DynamicLibrary> loader_library;
+  IREE_RETURN_IF_ERROR(DynamicLibrary::Load(
+      absl::MakeSpan(kVulkanLoaderSearchNames), &loader_library));
   auto syms = make_ref<DynamicSymbols>();
   syms->loader_library_ = std::move(loader_library);
 

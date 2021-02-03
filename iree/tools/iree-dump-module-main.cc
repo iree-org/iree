@@ -30,12 +30,12 @@ extern "C" int main(int argc, char** argv) {
     std::cerr << "Syntax: iree-dump-module module.vmfb > module.json\n";
     return 1;
   }
-  auto module_contents_or = iree::file_io::GetFileContents(argv[1]);
-  if (!module_contents_or.ok()) {
-    std::cerr << module_contents_or.status();
+  std::string module_contents;
+  auto status = iree::file_io::GetFileContents(argv[1], &module_contents);
+  if (!status.ok()) {
+    std::cerr << status;
     return 1;
   }
-  auto module_contents = std::move(module_contents_or.value());
 
   // Print direct to stdout.
   flatcc_json_printer_t printer;
