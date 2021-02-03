@@ -15,9 +15,9 @@
 #ifndef IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 #define IREE_HAL_VULKAN_EXTENSIBILITY_UTIL_H_
 
-#include "iree/base/arena.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 // A list of NUL-terminated strings (so they can be passed directly to Vulkan).
 typedef struct {

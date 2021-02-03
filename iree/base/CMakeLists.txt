@@ -54,31 +54,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    arena
-  HDRS
-    "arena.h"
-  SRCS
-    "arena.cc"
-  DEPS
-    ::logging
-    absl::core_headers
-    absl::span
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    arena_test
-  SRCS
-    "arena_test.cc"
-  DEPS
-    ::arena
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     atomic_slist
   HDRS
     "atomic_slist.h"

@@ -16,6 +16,31 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    arena
+  HDRS
+    "arena.h"
+  SRCS
+    "arena.cc"
+  DEPS
+    absl::core_headers
+    absl::span
+    iree::base::logging
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    arena_test
+  SRCS
+    "arena_test.cc"
+  DEPS
+    ::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     intrusive_list
   HDRS
     "intrusive_list.h"

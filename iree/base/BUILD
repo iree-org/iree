@@ -87,27 +87,6 @@ cc_test(
 #===------------------------------------------------------------------------===#
 
 cc_library(
-    name = "arena",
-    srcs = ["arena.cc"],
-    hdrs = ["arena.h"],
-    deps = [
-        ":logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "arena_test",
-    srcs = ["arena_test.cc"],
-    deps = [
-        ":arena",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "atomic_slist",
     srcs = ["atomic_slist.c"],
     hdrs = ["atomic_slist.h"],

@@ -18,14 +18,26 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-""",
+cc_library(
+    name = "arena",
+    srcs = ["arena.cc"],
+    hdrs = ["arena.h"],
+    deps = [
+        "//iree/base:logging",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
+    ],
 )
 
+cc_test(
+    name = "arena_test",
+    srcs = ["arena_test.cc"],
+    deps = [
+        ":arena",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
 
 cc_library(
     name = "intrusive_list",

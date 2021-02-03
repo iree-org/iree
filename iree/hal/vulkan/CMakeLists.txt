@@ -83,7 +83,6 @@ iree_cc_library(
     absl::strings
     absl::synchronization
     iree::base::api
-    iree::base::arena
     iree::base::core_headers
     iree::base::flatcc
     iree::base::logging
@@ -91,6 +90,7 @@ iree_cc_library(
     iree::base::synchronization
     iree::base::tracing
     iree::hal::api
+    iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr
     iree::schemas::spirv_executable_def_c_fbs

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_ARENA_H_
-#define IREE_BASE_ARENA_H_
+#ifndef IREE_HAL_VULKAN_UTIL_ARENA_H_
+#define IREE_HAL_VULKAN_UTIL_ARENA_H_
 
 #include <cstdint>
 #include <utility>
@@ -120,4 +120,4 @@ class Arena {
 
 }  // namespace iree
 
-#endif  // IREE_BASE_ARENA_H_
+#endif  // IREE_HAL_VULKAN_UTIL_ARENA_H_
