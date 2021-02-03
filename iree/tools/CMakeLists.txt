@@ -110,7 +110,7 @@ iree_cc_binary(
     "iree-dump-module-main.cc"
   DEPS
     flatcc::runtime
-    iree::base::file_mapping
+    iree::base::file_io
     iree::schemas::bytecode_module_def_c_fbs
 )
 
