@@ -52,6 +52,35 @@ class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+template <typename SrcOpTy>
+class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+ public:
+  ShiftArithmeticOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    typename SrcOpTy::Adaptor srcAdaptor(
+        operands, op.getOperation()->getAttrDictionary());
+
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args = rewriter.getArrayAttr(
+        {IntegerAttr::get(rewriter.getIndexType(), 0), srcAdaptor.amount()});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
 // TODO(simon-camp): These conversions to macro calls should be deleted once
 // support for control flow ops has landed in the c module target
 template <typename SrcOpTy>
@@ -137,6 +166,14 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<NoAttributeOpConversion<IREE::VM::XorI32Op>>(context,
                                                                "vm_xor_i32");
 
+  // Native bitwise shift and rotate ops
+  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShlI32Op>>(
+      context, "vm_shl_i32");
+  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShrI32SOp>>(
+      context, "vm_shr_i32s");
+  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShrI32UOp>>(
+      context, "vm_shr_i32u");
+
   // Check
   // TODO(simon-camp): These conversions to macro calls should be deleted once
   // support for control flow ops has landed in the c module target
@@ -187,6 +224,11 @@ class ConvertVMToEmitCPass
     target.addIllegalOp<IREE::VM::AndI32Op>();
     target.addIllegalOp<IREE::VM::OrI32Op>();
     target.addIllegalOp<IREE::VM::XorI32Op>();
+
+    // Native bitwise shift and rotate ops
+    target.addIllegalOp<IREE::VM::ShlI32Op>();
+    target.addIllegalOp<IREE::VM::ShrI32SOp>();
+    target.addIllegalOp<IREE::VM::ShrI32UOp>();
 
     // Check ops
     // TODO(simon-camp): These conversions to macro calls should be deleted once
