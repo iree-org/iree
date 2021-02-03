@@ -48,6 +48,7 @@ iree_cc_library(
     iree::base::api
     iree::base::atomic_slist
     iree::base::core_headers
+    iree::base::internal::prng
     iree::base::synchronization
     iree::base::threading
     iree::base::tracing
@@ -64,6 +65,7 @@ iree_cc_test(
     ::task
     iree::base::api
     iree::base::core_headers
+    iree::base::internal::prng
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main

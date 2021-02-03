@@ -83,6 +83,24 @@ cc_library(
 )
 
 cc_library(
+    name = "prng",
+    hdrs = ["prng.h"],
+    deps = [
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "prng_test",
+    srcs = ["prng_test.cc"],
+    deps = [
+        ":prng",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",

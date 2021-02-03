@@ -85,6 +85,27 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    prng
+  HDRS
+    "prng.h"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    prng_test
+  SRCS
+    "prng_test.cc"
+  DEPS
+    ::prng
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     status_internal
   HDRS
     "status.h"

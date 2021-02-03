@@ -15,6 +15,7 @@
 #ifndef IREE_TASK_EXECUTOR_IMPL_H_
 #define IREE_TASK_EXECUTOR_IMPL_H_
 
+#include "iree/base/internal/prng.h"
 #include "iree/base/math.h"
 #include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
