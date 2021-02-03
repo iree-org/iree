@@ -70,6 +70,8 @@ static void CleanupVulkanWindow() {
                                   g_Allocator);
 }
 
+namespace iree {
+
 extern "C" int iree_main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Create a window.
@@ -508,3 +510,5 @@ extern "C" int iree_main(int argc, char** argv) {
 
   return 0;
 }
+
+}  // namespace iree
