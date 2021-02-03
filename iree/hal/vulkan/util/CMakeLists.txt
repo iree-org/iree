@@ -19,7 +19,6 @@ iree_cc_library(
     intrusive_list
   HDRS
     "intrusive_list.h"
-    "intrusive_list_ref_ptr.inc"
     "intrusive_list_unique_ptr.inc"
   DEPS
     iree::base::logging
@@ -31,7 +30,6 @@ iree_cc_test(
   NAME
     intrusive_list_test
   SRCS
-    "intrusive_list_ref_ptr_test.cc"
     "intrusive_list_test.cc"
     "intrusive_list_unique_ptr_test.cc"
   DEPS

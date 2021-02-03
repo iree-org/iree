@@ -31,7 +31,6 @@ cc_library(
     name = "intrusive_list",
     hdrs = [
         "intrusive_list.h",
-        "intrusive_list_ref_ptr.inc",
         "intrusive_list_unique_ptr.inc",
     ],
     deps = [
@@ -43,7 +42,6 @@ cc_library(
 cc_test(
     name = "intrusive_list_test",
     srcs = [
-        "intrusive_list_ref_ptr_test.cc",
         "intrusive_list_test.cc",
         "intrusive_list_unique_ptr_test.cc",
     ],

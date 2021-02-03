@@ -752,7 +752,6 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::sort(
 }  // namespace iree
 
 // Specializations:
-#include "iree/hal/vulkan/util/intrusive_list_ref_ptr.inc"
 #include "iree/hal/vulkan/util/intrusive_list_unique_ptr.inc"
 
 #endif  // IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_H_
