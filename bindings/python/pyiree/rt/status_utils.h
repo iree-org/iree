@@ -16,19 +16,10 @@
 #define IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
 
 #include "iree/base/api.h"
-#include "iree/base/status.h"
 #include "pybind11/pybind11.h"
 
 namespace iree {
 namespace python {
-
-// Converts a failing status to a throwable exception, setting Python
-// error information.
-// Correct usage is something like:
-//   if (!status.ok()) {
-//     throw StatusToPyExc(status);
-//   }
-pybind11::error_already_set StatusToPyExc(const Status& status);
 
 // Raises a value error with the given message.
 // Correct usage:
@@ -41,16 +32,6 @@ pybind11::error_already_set RaisePyError(PyObject* exc_class,
 //   throw RaiseValueError("Foobar'd");
 inline pybind11::error_already_set RaiseValueError(const char* message) {
   return RaisePyError(PyExc_ValueError, message);
-}
-
-// Consumes a StatusOr<T>, returning an rvalue reference to the T if the
-// status is ok(). Otherwise, throws an exception.
-template <typename T>
-T&& PyConsumeStatusOr(iree::StatusOr<T>&& sor) {
-  if (sor.ok()) {
-    return std::move(*sor);
-  }
-  throw StatusToPyExc(sor.status());
 }
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
