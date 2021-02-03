@@ -245,12 +245,7 @@ module {
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
       module {
-        vm.module @module {
-          vm.func @dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-            vm.return
-          }
-          vm.export @dispatch_0
-        }
+        vm.module @module {}
       }
     }
   }
@@ -263,12 +258,7 @@ module {
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
       module {
-        vm.module @module {
-          vm.func @dispatch_1(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-            vm.return
-          }
-          vm.export @dispatch_1
-        }
+        vm.module @module {}
       }
     }
   }
@@ -281,23 +271,9 @@ module {
     hal.executable.target @vmla, filter="vmla" {
       hal.executable.entry_point @dispatch_2 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
       module {
-        vm.module @module {
-          vm.func @dispatch_2(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-            vm.return
-          }
-          vm.export @dispatch_2
-        }
+        vm.module @module {}
       }
     }
-  }
-  func @main() -> () {
-    %dev = hal.ex.shared_device : !hal.device
-    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
-    %c1 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %cmd, @dispatch_0::@vmla::@dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
-    hal.command_buffer.dispatch.symbol %cmd, @dispatch_1::@vmla::@dispatch_1, workgroup_xyz = [%c1, %c1, %c1]
-    hal.command_buffer.dispatch.symbol %cmd, @dispatch_2::@vmla::@dispatch_2, workgroup_xyz = [%c1, %c1, %c1]
-    return
   }
 }
 
