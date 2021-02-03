@@ -23,8 +23,8 @@ iree_cc_library(
     "arena.c"
   DEPS
     iree::base::api
-    iree::base::atomic_slist
     iree::base::core_headers
+    iree::base::internal::atomic_slist
     iree::base::synchronization
   PUBLIC
 )

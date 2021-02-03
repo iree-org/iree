@@ -16,7 +16,7 @@
 #define IREE_HAL_LOCAL_ARENA_H_
 
 #include "iree/base/api.h"
-#include "iree/base/atomic_slist.h"
+#include "iree/base/internal/atomic_slist.h"
 
 #ifdef __cplusplus
 extern "C" {

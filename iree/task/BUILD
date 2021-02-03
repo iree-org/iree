@@ -50,7 +50,6 @@ cc_library(
     ],
     deps = [
         "//iree/base:api",
-        "//iree/base:atomic_slist",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
         "//iree/base:threading",

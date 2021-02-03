@@ -16,8 +16,8 @@
 // design your algorithm so that you don't need anything from this file :)
 // See https://travisdowns.github.io/blog/2020/07/06/concurrency-costs.html
 
-#ifndef IREE_BASE_ATOMIC_SLIST_H_
-#define IREE_BASE_ATOMIC_SLIST_H_
+#ifndef IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
+#define IREE_BASE_INTERNAL_ATOMIC_SLIST_H_
 
 #include <stddef.h>
 
@@ -261,4 +261,4 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_ATOMIC_SLIST_H_
+#endif  // IREE_BASE_INTERNAL_ATOMIC_SLIST_H_

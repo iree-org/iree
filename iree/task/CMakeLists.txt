@@ -46,8 +46,8 @@ iree_cc_library(
   DEPS
     cpuinfo
     iree::base::api
-    iree::base::atomic_slist
     iree::base::core_headers
+    iree::base::internal::atomic_slist
     iree::base::internal::prng
     iree::base::synchronization
     iree::base::threading
