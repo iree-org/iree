@@ -16,6 +16,30 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    atomic_slist
+  HDRS
+    "atomic_slist.h"
+  SRCS
+    "atomic_slist.c"
+  DEPS
+    iree::base::core_headers
+    iree::base::synchronization
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    atomic_slist_test
+  SRCS
+    "atomic_slist_test.cc"
+  DEPS
+    ::atomic_slist
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     atomics
   HDRS
     "atomics_clang.h"
@@ -43,17 +67,58 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    file_io
+  HDRS
+    "file_io.h"
+  DEPS
+    absl::memory
+    absl::span
+    absl::strings
+    iree::base::core_headers
+    iree::base::internal::file_io_internal
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_io_hdrs
+  HDRS
+    "file_io.h"
+  DEPS
+    absl::strings
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_io_test
+  SRCS
+    "file_io_test.cc"
+  DEPS
+    ::file_io
+    ::file_path
+    absl::strings
+    iree::base::logging
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     file_io_internal
   SRCS
     "file_io_posix.cc"
     "file_io_win32.cc"
   DEPS
     ::file_handle_win32
+    ::file_io_hdrs
+    ::file_path
     absl::memory
     absl::strings
     iree::base::core_headers
-    iree::base::file_io_hdrs
-    iree::base::file_path
     iree::base::status
     iree::base::tracing
   PUBLIC
@@ -61,17 +126,38 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    file_mapping_internal
+    file_path
+  HDRS
+    "file_path.h"
   SRCS
-    "file_mapping_posix.cc"
-    "file_mapping_win32.cc"
+    "file_path.cc"
   DEPS
-    ::file_handle_win32
-    absl::memory
     absl::strings
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_path_test
+  SRCS
+    "file_path_test.cc"
+  DEPS
+    ::file_path
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    main
+  HDRS
+    "main.h"
+  SRCS
+    "main_posix.cc"
+    "main_win32.cc"
+  DEPS
     iree::base::core_headers
-    iree::base::file_mapping_hdrs
-    iree::base::tracing
+    iree::base::logging
   PUBLIC
 )
 
@@ -83,6 +169,27 @@ iree_cc_library(
   SRCS
     "ostringstream.cc"
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    prng
+  HDRS
+    "prng.h"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    prng_test
+  SRCS
+    "prng_test.cc"
+  DEPS
+    ::prng
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

@@ -14,7 +14,6 @@
 
 #include "iree/hal/vulkan/native_executable.h"
 
-#include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_executable_layout.h"

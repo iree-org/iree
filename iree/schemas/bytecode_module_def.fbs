@@ -115,7 +115,7 @@ table ModuleStateDef {
   // on module state allocation.
   global_bytes_capacity:int32;
 
-  // Total number of global ref_ptr values.
+  // Total number of global ref values.
   global_ref_count:int32;
 }
 
@@ -127,7 +127,7 @@ struct FunctionDescriptor {
   // TODO(benvanik): remove counts and embed directly in bytecode.
   // Total number of i32 registers used by the function.
   i32_register_count:int16;
-  // Total number of ref_ptr registers used by the function.
+  // Total number of ref registers used by the function.
   ref_register_count:int16;
 }
 

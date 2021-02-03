@@ -45,7 +45,7 @@ iree_cc_binary(
     "vulkan_inference_gui.cc"
   DEPS
     absl::base
-    iree::base::main
+    iree::base::internal::main
     iree::hal::vulkan::registration
     iree::modules::hal
     iree::samples::vulkan::simple_mul_bytecode_module_cc

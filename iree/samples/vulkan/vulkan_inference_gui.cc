@@ -32,8 +32,8 @@
 // Other dependencies (helpers, etc.)
 #include "absl/base/macros.h"
 #include "absl/types/span.h"
+#include "iree/base/internal/main.h"
 #include "iree/base/logging.h"
-#include "iree/base/main.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "iree/samples/vulkan/simple_mul_bytecode_module.h"
@@ -70,7 +70,7 @@ static void CleanupVulkanWindow() {
                                   g_Allocator);
 }
 
-int iree::IreeMain(int argc, char** argv) {
+extern "C" int iree_main(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Create a window.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {

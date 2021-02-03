@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/main.h"
+#include "iree/base/internal/main.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
@@ -21,7 +21,7 @@
 namespace iree {
 namespace {
 
-extern "C" int main(int argc, char** argv) { return IreeMain(argc, argv); }
+extern "C" int main(int argc, char** argv) { return iree_main(argc, argv); }
 
 }  // namespace
 }  // namespace iree

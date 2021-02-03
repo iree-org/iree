@@ -37,7 +37,6 @@ iree_cc_library(
     "atomics.h"
     "debugging.h"
     "math.h"
-    "memory.h"
     "target_platform.h"
   DEPS
     absl::core_headers
@@ -51,55 +50,6 @@ iree_cc_library(
   HDRS
     "target_platform.h"
   PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    arena
-  HDRS
-    "arena.h"
-  SRCS
-    "arena.cc"
-  DEPS
-    ::logging
-    absl::core_headers
-    absl::span
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    arena_test
-  SRCS
-    "arena_test.cc"
-  DEPS
-    ::arena
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    atomic_slist
-  HDRS
-    "atomic_slist.h"
-  SRCS
-    "atomic_slist.c"
-  DEPS
-    ::core_headers
-    ::synchronization
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    atomic_slist_test
-  SRCS
-    "atomic_slist_test.cc"
-  DEPS
-    ::atomic_slist
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -123,105 +73,14 @@ iree_cc_library(
     "dynamic_library_win32.cc"
   DEPS
     ::core_headers
-    ::file_path
     ::logging
     ::status
     ::tracing
     absl::memory
     absl::span
     absl::strings
+    iree::base::internal::file_path
   PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_io
-  HDRS
-    "file_io.h"
-  DEPS
-    ::core_headers
-    ::status
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::internal::file_io_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_io_hdrs
-  HDRS
-    "file_io.h"
-  DEPS
-    ::status
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_io_test
-  SRCS
-    "file_io_test.cc"
-  DEPS
-    ::file_io
-    ::file_path
-    ::logging
-    ::status
-    absl::strings
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    file_mapping
-  HDRS
-    "file_mapping.h"
-  DEPS
-    ::ref_ptr
-    ::status
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::internal::file_mapping_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_mapping_hdrs
-  HDRS
-    "file_mapping.h"
-  DEPS
-    ::ref_ptr
-    ::status
-    absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    file_path
-  HDRS
-    "file_path.h"
-  SRCS
-    "file_path.cc"
-  DEPS
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_path_test
-  SRCS
-    "file_path_test.cc"
-  DEPS
-    ::file_path
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -263,33 +122,6 @@ flatbuffer_c_library(
 
 iree_cc_library(
   NAME
-    intrusive_list
-  HDRS
-    "intrusive_list.h"
-    "intrusive_list_ref_ptr.inc"
-    "intrusive_list_unique_ptr.inc"
-  DEPS
-    ::logging
-    ::ref_ptr
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    intrusive_list_test
-  SRCS
-    "intrusive_list_ref_ptr_test.cc"
-    "intrusive_list_test.cc"
-    "intrusive_list_unique_ptr_test.cc"
-  DEPS
-    ::intrusive_list
-    absl::memory
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     logging
   HDRS
     "logging.h"
@@ -303,20 +135,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    main
-  HDRS
-    "main.h"
-  SRCS
-    "main_posix.cc"
-    "main_win32.cc"
-  DEPS
-    ::core_headers
-    ::logging
-  PUBLIC
-)
-
 iree_cc_test(
   NAME
     math_test
@@ -324,28 +142,6 @@ iree_cc_test(
     "math_test.cc"
   DEPS
     ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    ref_ptr
-  HDRS
-    "ref_ptr.h"
-  DEPS
-    ::logging
-    absl::core_headers
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    ref_ptr_test
-  SRCS
-    "ref_ptr_test.cc"
-  DEPS
-    ::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )

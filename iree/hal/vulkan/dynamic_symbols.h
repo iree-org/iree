@@ -24,9 +24,9 @@
 #include <memory>
 
 #include "iree/base/dynamic_library.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {

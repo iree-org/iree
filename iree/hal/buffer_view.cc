@@ -27,7 +27,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "iree/base/api.h"
-#include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/string_util.h"

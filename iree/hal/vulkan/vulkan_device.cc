@@ -21,7 +21,6 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/math.h"
-#include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"

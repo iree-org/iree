@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/atomic_slist.h"
+#include "iree/base/internal/atomic_slist.h"
 
 #include <assert.h>
 

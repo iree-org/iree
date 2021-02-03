@@ -19,9 +19,9 @@
 
 // Other dependencies (helpers, etc.)
 #include "absl/flags/flag.h"
-#include "iree/base/file_io.h"
 #include "iree/base/flags.h"
-#include "iree/base/main.h"
+#include "iree/base/internal/file_io.h"
+#include "iree/base/internal/main.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
@@ -146,7 +146,7 @@ Status RunModuleAndUpdateImGuiWindow(
 }  // namespace
 }  // namespace iree
 
-int iree::IreeMain(int argc, char** argv) {
+extern "C" int iree_main(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
       iree_hal_driver_registry_default()));

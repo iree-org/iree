@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/file_io.h"
+#include "iree/base/internal/file_io.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/file_path.h"
+#include "iree/base/internal/file_path.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"

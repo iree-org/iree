@@ -30,10 +30,10 @@ cc_binary(
     testonly = True,
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
-        "//iree/base:file_io",
         "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",
@@ -54,10 +54,10 @@ cc_binary(
     deps = [
         "//iree/base:api",
         "//iree/base:core_headers",
-        "//iree/base:file_io",
         "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/hal/drivers",
         "//iree/modules/check:native_module",
         "//iree/modules/hal",
@@ -73,7 +73,7 @@ cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.cc"],
     deps = [
-        "//iree/base:file_mapping",
+        "//iree/base/internal:file_io",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
 )
@@ -271,10 +271,10 @@ cc_binary(
     name = "iree-run-module",
     srcs = ["iree-run-module-main.cc"],
     deps = [
-        "//iree/base:file_io",
         "//iree/base:flags",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/hal/drivers",
         "//iree/modules/hal",
         "//iree/tools/utils:vm_util",

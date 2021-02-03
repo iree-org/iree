@@ -15,7 +15,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_replace.h"
 #include "iree/base/dynamic_library.h"
-#include "iree/base/file_path.h"
+#include "iree/base/internal/file_path.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 

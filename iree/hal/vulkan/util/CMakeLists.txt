@@ -12,63 +12,75 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_HAL_DRIVER_VMLA})
-  return()
-endif()
-
 iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    op_kernels
+    arena
   HDRS
-    "op_kernels.h"
-  TEXTUAL_HDRS
-    "op_kernels_fft.h"
-    "op_kernels_generic.h"
-    "op_kernels_ruy.h"
+    "arena.h"
+  SRCS
+    "arena.cc"
   DEPS
-    absl::algorithm
     absl::core_headers
-    absl::flat_hash_set
-    absl::inlined_vector
-    absl::memory
     absl::span
-    iree::base::status
-    iree::base::tracing
-    pffft
-    ruy
+    iree::base::logging
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    op_kernels_test
+    arena_test
   SRCS
-    "op_kernels_test.cc"
+    "arena_test.cc"
   DEPS
-    ::op_kernels
-    absl::inlined_vector
-    iree::base::core_headers
+    ::arena
     iree::testing::gtest
     iree::testing::gtest_main
 )
 
 iree_cc_library(
   NAME
-    op_module
+    intrusive_list
   HDRS
-    "op_module.h"
-  SRCS
-    "op_module.cc"
+    "intrusive_list.h"
+    "intrusive_list_unique_ptr.inc"
   DEPS
-    ::op_kernels
-    absl::span
-    iree::base::api
-    iree::base::core_headers
-    iree::base::status
-    iree::base::tracing
-    iree::vm
-    iree::vm::cc
+    iree::base::logging
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    intrusive_list_test
+  SRCS
+    "intrusive_list_test.cc"
+    "intrusive_list_unique_ptr_test.cc"
+  DEPS
+    ::intrusive_list
+    absl::memory
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    ref_ptr
+  HDRS
+    "ref_ptr.h"
+  DEPS
+    absl::core_headers
+    iree::base::logging
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    ref_ptr_test
+  SRCS
+    "ref_ptr_test.cc"
+  DEPS
+    ::ref_ptr
+    iree::testing::gtest
+    iree::testing::gtest_main
 )

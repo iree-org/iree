@@ -21,6 +21,26 @@ package(
 )
 
 cc_library(
+    name = "atomic_slist",
+    srcs = ["atomic_slist.c"],
+    hdrs = ["atomic_slist.h"],
+    deps = [
+        "//iree/base:core_headers",
+        "//iree/base:synchronization",
+    ],
+)
+
+cc_test(
+    name = "atomic_slist_test",
+    srcs = ["atomic_slist_test.cc"],
+    deps = [
+        ":atomic_slist",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "atomics",
     hdrs = [
         "atomics_clang.h",
@@ -45,6 +65,42 @@ cc_library(
 )
 
 cc_library(
+    name = "file_io",
+    hdrs = ["file_io.h"],
+    deps = [
+        "//iree/base:core_headers",
+        "//iree/base:status",
+        "//iree/base/internal:file_io_internal",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "file_io_hdrs",
+    hdrs = ["file_io.h"],
+    deps = [
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "file_io_test",
+    srcs = ["file_io_test.cc"],
+    deps = [
+        ":file_io",
+        ":file_path",
+        "//iree/base:logging",
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "file_io_internal",
     srcs = [
         "file_io_posix.cc",
@@ -52,9 +108,9 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
+        ":file_io_hdrs",
+        ":file_path",
         "//iree/base:core_headers",
-        "//iree/base:file_io_hdrs",
-        "//iree/base:file_path",
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
@@ -63,18 +119,36 @@ cc_library(
 )
 
 cc_library(
-    name = "file_mapping_internal",
+    name = "file_path",
+    srcs = ["file_path.cc"],
+    hdrs = ["file_path.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "file_path_test",
     srcs = [
-        "file_mapping_posix.cc",
-        "file_mapping_win32.cc",
+        "file_path_test.cc",
     ],
     deps = [
-        ":file_handle_win32",
+        ":file_path",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "main",
+    srcs = [
+        "main_posix.cc",
+        "main_win32.cc",
+    ],
+    hdrs = ["main.h"],
+    deps = [
         "//iree/base:core_headers",
-        "//iree/base:file_mapping_hdrs",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
+        "//iree/base:logging",
     ],
 )
 
@@ -83,6 +157,24 @@ cc_library(
     srcs = ["ostringstream.cc"],
     hdrs = ["ostringstream.h"],
     visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "prng",
+    hdrs = ["prng.h"],
+    deps = [
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "prng_test",
+    srcs = ["prng_test.cc"],
+    deps = [
+        ":prng",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
 )
 
 cc_library(

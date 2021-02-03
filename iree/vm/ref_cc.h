@@ -15,6 +15,7 @@
 #ifndef IREE_VM_REF_CC_H_
 #define IREE_VM_REF_CC_H_
 
+#include <atomic>
 #include <memory>
 #include <utility>
 
@@ -28,6 +29,10 @@
 
 namespace iree {
 namespace vm {
+
+//===----------------------------------------------------------------------===//
+// iree::vm::RefObject C++ base type equivalent of iree_vm_ref_t
+//===----------------------------------------------------------------------===//
 
 // TODO(benvanik): make this automatic for most types, or use type lookup.
 // This could be done with SFINAE to detect iree_vm_ref_object_t or RefObject
@@ -45,6 +50,137 @@ template <typename T>
 ABSL_ATTRIBUTE_ALWAYS_INLINE void ref_type_release(T* p) {
   iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
 }
+
+// Base class for reference counted objects.
+// Reference counted objects should be used with the iree::vm::ref<T> pointer
+// type. As reference counting can be tricky always prefer to use unique_ptr and
+// avoid this type. Only use this when unique_ptr is not possible, such as
+// when round-tripping objects through marshaling boundaries (v8/Java) or
+// any objects that may have their lifetime tied to a garbage collected
+// object.
+//
+// Subclasses should protect their dtor so that reference counting must
+// be used.
+//
+// This is designed to avoid the need for extra vtable space or for adding
+// methods to the vtable of subclasses. This differs from the boost Pointable
+// version of this object.
+// Inspiration for this comes from Peter Weinert's Dr. Dobb's article:
+// http://www.drdobbs.com/cpp/a-base-class-for-intrusively-reference-c/229218807
+//
+// RefObjects are thread safe and may be used with iree::vm::ref<T>s from
+// multiple threads.
+//
+// Subclasses may implement a custom Delete operator to handle their
+// deallocation. It should be thread safe as it may be called from any thread.
+//
+// Usage:
+//   class MyRefObject : public RefObject<MyRefObject> {
+//    public:
+//     MyRefObject() = default;
+//     // Optional; can be used to return to pool/etc - must be public:
+//     static void Delete(MyRefObject* ptr) {
+//       ::operator delete(ptr);
+//     }
+//   };
+template <class T>
+class RefObject {
+  static_assert(!std::is_array<T>::value, "T must not be an array");
+
+  // value is true if a static Delete(T*) function is present.
+  struct has_custom_deleter {
+    template <typename C>
+    static auto Test(C* p) -> decltype(C::Delete(nullptr), std::true_type());
+    template <typename>
+    static std::false_type Test(...);
+    static constexpr bool value =
+        std::is_same<std::true_type, decltype(Test<T>(nullptr))>::value;
+  };
+
+  template <typename V, bool has_custom_deleter>
+  struct delete_thunk {
+    static void Delete(V* p) {
+      auto ref_obj = static_cast<RefObject<V>*>(p);
+      int previous_count = ref_obj->counter_.fetch_sub(1);
+      if (previous_count == 1) {
+        // We delete type T pointer here to avoid the need for a virtual dtor.
+        V::Delete(p);
+      }
+    }
+    static void Destroy(V* p) { V::Delete(p); }
+  };
+
+  template <typename V>
+  struct delete_thunk<V, false> {
+    static void Delete(V* p) {
+      auto ref_obj = static_cast<RefObject<V>*>(p);
+      int previous_count = ref_obj->counter_.fetch_sub(1);
+      if (previous_count == 1) {
+        // We delete type T pointer here to avoid the need for a virtual dtor.
+        delete p;
+      }
+    }
+    static void Destroy(V* p) { delete p; }
+  };
+
+ public:
+  // Adds a reference; used by ref_ptr.
+  friend void ref_ptr_add_ref(T* p) {
+    auto ref_obj = static_cast<RefObject*>(p);
+    ++ref_obj->counter_;
+  }
+
+  // Releases a reference, potentially deleting the object; used by ref_ptr.
+  friend void ref_ptr_release_ref(T* p) {
+    delete_thunk<T, has_custom_deleter::value>::Delete(p);
+  }
+
+  // Deletes the object (precondition: ref count is zero).
+  friend void ref_ptr_destroy_ref(T* p) {
+    delete_thunk<T, has_custom_deleter::value>::Destroy(p);
+  }
+
+  // Deletes the object (precondition: ref count is zero).
+  static void DirectDestroy(void* p) {
+    ref_ptr_destroy_ref(reinterpret_cast<T*>(p));
+  }
+
+  // Adds a reference.
+  // ref_ptr should be used instead of this in most cases. This is required
+  // for when interoperating with marshaling APIs.
+  void AddReference() { ref_ptr_add_ref(static_cast<T*>(this)); }
+
+  // Releases a reference, potentially deleting the object.
+  // ref_ptr should be used instead of this in most cases. This is required
+  // for when interoperating with marshaling APIs.
+  void ReleaseReference() { ref_ptr_release_ref(static_cast<T*>(this)); }
+
+  // Returns the offset of the reference counter field from the start of the
+  // type T.
+  //
+  // This is generally unsafe to use and is here for support of the
+  // iree_vm_ref_t glue that allows RefObject-derived types to be round-tripped
+  // through the VM.
+  //
+  // For simple POD types or non-virtual classes we expect this to return 0.
+  // If the type has virtual methods (dtors/etc) then it should be 4 or 8
+  // (depending on pointer width). It may be other things, and instead of too
+  // much crazy magic we just rely on offsetof doing the right thing here.
+  static constexpr size_t offsetof_counter() { return offsetof(T, counter_); }
+
+ protected:
+  RefObject() { ref_ptr_add_ref(static_cast<T*>(this)); }
+  RefObject(const RefObject&) = default;
+  RefObject& operator=(const RefObject&) { return *this; }
+
+  // TODO(benvanik): replace this with just iree_vm_ref_object_t.
+  // That would allow us to remove a lot of these methods and reuse the C ones.
+  std::atomic<int32_t> counter_{0};
+};
+
+//===----------------------------------------------------------------------===//
+// iree::vm::ref<T> RAII equivalent of iree_vm_ref_t
+//===----------------------------------------------------------------------===//
 
 // Reference counted pointer container wrapping iree_vm_ref_t.
 // This is modeled on boost::instrusive_ptr in that it requires no
@@ -295,6 +431,10 @@ template <class T>
 void swap(ref<T>& lhs, ref<T>& rhs) {
   lhs.swap(rhs);
 }
+
+//===----------------------------------------------------------------------===//
+// iree::opaque_ref utility for type-erased ref values
+//===----------------------------------------------------------------------===//
 
 // An opaque reference that does not make any assertions about the type of the
 // ref contained. This can be used to accept arbitrary ref objects that are then
