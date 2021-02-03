@@ -223,20 +223,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    main
-  HDRS
-    "main.h"
-  SRCS
-    "main_posix.cc"
-    "main_win32.cc"
-  DEPS
-    ::core_headers
-    ::logging
-  PUBLIC
-)
-
 iree_cc_test(
   NAME
     math_test

@@ -226,19 +226,6 @@ cc_library(
 )
 
 cc_library(
-    name = "main",
-    srcs = [
-        "main_posix.cc",
-        "main_win32.cc",
-    ],
-    hdrs = ["main.h"],
-    deps = [
-        ":core_headers",
-        ":logging",
-    ],
-)
-
-cc_library(
     name = "signature_mangle",
     srcs = ["signature_mangle.cc"],
     hdrs = ["signature_mangle.h"],

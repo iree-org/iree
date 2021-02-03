@@ -15,8 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "iree/base/internal/main.h"
 #include "iree/base/logging.h"
-#include "iree/base/main.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -28,7 +28,7 @@ namespace iree {
 namespace {
 
 // Entry point when using /SUBSYSTEM:CONSOLE is the standard main().
-extern "C" int main(int argc, char** argv) { return IreeMain(argc, argv); }
+extern "C" int main(int argc, char** argv) { return iree_main(argc, argv); }
 
 // Entry point when using /SUBSYSTEM:WINDOWS.
 extern "C" int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -57,7 +57,7 @@ extern "C" int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
   // Run standard main function.
-  int exit_code = IreeMain(argc, argv_a.data());
+  int exit_code = iree_main(argc, argv_a.data());
 
   // Release arg memory.
   argv_a.clear();

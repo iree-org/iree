@@ -63,6 +63,19 @@ cc_library(
 )
 
 cc_library(
+    name = "main",
+    srcs = [
+        "main_posix.cc",
+        "main_win32.cc",
+    ],
+    hdrs = ["main.h"],
+    deps = [
+        "//iree/base:core_headers",
+        "//iree/base:logging",
+    ],
+)
+
+cc_library(
     name = "ostringstream",
     srcs = ["ostringstream.cc"],
     hdrs = ["ostringstream.h"],

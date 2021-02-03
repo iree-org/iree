@@ -61,6 +61,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    main
+  HDRS
+    "main.h"
+  SRCS
+    "main_posix.cc"
+    "main_win32.cc"
+  DEPS
+    iree::base::core_headers
+    iree::base::logging
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     ostringstream
   HDRS
     "ostringstream.h"

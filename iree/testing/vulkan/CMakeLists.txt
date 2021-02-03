@@ -66,7 +66,7 @@ iree_cc_binary(
     absl::flags
     iree::base::file_io
     iree::base::flags
-    iree::base::main
+    iree::base::internal::main
     iree::base::status
     iree::base::tracing
     iree::hal::vulkan::registration

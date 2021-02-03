@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_MAIN_H_
-#define IREE_BASE_MAIN_H_
+#ifndef IREE_BASE_INTERNAL_MAIN_H_
+#define IREE_BASE_INTERNAL_MAIN_H_
 
-namespace iree {
+extern "C" int iree_main(int argc, char** argv);
 
-int IreeMain(int argc, char** argv);
-
-}  // namespace iree
-
-#endif  // IREE_BASE_MAIN_H_
+#endif  // IREE_BASE_INTERNAL_MAIN_H_
