@@ -38,14 +38,14 @@ Status FileHandle::OpenRead(std::string path, DWORD file_flags,
       /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_NORMAL | file_flags,
       /*hTemplateFile=*/nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to open file " << path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to open file '%s'", path.c_str());
   }
 
   BY_HANDLE_FILE_INFORMATION file_info;
   if (::GetFileInformationByHandle(handle, &file_info) == FALSE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to query file info for " << path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to query file info for %s", path.c_str());
   }
 
   uint64_t file_size = (static_cast<uint64_t>(file_info.nFileSizeHigh) << 32) |
@@ -66,8 +66,8 @@ Status FileHandle::OpenWrite(std::string path, DWORD file_flags,
       /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_NORMAL | file_flags,
       /*hTemplateFile=*/nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to open file " << path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to open file '%s'", path.c_str());
   }
   *out_handle = absl::make_unique<FileHandle>(handle, 0);
   return OkStatus();

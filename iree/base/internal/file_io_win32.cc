@@ -35,8 +35,8 @@ Status FileExists(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::FileExists");
   DWORD attrs = ::GetFileAttributesA(path.c_str());
   if (attrs == INVALID_FILE_ATTRIBUTES) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to find/access file: " << path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to find/access file: %s", path.c_str());
   }
   return OkStatus();
 }
@@ -53,13 +53,14 @@ Status GetFileContents(const std::string& path, std::string* out_contents) {
   if (::ReadFile(file->handle(), const_cast<char*>(contents.data()),
                  static_cast<DWORD>(contents.size()), &bytes_read,
                  nullptr) == FALSE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to read file span of " << contents.size()
-           << " bytes from '" << path << "'";
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to read file span of %zu bytes from '%s'",
+                            contents.size(), path.c_str());
   } else if (bytes_read != file->size()) {
-    return ResourceExhaustedErrorBuilder(IREE_LOC)
-           << "Unable to read all " << file->size() << " bytes from '" << path
-           << "' (got " << bytes_read << ")";
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "unable to read all %zu bytes from '%.*s' (got %zu)", file->size(),
+        (int)path.size(), path.data(), bytes_read);
   }
   *out_contents = contents;
   return OkStatus();
@@ -71,9 +72,9 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_RETURN_IF_ERROR(FileHandle::OpenWrite(std::move(path), 0, &file));
   if (::WriteFile(file->handle(), content.data(),
                   static_cast<DWORD>(content.size()), NULL, NULL) == FALSE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to write file span of " << content.size() << " bytes to '"
-           << path << "'";
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to write file span of %zu bytes to '%s'",
+                            content.size(), path.c_str());
   }
   return OkStatus();
 }
@@ -81,8 +82,8 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
 Status DeleteFile(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::DeleteFile");
   if (::DeleteFileA(path.c_str()) == FALSE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to delete/access file: " << path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to delete/access file: %s", path.c_str());
   }
   return OkStatus();
 }
@@ -91,9 +92,9 @@ Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
   IREE_TRACE_SCOPE0("file_io::MoveFile");
   if (::MoveFileA(source_path.c_str(), destination_path.c_str()) == FALSE) {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to move file " << source_path << " to "
-           << destination_path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to move file '%s' to '%s'",
+                            source_path.c_str(), destination_path.c_str());
   }
   return OkStatus();
 }
@@ -133,8 +134,9 @@ Status GetTempFile(absl::string_view base_name, std::string* out_path) {
     *out_path = std::move(template_path);
     return OkStatus();
   } else {
-    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to create temp file with template " << template_path;
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "unable to create temp file with template '%s'",
+                            template_path.c_str());
   }
 }
 

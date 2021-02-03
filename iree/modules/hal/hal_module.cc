@@ -288,7 +288,7 @@ class HALModuleState final {
                         const vm::ref<iree_vm_rw_byte_buffer_t>& target_buffer,
                         int32_t target_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferReadData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferReadData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferReadData");
   }
 
   Status BufferWriteData(const vm::ref<iree_hal_buffer_t>& target_buffer,
@@ -296,7 +296,7 @@ class HALModuleState final {
                          const vm::ref<iree_vm_ro_byte_buffer_t>& source_buffer,
                          int32_t source_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferWriteData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferWriteData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferWriteData");
   }
 
   Status BufferCopyData(const vm::ref<iree_hal_buffer_t>& source_buffer,
@@ -304,7 +304,7 @@ class HALModuleState final {
                         const vm::ref<iree_hal_buffer_t>& target_buffer,
                         int32_t target_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferCopyData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferCopyData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferCopyData");
   }
 
   StatusOr<int32_t> BufferLoad(const vm::ref<iree_hal_buffer_t>& source_buffer,
@@ -330,7 +330,7 @@ class HALModuleState final {
 
     if (target_offset + length >
         iree_hal_buffer_byte_length(target_buffer.get())) {
-      return OutOfRangeErrorBuilder(IREE_LOC) << "Out of bounds store";
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "out of bounds store");
     } else if (length > sizeof(value)) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Length " << length << " exceeds max";

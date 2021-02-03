@@ -302,8 +302,8 @@ iree_status_t EmulatedTimelineSemaphore::GetSignalSemaphore(
     if ((*insertion_point)->value > value) break;
   }
 
-  IREE_ASSIGN_OR_RETURN(TimePointSemaphore * semaphore,
-                        semaphore_pool_->Acquire());
+  TimePointSemaphore* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(semaphore_pool_->Acquire(&semaphore));
   semaphore->value = value;
   semaphore->signal_fence = add_ref(signal_fence);
   if (semaphore->wait_fence) {

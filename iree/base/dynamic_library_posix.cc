@@ -46,8 +46,8 @@ class DynamicLibraryPosix : public DynamicLibrary {
         return OkStatus();
       }
     }
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library:'" << dlerror() << "'";
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "unable to open dynamic library:'%s'", dlerror());
   }
 
   void* GetSymbol(const char* symbol_name) const override {

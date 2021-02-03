@@ -138,34 +138,7 @@ StatusBuilder&& StatusBuilder::operator<<(const T& value) && {
 
 // Each of the functions below creates StatusBuilder with a canonical error.
 // The error code of the StatusBuilder matches the name of the function.
-StatusBuilder AbortedErrorBuilder(SourceLocation location);
-StatusBuilder AlreadyExistsErrorBuilder(SourceLocation location);
-StatusBuilder CancelledErrorBuilder(SourceLocation location);
-StatusBuilder DataLossErrorBuilder(SourceLocation location);
-StatusBuilder DeadlineExceededErrorBuilder(SourceLocation location);
-StatusBuilder FailedPreconditionErrorBuilder(SourceLocation location);
-StatusBuilder InternalErrorBuilder(SourceLocation location);
 StatusBuilder InvalidArgumentErrorBuilder(SourceLocation location);
-StatusBuilder NotFoundErrorBuilder(SourceLocation location);
-StatusBuilder OutOfRangeErrorBuilder(SourceLocation location);
-StatusBuilder PermissionDeniedErrorBuilder(SourceLocation location);
-StatusBuilder UnauthenticatedErrorBuilder(SourceLocation location);
-StatusBuilder ResourceExhaustedErrorBuilder(SourceLocation location);
-StatusBuilder UnavailableErrorBuilder(SourceLocation location);
-StatusBuilder UnimplementedErrorBuilder(SourceLocation location);
-StatusBuilder UnknownErrorBuilder(SourceLocation location);
-
-// Returns a StatusBuilder using a status code derived from |errno|.
-StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
-                                            SourceLocation location);
-
-#if defined(IREE_PLATFORM_WINDOWS)
-
-// Returns a StatusBuilder with a status describing the |error| and |location|.
-StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
-                                                 SourceLocation location);
-
-#endif  // IREE_PLATFORM_WINDOWS
 
 }  // namespace iree
 

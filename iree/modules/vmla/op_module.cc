@@ -99,29 +99,31 @@ Buffer::~Buffer() {
   parent_.reset();
 }
 
-StatusOr<absl::Span<uint8_t>> Buffer::MakeRange(
-    iree_vmla_size_t byte_offset, iree_vmla_size_t byte_length) const {
+Status Buffer::MakeRange(iree_vmla_size_t byte_offset,
+                         iree_vmla_size_t byte_length,
+                         absl::Span<uint8_t>* out_range) const {
   if (byte_length == kVMLAWholeBuffer) {
     byte_length = size() - byte_offset;
   }
   if (byte_offset > size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Attempted to access an address off the end of the valid "
-              "buffer range (offset="
-           << byte_offset << ", length=" << byte_length
-           << ", buffer byte_length=" << size() << ")";
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "attempted to access an address off the end of the valid buffer range "
+        "(offset=%u, length=%u, byte_length=%zu)",
+        byte_offset, byte_length, size());
   }
   size_t end = byte_offset + byte_length - 1;
   if (end >= size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Attempted to access an address outside of the valid buffer "
-              "range (offset="
-           << byte_offset << ", length=" << byte_length << ", end=" << end
-           << ", buffer byte_length=" << size() << ")";
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "attempted to access an address off the end of the valid buffer range "
+        "(offset=%u, length=%u, end=%zu, byte_length=%zu)",
+        byte_offset, byte_length, end, size());
   }
   uint8_t* data = reinterpret_cast<uint8_t*>(data_) + byte_offset;
   size_t data_length = byte_length;
-  return absl::MakeSpan(data, data_length);
+  *out_range = absl::MakeSpan(data, data_length);
+  return OkStatus();
 }
 
 constexpr int Interface::kMaxConstants;
@@ -258,19 +260,19 @@ class VMLAModuleState final {
       // Asking for the same buffer.
       return vm::retain_ref(src);
     } else if (byte_offset > src->size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address off the end of the valid "
-                "buffer range (offset="
-             << byte_offset << ", length=" << byte_length
-             << ", buffer byte_length=" << src->size() << ")";
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "attempted to access an address off the end of "
+                              "the valid buffer range "
+                              "(offset=%u, length=%u, byte_length=%zu)",
+                              byte_offset, byte_length, src->size());
     }
     size_t end = byte_offset + byte_length - 1;
     if (end >= src->size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address outside of the valid buffer "
-                "range (offset="
-             << byte_offset << ", length=" << byte_length << ", end=" << end
-             << ", buffer byte_length=" << src->size() << ")";
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "attempted to access an address off the end of the valid buffer "
+          "range (offset=%u, length=%u, end=%zu, byte_length=%zu)",
+          byte_offset, byte_length, end, src->size());
     }
     uint8_t* data = reinterpret_cast<uint8_t*>(src->data()) + byte_offset;
     size_t data_length = byte_length;

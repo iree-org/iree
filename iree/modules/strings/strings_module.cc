@@ -191,7 +191,7 @@ class StringsModuleState final {
         break;
 
       default:
-        return UnimplementedErrorBuilder(IREE_LOC);
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
     }
 
     // Unmap used buffer.

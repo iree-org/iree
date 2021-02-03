@@ -37,8 +37,8 @@ Status FileExists(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::FileExists");
   struct stat stat_buf;
   return stat(path.c_str(), &stat_buf) == 0
-             ? OkStatus()
-             : NotFoundErrorBuilder(IREE_LOC) << "'" << path << "'";
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_NOT_FOUND, "'%s'", path.c_str());
 }
 
 Status GetFileContents(const std::string& path, std::string* out_contents) {
@@ -49,28 +49,26 @@ Status GetFileContents(const std::string& path, std::string* out_contents) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to open file '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%s'", path.c_str());
   }
   if (std::fseek(file.get(), 0, SEEK_END) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to seek file '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
   }
   size_t file_size = std::ftell(file.get());
   if (file_size == -1L) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to read file length for '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno), "size query");
   }
   if (std::fseek(file.get(), 0, SEEK_SET) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to seek back in file '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
   }
   std::string contents;
   contents.resize(file_size);
   if (std::fread(const_cast<char*>(contents.data()), file_size, 1,
                  file.get()) != 1) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to read entire file contents of '" << path << "'";
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "unable to read entire file contents of '%.*s'",
+                            (int)path.size(), path.data());
   }
   *out_contents = std::move(contents);
   return OkStatus();
@@ -83,13 +81,14 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to open file '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%s'", path.c_str());
   }
   if (std::fwrite(const_cast<char*>(content.data()), content.size(), 1,
                   file.get()) != 1) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to write entire file contents of '" << path << "'";
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "unable to write entire file contents of '%.*s'",
+                            (int)path.size(), path.data());
   }
   return OkStatus();
 }
@@ -97,8 +96,8 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
 Status DeleteFile(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::DeleteFile");
   if (::remove(path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to delete file '" << path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to delete file '%s'", path.c_str());
   }
   return OkStatus();
 }
@@ -107,9 +106,9 @@ Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
   IREE_TRACE_SCOPE0("file_io::MoveFile");
   if (::rename(source_path.c_str(), destination_path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to rename file '" << source_path << "' to '"
-           << destination_path << "'";
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to rename file '%s' to '%s'",
+                            source_path.c_str(), destination_path.c_str());
   }
   return OkStatus();
 }
@@ -151,9 +150,9 @@ Status GetTempFile(absl::string_view base_name, std::string* out_path) {
     *out_path = std::move(template_path);
     return OkStatus();
   } else {
-    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
-           << "Failed to create temp file with template '" << template_path
-           << "'";
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to create temp file with template '%s'",
+                            template_path.c_str());
   }
 }
 

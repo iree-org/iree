@@ -181,7 +181,7 @@ iree_status_t SerializingCommandQueue::Submit(
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
     auto submission = std::make_unique<FencedSubmission>();
-    IREE_ASSIGN_OR_RETURN(submission->fence, fence_pool_->Acquire());
+    IREE_RETURN_IF_ERROR(fence_pool_->Acquire(&submission->fence));
 
     submission->wait_semaphores.resize(batch->wait_semaphores.count);
     for (iree_host_size_t j = 0; j < batch->wait_semaphores.count; ++j) {

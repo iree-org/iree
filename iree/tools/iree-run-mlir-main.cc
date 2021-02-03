@@ -194,8 +194,8 @@ Status PrepareModule(std::string target_backend,
   mlir::OwningModuleRef mlir_module =
       mlir::parseSourceFile(source_mgr, &context);
   if (!mlir_module) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "Could not parse MLIR file.";
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "could not parse MLIR file");
   }
 
   if (export_all_flag) {
@@ -223,8 +223,8 @@ Status PrepareModule(std::string target_backend,
   pass_manager.addPass(
       mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Conversion from source -> vm failed";
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "conversion from source -> vm failed");
   }
 
   if (print_mlir_flag) {
@@ -237,8 +237,9 @@ Status PrepareModule(std::string target_backend,
   llvm::raw_string_ostream binary_output(binary_contents);
   if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
           mlir_module.get(), bytecode_options, binary_output))) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Serialization to flatbuffer bytecode (binary) failed";
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "serialization to flatbuffer bytecode (binary) failed");
   }
   binary_output.flush();
 
@@ -251,8 +252,8 @@ Status PrepareModule(std::string target_backend,
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
             mlir_module.get(), bytecode_options, text_output))) {
-      return InternalErrorBuilder(IREE_LOC)
-             << "Serialization to annotated MLIR (text) failed";
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "serialization to annotated MLIR (text) failed");
     }
     text_output.flush();
     std::cerr << text_contents << std::endl;
@@ -264,8 +265,9 @@ Status PrepareModule(std::string target_backend,
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
             mlir_module.get(), bytecode_options, text_output))) {
-      return InternalErrorBuilder(IREE_LOC)
-             << "Serialization to flatbuffer bytecode (text) failed";
+      return iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "serialization to flatbuffer bytecode (text) failed");
     }
     text_output.flush();
     std::cerr << text_contents << std::endl;
@@ -446,9 +448,9 @@ Status RunFile(const std::string& mlir_filename,
   std::string error_message;
   auto file = mlir::openInputFile(mlir_filename, &error_message);
   if (!file) {
-    return NotFoundErrorBuilder(IREE_LOC)
-           << "Unable to open input file " << mlir_filename << ": "
-           << error_message;
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND, "unable to open input file %.*s: %s",
+        (int)mlir_filename.size(), mlir_filename.data(), error_message.c_str());
   }
 
   if (!split_input_file_flag) {

@@ -68,8 +68,9 @@ class DynamicLibraryWin : public DynamicLibrary {
       }
     }
 
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library, not found on search paths";
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "unable to open dynamic library, not found on search paths");
   }
 
 #if defined(IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT)

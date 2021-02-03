@@ -35,10 +35,10 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
     auto function_name = iree_vm_function_name(&function);
-    return iree::UnimplementedErrorBuilder(IREE_LOC)
-           << "Unsupported function ABI for: '"
-           << absl::string_view(function_name.data, function_name.size) << "'("
-           << absl::string_view{sig_fv.data, sig_fv.size} << ")";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unsupported function ABI for: '%.*s'(%.*s)",
+                            (int)function_name.size, function_name.data,
+                            (int)sig_fv.size, sig_fv.data);
   }
   return OkStatus();
 }
@@ -104,8 +104,9 @@ Status ParseToVariantList(
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
         if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
-          return UnimplementedErrorBuilder(IREE_LOC)
-                 << "Unsupported signature scalar type: " << desc_str;
+          return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                  "unsupported signature scalar type: %s",
+                                  desc_str.c_str());
         }
         absl::string_view input_view = absl::StripAsciiWhitespace(input_string);
         input_view = absl::StripPrefix(input_view, "\"");
@@ -136,8 +137,9 @@ Status ParseToVariantList(
         break;
       }
       default:
-        return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported signature type: " << desc_str;
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "unsupported signature type: %s",
+                                desc_str.c_str());
     }
   }
   *out_list = variant_list.release();
@@ -187,8 +189,9 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                  << " but descriptor information " << desc_str;
         }
         if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
-          return UnimplementedErrorBuilder(IREE_LOC)
-                 << "Unsupported signature scalar type: " << desc_str;
+          return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                  "unsupported signature scalar type: %s",
+                                  desc_str.c_str());
         }
         *os << "i32=" << variant.i32 << "\n";
         break;
@@ -221,8 +224,9 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
         break;
       }
       default:
-        return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported signature type: " << desc_str;
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "unsupported signature type: %s",
+                                desc_str.c_str());
     }
   }
 

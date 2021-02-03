@@ -413,6 +413,11 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // retrieved with value(), operator*(), or operator->().
   StatusOr(const T& value);
 
+  // Takes ownership of a C API status instance.
+  StatusOr(iree_status_t&& status) noexcept
+      : Base(exchange(status,
+                      iree_status_from_code(iree_status_code(status)))) {}
+
   // Constructs a new StatusOr with the given non-ok status. After calling this
   // constructor, this->ok() will be false and calls to value() will
   // IREE_CHECK-fail.

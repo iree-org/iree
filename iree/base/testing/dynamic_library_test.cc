@@ -26,6 +26,8 @@
 namespace iree {
 namespace {
 
+using iree::testing::status::StatusIs;
+
 static const char* kUnknownName = "library_that_does_not_exist.so";
 
 class DynamicLibraryTest : public ::testing::Test {
@@ -67,7 +69,8 @@ TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
 
 TEST_F(DynamicLibraryTest, LoadLibraryFailure) {
   std::unique_ptr<DynamicLibrary> library;
-  EXPECT_TRUE(IsUnavailable(DynamicLibrary::Load(kUnknownName, &library)));
+  EXPECT_THAT(DynamicLibrary::Load(kUnknownName, &library),
+              StatusIs(iree::StatusCode::kUnavailable));
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
