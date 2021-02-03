@@ -55,6 +55,7 @@ cc_library(
         "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base:wait_handle",
+        "//iree/base/internal",
         "//iree/base/internal:atomic_slist",
         "//iree/base/internal:prng",
         "@cpuinfo",

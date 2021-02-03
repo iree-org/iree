@@ -74,6 +74,7 @@ iree_cc_library(
     ::executable_library
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
     iree::hal::api
   PUBLIC
@@ -104,6 +105,7 @@ iree_cc_library(
     ::local
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::synchronization
     iree::base::tracing
     iree::base::wait_handle

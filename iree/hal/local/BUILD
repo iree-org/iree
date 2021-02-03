@@ -82,6 +82,7 @@ cc_library(
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:tracing",
+        "//iree/base/internal",
         "//iree/hal:api",
     ],
 )
@@ -115,6 +116,7 @@ cc_library(
         "//iree/base:synchronization",
         "//iree/base:tracing",
         "//iree/base:wait_handle",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/task",
     ],

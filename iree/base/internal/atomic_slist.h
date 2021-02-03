@@ -22,7 +22,7 @@
 #include <stddef.h>
 
 #include "iree/base/alignment.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/synchronization.h"
 
 #ifdef __cplusplus

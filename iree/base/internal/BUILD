@@ -20,11 +20,48 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+#===------------------------------------------------------------------------===#
+# Core headers (internal)
+#===------------------------------------------------------------------------===#
+# Put files here that large percentages of the code include only; adding
+# infrequently used files here will cause extraneous large rebuilds.
+
+cc_library(
+    name = "internal",
+    srcs = [
+        "atomics_clang.h",
+        "atomics_gcc.h",
+        "atomics_msvc.h",
+    ],
+    hdrs = [
+        "atomics.h",
+    ],
+    deps = [
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "atomics_test",
+    srcs = ["atomics_test.cc"],
+    deps = [
+        ":internal",
+        "//iree/base:core_headers",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Utilities
+#===------------------------------------------------------------------------===#
+
 cc_library(
     name = "atomic_slist",
     srcs = ["atomic_slist.c"],
     hdrs = ["atomic_slist.h"],
     deps = [
+        ":internal",
         "//iree/base:core_headers",
         "//iree/base:synchronization",
     ],
@@ -37,18 +74,6 @@ cc_test(
         ":atomic_slist",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "atomics",
-    hdrs = [
-        "atomics_clang.h",
-        "atomics_gcc.h",
-        "atomics_msvc.h",
-    ],
-    deps = [
-        "//iree/base:target_platform",
     ],
 )
 

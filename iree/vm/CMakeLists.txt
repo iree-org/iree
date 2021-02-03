@@ -72,6 +72,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
   PUBLIC
 )

@@ -16,7 +16,7 @@
 
 #include <string.h>
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 

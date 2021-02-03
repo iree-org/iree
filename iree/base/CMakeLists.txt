@@ -34,13 +34,11 @@ iree_cc_library(
     core_headers
   HDRS
     "alignment.h"
-    "atomics.h"
     "debugging.h"
     "math.h"
     "target_platform.h"
   DEPS
     absl::core_headers
-    iree::base::internal::atomics
   PUBLIC
 )
 
@@ -50,17 +48,6 @@ iree_cc_library(
   HDRS
     "target_platform.h"
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    atomics_test
-  SRCS
-    "atomics_test.cc"
-  DEPS
-    ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -193,6 +180,7 @@ iree_cc_library(
     ::api
     ::core_headers
     ::tracing
+    iree::base::internal
   PUBLIC
 )
 
@@ -244,6 +232,7 @@ iree_cc_library(
     ::core_headers
     ::synchronization
     ::tracing
+    iree::base::internal
   PUBLIC
 )
 

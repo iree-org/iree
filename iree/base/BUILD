@@ -46,13 +46,11 @@ cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
-        "atomics.h",
         "debugging.h",
         "math.h",
         "target_platform.h",
     ],
     deps = [
-        "//iree/base/internal:atomics",
         "@com_google_absl//absl/base:core_headers",
     ],
 )
@@ -60,16 +58,6 @@ cc_library(
 cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],
-)
-
-cc_test(
-    name = "atomics_test",
-    srcs = ["atomics_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
 )
 
 cc_test(
@@ -188,6 +176,7 @@ cc_library(
         ":api",
         ":core_headers",
         ":tracing",
+        "//iree/base/internal",
     ],
 )
 
@@ -234,6 +223,7 @@ cc_library(
         ":synchronization",
         ":tracing",
         "//build_tools:default_linkopts",
+        "//iree/base/internal",
     ],
 )
 

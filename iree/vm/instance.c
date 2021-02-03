@@ -14,7 +14,7 @@
 
 #include "iree/vm/instance.h"
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/builtin_types.h"
 

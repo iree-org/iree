@@ -17,7 +17,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 
 // TODO(benvanik): dynamic, if we care - otherwise keep small.
 // After a dozen or so types the linear scan will likely start to spill the

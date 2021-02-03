@@ -16,12 +16,39 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    internal
+  HDRS
+    "atomics.h"
+  SRCS
+    "atomics_clang.h"
+    "atomics_gcc.h"
+    "atomics_msvc.h"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    atomics_test
+  SRCS
+    "atomics_test.cc"
+  DEPS
+    ::internal
+    iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     atomic_slist
   HDRS
     "atomic_slist.h"
   SRCS
     "atomic_slist.c"
   DEPS
+    ::internal
     iree::base::core_headers
     iree::base::synchronization
   PUBLIC
@@ -36,18 +63,6 @@ iree_cc_test(
     ::atomic_slist
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    atomics
-  HDRS
-    "atomics_clang.h"
-    "atomics_gcc.h"
-    "atomics_msvc.h"
-  DEPS
-    iree::base::target_platform
-  PUBLIC
 )
 
 iree_cc_library(

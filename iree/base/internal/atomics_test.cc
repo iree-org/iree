@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 
 #include "iree/testing/gtest.h"
 
