@@ -22,11 +22,11 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 
@@ -36,7 +36,7 @@ namespace iree {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class TensorList final : public RefObject<TensorList> {
+class TensorList final : public iree::vm::RefObject<TensorList> {
  public:
   TensorList(absl::Span<const int32_t> shape, iree_hal_element_type_t dtype)
       : shape_(shape.begin(), shape.end()), dtype_(dtype) {}

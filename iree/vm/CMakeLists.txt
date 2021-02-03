@@ -40,7 +40,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
-    iree::base::ref_ptr
     iree::base::status
   PUBLIC
 )
@@ -83,9 +82,9 @@ iree_cc_test(
   SRCS
     "list_test.cc"
   DEPS
+    ::cc
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -136,9 +135,9 @@ iree_cc_test(
   SRCS
     "ref_test.cc"
   DEPS
+    ::cc
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -48,7 +48,6 @@ cc_library(
     deps = [
         ":vm",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
@@ -99,9 +98,9 @@ cc_test(
     name = "list_test",
     srcs = ["list_test.cc"],
     deps = [
+        ":cc",
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -149,9 +148,9 @@ cc_test(
     name = "ref_test",
     srcs = ["ref_test.cc"],
     deps = [
+        ":cc",
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

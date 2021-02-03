@@ -15,12 +15,12 @@
 #include "iree/vm/list.h"
 
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/builtin_types.h"
+#include "iree/vm/ref_cc.h"
 
-class A : public iree::RefObject<A> {
+class A : public iree::vm::RefObject<A> {
  public:
   float data() const { return data_; }
   void set_data(float value) { data_ = value; }
@@ -32,7 +32,7 @@ static iree_vm_ref_type_descriptor_t test_a_descriptor = {0};
 IREE_VM_DECLARE_TYPE_ADAPTERS(test_a, A);
 IREE_VM_DEFINE_TYPE_ADAPTERS(test_a, A);
 
-class B : public iree::RefObject<B> {
+class B : public iree::vm::RefObject<B> {
  public:
   int data() const { return data_; }
   void set_data(int value) { data_ = value; }

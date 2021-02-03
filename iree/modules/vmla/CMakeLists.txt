@@ -66,7 +66,6 @@ iree_cc_library(
     absl::span
     iree::base::api
     iree::base::core_headers
-    iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
     iree::vm
