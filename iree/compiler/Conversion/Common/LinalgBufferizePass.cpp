@@ -56,6 +56,8 @@ static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
     }
     if (auto flowTieShapeOp =
             dyn_cast<IREE::Flow::DispatchTieShapeOp>(opOperand.getOwner())) {
+      OpBuilder::InsertionGuard g(b);
+      b.setInsertionPoint(flowTieShapeOp);
       auto tieShapeOp =
           b.create<Shape::TieShapeOp>(flowTieShapeOp.getLoc(), memref.getType(),
                                       memref, flowTieShapeOp.shape());

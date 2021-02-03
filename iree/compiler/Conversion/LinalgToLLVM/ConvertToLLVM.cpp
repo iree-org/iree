@@ -170,7 +170,6 @@ IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
   llvm_unreachable("unknown interface binding op");
 }
 
-
 // Assumes the enclosing FuncOp has been converted to IREE-compatible ABI:
 // ```
 //    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
@@ -185,8 +184,7 @@ IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
 template <typename BindingOp>
 class ConvertBindingOp : public ConvertToLLVMPattern {
  public:
-  explicit ConvertBindingOp(MLIRContext *context,
-                                    LLVMTypeConverter &converter)
+  explicit ConvertBindingOp(MLIRContext *context, LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(BindingOp::getOperationName(), context,
                              converter) {}
 
@@ -200,8 +198,7 @@ class ConvertBindingOp : public ConvertToLLVMPattern {
 
     auto llvmTypeConverter = getTypeConverter();
     Location loc = op->getLoc();
-    MemRefType memrefType =
-        op->getResult(0).getType().dyn_cast<MemRefType>();
+    MemRefType memrefType = op->getResult(0).getType().dyn_cast<MemRefType>();
     auto elementType = typeConverter->convertType(memrefType.getElementType());
 
     // Fetch the interface binding op and extract the buffer index from void**.
