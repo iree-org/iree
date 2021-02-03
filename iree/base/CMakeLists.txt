@@ -275,28 +275,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    ref_ptr
-  HDRS
-    "ref_ptr.h"
-  DEPS
-    ::logging
-    absl::core_headers
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    ref_ptr_test
-  SRCS
-    "ref_ptr_test.cc"
-  DEPS
-    ::ref_ptr
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     signature_mangle
   HDRS
     "signature_mangle.h"

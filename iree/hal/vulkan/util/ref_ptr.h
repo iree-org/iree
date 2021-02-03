@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_REF_PTR_H_
-#define IREE_BASE_REF_PTR_H_
+#ifndef IREE_HAL_VULKAN_UTIL_REF_PTR_H_
+#define IREE_HAL_VULKAN_UTIL_REF_PTR_H_
 
 #include <atomic>
 #include <cstdint>
@@ -387,4 +387,4 @@ void swap(ref_ptr<T>& lhs, ref_ptr<T>& rhs) {
 
 }  // namespace iree
 
-#endif  // IREE_BASE_REF_PTR_H_
+#endif  // IREE_HAL_VULKAN_UTIL_REF_PTR_H_

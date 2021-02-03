@@ -51,3 +51,23 @@ cc_test(
         "@com_google_absl//absl/memory",
     ],
 )
+
+cc_library(
+    name = "ref_ptr",
+    hdrs = ["ref_ptr.h"],
+    deps = [
+        "//iree/base:logging",
+        "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "ref_ptr_test",
+    size = "small",
+    srcs = ["ref_ptr_test.cc"],
+    deps = [
+        ":ref_ptr",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)

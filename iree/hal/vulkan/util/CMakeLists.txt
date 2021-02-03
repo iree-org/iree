@@ -37,3 +37,25 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
+
+iree_cc_library(
+  NAME
+    ref_ptr
+  HDRS
+    "ref_ptr.h"
+  DEPS
+    absl::core_headers
+    iree::base::logging
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    ref_ptr_test
+  SRCS
+    "ref_ptr_test.cc"
+  DEPS
+    ::ref_ptr
+    iree::testing::gtest
+    iree::testing::gtest_main
+)

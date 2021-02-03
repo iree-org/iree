@@ -74,10 +74,10 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:core_headers",
-        "//iree/base:ref_ptr",
         "//iree/base:synchronization",
         "//iree/base:threading",
         "//iree/base:tracing",
+        "//iree/hal/vulkan/util:ref_ptr",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",

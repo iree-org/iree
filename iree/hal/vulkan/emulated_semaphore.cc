@@ -20,7 +20,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

@@ -260,26 +260,6 @@ cc_library(
 )
 
 cc_library(
-    name = "ref_ptr",
-    hdrs = ["ref_ptr.h"],
-    deps = [
-        ":logging",
-        "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_test(
-    name = "ref_ptr_test",
-    size = "small",
-    srcs = ["ref_ptr_test.cc"],
-    deps = [
-        ":ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "signature_mangle",
     srcs = ["signature_mangle.cc"],
     hdrs = ["signature_mangle.h"],
