@@ -37,7 +37,6 @@ iree_cc_library(
     "atomics.h"
     "debugging.h"
     "math.h"
-    "memory.h"
     "target_platform.h"
   DEPS
     absl::core_headers

@@ -28,7 +28,6 @@
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"

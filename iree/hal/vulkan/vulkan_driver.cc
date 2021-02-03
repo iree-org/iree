@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/debug_reporter.h"

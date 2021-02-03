@@ -49,7 +49,6 @@ cc_library(
         "atomics.h",
         "debugging.h",
         "math.h",
-        "memory.h",
         "target_platform.h",
     ],
     deps = [

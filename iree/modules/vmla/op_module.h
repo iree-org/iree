@@ -23,7 +23,6 @@
 
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/memory.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/vm/api.h"
@@ -85,6 +84,13 @@ class Buffer final : public RefObject<Buffer> {
   }
 
  private:
+  // reinterpret_cast for Spans, preserving byte size.
+  template <typename T, typename U>
+  static constexpr absl::Span<T> ReinterpretSpan(absl::Span<U> value) {
+    return absl::MakeSpan(reinterpret_cast<T*>(value.data()),
+                          (value.size() * sizeof(U)) / sizeof(T));
+  }
+
   StatusOr<absl::Span<uint8_t>> MakeRange(iree_vmla_size_t byte_offset,
                                           iree_vmla_size_t byte_length) const;
 

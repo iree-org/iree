@@ -87,6 +87,9 @@ class SerializingCommandQueue final : public CommandQueue {
   // Processes deferred submissions in this queue and returns whether there are
   // new workload submitted to the GPU if no errors happen.
   iree_status_t ProcessDeferredSubmissions(bool* out_work_submitted = NULL);
+  iree_status_t TryProcessDeferredSubmissions(
+      IntrusiveList<std::unique_ptr<FencedSubmission>>& remaining_submissions,
+      bool* out_work_submitted);
 
   TimePointFencePool* fence_pool_;
 
