@@ -140,12 +140,6 @@ class Status final {
     return *this;
   }
 
-  // TODO(benvanik): remove if possible; we don't want to be cloning things.
-  // Currently some of our status usage for sticky errors requires this.
-  Status(const Status& other) {
-    value_ = other.value_ ? iree_status_clone(other.value_) : iree_ok_status();
-  }
-
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
   Status(StatusCode code, absl::string_view message) {

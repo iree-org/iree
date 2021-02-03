@@ -155,9 +155,6 @@ class StatusOrData {
   explicit StatusOrData(const T& value) : data_(value) { MakeStatus(); }
   explicit StatusOrData(T&& value) : data_(std::move(value)) { MakeStatus(); }
 
-  explicit StatusOrData(const Status& status) : status_(status) {
-    EnsureNotOk();
-  }
   explicit StatusOrData(Status&& status)
       : status_(exchange(status, status.code())) {
     EnsureNotOk();

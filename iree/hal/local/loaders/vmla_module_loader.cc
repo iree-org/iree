@@ -215,7 +215,9 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
     for (iree_host_size_t i = 0; i < local_set_layout->binding_count; ++i) {
       auto buffer_or = iree::hal::vmla::Buffer::WrapMutable(
           call->bindings[i], call->binding_lengths[i], iree_allocator_null());
-      IREE_CHECK_OK(buffer_or.status());
+      if (!buffer_or.ok()) {
+        IREE_CHECK_OK(std::move(buffer_or).status());
+      }
       IREE_CHECK_OK(interface.SetBinding(set_ordinal,
                                          local_set_layout->bindings[i].binding,
                                          {std::move(buffer_or.value())}));
