@@ -158,7 +158,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           funcOp->getAttrOfType<FlatSymbolRefAttr>(
               getNumWorkgroupsFnAttrName());
       if (!numWorkgroupsFnAttr) {
-        return funcOp.emitError("expected llvm.num_workgroups_fn ");
+        auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+        rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+            loc, commandBuffer, dispatchState.entryPointOp, constantOne,
+            constantOne, constantOne);
+        rewriter.create<IREE::HAL::ReturnOp>(loc);
+        return success();
       }
       std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
       FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
