@@ -35,7 +35,6 @@ cc_library(
     ],
     deps = [
         "//iree/base:logging",
-        "//iree/base:ref_ptr",
     ],
 )
 

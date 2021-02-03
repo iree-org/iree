@@ -151,7 +151,6 @@ iree_cc_test(
   DEPS
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )

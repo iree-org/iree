@@ -17,7 +17,6 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/ref.h"

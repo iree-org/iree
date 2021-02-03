@@ -22,7 +22,6 @@ iree_cc_library(
     "intrusive_list_unique_ptr.inc"
   DEPS
     iree::base::logging
-    iree::base::ref_ptr
   PUBLIC
 )
 

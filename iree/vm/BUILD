@@ -163,7 +163,6 @@ cc_test(
     deps = [
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
