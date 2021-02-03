@@ -1025,17 +1025,17 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_SHIFT_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int32_t operand = VM_DecOperandRegI32("operand"); \
-    int8_t amount = VM_DecConstI8("amount");          \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = (int32_t)(((type)operand)op amount);    \
+#define DISPATCH_OP_CORE_SHIFT_I32(op_name, type, op_func) \
+  DISPATCH_OP(CORE, op_name, {                             \
+    int32_t operand = VM_DecOperandRegI32("operand");      \
+    int8_t amount = VM_DecConstI8("amount");               \
+    int32_t* result = VM_DecResultRegI32("result");        \
+    *result = op_func(operand, amount);                    \
   });
 
-    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, int32_t, <<);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, int32_t, >>);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, uint32_t, >>);
+    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, int32_t, vm_shl_i32);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, int32_t, vm_shr_i32s);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, uint32_t, vm_shr_i32u);
 
     //===------------------------------------------------------------------===//
     // Comparison ops
