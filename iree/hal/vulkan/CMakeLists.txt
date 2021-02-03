@@ -86,13 +86,13 @@ iree_cc_library(
     iree::base::arena
     iree::base::core_headers
     iree::base::flatcc
-    iree::base::intrusive_list
     iree::base::logging
     iree::base::ref_ptr
     iree::base::status
     iree::base::synchronization
     iree::base::tracing
     iree::hal::api
+    iree::hal::vulkan::util::intrusive_list
     iree::schemas::spirv_executable_def_c_fbs
     vulkan_memory_allocator
   PUBLIC

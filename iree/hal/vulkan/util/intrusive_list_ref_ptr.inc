@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// IWYU pragma: private, include "iree/base/intrusive_list.h"
+// IWYU pragma: private, include "iree/hal/vulkan/util/intrusive_list.h"
 
-#ifndef IREE_BASE_INTRUSIVE_LIST_REF_PTR_H_
-#define IREE_BASE_INTRUSIVE_LIST_REF_PTR_H_
+#ifndef IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_REF_PTR_H_
+#define IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_REF_PTR_H_
 
 #include <cstddef>
 #include <iterator>
 
-#include "iree/base/intrusive_list.h"
 #include "iree/base/ref_ptr.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
 
 namespace iree {
 
@@ -176,4 +176,4 @@ class IntrusiveList<ref_ptr<U>, kUseDefaultLinkOffset>
 
 }  // namespace iree
 
-#endif  // IREE_BASE_INTRUSIVE_LIST_REF_PTR_H_
+#endif  // IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_REF_PTR_H_

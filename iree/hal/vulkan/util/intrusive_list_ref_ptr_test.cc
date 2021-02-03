@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/intrusive_list.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {

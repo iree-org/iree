@@ -48,8 +48,8 @@
 //
 // This type is thread-unsafe.
 
-#ifndef IREE_BASE_INTRUSIVE_LIST_H_
-#define IREE_BASE_INTRUSIVE_LIST_H_
+#ifndef IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_H_
+#define IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_H_
 
 #include <cstddef>
 #include <cstdint>
@@ -752,7 +752,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::sort(
 }  // namespace iree
 
 // Specializations:
-#include "iree/base/intrusive_list_ref_ptr.inc"
-#include "iree/base/intrusive_list_unique_ptr.inc"
+#include "iree/hal/vulkan/util/intrusive_list_ref_ptr.inc"
+#include "iree/hal/vulkan/util/intrusive_list_unique_ptr.inc"
 
-#endif  // IREE_BASE_INTRUSIVE_LIST_H_
+#endif  // IREE_HAL_VULKAN_UTIL_INTRUSIVE_LIST_H_

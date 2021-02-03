@@ -24,7 +24,6 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
-#include "iree/base/intrusive_list.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
@@ -32,6 +31,7 @@
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/timepoint_util.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
 
 namespace iree {
 namespace hal {

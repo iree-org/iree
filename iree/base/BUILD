@@ -258,34 +258,6 @@ iree_flatbuffer_c_library(
 )
 
 cc_library(
-    name = "intrusive_list",
-    hdrs = [
-        "intrusive_list.h",
-        "intrusive_list_ref_ptr.inc",
-        "intrusive_list_unique_ptr.inc",
-    ],
-    deps = [
-        ":logging",
-        ":ref_ptr",
-    ],
-)
-
-cc_test(
-    name = "intrusive_list_test",
-    srcs = [
-        "intrusive_list_ref_ptr_test.cc",
-        "intrusive_list_test.cc",
-        "intrusive_list_unique_ptr_test.cc",
-    ],
-    deps = [
-        ":intrusive_list",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
-    ],
-)
-
-cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
