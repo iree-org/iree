@@ -21,7 +21,8 @@ iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,
                                          iree_string_view_t attr,
                                          iree_allocator_t allocator) {
   char* str = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, attr.size + 1, &str));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, attr.size + 1, (void**)&str));
   memcpy(str, attr.data, attr.size);
   str[attr.size] = 0;
   tensor->name = iree_make_string_view(str, attr.size);
@@ -205,7 +206,7 @@ void _TfLiteTensorDiscardBuffer(TfLiteTensor* tensor) {
 void _TfLiteTensorReset(TfLiteTensor* tensor, iree_allocator_t allocator) {
   _TfLiteTensorDiscardBuffer(tensor);
   if (tensor->name.data) {
-    iree_allocator_free(allocator, tensor->name.data);
+    iree_allocator_free(allocator, (void*)tensor->name.data);
   }
 }
 
