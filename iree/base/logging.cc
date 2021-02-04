@@ -76,7 +76,7 @@ LogMessage::LogMessage(const char* file_name, int line, int severity)
 LogMessage::~LogMessage() {
   // Read the min log level once during the first call to logging.
   static int64_t min_log_level = MinLogLevelFromEnv();
-  if (ABSL_PREDICT_TRUE(severity_ >= min_log_level)) {
+  if (IREE_LIKELY(severity_ >= min_log_level)) {
     EmitLogMessage();
   }
 }

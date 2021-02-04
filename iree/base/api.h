@@ -142,6 +142,8 @@ extern "C" {
 #define IREE_API_PTR
 #endif  // _WIN32
 
+// TODO(benvanik): remove the following and use attributes.h instead.
+
 // Queries for [[attribute]] identifiers in modern compilers.
 #ifdef __has_attribute
 #define IREE_HAVE_ATTRIBUTE(x) __has_attribute(x)

@@ -24,6 +24,7 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::span
+    iree::base::core_headers
     iree::base::logging
   PUBLIC
 )
@@ -70,6 +71,7 @@ iree_cc_library(
     "ref_ptr.h"
   DEPS
     absl::core_headers
+    iree::base::internal
     iree::base::logging
   PUBLIC
 )
