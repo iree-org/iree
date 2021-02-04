@@ -15,9 +15,9 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 
+#include "iree/schemas/dylib_executable_def_builder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetOptions.h"
-#include "iree/schemas/dylib_executable_def_builder.h"
 
 namespace mlir {
 namespace iree_compiler {
