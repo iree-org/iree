@@ -429,13 +429,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     output << "#include \"" << include << "\"\n";
   };
 
-  printInclude("iree/vm/context.h");
-  printInclude("iree/vm/instance.h");
-  printInclude("iree/vm/native_module.h");
-  printInclude("iree/vm/ops.h");
-  printInclude("iree/vm/ref.h");
-  printInclude("iree/vm/shims.h");
-  printInclude("iree/vm/stack.h");
+  printInclude("iree/vm/api.h");
   output << "\n";
 
   printModuleComment(moduleOp, output);

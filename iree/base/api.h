@@ -204,6 +204,7 @@ extern "C" {
 
 // Size, in bytes, of a buffer on the host.
 typedef size_t iree_host_size_t;
+#define IREE_MAX_HOST_SIZE SIZE_MAX
 
 // Size, in bytes, of a buffer on devices.
 typedef uint64_t iree_device_size_t;

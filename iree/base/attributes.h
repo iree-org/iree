@@ -149,4 +149,14 @@
 #define IREE_UNLIKELY(x) (x)
 #endif  // IREE_HAVE_ATTRIBUTE(likely)
 
+//===----------------------------------------------------------------------===//
+// IREE_ATTRIBUTE_PACKED
+//===----------------------------------------------------------------------===//
+
+#if IREE_HAVE_ATTRIBUTE(packed) || (defined(__GNUC__) && !defined(__clang__))
+#define IREE_ATTRIBUTE_PACKED __attribute__((__packed__))
+#else
+#define IREE_ATTRIBUTE_PACKED
+#endif  // IREE_HAVE_ATTRIBUTE(packed)
+
 #endif  // IREE_BASE_ATTRIBUTES_H_
