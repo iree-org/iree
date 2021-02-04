@@ -24,13 +24,21 @@
 static inline int32_t vm_add_i32(int32_t lhs, int32_t rhs) { return lhs + rhs; }
 static inline int32_t vm_sub_i32(int32_t lhs, int32_t rhs) { return lhs - rhs; }
 static inline int32_t vm_mul_i32(int32_t lhs, int32_t rhs) { return lhs * rhs; }
-// clang-format off
-static inline int32_t vm_div_i32s(int32_t lhs, int32_t rhs) { return lhs / rhs; }
-static inline uint32_t vm_div_i32u(uint32_t lhs, uint32_t rhs) { return lhs / rhs; }
-static inline int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) { return lhs % rhs;}
-static inline uint32_t vm_rem_i32u(uint32_t lhs, uint32_t rhs) { return lhs % rhs; }
-// clang-format on
-static inline uint32_t vm_not_i32(uint32_t operand) { return ~operand; }
+static inline int32_t vm_div_i32s(int32_t lhs, int32_t rhs) {
+  return lhs / rhs;
+}
+static inline int32_t vm_div_i32u(int32_t lhs, int32_t rhs) {
+  return (int32_t)(((uint32_t)lhs) / ((uint32_t)rhs));
+}
+static inline int32_t vm_rem_i32s(int32_t lhs, int32_t rhs) {
+  return lhs % rhs;
+}
+static inline int32_t vm_rem_i32u(int32_t lhs, int32_t rhs) {
+  return (int32_t)(((uint32_t)lhs) % ((uint32_t)rhs));
+}
+static inline int32_t vm_not_i32(int32_t operand) {
+  return (int32_t)(~((uint32_t)operand));
+}
 static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
 static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
@@ -45,8 +53,8 @@ static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
 static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
   return (int32_t)(operand >> amount);
 };
-static inline int32_t vm_shr_i32u(uint32_t operand, int8_t amount) {
-  return (int32_t)(operand >> amount);
+static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
+  return (int32_t)(((uint32_t)operand) >> amount);
 };
 
 // Check ops
