@@ -220,7 +220,9 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
 }
-// CHECK-LABEL: func @bufferize_dynamic()
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//       CHECK: func @bufferize_dynamic()
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@arg2
@@ -235,18 +237,24 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[DIM7:.+]] = hal.interface.load.constant offset = 7 : index
 //       CHECK:   %[[SHAPE_LHS:.+]] = shapex.make_ranked_shape %[[DIM0]], %[[DIM1]]
 //       CHECK:   %[[LHS_SHAPED:.+]] = shapex.tie_shape %[[LHS]], %[[SHAPE_LHS]]
-//       CHECK:   %[[SHAPE_RHS:.+]] = shapex.make_ranked_shape %[[DIM0]], %[[DIM1]]
+//       CHECK:   %[[SHAPE_RHS:.+]] = shapex.make_ranked_shape %[[DIM2]], %[[DIM3]]
 //       CHECK:   %[[RHS_SHAPED:.+]] = shapex.tie_shape %[[RHS]], %[[SHAPE_RHS]]
-//       CHECK:   %[[SHAPE_INIT:.+]] = shapex.make_ranked_shape %[[DIM0]], %[[DIM1]]
+//       CHECK:   %[[SHAPE_INIT:.+]] = shapex.make_ranked_shape %[[DIM4]], %[[DIM5]]
 //       CHECK:   %[[INIT_SHAPED:.+]] = shapex.tie_shape %[[INIT]], %[[SHAPE_INIT]]
-//       CHECK:   %[[SHAPE_RESULT:.+]] = shapex.make_ranked_shape %[[DIM0]], %[[DIM1]]
+//       CHECK:   %[[SHAPE_RESULT:.+]] = shapex.make_ranked_shape %[[DIM6]], %[[DIM7]]
 //       CHECK:   %[[RESULT_SHAPED:.+]] = shapex.tie_shape %[[RESULT]], %[[SHAPE_RESULT]]
+//   CHECK-DAG:   %[[WGSIZE_X:.+]] = hal.interface.workgroup.size[0]
+//   CHECK-DAG:   %[[WGSIZE_Y:.+]] = hal.interface.workgroup.size[1]
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS_TILE:.+]] = subview %[[LHS_SHAPED]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS_SHAPED]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT_TILE:.+]] = subview %[[INIT_SHAPED]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RESULT_SHAPED]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       CHECK:       %[[TILE_M:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[DIM0]], %[[WGSIZE_Y]]]
+//       CHECK:       %[[LHS_TILE:.+]] = subview %[[LHS_SHAPED]][%[[IV0]], 0] [%[[TILE_M]], %[[DIM1]]]
+//       CHECK:       %[[TILE_N:.+]] = affine.min #[[MAP0]](%[[IV1]])[%[[DIM3]], %[[WGSIZE_X]]]
+//   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS_SHAPED]][0, %[[IV1]]] [%[[DIM2]], %[[TILE_N]]]
+//       CHECK:       %[[TILE_M_2:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[WGSIZE_Y]], %[[DIM4]]]
+//       CHECK:       %[[TILE_N_2:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[WGSIZE_X]], %[[DIM5]]]
+//   CHECK-DAG:       %[[INIT_TILE:.+]] = subview %[[INIT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
+//   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RESULT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
 //       CHECK:       linalg.copy(%[[INIT_TILE]], %[[RESULT_TILE]])
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
