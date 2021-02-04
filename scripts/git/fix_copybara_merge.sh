@@ -14,8 +14,17 @@
 # limitations under the License.
 
 # Fixes a Copybara push that failed to create a merge commit, using the
-# COPYBARA_TAG label to add a second parent to the HEAD commit.
-# This is mostly intended to be used by automation.
+# COPYBARA_TAG label to add a second parent to the HEAD commit. This should be
+# run when Copybara exports a 'main -> google' commit, but fails to create a
+# merge commit. The failure to create such a commit means that the
+# COPYBARA_INTEGRATE_REVIEW tag is left in the commit message. It should only
+# be run on the google branch. After running this script, you can verify the git
+# log looks as expected, using something like:
+#
+# git log --left-right --graph --oneline --boundary google...main
+#
+# and then force push over the google branch. Force pushing is destructive. If
+# you're uncertain, ask!
 
 set -e
 
@@ -25,6 +34,15 @@ UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working directory not clean. Aborting"
   git status
+  exit 1
+fi
+
+# Technically this works anywhere, but our only current use case is to run it on
+# the google branch and this is a weird and destructive change, so just be
+# really picky about it.
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "${CURRENT_BRANCH?}" != "google" ]]; then
+  echo "Current branch ${CURRENT_BRANCH?} is not 'google'. Aborting"
   exit 1
 fi
 
@@ -41,10 +59,13 @@ MESSAGE="$(git log --format=%B -n 1 HEAD)"
 MERGE_FROM="$(echo "${MESSAGE?}" | awk -v pat="${COPYBARA_TAG?}" '$0~pat{print $NF}')"
 
 if [[ -z "${MERGE_FROM?}" ]]; then
-  echo "HEAD commit was not tagged with ${COPYBARA_TAG?}. Aborting"
+  echo "HEAD commit is not tagged with ${COPYBARA_TAG?}. Aborting"
   git show HEAD
   exit 1
 fi
+
+echo "To revert the changes made by this script, run:"
+echo "git reset --hard $(git rev-parse HEAD)"
 
 # And create a new message with the tag removed
 NEW_MESSAGE="$(echo "${MESSAGE?}" | sed "/${COPYBARA_TAG?}/d")"
