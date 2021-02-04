@@ -62,8 +62,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
     OpPassManager &passManager) {
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  buildSPIRVTransformPassPipeline(nestedModulePM, spvCodeGenOptions_);
+  buildSPIRVTransformPassPipeline(passManager, spvCodeGenOptions_);
 }
 
 LogicalResult SPIRVTargetBackend::recordDispatch(

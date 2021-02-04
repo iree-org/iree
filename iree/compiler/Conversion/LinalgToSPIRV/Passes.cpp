@@ -65,8 +65,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
   // Tile Linalg on buffers.
@@ -88,12 +88,15 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  pm.addPass(createSplitDispatchFunctionPass());
+  if (!clEnableLinalgOnTensorsSPIRV) {
+    pm.nest<ModuleOp>().addPass(createSplitDispatchFunctionPass());
+  }
   pm.addPass(createLinalgTileAndFusePass(options));
   if (options.vectorizeMemref) {
-    pm.addNestedPass<FuncOp>(createLoadStoreVectorizationPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createLoadStoreVectorizationPass());
   }
-  pm.addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
   // Map to GPU processor IDs.
@@ -103,13 +106,13 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createConvertToGPUPass());
+  pm.nest<ModuleOp>().addPass(createConvertToGPUPass());
   if (options.enableVectorization) {
-    pm.addNestedPass<FuncOp>(createVectorToGPUPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
   }
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  pm.nest<ModuleOp>().addPass(createLowerAffinePass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
 
   if (!clEnableLinalgOnTensorsSPIRV) {
     //===--------------------------------------------------------------------===//
@@ -121,7 +124,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
     //   are
     //     tied to the arguments of the function.
     //===--------------------------------------------------------------------===//
-    pm.addPass(createLegalizeNumWorkgroupsFnPass());
+    pm.nest<ModuleOp>().addPass(createLegalizeNumWorkgroupsFnPass());
 
     //===--------------------------------------------------------------------===//
     // Resolve shape related ops.
@@ -137,7 +140,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
     //     hal.inteface.load.constant op. There are no std.dim ops left
     //     in the IR.
     //===--------------------------------------------------------------------===//
-    pm.addNestedPass<FuncOp>(createResolveShapeOpsPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createResolveShapeOpsPass());
 
     //===--------------------------------------------------------------------===//
     // Legalize the function that computes the number of workgroups to be
@@ -147,7 +150,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
     //   - The dead `iree.placeholder` operations are removed after shape
     //     resolution.
     //===--------------------------------------------------------------------===//
-    pm.addPass(createLegalizeNumWorkgroupsFnPass());
+    pm.nest<ModuleOp>().addPass(createLegalizeNumWorkgroupsFnPass());
   }
 
   //===--------------------------------------------------------------------===//
@@ -158,16 +161,18 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     original buffers.
   //===--------------------------------------------------------------------===//
   if (options.enableVectorization) {
-    pm.addNestedPass<FuncOp>(createVectorTransferOptimizationPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createVectorTransferOptimizationPass());
   }
-  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  pm.nest<ModuleOp>().addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+  pm.nest<ModuleOp>().addPass(createCSEPass());
   if (options.enableVectorization) {
-    pm.addPass(createVectorizeMemref());
-    pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
+    pm.nest<ModuleOp>().addPass(createVectorizeMemref());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createForOpCanonicalizationPass());
+    pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
+    pm.nest<ModuleOp>().addPass(createCSEPass());
   }
 
   //===--------------------------------------------------------------------===//
@@ -177,7 +182,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - All ops are converted to SPIR-V counterparts.
   //   - spv.module ops are formed to hold all SPIR-V ops.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createConvertToSPIRVPass());
+  pm.nest<ModuleOp>().addPass(createConvertToSPIRVPass());
 
   //===--------------------------------------------------------------------===//
   // SPIR-V dialect level conversions.
@@ -186,7 +191,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - SPIR-V Entry point ops are inserted.
   //   - Required version/extension/capability are deduced.
   //===--------------------------------------------------------------------===//
-  OpPassManager &spirvModulePM = pm.nest<spirv::ModuleOp>();
+  OpPassManager &spirvModulePM = pm.nest<ModuleOp>().nest<spirv::ModuleOp>();
   spirvModulePM.addPass(spirv::createLowerABIAttributesPass());
   spirvModulePM.addPass(createCanonicalizerPass());
   spirvModulePM.addPass(createCSEPass());
@@ -208,25 +213,27 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //     that returns the number of workgroups.
   //   - The entry point function gets an attribute `vkspv.num_workgroups_fn` to
   //     record which function in the module returns the number of workgroups.
-  if (!clEnableLinalgOnTensorsSPIRV)
-    pm.addPass(createDeclareNumWorkgroupsFnPass());
+  if (!clEnableLinalgOnTensorsSPIRV) {
+    pm.nest<ModuleOp>().addPass(createDeclareNumWorkgroupsFnPass());
+  }
 
   //===--------------------------------------------------------------------===//
   // Inline the impl dispatch function into the wrapper dispatch function.
   //
   // TODO(antiagainst): re-evaluate the inlining timing.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createInlinerPass());
+  pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (clEnableLinalgOnTensorsSPIRV) {
-    addLinalgBufferizePasses(pm, [](OpBuilder &builder, Location loc,
-                                    ArrayRef<Value> dynamicSizes,
-                                    MemRefType allocationType) {
-      MemRefType allocType = MemRefType::get(allocationType.getShape(),
-                                             allocationType.getElementType(),
-                                             {}, getWorkgroupMemorySpace());
-      return builder.create<AllocOp>(loc, allocType, dynamicSizes);
-    });
+    addLinalgBufferizePasses(
+        pm.nest<ModuleOp>(),
+        [](OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
+           MemRefType allocationType) {
+          MemRefType allocType = MemRefType::get(
+              allocationType.getShape(), allocationType.getElementType(), {},
+              getWorkgroupMemorySpace());
+          return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+        });
   } else {
     //===--------------------------------------------------------------------===//
     // Inject shape calculation for output buffers.
@@ -243,9 +250,12 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //   - No shapex.get_ranked_shape ops exist.
     //   - Shape folding and canonicalization has been done.
     //===--------------------------------------------------------------------===//
-    pm.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
-    pm.addNestedPass<FuncOp>(Shape::createMaterializeShapeCalculationsPass());
-    pm.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        Shape::createTieDynamicShapesPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        Shape::createMaterializeShapeCalculationsPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        Shape::createHoistShapeCalculationsPass());
 
     //===--------------------------------------------------------------------===//
     // Convert XLA HLO ops to Linalg ops with buffer semantics.
@@ -254,8 +264,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //   - All XLA HLO ops are converted.
     //   - All Linalg ops are operating on buffers.
     //===--------------------------------------------------------------------===//
-    pm.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-    addHLOToLinalgOnBuffersPasses(pm);
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+    addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
   }
 
   //===--------------------------------------------------------------------===//
@@ -267,13 +277,14 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   addLinalgToSPIRVPasses(pm, options);
 
-  // HACK: SplitDispatchFunctionPass inserts spv.EntryPoints but does not tell
-  // the HAL about them. We need to find those new entry points and materialize
-  // hal.executable.entry_point ops so that we have a consistent view of the
-  // executable.
-  // SplitDispatchFunctionPass can hopefully go away with linalg-on-tensors
-  // and we can remove this.
-  pm.addPass(createMaterializeEntryPointsPass());
+  if (!clEnableLinalgOnTensorsSPIRV) {
+    // HACK: SplitDispatchFunctionPass inserts spv.EntryPoints but does not tell
+    // the HAL about them. We need to find those new entry points and
+    // materialize hal.executable.entry_point ops so that we have a consistent
+    // view of the executable.  SplitDispatchFunctionPass can hopefully go away
+    // with linalg-on-tensors and we can remove this.
+    pm.addPass(createMaterializeEntryPointsPass());
+  }
 }
 
 static PassPipelineRegistration<> linalgToSPIRVPipeline(

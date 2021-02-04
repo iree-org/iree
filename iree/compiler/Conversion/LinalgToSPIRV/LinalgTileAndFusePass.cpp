@@ -29,6 +29,8 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
@@ -110,7 +112,8 @@ static void applyIndexCalculationCanonicalization(FuncOp funcOp) {
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 class LinalgTileAndFusePass
-    : public PassWrapper<LinalgTileAndFusePass, OperationPass<ModuleOp>> {
+    : public PassWrapper<LinalgTileAndFusePass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   LinalgTileAndFusePass(const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
@@ -118,8 +121,9 @@ class LinalgTileAndFusePass
       : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
+    registry.insert<AffineDialect, IREE::HAL::HALDialect, gpu::GPUDialect,
+                    linalg::LinalgDialect, scf::SCFDialect, ShapeDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -431,7 +435,8 @@ static void populateTilingConvFilterPatterns(
 
 void LinalgTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  ModuleOp module = getOperation();
+  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
+  ModuleOp module = targetOp.getInnerModule();
 
   LLVM_DEBUG(
       llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";);
@@ -620,8 +625,8 @@ void LinalgTileAndFusePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
-    const SPIRVCodegenOptions &options) {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLinalgTileAndFusePass(const SPIRVCodegenOptions &options) {
   return std::make_unique<LinalgTileAndFusePass>(options);
 }
 
