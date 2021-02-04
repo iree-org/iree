@@ -119,12 +119,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns;
-    vectorizationPatterns
-        .insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
-                linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>>(
-            context, linalg::LinalgVectorizationOptions(),
-            linalg::LinalgTransformationFilter(
-                Identifier::get(getVectorizeMarker(), context)));
+    linalg::insertVectorizationPatterns<linalg::ContractionOpInterface>(
+        vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+        linalg::LinalgTransformationFilter(
+            Identifier::get(getVectorizeMarker(), context)));
     applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
   }
 

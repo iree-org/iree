@@ -194,11 +194,10 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns;
-  vectorizationPatterns
-      .insert<linalg::LinalgVectorizationPattern<linalg::CopyOp>>(
-          context, linalg::LinalgVectorizationOptions(),
-          linalg::LinalgTransformationFilter(
-              Identifier::get(getVectorizeMarker(), context), {}));
+  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+      vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+      linalg::LinalgTransformationFilter(
+          Identifier::get(getVectorizeMarker(), context), {}));
   applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 

@@ -327,11 +327,9 @@ static void populateTilingToInvocationPatterns(
 static void populateVectorizationPatterns(MLIRContext *context,
                                           const LaunchConfig &launchConfig,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>,
-                  linalg::LinalgVectorizationPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgVectorizationPattern<linalg::FillOp>,
-                  linalg::LinalgVectorizationPattern<linalg::GenericOp>>(
-      context, linalg::LinalgVectorizationOptions(),
+  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
+                                      linalg::ContractionOpInterface>(
+      patterns, context, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context)));
 }
