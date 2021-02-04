@@ -229,7 +229,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
-    if (options_.addressSanitizer) {
+    if (options_.sanitizerKind == iree_Sanitizer_ADDRESS) {
       for(auto &function : llvmModule->getFunctionList())
         function.addFnAttr(llvm::Attribute::SanitizeAddress);
     }
@@ -344,6 +344,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         builder, debugDatabaseFilenameRef);
     iree_DyLibExecutableDef_debug_database_embedded_add(builder,
                                                         debugDatabaseRef);
+    iree_DyLibExecutableDef_sanitized_kind_add(builder, options_.sanitizerKind);
     iree_DyLibExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

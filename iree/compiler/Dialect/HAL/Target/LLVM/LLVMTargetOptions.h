@@ -38,7 +38,14 @@ struct LLVMTargetOptions {
   // information is valid) it may significantly change the output program
   // and benchmarking
   bool debugSymbols = true;
-  bool addressSanitizer = false;
+
+  // Define kinds of sanitizer.
+  enum Sanitizer {
+    NONE = 0,
+    ADDRESS = 1
+  };
+
+  Sanitizer sanitizerKind = NONE;
 
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on

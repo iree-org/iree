@@ -82,6 +82,14 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
     llvmTargetOptions.targetCPUFeatures = clTargetCPUFeatures;
   }
 
+  static llvm::cl::opt<std::string> clSanitizerKind(
+      "iree-llvm-sanitize",
+      llvm::cl::desc(
+          "Specify LLVM sanitize feature such as 'address' ETC"),
+      llvm::cl::init(""));
+  if (clSanitizerKind == "address")
+    llvmTargetOptions.sanitizerKind = LLVMTargetOptions::Sanitizer::ADDRESS;
+
   static llvm::cl::opt<std::string> clTargetABI(
       "iree-llvm-target-abi",
       llvm::cl::desc("LLVM target machine ABI; specify for -mabi"),
@@ -106,12 +114,6 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::desc("Generate and embed debug information (DWARF, PDB, etc)"),
       llvm::cl::init(llvmTargetOptions.debugSymbols));
   llvmTargetOptions.debugSymbols = clDebugSymbols;
-
-  static llvm::cl::opt<bool> clAddressSanitizer(
-      "iree-llvm-address-sanitizer",
-      llvm::cl::desc("Turn on address sanitization to detect memory violations"),
-      llvm::cl::init(llvmTargetOptions.addressSanitizer));
-  llvmTargetOptions.addressSanitizer = clAddressSanitizer;
 
   static llvm::cl::opt<bool> clLinkStatic(
       "iree-llvm-link-static",

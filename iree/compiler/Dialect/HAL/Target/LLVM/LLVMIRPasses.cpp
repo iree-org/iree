@@ -28,7 +28,6 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
-// #include "clang/Basic/CodeGenOptions.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -89,23 +88,24 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.registerLoopAnalyses(loopAnalysisManager);
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
-  if (options.addressSanitizer) {
-    bool CompileKernel = false;
-    bool Recover = false;
-    bool UseAfterScope = true;
-    bool ModuleUseAfterScope = false; // asanUseGlobalsGC(TargetTriple, CodeGenOpts);
-    bool UseOdrIndicator = false; // CodeGenOpts.SanitizeAddressUseOdrIndicator;
+
+  if (options.sanitizerKind == LLVMTargetOptions::Sanitizer::ADDRESS) {
+    bool compileKernel = false;
+    bool recover = false;
+    bool useAfterScope = true;
+    bool moduleUseAfterScope = false;
+    bool useOdrIndicator = false;
     passBuilder.registerOptimizerLastEPCallback(
-        [CompileKernel, Recover, UseAfterScope, ModuleUseAfterScope,
-         UseOdrIndicator](llvm::ModulePassManager &modulePassManager,
+        [compileKernel, recover, useAfterScope, moduleUseAfterScope,
+         useOdrIndicator](llvm::ModulePassManager &modulePassManager,
                           llvm::PassBuilder::OptimizationLevel Level) {
           modulePassManager.addPass(
               llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis, llvm::Module>());
-          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(CompileKernel, Recover,
-                                                 ModuleUseAfterScope,
-                                                 UseOdrIndicator));
+          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(compileKernel, recover,
+                                                 moduleUseAfterScope,
+                                                 useOdrIndicator));
           modulePassManager.addPass(createModuleToFunctionPassAdaptor(
-              llvm::AddressSanitizerPass(CompileKernel, Recover, UseAfterScope)));
+              llvm::AddressSanitizerPass(compileKernel, recover, useAfterScope)));
         });
   }
 
