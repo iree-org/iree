@@ -84,11 +84,10 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
 
   static llvm::cl::opt<std::string> clSanitizerKind(
       "iree-llvm-sanitize",
-      llvm::cl::desc(
-          "Specify LLVM sanitize feature such as 'address' ETC"),
+      llvm::cl::desc("Specify LLVM sanitize feature such as 'address' ETC"),
       llvm::cl::init(""));
   if (clSanitizerKind == "address")
-    llvmTargetOptions.sanitizerKind = LLVMTargetOptions::Sanitizer::ADDRESS;
+    llvmTargetOptions.sanitizerKind = iree_Sanitizer_kAddress;
 
   static llvm::cl::opt<std::string> clTargetABI(
       "iree-llvm-target-abi",

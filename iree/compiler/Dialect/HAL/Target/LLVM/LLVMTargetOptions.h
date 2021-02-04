@@ -17,6 +17,7 @@
 
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetOptions.h"
+#include "iree/schemas/dylib_executable_def_builder.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -38,14 +39,7 @@ struct LLVMTargetOptions {
   // information is valid) it may significantly change the output program
   // and benchmarking
   bool debugSymbols = true;
-
-  // Define kinds of sanitizer.
-  enum Sanitizer {
-    NONE = 0,
-    ADDRESS = 1
-  };
-
-  Sanitizer sanitizerKind = NONE;
+  iree_Sanitizer_enum_t sanitizerKind;
 
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on

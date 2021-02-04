@@ -15,8 +15,8 @@
 namespace iree;
 // Define kinds of sanitizer used to connect CPU kernels and runtime
 enum Sanitizer : ubyte {
-  NONE = 0,
-  ADDRESS
+  kNone = 0,
+  kAddress
 }
 
 // 'Dynamic Library (dylib) Executable'.
@@ -35,7 +35,7 @@ table DyLibExecutableDef {
 
   debug_database_filename:string;
   debug_database_embedded:[ubyte];
-  sanitized_kind:Sanitizer = NONE;
+  sanitized_kind:Sanitizer = kNone;
 
   // TODO(scotttodd): Relative file path from this flatbuffer file
 }

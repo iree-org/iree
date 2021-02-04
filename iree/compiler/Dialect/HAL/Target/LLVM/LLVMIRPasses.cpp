@@ -89,7 +89,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
 
-  if (options.sanitizerKind == LLVMTargetOptions::Sanitizer::ADDRESS) {
+  if (options.sanitizerKind == iree_Sanitizer_kAddress) {
     bool compileKernel = false;
     bool recover = false;
     bool useAfterScope = true;
@@ -100,12 +100,13 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
          useOdrIndicator](llvm::ModulePassManager &modulePassManager,
                           llvm::PassBuilder::OptimizationLevel Level) {
           modulePassManager.addPass(
-              llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis, llvm::Module>());
-          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(compileKernel, recover,
-                                                 moduleUseAfterScope,
-                                                 useOdrIndicator));
-          modulePassManager.addPass(createModuleToFunctionPassAdaptor(
-              llvm::AddressSanitizerPass(compileKernel, recover, useAfterScope)));
+              llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis,
+                                        llvm::Module>());
+          modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
+              compileKernel, recover, moduleUseAfterScope, useOdrIndicator));
+          modulePassManager.addPass(
+              createModuleToFunctionPassAdaptor(llvm::AddressSanitizerPass(
+                  compileKernel, recover, useAfterScope)));
         });
   }
 

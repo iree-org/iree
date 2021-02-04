@@ -81,7 +81,7 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
                             "executable library_embedded is missing/empty");
   }
 
-  if (iree_DyLibExecutableDef_sanitized_kind_get(executable_def) == iree_Sanitizer_ADDRESS && !__has_feature(address_sanitizer)) {
+  if (iree_DyLibExecutableDef_sanitized_kind_get(executable_def) == iree_Sanitizer_kAddress && !__has_feature(address_sanitizer)) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "Failed to load ASAN libraries");
   }

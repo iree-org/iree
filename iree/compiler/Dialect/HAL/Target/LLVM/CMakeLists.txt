@@ -81,6 +81,7 @@ iree_cc_library(
     LLVMPasses
     LLVMSupport
     LLVMTarget
+    iree::compiler::Utils
   PUBLIC
 )
 

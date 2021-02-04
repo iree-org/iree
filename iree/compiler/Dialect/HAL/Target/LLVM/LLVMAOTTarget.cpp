@@ -229,8 +229,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       return targetOp.emitError() << "failed to translate the MLIR LLVM "
                                      "dialect to the native llvm::Module";
     }
-    if (options_.sanitizerKind == iree_Sanitizer_ADDRESS) {
-      for(auto &function : llvmModule->getFunctionList())
+    if (options_.sanitizerKind == iree_Sanitizer_kAddress) {
+      for (auto &function : llvmModule->getFunctionList())
         function.addFnAttr(llvm::Attribute::SanitizeAddress);
     }
 
