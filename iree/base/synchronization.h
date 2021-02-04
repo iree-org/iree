@@ -23,7 +23,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 

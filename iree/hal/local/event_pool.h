@@ -16,7 +16,7 @@
 #define IREE_HAL_LOCAL_EVENT_POOL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/wait_handle.h"
+#include "iree/base/internal/wait_handle.h"
 
 #ifdef __cplusplus
 extern "C" {

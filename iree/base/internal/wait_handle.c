@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/wait_handle.h"
+#include "iree/base/internal/wait_handle.h"
 
 //===----------------------------------------------------------------------===//
 // iree_wait_handle_t

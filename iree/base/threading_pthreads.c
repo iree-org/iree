@@ -28,7 +28,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/synchronization.h"
 #include "iree/base/threading.h"
 #include "iree/base/tracing.h"

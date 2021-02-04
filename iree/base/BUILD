@@ -46,13 +46,9 @@ cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
-        "atomics.h",
-        "debugging.h",
-        "math.h",
         "target_platform.h",
     ],
     deps = [
-        "//iree/base/internal:atomics",
         "@com_google_absl//absl/base:core_headers",
     ],
 )
@@ -60,26 +56,6 @@ cc_library(
 cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],
-)
-
-cc_test(
-    name = "atomics_test",
-    srcs = ["atomics_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "math_test",
-    srcs = ["math_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
 )
 
 #===------------------------------------------------------------------------===#
@@ -103,16 +79,6 @@ cc_library(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "flags",
-    srcs = ["flags.cc"],
-    hdrs = ["flags.h"],
-    deps = [
-        ":api",
-        "@com_google_absl//absl/flags:parse",
     ],
 )
 
@@ -198,6 +164,7 @@ cc_library(
         ":api",
         ":core_headers",
         ":tracing",
+        "//iree/base/internal",
     ],
 )
 
@@ -244,6 +211,7 @@ cc_library(
         ":synchronization",
         ":tracing",
         "//build_tools:default_linkopts",
+        "//iree/base/internal",
     ],
 )
 
@@ -276,35 +244,5 @@ cc_library(
     hdrs = ["tracing.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_library(
-    name = "wait_handle",
-    srcs = [
-        "wait_handle.c",
-        "wait_handle_epoll.c",
-        "wait_handle_impl.h",
-        "wait_handle_kqueue.c",
-        "wait_handle_poll.c",
-        "wait_handle_posix.c",
-        "wait_handle_posix.h",
-        "wait_handle_win32.c",
-    ],
-    hdrs = ["wait_handle.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":tracing",
-    ],
-)
-
-cc_test(
-    name = "wait_handle_test",
-    srcs = ["wait_handle_test.cc"],
-    deps = [
-        ":wait_handle",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )

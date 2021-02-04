@@ -34,13 +34,10 @@ iree_cc_library(
     core_headers
   HDRS
     "alignment.h"
-    "atomics.h"
-    "debugging.h"
     "math.h"
     "target_platform.h"
   DEPS
     absl::core_headers
-    iree::base::internal::atomics
   PUBLIC
 )
 
@@ -50,17 +47,6 @@ iree_cc_library(
   HDRS
     "target_platform.h"
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    atomics_test
-  SRCS
-    "atomics_test.cc"
-  DEPS
-    ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -80,19 +66,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::internal::file_path
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    flags
-  HDRS
-    "flags.h"
-  SRCS
-    "flags.cc"
-  DEPS
-    ::api
-    absl::flags_parse
   PUBLIC
 )
 
@@ -133,17 +106,6 @@ iree_cc_library(
     absl::flags
     absl::str_format
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    math_test
-  SRCS
-    "math_test.cc"
-  DEPS
-    ::core_headers
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -206,6 +168,7 @@ iree_cc_library(
     ::api
     ::core_headers
     ::tracing
+    iree::base::internal
   PUBLIC
 )
 
@@ -257,6 +220,7 @@ iree_cc_library(
     ::core_headers
     ::synchronization
     ::tracing
+    iree::base::internal
   PUBLIC
 )
 
@@ -314,35 +278,3 @@ else()
     PUBLIC
   )
 endif()
-
-iree_cc_library(
-  NAME
-    wait_handle
-  HDRS
-    "wait_handle.h"
-  SRCS
-    "wait_handle.c"
-    "wait_handle_epoll.c"
-    "wait_handle_impl.h"
-    "wait_handle_kqueue.c"
-    "wait_handle_poll.c"
-    "wait_handle_posix.c"
-    "wait_handle_posix.h"
-    "wait_handle_win32.c"
-  DEPS
-    ::api
-    ::core_headers
-    ::tracing
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    wait_handle_test
-  SRCS
-    "wait_handle_test.cc"
-  DEPS
-    ::wait_handle
-    iree::testing::gtest
-    iree::testing::gtest_main
-)

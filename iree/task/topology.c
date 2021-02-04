@@ -18,8 +18,8 @@
 #include <cpuinfo.h>
 #include <stdio.h>
 
-#include "iree/base/debugging.h"
-#include "iree/base/math.h"
+#include "iree/base/internal/debugging.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/task/tuning.h"
 

@@ -14,7 +14,7 @@
 
 #include "iree/task/scope.h"
 
-#include "iree/base/debugging.h"
+#include "iree/base/internal/debugging.h"
 
 void iree_task_scope_initialize(iree_string_view_t name,
                                 iree_task_scope_t* out_scope) {

@@ -15,6 +15,10 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_H_
 #define IREE_BASE_INTERNAL_STATUS_H_
 
+#ifndef __cplusplus
+#error iree::Status is only usable in C++ code.
+#endif  // !__cplusplus
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -136,12 +140,6 @@ class Status final {
     return *this;
   }
 
-  // TODO(benvanik): remove if possible; we don't want to be cloning things.
-  // Currently some of our status usage for sticky errors requires this.
-  Status(const Status& other) {
-    value_ = other.value_ ? iree_status_clone(other.value_) : iree_ok_status();
-  }
-
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
   Status(StatusCode code, absl::string_view message) {
@@ -216,8 +214,6 @@ class Status final {
   }
 
  private:
-  friend class StatusBuilder;
-
   iree_status_t value_ = iree_ok_status();
 };
 
@@ -233,76 +229,6 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
 
 IREE_MUST_USE_RESULT static inline bool IsOk(const iree_status_t& status) {
   return iree_status_is_ok(status);
-}
-
-IREE_MUST_USE_RESULT static inline bool IsAborted(const Status& status) {
-  return status.code() == StatusCode::kAborted;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsAlreadyExists(const Status& status) {
-  return status.code() == StatusCode::kAlreadyExists;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsCancelled(const Status& status) {
-  return status.code() == StatusCode::kCancelled;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsDataLoss(const Status& status) {
-  return status.code() == StatusCode::kDataLoss;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsDeadlineExceeded(
-    const Status& status) {
-  return status.code() == StatusCode::kDeadlineExceeded;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsFailedPrecondition(
-    const Status& status) {
-  return status.code() == StatusCode::kFailedPrecondition;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsInternal(const Status& status) {
-  return status.code() == StatusCode::kInternal;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsInvalidArgument(
-    const Status& status) {
-  return status.code() == StatusCode::kInvalidArgument;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsNotFound(const Status& status) {
-  return status.code() == StatusCode::kNotFound;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsOutOfRange(const Status& status) {
-  return status.code() == StatusCode::kOutOfRange;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsPermissionDenied(
-    const Status& status) {
-  return status.code() == StatusCode::kPermissionDenied;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsResourceExhausted(
-    const Status& status) {
-  return status.code() == StatusCode::kResourceExhausted;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsUnauthenticated(
-    const Status& status) {
-  return status.code() == StatusCode::kUnauthenticated;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsUnavailable(const Status& status) {
-  return status.code() == StatusCode::kUnavailable;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsUnimplemented(const Status& status) {
-  return status.code() == StatusCode::kUnimplemented;
-}
-
-IREE_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
-  return status.code() == StatusCode::kUnknown;
 }
 
 // TODO(#2843): better logging of status checks.

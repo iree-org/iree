@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

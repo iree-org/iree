@@ -64,8 +64,8 @@ iree_cc_binary(
     absl::flags_usage
     absl::strings
     benchmark
-    iree::base::flags
     iree::base::internal::file_io
+    iree::base::internal::flags
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -89,8 +89,8 @@ iree_cc_binary(
     absl::strings
     iree::base::api
     iree::base::core_headers
-    iree::base::flags
     iree::base::internal::file_io
+    iree::base::internal::flags
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -124,8 +124,8 @@ iree_cc_binary(
   DEPS
     absl::flags
     absl::strings
-    iree::base::flags
     iree::base::internal::file_io
+    iree::base::internal::flags
     iree::base::status
     iree::base::tracing
     iree::hal::drivers
@@ -363,7 +363,7 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       absl::strings
       iree::base::api
-      iree::base::flags
+      iree::base::internal::flags
       iree::base::status
       iree::base::tracing
       iree::compiler::Dialect::Flow::Transforms

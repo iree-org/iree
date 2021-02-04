@@ -39,9 +39,10 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::tracing
-    iree::base::wait_handle
   PUBLIC
 )
 
@@ -74,6 +75,7 @@ iree_cc_library(
     ::executable_library
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
     iree::hal::api
   PUBLIC
@@ -104,9 +106,10 @@ iree_cc_library(
     ::local
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::tracing
-    iree::base::wait_handle
     iree::hal::api
     iree::task
   PUBLIC

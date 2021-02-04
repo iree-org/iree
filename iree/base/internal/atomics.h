@@ -22,8 +22,8 @@
 //
 // https://en.cppreference.com/w/c/atomic
 
-#ifndef IREE_BASE_ATOMICS_H_
-#define IREE_BASE_ATOMICS_H_
+#ifndef IREE_BASE_INTERNAL_ATOMICS_H_
+#define IREE_BASE_INTERNAL_ATOMICS_H_
 
 #include <assert.h>
 #include <stdbool.h>
@@ -144,4 +144,4 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_ATOMICS_H_
+#endif  // IREE_BASE_INTERNAL_ATOMICS_H_

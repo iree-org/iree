@@ -96,6 +96,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:synchronization",
         "//iree/base:tracing",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/hal/vulkan/util:arena",
         "//iree/hal/vulkan/util:intrusive_list",

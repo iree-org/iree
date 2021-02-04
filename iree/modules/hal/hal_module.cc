@@ -14,6 +14,8 @@
 
 #include "iree/modules/hal/hal_module.h"
 
+#include <inttypes.h>
+
 #include "absl/base/macros.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
@@ -234,20 +236,22 @@ class HALModuleState final {
     }
     if (length < 0 || offset < 0 || offset > buffer_length ||
         offset + length > buffer_length) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Byte range out of bounds (requested " << offset << "-"
-             << (offset + length - 1) << " of available " << buffer_length
-             << ")";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "byte range out of bounds (requested %d-%d of available %" PRIu64 ")",
+          offset, (offset + length - 1), buffer_length);
     }
 
     vm::ref<iree_hal_buffer_t> buffer;
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-        allocator.get(), memory_types, buffer_usage, length, &buffer))
-        << "Failed to allocate buffer";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_allocator_allocate_buffer(allocator.get(), memory_types,
+                                           buffer_usage, length, &buffer),
+        "failed to allocate buffer");
 
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(
-        buffer.get(), 0, source->data.data + offset, length))
-        << "Writing constant data";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_write_data(buffer.get(), 0, source->data.data + offset,
+                                   length),
+        "writing constant data");
 
     return buffer;
   }
@@ -266,20 +270,22 @@ class HALModuleState final {
       int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferSubspan");
     vm::ref<iree_hal_buffer_t> target_buffer;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
-        source_buffer.get(), source_offset, length, &target_buffer))
-        << "Subspan of an existing buffer (source_offset=" << source_offset
-        << ", length=" << length << ")";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_subspan(source_buffer.get(), source_offset, length,
+                                &target_buffer),
+        "subspan of an existing buffer (source_offset=%u, length=%u)",
+        source_offset, length);
     return target_buffer;
   }
 
   Status BufferFill(const vm::ref<iree_hal_buffer_t>& target_buffer,
                     int32_t target_offset, int32_t length, int32_t pattern) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferFill");
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(
-        target_buffer.get(), target_offset, length, &pattern, sizeof(pattern)))
-        << "Fill range failed (target_offset=" << target_offset
-        << ", length=" << length << ")";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_fill(target_buffer.get(), target_offset, length,
+                             &pattern, sizeof(pattern)),
+        "fill range failed (target_offset=%u, length=%u)", target_offset,
+        length);
     return OkStatus();
   }
 
@@ -288,7 +294,7 @@ class HALModuleState final {
                         const vm::ref<iree_vm_rw_byte_buffer_t>& target_buffer,
                         int32_t target_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferReadData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferReadData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferReadData");
   }
 
   Status BufferWriteData(const vm::ref<iree_hal_buffer_t>& target_buffer,
@@ -296,7 +302,7 @@ class HALModuleState final {
                          const vm::ref<iree_vm_ro_byte_buffer_t>& source_buffer,
                          int32_t source_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferWriteData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferWriteData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferWriteData");
   }
 
   Status BufferCopyData(const vm::ref<iree_hal_buffer_t>& source_buffer,
@@ -304,7 +310,7 @@ class HALModuleState final {
                         const vm::ref<iree_hal_buffer_t>& target_buffer,
                         int32_t target_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferCopyData");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferCopyData";
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferCopyData");
   }
 
   StatusOr<int32_t> BufferLoad(const vm::ref<iree_hal_buffer_t>& source_buffer,
@@ -313,13 +319,14 @@ class HALModuleState final {
 
     uint32_t target_buffer = 0;
     if (length > sizeof(target_buffer)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Length " << length << " exceeds max";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "length %d exceeds max", length);
     }
 
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(
-        source_buffer.get(), source_offset, &target_buffer, length))
-        << "Read failed";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_read_data(source_buffer.get(), source_offset,
+                                  &target_buffer, length),
+        "read failed");
     return target_buffer;
   }
 
@@ -330,15 +337,16 @@ class HALModuleState final {
 
     if (target_offset + length >
         iree_hal_buffer_byte_length(target_buffer.get())) {
-      return OutOfRangeErrorBuilder(IREE_LOC) << "Out of bounds store";
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "out of bounds store");
     } else if (length > sizeof(value)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Length " << length << " exceeds max";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "length %d exceeds max", length);
     }
 
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(
-        target_buffer.get(), target_offset, &value, length))
-        << "Write failed";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_write_data(target_buffer.get(), target_offset, &value,
+                                   length),
+        "write failed");
     return OkStatus();
   }
 
@@ -350,9 +358,10 @@ class HALModuleState final {
       const vm::ref<iree_hal_buffer_t>& buffer, absl::Span<const int32_t> shape,
       iree_hal_element_type_t element_type) {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(), element_type, &buffer_view))
-        << "Failed to create buffer view";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
+                                    element_type, &buffer_view),
+        "failed to create buffer view");
     return std::move(buffer_view);
   }
 
@@ -361,9 +370,9 @@ class HALModuleState final {
       absl::Span<const int32_t> indices, absl::Span<const int32_t> lengths) {
     vm::ref<iree_hal_buffer_view_t> new_buffer_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_subview(
-        buffer_view.get(), indices.data(), indices.size(), lengths.data(),
-        lengths.size(), &new_buffer_view))
-        << "Failed to create subview";
+                             buffer_view.get(), indices.data(), indices.size(),
+                             lengths.data(), lengths.size(), &new_buffer_view),
+                         "failed to create subview");
     return std::move(new_buffer_view);
   }
 
@@ -473,9 +482,10 @@ class HALModuleState final {
       iree_hal_command_buffer_mode_t modes,
       iree_hal_command_category_t command_categories) {
     vm::ref<iree_hal_command_buffer_t> command_buffer;
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-        device.get(), modes, command_categories, &command_buffer))
-        << "Failed to create command buffer";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_command_buffer_create(device.get(), modes, command_categories,
+                                       &command_buffer),
+        "failed to create command buffer");
     return command_buffer;
   }
 

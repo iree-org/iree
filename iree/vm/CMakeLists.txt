@@ -72,6 +72,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
   PUBLIC
 )
@@ -171,6 +172,7 @@ iree_cc_library(
     iree::base::api
     iree::base::core_headers
     iree::base::flatcc
+    iree::base::internal
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC

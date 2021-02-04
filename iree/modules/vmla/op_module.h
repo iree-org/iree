@@ -79,7 +79,8 @@ class Buffer final : public iree::vm::RefObject<Buffer> {
   template <typename T>
   StatusOr<absl::Span<T>> RangeAs(iree_vmla_size_t byte_offset,
                                   iree_vmla_size_t byte_length) {
-    IREE_ASSIGN_OR_RETURN(auto byte_range, MakeRange(byte_offset, byte_length));
+    absl::Span<uint8_t> byte_range;
+    IREE_RETURN_IF_ERROR(MakeRange(byte_offset, byte_length, &byte_range));
     return ReinterpretSpan<T>(byte_range);
   }
 
@@ -91,8 +92,8 @@ class Buffer final : public iree::vm::RefObject<Buffer> {
                           (value.size() * sizeof(U)) / sizeof(T));
   }
 
-  StatusOr<absl::Span<uint8_t>> MakeRange(iree_vmla_size_t byte_offset,
-                                          iree_vmla_size_t byte_length) const;
+  Status MakeRange(iree_vmla_size_t byte_offset, iree_vmla_size_t byte_length,
+                   absl::Span<uint8_t>* out_range) const;
 
   vm::ref<Buffer> parent_;
   void* data_ = nullptr;

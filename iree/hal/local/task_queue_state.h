@@ -16,7 +16,7 @@
 #define IREE_HAL_LOCAL_TASK_QUEUE_STATE_H_
 
 #include "iree/base/api.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/hal/api.h"
 #include "iree/task/scope.h"
 

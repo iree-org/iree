@@ -112,8 +112,8 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
   char element_type_str[16];
   IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
       element_type, sizeof(element_type_str), element_type_str, nullptr));
-  return InvalidArgumentErrorBuilder(IREE_LOC)
-         << "Unsupported element type " << element_type_str;
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unsupported element type %s", element_type_str);
 }
 
 Status ExpectAllTrue(iree_byte_span_t bytes,
@@ -151,8 +151,8 @@ Status ExpectAllTrue(iree_byte_span_t bytes,
   char element_type_str[16];
   IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
       element_type, sizeof(element_type_str), element_type_str, nullptr));
-  return InvalidArgumentErrorBuilder(IREE_LOC)
-         << "Unsupported element type " << element_type_str;
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unsupported element type %s", element_type_str);
 }
 
 // Per-context module state.

@@ -191,7 +191,7 @@ class StringsModuleState final {
         break;
 
       default:
-        return UnimplementedErrorBuilder(IREE_LOC);
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
     }
 
     // Unmap used buffer.
@@ -220,7 +220,7 @@ class StringsModuleState final {
     // The dict must be a simple list, and the indices must be integers.
     if (dict->rank != 1 || iree_hal_buffer_view_element_type(ids.get()) !=
                                IREE_HAL_ELEMENT_TYPE_SINT_32) {
-      return InvalidArgumentErrorBuilder(IREE_LOC);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
 
     const size_t rank = iree_hal_buffer_view_shape_rank(ids.get());

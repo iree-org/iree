@@ -58,31 +58,12 @@ TEST(Status, StreamInsertionContinued) {
   CHECK_STREAM_MESSAGE(status, os, "annotation");
 }
 
-TEST(StatusBuilder, StreamInsertion) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
-  CHECK_STATUS_MESSAGE(status, "message");
-}
-
-TEST(StatusBuilder, StreamInsertionMultiple) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message"
-                                                        << " goes"
-                                                        << " like"
-                                                        << " this.";
-  CHECK_STATUS_MESSAGE(status, "message goes like this.");
-}
-
-TEST(StatusBuilder, StreamInsertionFlag) {
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC)
-                  << "message " << std::hex << 32;
-  CHECK_STATUS_MESSAGE(status, "message 20");
-}
-
 TEST(StatusMacro, ReturnIfError) {
-  auto returnIfError = [](Status status) -> Status {
-    IREE_RETURN_IF_ERROR(status) << "annotation";
-    return OkStatus();
+  auto returnIfError = [](iree_status_t status) -> iree_status_t {
+    IREE_RETURN_IF_ERROR(status, "annotation");
+    return iree_ok_status();
   };
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  Status status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "message");
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");
@@ -92,33 +73,30 @@ TEST(StatusMacro, ReturnIfError) {
 }
 
 TEST(StatusMacro, ReturnIfErrorFormat) {
-  auto returnIfError = [](Status status) -> Status {
-    IREE_RETURN_IF_ERROR(status, "annotation %d %d %d", 1, 2, 3)
-        << "extra annotation";
-    return OkStatus();
+  auto returnIfError = [](iree_status_t status) -> iree_status_t {
+    IREE_RETURN_IF_ERROR(status, "annotation %d %d %d", 1, 2, 3);
+    return iree_ok_status();
   };
-  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  Status status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "message");
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");
   CHECK_STATUS_MESSAGE(status, "annotation 1 2 3");
-  CHECK_STATUS_MESSAGE(status, "extra annotation");
 
   IREE_EXPECT_OK(returnIfError(OkStatus()));
 }
 
 TEST(StatusMacro, AssignOrReturn) {
-  auto assignOrReturn = [](StatusOr<std::string> statusOr) -> Status {
-    IREE_ASSIGN_OR_RETURN(auto ret, std::move(statusOr), _ << "annotation");
+  auto assignOrReturn = [](StatusOr<std::string> statusOr) -> iree_status_t {
+    IREE_ASSIGN_OR_RETURN(auto ret, std::move(statusOr));
     (void)ret;
-    return OkStatus();
+    return iree_ok_status();
   };
-  StatusOr<std::string> statusOr = InvalidArgumentErrorBuilder(IREE_LOC)
-                                   << "message";
+  StatusOr<std::string> statusOr =
+      iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "message");
   Status status = assignOrReturn(std::move(statusOr));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   CHECK_STATUS_MESSAGE(status, "message");
-  CHECK_STATUS_MESSAGE(status, "annotation");
 
   IREE_EXPECT_OK(assignOrReturn("foo"));
 }

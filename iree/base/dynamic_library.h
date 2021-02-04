@@ -45,13 +45,13 @@ class DynamicLibrary {
   virtual ~DynamicLibrary() = default;
 
   // Loads the library at the null-terminated string |search_file_name|.
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      const char* search_file_name) {
-    return Load(absl::Span<const char* const>({search_file_name}));
+  static Status Load(const char* search_file_name,
+                     std::unique_ptr<DynamicLibrary>* out_library) {
+    return Load(absl::Span<const char* const>({search_file_name}), out_library);
   }
   // Loads the library at the first name within |search_file_names| found.
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names);
+  static Status Load(absl::Span<const char* const> search_file_names,
+                     std::unique_ptr<DynamicLibrary>* out_library);
 
   // Gets the name of the library file that is loaded.
   const std::string& file_name() const { return file_name_; }

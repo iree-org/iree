@@ -14,7 +14,7 @@
 
 #include <string.h>
 
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"

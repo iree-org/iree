@@ -175,13 +175,11 @@ class CustomModuleState final {
   StatusOr<vm::ref<iree_hal_buffer_view_t>> MessageToBuffer(
       vm::ref<iree_custom_message_t> message) {
     // Convert the [shape]x[type]=[contents] string to a buffer view.
-    auto input_string =
-        absl::string_view(message->value.data, message->value.size);
     vm::ref<iree_hal_buffer_view_t> buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
-        iree_string_view_t{input_string.data(), input_string.size()},
-        host_local_allocator_.get(), allocator_, &buffer_view))
-        << "Parsing value '" << input_string << "'";
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_parse(message->value, host_local_allocator_.get(),
+                                   allocator_, &buffer_view),
+        "parsing value '%.*s'", (int)message->value.size, message->value.data);
     return std::move(buffer_view);
   }
 

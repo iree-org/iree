@@ -16,12 +16,52 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    internal
+  HDRS
+    "atomics.h"
+    "debugging.h"
+    "math.h"
+  SRCS
+    "atomics_clang.h"
+    "atomics_gcc.h"
+    "atomics_msvc.h"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    atomics_test
+  SRCS
+    "atomics_test.cc"
+  DEPS
+    ::internal
+    iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    math_test
+  SRCS
+    "math_test.cc"
+  DEPS
+    ::internal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     atomic_slist
   HDRS
     "atomic_slist.h"
   SRCS
     "atomic_slist.c"
   DEPS
+    ::internal
     iree::base::core_headers
     iree::base::synchronization
   PUBLIC
@@ -36,18 +76,6 @@ iree_cc_test(
     ::atomic_slist
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    atomics
-  HDRS
-    "atomics_clang.h"
-    "atomics_gcc.h"
-    "atomics_msvc.h"
-  DEPS
-    iree::base::target_platform
-  PUBLIC
 )
 
 iree_cc_library(
@@ -149,6 +177,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    flags
+  HDRS
+    "flags.h"
+  SRCS
+    "flags.cc"
+  DEPS
+    absl::flags_parse
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     main
   HDRS
     "main.h"
@@ -163,20 +204,11 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    ostringstream
-  HDRS
-    "ostringstream.h"
-  SRCS
-    "ostringstream.cc"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     prng
   HDRS
     "prng.h"
   DEPS
+    ::internal
     iree::base::core_headers
   PUBLIC
 )
@@ -197,14 +229,11 @@ iree_cc_library(
     status_internal
   HDRS
     "status.h"
-    "status_builder.h"
     "statusor.h"
   SRCS
     "status.cc"
-    "status_builder.cc"
     "statusor.cc"
   DEPS
-    ::ostringstream
     absl::core_headers
     absl::strings
     absl::utility
@@ -212,4 +241,36 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::logging
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    wait_handle
+  HDRS
+    "wait_handle.h"
+  SRCS
+    "wait_handle.c"
+    "wait_handle_epoll.c"
+    "wait_handle_impl.h"
+    "wait_handle_kqueue.c"
+    "wait_handle_poll.c"
+    "wait_handle_posix.c"
+    "wait_handle_posix.h"
+    "wait_handle_win32.c"
+  DEPS
+    iree::base::api
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    wait_handle_test
+  SRCS
+    "wait_handle_test.cc"
+  DEPS
+    ::wait_handle
+    iree::testing::gtest
+    iree::testing::gtest_main
 )

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/flags.h"
+#include "iree/base/internal/flags.h"
 #include "iree/testing/gtest.h"
 
 extern "C" int main(int argc, char** argv) {

@@ -132,7 +132,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     // If creation failed before, don't try again.
     if (unavailable_driver_names.find(driver_name) !=
         unavailable_driver_names.end()) {
-      return UnavailableErrorBuilder(IREE_LOC) << "Driver unavailable";
+      return iree_make_status(IREE_STATUS_UNAVAILABLE, "driver unavailable");
     }
 
     // No existing driver, attempt to create.

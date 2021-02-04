@@ -14,7 +14,7 @@
 
 #include "iree/task/submission.h"
 
-#include "iree/base/debugging.h"
+#include "iree/base/internal/debugging.h"
 
 void iree_task_submission_initialize(iree_task_submission_t* out_submission) {
   iree_task_list_initialize(&out_submission->ready_list);
