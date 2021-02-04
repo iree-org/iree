@@ -192,10 +192,12 @@ static LogicalResult translateFromMLIRToBenchmarkVMBytecodeModuleWithFlags(
 //
 // Exposed via the --iree-mlir-to-vm-c-module translation.
 static LogicalResult translateFromMLIRToVMCModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    ModuleOp moduleOp, BindingOptions bindingOptions,
+    IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, llvm::raw_ostream &output) {
-  auto result =
-      translateFromMLIRToVM(moduleOp, executableOptions, targetOptions);
+  auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
+                                      executableOptions, targetOptions,
+                                      /*addExportDispatchesPipeline=*/false);
   if (failed(result)) {
     return result;
   }
@@ -207,10 +209,11 @@ static LogicalResult translateFromMLIRToVMCModule(
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
+  auto bindingOptions = getBindingOptionsFromFlags();
   auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
-  return translateFromMLIRToVMCModule(moduleOp, halTargetOptions,
-                                      vmTargetOptions, output);
+  return translateFromMLIRToVMCModule(
+      moduleOp, bindingOptions, halTargetOptions, vmTargetOptions, output);
 }
 #endif  // IREE_HAVE_EMITC_DIALECT
 
