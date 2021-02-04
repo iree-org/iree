@@ -18,6 +18,7 @@ iree_cc_library(
   NAME
     LinkerTools_internal
   SRCS
+    "AndroidLinkerTool.cpp"
     "LinkerTools.cpp"
     "UnixLinkerTool.cpp"
     "WindowsLinkerTool.cpp"
@@ -25,7 +26,6 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     MLIRSupport
-    iree::base::core_headers
     iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs
   PUBLIC
 )
