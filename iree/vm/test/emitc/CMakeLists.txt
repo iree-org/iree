@@ -45,4 +45,16 @@ iree_bytecode_module(
   PUBLIC
 )
 
+iree_bytecode_module(
+  NAME
+    shift_ops
+  SRC
+    "../shift_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
+)
+
 endif()
