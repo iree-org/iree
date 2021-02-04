@@ -84,7 +84,7 @@ fi
 
 # Add a tag to the commit to merge from so it is highlighted in the git log. If
 # someone knows how to just highlight an individual commit with git log, that
-# would be preferable
+# would be preferable.
 git tag "merge-from-${MERGE_FROM?}" "${MERGE_FROM?}"
 
 echo -e "\n\nCurrent git graph:"
