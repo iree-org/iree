@@ -144,7 +144,6 @@ Status RunModuleAndUpdateImGuiWindow(
   return OkStatus();
 }
 }  // namespace
-}  // namespace iree
 
 extern "C" int iree_main(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
@@ -455,3 +454,5 @@ extern "C" int iree_main(int argc, char** argv) {
 
   return 0;
 }
+
+}  // namespace iree
