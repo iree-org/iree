@@ -262,7 +262,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-????): Enable after fixing the allocation for vector.transfer_writes.
+// TODO(GH-4734): Enable after fixing the allocation for vector.transfer_writes.
 // #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 // #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 // #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
