@@ -32,7 +32,7 @@ COPYBARA_TAG="COPYBARA_INTEGRATE_REVIEW"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean. Aborting"
+  echo -e "\n\nWorking directory not clean. Aborting"
   git status
   exit 1
 fi
@@ -42,13 +42,13 @@ fi
 # really picky about it.
 CURRENT_BRANCH="$(git branch --show-current)"
 if [[ "${CURRENT_BRANCH?}" != "google" ]]; then
-  echo "Current branch ${CURRENT_BRANCH?} is not 'google'. Aborting"
+  echo -e "\n\nCurrent branch ${CURRENT_BRANCH?} is not 'google'. Aborting"
   exit 1
 fi
 
 if [[ -n "$(git rev-list --merges HEAD^..HEAD)" ]]; then
-  echo "HEAD commit is already a merge commit. Aborting"
-  git show HEAD
+  echo -e "\n\nHEAD commit is already a merge commit. Aborting"
+  git log -n 1 HEAD
   exit 1
 fi
 
@@ -59,8 +59,8 @@ MESSAGE="$(git log --format=%B -n 1 HEAD)"
 MERGE_FROM="$(echo "${MESSAGE?}" | awk -v pat="${COPYBARA_TAG?}" '$0~pat{print $NF}')"
 
 if [[ -z "${MERGE_FROM?}" ]]; then
-  echo "HEAD commit is not tagged with ${COPYBARA_TAG?}. Aborting"
-  git show HEAD
+  echo -e "\n\nHEAD commit is not tagged with ${COPYBARA_TAG?}. Aborting"
+  git log -n 1 HEAD
   exit 1
 fi
 
@@ -71,7 +71,24 @@ echo "git reset --hard $(git rev-parse HEAD)"
 NEW_MESSAGE="$(echo "${MESSAGE?}" | sed "/${COPYBARA_TAG?}/d")"
 
 # Make sure we actually have the commit we need to merge from.
+echo -e "\n\nFetching ${MERGE_FROM?}"
 git fetch "${UPSTREAM_REMOTE?}" "${MERGE_FROM?}"
+
+echo -e "\n\nMerging from ${MERGE_FROM?}:"
+git log -n 1 "${MERGE_FROM?}"
+
+if ! git merge-base --is-ancestor "${MERGE_FROM?}" main; then
+  echo -e "\n\nCommit to merge from is not on main branch. Aborting"
+  exit 1
+fi
+
+# Add a tag to the commit to merge from so it is highlighted in the git log. If
+# someone knows how to just highlight an individual commit with git log, that
+# would be preferable
+git tag "merge-from-${MERGE_FROM?}" "${MERGE_FROM?}"
+
+echo -e "\n\nCurrent git graph:"
+git log --left-right --graph --oneline --boundary "HEAD...main"
 
 # Create a new commit object `git commit-tree` based on the tree of the current
 # HEAD commit with the parent of the HEAD commit as first parent and the commit
@@ -79,3 +96,9 @@ git fetch "${UPSTREAM_REMOTE?}" "${MERGE_FROM?}"
 # the current branch to this commit.
 # See https://stackoverflow.com/q/48560351
 git reset --soft "$(git commit-tree -m "${NEW_MESSAGE?}" -p HEAD^ -p ${MERGE_FROM?} HEAD^{tree})"
+
+echo -e "\n\nCreated fake merge. New git graph:"
+git log --left-right --graph --oneline --boundary "HEAD...main"
+
+# Delete the tag we created
+git tag -d "merge-from-${MERGE_FROM?}"
