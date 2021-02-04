@@ -29,11 +29,12 @@ iree_check_single_backend_test_suite(
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
 )
 
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
-    "add.mlir"
+    "${_GLOB_X_MLIR}"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER

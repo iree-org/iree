@@ -25,6 +25,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -74,6 +75,17 @@ static Value maybeConvertToIndex(Location loc, Value val, OpBuilder &b) {
   return b.create<IndexCastOp>(loc, val, b.getIndexType());
 }
 
+// TODO(ravishankarm): Marker added to copy op to hook into rest of the
+// codegen. Mostly need to kill markers (or at least assume that default marker
+// is workgroup marker on the linalg on tensors path.
+static void createCopyOp(OpBuilder &b, Value source, Value dest, Location loc,
+                         StringRef marker = "") {
+  auto op = b.create<linalg::CopyOp>(loc, source, dest);
+  if (!marker.empty()) {
+    setMarker(op, marker);
+  }
+}
+
 // Non-conversion equivalent of the core MLIR Linalg bufferization patterns.
 // Allocate the output buffers for the bufferized Linalg op to write into.
 // If the tensor is an init tensor, we additionally copy the original value into
@@ -121,8 +133,9 @@ static LogicalResult allocateBuffersForResults(
     resultBuffers.push_back(alloc);
 
     // Additionally, if the output buffer is used, clone its value for now.
-    if (op.payloadUsesValueFromOutputOperandIndex(resultIndex))
-      b.create<linalg::CopyOp>(loc, bvm.lookup(outTensor), alloc);
+    if (op.payloadUsesValueFromOutputOperandIndex(resultIndex)) {
+      createCopyOp(b, bvm.lookup(outTensor), alloc, loc, getMarkerOrNull(op));
+    }
   }
   for (auto it : llvm::zip(op->getResults(), resultBuffers)) {
     transferShapeOpsToMemref(b, std::get<0>(it), std::get<1>(it), bvm);
@@ -146,7 +159,8 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
     Value resultValue = result.value();
     Value resultBuffer = bvm.lookup(resultValue);
     if (resultBuffer != outputs[result.index()]) {
-      b.create<linalg::CopyOp>(loc, outputs[result.index()], resultBuffer);
+      createCopyOp(b, outputs[result.index()], resultBuffer, loc,
+                   getMarkerOrNull(op));
     }
   }
 }

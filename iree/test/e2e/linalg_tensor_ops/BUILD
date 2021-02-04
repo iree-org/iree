@@ -39,7 +39,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = ["add.mlir"],  #glob(["*.mlir"]),
+    srcs = glob(["*.mlir"]),
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-spirv-experimental-linalg-on-tensors",

@@ -55,11 +55,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
-    "iree-codegen-spirv-experimental-linalg-on-tensors",
-    llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
-    llvm::cl::init(false));
-
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
   //===--------------------------------------------------------------------===//
@@ -88,7 +83,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (!clEnableLinalgOnTensorsSPIRV) {
+  if (!options.useLinalgOnTensors) {
     pm.nest<ModuleOp>().addPass(createSplitDispatchFunctionPass());
   }
   pm.addPass(createLinalgTileAndFusePass(options));
@@ -106,7 +101,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.nest<ModuleOp>().addPass(createConvertToGPUPass());
+  pm.nest<ModuleOp>().addPass(createConvertToGPUPass(options));
   if (options.enableVectorization) {
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
   }
@@ -114,7 +109,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  if (!clEnableLinalgOnTensorsSPIRV) {
+  if (!options.useLinalgOnTensors) {
     //===--------------------------------------------------------------------===//
     // Legalize the function that computes the number of workgroups to be
     // runnable on the host.
@@ -213,7 +208,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //     that returns the number of workgroups.
   //   - The entry point function gets an attribute `vkspv.num_workgroups_fn` to
   //     record which function in the module returns the number of workgroups.
-  if (!clEnableLinalgOnTensorsSPIRV) {
+  if (!options.useLinalgOnTensors) {
     pm.nest<ModuleOp>().addPass(createDeclareNumWorkgroupsFnPass());
   }
 
@@ -224,7 +219,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
-  if (clEnableLinalgOnTensorsSPIRV) {
+  if (options.useLinalgOnTensors) {
     WorkgroupMemoryAllocationFn allocationFn = [](OpBuilder &builder,
                                                   Location loc,
                                                   ArrayRef<Value> dynamicSizes,
@@ -278,7 +273,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   addLinalgToSPIRVPasses(pm, options);
 
-  if (!clEnableLinalgOnTensorsSPIRV) {
+  if (!options.useLinalgOnTensors) {
     // HACK: SplitDispatchFunctionPass inserts spv.EntryPoints but does not tell
     // the HAL about them. We need to find those new entry points and
     // materialize hal.executable.entry_point ops so that we have a consistent
