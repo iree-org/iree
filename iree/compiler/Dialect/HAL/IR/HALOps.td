@@ -314,7 +314,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type
+    HAL_ElementType:$element_type
   );
   let results = (outs
     HAL_DeviceSize:$result
@@ -327,7 +327,9 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
 
   let builders = [
     OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
-      "int32_t":$elementSize)>,
+      "int32_t":$elementType)>,
+    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+      "Value":$elementType)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -346,7 +348,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type,
+    HAL_ElementType:$element_type,
     HAL_Dims:$indices
   );
 
@@ -362,6 +364,8 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let builders = [
     OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
       "int32_t":$elementType, "ValueRange":$indices)>,
+    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+      "Value":$elementType, "ValueRange":$indices)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -380,7 +384,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type,
+    HAL_ElementType:$element_type,
     HAL_Dims:$indices,
     HAL_Dims:$lengths
   );
@@ -399,6 +403,8 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   let builders = [
     OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
       "int32_t":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
+    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+      "Value":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -836,6 +842,8 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let builders = [
     OpBuilderDAG<(ins "Value":$bufferView, "ValueRange":$indices)>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
@@ -868,6 +876,8 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
     OpBuilderDAG<(ins "Value":$bufferView, "ValueRange":$indices,
       "ValueRange":$lengths)>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {

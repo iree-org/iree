@@ -360,9 +360,16 @@ static LogicalResult verifyVariableStoreIndirectOp(
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
                                    int32_t elementType) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32));
+}
+
+void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
+                                   Value allocator, ValueRange shape,
+                                   Value elementType) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addTypes({builder.getIndexType()});
 }
 
@@ -378,9 +385,17 @@ void AllocatorComputeSizeOp::getAsmResultNames(
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
                                      int32_t elementType, ValueRange indices) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        indices);
+}
+
+void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
+                                     Value allocator, ValueRange shape,
+                                     Value elementType, ValueRange indices) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addOperands(indices);
   state.addTypes({builder.getIndexType()});
 }
@@ -398,9 +413,18 @@ void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
                                     int32_t elementType, ValueRange indices,
                                     ValueRange lengths) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        indices, lengths);
+}
+
+void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
+                                    Value allocator, ValueRange shape,
+                                    Value elementType, ValueRange indices,
+                                    ValueRange lengths) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addOperands(indices);
   state.addOperands(lengths);
   state.addTypes({builder.getIndexType(), builder.getIndexType()});

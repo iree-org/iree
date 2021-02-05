@@ -32,7 +32,7 @@ func @tensorLoad(%arg0 : tensor<2x3xi32>) {
   %i1 = constant 1 : index
   // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [
   // CHECK-SAME:   %[[C2]], %[[C3]]
-  // CHECK-SAME: ], element_type = 16777248, indices = [
+  // CHECK-SAME: ], element_type = %c16777248_i32, indices = [
   // CHECK-SAME:   %[[C0]], %[[C1]]
   // CHECK-SAME: ]
   // CHECK-NEXT: = hal.buffer.load %arg0[
@@ -46,7 +46,7 @@ func @tensorLoad(%arg0 : tensor<2x3xi32>) {
 
 // CHECK-LABEL: @tensorLoad1
 func @tensorLoad1(%arg0 : tensor<i1>) {
-  // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [], element_type = 16777217, indices = []
+  // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [], element_type = %c16777217_i32, indices = []
   // CHECK-NEXT: = hal.buffer.load %arg0[
   // CHECK-SAME:   %[[OFF]]
   // CHECK-SAME: ] : i1
@@ -68,7 +68,7 @@ func @tensorStore(%arg0 : tensor<2x3xi32>) {
   %c9 = constant 9 : i32
   // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [
   // CHECK-SAME:   %[[C2]], %[[C3]]
-  // CHECK-SAME: ], element_type = 16777248, indices = [
+  // CHECK-SAME: ], element_type = %c16777248_i32, indices = [
   // CHECK-SAME:   %[[C0]], %[[C1]]
   // CHECK-SAME: ]
   // CHECK-NEXT: hal.buffer.store %[[C9]], %arg0[
@@ -84,7 +84,7 @@ func @tensorStore(%arg0 : tensor<2x3xi32>) {
 func @tensorStore1(%arg0 : tensor<i1>) {
   // CHECK-DAG: %[[C1:.+]] = constant true
   %c1 = constant true
-  // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [], element_type = 16777217, indices = []
+  // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [], element_type = %c16777217_i32, indices = []
   // CHECK-NEXT: hal.buffer.store %[[C1]], %arg0[
   // CHECK-SAME:   %[[OFF]]
   // CHECK-SAME: ] : i1

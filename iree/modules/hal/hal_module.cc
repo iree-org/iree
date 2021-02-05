@@ -375,29 +375,6 @@ class HALModuleState final {
     return iree_hal_buffer_view_byte_length(buffer_view.get());
   }
 
-  StatusOr<int32_t> BufferViewComputeOffset(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> indices) {
-    iree_device_size_t offset = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_offset(
-        buffer_view.get(), indices.data(), indices.size(), &offset));
-    return offset;
-  }
-
-  StatusOr<std::tuple<int32_t, int32_t>> BufferViewComputeRange(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> start_indices,
-      absl::Span<const int32_t> lengths) {
-    iree_device_size_t start_offset = 0;
-    iree_device_size_t subspan_length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
-        buffer_view.get(), start_indices.data(), start_indices.size(),
-        lengths.data(), lengths.size(), &start_offset, &subspan_length));
-    return std::make_tuple<int32_t, int32_t>(
-        static_cast<int32_t>(start_offset),
-        static_cast<int32_t>(subspan_length));
-  }
-
   StatusOr<int32_t> BufferViewElementType(
       const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
     return static_cast<int32_t>(
@@ -785,10 +762,6 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferViewBuffer),
     vm::MakeNativeFunction("buffer_view.byte_length",
                            &HALModuleState::BufferViewByteLength),
-    vm::MakeNativeFunction("buffer_view.compute_offset",
-                           &HALModuleState::BufferViewComputeOffset),
-    vm::MakeNativeFunction("buffer_view.compute_range",
-                           &HALModuleState::BufferViewComputeRange),
     vm::MakeNativeFunction("buffer_view.element_type",
                            &HALModuleState::BufferViewElementType),
     vm::MakeNativeFunction("buffer_view.rank", &HALModuleState::BufferViewRank),
