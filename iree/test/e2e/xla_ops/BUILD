@@ -139,7 +139,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "abs.mlir",
         "add.mlir",
-        "batch_norm_inference.mlir",
+        # "batch_norm_inference.mlir",
         "broadcast.mlir",
         "broadcast_add.mlir",
         "broadcast_in_dim.mlir",
@@ -193,6 +193,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
+        "-iree-flow-dispatch-linalg-on-tensors-enable-fusion",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
