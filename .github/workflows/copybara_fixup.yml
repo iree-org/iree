@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Edits the HEAD commit to use the submodule state specified in SUBMODULE_VERSIONS.txt
+# Edits the HEAD commit if it is tagged with the Copybara tag to use the
+# submodule state specified in SUBMODULE_VERSIONS.txt and merge from the
+# specified commit.
 # WARNING: rewrites history!
 
 name: Fixup Copybara
