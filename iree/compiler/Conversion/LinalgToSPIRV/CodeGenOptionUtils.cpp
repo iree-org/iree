@@ -55,6 +55,11 @@ static llvm::SmallVector<unsigned, 3> getSPIRVWorkgroupSizeClOption() {
   return sizes;
 }
 
+static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
+    "iree-codegen-spirv-experimental-linalg-on-tensors",
+    llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -65,6 +70,7 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   options.enableVectorization = clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
   options.vectorizeMemref = clVectorizeMemref;
+  options.useLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;
   return options;
 }
 

@@ -173,7 +173,7 @@ class MaterializeResourceCachesPass
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
-        loc, layoutType, deviceValue, setLayoutValues, pushConstantsAttr);
+        loc, layoutType, deviceValue, pushConstantsAttr, setLayoutValues);
     blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
 
     return variableOp;

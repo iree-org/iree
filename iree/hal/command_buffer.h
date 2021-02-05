@@ -83,6 +83,14 @@ enum iree_hal_execution_stage_e {
 };
 typedef uint32_t iree_hal_execution_stage_t;
 
+// Bitfield specifying flags controlling an execution dependency.
+//
+// Maps to VkDependencyFlags.
+enum iree_hal_execution_barrier_flags_e {
+  IREE_HAL_EXECUTION_BARRIER_FLAG_NONE = 0,
+};
+typedef uint32_t iree_hal_execution_barrier_flags_t;
+
 // Bitfield specifying which scopes will access memory and how.
 //
 // Maps to VkAccessFlagBits.
@@ -223,6 +231,7 @@ iree_hal_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
+    iree_hal_execution_barrier_flags_t flags,
     iree_host_size_t memory_barrier_count,
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
@@ -434,6 +443,7 @@ typedef struct {
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_execution_stage_t source_stage_mask,
       iree_hal_execution_stage_t target_stage_mask,
+      iree_hal_execution_barrier_flags_t flags,
       iree_host_size_t memory_barrier_count,
       const iree_hal_memory_barrier_t* memory_barriers,
       iree_host_size_t buffer_barrier_count,

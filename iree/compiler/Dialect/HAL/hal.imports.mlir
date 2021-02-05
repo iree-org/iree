@@ -112,8 +112,8 @@ vm.import @buffer.store(
 // Creates a reference to a buffer with a particular shape and element type.
 vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %element_type : i32
+  %element_type : i32,
+  %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
@@ -184,10 +184,10 @@ vm.import @buffer_view.dims.4(
 ) -> (i32, i32, i32, i32)
 attributes {nosideeffects}
 
-// Prints out the content of buffers.
+// Prints out the content of buffer views.
 vm.import @buffer_view.trace(
-  %operands : !vm.ref<!hal.buffer_view> ...,
-  %trace_info : !vm.ref<!iree.byte_buffer>
+  %key : !vm.ref<!iree.byte_buffer>,
+  %operands : !vm.ref<!hal.buffer_view> ...
 )
 
 //===----------------------------------------------------------------------===//
@@ -212,15 +212,14 @@ vm.import @command_buffer.end(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
-// Defines a memory dependency between commands recorded before and after the
-// barrier.
+// Defines an execution dependency between all commands recorded before the
+// barrier and all commands recorded after the barrier. Only the stages provided
+// will be affected.
 vm.import @command_buffer.execution_barrier(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_stage_mask : i32,
   %target_stage_mask : i32,
-  // TODO(benvanik): tuple types.
-  %memory_barriers : i32 ...,
-  %buffer_barriers : i32 ...
+  %flags : i32
 )
 
 // Fills the target buffer with the given repeating value.
@@ -358,8 +357,8 @@ attributes {nosideeffects}
 // required size.
 vm.import @executable_layout.create(
   %device : !vm.ref<!hal.device>,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...,
-  %push_constants : i32
+  %push_constants : i32,
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 

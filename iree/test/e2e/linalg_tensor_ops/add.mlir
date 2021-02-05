@@ -33,3 +33,22 @@ func @tensor() attributes { iree.module.export } {
      [47.0, 49.0, 51.0, 53.0, 55.0]]> : tensor<8x5xf32>) : tensor<8x5xf32>
   return
 }
+
+func @tensor_large() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<20.0> : tensor<250x500xf32>
+  %rhs = iree.unfoldable_constant dense<22.0> : tensor<500xf32>
+  %init = linalg.init_tensor [500, 250] : tensor<500x250xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                     affine_map<(d0, d1) -> (d0)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%lhs, %rhs: tensor<250x500xf32>, tensor<500xf32>)
+    outs(%init: tensor<500x250xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32, %arg2 : f32):
+      %0 = addf %arg0, %arg1 : f32
+      linalg.yield %0 : f32
+    } -> tensor<500x250xf32>
+  check.expect_almost_eq_const(%result, dense<42.0> : tensor<500x250xf32>) : tensor<500x250xf32>
+  return
+}

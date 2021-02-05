@@ -1,6 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-codegen-convert-to-spirv %s | IreeFileCheck %s
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   // CHECK: spv.globalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
   // CHECK: spv.func @push_constant()
   func @push_constant() {
@@ -22,6 +23,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 // -----
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   // CHECK: spv.globalVariable @[[RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.globalVariable @[[ARG0:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.globalVariable @[[ARG1:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
@@ -42,6 +44,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 // -----
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   // CHECK: spv.globalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.globalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.globalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
@@ -79,6 +82,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess], [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   // CHECK: spv.func @kernel_matmul
   func @kernel_matmul(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
     %c0 = constant 0 : index
@@ -106,6 +110,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer], [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   func @kernel_matmul_licm(%arg0: memref<4096x4096xi8>, %arg1: memref<4096x4096xi8>, %arg2: memref<4096x4096xi32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
     %c32 = constant 32 : index
     %c4096 = constant 4096 : index
@@ -144,6 +149,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer], [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  // CHECK-LABEL: spv.module
   func @kernel_matmul_vector_memref(%arg0: memref<4096x256xvector<4xi32>>, %arg1: memref<4096x256xvector<4xi32>>, %arg2: memref<4096x1024xvector<4xi32>>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
     %c32 = constant 32 : index
     %c4096 = constant 4096 : index
@@ -172,3 +178,76 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     return
   }
 }
+
+// -----
+
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @interface_binding() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<8x5xf32>
+    %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<5xf32>
+    %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<8x5xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+// CHECK-LABEL: spv.module
+//   CHECK-DAG:   spv.globalVariable @[[RET0:.+]] bind(0, 2)
+//   CHECK-DAG:   spv.globalVariable @[[ARG1:.+]] bind(0, 1)
+//   CHECK-DAG:   spv.globalVariable @[[ARG0:.+]] bind(0, 0)
+//       CHECK:   spv.func
+//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[RET0]]
+//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[ARG0]]
+//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[ARG1]]
+
+// -----
+
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @interface_wg_id() {
+    %0 = hal.interface.workgroup.id[0] : index
+    %1 = hal.interface.workgroup.id[1] : index
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+// CHECK-LABEL: spv.module
+//   CHECK-DAG:   spv.globalVariable @[[WGID:.+]] built_in("WorkgroupId")
+//       CHECK:   spv.func
+//       CHECK:     %[[ADDR1:.+]] = spv.mlir.addressof @[[WGID]]
+//       CHECK:     %[[VAL1:.+]] = spv.Load "Input" %[[ADDR1]]
+//       CHECK:     %[[WGIDX:.+]] = spv.CompositeExtract %[[VAL1]][0 : i32]
+//       CHECK:     %[[ADDR2:.+]] = spv.mlir.addressof @[[WGID]]
+//       CHECK:     %[[VAL2:.+]] = spv.Load "Input" %[[ADDR2]]
+//       CHECK:     %[[WGIDY:.+]] = spv.CompositeExtract %[[VAL2]][1 : i32]
+
+// -----
+
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+  func @interface_wg_count() {
+    %0 = hal.interface.workgroup.count[0] : index
+    %1 = hal.interface.workgroup.count[1] : index
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+// CHECK-LABEL: spv.module
+//   CHECK-DAG:   spv.globalVariable @[[WGCOUNT:.+]] built_in("NumWorkgroups")
+//       CHECK:   spv.func
+//       CHECK:     %[[ADDR1:.+]] = spv.mlir.addressof @[[WGCOUNT]]
+//       CHECK:     %[[VAL1:.+]] = spv.Load "Input" %[[ADDR1]]
+//       CHECK:     %[[WGIDX:.+]] = spv.CompositeExtract %[[VAL1]][0 : i32]
+//       CHECK:     %[[ADDR2:.+]] = spv.mlir.addressof @[[WGCOUNT]]
+//       CHECK:     %[[VAL2:.+]] = spv.Load "Input" %[[ADDR2]]
+//       CHECK:     %[[WGIDY:.+]] = spv.CompositeExtract %[[VAL2]][1 : i32]

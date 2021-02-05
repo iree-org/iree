@@ -715,22 +715,22 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 
   let arguments = (ins
     HAL_Buffer:$buffer,
-    HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type
+    HAL_ElementTypeAttr:$element_type,
+    HAL_Shape:$shape
   );
   let results = (outs
     HAL_BufferView:$result
   );
 
   let assemblyFormat = [{
-    $buffer `,` `shape` `=` `[` $shape `]` `,` `element_type` `=` $element_type
+    $buffer `,` `element_type` `=` $element_type `,` `shape` `=` `[` $shape `]`
     `:` type($result) attr-dict
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$buffer, "ValueRange":$shape,
-      "int32_t":$elementType)>,
+    OpBuilderDAG<(ins "Value":$buffer, "int32_t":$elementType,
+                  "ValueRange":$shape)>,
   ];
 }
 
@@ -918,12 +918,14 @@ def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   let summary = [{trace value(s) operation}];
   let description = [{
-    Trace point for dispatchable functions.
+    Traces out to a runtime trace sink (console, log file, etc) the given buffer
+    views and titles them with the given key. The key is informational only and
+    useful for titling/marking specific sets of buffers for easier searching.
   }];
 
   let arguments = (ins
-    Variadic<HAL_BufferView>:$operands,
-    StrAttr:$trace_info
+    StrAttr:$key,
+    Variadic<HAL_BufferView>:$operands
   );
 
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
@@ -1008,30 +1010,20 @@ def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
   let hasCanonicalizer = 1;
 }
 
-def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
-    AttrSizedOperandSegments,
-  ]> {
+def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
   let summary = [{command buffer execution barrier recording operation}];
   let description = [{
-    Defines a memory dependency between commands recorded before and after the
-    barrier.
+    Defines an execution dependency between all commands recorded before the
+    barrier and all commands recorded after the barrier. Only the stages
+    provided will be affected.
   }];
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_ExecutionStageBitfieldAttr:$source_stage_mask,
     HAL_ExecutionStageBitfieldAttr:$target_stage_mask,
-    Variadic<HAL_MemoryBarrier>:$memory_barriers,
-    Variadic<HAL_BufferBarrier>:$buffer_barriers
+    HAL_ExecutionBarrierFlagBitfieldAttr:$flags
   );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilderDAG<(ins "Value":$commandBuffer,
-      "IREE::HAL::ExecutionStageBitfield":$sourceStageMask,
-      "IREE::HAL::ExecutionStageBitfield":$targetStageMask,
-      "ValueRange":$memoryBarriers, "ValueRange":$bufferBarriers)>,
-  ];
 }
 
 // TODO(benvanik): event ops.
@@ -2556,23 +2548,24 @@ def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
     %set0 = hal.descriptor_set_layout.create ...
     %set1 = hal.descriptor_set_layout.create ...
     %layout = hal.executable_layout.create %device,
-                                           set_layouts = [%set0, %set1],
-                                           push_constants = 3 : !hal.executable_layout
+                                           push_constants = 3,
+                                           set_layouts = [%set0, %set1] : !hal.executable_layout
     ```
   }];
 
   let arguments = (ins
     HAL_Device:$device,
-    Variadic<HAL_DescriptorSetLayout>:$set_layouts,
-    I32Attr:$push_constants
+    I32Attr:$push_constants,
+    Variadic<HAL_DescriptorSetLayout>:$set_layouts
   );
   let results = (outs
     HAL_ExecutableLayout:$result
   );
 
   let assemblyFormat = [{
-    $device `,` `set_layouts` `=` `[` $set_layouts `]` `,`
-    `push_constants` `=` $push_constants
+    $device `,`
+    `push_constants` `=` $push_constants `,`
+    `set_layouts` `=` `[` $set_layouts `]`
     attr-dict-with-keyword `:` type($result)
   }];
 }

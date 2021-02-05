@@ -32,13 +32,10 @@ namespace HAL {
 // Records a full execution barrier that forces visibility of all buffers.
 static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
                                        OpBuilder &builder) {
-  Value memoryBarrier = builder.create<IREE::HAL::MakeMemoryBarrierOp>(
-      loc, IREE::HAL::AccessScopeBitfield::DispatchWrite,
-      IREE::HAL::AccessScopeBitfield::DispatchRead);
   builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
       loc, commandBuffer, IREE::HAL::ExecutionStageBitfield::Dispatch,
       IREE::HAL::ExecutionStageBitfield::Dispatch,
-      ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
+      IREE::HAL::ExecutionBarrierFlagBitfield::None);
 }
 
 SPIRVTargetBackend::SPIRVTargetBackend(SPIRVCodegenOptions options)
@@ -62,8 +59,7 @@ void SPIRVTargetBackend::declareTargetOpsForEnv(
 
 void SPIRVTargetBackend::buildTranslationPassPipeline(
     OpPassManager &passManager) {
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  buildSPIRVTransformPassPipeline(nestedModulePM, spvCodeGenOptions_);
+  buildSPIRVTransformPassPipeline(passManager, spvCodeGenOptions_);
 }
 
 LogicalResult SPIRVTargetBackend::recordDispatch(

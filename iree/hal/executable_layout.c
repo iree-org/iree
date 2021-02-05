@@ -25,9 +25,9 @@
 IREE_HAL_API_RETAIN_RELEASE(executable_layout);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
-    iree_hal_device_t* device, iree_host_size_t set_layout_count,
+    iree_hal_device_t* device, iree_host_size_t push_constants,
+    iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constants,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
@@ -36,7 +36,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
                                                   create_executable_layout)(
-      device, set_layout_count, set_layouts, push_constants,
+      device, push_constants, set_layout_count, set_layouts,
       out_executable_layout);
   IREE_TRACE_ZONE_END(z0);
   return status;

@@ -16,7 +16,7 @@
 
 #include <memory>
 
-#include "absl/base/attributes.h"
+#include "iree/base/attributes.h"
 #include "iree/base/logging.h"
 
 namespace iree {
@@ -25,7 +25,7 @@ namespace {
 
 // Rounds up to the next alignment value, if it is not already aligned.
 template <typename T>
-ABSL_ATTRIBUTE_ALWAYS_INLINE constexpr T RoundToAlignment(
+IREE_ATTRIBUTE_ALWAYS_INLINE constexpr T RoundToAlignment(
     T value, T alignment) noexcept {
   return ((value + alignment - 1) / alignment) * alignment;
 }

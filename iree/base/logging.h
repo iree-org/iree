@@ -59,8 +59,7 @@
 #include <limits>
 #include <sstream>
 
-#include "absl/base/attributes.h"
-#include "absl/base/optimization.h"
+#include "iree/base/attributes.h"
 
 namespace iree {
 
@@ -102,8 +101,8 @@ class LogMessage : public std::basic_ostringstream<char> {
 // LogMessageFatal ensures the process exits in failure after logging a message.
 class LogMessageFatal : public LogMessage {
  public:
-  LogMessageFatal(const char* file, int line) ABSL_ATTRIBUTE_COLD;
-  ABSL_ATTRIBUTE_NORETURN ~LogMessageFatal();
+  LogMessageFatal(const char* file, int line) IREE_ATTRIBUTE_COLD;
+  IREE_ATTRIBUTE_NORETURN ~LogMessageFatal();
 };
 
 // NullStream implements operator<< but does nothing.
@@ -146,8 +145,8 @@ inline NullStream& operator<<(NullStream& str,
 #define IREE_VLOG_IS_ON(lvl) \
   ((lvl) <= ::iree::internal::LogMessage::MinVLogLevel())
 
-#define IREE_VLOG(lvl)                          \
-  if (ABSL_PREDICT_FALSE(IREE_VLOG_IS_ON(lvl))) \
+#define IREE_VLOG(lvl)                     \
+  if (IREE_UNLIKELY(IREE_VLOG_IS_ON(lvl))) \
   ::iree::internal::LogMessage(__FILE__, __LINE__, ::iree::INFO)
 
 // `IREE_DVLOG` behaves like `IREE_VLOG` in debug mode (i.e. `#ifndef NDEBUG`).
@@ -167,8 +166,8 @@ inline NullStream& operator<<(NullStream& str,
 // controlled by NDEBUG, so the check will be executed regardless of
 // compilation mode.  Therefore, it is safe to do things like:
 //    IREE_CHECK(fp->Write(x) == 4)
-#define IREE_CHECK(condition)           \
-  if (ABSL_PREDICT_FALSE(!(condition))) \
+#define IREE_CHECK(condition)      \
+  if (IREE_UNLIKELY(!(condition))) \
   IREE_LOG(FATAL) << "Check failed: " #condition " "
 
 // Function is overloaded for integral types to allow static const
@@ -213,14 +212,14 @@ struct CheckOpString {
   CheckOpString(std::string* str) : str_(str) {}  // NOLINT
   // No destructor: if str_ is non-NULL, we're about to IREE_LOG(FATAL),
   // so there's no point in cleaning up str_.
-  operator bool() const { return ABSL_PREDICT_FALSE(str_ != NULL); }
+  operator bool() const { return IREE_UNLIKELY(str_ != NULL); }
   std::string* str_;
 };
 
 // Build the error message string. Specify no inlining for code size.
 template <typename T1, typename T2>
 std::string* MakeCheckOpString(const T1& v1, const T2& v2,
-                               const char* exprtext) ABSL_ATTRIBUTE_NOINLINE;
+                               const char* exprtext) IREE_ATTRIBUTE_NOINLINE;
 
 // A helper class for formatting "expr (V1 vs. V2)" in a IREE_CHECK_XX
 // statement. See MakeCheckOpString for sample usage.
@@ -260,7 +259,7 @@ std::string* MakeCheckOpString(const T1& v1, const T2& v2,
   template <typename T1, typename T2>                                    \
   inline std::string* name##Impl(const T1& v1, const T2& v2,             \
                                  const char* exprtext) {                 \
-    if (ABSL_PREDICT_TRUE(v1 op v2))                                     \
+    if (IREE_LIKELY(v1 op v2))                                           \
       return NULL;                                                       \
     else                                                                 \
       return ::iree::internal::MakeCheckOpString(v1, v2, exprtext);      \
@@ -270,7 +269,7 @@ std::string* MakeCheckOpString(const T1& v1, const T2& v2,
   }                                                                      \
   inline std::string* name##Impl(const size_t v1, const int v2,          \
                                  const char* exprtext) {                 \
-    if (ABSL_PREDICT_FALSE(v2 < 0)) {                                    \
+    if (IREE_UNLIKELY(v2 < 0)) {                                         \
       return ::iree::internal::MakeCheckOpString(v1, v2, exprtext);      \
     }                                                                    \
     const size_t uval = (size_t)((unsigned)v1);                          \
@@ -278,7 +277,7 @@ std::string* MakeCheckOpString(const T1& v1, const T2& v2,
   }                                                                      \
   inline std::string* name##Impl(const int v1, const size_t v2,          \
                                  const char* exprtext) {                 \
-    if (ABSL_PREDICT_FALSE(v2 >= std::numeric_limits<int>::max())) {     \
+    if (IREE_UNLIKELY(v2 >= std::numeric_limits<int>::max())) {          \
       return ::iree::internal::MakeCheckOpString(v1, v2, exprtext);      \
     }                                                                    \
     const size_t uval = (size_t)((unsigned)v2);                          \

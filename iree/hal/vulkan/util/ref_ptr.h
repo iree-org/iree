@@ -16,11 +16,12 @@
 #define IREE_HAL_VULKAN_UTIL_REF_PTR_H_
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
 
-#include "absl/base/attributes.h"
+#include "iree/base/attributes.h"
 #include "iree/base/logging.h"
 
 namespace iree {
@@ -111,19 +112,19 @@ class ref_ptr {
 
  public:
   // Initializes with nullptr.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref_ptr() noexcept = default;
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref_ptr() noexcept = default;
 
   // Initializes with nullptr so that there is no way to create an
   // uninitialized ref_ptr.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref_ptr(std::nullptr_t) noexcept {}  // NOLINT
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref_ptr(std::nullptr_t) noexcept {}  // NOLINT
 
   // Initializes the pointer to the given value.
   // The value will not have its reference count incremented (as it is with
   // unique_ptr). Use Retain to add to the reference count.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE explicit ref_ptr(T* p) noexcept : px_(p) {}
+  IREE_ATTRIBUTE_ALWAYS_INLINE explicit ref_ptr(T* p) noexcept : px_(p) {}
 
   // Decrements the reference count of the owned pointer.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ~ref_ptr() noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE ~ref_ptr() noexcept {
     if (px_) ref_ptr_release_ref(px_);
   }
 
@@ -167,7 +168,7 @@ class ref_ptr {
   // its reference count decremented and resets the ref_ptr to empty.
   // Returns nullptr if the ref_ptr holds no value.
   // To re-wrap in a ref_ptr use either ref_ptr<T>(value) or assign().
-  ABSL_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
     T* p = px_;
     px_ = nullptr;
     return p;
@@ -176,7 +177,7 @@ class ref_ptr {
   // Assigns a pointer.
   // The pointer will be accepted by the ref_ptr and its reference count will
   // not be incremented.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
     reset();
     px_ = value;
   }

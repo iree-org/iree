@@ -268,6 +268,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   };
 
   // exports
+  // TODO: Add sorting the module export table by name. This is already
+  //       supported in the ByteCodeModuleTarget using `llvm::sort`.
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";

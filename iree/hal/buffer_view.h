@@ -126,8 +126,8 @@ typedef struct iree_hal_buffer_view_s iree_hal_buffer_view_t;
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer, iree_hal_element_type_t element_type,
+    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Creates a buffer view referencing a subview of the given |buffer_view|.

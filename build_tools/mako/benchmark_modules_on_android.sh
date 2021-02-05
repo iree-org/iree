@@ -89,6 +89,7 @@ EOF
 function run_and_log {
   local mako_log="$1"
   local target="$2"
+  extra_flags=()
   case "${target}" in
     "vulkan-spirv")
       TAG='vlk'
@@ -98,6 +99,10 @@ function run_and_log {
       ;;
     "dylib-llvm-aot")
       TAG='cpu'
+      # TODO(hanchung): Figure out a better way to customize extra flags for
+      # different benchmarking targets. This forces all dylib targets use single
+      # thread.
+      extra_flags+=('--dylib_worker_count=1')
       ;;
     *)
       echo "Unrecognized target '${target}'"
@@ -112,6 +117,7 @@ function run_and_log {
     "--flagfile=${DEVICE_ROOT}/flagfile" \
     "--module_file=${DEVICE_ROOT}/${model}-${target}.vmfb" \
     "--driver=${driver}" \
+    "${extra_flags[@]}" \
     --benchmark_repetitions=10 | tee "${test_out}"
   while read -r ms; do
     append_mako_sample "${mako_log}" "${ms}" "${TAG}"

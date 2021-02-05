@@ -247,12 +247,12 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
 }
 
 static iree_status_t iree_hal_task_device_create_executable_layout(
-    iree_hal_device_t* base_device, iree_host_size_t set_layout_count,
+    iree_hal_device_t* base_device, iree_host_size_t push_constants,
+    iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constants,
     iree_hal_executable_layout_t** out_executable_layout) {
   return iree_hal_local_executable_layout_create(
-      set_layout_count, set_layouts, push_constants,
+      push_constants, set_layout_count, set_layouts,
       iree_hal_device_host_allocator(base_device), out_executable_layout);
 }
 

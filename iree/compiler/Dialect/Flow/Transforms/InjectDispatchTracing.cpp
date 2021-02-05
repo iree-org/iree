@@ -52,14 +52,16 @@ class InjectDispatchTracingPass
       // Input tensors:
       OpBuilder builder(dispatchOp);
       builder.create<TensorTraceOp>(
-          dispatchOp.getLoc(), filterTensorValues(dispatchOp.operands()),
-          builder.getStringAttr(entryPointName + " inputs"));
+          dispatchOp.getLoc(),
+          builder.getStringAttr(entryPointName + " inputs"),
+          filterTensorValues(dispatchOp.operands()));
 
       // Output tensors:
       builder.setInsertionPointAfter(dispatchOp);
       builder.create<TensorTraceOp>(
-          dispatchOp.getLoc(), filterTensorValues(dispatchOp.results()),
-          builder.getStringAttr(entryPointName + " outputs"));
+          dispatchOp.getLoc(),
+          builder.getStringAttr(entryPointName + " outputs"),
+          filterTensorValues(dispatchOp.results()));
     }
   }
 };

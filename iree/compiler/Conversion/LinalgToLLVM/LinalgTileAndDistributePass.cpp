@@ -76,59 +76,6 @@ Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
   return buffer;
 }
 
-/// Given the tile sizes to use add a region to the entry point operation that
-/// describes the maximum number of workgroups for a given workload. For now it
-/// is computed as (workload + tilesize - 1) / tilesize along each dimension and
-/// restricted to be 3D dimensional.
-static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
-                                             ArrayRef<int64_t> tileSizes) {
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
-      entryPointOp = op;
-      break;
-    }
-  }
-  if (!entryPointOp)
-    return funcOp.emitOpError("unable to find corresponding entry point op");
-  if (entryPointOp.getBody())
-    return entryPointOp.emitOpError("cannot override workgroup_count_region");
-  Location loc = entryPointOp.getLoc();
-
-  OpBuilder::InsertionGuard guard(builder);
-  // Create the cloned operation but with a single region.
-  builder.setInsertionPoint(entryPointOp);
-  auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
-      loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
-      entryPointOp.interfaceAttr(), entryPointOp.signatureAttr(),
-      entryPointOp.workgroup_sizeAttr(), 1);
-  Region *region = clonedOp.getBody();
-  Block *entryBlock = new Block();
-  region->push_back(entryBlock);
-  builder.setInsertionPointToStart(entryBlock);
-  // Add 3 index arguments for the workload.
-  auto indexType = builder.getIndexType();
-  SmallVector<BlockArgument, 4> workload = llvm::to_vector<4>(
-      entryBlock->addArguments({indexType, indexType, indexType}));
-  // Make the number of workgroups workload / tile size.
-  SmallVector<Value, 4> returnValues;
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
-  assert(tileSizes.size() <= 3 &&
-         "expected only three tile size values for num workgroups computation");
-  for (auto ts : llvm::enumerate(llvm::reverse(tileSizes))) {
-    Value tsVal = builder.create<ConstantIndexOp>(loc, ts.value());
-    Value tsMinusOne = builder.create<SubIOp>(loc, tsVal, one);
-    Value num = builder.create<AddIOp>(loc, workload[ts.index()], tsMinusOne);
-    returnValues.push_back(builder.create<SignedDivIOp>(loc, num, tsVal));
-  }
-  returnValues.resize(3, one);
-  builder.create<IREE::HAL::ReturnOp>(loc, returnValues);
-  entryPointOp.erase();
-  return success();
-}
-
 void LinalgTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
@@ -211,13 +158,7 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
       if (failed(materializeStaticLaunchInformation(
               funcOp, workloadPerWorkgroup.getValue()))) {
-        funcOp.emitOpError("failed to set tile size to constant value");
-        return signalPassFailure();
-      }
-      OpBuilder builder(funcOp.getContext());
-      if (failed(initNumWorkgroupsRegion(builder, funcOp,
-                                         *workloadPerWorkgroup))) {
-        funcOp.emitOpError("failed to update number of workgroups");
+        funcOp.emitOpError("failed to materialize static launch information");
         return signalPassFailure();
       }
     }

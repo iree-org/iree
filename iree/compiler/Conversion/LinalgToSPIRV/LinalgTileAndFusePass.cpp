@@ -30,6 +30,8 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
@@ -112,7 +114,8 @@ static void applyIndexCalculationCanonicalization(FuncOp funcOp) {
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 class LinalgTileAndFusePass
-    : public PassWrapper<LinalgTileAndFusePass, OperationPass<ModuleOp>> {
+    : public PassWrapper<LinalgTileAndFusePass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   LinalgTileAndFusePass(const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
@@ -120,8 +123,9 @@ class LinalgTileAndFusePass
       : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
+    registry.insert<AffineDialect, IREE::HAL::HALDialect, gpu::GPUDialect,
+                    linalg::LinalgDialect, scf::SCFDialect, ShapeDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -433,30 +437,25 @@ static void populateTilingConvFilterPatterns(
 
 void LinalgTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  ModuleOp module = getOperation();
+  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
+  ModuleOp module = targetOp.getInnerModule();
 
   LLVM_DEBUG(
       llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";);
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
-    Region &body = funcOp.getBody();
-    if (!llvm::hasSingleElement(body.getBlocks())) {
-      funcOp.emitError("unhandled dispatch function with multiple blocks");
+    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    SmallVector<Operation *, 4> tiledLoops;
+
+    if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
       return signalPassFailure();
     }
-    Block &block = body.front();
-    auto linalgOps = block.getOps<linalg::LinalgOp>();
-    if (linalgOps.empty()) continue;
 
-    SmallVector<linalg::LinalgOp, 4> linalgOpsVec =
-        llvm::to_vector<4>(llvm::map_range(linalgOps, [](Operation *op) {
-          return cast<linalg::LinalgOp>(op);
-        }));
     linalg::Aliases aliases;
-    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
     Optional<LaunchConfig> launchConfigOpt =
-        initGPULaunchConfig(context, dependenceGraph, options, linalgOpsVec);
+        initGPULaunchConfig(context, dependenceGraph, options, linalgOps);
     if (!launchConfigOpt) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
@@ -482,11 +481,33 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    TileAndFuseOptions tileAndFuseOptions = {getWorkgroupDistributionOptions(),
-                                             allocateWorkgroupMemory};
-    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOpsVec, dependenceGraph,
-                                          launchConfig, tileAndFuseOptions)) ||
-        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
+    if (tiledLoops.empty()) {
+      TileAndFuseOptions tileAndFuseOptions = {
+          getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
+      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
+                                            launchConfig,
+                                            tileAndFuseOptions))) {
+        return signalPassFailure();
+      }
+    } else {
+      ArrayRef<int64_t> workgroupSize = launchConfig.getWorkgroupSize();
+      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup = llvm::to_vector<4>(
+          llvm::reverse(workgroupSize.take_front(tiledLoops.size())));
+      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
+          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
+                                               defaultWorkloadPerWorkgroup);
+      if (!workloadPerWorkgroup) {
+        funcOp.emitOpError("unable to find workload per workgroup");
+        return signalPassFailure();
+      }
+      if (failed(materializeStaticLaunchInformation(
+              funcOp, workloadPerWorkgroup.getValue()))) {
+        funcOp.emitOpError("failed to set tile size to constant value");
+        return signalPassFailure();
+      }
+    }
+
+    if (failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
       return signalPassFailure();
     }
 
@@ -615,8 +636,8 @@ void LinalgTileAndFusePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
-    const SPIRVCodegenOptions &options) {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLinalgTileAndFusePass(const SPIRVCodegenOptions &options) {
   return std::make_unique<LinalgTileAndFusePass>(options);
 }
 

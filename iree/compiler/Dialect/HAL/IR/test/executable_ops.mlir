@@ -115,7 +115,7 @@ func @executable_create(%device : !hal.device, %layout0 : !hal.executable_layout
 
 // CHECK-LABEL: @executable_layout_create
 func @executable_layout_create(%arg0 : !hal.device, %arg1 : !hal.descriptor_set_layout) {
-  // CHECK: hal.executable_layout.create %arg0, set_layouts = [%arg1], push_constants = 1 : !hal.executable_layout
-  %executable_layout = hal.executable_layout.create %arg0, set_layouts = [%arg1], push_constants = 1 : !hal.executable_layout
+  // CHECK: hal.executable_layout.create %arg0, push_constants = 1, set_layouts = [%arg1] : !hal.executable_layout
+  %executable_layout = hal.executable_layout.create %arg0, push_constants = 1, set_layouts = [%arg1] : !hal.executable_layout
   return
 }

@@ -388,8 +388,8 @@ struct ExpandBufferViewConstOp : public OpRewritePattern<BufferViewConstOp> {
       }
     }
 
-    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(op, buffer, shape,
-                                                    elementType.getValue());
+    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(
+        op, buffer, elementType.getValue(), shape);
     return success();
   }
 };
