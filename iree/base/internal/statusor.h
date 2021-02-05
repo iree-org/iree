@@ -22,8 +22,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "absl/base/attributes.h"
 #include "absl/utility/utility.h"
+#include "iree/base/attributes.h"
 #include "iree/base/internal/status.h"
 
 namespace iree {
@@ -81,8 +81,8 @@ using IsStatusOrDirectInitializationValid = absl::disjunction<
 
 class Helper {
  public:
-  ABSL_ATTRIBUTE_NORETURN static void HandleInvalidStatusCtorArg(Status*);
-  ABSL_ATTRIBUTE_NORETURN static void Crash(const Status& status);
+  IREE_ATTRIBUTE_NORETURN static void HandleInvalidStatusCtorArg(Status*);
+  IREE_ATTRIBUTE_NORETURN static void Crash(const Status& status);
 };
 
 // Construct an instance of T in `p` through placement new, passing Args... to

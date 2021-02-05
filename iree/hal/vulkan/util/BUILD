@@ -23,6 +23,7 @@ cc_library(
     srcs = ["arena.cc"],
     hdrs = ["arena.h"],
     deps = [
+        "//iree/base:core_headers",
         "//iree/base:logging",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
@@ -69,6 +70,7 @@ cc_library(
     hdrs = ["ref_ptr.h"],
     deps = [
         "//iree/base:logging",
+        "//iree/base/internal",
         "@com_google_absl//absl/base:core_headers",
     ],
 )
