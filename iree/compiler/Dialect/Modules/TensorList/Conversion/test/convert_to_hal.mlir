@@ -3,8 +3,8 @@
 
 // CHECK: @Reserve
 func @Reserve(%arg0: tensor<0xi32>, %arg1: tensor<i32>) -> !tensorlist.list {
-  // CHECK: [[VIEW0:%.+]] = hal.buffer_view.create %arg0, shape = [%c0], element_type = 16777248
-  // CHECK: [[VIEW1:%.+]] = hal.buffer_view.create %arg1, shape = [], element_type = 16777248
+  // CHECK: [[VIEW0:%.+]] = hal.buffer_view.create %arg0, element_type = 16777248, shape = [%c0]
+  // CHECK: [[VIEW1:%.+]] = hal.buffer_view.create %arg1, element_type = 16777248, shape = []
   // CHECK: [[LIST:%.+]] = "tensorlist.Reserve"(%view, %view_0) {element_type = 50331680 : i32}
   %0 = "tensorlist.Reserve.Tensor"(%arg0, %arg1) {element_type = f32} : (tensor<0xi32>, tensor<i32>) -> !tensorlist.list
 

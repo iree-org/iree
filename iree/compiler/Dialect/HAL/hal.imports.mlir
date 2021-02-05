@@ -112,8 +112,8 @@ vm.import @buffer.store(
 // Creates a reference to a buffer with a particular shape and element type.
 vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %element_type : i32
+  %element_type : i32,
+  %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 

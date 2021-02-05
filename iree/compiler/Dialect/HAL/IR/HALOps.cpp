@@ -531,11 +531,11 @@ void BufferViewConstOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
-                               Value buffer, ValueRange shape,
-                               int32_t elementType) {
+                               Value buffer, int32_t elementType,
+                               ValueRange shape) {
   state.addOperands({buffer});
-  state.addOperands(shape);
   state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(shape);
   state.addTypes({BufferViewType::get(builder.getContext())});
 }
 
