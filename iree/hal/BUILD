@@ -78,7 +78,6 @@ cc_library(
         "//iree/base:threading",
         "//iree/base:tracing",
         "//iree/base/internal",
-        "//iree/hal/vulkan/util:ref_ptr",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
