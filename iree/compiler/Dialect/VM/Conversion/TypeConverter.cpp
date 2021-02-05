@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 #define DEBUG_TYPE "iree-vm"
@@ -103,6 +104,14 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     LLVM_DEBUG(llvm::dbgs()
                << "MATERIALIZE CONVERSION: " << resultType << "\n");
     return builder.create<Shape::MakeRankedShapeOp>(loc, resultType, inputs);
+  });
+
+  addSourceMaterialization([](OpBuilder &builder, IndexType type,
+                              ValueRange inputs, Location loc) -> Value {
+    if (inputs.size() != 1 || !inputs.front().getType().isa<IntegerType>()) {
+      return nullptr;
+    }
+    return builder.create<IndexCastOp>(loc, type, inputs.front());
   });
 }
 

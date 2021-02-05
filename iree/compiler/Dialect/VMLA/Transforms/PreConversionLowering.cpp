@@ -43,6 +43,25 @@ namespace VMLA {
 
 namespace {
 
+// Removes no-op transpose.
+//
+// TODO(silvasean): This is a temporary workaround after upstream MLIR
+// (https://reviews.llvm.org/D95991) changed canoncalization to bail out on
+// different types. Figure out a better way to handle type specialization style
+// canonicalization in general.
+struct CanonicalizeTranspose : public OpRewritePattern<mhlo::TransposeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::TransposeOp op,
+                                PatternRewriter &rewriter) const override {
+    for (auto it : llvm::enumerate(op.permutation().getValues<APInt>())) {
+      if (it.index() != it.value()) return failure();
+    }
+    rewriter.replaceOp(op, op.operand());
+    return success();
+  }
+};
+
 // Convert instances of `mhlo.dot` to `mhlo.dot_general`.
 //
 // TODO(silvasean): This logically is part of a future HLO client -> HLO server
@@ -481,6 +500,15 @@ class PreConversionLoweringPass
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       return signalPassFailure();
+    }
+
+    {
+      OwningRewritePatternList greedyPatterns;
+      greedyPatterns.insert<CanonicalizeTranspose>(context);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(greedyPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

@@ -177,7 +177,7 @@ class RegisterAllocation {
 
   RegisterAllocation() = default;
   explicit RegisterAllocation(Operation *op) {
-    recalculate(cast<IREE::VM::FuncOp>(op));
+    (void)recalculate(cast<IREE::VM::FuncOp>(op));
   }
   RegisterAllocation(RegisterAllocation &&) = default;
   RegisterAllocation &operator=(RegisterAllocation &&) = default;

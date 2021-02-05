@@ -67,12 +67,12 @@ static void expandFragmentToPrimitiveTypes(ExStreamFragmentOp fragmentOp) {
   Block *entryBlock = &fragmentOp.body().front();
   auto &typeExpander = Shape::getShapeToPrimitiveTypeExpander();
   OpBuilder expandBuilder(fragmentOp.getContext());
-  typeExpander.expandBlockSignature(loc, entryBlock, expandBuilder);
+  (void)typeExpander.expandBlockSignature(loc, entryBlock, expandBuilder);
   SmallVector<Value, 4> origFragmentArgs(fragmentOp.args());
   SmallVector<Value, 4> newFragmentArgs;
   expandBuilder.setInsertionPoint(fragmentOp);
-  typeExpander.expandSourceValuesToTarget(loc, origFragmentArgs,
-                                          newFragmentArgs, expandBuilder);
+  (void)typeExpander.expandSourceValuesToTarget(loc, origFragmentArgs,
+                                                newFragmentArgs, expandBuilder);
   fragmentOp.getOperation()->setOperands(newFragmentArgs);
 }
 

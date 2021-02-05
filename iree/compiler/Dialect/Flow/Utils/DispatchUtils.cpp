@@ -171,7 +171,7 @@ ExecutableOp createExecutable(Location loc, StringRef executableName,
   // Gather all reachable functions.
   llvm::SetVector<FuncOp> reachableFuncs;
   for (auto funcOp : funcOps) {
-    findReachableFunctions(funcOp, reachableFuncs, dispatchableFuncOps);
+    (void)findReachableFunctions(funcOp, reachableFuncs, dispatchableFuncOps);
   }
 
   // Create the executable that will contain the outlined region.

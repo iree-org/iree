@@ -48,9 +48,9 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:core_headers",
-        "//iree/base:internal",
         "//iree/base:threading",
         "//iree/base:tracing",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/hal/drivers",
         "//iree/modules/hal",

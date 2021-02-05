@@ -238,7 +238,8 @@ class HALModuleState final {
         offset + length > buffer_length) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "byte range out of bounds (requested %d-%d of available %" PRIu64 ")",
+          "byte range out of bounds (requested %d-%d of available %zu" PRIu64
+          ")",
           offset, (offset + length - 1), buffer_length);
     }
 

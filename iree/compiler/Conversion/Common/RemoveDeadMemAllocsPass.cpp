@@ -49,7 +49,7 @@ struct RemoveDeadMemAllocsPass
   void runOnOperation() override {
     OwningRewritePatternList patterns;
     patterns.insert<RemoveDeadMemAllocs>();
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 }  // namespace

@@ -116,7 +116,7 @@ void ResolveShapeOpsPass::runOnFunction() {
 
   // Then elide all shapex.tie_shape ops and canonicalize shapex.ranked_dim
   // given that we don't need the shape annotation anymore.
-  applyPatternsAndFoldGreedily(getFunction(), std::move(shapePatterns));
+  (void)applyPatternsAndFoldGreedily(getFunction(), std::move(shapePatterns));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass() {

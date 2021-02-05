@@ -190,16 +190,15 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   canonicalizePatterns.insert<AffineMinCanonicalizationPattern,
                               linalg::AffineMinSCFCanonicalizationPattern>(
       context);
-  applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns;
-  vectorizationPatterns
-      .insert<linalg::LinalgVectorizationPattern<linalg::CopyOp>>(
-          context, linalg::LinalgVectorizationOptions(),
-          linalg::LinalgTransformationFilter(
-              Identifier::get(getVectorizeMarker(), context), {}));
-  applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+      vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
+      linalg::LinalgTransformationFilter(
+          Identifier::get(getVectorizeMarker(), context), {}));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
 // Convert vector transfer_read to a load if possible. This is the case only if
@@ -367,7 +366,7 @@ void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
   patterns.insert<VectorContractLowering, VectorTransferReadToLoad,
                   VectorTransferWriteToStore, ExtractStridedLowering,
                   ElementwiseLowering>(context);
-  applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 void ConvertVectorToGPUPass::runOnOperation() {

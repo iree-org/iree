@@ -40,7 +40,7 @@ class CleanupShapePlaceholdersPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<CleanupTieShapePattern>(&getContext());
-    applyPatternsAndFoldGreedily(getFunction(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getFunction(), std::move(patterns));
   }
 };
 

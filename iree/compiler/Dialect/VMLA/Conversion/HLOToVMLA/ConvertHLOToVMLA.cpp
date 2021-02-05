@@ -440,11 +440,10 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
 
     if (dimension_numbers.scatter_dims_to_operand_dims().getType().getRank() !=
         1) {
-      rewriter.notifyMatchFailure(
+      return rewriter.notifyMatchFailure(
           scatterOp,
-          "couldn't lower scatter with scatter_dims_to_operand_dims with non"
-          " rank-1");
-      return failure();
+          "couldn't lower scatter with scatter_dims_to_operand_dims with non "
+          "rank-1");
     }
 
     // We assume the scatter to operand dims occurs in a normal order. If
@@ -453,19 +452,17 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     for (auto pair : llvm::enumerate(
              dimension_numbers.scatter_dims_to_operand_dims().getIntValues())) {
       if (pair.index() != pair.value()) {
-        rewriter.notifyMatchFailure(
+        return rewriter.notifyMatchFailure(
             scatterOp,
             "couldn't lower scatter with scatter_dims_to_operand_dims "
             "!= [0, 1, ..., n]");
-        return failure();
       }
     }
 
     if (dimension_numbers.inserted_window_dims().getType().getRank() != 1) {
-      rewriter.notifyMatchFailure(
+      return rewriter.notifyMatchFailure(
           scatterOp,
           "couldn't lower scatter with inserted_window_dims with non rank-1");
-      return failure();
     }
 
     // Inserted window dims only occurs in normal order and all sources should
@@ -473,28 +470,25 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     for (auto pair : llvm::enumerate(
              dimension_numbers.inserted_window_dims().getIntValues())) {
       if (pair.index() != pair.value()) {
-        rewriter.notifyMatchFailure(
+        return rewriter.notifyMatchFailure(
             scatterOp,
             "couldn't lower scatter with inserted_window_dims "
             "!= [0, 1, ..., n]");
-        return failure();
       }
     }
 
     if (dimension_numbers.update_window_dims().getType().getRank() != 1) {
-      rewriter.notifyMatchFailure(
+      return rewriter.notifyMatchFailure(
           scatterOp,
           "couldn't lower scatter with update_window_dims with non rank-1");
-      return failure();
     }
 
     for (auto pair : llvm::enumerate(
              dimension_numbers.update_window_dims().getIntValues())) {
       if ((pair.index() + 1) != pair.value()) {
-        rewriter.notifyMatchFailure(
+        return rewriter.notifyMatchFailure(
             scatterOp,
             "couldn't lower scatter with update_window_dims != [1, 2, ..., n]");
-        return failure();
       }
     }
 
@@ -528,9 +522,8 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto &firstBlock = scatterOp.getRegion().front();
     if (!isa<mhlo::ReturnOp>(firstBlock.front()) ||
         firstBlock.front().getOperand(0) != firstBlock.getArgument(1)) {
-      rewriter.notifyMatchFailure(scatterOp,
-                                  "scatter update is not solely a write.");
-      return failure();
+      return rewriter.notifyMatchFailure(
+          scatterOp, "scatter update is not solely a write.");
     }
 
     // Copy the source contents. The copy can be optimized in the future.

@@ -60,11 +60,11 @@ TEST(Copy, WholeBuffer) {
   Shape src_shape = {2, 2};
   auto src_buffer = MakeIota<uint8_t>(4);
   std::vector<int32_t> src_indices = {0, 0};
-  Shape dst_shape = src_shape;
+  const Shape& dst_shape = src_shape;
   std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {2, 2};
-  auto expected_dst = src_buffer;
+  const auto& expected_dst = src_buffer;
 
   IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
                                   absl::MakeSpan(dst_buffer), dst_shape,
@@ -240,9 +240,9 @@ TEST(Pad, NoPadding) {
   std::vector<int32_t> edge_padding_low = {0, 0};
   std::vector<int32_t> edge_padding_high = {0, 0};
   std::vector<int32_t> interior_padding = {0, 0};
-  Shape dst_shape = src_shape;
+  const Shape& dst_shape = src_shape;
   std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
-  auto expected_dst = src_buffer;
+  const auto& expected_dst = src_buffer;
 
   IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,

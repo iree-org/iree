@@ -71,7 +71,7 @@ class MaterializeShapeCalculationsPass
     RankedDimsOp::getCanonicalizationPatterns(patterns, context);
     TieShapeOp::getCanonicalizationPatterns(patterns, context);
     FromExtentTensorOp::getCanonicalizationPatterns(patterns, context);
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

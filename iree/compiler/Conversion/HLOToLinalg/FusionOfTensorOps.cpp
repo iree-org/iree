@@ -81,12 +81,15 @@ struct FusionOfTensorOpsPass
     FrozenRewritePatternList frozenInterfacePatterns(
         std::move(interfacePatterns));
 
-    applyPatternsAndFoldGreedily(op->getRegions(), frozenInterfacePatterns);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       frozenInterfacePatterns);
 
     populateLinalgTensorOpsFusionPatterns(context, fusionPatterns);
-    applyPatternsAndFoldGreedily(op->getRegions(), std::move(fusionPatterns));
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       std::move(fusionPatterns));
 
-    applyPatternsAndFoldGreedily(op->getRegions(), frozenInterfacePatterns);
+    (void)applyPatternsAndFoldGreedily(op->getRegions(),
+                                       frozenInterfacePatterns);
   }
 };
 }  // namespace

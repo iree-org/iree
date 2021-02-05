@@ -138,7 +138,7 @@ struct ForOpCanonicalizationPass
     FuncOp fn = getFunction();
     OwningRewritePatternList patterns;
     patterns.insert<ForOpArgFolding>(fn.getContext());
-    applyPatternsAndFoldGreedily(fn, std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(fn, std::move(patterns));
   }
 };
 }  // namespace

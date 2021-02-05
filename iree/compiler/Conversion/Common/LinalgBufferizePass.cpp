@@ -564,31 +564,31 @@ void LinalgBufferizePass::runOnFunction() {
   });
   funcOp.walk([&](Operation *op) {
     if (auto loadOp = dyn_cast<IREE::HAL::InterfaceLoadTensorOp>(op)) {
-      convertInterfaceLoadTensorOp(b, loadOp, bvm);
+      (void)convertInterfaceLoadTensorOp(b, loadOp, bvm);
     } else if (auto loadOp =
                    dyn_cast<IREE::HAL::InterfaceLoadTensorTileOp>(op)) {
-      convertInterfaceLoadTensorOp(b, loadOp, bvm);
+      (void)convertInterfaceLoadTensorOp(b, loadOp, bvm);
     } else if (auto loadOp = dyn_cast<IREE::Flow::DispatchInputLoadOp>(op)) {
-      convertInterfaceLoadTensorOp(b, loadOp, bvm);
+      (void)convertInterfaceLoadTensorOp(b, loadOp, bvm);
     }
   });
   funcOp.walk([&](IREE::Flow::DispatchOutputStoreOp op) {
-    preProcessConvertInterfaceStoreTensorOp(b, op, bvm);
+    (void)preProcessConvertInterfaceStoreTensorOp(b, op, bvm);
   });
   funcOp.walk([&](linalg::LinalgOp op) {
-    convertAnyLinalgOp(b, allocationFn, op, bvm);
+    (void)convertAnyLinalgOp(b, allocationFn, op, bvm);
   });
   funcOp.walk([&](VectorTransferOpInterface op) {
-    convertTransferOp(b, allocationFn, op, bvm);
+    (void)convertTransferOp(b, allocationFn, op, bvm);
   });
   funcOp.walk([&](Operation *op) {
     if (auto storeOp = dyn_cast<IREE::HAL::InterfaceStoreTensorOp>(op)) {
-      convertInterfaceStoreTensorOp(b, storeOp, bvm);
+      (void)convertInterfaceStoreTensorOp(b, storeOp, bvm);
     } else if (auto storeOp =
                    dyn_cast<IREE::HAL::InterfaceStoreTensorTileOp>(op)) {
-      convertInterfaceStoreTensorOp(b, storeOp, bvm);
+      (void)convertInterfaceStoreTensorOp(b, storeOp, bvm);
     } else if (auto storeOp = dyn_cast<IREE::Flow::DispatchOutputStoreOp>(op)) {
-      convertInterfaceStoreTensorOp(b, storeOp, bvm);
+      (void)convertInterfaceStoreTensorOp(b, storeOp, bvm);
     }
   });
 }

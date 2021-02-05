@@ -108,7 +108,7 @@ void FastExpConversionPass::runOnOperation() {
   auto context = moduleOp.getContext();
   OwningRewritePatternList patterns;
   populateFastExpConversionPatterns(patterns, context);
-  applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>

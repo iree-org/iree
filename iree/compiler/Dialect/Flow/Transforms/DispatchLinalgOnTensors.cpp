@@ -460,7 +460,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // Add canonicalization patterns.
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
   patterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
-  applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.

@@ -980,7 +980,7 @@ struct HLOToHLOPreprocessing
     if (conv1x1toDot) {
       patterns.insert<Lower1x1ConvolutionToDotOp>(context);
     }
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
