@@ -33,6 +33,12 @@ UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 
 # Get the commit message of the HEAD commit
 MESSAGE="$(git log --format=%B -n 1 HEAD)"
+# We want to preserve the original commit author. git commit-tree uses these env
+# variables to determine the author to use (falling back to the git config). It
+# does not have any command line flags for these. See
+# https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables#_committing
+GIT_AUTHOR_NAME="$(git log --format=%an -n 1 HEAD)"
+GIT_AUTHOR_EMAIL="$(git log --format=%ae -n 1 HEAD)"
 
 ################################ Safety checks ################################
 
