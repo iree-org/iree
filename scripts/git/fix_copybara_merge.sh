@@ -60,8 +60,8 @@ fi
 # We don't want to be rewriting commits that have already hit the main branch.
 # Obviously this is not foolproof because there can be a race, but still not a
 # bad check to have.
-git fetch "${UPSTREAM_REMOTE?}" main
-if git merge-base --is-ancestor HEAD FETCH_HEAD; then
+git fetch "${UPSTREAM_REMOTE?}" main:main
+if git merge-base --is-ancestor HEAD main; then
   echo -e "\n\nHEAD commit is already on main branch. Aborting"
   exit 1
 fi
@@ -102,23 +102,7 @@ git fetch "${UPSTREAM_REMOTE?}" "${MERGE_FROM?}"
 echo -e "\n\nIdentified ${MERGE_FROM?} as commit to merge from:"
 git log -n 1 "${MERGE_FROM?}"
 
-CREATE_MERGE=true
-
-if [[ -n "$(git rev-list --merges HEAD^..HEAD)" ]]; then
-  echo -e "\n\nHEAD commit is already a merge commit. Will not create a new merge."
-  CREATE_MERGE=false
-fi
-
-# We technically could always create merge commits, but we only really want them
-# when the PR is a `main -> google` merge, and it's easy to *not* create them.
-# We could unconditionally create them or make the logic here keyed off of some
-# feature of the commit rather than hardcoded to the main branch.
-if ! git merge-base --is-ancestor "${MERGE_FROM?}" main; then
-  echo -e "\n\nCommit to merge from is not on main branch. Will not create a merge commit."
-  CREATE_MERGE=false
-fi
-
-if [[ "${CREATE_MERGE?}" == true ]]; then
+if [[ -z "$(git rev-list --merges HEAD^..HEAD)" ]]; then
   # Add a tag to the commit to merge from so it is highlighted in the git log.
   # If someone knows how to just highlight an individual commit with git log,
   # that would be preferable.
@@ -142,6 +126,7 @@ if [[ "${CREATE_MERGE?}" == true ]]; then
   exit 0
 fi
 
+echo -e "\n\nHEAD commit is already a merge commit. Will not create a new merge."
 # Just rewrite the commit message.
 git commit --amend --no-edit --message="${NEW_MESSAGE?}"
 if [[ -z "$(which gh)" ]]; then
