@@ -25,6 +25,7 @@
 
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
+#include "iree/base/attributes.h"
 #include "iree/base/logging.h"
 #include "iree/base/target_platform.h"
 

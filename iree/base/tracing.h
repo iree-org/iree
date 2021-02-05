@@ -37,7 +37,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "absl/base/attributes.h"
+#include "iree/base/attributes.h"
 
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
@@ -211,10 +211,10 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
   (TracyCZoneCtx) { zone_id, 1 }
 #endif  // __cplusplus
 
-ABSL_MUST_USE_RESULT iree_zone_id_t
+IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
-ABSL_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
+IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);

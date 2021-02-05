@@ -19,8 +19,8 @@
 #include <memory>
 #include <utility>
 
-#include "absl/base/attributes.h"
 #include "iree/base/api.h"
+#include "iree/base/attributes.h"
 #include "iree/vm/ref.h"
 
 #ifndef __cplusplus
@@ -42,12 +42,12 @@ namespace vm {
 // Users may override this with their custom types to allow the packing code to
 // access their registered type ID at runtime.
 template <typename T>
-ABSL_ATTRIBUTE_ALWAYS_INLINE void ref_type_retain(T* p) {
+IREE_ATTRIBUTE_ALWAYS_INLINE void ref_type_retain(T* p) {
   iree_vm_ref_object_retain(p, ref_type_descriptor<T>::get());
 }
 
 template <typename T>
-ABSL_ATTRIBUTE_ALWAYS_INLINE void ref_type_release(T* p) {
+IREE_ATTRIBUTE_ALWAYS_INLINE void ref_type_release(T* p) {
   iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
 }
 
