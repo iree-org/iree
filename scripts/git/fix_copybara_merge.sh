@@ -48,12 +48,6 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-if ! echo "${MESSAGE?}" | grep -q "${COPYBARA_TAG}"; then
-  echo -e "\n\nHEAD commit does not contain Copybara tag '${COPYBARA_TAG?}'. Aborting."
-  git log -n 1 HEAD
-  exit 1
-fi
-
 # Technically this works anywhere, but our only current use case is to run it on
 # the google branch and this is a weird and destructive change, so just be
 # really picky about it.
@@ -88,6 +82,12 @@ echo "git reset --hard $(git rev-parse HEAD)"
 if ! git diff --cached --exit-code; then
   echo -e "\n\nUpdating commit with fixed submodules"
   git commit --amend -a --no-edit
+fi
+
+if ! echo "${MESSAGE?}" | grep -q "${COPYBARA_TAG}"; then
+  echo -e "\n\nHEAD commit does not contain Copybara tag '${COPYBARA_TAG?}'."
+  git log -n 1 HEAD
+  exit 0
 fi
 
 COPYBARA_LINE="$(echo "${MESSAGE?}" | grep "${COPYBARA_TAG?}")"
