@@ -90,7 +90,6 @@ cc_library(
         "LLVMTargetOptions.h",
     ],
     deps = [
-        "//iree/compiler/Utils",
         "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
