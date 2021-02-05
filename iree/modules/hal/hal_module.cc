@@ -289,30 +289,6 @@ class HALModuleState final {
     return OkStatus();
   }
 
-  Status BufferReadData(const vm::ref<iree_hal_buffer_t>& source_buffer,
-                        int32_t source_offset,
-                        const vm::ref<iree_vm_rw_byte_buffer_t>& target_buffer,
-                        int32_t target_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferReadData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferReadData");
-  }
-
-  Status BufferWriteData(const vm::ref<iree_hal_buffer_t>& target_buffer,
-                         int32_t target_offset,
-                         const vm::ref<iree_vm_ro_byte_buffer_t>& source_buffer,
-                         int32_t source_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferWriteData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferWriteData");
-  }
-
-  Status BufferCopyData(const vm::ref<iree_hal_buffer_t>& source_buffer,
-                        int32_t source_offset,
-                        const vm::ref<iree_hal_buffer_t>& target_buffer,
-                        int32_t target_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferCopyData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferCopyData");
-  }
-
   StatusOr<int32_t> BufferLoad(const vm::ref<iree_hal_buffer_t>& source_buffer,
                                int32_t source_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferLoad");
@@ -749,10 +725,6 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferAllocator),
     vm::MakeNativeFunction("buffer.subspan", &HALModuleState::BufferSubspan),
     vm::MakeNativeFunction("buffer.fill", &HALModuleState::BufferFill),
-    vm::MakeNativeFunction("buffer.read_data", &HALModuleState::BufferReadData),
-    vm::MakeNativeFunction("buffer.write_data",
-                           &HALModuleState::BufferWriteData),
-    vm::MakeNativeFunction("buffer.copy_data", &HALModuleState::BufferCopyData),
     vm::MakeNativeFunction("buffer.load", &HALModuleState::BufferLoad),
     vm::MakeNativeFunction("buffer.store", &HALModuleState::BufferStore),
 
