@@ -16,6 +16,7 @@
 #define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
 #include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
@@ -29,6 +30,16 @@ namespace iree_compiler {
 // These functions should be called before creating any MLIRContext if one
 // expects all the possible conversions to be made available to the context
 // automatically.
+
+inline void registerCommonConversionPasses() {
+  static bool init_once = []() {
+    // Common
+    createLinalgBufferizePass();
+    createLinalgRewriteDestructiveUpdatesPass();
+    return true;
+  }();
+  (void)init_once;
+}
 
 inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
@@ -65,8 +76,6 @@ inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
     // LinalgToLLVM
     createConvImg2ColMatmulConversionPass();
-    createLinalgLLVMBufferizePass();
-    createLinalgRewriteDestructiveUpdatesPass();
     createLinalgTileAndDistributePass();
     createLinalgTileAndDistributeOnTensorsPass();
     createLinalgTileAndVectorizeWorkgroupsPass();

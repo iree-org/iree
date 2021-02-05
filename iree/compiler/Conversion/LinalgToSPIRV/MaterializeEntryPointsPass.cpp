@@ -27,7 +27,8 @@ namespace iree_compiler {
 namespace {
 
 struct MaterializeEntryPointsPass
-    : public PassWrapper<MaterializeEntryPointsPass, OperationPass<ModuleOp>> {
+    : public PassWrapper<MaterializeEntryPointsPass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
   MaterializeEntryPointsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -35,13 +36,12 @@ struct MaterializeEntryPointsPass
   }
 
   void runOnOperation() override {
-    auto targetOp = getOperation()
-                        .getOperation()
-                        ->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+    IREE::HAL::ExecutableTargetOp targetOp = getOperation();
     auto existingEntryPointOps = llvm::to_vector<4>(
         targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
 
-    auto spvModuleOp = *getOperation().getOps<spirv::ModuleOp>().begin();
+    ModuleOp moduleOp = targetOp.getInnerModule();
+    spirv::ModuleOp spvModuleOp = *moduleOp.getOps<spirv::ModuleOp>().begin();
     auto spvEntryPointOps =
         llvm::to_vector<4>(spvModuleOp.getOps<spirv::EntryPointOp>());
 
@@ -49,7 +49,7 @@ struct MaterializeEntryPointsPass
       return;
     }
 
-    OpBuilder builder(getOperation());
+    OpBuilder builder(moduleOp);
     auto templateEntryPointOp = existingEntryPointOps.front();
     for (size_t i = 1; i < spvEntryPointOps.size(); ++i) {
       auto spvEntryPointOp = spvEntryPointOps[i];
@@ -63,7 +63,8 @@ struct MaterializeEntryPointsPass
 
 };  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeEntryPointsPass() {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createMaterializeEntryPointsPass() {
   return std::make_unique<MaterializeEntryPointsPass>();
 }
 

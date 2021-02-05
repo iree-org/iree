@@ -154,86 +154,21 @@ class ConvertFunc : public ConvertToLLVMPattern {
   }
 };
 
-// Assumes the enclosing FuncOp has been converted to IREE-compatible ABI:
-// ```
-//    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-//                  %push_constant: !llvm.ptr<i32>,
-//                  workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
-// ```
-//
-// Rewrites hal.interface.subspan into a subview into the proper buffer
-// extracted from `packed_buffer_args`.
-class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
- public:
-  explicit ConvertHALInterfaceBindingSubspanToView(MLIRContext *context,
-                                                   LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
-            converter) {}
-
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    // Bail until nested under an LLVMFuncOp.
-    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!llvmFuncOp) return failure();
-    assert(llvmFuncOp.getNumArguments() > 0);
-
-    auto llvmTypeConverter = getTypeConverter();
-    Location loc = op->getLoc();
-    auto interfaceBindingSubspanOp =
-        cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(operands);
-    MemRefType memrefType =
-        interfaceBindingSubspanOp.getResult().getType().dyn_cast<MemRefType>();
-    if (!memrefType) return failure();
-
-    // Fetch the interface binding op and extract the buffer index from void**.
-    auto symbol = SymbolTable::lookupNearestSymbolFrom(
-        op, interfaceBindingSubspanOp.binding());
-    auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(symbol);
-    Value bufferIndex =
-        rewriter.create<ConstantIndexOp>(loc, interfaceBindingOp.binding());
-    Value llvmBufferIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, llvmTypeConverter->convertType(bufferIndex.getType()),
-        bufferIndex);
-    Value llvmBufferBasePtrAddr = rewriter.create<LLVM::GEPOp>(
-        loc, llvmFuncOp.getArgument(kIndexPackedBuffer).getType(),
-        llvmFuncOp.getArgument(kIndexPackedBuffer), llvmBufferIndex);
-    Value llvmBufferBasePtr =
-        rewriter.create<LLVM::LoadOp>(loc, llvmBufferBasePtrAddr);
-
-    // Base memref is memref<?xi8>.
-    MemRefType baseMemRefType =
-        MemRefType::get(/*shape*/ {-1}, rewriter.getIntegerType(8),
-                        /*layoutMap*/ {}, memrefType.getMemorySpace());
-    // Just create a descriptor and set the allocatedPtr and alignedPtr.
-    // The size is deemed unimportant at this point.
-    Value oneIndex = rewriter.create<ConstantIndexOp>(loc, 1);
-    Value llvmOneIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, llvmTypeConverter->convertType(oneIndex.getType()), oneIndex);
-    Value llvmByteOffset = rewriter.create<LLVM::DialectCastOp>(
-        loc, llvmTypeConverter->convertType(oneIndex.getType()),
-        interfaceBindingSubspanOp.byte_offset());
-    // If no size is specified, just use size 1 as it does not matter.
-    Value llvmByteLength =
-        interfaceBindingSubspanOp.byte_length()
-            ? rewriter.create<LLVM::DialectCastOp>(
-                  loc, llvmTypeConverter->convertType(oneIndex.getType()),
-                  interfaceBindingSubspanOp.byte_length())
-            : llvmOneIndex;
-    auto llvmBaseDesc = MemRefDescriptor::pack(
-        rewriter, loc, *llvmTypeConverter, baseMemRefType,
-        ValueRange{/*allocatedPointer=*/llvmBufferBasePtr,
-                   /*alignedPointer=*/llvmBufferBasePtr,
-                   /*offset=*/llvmByteOffset,
-                   /*size[1]=*/llvmByteLength, /*stride[1]=*/llvmOneIndex});
-    rewriter.replaceOp(op, llvmBaseDesc);
-    return success();
+/// Returns the IREE::HAL::InterfaceBindingOp from an interface op.
+// TODO(ravishankarm) : Copy of similar method in LinalgToSPIRV path. Consider
+// combining them.
+IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
+  if (auto placeholderOp = dyn_cast<IREE::PlaceholderOp>(op)) {
+    return cast<IREE::HAL::InterfaceBindingOp>(
+        SymbolTable::lookupNearestSymbolFrom(
+            op, op->getAttrOfType<SymbolRefAttr>("binding")));
   }
-};
+  if (auto bindingSubspanOp =
+          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
+    return bindingSubspanOp.queryBindingOp();
+  }
+  llvm_unreachable("unknown interface binding op");
+}
 
 // Assumes the enclosing FuncOp has been converted to IREE-compatible ABI:
 // ```
@@ -244,13 +179,13 @@ class ConvertHALInterfaceBindingSubspanToView : public ConvertToLLVMPattern {
 //                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
 // ```
 //
-// Rewrites iree.placeholder into the proper memref descriptor
-// extracted from `packed_buffer_args`.
-class ConvertIREEPlaceholderOp : public ConvertToLLVMPattern {
+// Rewrites BindingOp into the proper memref descriptor extracted from
+// `packed_buffer_args`.
+template <typename BindingOp>
+class ConvertBindingOp : public ConvertToLLVMPattern {
  public:
-  explicit ConvertIREEPlaceholderOp(MLIRContext *context,
-                                    LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(IREE::PlaceholderOp::getOperationName(), context,
+  explicit ConvertBindingOp(MLIRContext *context, LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(BindingOp::getOperationName(), context,
                              converter) {}
 
   LogicalResult matchAndRewrite(
@@ -263,16 +198,11 @@ class ConvertIREEPlaceholderOp : public ConvertToLLVMPattern {
 
     auto llvmTypeConverter = getTypeConverter();
     Location loc = op->getLoc();
-    auto ireePlaceHolderOp = cast<IREE::PlaceholderOp>(op);
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(operands);
-    MemRefType memrefType =
-        ireePlaceHolderOp.getResult().getType().dyn_cast<MemRefType>();
+    MemRefType memrefType = op->getResult(0).getType().dyn_cast<MemRefType>();
     auto elementType = typeConverter->convertType(memrefType.getElementType());
 
     // Fetch the interface binding op and extract the buffer index from void**.
-    auto symbol = SymbolTable::lookupNearestSymbolFrom(
-        op, op->getAttrOfType<SymbolRefAttr>("binding"));
-    auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(symbol);
+    auto interfaceBindingOp = getBindingOp(op);
     Value bufferIndex =
         rewriter.create<ConstantIndexOp>(loc, interfaceBindingOp.binding());
     Value llvmBufferIndex = rewriter.create<LLVM::DialectCastOp>(
@@ -509,9 +439,9 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // clang-format off
   patterns.insert<
+      ConvertBindingOp<IREE::HAL::InterfaceBindingSubspanOp>,
+      ConvertBindingOp<IREE::PlaceholderOp>,
     ConvertFunc,
-    ConvertHALInterfaceBindingSubspanToView,
-    ConvertIREEPlaceholderOp,
     ConvertTieShapePattern,
     RemoveMakeRankedShape,
     RemoveInterfaceOpPattern,

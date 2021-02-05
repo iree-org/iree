@@ -26,7 +26,16 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = glob(
+        ["*.mlir"],
+        # Disabled temporarily. See GH Issue #4733
+        exclude = [
+            "dynamic_linalg_matmul_on_tensors.mlir",
+            "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
+            "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
+            "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+        ],
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",

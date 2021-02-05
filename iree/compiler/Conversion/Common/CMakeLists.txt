@@ -26,6 +26,9 @@ iree_cc_library(
     "DeclareNumWorkgroupsFnPass.cpp"
     "LaunchConfig.cpp"
     "LegalizeNumWorkgroupsFnPass.cpp"
+    "LinalgBufferizePass.cpp"
+    "LinalgRewriteDestructiveUpdatesPass.cpp"
+    "Passes.cpp"
     "RemoveDeadMemAllocsPass.cpp"
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"
@@ -36,12 +39,14 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass
+    MLIRSCF
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRTransforms
     MLIRVector
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR

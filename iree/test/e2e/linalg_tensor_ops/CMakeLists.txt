@@ -28,3 +28,17 @@ iree_check_single_backend_test_suite(
     "-iree-flow-dispatch-linalg-on-tensors"
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
 )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "add.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-spirv-experimental-linalg-on-tensors"
+)
