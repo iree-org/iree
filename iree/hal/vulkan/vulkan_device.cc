@@ -879,13 +879,13 @@ static iree_status_t iree_hal_vulkan_device_create_executable_cache(
 }
 
 static iree_status_t iree_hal_vulkan_device_create_executable_layout(
-    iree_hal_device_t* base_device, iree_host_size_t set_layout_count,
+    iree_hal_device_t* base_device, iree_host_size_t push_constants,
+    iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constants,
     iree_hal_executable_layout_t** out_executable_layout) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   return iree_hal_vulkan_native_executable_layout_create(
-      device->logical_device, set_layout_count, set_layouts, push_constants,
+      device->logical_device, push_constants, set_layout_count, set_layouts,
       out_executable_layout);
 }
 
