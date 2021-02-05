@@ -30,8 +30,8 @@ struct iree_hal_buffer_view_s {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer, iree_hal_element_type_t element_type,
+    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -115,8 +115,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
       buffer_view->buffer, start_offset, subview_length, &subview_buffer));
 
   iree_status_t status =
-      iree_hal_buffer_view_create(subview_buffer, lengths, lengths_count,
-                                  buffer_view->element_type, out_buffer_view);
+      iree_hal_buffer_view_create(subview_buffer, buffer_view->element_type,
+                                  lengths, lengths_count, out_buffer_view);
   iree_hal_buffer_release(subview_buffer);
   return status;
 }

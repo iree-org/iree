@@ -172,8 +172,8 @@ class TensorListModulesTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
                                               contents.size() * sizeof(float)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
+        buffer.get(), IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape.data(),
+        shape.size(), &*out_buffer_view));
   }
 
   iree_hal_device_t* device_ = nullptr;

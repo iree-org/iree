@@ -715,22 +715,22 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 
   let arguments = (ins
     HAL_Buffer:$buffer,
-    HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type
+    HAL_ElementTypeAttr:$element_type,
+    HAL_Shape:$shape
   );
   let results = (outs
     HAL_BufferView:$result
   );
 
   let assemblyFormat = [{
-    $buffer `,` `shape` `=` `[` $shape `]` `,` `element_type` `=` $element_type
+    $buffer `,` `element_type` `=` $element_type `,` `shape` `=` `[` $shape `]`
     `:` type($result) attr-dict
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$buffer, "ValueRange":$shape,
-      "int32_t":$elementType)>,
+    OpBuilderDAG<(ins "Value":$buffer, "int32_t":$elementType,
+                  "ValueRange":$shape)>,
   ];
 }
 

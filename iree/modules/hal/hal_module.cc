@@ -355,12 +355,12 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewCreate(
-      const vm::ref<iree_hal_buffer_t>& buffer, absl::Span<const int32_t> shape,
-      iree_hal_element_type_t element_type) {
+      const vm::ref<iree_hal_buffer_t>& buffer,
+      iree_hal_element_type_t element_type, absl::Span<const int32_t> shape) {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    element_type, &buffer_view),
+        iree_hal_buffer_view_create(buffer.get(), element_type, shape.data(),
+                                    shape.size(), &buffer_view),
         "failed to create buffer view");
     return std::move(buffer_view);
   }
