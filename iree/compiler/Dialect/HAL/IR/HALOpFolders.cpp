@@ -403,6 +403,41 @@ void BufferViewConstOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Expands a hal.buffer_view.subview op into range computation and creation
+/// ops. This allows for greater opportunity to CSE/bypass/etc the buffer view
+/// operations.
+struct ExpandBufferViewSubviewOp
+    : public OpRewritePattern<BufferViewSubviewOp> {
+  using OpRewritePattern<BufferViewSubviewOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferViewSubviewOp op,
+                                PatternRewriter &rewriter) const override {
+    auto computeRangeOp = rewriter.create<BufferViewComputeRangeOp>(
+        op.getLoc(), op.buffer_view(), op.indices(), op.lengths());
+
+    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
+        op.getLoc(), op.buffer_view());
+    auto subspanValue = rewriter.createOrFold<BufferSubspanOp>(
+        op.getLoc(), bufferValue.getType(), bufferValue,
+        computeRangeOp.offset(), computeRangeOp.length());
+
+    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
+        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
+    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(
+        op, subspanValue, elementTypeValue, op.lengths());
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewSubviewOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandBufferViewSubviewOp>(context);
+}
+
+namespace {
+
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
@@ -424,6 +459,32 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
 void BufferViewBufferOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SkipBufferViewBufferOp>(context);
+}
+
+namespace {
+
+/// Expands a hal.buffer_view.dims op into individual ops for each dimension.
+struct ExpandBufferViewDimsOp : public OpRewritePattern<BufferViewDimsOp> {
+  using OpRewritePattern<BufferViewDimsOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferViewDimsOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value, 4> newDimValues;
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
+      newDimValues.push_back(rewriter.createOrFold<BufferViewDimOp>(
+          op.getLoc(), rewriter.getIndexType(), op.buffer_view(),
+          rewriter.getI32IntegerAttr(i)));
+    }
+    rewriter.replaceOp(op, {newDimValues});
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewDimsOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandBufferViewDimsOp>(context);
 }
 
 //===----------------------------------------------------------------------===//

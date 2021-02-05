@@ -533,8 +533,15 @@ void BufferViewConstOp::getAsmResultNames(
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, int32_t elementType,
                                ValueRange shape) {
-  state.addOperands({buffer});
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  build(builder, state, buffer,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        shape);
+}
+
+void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
+                               Value buffer, Value elementType,
+                               ValueRange shape) {
+  state.addOperands({buffer, elementType});
   state.addOperands(shape);
   state.addTypes({BufferViewType::get(builder.getContext())});
 }

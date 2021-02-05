@@ -117,15 +117,6 @@ vm.import @buffer_view.create(
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
-// Returns a view into a buffer. The buffer is not copied and both the original
-// and sliced references must be synchronized.
-vm.import @buffer_view.subview(
-  %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...,
-  %lengths : i32 ...
-) -> !vm.ref<!hal.buffer_view>
-attributes {nosideeffects}
-
 // Returns the backing buffer of the buffer view.
 vm.import @buffer_view.buffer(
   %buffer_view : !vm.ref<!hal.buffer_view>
@@ -153,6 +144,12 @@ vm.import @buffer_view.compute_range(
 ) -> (i32, i32)
 attributes {nosideeffects}
 
+// Returns the element type of the buffer view.
+vm.import @buffer_view.element_type(
+  %buffer_view : !vm.ref<!hal.buffer_view>,
+) -> i32
+attributes {nosideeffects}
+
 // Returns the rank of the buffer view.
 vm.import @buffer_view.rank(
   %buffer_view : !vm.ref<!hal.buffer_view>,
@@ -164,24 +161,6 @@ vm.import @buffer_view.dim(
   %buffer_view : !vm.ref<!hal.buffer_view>,
   %index : i32
 ) -> i32
-attributes {nosideeffects}
-
-// Returns N dimension values.
-vm.import @buffer_view.dims.1(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.2(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.3(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32, i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.4(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32, i32, i32)
 attributes {nosideeffects}
 
 // Prints out the content of buffer views.
