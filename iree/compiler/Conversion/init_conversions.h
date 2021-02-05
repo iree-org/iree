@@ -59,7 +59,7 @@ inline void registerLinalgToVectorPasses() {
 inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
-    createConvertToGPUPass();
+    createConvertToGPUPass(SPIRVCodegenOptions());
     createFoldProcessorIDUsesPass();
     createLinalgTileAndFusePass(SPIRVCodegenOptions());
     createSplitDispatchFunctionPass();
