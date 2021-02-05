@@ -51,7 +51,7 @@ jobs:
       - name: Checking for a change
         run: |
           echo "commit_amended=false" >> $GITHUB_ENV
-          if [[ "$(git rev-parse HEAD)" != "${SHA?}" ]]; then
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA?}" ]]; then
             echo "commit_amended=true" >> $GITHUB_ENV
           fi
       - name: Pushing changes
