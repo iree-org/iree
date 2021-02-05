@@ -494,15 +494,7 @@ namespace {
 class LinalgBufferizePass
     : public PassWrapper<LinalgBufferizePass, FunctionPass> {
  public:
-  LinalgBufferizePass(WorkgroupMemoryAllocationFn fn = nullptr)
-      : allocationFn(fn ? fn
-                        : WorkgroupMemoryAllocationFn(
-                              [](OpBuilder &builder, Location loc,
-                                 ArrayRef<Value> dynamicSizes,
-                                 MemRefType allocationType) {
-                                return builder.create<AllocOp>(
-                                    loc, allocationType, dynamicSizes);
-                              })) {}
+  LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREEDialect, linalg::LinalgDialect, scf::SCFDialect,
                     StandardOpsDialect>();
@@ -587,14 +579,21 @@ void LinalgBufferizePass::runOnFunction() {
   });
 }
 
+static Value defaultAllocationFn(OpBuilder &builder, Location loc,
+                                 ArrayRef<Value> dynamicSizes,
+                                 MemRefType allocationType) {
+  return builder.create<AllocOp>(loc, allocationType, dynamicSizes);
+}
+
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn) {
-  return std::make_unique<LinalgBufferizePass>(allocationFn);
+  return std::make_unique<LinalgBufferizePass>(
+      allocationFn ? allocationFn : defaultAllocationFn);
 }
 
 static PassRegistration<LinalgBufferizePass> pass(
     "iree-codegen-linalg-bufferize-llvm",
     "Convert from to Linalg ops on tensors to buffers",
-    [] { return std::make_unique<LinalgBufferizePass>(); });
+    [] { return std::make_unique<LinalgBufferizePass>(defaultAllocationFn); });
 }  // namespace iree_compiler
 }  // namespace mlir
