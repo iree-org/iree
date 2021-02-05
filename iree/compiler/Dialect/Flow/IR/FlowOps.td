@@ -319,6 +319,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
               operands(), [](Value value) { return value.getType(); })),
           getResultTypes());
     }
+
+    /// Returns the index of the args() operand in the Operation operands list.
+    unsigned mapArgOperandToOpOperand(unsigned i) { return i + workgroup_count().size(); };
   }];
 
   let verifier = [{ return verifyDispatchWorkgroupsOp(*this); }];
