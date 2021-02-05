@@ -44,8 +44,6 @@ jobs:
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Synchronize Action"
       - name: Running fixer script
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
         run: |
           if git log --format=%B -n 1 HEAD | grep -q "${COPYBARA_TAG}"; then
             ./scripts/git/fix_copybara_merge.sh

@@ -40,7 +40,7 @@ MESSAGE="$(git log --format=%B -n 1 HEAD)"
 export GIT_AUTHOR_NAME="$(git log --format=%an -n 1 HEAD)"
 export GIT_AUTHOR_EMAIL="$(git log --format=%ae -n 1 HEAD)"
 
-################################ Safety checks ################################
+################################ Safety checks #################################
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo -e "\n\nWorking directory not clean. Aborting"
@@ -72,6 +72,11 @@ if git merge-base --is-ancestor HEAD main; then
   exit 1
 fi
 
+if [[ -n "$(git rev-list --merges HEAD^..HEAD)" ]]; then
+  echo -e "\n\nHEAD commit is already a merge commit. Aborting."
+  exit 1
+fi
+
 ################################################################################
 
 echo -e "\n\nTo revert the changes made by this script, run:"
@@ -90,9 +95,6 @@ COPYBARA_LINE="$(echo "${MESSAGE?}" | grep "${COPYBARA_TAG?}")"
 # Extract the commit to merge from using the Copybara tag.
 MERGE_FROM="$(echo "${COPYBARA_LINE?}" | awk '{print $NF}')"
 
-# Extract the PR URL from the Copybara tag
-PR_URL="$(echo "${COPYBARA_LINE?}" | awk -F'[= ]' '{print $2}')"
-
 if [[ -z "${MERGE_FROM?}" ]]; then
   echo -e "\n\nFailed extracting commit to merge from. Aborting"
   exit 1
@@ -108,55 +110,25 @@ git fetch "${UPSTREAM_REMOTE?}" "${MERGE_FROM?}"
 echo -e "\n\nIdentified ${MERGE_FROM?} as commit to merge from:"
 git log -n 1 "${MERGE_FROM?}"
 
-if [[ -z "$(git rev-list --merges HEAD^..HEAD)" ]]; then
-  # Add a tag to the commit to merge from so it is highlighted in the git log.
-  # If someone knows how to just highlight an individual commit with git log,
-  # that would be preferable.
-  git tag "merge-from-${MERGE_FROM?}" "${MERGE_FROM?}"
+# Add a tag to the commit to merge from so it is highlighted in the git log. If
+# someone knows how to just highlight an individual commit with git log, that
+# would be preferable.
+git tag "merge-from-${MERGE_FROM?}" "${MERGE_FROM?}"
 
-  echo -e "\n\nCurrent git log graph:"
-  git log --left-right --graph --oneline --boundary "HEAD...main"
+echo -e "\n\nCurrent git log graph:"
+git log --left-right --graph --oneline --boundary "HEAD...main"
 
-  # Create a new commit object `git commit-tree` based on the tree of the
-  # current HEAD commit with the parent of the HEAD commit as first parent and
-  # the commit to merge from as the second. Use the new message as the commit
-  # message. Reset the current branch to this commit.
-  # See https://stackoverflow.com/q/48560351
-  git reset --soft "$(git commit-tree -m "${NEW_MESSAGE?}" -p HEAD^ -p ${MERGE_FROM?} HEAD^{tree})"
+# Create a new commit object `git commit-tree` based on the tree of the current
+# HEAD commit with the parent of the HEAD commit as first parent and the commit
+# to merge from as the second. Use the new message as the commit message. Reset
+# the current branch to this commit. See https://stackoverflow.com/q/48560351
+git reset --soft "$(git commit-tree -m "${NEW_MESSAGE?}" -p HEAD^ -p ${MERGE_FROM?} HEAD^{tree})"
 
-  echo -e "\n\nCreated fake merge. New commit:"
-  git log -n1 HEAD
-
-  echo -e "\n\nNew git log graph:"
-  git log --left-right --graph --oneline --boundary "HEAD...main"
-
-  # Delete the tag we created
-  git tag -d "merge-from-${MERGE_FROM?}"
-  exit 0
-fi
-
-echo -e "\n\nHEAD commit is already a merge commit. Will not create a new merge."
-# Just rewrite the commit message.
-git commit --amend --no-edit --message="${NEW_MESSAGE?}"
-
-echo -e "\n\nNew commit:"
+echo -e "\n\nCreated fake merge. New commit:"
 git log -n1 HEAD
-if [[ -z "$(which gh)" ]]; then
-  echo "gh not found on path."
-  echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
-  echo "Cannot close PR ${PR_URL?}"
-  echo "You can manually close the PR from the GitHub UI."
-else
-  # Technically this commit doesn't exist in the repository yet, but the
-  # alternatives are to:
-  # 1. Not close the PR automatically -> clutter in the repo and manual work.
-  # 2. Force-push automatically as part of this script. Fine for use in the
-  #    GitHub action, but humans will probably want to check everything first.
-  # 3. Reparse the PR URL as part of the action and close it there. Duplicated
-  #    logic that is likely to get out of sync.
-  # 4. Propagate the PR URL back to the calling action. Not sure how to do
-  #    that and involves coordinating moving parts.
-  echo "Closing ${PR_URL?}"
-  gh pr comment --body "Closed by $(git rev-parse HEAD)"
-  gh pr close -d "${PR_URL?}"
-fi
+
+echo -e "\n\nNew git log graph:"
+git log --left-right --graph --oneline --boundary "HEAD...main"
+
+# Delete the tag we created
+git tag -d "merge-from-${MERGE_FROM?}"
