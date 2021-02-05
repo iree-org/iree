@@ -20,13 +20,13 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
-#include "iree/base/intrusive_list.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {
@@ -302,8 +302,8 @@ iree_status_t EmulatedTimelineSemaphore::GetSignalSemaphore(
     if ((*insertion_point)->value > value) break;
   }
 
-  IREE_ASSIGN_OR_RETURN(TimePointSemaphore * semaphore,
-                        semaphore_pool_->Acquire());
+  TimePointSemaphore* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(semaphore_pool_->Acquire(&semaphore));
   semaphore->value = value;
   semaphore->signal_fence = add_ref(signal_fence);
   if (semaphore->wait_fence) {

@@ -17,20 +17,30 @@
 #include "bindings/tflite/shim.h"
 #include "iree/base/tracing.h"
 
-iree_status_t _TfLiteTensorParseAttr(iree_string_view_t attr,
-                                     TfLiteTensor* out_tensor) {
-  memset(out_tensor, 0, sizeof(*out_tensor));
+iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,
+                                         iree_string_view_t attr,
+                                         iree_allocator_t allocator) {
+  char* str = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, attr.size + 1, (void**)&str));
+  memcpy(str, attr.data, attr.size);
+  str[attr.size] = 0;
+  tensor->name = iree_make_string_view(str, attr.size);
+  return iree_ok_status();
+}
 
+iree_status_t _TfLiteTensorParseTypeAttr(TfLiteTensor* tensor,
+                                         iree_string_view_t attr) {
   // TODO(#3978): extract tensor type and plumb through iree.reflection.
-  out_tensor->type = kTfLiteFloat32;
+  tensor->type = kTfLiteFloat32;
+  return iree_ok_status();
+}
 
+iree_status_t _TfLiteTensorParseQuantAttr(TfLiteTensor* tensor,
+                                          iree_string_view_t attr) {
   // TODO(#3972): extract !quant.uniform and plumb through iree.reflection.
-  out_tensor->quantization_params.scale = 0.0f;
-  out_tensor->quantization_params.zero_point = 0;
-
-  // TODO(#3974): extract tensor names from tf.entry_function.
-  out_tensor->name = iree_make_cstring_view("UNIMPLEMENTED");
-
+  tensor->quantization_params.scale = 0.0f;
+  tensor->quantization_params.zero_point = 0;
   return iree_ok_status();
 }
 
@@ -193,8 +203,11 @@ void _TfLiteTensorDiscardBuffer(TfLiteTensor* tensor) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-void _TfLiteTensorReset(TfLiteTensor* tensor) {
+void _TfLiteTensorReset(TfLiteTensor* tensor, iree_allocator_t allocator) {
   _TfLiteTensorDiscardBuffer(tensor);
+  if (tensor->name.data) {
+    iree_allocator_free(allocator, (void*)tensor->name.data);
+  }
 }
 
 TFL_CAPI_EXPORT extern TfLiteType TfLiteTensorType(const TfLiteTensor* tensor) {

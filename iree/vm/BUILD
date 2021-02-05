@@ -48,7 +48,6 @@ cc_library(
     deps = [
         ":vm",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
@@ -92,6 +91,7 @@ cc_library(
         "//iree/base:api",
         "//iree/base:core_headers",
         "//iree/base:tracing",
+        "//iree/base/internal",
     ],
 )
 
@@ -99,9 +99,9 @@ cc_test(
     name = "list_test",
     srcs = ["list_test.cc"],
     deps = [
+        ":cc",
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -149,9 +149,9 @@ cc_test(
     name = "ref_test",
     srcs = ["ref_test.cc"],
     deps = [
+        ":cc",
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -163,7 +163,6 @@ cc_test(
     deps = [
         ":impl",
         "//iree/base:api",
-        "//iree/base:ref_ptr",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -192,6 +191,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:flatcc",
         "//iree/base:tracing",
+        "//iree/base/internal",
         "//iree/schemas:bytecode_module_def_c_fbs",
     ],
 )

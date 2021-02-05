@@ -15,13 +15,16 @@
 #ifndef IREE_BASE_INTERNAL_STATUSOR_H_
 #define IREE_BASE_INTERNAL_STATUSOR_H_
 
+#ifndef __cplusplus
+#error iree::StatusOr<T> is only usable in C++ code.
+#endif  // !__cplusplus
+
 #include <type_traits>
 #include <utility>
 
 #include "absl/base/attributes.h"
 #include "absl/utility/utility.h"
 #include "iree/base/internal/status.h"
-#include "iree/base/internal/status_builder.h"
 
 namespace iree {
 
@@ -66,7 +69,6 @@ template <typename T, typename U>
 using IsStatusOrDirectInitializationAmbiguous = absl::disjunction<
     std::is_same<StatusOr<T>, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<Status, std::remove_cv_t<std::remove_reference_t<U>>>,
-    std::is_same<StatusBuilder, std::remove_cv_t<std::remove_reference_t<U>>>,
     std::is_same<absl::in_place_t,
                  std::remove_cv_t<std::remove_reference_t<U>>>,
     IsAmbiguousStatusOrForInitialization<T, U>>;
@@ -153,9 +155,6 @@ class StatusOrData {
   explicit StatusOrData(const T& value) : data_(value) { MakeStatus(); }
   explicit StatusOrData(T&& value) : data_(std::move(value)) { MakeStatus(); }
 
-  explicit StatusOrData(const Status& status) : status_(status) {
-    EnsureNotOk();
-  }
   explicit StatusOrData(Status&& status)
       : status_(exchange(status, status.code())) {
     EnsureNotOk();
@@ -413,13 +412,16 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // retrieved with value(), operator*(), or operator->().
   StatusOr(const T& value);
 
+  // Takes ownership of a C API status instance.
+  StatusOr(iree_status_t&& status) noexcept
+      : Base(exchange(status,
+                      iree_status_from_code(iree_status_code(status)))) {}
+
   // Constructs a new StatusOr with the given non-ok status. After calling this
   // constructor, this->ok() will be false and calls to value() will
   // IREE_CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
-  StatusOr(const StatusBuilder& builder) = delete;
-  StatusOr& operator=(const StatusBuilder& builder) = delete;
 
   // Similar to the `const T&` overload.
   //
@@ -429,8 +431,6 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // RValue versions of the operations declared above.
   StatusOr(Status&& status);
   StatusOr& operator=(Status&& status);
-  StatusOr(StatusBuilder&& builder);
-  StatusOr& operator=(StatusBuilder&& builder);
 
   // Constructs the inner value T in-place using the provided args, using the
   // T(args...) constructor.
@@ -540,10 +540,6 @@ template <typename T>
 StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
 
 template <typename T>
-StatusOr<T>::StatusOr(StatusBuilder&& builder)
-    : Base(static_cast<Status&&>(std::move(builder))) {}
-
-template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
   this->Assign(status);
   return *this;
@@ -552,12 +548,6 @@ StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
   this->Assign(std::move(status));
-  return *this;
-}
-
-template <typename T>
-StatusOr<T>& StatusOr<T>::operator=(StatusBuilder&& builder) {
-  this->Assign(builder.ToStatus());
   return *this;
 }
 
@@ -698,32 +688,14 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
 // Executes an expression `rexpr` that returns a `iree::StatusOr<T>`. On OK,
 // moves its value into the variable defined by `lhs`, otherwise returns
 // from the current function.
-#define IREE_ASSIGN_OR_RETURN(...)                               \
-  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
-      (__VA_ARGS__, IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
-       IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \
-  (IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), __VA_ARGS__)
-
-// MSVC incorrectly expands variadic macros, splice together a macro call to
-// work around the bug.
-#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, ...) NAME
-#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(args) \
-  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_ args
+#define IREE_ASSIGN_OR_RETURN(lhs, rexpr)      \
+  IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_( \
+      IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), lhs, (rexpr))
 
 #define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(statusor, lhs, rexpr) \
   auto statusor = rexpr;                                                  \
   if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
     return std::move(statusor).status();                                  \
-  }                                                                       \
-  lhs = std::move(statusor).value()
-
-#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(statusor, lhs, rexpr, \
-                                                    error_expression)     \
-  auto statusor = rexpr;                                                  \
-  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
-    ::iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);      \
-    (void)_; /* error_expression is allowed to not use this variable */   \
-    return std::move(error_expression);                                   \
   }                                                                       \
   lhs = std::move(statusor).value()
 

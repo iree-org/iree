@@ -50,6 +50,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:threading",
         "//iree/base:tracing",
+        "//iree/base/internal",
         "//iree/hal:api",
         "//iree/hal/drivers",
         "//iree/modules/hal",
@@ -72,7 +73,9 @@ cc_test(
     # ],
     deps = [
         ":shim",
-        "//bindings/tflite/testdata:add_cc",
+        "//bindings/tflite/testdata:add_dynamic_cc",
+        "//bindings/tflite/testdata:add_multi_cc",
+        "//bindings/tflite/testdata:add_static_cc",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

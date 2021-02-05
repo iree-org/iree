@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
@@ -65,19 +66,23 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
   passManager.addPass(createCanonicalizerPass());
 
-  // Frontload linalg-on-tensors transformations and dispatch region creation.
-  if (clEnableLinalgOnTensorsDispatch) {
-    addHLOToLinalgOnTensorsPasses(passManager);
-    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass(
-        clLinalgOnTensorsTileSizes, clLinalgOnTensorsEnableFusion));
-  }
-
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
 
   // Convert TOSA ops to Linalg-on-tensor ops.
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
+
+  // Frontload linalg-on-tensors transformations and dispatch region creation.
+  if (clEnableLinalgOnTensorsDispatch) {
+    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
+    // will break VMLA backend.
+    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    addHLOToLinalgOnTensorsPasses(passManager);
+    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass(
+        clLinalgOnTensorsTileSizes, clLinalgOnTensorsEnableFusion));
+  }
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
@@ -121,6 +126,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // in the public ABI (i.e. loose shape dims, etc).
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createMaterializeExportedReflection());
+
+  // Replaces variables with !shapex.ranked_shape types with individual
+  // variables for each dimension. This allows for constant dimensions to be
+  // DCE'd in following passes.
+  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
 
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:
@@ -209,10 +219,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Note that as we are rematerializing things here it's critical we do not run
   // the canonicalizer/CSE between now and when we outline - otherwise it'll
   // undo all of our work!
-  if (!clEnableLinalgOnTensorsDispatch) {
-    passManager.addNestedPass<FuncOp>(
-        IREE::Flow::createRematerializeDispatchConstantsPass());
-  }
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createRematerializeDispatchConstantsPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from

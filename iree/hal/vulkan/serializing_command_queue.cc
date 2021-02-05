@@ -18,7 +18,6 @@
 
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
@@ -182,7 +181,7 @@ iree_status_t SerializingCommandQueue::Submit(
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
     auto submission = std::make_unique<FencedSubmission>();
-    IREE_ASSIGN_OR_RETURN(submission->fence, fence_pool_->Acquire());
+    IREE_RETURN_IF_ERROR(fence_pool_->Acquire(&submission->fence));
 
     submission->wait_semaphores.resize(batch->wait_semaphores.count);
     for (iree_host_size_t j = 0; j < batch->wait_semaphores.count; ++j) {
@@ -218,28 +217,25 @@ iree_status_t SerializingCommandQueue::Submit(
 iree_status_t SerializingCommandQueue::ProcessDeferredSubmissions(
     bool* out_work_submitted) {
   IREE_TRACE_SCOPE0("SerializingCommandQueue::ProcessDeferredSubmissions");
-  if (out_work_submitted) *out_work_submitted = false;
 
-  // We need to return all remaining submissions back to the queue to avoid
-  // dropping work.
+  // Try to process the submissions and if we hit a stopping point during the
+  // process where we need to yield we take the remaining submissions and
+  // re-enqueue them.
   IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
-  auto submission_cleanup = MakeCleanup([this, &remaining_submissions]() {
-// Disable thread-safety-analysis as it doesn't understand this lambda.
-//   - This entire function is ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_)
-//   - This Cleanup object is destroyed when it drops out of scope
-//   - The mutex is always held when executing this function
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wthread-safety-analysis"
-#endif
-    while (!remaining_submissions.empty()) {
-      deferred_submissions_.push_back(
-          remaining_submissions.take(remaining_submissions.front()));
-    }
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-  });
+  iree_status_t status =
+      TryProcessDeferredSubmissions(remaining_submissions, out_work_submitted);
+  while (!remaining_submissions.empty()) {
+    deferred_submissions_.push_back(
+        remaining_submissions.take(remaining_submissions.front()));
+  }
+
+  return status;
+}
+
+iree_status_t SerializingCommandQueue::TryProcessDeferredSubmissions(
+    IntrusiveList<std::unique_ptr<FencedSubmission>>& remaining_submissions,
+    bool* out_work_submitted) {
+  if (out_work_submitted) *out_work_submitted = false;
 
   Arena arena(4 * 1024);
   absl::InlinedVector<VkSubmitInfo, 4> submit_infos;

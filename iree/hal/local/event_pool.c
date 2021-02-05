@@ -14,7 +14,7 @@
 
 #include "iree/hal/local/event_pool.h"
 
-#include "iree/base/debugging.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/base/synchronization.h"
 #include "iree/base/tracing.h"
 

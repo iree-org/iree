@@ -342,9 +342,9 @@ def VM_GlobalI64Op : VM_GlobalOp<"global.i64", VM_ConstIntValueAttr<I64>,
 }
 
 def VM_GlobalRefOp : VM_GlobalOp<"global.ref", UnitAttr> {
-  let summary = [{ref_ptr<T> global declaration}];
+  let summary = [{ref<T> global declaration}];
   let description = [{
-    Defines a global value that is a ref_ptr of a specific type. The global will
+    Defines a global value that is a ref of a specific type. The global will
     retain the ref object for the lifetime of the context or until the value is
     replaced with a store or reset.
   }];
@@ -545,9 +545,9 @@ def VM_GlobalStoreIndirectI64Op :
 }
 
 def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref"> {
-  let summary = [{global ref_ptr<T> load operation}];
+  let summary = [{global ref<T> load operation}];
   let description = [{
-    Loads the value of a global containing a ref_ptr of the given type.
+    Loads the value of a global containing a ref of the given type.
   }];
 
   let encoding = [
@@ -561,9 +561,9 @@ def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref"> {
 }
 
 def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
-  let summary = [{global ref_ptr<T> stores operation}];
+  let summary = [{global ref<T> stores operation}];
   let description = [{
-    Stores a ref_ptr<T> to a global, retaining it until the global is reset.
+    Stores a ref<T> to a global, retaining it until the global is reset.
   }];
 
   let encoding = [
@@ -576,9 +576,9 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
 
 def VM_GlobalLoadIndirectRefOp :
     VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref"> {
-  let summary = [{global ref_ptr<T> load operation}];
+  let summary = [{global ref<T> load operation}];
   let description = [{
-    Loads the value of a global containing a ref_ptr of the given type.
+    Loads the value of a global containing a ref of the given type.
   }];
 
   let encoding = [
@@ -593,9 +593,9 @@ def VM_GlobalLoadIndirectRefOp :
 
 def VM_GlobalStoreIndirectRefOp :
     VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref"> {
-  let summary = [{global ref_ptr<T> stores operation}];
+  let summary = [{global ref<T> stores operation}];
   let description = [{
-    Stores a ref_ptr<T> to a global, retaining it until the global is reset.
+    Stores a ref<T> to a global, retaining it until the global is reset.
   }];
 
   let encoding = [
@@ -712,9 +712,9 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
     ConstantLike,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
   ]> {
-  let summary = [{null ref_ptr constant operation}];
+  let summary = [{null ref constant operation}];
   let description = [{
-    Defines a constant null ref_ptr that can be used in comparisons and
+    Defines a constant null ref that can be used in comparisons and
     initialization.
   }];
 
@@ -745,7 +745,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let summary = [{read-only data definition operation}];
   let description = [{
     Defines a blob of read-only constant data that can be represented as a
-    ref_ptr. This can be used to store arbitrary data within modules such as
+    ref. This can be used to store arbitrary data within modules such as
     large constant buffers and other file contents.
 
     Note that the data is reference counted as a way to track its usage once the
@@ -1113,7 +1113,7 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     AllTypesMatch<["true_value", "false_value", "result"]>,
   ]> {
-  let summary = [{ref_ptr select operation}];
+  let summary = [{ref<T> select operation}];
   let description = [{
     Chooses one value based on a binary condition supplied as its first operand.
     If the value of the condition is true the `true_value` operand is chosen,
@@ -1197,7 +1197,7 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     AllTypesMatch<["default_value", "result"]>,
   ]> {
-  let summary = [{ref_ptr switch operation}];
+  let summary = [{ref<T> switch operation}];
   let description = [{
     Returns the value with the given `index` in `values` or `default_value` if
     the index is out of bounds.
@@ -1867,7 +1867,7 @@ def VM_CmpNZI64Op :
 def VM_CmpEQRefOp :
     VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
                           [Commutative]> {
-  let summary = [{ref_ptr equality comparison operation}];
+  let summary = [{ref<T> equality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
@@ -1876,16 +1876,16 @@ def VM_CmpEQRefOp :
 def VM_CmpNERefOp :
     VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef,
                           [Commutative]> {
-  let summary = [{ref_ptr inequality comparison operation}];
+  let summary = [{ref<T> inequality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_CmpNZRefOp :
     VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef> {
-  let summary = [{ref_ptr non-zero comparison operation}];
+  let summary = [{ref<T> non-zero comparison operation}];
   let description = [{
-    Compares the given ref_ptr operand for a non-zero/null value.
+    Compares the given ref operand for a non-zero/null value.
   }];
   let hasFolder = 1;
 }

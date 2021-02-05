@@ -34,12 +34,14 @@ namespace iree {
 Status ValidateFunctionAbi(const iree_vm_function_t& function);
 
 // Returns descriptors for the input of the given function.
-StatusOr<std::vector<RawSignatureParser::Description>> ParseInputSignature(
-    iree_vm_function_t& function);
+Status ParseInputSignature(
+    iree_vm_function_t& function,
+    std::vector<RawSignatureParser::Description>* out_input_descs);
 
 // Returns descriptors for the output of the given function.
-StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
-    const iree_vm_function_t& function);
+Status ParseOutputSignature(
+    const iree_vm_function_t& function,
+    std::vector<RawSignatureParser::Description>* out_output_descs);
 
 // Parses |input_strings| into a variant list of VM scalars and buffers.
 // Scalars should be in the format:
@@ -50,21 +52,23 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
 // Uses |allocator| to allocate the buffers.
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+Status ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const absl::string_view> input_strings);
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+    absl::Span<const absl::string_view> input_strings,
+    iree_vm_list_t** out_list);
+Status ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const std::string> input_strings);
+    absl::Span<const std::string> input_strings, iree_vm_list_t** out_list);
 
 // Parses the content in |filename| into a variant list of VM scalars and
 // buffers. See ParseToVariantList for the format of scalars and buffers. The
 // inputs are expected to be newline-separated.
-StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
+Status ParseToVariantListFromFile(
     absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, const std::string& filename);
+    iree_hal_allocator_t* allocator, const std::string& filename,
+    iree_vm_list_t** out_list);
 
 // Prints a variant list of VM scalars and buffers to |os|.
 // Prints scalars in the format:

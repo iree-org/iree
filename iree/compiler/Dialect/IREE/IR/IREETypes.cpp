@@ -23,6 +23,43 @@ namespace iree_compiler {
 namespace IREE {
 
 //===----------------------------------------------------------------------===//
+// ListType
+//===----------------------------------------------------------------------===//
+
+namespace detail {
+
+struct ListTypeStorage : public TypeStorage {
+  ListTypeStorage(Type elementType) : elementType(elementType) {}
+
+  /// The hash key used for uniquing.
+  using KeyTy = Type;
+  bool operator==(const KeyTy &key) const { return key == elementType; }
+
+  static ListTypeStorage *construct(TypeStorageAllocator &allocator,
+                                    const KeyTy &key) {
+    // Initialize the memory using placement new.
+    return new (allocator.allocate<ListTypeStorage>()) ListTypeStorage(key);
+  }
+
+  Type elementType;
+};
+
+}  // namespace detail
+
+// static
+bool ListType::isCompatible(Type type) { return true; }
+
+ListType ListType::get(Type elementType) {
+  return Base::get(elementType.getContext(), elementType);
+}
+
+ListType ListType::getChecked(Type elementType, Location location) {
+  return Base::getChecked(location, elementType);
+}
+
+Type ListType::getElementType() { return getImpl()->elementType; }
+
+//===----------------------------------------------------------------------===//
 // PtrType
 //===----------------------------------------------------------------------===//
 

@@ -31,7 +31,7 @@ namespace VM {
 
 TypeConverter::TypeConverter(TargetOptions targetOptions)
     : targetOptions_(targetOptions) {
-  // All ref_ptr types are passed through unmodified.
+  // All ref types are passed through unmodified.
   addConversion([](IREE::VM::RefType type) { return type; });
   // Wrap ref types.
   addConversion([](Type type) -> Optional<Type> {

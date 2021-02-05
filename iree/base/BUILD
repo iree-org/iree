@@ -46,14 +46,9 @@ cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
-        "atomics.h",
-        "debugging.h",
-        "math.h",
-        "memory.h",
         "target_platform.h",
     ],
     deps = [
-        "//iree/base/internal:atomics",
         "@com_google_absl//absl/base:core_headers",
     ],
 )
@@ -63,70 +58,9 @@ cc_library(
     hdrs = ["target_platform.h"],
 )
 
-cc_test(
-    name = "atomics_test",
-    srcs = ["atomics_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "math_test",
-    srcs = ["math_test.cc"],
-    deps = [
-        ":core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-cc_library(
-    name = "arena",
-    srcs = ["arena.cc"],
-    hdrs = ["arena.h"],
-    deps = [
-        ":logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "arena_test",
-    srcs = ["arena_test.cc"],
-    deps = [
-        ":arena",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "atomic_slist",
-    srcs = ["atomic_slist.c"],
-    hdrs = ["atomic_slist.h"],
-    deps = [
-        ":core_headers",
-        ":synchronization",
-    ],
-)
-
-cc_test(
-    name = "atomic_slist_test",
-    srcs = ["atomic_slist_test.cc"],
-    deps = [
-        ":atomic_slist",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
 
 cc_library(
     name = "dynamic_library",
@@ -137,104 +71,14 @@ cc_library(
     hdrs = ["dynamic_library.h"],
     deps = [
         ":core_headers",
-        ":file_path",
         ":logging",
         ":status",
         ":tracing",
         "//build_tools:default_linkopts",
+        "//iree/base/internal:file_path",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_io",
-    hdrs = ["file_io.h"],
-    deps = [
-        ":core_headers",
-        ":status",
-        "//iree/base/internal:file_io_internal",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_io_hdrs",
-    hdrs = ["file_io.h"],
-    deps = [
-        ":status",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "file_io_test",
-    srcs = ["file_io_test.cc"],
-    deps = [
-        ":file_io",
-        ":file_path",
-        ":logging",
-        ":status",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "file_mapping",
-    hdrs = ["file_mapping.h"],
-    deps = [
-        ":ref_ptr",
-        ":status",
-        "//iree/base/internal:file_mapping_internal",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_mapping_hdrs",
-    hdrs = ["file_mapping.h"],
-    deps = [
-        ":ref_ptr",
-        ":status",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "file_path",
-    srcs = ["file_path.cc"],
-    hdrs = ["file_path.h"],
-    deps = [
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "file_path_test",
-    srcs = [
-        "file_path_test.cc",
-    ],
-    deps = [
-        ":file_path",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "flags",
-    srcs = ["flags.cc"],
-    hdrs = ["flags.h"],
-    deps = [
-        ":api",
-        "@com_google_absl//absl/flags:parse",
     ],
 )
 
@@ -259,34 +103,6 @@ iree_flatbuffer_c_library(
 )
 
 cc_library(
-    name = "intrusive_list",
-    hdrs = [
-        "intrusive_list.h",
-        "intrusive_list_ref_ptr.inc",
-        "intrusive_list_unique_ptr.inc",
-    ],
-    deps = [
-        ":logging",
-        ":ref_ptr",
-    ],
-)
-
-cc_test(
-    name = "intrusive_list_test",
-    srcs = [
-        "intrusive_list_ref_ptr_test.cc",
-        "intrusive_list_test.cc",
-        "intrusive_list_unique_ptr_test.cc",
-    ],
-    deps = [
-        ":intrusive_list",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
-    ],
-)
-
-cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
@@ -295,39 +111,6 @@ cc_library(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings:str_format",
-    ],
-)
-
-cc_library(
-    name = "main",
-    srcs = [
-        "main_posix.cc",
-        "main_win32.cc",
-    ],
-    hdrs = ["main.h"],
-    deps = [
-        ":core_headers",
-        ":logging",
-    ],
-)
-
-cc_library(
-    name = "ref_ptr",
-    hdrs = ["ref_ptr.h"],
-    deps = [
-        ":logging",
-        "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_test(
-    name = "ref_ptr_test",
-    size = "small",
-    srcs = ["ref_ptr_test.cc"],
-    deps = [
-        ":ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )
 
@@ -381,6 +164,7 @@ cc_library(
         ":api",
         ":core_headers",
         ":tracing",
+        "//iree/base/internal",
     ],
 )
 
@@ -427,6 +211,7 @@ cc_library(
         ":synchronization",
         ":tracing",
         "//build_tools:default_linkopts",
+        "//iree/base/internal",
     ],
 )
 
@@ -459,35 +244,5 @@ cc_library(
     hdrs = ["tracing.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_library(
-    name = "wait_handle",
-    srcs = [
-        "wait_handle.c",
-        "wait_handle_epoll.c",
-        "wait_handle_impl.h",
-        "wait_handle_kqueue.c",
-        "wait_handle_poll.c",
-        "wait_handle_posix.c",
-        "wait_handle_posix.h",
-        "wait_handle_win32.c",
-    ],
-    hdrs = ["wait_handle.h"],
-    deps = [
-        ":api",
-        ":core_headers",
-        ":tracing",
-    ],
-)
-
-cc_test(
-    name = "wait_handle_test",
-    srcs = ["wait_handle_test.cc"],
-    deps = [
-        ":wait_handle",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
     ],
 )

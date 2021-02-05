@@ -21,19 +21,6 @@ namespace python {
 
 namespace {
 
-PyObject* StatusToPyExcClass(const Status& status) {
-  switch (status.code()) {
-    case StatusCode::kInvalidArgument:
-      return PyExc_ValueError;
-    case StatusCode::kOutOfRange:
-      return PyExc_IndexError;
-    case StatusCode::kUnimplemented:
-      return PyExc_NotImplementedError;
-    default:
-      return PyExc_RuntimeError;
-  }
-}
-
 PyObject* ApiStatusToPyExcClass(iree_status_t status) {
   switch (iree_status_code(status)) {
     case IREE_STATUS_INVALID_ARGUMENT:
@@ -48,12 +35,6 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
 }
 
 }  // namespace
-
-pybind11::error_already_set StatusToPyExc(const Status& status) {
-  assert(!status.ok());
-  PyErr_SetString(StatusToPyExcClass(status), status.ToString().c_str());
-  return pybind11::error_already_set();
-}
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message) {

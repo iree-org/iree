@@ -46,12 +46,13 @@ iree_cc_library(
   DEPS
     cpuinfo
     iree::base::api
-    iree::base::atomic_slist
     iree::base::core_headers
+    iree::base::internal::atomic_slist
+    iree::base::internal::prng
+    iree::base::internal::wait_handle
     iree::base::synchronization
     iree::base::threading
     iree::base::tracing
-    iree::base::wait_handle
   PUBLIC
 )
 
@@ -64,6 +65,7 @@ iree_cc_test(
     ::task
     iree::base::api
     iree::base::core_headers
+    iree::base::internal::prng
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main

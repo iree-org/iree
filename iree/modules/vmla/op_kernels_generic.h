@@ -343,8 +343,8 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
   // TODO(b/140836672) support negative padding
 
   if (padding_value_buffer.size() != 1) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Padding value buffer is larger than one element.";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "adding value buffer is larger than one element");
   }
   auto padding_value = padding_value_buffer.front();
 
@@ -483,8 +483,8 @@ Status ScatterHelper(absl::Span<const T> src_buffer,
   }
 
   if ((src_shape.size() + indices_buffer.size()) != dst_shape.size()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Attempting to scatter to differing dimensions.";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "attempting to scatter to differing dimensions");
   }
 
   IREE_RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset),

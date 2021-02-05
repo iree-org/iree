@@ -295,7 +295,7 @@ endfunction()
 # Adds test environment variable properties based on the current build options.
 #
 # Parameters:
-# TEST_NAME: the test name, e.g. iree/base:ref_ptr_test
+# TEST_NAME: the test name, e.g. iree/base:math_test
 function(iree_add_test_environment_properties TEST_NAME)
   # IREE_*_DISABLE environment variables may used to skip test cases which
   # require both a compiler target backend and compatible runtime HAL driver.

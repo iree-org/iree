@@ -28,6 +28,7 @@ iree_cc_library(
     "DispatchConfig.cpp"
     "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
+    "ExpandVariableDynamicDims.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
@@ -62,6 +63,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle
+    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
     iree::compiler::Dialect::Flow::Analysis

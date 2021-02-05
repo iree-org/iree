@@ -24,14 +24,14 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
-#include "iree/base/intrusive_list.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/timepoint_util.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {
@@ -87,6 +87,9 @@ class SerializingCommandQueue final : public CommandQueue {
   // Processes deferred submissions in this queue and returns whether there are
   // new workload submitted to the GPU if no errors happen.
   iree_status_t ProcessDeferredSubmissions(bool* out_work_submitted = NULL);
+  iree_status_t TryProcessDeferredSubmissions(
+      IntrusiveList<std::unique_ptr<FencedSubmission>>& remaining_submissions,
+      bool* out_work_submitted);
 
   TimePointFencePool* fence_pool_;
 

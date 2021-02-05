@@ -40,7 +40,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
-    iree::base::ref_ptr
     iree::base::status
   PUBLIC
 )
@@ -73,6 +72,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
   PUBLIC
 )
@@ -83,9 +83,9 @@ iree_cc_test(
   SRCS
     "list_test.cc"
   DEPS
+    ::cc
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -136,9 +136,9 @@ iree_cc_test(
   SRCS
     "ref_test.cc"
   DEPS
+    ::cc
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -151,7 +151,6 @@ iree_cc_test(
   DEPS
     ::impl
     iree::base::api
-    iree::base::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -173,6 +172,7 @@ iree_cc_library(
     iree::base::api
     iree::base::core_headers
     iree::base::flatcc
+    iree::base::internal
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC

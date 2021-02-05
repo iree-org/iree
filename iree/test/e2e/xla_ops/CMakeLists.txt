@@ -130,3 +130,41 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
 )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg_on_tensors_dylib-llvm-aot_dylib
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "constant.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "exponential.mlir"
+    "floor.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "remainder.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-llvm-experimental-linalg-on-tensors"
+)

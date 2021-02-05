@@ -225,7 +225,7 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
   } else if (spec.consume_front("ref")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
-          << "malformed ref_ptr type '" << parser.getFullSymbolSpec() << "'";
+          << "malformed ref type '" << parser.getFullSymbolSpec() << "'";
       return Type();
     }
     if (spec == "?") {
@@ -236,7 +236,7 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
     auto objectType = mlir::parseType(spec, getContext());
     if (!objectType) {
       parser.emitError(parser.getCurrentLocation())
-          << "invalid ref_ptr object type specification: '"
+          << "invalid ref object type specification: '"
           << parser.getFullSymbolSpec() << "'";
       return Type();
     }
@@ -286,9 +286,9 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
   } else if (type.isa<IREE::VM::RefType>()) {
-    // The only constant type we support for ref_ptrs is null so we can just
+    // The only constant type we support for refs is null so we can just
     // emit that here.
-    // TODO(b/144027097): relace unit attr with a proper null ref_ptr attr.
+    // TODO(b/144027097): relace unit attr with a proper null ref attr.
     return builder.create<VM::ConstRefZeroOp>(loc, type);
   }
   // TODO(benvanik): handle other constant value types.

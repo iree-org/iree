@@ -26,7 +26,7 @@ iree_cc_library(
   DEPS
     absl::flags
     iree::base::core_headers
-    iree::base::flags
+    iree::base::internal::flags
     iree::base::status
     iree::base::tracing
     iree::hal::api

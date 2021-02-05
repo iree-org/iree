@@ -16,10 +16,10 @@
 #define IREE_TASK_TASK_H_
 
 #include "iree/base/api.h"
-#include "iree/base/atomic_slist.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomic_slist.h"
+#include "iree/base/internal/atomics.h"
+#include "iree/base/internal/wait_handle.h"
 #include "iree/base/synchronization.h"
-#include "iree/base/wait_handle.h"
 #include "iree/task/affinity_set.h"
 
 #ifdef __cplusplus

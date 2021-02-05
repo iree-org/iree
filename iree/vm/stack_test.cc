@@ -17,7 +17,6 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/ref.h"
@@ -117,11 +116,12 @@ TEST(VMStackTest, StackOverflow) {
   bool did_overflow = false;
   for (int i = 0; i < 99999; ++i) {
     iree_vm_stack_frame_t* frame_a = nullptr;
-    ::iree::Status status = iree_vm_stack_function_enter(
+    iree_status_t status = iree_vm_stack_function_enter(
         stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a);
-    if (::iree::IsResourceExhausted(status)) {
+    if (iree_status_is_resource_exhausted(status)) {
       // Hit the stack overflow, as expected.
       did_overflow = true;
+      IREE_IGNORE_ERROR(status);
       break;
     }
     IREE_EXPECT_OK(status);

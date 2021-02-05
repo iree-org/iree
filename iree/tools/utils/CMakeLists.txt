@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
-    iree::base::file_io
+    iree::base::internal::file_io
     iree::base::signature_mangle
     iree::base::status
     iree::hal::api

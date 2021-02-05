@@ -15,7 +15,7 @@
 #include "iree/hal/vulkan/direct_command_buffer.h"
 
 #include "absl/container/inlined_vector.h"
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

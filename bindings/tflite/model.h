@@ -16,7 +16,7 @@
 #define IREE_BINDINGS_TFLITE_MODEL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/vm/api.h"
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.

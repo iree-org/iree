@@ -24,9 +24,9 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::dynamic_library
-    iree::base::file_io
-    iree::base::file_path
     iree::base::flatcc
+    iree::base::internal::file_io
+    iree::base::internal::file_path
     iree::base::tracing
     iree::hal::api
     iree::hal::local
@@ -45,8 +45,8 @@ iree_cc_library(
     "system_library_loader.c"
   DEPS
     iree::base::api
-    iree::base::file_io
     iree::base::flatcc
+    iree::base::internal::file_io
     iree::base::tracing
     iree::hal::api
     iree::hal::local

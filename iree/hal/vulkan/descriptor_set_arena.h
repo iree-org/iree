@@ -18,10 +18,10 @@
 #include <array>
 #include <vector>
 
-#include "iree/base/arena.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/native_executable.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
 namespace hal {

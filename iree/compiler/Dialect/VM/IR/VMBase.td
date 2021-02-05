@@ -44,7 +44,7 @@ def VM_Dialect : Dialect {
     flow control such as fixed-range loops.
 
     Besides integer values the only other storage type is a variant reference
-    modeling an abstract iree::ref_ptr. This allows automated reference counting
+    modeling an abstract iree_vm_ref_t. This allows automated reference counting
     to be relied upon by other dialects built on top of the VM dialect and
     avoids the need for more verbose manual reference counting logic (that may
     be difficult or impossible to manage given the coroutine-like nature of the

@@ -69,13 +69,13 @@ TimePointFencePool::~TimePointFencePool() {
   free_fences_.clear();
 }
 
-StatusOr<ref_ptr<TimePointFence>> TimePointFencePool::Acquire() {
+Status TimePointFencePool::Acquire(ref_ptr<TimePointFence>* out_fence) {
   IREE_TRACE_SCOPE0("TimePointFencePool::Acquire");
 
   absl::MutexLock lock(&mutex_);
   if (free_fences_.empty()) {
-    return ResourceExhaustedErrorBuilder(IREE_LOC)
-           << "Fence pool out of free fences";
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "fence pool out of free fences");
   }
 
   // To acquire from the pool, we:
@@ -88,7 +88,8 @@ StatusOr<ref_ptr<TimePointFence>> TimePointFencePool::Acquire() {
   // automatically.
   std::unique_ptr<TimePointFence> fence =
       free_fences_.take(free_fences_.front());
-  return add_ref(fence.release());
+  *out_fence = add_ref(fence.release());
+  return OkStatus();
 }
 
 void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
@@ -166,18 +167,18 @@ TimePointSemaphorePool::~TimePointSemaphorePool() {
   }
 }
 
-StatusOr<TimePointSemaphore*> TimePointSemaphorePool::Acquire() {
+Status TimePointSemaphorePool::Acquire(TimePointSemaphore** out_semaphore) {
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Acquire");
 
   absl::MutexLock lock(&mutex_);
   if (free_semaphores_.empty()) {
-    return ResourceExhaustedErrorBuilder(IREE_LOC)
-           << "Semaphore pool out of free semaphores";
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "semaphore pool out of free semaphores");
   }
 
-  auto* semaphore = free_semaphores_.front();
+  *out_semaphore = free_semaphores_.front();
   free_semaphores_.pop_front();
-  return semaphore;
+  return OkStatus();
 }
 
 void TimePointSemaphorePool::ReleaseResolved(

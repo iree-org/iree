@@ -23,6 +23,7 @@ namespace iree_compiler {
 
 // Appends IREE special hint ops to VM dialect patterns.
 void populateIREEToVMPatterns(MLIRContext *context,
+                              TypeConverter &typeConverter,
                               OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler

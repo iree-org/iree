@@ -35,8 +35,8 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
   descriptor.type_name = iree_make_cstring_view(name);         \
   descriptor.offsetof_counter = type::offsetof_counter();      \
   descriptor.destroy = type::DirectDestroy;                    \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor)) \
-      << "Failed to register type " << name;
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor), \
+                       "failed to register type %s", name);
 
 namespace iree {
 namespace hal {
@@ -61,8 +61,8 @@ Status ModuleRegisterTypes() {
 StatusOr<vm::ref<Buffer>> Buffer::Allocate(size_t byte_length,
                                            iree_allocator_t allocator) {
   void* data = nullptr;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data))
-      << "Failed to allocate buffer of size " << byte_length;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data),
+                       "failed to allocate buffer of size %zu", byte_length);
 
   auto buffer = vm::assign_ref(new Buffer());
   buffer->data_ = data;
@@ -99,29 +99,31 @@ Buffer::~Buffer() {
   parent_.reset();
 }
 
-StatusOr<absl::Span<uint8_t>> Buffer::MakeRange(
-    iree_vmla_size_t byte_offset, iree_vmla_size_t byte_length) const {
+Status Buffer::MakeRange(iree_vmla_size_t byte_offset,
+                         iree_vmla_size_t byte_length,
+                         absl::Span<uint8_t>* out_range) const {
   if (byte_length == kVMLAWholeBuffer) {
     byte_length = size() - byte_offset;
   }
   if (byte_offset > size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Attempted to access an address off the end of the valid "
-              "buffer range (offset="
-           << byte_offset << ", length=" << byte_length
-           << ", buffer byte_length=" << size() << ")";
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "attempted to access an address off the end of the valid buffer range "
+        "(offset=%u, length=%u, byte_length=%zu)",
+        byte_offset, byte_length, size());
   }
   size_t end = byte_offset + byte_length - 1;
   if (end >= size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Attempted to access an address outside of the valid buffer "
-              "range (offset="
-           << byte_offset << ", length=" << byte_length << ", end=" << end
-           << ", buffer byte_length=" << size() << ")";
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "attempted to access an address off the end of the valid buffer range "
+        "(offset=%u, length=%u, end=%zu, byte_length=%zu)",
+        byte_offset, byte_length, end, size());
   }
   uint8_t* data = reinterpret_cast<uint8_t*>(data_) + byte_offset;
   size_t data_length = byte_length;
-  return absl::MakeSpan(data, data_length);
+  *out_range = absl::MakeSpan(data, data_length);
+  return OkStatus();
 }
 
 constexpr int Interface::kMaxConstants;
@@ -138,17 +140,17 @@ void Interface::Reset() {
 
 StatusOr<uint32_t> Interface::GetConstant(uint32_t offset) const {
   if (offset >= kMaxConstants) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid constant offset=" << offset;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid constant offset=%u", offset);
   }
   return constants_[offset];
 }
 
 Status Interface::SetConstants(absl::Span<const uint32_t> values) {
   if (values.size() > kMaxConstants) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Constant value overflow; have " << values.size()
-           << " but max is " << kMaxConstants;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "constant value overflow; have %zu but max is %d",
+                            values.size(), kMaxConstants);
   }
   for (size_t i = 0; i < values.size(); ++i) {
     constants_[i] = values[i];
@@ -159,16 +161,16 @@ Status Interface::SetConstants(absl::Span<const uint32_t> values) {
 StatusOr<const Interface::Binding> Interface::GetBinding(
     uint32_t set, uint32_t binding) const {
   if (set >= kMaxSets || binding >= kMaxBindings) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid binding set=" << set << ", binding=" << binding;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid binding set=%u, binding=%u", set, binding);
   }
   return bindings_[set][binding];
 }
 
 Status Interface::SetBinding(uint32_t set, uint32_t binding, Binding value) {
   if (set >= kMaxSets || binding >= kMaxBindings) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid binding set=" << set << ", binding=" << binding;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid binding set=%u, binding=%u", set, binding);
   }
   bindings_[set][binding] = std::move(value);
   return OkStatus();
@@ -258,19 +260,19 @@ class VMLAModuleState final {
       // Asking for the same buffer.
       return vm::retain_ref(src);
     } else if (byte_offset > src->size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address off the end of the valid "
-                "buffer range (offset="
-             << byte_offset << ", length=" << byte_length
-             << ", buffer byte_length=" << src->size() << ")";
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "attempted to access an address off the end of "
+                              "the valid buffer range "
+                              "(offset=%u, length=%u, byte_length=%zu)",
+                              byte_offset, byte_length, src->size());
     }
     size_t end = byte_offset + byte_length - 1;
     if (end >= src->size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address outside of the valid buffer "
-                "range (offset="
-             << byte_offset << ", length=" << byte_length << ", end=" << end
-             << ", buffer byte_length=" << src->size() << ")";
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "attempted to access an address off the end of the valid buffer "
+          "range (offset=%u, length=%u, end=%zu, byte_length=%zu)",
+          byte_offset, byte_length, end, src->size());
     }
     uint8_t* data = reinterpret_cast<uint8_t*>(src->data()) + byte_offset;
     size_t data_length = byte_length;
@@ -307,10 +309,10 @@ class VMLAModuleState final {
       std::memset(dst->data(), value->As<uint8_t>()[0], dst->size());
       return OkStatus();
     } else if (dst->size() % value->size() != 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Fill value length (" << value->size()
-             << ") must divide evenly into buffer length (" << dst->size()
-             << ")";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "fill value length (%zu) must divide evenly into buffer length (%zu)",
+          value->size(), dst->size());
     }
     auto value_bytes = value->As<uint8_t>();
     auto dst_bytes = dst->As<uint8_t>();
@@ -405,8 +407,8 @@ class VMLAModuleState final {
         return kernels::CompareGE::Execute<type>(                       \
             lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
       default:                                                          \
-        return InvalidArgumentErrorBuilder(IREE_LOC)                    \
-               << "Unsupported predicate " << predicate;                \
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,           \
+                                "unsupported predicate %d", predicate); \
     }                                                                   \
   }
   IREE_VMLA_COMPARE_OP(CmpI8, int8_t);
@@ -730,8 +732,8 @@ class VMLAModuleState final {
     IREE_TRACE_SCOPE0("VMLAModuleState::ConvF32F32F32");
     if (input_shape.size() != 4 || filter_shape.size() != 4 ||
         dst_shape.size() != 4) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expecting 4-d tensors for Conv2D kernel";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expecting 4-d tensors for Conv2D kernel");
     }
 
     const int32_t batch_size = input_shape[0];
@@ -1125,8 +1127,8 @@ class VMLAModule final : public vm::NativeModule<VMLAModuleState> {
 
 Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
   if (!out_module) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "out_module must not be null";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "out_module must not be null");
   }
   *out_module = nullptr;
   auto module = std::make_unique<VMLAModule>(allocator);

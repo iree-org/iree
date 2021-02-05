@@ -232,3 +232,63 @@ module {
 // CHECK-NEXT:    }
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
+
+// -----
+
+module {
+  hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+    hal.executable.target @vmla, filter="vmla" {
+      hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      module {
+        vm.module @module {}
+      }
+    }
+  }
+  hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io attributes {push_constants = 2 : i32} {
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+    hal.executable.target @vmla, filter="vmla" {
+      hal.executable.entry_point @dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      module {
+        vm.module @module {}
+      }
+    }
+  }
+  hal.executable @dispatch_2 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io attributes {push_constants = 2 : i32} {
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+    hal.executable.target @vmla, filter="vmla" {
+      hal.executable.entry_point @dispatch_2 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+      module {
+        vm.module @module {}
+      }
+    }
+  }
+}
+
+// Interfaces with different numbers of push constants should remain separate.
+// CHECK-NOT: hal.executable @dispatch_0
+// CHECK-NOT: hal.executable @dispatch_1
+// CHECK-NOT: hal.executable @dispatch_2
+// CHECK:       hal.executable @vmla_linked_1 attributes {sym_visibility = "private"} {
+// CHECK-NEXT:    hal.interface @legacy_io_0 {
+// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    }
+// CHECK-NEXT:    hal.interface @legacy_io_1 attributes {push_constants = 2 : i32} {
+// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    }

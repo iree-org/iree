@@ -19,9 +19,9 @@
 
 // Other dependencies (helpers, etc.)
 #include "absl/flags/flag.h"
-#include "iree/base/file_io.h"
-#include "iree/base/flags.h"
-#include "iree/base/main.h"
+#include "iree/base/internal/file_io.h"
+#include "iree/base/internal/flags.h"
+#include "iree/base/internal/main.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
 #include "iree/modules/hal/hal_module.h"
@@ -88,16 +88,15 @@ void CleanupVulkanWindow() {
                                   g_Allocator);
 }
 
-StatusOr<std::string> GetModuleContentsFromFlags() {
+Status GetModuleContentsFromFlags(std::string* out_contents) {
   auto module_file = absl::GetFlag(FLAGS_module_file);
-  std::string contents;
   if (module_file == "-") {
-    contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                           std::istreambuf_iterator<char>()};
+    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
+                                std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
+    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, out_contents));
   }
-  return contents;
+  return OkStatus();
 }
 
 // Runs the current IREE bytecode module and renders its result to a window
@@ -144,9 +143,8 @@ Status RunModuleAndUpdateImGuiWindow(
   return OkStatus();
 }
 }  // namespace
-}  // namespace iree
 
-int iree::IreeMain(int argc, char** argv) {
+extern "C" int iree_main(int argc, char** argv) {
   iree_flags_parse_checked(&argc, &argv);
   IREE_CHECK_OK(iree_hal_vulkan_driver_module_register(
       iree_hal_driver_registry_default()));
@@ -307,16 +305,16 @@ int iree::IreeMain(int argc, char** argv) {
 
   // Load bytecode module from embedded data.
   IREE_LOG(INFO) << "Loading IREE byecode module...";
-  auto module_file_or = iree::GetModuleContentsFromFlags();
-  if (!module_file_or) {
-    IREE_LOG(FATAL) << "Error when reading module file"
-                    << module_file_or.status();
+  std::string module_file;
+  Status status = iree::GetModuleContentsFromFlags(&module_file);
+  if (!status.ok()) {
+    IREE_LOG(FATAL) << "Error when reading module file" << status;
   }
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
-          reinterpret_cast<const uint8_t*>(module_file_or->data()),
-          module_file_or->size()},
+          reinterpret_cast<const uint8_t*>(module_file.data()),
+          module_file.size()},
       iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
@@ -342,32 +340,26 @@ int iree::IreeMain(int argc, char** argv) {
 
   IREE_CHECK_OK(ValidateFunctionAbi(main_function));
 
-  auto main_function_input_descs = ParseInputSignature(main_function);
-  if (!main_function_input_descs.ok()) {
-    IREE_LOG(FATAL) << main_function_input_descs.status().ToString();
-  }
-  StatusOr<vm::ref<iree_vm_list_t>> main_function_inputs;
+  std::vector<RawSignatureParser::Description> main_function_input_descs;
+  IREE_CHECK_OK(ParseInputSignature(main_function, &main_function_input_descs));
+  vm::ref<iree_vm_list_t> main_function_inputs;
   if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
     if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
       IREE_LOG(FATAL) << "Expected only one of function_inputs and "
                          "function_inputs_file to be set";
     }
-    main_function_inputs = ParseToVariantListFromFile(
-        *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_function_inputs_file));
+    IREE_CHECK_OK(ParseToVariantListFromFile(
+        main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
+        absl::GetFlag(FLAGS_function_inputs_file), &main_function_inputs));
   } else {
-    main_function_inputs = ParseToVariantList(
-        *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_function_inputs));
-  }
-  if (!main_function_inputs.ok()) {
-    IREE_LOG(FATAL) << main_function_inputs.status().ToString();
+    IREE_CHECK_OK(ParseToVariantList(
+        main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
+        absl::GetFlag(FLAGS_function_inputs), &main_function_inputs));
   }
 
-  auto main_function_output_descs = ParseOutputSignature(main_function);
-  if (!main_function_output_descs.ok()) {
-    IREE_LOG(FATAL) << main_function_output_descs.status().ToString();
-  }
+  std::vector<RawSignatureParser::Description> main_function_output_descs;
+  IREE_CHECK_OK(
+      ParseOutputSignature(main_function, &main_function_output_descs));
 
   const std::string& window_title = absl::GetFlag(FLAGS_module_file);
   // --------------------------------------------------------------------------
@@ -455,3 +447,5 @@ int iree::IreeMain(int argc, char** argv) {
 
   return 0;
 }
+
+}  // namespace iree

@@ -15,7 +15,6 @@
 #include "iree/modules/vmla/op_kernels.h"
 
 #include "absl/container/inlined_vector.h"
-#include "iree/base/memory.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -29,6 +28,18 @@ namespace {
 constexpr float kEpsilon = 0.0001f;
 
 using Shape = absl::InlinedVector<int32_t, 6>;
+
+// reinterpret_cast for Spans, preserving byte size.
+template <typename T, typename U>
+constexpr absl::Span<const T> ReinterpretSpan(absl::Span<const U> value) {
+  return absl::MakeSpan(reinterpret_cast<const T*>(value.data()),
+                        (value.size() * sizeof(U)) / sizeof(T));
+}
+template <typename T, typename U>
+constexpr absl::Span<T> ReinterpretSpan(absl::Span<U> value) {
+  return absl::MakeSpan(reinterpret_cast<T*>(value.data()),
+                        (value.size() * sizeof(U)) / sizeof(T));
+}
 
 size_t GetShapeElementCount(const Shape& shape) {
   size_t count = 1;

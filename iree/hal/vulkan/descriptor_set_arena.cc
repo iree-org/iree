@@ -15,7 +15,7 @@
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 
 #include "iree/base/alignment.h"
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/native_descriptor_set_layout.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
@@ -141,9 +141,10 @@ Status DescriptorSetArena::BindDescriptorSet(
   uint32_t bucket =
       iree_math_count_trailing_zeros_u32(max_descriptor_count >> 3);
   if (bucket >= descriptor_pool_buckets_.size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Too many descriptors required: " << required_descriptor_count
-           << " (max=" << (1 << (descriptor_pool_buckets_.size() + 3)) << ")";
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "too many descriptors required: %u (max=%u)",
+                            required_descriptor_count,
+                            (1 << (descriptor_pool_buckets_.size() + 3)));
   }
   if (descriptor_pool_buckets_[bucket].handle == VK_NULL_HANDLE) {
     // Acquire a pool for this max_descriptor_count bucket.

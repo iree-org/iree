@@ -16,7 +16,7 @@
 #define IREE_TASK_LIST_H_
 
 #include "iree/base/api.h"
-#include "iree/base/atomic_slist.h"
+#include "iree/base/internal/atomic_slist.h"
 #include "iree/task/task.h"
 
 #ifdef __cplusplus

@@ -25,7 +25,6 @@ iree_cc_library(
     absl::inlined_vector
     absl::span
     iree::base::api
-    iree::base::ref_ptr
     iree::base::status
     iree::hal::api
     iree::modules::hal

@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 
 struct iree_vm_context {

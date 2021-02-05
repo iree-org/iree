@@ -16,7 +16,7 @@
 #include <string>
 #include <utility>
 
-#include "iree/base/file_mapping.h"
+#include "iree/base/internal/file_io.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 
 // Today we just print to JSON. We could do something more useful (size
@@ -30,21 +30,20 @@ extern "C" int main(int argc, char** argv) {
     std::cerr << "Syntax: iree-dump-module module.vmfb > module.json\n";
     return 1;
   }
-  auto module_mapping_or = iree::FileMapping::OpenRead(argv[1]);
-  if (!module_mapping_or.ok()) {
-    std::cerr << module_mapping_or.status();
+  std::string module_contents;
+  auto status = iree::file_io::GetFileContents(argv[1], &module_contents);
+  if (!status.ok()) {
+    std::cerr << status;
     return 1;
   }
-  auto module_mapping = std::move(module_mapping_or.value());
-  auto module_buffer = module_mapping->data();
 
   // Print direct to stdout.
   flatcc_json_printer_t printer;
   flatcc_json_printer_init(&printer, /*fp=*/nullptr);
   flatcc_json_printer_set_skip_default(&printer, true);
   bytecode_module_def_print_json(
-      &printer, reinterpret_cast<const char*>(module_buffer.data()),
-      module_buffer.size());
+      &printer, reinterpret_cast<const char*>(module_contents.data()),
+      module_contents.size());
   flatcc_json_printer_clear(&printer);
 
   return 0;

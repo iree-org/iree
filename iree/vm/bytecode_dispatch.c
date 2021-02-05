@@ -14,7 +14,7 @@
 
 #include <string.h>
 
-#include "iree/base/math.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
@@ -976,32 +976,32 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, type, op_func) \
-  DISPATCH_OP(CORE, op_name, {                                 \
-    int32_t operand = VM_DecOperandRegI32("operand");          \
-    int32_t* result = VM_DecResultRegI32("result");            \
-    *result = (int32_t)(op_func((type)operand));               \
+#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                           \
+    int32_t operand = VM_DecOperandRegI32("operand");    \
+    int32_t* result = VM_DecResultRegI32("result");      \
+    *result = op_func(operand);                          \
   });
 
-#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, type, op_func) \
-  DISPATCH_OP(CORE, op_name, {                                  \
-    int32_t lhs = VM_DecOperandRegI32("lhs");                   \
-    int32_t rhs = VM_DecOperandRegI32("rhs");                   \
-    int32_t* result = VM_DecResultRegI32("result");             \
-    *result = (int32_t)(op_func((type)lhs, (type)rhs));         \
+#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                            \
+    int32_t lhs = VM_DecOperandRegI32("lhs");             \
+    int32_t rhs = VM_DecOperandRegI32("rhs");             \
+    int32_t* result = VM_DecResultRegI32("result");       \
+    *result = op_func(lhs, rhs);                          \
   });
 
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, int32_t, vm_add_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, int32_t, vm_sub_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, int32_t, vm_mul_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, int32_t, vm_div_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, uint32_t, vm_div_i32u);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, int32_t, vm_rem_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, uint32_t, vm_rem_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, uint32_t, vm_not_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, uint32_t, vm_and_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, uint32_t, vm_or_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, uint32_t, vm_xor_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, vm_add_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, vm_sub_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, vm_mul_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, vm_div_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, vm_div_i32u);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, vm_rem_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, vm_rem_i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, vm_not_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, vm_and_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, vm_or_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, vm_xor_i32);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
@@ -1025,17 +1025,17 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_SHIFT_I32(op_name, type, op_func) \
-  DISPATCH_OP(CORE, op_name, {                             \
-    int32_t operand = VM_DecOperandRegI32("operand");      \
-    int8_t amount = VM_DecConstI8("amount");               \
-    int32_t* result = VM_DecResultRegI32("result");        \
-    *result = op_func(operand, amount);                    \
+#define DISPATCH_OP_CORE_SHIFT_I32(op_name, op_func)  \
+  DISPATCH_OP(CORE, op_name, {                        \
+    int32_t operand = VM_DecOperandRegI32("operand"); \
+    int8_t amount = VM_DecConstI8("amount");          \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(operand, amount);               \
   });
 
-    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, int32_t, vm_shl_i32);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, int32_t, vm_shr_i32s);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, uint32_t, vm_shr_i32u);
+    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, vm_shl_i32);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, vm_shr_i32s);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, vm_shr_i32u);
 
     //===------------------------------------------------------------------===//
     // Comparison ops

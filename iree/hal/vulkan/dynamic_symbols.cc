@@ -121,9 +121,10 @@ Status ResolveFunctions(DynamicSymbols* syms,
 #endif  // IREE_PLATFORM_ANDROID
 
   if (!syms->vkGetInstanceProcAddr) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Required method vkGetInstanceProcAddr not "
-              "found in provided Vulkan library (did you pick the wrong file?)";
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "required method vkGetInstanceProcAddr not found in provided Vulkan "
+        "library (did you pick the wrong file?)");
   }
 
   // Resolve the mandatory functions that we need to create instances.
@@ -136,9 +137,10 @@ Status ResolveFunctions(DynamicSymbols* syms,
     *member_ptr =
         syms->vkGetInstanceProcAddr(VK_NULL_HANDLE, function_ptr.function_name);
     if (*member_ptr == nullptr) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Mandatory Vulkan function " << function_ptr.function_name
-             << " not available; invalid loader/ICD?";
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "mandatory Vulkan function %s not available; invalid loader/ICD?",
+          function_ptr.function_name);
     }
   }
 
@@ -162,9 +164,9 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-  IREE_ASSIGN_OR_RETURN(
-      auto loader_library,
-      DynamicLibrary::Load(absl::MakeSpan(kVulkanLoaderSearchNames)));
+  std::unique_ptr<iree::DynamicLibrary> loader_library;
+  IREE_RETURN_IF_ERROR(DynamicLibrary::Load(
+      absl::MakeSpan(kVulkanLoaderSearchNames), &loader_library));
   auto syms = make_ref<DynamicSymbols>();
   syms->loader_library_ = std::move(loader_library);
 
@@ -186,9 +188,9 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Instance must have been created and a default instance proc "
-              "lookup function is required";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "instance must have been created and a default "
+                            "instance proc lookup function is required");
   }
 
   // Setup the lookup methods first. The rest of the syms uses these to
@@ -196,9 +198,9 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   this->vkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
       this->vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr"));
   if (!this->vkGetDeviceProcAddr) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Required Vulkan function vkGetDeviceProcAddr not available; "
-              "invalid driver handle?";
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "required Vulkan function vkGetDeviceProcAddr not "
+                            "available; invalid driver handle?");
   }
 
   // Load the rest of the functions.
@@ -214,9 +216,9 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
           this->vkGetInstanceProcAddr(instance, function_ptr.function_name);
     }
     if (*member_ptr == nullptr && function_ptr.is_required) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Required Vulkan function " << function_ptr.function_name
-             << " not available";
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "required Vulkan function %s not available",
+                              function_ptr.function_name);
     }
   }
 

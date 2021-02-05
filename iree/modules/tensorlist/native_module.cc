@@ -22,11 +22,11 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 
@@ -36,7 +36,7 @@ namespace iree {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class TensorList final : public RefObject<TensorList> {
+class TensorList final : public iree::vm::RefObject<TensorList> {
  public:
   TensorList(absl::Span<const int32_t> shape, iree_hal_element_type_t dtype)
       : shape_(shape.begin(), shape.end()), dtype_(dtype) {}
@@ -78,8 +78,8 @@ class TensorList final : public RefObject<TensorList> {
       vm::ref<iree_hal_buffer_view_t> tensor) {
     size_t rank = iree_hal_buffer_view_shape_rank(tensor.get());
     if (rank == 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "expected rank > 0 buffer view";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected rank > 0 buffer view");
     }
     absl::InlinedVector<int32_t, 6> shape(rank);
     IREE_RETURN_IF_ERROR(
@@ -124,7 +124,8 @@ class TensorList final : public RefObject<TensorList> {
       vm::ref<iree_hal_allocator_t> hal_allocator) {
     size_t num_tensors = Size();
     if (num_tensors == 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC) << "expected non-empty list";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected non-empty list");
     }
 
     // Validate that all buffers are of the right shape/type.
@@ -139,9 +140,11 @@ class TensorList final : public RefObject<TensorList> {
           item, element_rank, element_shape.data(), nullptr));
       if (absl::MakeSpan(shape) != absl::MakeSpan(element_shape) ||
           iree_hal_buffer_view_element_type(item) != type) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "stacking list with elements of different shapes or element "
-               << "types. Mismatch between element 0 and element " << i;
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "stacking list with elements of different shapes or element types; "
+            "mismatch between element 0 and element %zu",
+            i);
         ;
       }
     }
@@ -180,12 +183,13 @@ class TensorList final : public RefObject<TensorList> {
       vm::ref<iree_hal_allocator_t> hal_allocator) {
     size_t num_tensors = Size();
     if (num_tensors == 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC) << "expected non-empty list";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected non-empty list");
     }
 
     if (shape_.empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "stacking rank must be greater than zero.";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "stacking rank must be greater than zero");
     }
 
     size_t rank = iree_hal_buffer_view_shape_rank(GetItem(0).get());
@@ -199,8 +203,9 @@ class TensorList final : public RefObject<TensorList> {
       if (!item) continue;
       size_t element_rank = iree_hal_buffer_view_shape_rank(item);
       if (element_rank < 1) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "stacking rank must be greater than zero." << i;
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "stacking rank %zu must be greater than zero",
+                                i);
       }
 
       absl::InlinedVector<int32_t, 6> element_shape(element_rank);
@@ -210,10 +215,11 @@ class TensorList final : public RefObject<TensorList> {
       if (absl::MakeSpan(shape).subspan(1) !=
               absl::MakeSpan(element_shape).subspan(1) ||
           iree_hal_buffer_view_element_type(GetItem(i).get()) != type) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "stacking list with elements of different shapes or element "
-                  "types. Mismatch between element 0 and element "
-               << i;
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "stacking list with elements of different shapes or element types; "
+            "mismatch between element 0 and element %zu",
+            i);
       }
     }
 
@@ -332,11 +338,12 @@ static StatusOr<int32_t> ReadInt32FromScalarBufferView(
     iree_hal_buffer_view_t* buffer_view) {
   if (iree_hal_buffer_view_element_type(buffer_view) !=
       IREE_HAL_ELEMENT_TYPE_SINT_32) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "expected i32 buffer view";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected i32 buffer view");
   }
   if (iree_hal_buffer_view_shape_rank(buffer_view) != 0) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "expected rank-0 buffer view";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected rank-0 buffer view");
   }
   iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
   iree_hal_buffer_mapping_t mapped_memory;
@@ -351,11 +358,12 @@ static StatusOr<std::vector<int32_t>> ReadInt32VectorFromBufferView(
     iree_hal_buffer_view_t* buffer_view) {
   if (iree_hal_buffer_view_element_type(buffer_view) !=
       IREE_HAL_ELEMENT_TYPE_SINT_32) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "expected i32 buffer view";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected i32 buffer view");
   }
   if (iree_hal_buffer_view_shape_rank(buffer_view) != 1) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "expected rank-1 buffer view";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected rank-1 buffer view");
   }
 
   int32_t length;
@@ -429,9 +437,10 @@ class TensorListModuleState final {
         int32_t num_elements,
         ReadInt32FromScalarBufferView(num_elements_buffer_view.get()));
     if (num_elements != -1 && list->Size() != num_elements) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "num_elements arg to tesorlist.stack doesn't match the list "
-                "size";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "num_elements arg to tesorlist.stack doesn't match the list "
+          "size");
     }
     return list->Stack(allocator);
   }

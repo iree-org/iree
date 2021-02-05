@@ -26,6 +26,7 @@ namespace iree_compiler {
 namespace IREE {
 
 namespace detail {
+struct ListTypeStorage;
 struct PtrTypeStorage;
 struct RankedShapeTypeStorage;
 }  // namespace detail
@@ -50,6 +51,36 @@ enum class StatusCode : int32_t {
   DataLoss = 15,
   Unauthenticated = 16,
   DoNotUseReservedForFutureExpansionUseDefaultInSwitchInstead_ = 20
+};
+
+/// A list containing an optional element type.
+class ListType
+    : public Type::TypeBase<ListType, Type, detail::ListTypeStorage> {
+ public:
+  using Base::Base;
+
+  /// Returns true if the given type can be wrapped in a list.
+  static bool isCompatible(Type type);
+
+  /// Gets or creates a ListType with the provided element type.
+  static ListType get(Type elementType);
+
+  /// Gets or creates a ListType with the provided element type.
+  /// This emits an error at the specified location and returns null if the
+  /// element type isn't supported.
+  static ListType getChecked(Type elementType, Location location);
+
+  /// Verifies construction of a type with the given object.
+  static LogicalResult verifyConstructionInvariants(Location loc,
+                                                    Type elementType) {
+    if (!isCompatible(elementType)) {
+      return emitError(loc)
+             << "invalid element type for a list: " << elementType;
+    }
+    return success();
+  }
+
+  Type getElementType();
 };
 
 /// Base for typed pointer-like references.

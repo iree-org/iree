@@ -83,16 +83,17 @@ iree_cc_library(
     absl::strings
     absl::synchronization
     iree::base::api
-    iree::base::arena
     iree::base::core_headers
     iree::base::flatcc
-    iree::base::intrusive_list
+    iree::base::internal
     iree::base::logging
-    iree::base::ref_ptr
     iree::base::status
     iree::base::synchronization
     iree::base::tracing
     iree::hal::api
+    iree::hal::vulkan::util::arena
+    iree::hal::vulkan::util::intrusive_list
+    iree::hal::vulkan::util::ref_ptr
     iree::schemas::spirv_executable_def_c_fbs
     vulkan_memory_allocator
   PUBLIC
@@ -115,9 +116,9 @@ iree_cc_library(
     absl::strings
     iree::base::core_headers
     iree::base::dynamic_library
-    iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
+    iree::hal::vulkan::util::ref_ptr
   PUBLIC
 )
 

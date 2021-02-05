@@ -17,12 +17,12 @@
 
 #include <string>
 
-#include "iree/base/arena.h"
 #include "iree/base/status.h"
 #include "iree/base/synchronization.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
 namespace hal {

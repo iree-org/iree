@@ -18,13 +18,13 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/vm/ref_cc.h"
 
 namespace {
 
-class A : public iree::RefObject<A> {
+class A : public iree::vm::RefObject<A> {
  public:
   static iree_vm_ref_type_t kTypeID;
 
@@ -35,7 +35,7 @@ class A : public iree::RefObject<A> {
 };
 iree_vm_ref_type_t A::kTypeID = IREE_VM_REF_TYPE_NULL;
 
-class B : public iree::RefObject<B> {
+class B : public iree::vm::RefObject<B> {
  public:
   static iree_vm_ref_type_t kTypeID;
 
@@ -108,7 +108,7 @@ TEST(VMRefTest, WrappingCStruct) {
 
 // Tests wrapping a C++ RefObject with a vtable.
 TEST(VMRefTest, WrappingSubclassedRefObject) {
-  struct BaseType : public iree::RefObject<BaseType> {
+  struct BaseType : public iree::vm::RefObject<BaseType> {
     virtual ~BaseType() = default;
     virtual int DoSomething() = 0;
   };

@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef IREE_TESTING_VULKAN_VULKAN_GUI_UTIL_H_
+#define IREE_TESTING_VULKAN_VULKAN_GUI_UTIL_H_
+
 #include <SDL.h>
 #include <SDL_vulkan.h>
 #include <imgui.h>
@@ -74,3 +77,5 @@ void RenderFrame(ImGui_ImplVulkanH_Window* wd, VkDevice device, VkQueue queue);
 void PresentFrame(ImGui_ImplVulkanH_Window* wd, VkQueue queue);
 
 }  // namespace iree
+
+#endif  // IREE_TESTING_VULKAN_VULKAN_GUI_UTIL_H_

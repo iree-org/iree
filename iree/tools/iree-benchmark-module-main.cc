@@ -17,8 +17,8 @@
 #include "absl/flags/usage.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
-#include "iree/base/file_io.h"
-#include "iree/base/flags.h"
+#include "iree/base/internal/file_io.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
@@ -105,17 +105,16 @@ void RegisterModuleBenchmarks(
       ->Unit(benchmark::kMillisecond);
 }
 
-StatusOr<std::string> GetModuleContentsFromFlags() {
+Status GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = absl::GetFlag(FLAGS_module_file);
-  std::string contents;
   if (module_file == "-") {
-    contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                           std::istreambuf_iterator<char>()};
+    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
+                                std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
+    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, out_contents));
   }
-  return contents;
+  return OkStatus();
 }
 
 // TODO(hanchung): Consider to refactor this out and reuse in iree-run-module.
@@ -165,7 +164,7 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE0("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
-    IREE_ASSIGN_OR_RETURN(module_data_, GetModuleContentsFromFlags());
+    IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data_));
 
     IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
     IREE_RETURN_IF_ERROR(
@@ -199,21 +198,21 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Construct inputs.
-    IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+    std::vector<RawSignatureParser::Description> input_descs;
+    IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
     if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
-      IREE_ASSIGN_OR_RETURN(inputs_,
-                            ParseToVariantListFromFile(
-                                input_descs, iree_hal_device_allocator(device_),
-                                absl::GetFlag(FLAGS_function_inputs_file)));
+      IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
+          input_descs, iree_hal_device_allocator(device_),
+          absl::GetFlag(FLAGS_function_inputs_file), &inputs_));
     } else {
-      IREE_ASSIGN_OR_RETURN(
-          inputs_,
+      IREE_RETURN_IF_ERROR(
           ParseToVariantList(input_descs, iree_hal_device_allocator(device_),
-                             absl::GetFlag(FLAGS_function_inputs)));
+                             absl::GetFlag(FLAGS_function_inputs), &inputs_));
     }
 
-    // Creates output singnature.
-    IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+    // Creates output signature.
+    std::vector<RawSignatureParser::Description> output_descs;
+    IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
     RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
                              output_descs);
     return iree::OkStatus();
@@ -232,13 +231,15 @@ class IREEBenchmark {
       if (!ValidateFunctionAbi(function).ok()) continue;
 
       std::string function_name(name.data, name.size);
-      IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+      std::vector<RawSignatureParser::Description> input_descs;
+      IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
       if (!input_descs.empty()) {
-        return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Expect not to have input arguments for '" << function_name
-               << "'";
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "expect not to have input arguments for '%.*s'",
+                                (int)name.size, name.data);
       }
-      IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+      std::vector<RawSignatureParser::Description> output_descs;
+      IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
       iree::RegisterModuleBenchmarks(function_name, context_, function,
                                      /*inputs=*/nullptr, output_descs);
     }

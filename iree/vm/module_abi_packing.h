@@ -301,11 +301,12 @@ struct Unpacker {
     IREE_RETURN_IF_ERROR(std::move(status));
     params_ptr_t limit = storage.data + storage.data_length;
     if (IREE_UNLIKELY(ptr != limit)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "argument buffer unpacking failure; consumed "
-             << (reinterpret_cast<intptr_t>(ptr) -
-                 reinterpret_cast<intptr_t>(storage.data))
-             << " of " << storage.data_length << " bytes";
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "argument buffer unpacking failure; consumed %zu of %zu bytes",
+          (reinterpret_cast<intptr_t>(ptr) -
+           reinterpret_cast<intptr_t>(storage.data)),
+          storage.data_length);
     }
     return std::move(params);
   }
@@ -354,10 +355,14 @@ struct ParamUnpack<ref<T>> {
       out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
-      status = InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Parameter contains a reference to the wrong type; have "
-               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
-               << ref_type_descriptor<T>::get()->type_name.data;
+      status =
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                           "parameter contains a reference to the wrong type; "
+                           "have %.*s but expected %.*s",
+                           (int)iree_vm_ref_type_name(reg_ptr->type).size,
+                           iree_vm_ref_type_name(reg_ptr->type).data,
+                           (int)ref_type_descriptor<T>::get()->type_name.size,
+                           ref_type_descriptor<T>::get()->type_name.data);
     } else {
       out_param = {};
     }
@@ -375,10 +380,14 @@ struct ParamUnpack<const ref<T>> {
       out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
-      status = InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Parameter contains a reference to the wrong type; have "
-               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
-               << ref_type_descriptor<T>::get()->type_name.data;
+      status =
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                           "parameter contains a reference to the wrong type; "
+                           "have %.*s but expected %.*s",
+                           (int)iree_vm_ref_type_name(reg_ptr->type).size,
+                           iree_vm_ref_type_name(reg_ptr->type).data,
+                           (int)ref_type_descriptor<T>::get()->type_name.size,
+                           ref_type_descriptor<T>::get()->type_name.data);
     } else {
       out_param = {};
     }
@@ -400,11 +409,15 @@ struct ParamUnpack<absl::string_view> {
       out_param = absl::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
-      status = InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Parameter contains a reference to the wrong type; have "
-               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
-               << ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
-                      ->type_name.data;
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "parameter contains a reference to the wrong type; "
+          "have %.*s but expected %.*s",
+          (int)iree_vm_ref_type_name(reg_ptr->type).size,
+          iree_vm_ref_type_name(reg_ptr->type).data,
+          (int)ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
+              ->type_name.size,
+          ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type_name.data);
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};

@@ -20,7 +20,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,7 +63,7 @@ typedef enum {
 //  iree_vm_ref_register_defined_type(&my_type_descriptor);
 //
 // Usage (C++):
-//  Prefer using RefObject as a base type.
+//  Prefer using iree::vm::RefObject as a base type.
 typedef struct {
   iree_atomic_ref_count_t counter;
 } iree_vm_ref_object_t;
@@ -212,7 +212,6 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_assign(iree_vm_ref_t* ref,
                                                       iree_vm_ref_t* out_ref);
 
 // Moves one reference to another without changing the reference count.
-// Equivalent to an std::move of a ref_ptr.
 // |out_ref| will be released if it already contains a reference.
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
                                                     iree_vm_ref_t* out_ref);
@@ -228,6 +227,10 @@ IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// Type adapter utilities for interfacing with the VM
+//===----------------------------------------------------------------------===//
 
 #ifdef __cplusplus
 namespace iree {

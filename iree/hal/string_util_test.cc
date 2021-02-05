@@ -14,7 +14,6 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
@@ -69,8 +68,8 @@ StatusOr<iree_hal_element_type_t> ParseElementType(absl::string_view value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
       iree_string_view_t{value.data(), value.size()}, &element_type);
-  IREE_RETURN_IF_ERROR(std::move(status))
-      << "Failed to parse element type '" << value << "'";
+  IREE_RETURN_IF_ERROR(status, "Failed to parse element type '%.*s'",
+                       (int)value.size(), value.data());
   return element_type;
 }
 
@@ -97,13 +96,10 @@ template <typename T>
 Status ParseElement(absl::string_view value,
                     iree_hal_element_type_t element_type,
                     absl::Span<T> buffer) {
-  iree_status_t status = iree_hal_parse_element(
+  return iree_hal_parse_element(
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
                        buffer.size() * sizeof(T)});
-  IREE_RETURN_IF_ERROR(std::move(status))
-      << "Failed to parse element '" << value << "'";
-  return OkStatus();
 }
 
 // Converts a single element of |element_type| to a string.
@@ -120,8 +116,7 @@ StatusOr<std::string> FormatElement(T value,
         element_type, result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  IREE_RETURN_IF_ERROR(std::move(status))
-      << "Failed to format buffer element '" << value << "'";
+  IREE_RETURN_IF_ERROR(status, "failed to format buffer element");
   return std::move(result);
 }
 
@@ -134,11 +129,13 @@ template <typename T>
 Status ParseBufferElements(absl::string_view value,
                            iree_hal_element_type_t element_type,
                            absl::Span<T> buffer) {
-  IREE_RETURN_IF_ERROR(iree_hal_parse_buffer_elements(
-      iree_string_view_t{value.data(), value.size()}, element_type,
-      iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
-                       buffer.size() * sizeof(T)}))
-      << "Failed to parse buffer elements '" << value << "'";
+  IREE_RETURN_IF_ERROR(
+      iree_hal_parse_buffer_elements(
+          iree_string_view_t{value.data(), value.size()}, element_type,
+          iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
+                           buffer.size() * sizeof(T)}),
+      "failed to parse buffer elements '%.*s'",
+      iree_min(256, (int)value.size()), value.data());
   return OkStatus();
 }
 

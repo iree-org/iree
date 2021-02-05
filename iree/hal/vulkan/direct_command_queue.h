@@ -15,8 +15,8 @@
 #ifndef IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 #define IREE_HAL_VULKAN_DIRECT_COMMAND_QUEUE_H_
 
-#include "iree/base/arena.h"
 #include "iree/hal/vulkan/command_queue.h"
+#include "iree/hal/vulkan/util/arena.h"
 
 namespace iree {
 namespace hal {

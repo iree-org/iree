@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/atomics.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

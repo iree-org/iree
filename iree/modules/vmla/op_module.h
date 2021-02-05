@@ -23,11 +23,10 @@
 
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/memory.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace hal {
@@ -48,7 +47,7 @@ constexpr iree_vmla_size_t kVMLAWholeBuffer = -1;
 //
 // The provided data pointer and length is always for the buffer itself; it'll
 // already be offset/clamped to parent buffer bounds when a view.
-class Buffer final : public RefObject<Buffer> {
+class Buffer final : public iree::vm::RefObject<Buffer> {
  public:
   static StatusOr<vm::ref<Buffer>> Allocate(size_t byte_length,
                                             iree_allocator_t allocator);
@@ -80,13 +79,21 @@ class Buffer final : public RefObject<Buffer> {
   template <typename T>
   StatusOr<absl::Span<T>> RangeAs(iree_vmla_size_t byte_offset,
                                   iree_vmla_size_t byte_length) {
-    IREE_ASSIGN_OR_RETURN(auto byte_range, MakeRange(byte_offset, byte_length));
+    absl::Span<uint8_t> byte_range;
+    IREE_RETURN_IF_ERROR(MakeRange(byte_offset, byte_length, &byte_range));
     return ReinterpretSpan<T>(byte_range);
   }
 
  private:
-  StatusOr<absl::Span<uint8_t>> MakeRange(iree_vmla_size_t byte_offset,
-                                          iree_vmla_size_t byte_length) const;
+  // reinterpret_cast for Spans, preserving byte size.
+  template <typename T, typename U>
+  static constexpr absl::Span<T> ReinterpretSpan(absl::Span<U> value) {
+    return absl::MakeSpan(reinterpret_cast<T*>(value.data()),
+                          (value.size() * sizeof(U)) / sizeof(T));
+  }
+
+  Status MakeRange(iree_vmla_size_t byte_offset, iree_vmla_size_t byte_length,
+                   absl::Span<uint8_t>* out_range) const;
 
   vm::ref<Buffer> parent_;
   void* data_ = nullptr;
@@ -94,7 +101,7 @@ class Buffer final : public RefObject<Buffer> {
   iree_allocator_t allocator_;
 };
 
-class Interface final : public RefObject<Interface> {
+class Interface final : public iree::vm::RefObject<Interface> {
  public:
   static constexpr int kMaxConstants = 32;
   static constexpr int kMaxSets = 4;

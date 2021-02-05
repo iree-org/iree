@@ -85,6 +85,7 @@ class CompilerOptions:
       (but which may aid debugging).
     crash_reproducer_path: File name to output an MLIR crash dump to if there
       is a compiler failure.
+    enable_tflite_bindings: Support the IREE TFLite runtime bindings API shim.
     enable_benchmark: Whether to generate instrumented binaries suitable
       for benchmarking.
   """
@@ -101,6 +102,7 @@ class CompilerOptions:
                strip_source_map: bool = False,
                strip_symbols: bool = False,
                crash_reproducer_path: Optional[str] = None,
+               enable_tflite_bindings: bool = False,
                enable_benchmark: bool = False):
     self.output_file = output_file
     self.target_backends = target_backends
@@ -111,6 +113,7 @@ class CompilerOptions:
     self.strip_source_map = strip_source_map
     self.strip_symbols = strip_symbols
     self.crash_reproducer_path = crash_reproducer_path
+    self.enable_tflite_bindings = enable_tflite_bindings
     self.enable_benchmark = enable_benchmark
 
 
@@ -154,6 +157,8 @@ def build_compile_command_line(input_file: str,
   if options.crash_reproducer_path:
     cl.append(
         f"--pass-pipeline-crash-reproducer={options.crash_reproducer_path}")
+  if options.enable_tflite_bindings:
+    cl.append("--iree-tflite-bindings-support")
 
   cl.extend(options.extra_args)
   return cl

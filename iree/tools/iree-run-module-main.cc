@@ -16,8 +16,8 @@
 
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/file_io.h"
-#include "iree/base/flags.h"
+#include "iree/base/internal/file_io.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
@@ -55,30 +55,30 @@ ABSL_FLAG(std::string, function_inputs_file, "",
 namespace iree {
 namespace {
 
-StatusOr<std::string> GetModuleContentsFromFlags() {
+Status GetModuleContentsFromFlags(std::string* out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = absl::GetFlag(FLAGS_module_file);
-  std::string contents;
   if (module_file == "-") {
-    contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                           std::istreambuf_iterator<char>()};
+    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
+                                std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
+    IREE_RETURN_IF_ERROR(file_io::GetFileContents(module_file, out_contents));
   }
-  return contents;
+  return OkStatus();
 }
 
 Status Run() {
   IREE_TRACE_SCOPE0("iree-run-module");
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
-      << "registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+                       "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance))
-      << "creating instance";
+      iree_vm_instance_create(iree_allocator_system(), &instance),
+      "creating instance");
 
-  IREE_ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
+  std::string module_data;
+  IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data));
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
@@ -91,58 +91,59 @@ Status Run() {
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), iree_allocator_system(),
-      &context))
-      << "creating context";
+                           instance, modules.data(), modules.size(),
+                           iree_allocator_system(), &context),
+                       "creating context");
 
   std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "No --entry_function= specified";
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no --entry_function= specified");
   } else {
-    IREE_RETURN_IF_ERROR(input_module->lookup_function(
-        input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-        iree_string_view_t{function_name.data(), function_name.size()},
-        &function))
-        << "looking up function '" << function_name << "'";
+    IREE_RETURN_IF_ERROR(
+        input_module->lookup_function(
+            input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+            iree_string_view_t{function_name.data(), function_name.size()},
+            &function),
+        "looking up function '%s'", function_name.c_str());
   }
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  std::vector<RawSignatureParser::Description> input_descs;
+  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
 
   vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
     if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of function_inputs and function_inputs_file "
-                "to be set";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected only one of function_inputs and "
+                              "function_inputs_file to be set");
     }
-    IREE_ASSIGN_OR_RETURN(inputs,
-                          ParseToVariantListFromFile(
-                              input_descs, iree_hal_device_allocator(device),
-                              absl::GetFlag(FLAGS_function_inputs_file)));
+    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
+        input_descs, iree_hal_device_allocator(device),
+        absl::GetFlag(FLAGS_function_inputs_file), &inputs));
   } else {
-    IREE_ASSIGN_OR_RETURN(
-        inputs,
-        ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                           absl::GetFlag(FLAGS_function_inputs)));
+    IREE_RETURN_IF_ERROR(ParseToVariantList(
+        input_descs, iree_hal_device_allocator(device),
+        absl::MakeConstSpan(absl::GetFlag(FLAGS_function_inputs)), &inputs));
   }
 
-  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  std::vector<RawSignatureParser::Description> output_descs;
+  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
                                            output_descs.size(),
                                            iree_allocator_system(), &outputs));
 
   std::cout << "EXEC @" << function_name << "\n";
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                      inputs.get(), outputs.get(),
-                                      iree_allocator_system()))
-      << "invoking function " << function_name;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), iree_allocator_system()),
+      "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()))
-      << "printing results";
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()),
+                       "printing results");
 
   inputs.reset();
   outputs.reset();

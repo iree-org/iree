@@ -35,6 +35,7 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::tracing
     iree::hal::api
     iree::hal::drivers
@@ -51,7 +52,9 @@ iree_cc_test(
     "smoke_test.cc"
   DEPS
     ::shim
-    bindings::tflite::testdata::add_cc
+    bindings::tflite::testdata::add_dynamic_cc
+    bindings::tflite::testdata::add_multi_cc
+    bindings::tflite::testdata::add_static_cc
     iree::testing::gtest
     iree::testing::gtest_main
 )

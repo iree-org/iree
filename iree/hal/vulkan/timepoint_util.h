@@ -24,10 +24,10 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
-#include "iree/base/intrusive_list.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/util/intrusive_list.h"
+#include "iree/hal/vulkan/util/ref_ptr.h"
 
 namespace iree {
 namespace hal {
@@ -137,7 +137,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
   // Callers are expected to handle this by waiting on previous fences or for
   // complete device idle. Yes, that's as bad as it sounds, and if we start
   // seeing that we should bump up the max count.
-  StatusOr<ref_ptr<TimePointFence>> Acquire();
+  Status Acquire(ref_ptr<TimePointFence>* out_fence);
 
   // Releases one fence back to the pool. The fence must either be signaled or
   // not be in flight on GPU.
@@ -181,7 +181,7 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
   // Callers are expected to handle this by waiting on previous fences or for
   // complete device idle. Yes, that's as bad as it sounds, and if we start
   // seeing that we should bump up the max count.
-  StatusOr<TimePointSemaphore*> Acquire();
+  Status Acquire(TimePointSemaphore** out_semaphore);
 
   // Releases one or more semaphores back to the pool. The binary semaphore must
   // be unsignaled and not in flight on GPU.

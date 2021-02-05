@@ -15,8 +15,8 @@
 #ifndef IREE_TASK_AFFINITY_SET_H_
 #define IREE_TASK_AFFINITY_SET_H_
 
-#include "iree/base/atomics.h"
-#include "iree/base/math.h"
+#include "iree/base/internal/atomics.h"
+#include "iree/base/internal/math.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus

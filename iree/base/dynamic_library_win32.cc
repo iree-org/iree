@@ -15,7 +15,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_replace.h"
 #include "iree/base/dynamic_library.h"
-#include "iree/base/file_path.h"
+#include "iree/base/internal/file_path.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
@@ -54,20 +54,23 @@ class DynamicLibraryWin : public DynamicLibrary {
     ::FreeLibrary(library_);
   }
 
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names) {
+  static Status Load(absl::Span<const char* const> search_file_names,
+                     std::unique_ptr<DynamicLibrary>* out_library) {
     IREE_TRACE_SCOPE();
+    out_library->reset();
 
     for (int i = 0; i < search_file_names.size(); ++i) {
       HMODULE library = ::LoadLibraryA(search_file_names[i]);
       if (library) {
-        return absl::WrapUnique(
+        out_library->reset(
             new DynamicLibraryWin(search_file_names[i], library));
+        return OkStatus();
       }
     }
 
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library, not found on search paths";
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "unable to open dynamic library, not found on search paths");
   }
 
 #if defined(IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT)
@@ -147,9 +150,9 @@ class DynamicLibraryWin : public DynamicLibrary {
 };
 
 // static
-StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::Load(
-    absl::Span<const char* const> search_file_names) {
-  return DynamicLibraryWin::Load(search_file_names);
+Status DynamicLibrary::Load(absl::Span<const char* const> search_file_names,
+                            std::unique_ptr<DynamicLibrary>* out_library) {
+  return DynamicLibraryWin::Load(search_file_names, out_library);
 }
 
 }  // namespace iree

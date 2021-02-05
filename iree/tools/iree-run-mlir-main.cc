@@ -44,7 +44,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/flags.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -156,8 +156,9 @@ std::string BackendToDriverName(std::string backend) {
 }
 
 // Returns a list of target compiler backends to use for file evaluation.
-StatusOr<std::vector<std::string>> GetTargetBackends() {
-  IREE_TRACE_SCOPE0("GetTargetBackends");
+Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
+  IREE_TRACE_SCOPE();
+  out_target_backends->clear();
   auto target_backends =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags().targets;
   if (target_backends.empty()) {
@@ -172,15 +173,17 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
     }
     iree_allocator_system_free(NULL, driver_infos);
   }
-  return target_backends;
+  *out_target_backends = std::move(target_backends);
+  return OkStatus();
 }
 
 // Prepares a module for evaluation by running MLIR import and IREE translation.
 // Returns the serialized flatbuffer data.
-StatusOr<std::string> PrepareModule(
-    std::string target_backend, std::unique_ptr<llvm::MemoryBuffer> file_buffer,
-    mlir::DialectRegistry& registry) {
-  IREE_TRACE_SCOPE0("PrepareModule");
+Status PrepareModule(std::string target_backend,
+                     std::unique_ptr<llvm::MemoryBuffer> file_buffer,
+                     mlir::DialectRegistry& registry, std::string* out_module) {
+  IREE_TRACE_SCOPE();
+  out_module->clear();
 
   mlir::MLIRContext context;
   registry.appendTo(context.getDialectRegistry());
@@ -191,8 +194,8 @@ StatusOr<std::string> PrepareModule(
   mlir::OwningModuleRef mlir_module =
       mlir::parseSourceFile(source_mgr, &context);
   if (!mlir_module) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "Could not parse MLIR file.";
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "could not parse MLIR file");
   }
 
   if (export_all_flag) {
@@ -220,8 +223,8 @@ StatusOr<std::string> PrepareModule(
   pass_manager.addPass(
       mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Conversion from source -> vm failed";
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "conversion from source -> vm failed");
   }
 
   if (print_mlir_flag) {
@@ -234,8 +237,9 @@ StatusOr<std::string> PrepareModule(
   llvm::raw_string_ostream binary_output(binary_contents);
   if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
           mlir_module.get(), bytecode_options, binary_output))) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Serialization to flatbuffer bytecode (binary) failed";
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "serialization to flatbuffer bytecode (binary) failed");
   }
   binary_output.flush();
 
@@ -248,8 +252,8 @@ StatusOr<std::string> PrepareModule(
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
             mlir_module.get(), bytecode_options, text_output))) {
-      return InternalErrorBuilder(IREE_LOC)
-             << "Serialization to annotated MLIR (text) failed";
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "serialization to annotated MLIR (text) failed");
     }
     text_output.flush();
     std::cerr << text_contents << std::endl;
@@ -261,14 +265,16 @@ StatusOr<std::string> PrepareModule(
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
             mlir_module.get(), bytecode_options, text_output))) {
-      return InternalErrorBuilder(IREE_LOC)
-             << "Serialization to flatbuffer bytecode (text) failed";
+      return iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "serialization to flatbuffer bytecode (text) failed");
     }
     text_output.flush();
     std::cerr << text_contents << std::endl;
   }
 
-  return binary_contents;
+  *out_module = std::move(binary_contents);
+  return OkStatus();
 }
 
 // Evaluates a single function in its own fiber, printing the results to stdout.
@@ -276,29 +282,30 @@ Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
                         iree_vm_function_t function,
                         absl::string_view export_name) {
-  IREE_TRACE_SCOPE0("EvaluateFunction");
+  IREE_TRACE_SCOPE();
 
   std::cout << "EXEC @" << export_name << std::endl;
-  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  std::vector<RawSignatureParser::Description> input_descs;
+  IREE_RETURN_IF_ERROR(ParseInputSignature(function, &input_descs));
   vm::ref<iree_vm_list_t> inputs;
   if (!function_inputs_file_flag.empty()) {
     if (!function_inputs_flag.empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of function_inputs and "
-                "function_inputs_file to be set";
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "expected only one of function_inputs and "
+                              "function_inputs_file to be set");
     }
-    IREE_ASSIGN_OR_RETURN(
-        inputs, ParseToVariantListFromFile(input_descs, allocator,
-                                           function_inputs_file_flag));
+    IREE_RETURN_IF_ERROR(ParseToVariantListFromFile(
+        input_descs, allocator, function_inputs_file_flag, &inputs));
   } else {
     auto function_inputs_list = absl::MakeConstSpan(
         function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
         function_inputs_flag.size());
-    IREE_ASSIGN_OR_RETURN(inputs, ParseToVariantList(input_descs, allocator,
-                                                     function_inputs_list));
+    IREE_RETURN_IF_ERROR(ParseToVariantList(input_descs, allocator,
+                                            function_inputs_list, &inputs));
   }
 
-  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  std::vector<RawSignatureParser::Description> output_descs;
+  IREE_RETURN_IF_ERROR(ParseOutputSignature(function, &output_descs));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
@@ -347,9 +354,9 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     iree_vm_function_t function;
     iree_string_view_t export_name_isv;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-        bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
-        &export_name_isv))
-        << "Looking up function export " << ordinal;
+                             bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+                             ordinal, &function, &export_name_isv),
+                         "Looking up function export %d", ordinal);
     absl::string_view export_name(export_name_isv.data, export_name_isv.size);
     if (absl::StartsWith(export_name, "__") ||
         export_name.find('$') != absl::string_view::npos) {
@@ -364,14 +371,15 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     iree_vm_context_t* context = nullptr;
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
     IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-        instance, modules.data(), modules.size(), iree_allocator_system(),
-        &context))
-        << "Creating context";
+                             instance, modules.data(), modules.size(),
+                             iree_allocator_system(), &context),
+                         "Creating context");
 
     // Invoke the function and print results.
-    IREE_RETURN_IF_ERROR(EvaluateFunction(
-        context, iree_hal_device_allocator(device), function, export_name))
-        << "Evaluating export function " << ordinal;
+    IREE_RETURN_IF_ERROR(
+        EvaluateFunction(context, iree_hal_device_allocator(device), function,
+                         export_name),
+        "Evaluating export function %d", ordinal);
 
     iree_vm_context_release(context);
     return OkStatus();
@@ -400,29 +408,31 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
-      << "Registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+                       "Registering HAL types");
 
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance))
-      << "Create instance";
+      iree_vm_instance_create(iree_allocator_system(), &instance),
+      "Creating instance");
 
-  IREE_ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
+  std::vector<std::string> target_backends;
+  IREE_RETURN_IF_ERROR(GetTargetBackends(&target_backends));
   for (const auto& target_backend : target_backends) {
     // Prepare the module for execution and evaluate it.
     IREE_TRACE_FRAME_MARK();
     auto cloned_file_buffer = llvm::MemoryBuffer::getMemBufferCopy(
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
-    IREE_ASSIGN_OR_RETURN(
-        auto flatbuffer_data,
+    std::string flatbuffer_data;
+    IREE_RETURN_IF_ERROR(
         PrepareModule(target_backend + '*', std::move(cloned_file_buffer),
-                      registry),
-        _ << "Translating module");
+                      registry, &flatbuffer_data),
+        "Translating module");
     IREE_TRACE_FRAME_MARK();
-    IREE_RETURN_IF_ERROR(EvaluateFunctions(
-        instance, BackendToDriverName(target_backend), flatbuffer_data))
-        << "Evaluating functions";
+    IREE_RETURN_IF_ERROR(
+        EvaluateFunctions(instance, BackendToDriverName(target_backend),
+                          flatbuffer_data),
+        "Evaluating functions");
   }
 
   iree_vm_instance_release(instance);
@@ -438,9 +448,9 @@ Status RunFile(const std::string& mlir_filename,
   std::string error_message;
   auto file = mlir::openInputFile(mlir_filename, &error_message);
   if (!file) {
-    return NotFoundErrorBuilder(IREE_LOC)
-           << "Unable to open input file " << mlir_filename << ": "
-           << error_message;
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND, "unable to open input file %.*s: %s",
+        (int)mlir_filename.size(), mlir_filename.data(), error_message.c_str());
   }
 
   if (!split_input_file_flag) {
