@@ -17,6 +17,7 @@
 #include "iree/base/dynamic_library.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/file_path.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_executable.h"
 
@@ -82,10 +83,12 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
   }
 
   if (iree_DyLibExecutableDef_sanitized_kind_get(executable_def) ==
-          iree_Sanitizer_kAddress &&
-      !__has_feature(address_sanitizer)) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "Failed to load ASAN libraries");
+          iree_Sanitizer_Address &&
+      !IREE_SANITIZER_ADDRESS) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "Dynamic library executable is compiled with ASAN support, but this "
+        "host application failed to enable ASAN to load this executable");
   }
 
   return iree_ok_status();

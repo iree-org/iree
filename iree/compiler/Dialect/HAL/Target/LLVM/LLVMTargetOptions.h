@@ -15,7 +15,6 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 
-#include "iree/schemas/dylib_executable_def_builder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetOptions.h"
 
@@ -39,7 +38,11 @@ struct LLVMTargetOptions {
   // information is valid) it may significantly change the output program
   // and benchmarking
   bool debugSymbols = true;
-  iree_Sanitizer_enum_t sanitizerKind;
+
+  // Define and declare kinds of Sanitizer as enum
+  // the order in enum should be same as one in flat buffer schema
+  enum SanitizerKind { None = 0, Address };
+  SanitizerKind sanitizerKind = SanitizerKind::None;
 
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on
