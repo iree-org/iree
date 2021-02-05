@@ -924,12 +924,15 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
 def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
   let summary = [{trace value(s) operation}];
   let description = [{
-    Trace point for dispatchable functions.
+    Traces out to a runtime trace sink (console, log file, etc) the given
+    tensors and titles them with the given key. The key is informational only
+    and useful for titling/marking specific sets of tensors for easier
+    searching.
   }];
 
   let arguments = (ins
-    Variadic<FLOW_Tensor>:$operands,
-    StrAttr:$trace_info
+    StrAttr:$key,
+    Variadic<FLOW_Tensor>:$operands
   );
 
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
