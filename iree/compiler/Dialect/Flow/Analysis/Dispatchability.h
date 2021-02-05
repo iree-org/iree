@@ -34,7 +34,9 @@ class Dispatchability {
   static LogicalResult annotateIR(ModuleOp moduleOp);
 
   Dispatchability() = default;
-  explicit Dispatchability(Operation *op) { recalculate(cast<ModuleOp>(op)); }
+  explicit Dispatchability(Operation *op) {
+    (void)recalculate(cast<ModuleOp>(op));
+  }
   Dispatchability(Dispatchability &&) = default;
   Dispatchability &operator=(Dispatchability &&) = default;
   Dispatchability(const Dispatchability &) = delete;

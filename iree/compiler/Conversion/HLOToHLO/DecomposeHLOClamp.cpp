@@ -62,7 +62,7 @@ struct DecomposeHLOClampPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     patterns.insert<DecomposeClampOp>(context);
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 }  // namespace

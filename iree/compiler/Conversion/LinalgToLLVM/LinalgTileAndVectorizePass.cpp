@@ -83,7 +83,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
             Identifier::get(getWorkgroupMarker(), context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
-    applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
   }
 
   // Second level of tiling. (workgroups memroey -> vectors)
@@ -102,7 +102,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
-    applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
   }
 
   // Apply canonicalization.
@@ -113,7 +113,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
                                                context);
     AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
     SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
   }
 
   // Apply vectorization patterns.
@@ -123,7 +124,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
-    applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorizationPatterns));
   }
 
   // TODO: This should be a folding of Add into Contract in core but while they
@@ -144,8 +146,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
             vectorTransformsOptions, context);
-    applyPatternsAndFoldGreedily(funcOp,
-                                 std::move(vectorContractLoweringPatterns));
+    (void)applyPatternsAndFoldGreedily(
+        funcOp, std::move(vectorContractLoweringPatterns));
   }
 
   // Programmatic controlled lowering of vector.transfer only.
@@ -163,7 +165,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     // TODO(ataei): Move this to common vector dialect patterns.
     populateStdLegalizationPatternsForSPIRVLowering(context,
                                                     vectorToLoopsPatterns);
-    applyPatternsAndFoldGreedily(funcOp, std::move(vectorToLoopsPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorToLoopsPatterns));
   }
 }
 

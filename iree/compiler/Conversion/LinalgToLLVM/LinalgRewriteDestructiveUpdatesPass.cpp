@@ -447,7 +447,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   buildAndUseLoad(bindingAttr, offsetValue);
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
-    loopOp.walk([&](SubTensorOp op) { propagateSubTensorOp(b, op); });
+    loopOp.walk([&](SubTensorOp op) { (void)propagateSubTensorOp(b, op); });
 
   return success();
 }
@@ -533,7 +533,8 @@ void LinalgRewriteDestructiveUpdates::runOnFunction() {
   // as needed.
   OwningRewritePatternList canonicalizationPatterns;
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns));
+  (void)applyPatternsAndFoldGreedily(funcOp,
+                                     std::move(canonicalizationPatterns));
 }
 
 std::unique_ptr<OperationPass<FuncOp>>

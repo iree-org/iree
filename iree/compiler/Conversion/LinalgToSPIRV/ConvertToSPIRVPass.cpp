@@ -316,7 +316,7 @@ class TransferToCoopMatLoadStore final : public CoopMatOpLowering<OpTy> {
         rewriter.getRemappedValue(op.source()), remappedIndices, loc, rewriter);
     int64_t offset = 0;
     SmallVector<int64_t, 2> strides;
-    getStridesAndOffset(memrefType, strides, offset);
+    (void)getStridesAndOffset(memrefType, strides, offset);
     auto stride = strides[0];
     if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
     auto int32Type = rewriter.getI32Type();

@@ -397,8 +397,7 @@ LogicalResult ConvOpConversion::apply(
   }
 
   if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-    rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-    return failure();
+    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
   }
 
   ShapedType filterShapeType =
@@ -722,8 +721,7 @@ LogicalResult ReduceWindowOpConversion::apply(
   PoolingType poolingType = getPoolingType(op.body());
 
   if (failed(zeroFillBuffer(loc, resultBuffers[0], rewriter))) {
-    rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-    return failure();
+    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
   }
   switch (poolingType) {
     case PoolingType::kMin: {

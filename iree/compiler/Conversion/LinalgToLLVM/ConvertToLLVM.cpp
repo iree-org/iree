@@ -479,15 +479,15 @@ void ConvertToLLVMPass::runOnOperation() {
                                                            &getContext());
     vector::populateVectorSlicesLoweringPatterns(patterns, &getContext());
     vector::populateVectorContractLoweringPatterns(patterns, &getContext());
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
   {
     OwningRewritePatternList vectorToLoopsPatterns;
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, &getContext(),
         VectorTransferToSCFOptions().setUnroll(true));
-    applyPatternsAndFoldGreedily(getOperation(),
-                                 std::move(vectorToLoopsPatterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(),
+                                       std::move(vectorToLoopsPatterns));
   }
 
   auto module = getOperation();

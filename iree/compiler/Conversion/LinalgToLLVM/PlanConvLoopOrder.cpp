@@ -61,7 +61,7 @@ void PlanConvLoopOrderPass::runOnFunction() {
   patterns.insert<linalg::LinalgInterchangePattern<linalg::GenericOp>>(
       context, loopOrder, secondStepMarker);
 
-  applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 std::unique_ptr<FunctionPass> createPlanConvLoopOrderPass() {

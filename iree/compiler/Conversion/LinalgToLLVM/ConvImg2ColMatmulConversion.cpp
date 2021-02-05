@@ -203,7 +203,7 @@ void ConvImg2ColMatmulConversionPass::runOnFunction() {
   auto context = funcOp.getContext();
   OwningRewritePatternList patterns;
   populateConvImg2ColMatmulConversionPatterns(context, patterns);
-  applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass() {

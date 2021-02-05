@@ -136,7 +136,7 @@ void DeclareNumWorkgroupsFnPass::runOnOperation() {
   OwningRewritePatternList patterns;
   MLIRContext *context = &getContext();
   patterns.insert<DeclareNumWorkgroupsFn>(context);
-  applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass() {

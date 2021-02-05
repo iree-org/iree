@@ -48,7 +48,7 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
+  (void)applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
 }
 
 //===----------------------------------------------------------------------===//

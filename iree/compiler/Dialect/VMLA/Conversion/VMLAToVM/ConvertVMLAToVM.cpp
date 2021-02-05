@@ -398,7 +398,7 @@ class ConvertVMLAToVMPass
     std::tie(outerModuleOp, innerModuleOp) =
         VMConversionTarget::nestModuleForConversion(getOperation());
 
-    appendImportModule(
+    (void)appendImportModule(
         StringRef(vmla_imports_create()->data, vmla_imports_create()->size),
         innerModuleOp);
 

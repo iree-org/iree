@@ -87,7 +87,7 @@ class ResolveEntryPointOrdinalsPass
     OwningRewritePatternList patterns;
     patterns.insert<ResolveCommandBufferDispatchOrdinals>(context);
     patterns.insert<ResolveCommandBufferDispatchIndirectOrdinals>(context);
-    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

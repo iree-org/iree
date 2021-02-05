@@ -64,7 +64,8 @@ void LinalgVectorizationPass::runOnFunction() {
         vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(ArrayRef<Identifier>(
             Identifier::get(getWorkgroupMarker(), context))));
-    applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorizationPatterns));
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Vectorization ---\n";
@@ -86,19 +87,21 @@ void LinalgVectorizationPass::runOnFunction() {
     OwningRewritePatternList vectorUnrollPatterns;
     vectorUnrollPatterns.insert<vector::UnrollVectorPattern>(
         context, vector::UnrollVectorOptions().setNativeShapeFn(getShape));
-    applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
 
     OwningRewritePatternList canonicalizationPatterns1;
     vector::populateVectorToVectorCanonicalizationPatterns(
         canonicalizationPatterns1, funcOp.getContext());
     vector::populateVectorToVectorTransformationPatterns(
         canonicalizationPatterns1, funcOp.getContext());
-    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns1));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns1));
 
     OwningRewritePatternList canonicalizationPatterns2;
     vector::populateVectorSlicesLoweringPatterns(canonicalizationPatterns2,
                                                  funcOp.getContext());
-    applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizationPatterns2));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns2));
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Vector Unroll ---\n";

@@ -117,15 +117,15 @@ class GenericTypeConvert : public ConversionPattern {
     llvm::SmallVector<NamedAttribute, 4> newAttr;
     convertAttributes(op->getAttrs(), rewriter, newAttr);
     llvm::SmallVector<Type, 4> newResults;
-    getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
+    (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
     OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
                          newResults, newAttr, op->getSuccessors());
     for (Region &r : op->getRegions()) {
       Region *newRegion = state.addRegion();
       rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
       TypeConverter::SignatureConversion result(newRegion->getNumArguments());
-      getTypeConverter()->convertSignatureArgs(newRegion->getArgumentTypes(),
-                                               result);
+      (void)getTypeConverter()->convertSignatureArgs(
+          newRegion->getArgumentTypes(), result);
       rewriter.applySignatureConversion(newRegion, result);
     }
     Operation *newOp = rewriter.createOperation(state);

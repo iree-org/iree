@@ -115,7 +115,7 @@ void LinalgTileAndDistributeOnTensorsPass::runOnOperation() {
     // Add canonicalization patterns.
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
     patterns.insert<AffineMinCanonicalizationPattern>(context);
-    applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
 

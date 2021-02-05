@@ -40,7 +40,7 @@ class ValueLiveness {
 
   ValueLiveness() = default;
   explicit ValueLiveness(Operation *op) {
-    recalculate(cast<IREE::VM::FuncOp>(op));
+    (void)recalculate(cast<IREE::VM::FuncOp>(op));
   }
   ValueLiveness(ValueLiveness &&) = default;
   ValueLiveness &operator=(ValueLiveness &&) = default;
