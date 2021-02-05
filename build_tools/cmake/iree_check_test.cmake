@@ -99,7 +99,7 @@ function(iree_check_test)
 
   # TODO(b/146898896): It would be nice if this were something we could query
   # rather than having to know the conventions used by iree_bytecode_module.
-  set(_MODULE_FILE_NAME "${_MODULE_NAME}.module")
+  set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
 
   # iree_bytecode_module does not define a target, only a custom command.
   # We need to create a target that depends on the command to ensure the

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(${IREE_ENABLE_EMITC})
-  # TODO(simon-camp): We are only interested in the output of iree-translate, i.e. add_module.module
+  # TODO(simon-camp): We are only interested in the output of iree-translate, i.e. add_module.vmfb
   # TODO(marbre): Use a custom command or rather implement a new CMake function.
   iree_bytecode_module(
     NAME
