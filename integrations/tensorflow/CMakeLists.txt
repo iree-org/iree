@@ -27,7 +27,9 @@ set(_executable_paths)
 
 if(${IREE_BUILD_TENSORFLOW_COMPILER})
   list(APPEND _bazel_targets //iree_tf_compiler:iree-tf-import)
+  list(APPEND _bazel_targets //iree_tf_compiler:iree-import-tflite)
   list(APPEND _executable_paths iree_tf_compiler/iree-tf-import)
+  list(APPEND _executable_paths iree_tf_compiler/iree-import-tflite)
 endif()
 
 if(${IREE_BUILD_TFLITE_COMPILER})
