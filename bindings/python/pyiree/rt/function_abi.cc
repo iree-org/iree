@@ -570,6 +570,8 @@ void FunctionAbi::RawPack(absl::Span<const Description> descs,
 void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
                             VmVariantList& f_results,
                             absl::Span<py::object> py_results) {
+  py::object this_object =
+      py::cast(this, py::return_value_policy::take_ownership);
   if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
     throw RaiseValueError("Mismatched RawUnpack() result arity");
   }
@@ -618,7 +620,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
             desc.buffer.scalar_type,
             absl::MakeConstSpan(reinterpret_cast<int*>(dims.data()),
                                 dims.size()),
-            std::move(buffer));
+            std::move(buffer), this_object);
         break;
       }
       case RawSignatureParser::Type::kRefObject:

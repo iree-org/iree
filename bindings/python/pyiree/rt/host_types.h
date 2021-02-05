@@ -46,7 +46,7 @@ class HostTypeFactory {
   // available for use immediately.
   virtual py::object CreateImmediateNdarray(
       AbiConstants::ScalarType element_type, absl::Span<const int> dims,
-      HalBuffer buffer);
+      HalBuffer buffer, py::object parent_keep_alive);
 
   // TODO(laurenzo): Add a CreateDelayedNdarray() which is conditioned on
   // a semaphore. This is actually what should be used for async results.

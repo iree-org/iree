@@ -120,8 +120,9 @@ class PyMappedMemory {
   };
 
   PyMappedMemory(Description desc, iree_hal_buffer_mapping_t mapped_memory,
-                 HalBuffer buffer)
-      : desc_(std::move(desc)),
+                 HalBuffer buffer, py::object parent_keep_alive)
+      : parent_keep_alive_(std::move(parent_keep_alive)),
+        desc_(std::move(desc)),
         mapped_memory_(mapped_memory),
         buf_(std::move(buffer)) {}
   ~PyMappedMemory() {
@@ -135,7 +136,8 @@ class PyMappedMemory {
   const Description& desc() const { return desc_; }
 
   static std::unique_ptr<PyMappedMemory> Read(Description desc,
-                                              HalBuffer buffer) {
+                                              HalBuffer buffer,
+                                              py::object parent_keep_alive) {
     iree_device_size_t byte_length =
         iree_hal_buffer_byte_length(buffer.raw_ptr());
     iree_hal_buffer_mapping_t mapped_memory;
@@ -144,7 +146,8 @@ class PyMappedMemory {
                        0 /* element_offset */, byte_length, &mapped_memory),
                    "Could not map memory");
     return absl::make_unique<PyMappedMemory>(std::move(desc), mapped_memory,
-                                             std::move(buffer));
+                                             std::move(buffer),
+                                             std::move(parent_keep_alive));
   }
 
   py::buffer_info ToBufferInfo() {
@@ -158,6 +161,10 @@ class PyMappedMemory {
   }
 
  private:
+  // Important: Since the parent_keep_alive object may be keeping things
+  // alive needed to deallocate various other fields, it must be destructed
+  // last (by being first here).
+  py::object parent_keep_alive_;
   Description desc_;
   iree_hal_buffer_mapping_t mapped_memory_;
   HalBuffer buf_;
@@ -166,14 +173,15 @@ class PyMappedMemory {
 class NumpyHostTypeFactory : public HostTypeFactory {
   py::object CreateImmediateNdarray(AbiConstants::ScalarType element_type,
                                     absl::Span<const int> dims,
-                                    HalBuffer buffer) override {
-    auto mapped_memory = PyMappedMemory::Read(
+                                    HalBuffer buffer,
+                                    py::object parent_keep_alive) override {
+    std::unique_ptr<PyMappedMemory> mapped_memory = PyMappedMemory::Read(
         PyMappedMemory::Description::ForNdarray(element_type, dims),
-        std::move(buffer));
+        std::move(buffer), std::move(parent_keep_alive));
     // Since an immediate ndarray was requested, we can just return a native
     // ndarray directly (versus a proxy that needs to lazily map on access).
     auto buffer_info = mapped_memory->ToBufferInfo();
-    auto py_mapped_memory = py::cast(mapped_memory.release(),
+    auto py_mapped_memory = py::cast(std::move(mapped_memory),
                                      py::return_value_policy::take_ownership);
     return py::array(py::dtype(buffer_info), buffer_info.shape,
                      buffer_info.strides, buffer_info.ptr,
@@ -194,7 +202,7 @@ std::shared_ptr<HostTypeFactory> HostTypeFactory::GetNumpyFactory() {
 
 py::object HostTypeFactory::CreateImmediateNdarray(
     AbiConstants::ScalarType element_type, absl::Span<const int> dims,
-    HalBuffer buffer) {
+    HalBuffer buffer, py::object parent_keep_alive) {
   throw RaisePyError(PyExc_NotImplementedError,
                      "CreateImmediateNdarray not implemented");
 }
