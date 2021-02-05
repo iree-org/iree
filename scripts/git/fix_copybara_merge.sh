@@ -37,8 +37,8 @@ MESSAGE="$(git log --format=%B -n 1 HEAD)"
 # variables to determine the author to use (falling back to the git config). It
 # does not have any command line flags for these. See
 # https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables#_committing
-GIT_AUTHOR_NAME="$(git log --format=%an -n 1 HEAD)"
-GIT_AUTHOR_EMAIL="$(git log --format=%ae -n 1 HEAD)"
+export GIT_AUTHOR_NAME="$(git log --format=%an -n 1 HEAD)"
+export GIT_AUTHOR_EMAIL="$(git log --format=%ae -n 1 HEAD)"
 
 ################################ Safety checks ################################
 
@@ -124,7 +124,10 @@ if [[ -z "$(git rev-list --merges HEAD^..HEAD)" ]]; then
   # See https://stackoverflow.com/q/48560351
   git reset --soft "$(git commit-tree -m "${NEW_MESSAGE?}" -p HEAD^ -p ${MERGE_FROM?} HEAD^{tree})"
 
-  echo -e "\n\nCreated fake merge. New git log graph:"
+  echo -e "\n\nCreated fake merge. New commit:"
+  git log -n1 HEAD
+
+  echo -e "\n\nNew git log graph:"
   git log --left-right --graph --oneline --boundary "HEAD...main"
 
   # Delete the tag we created
@@ -135,6 +138,9 @@ fi
 echo -e "\n\nHEAD commit is already a merge commit. Will not create a new merge."
 # Just rewrite the commit message.
 git commit --amend --no-edit --message="${NEW_MESSAGE?}"
+
+echo -e "\n\nNew commit:"
+git log -n1 HEAD
 if [[ -z "$(which gh)" ]]; then
   echo "gh not found on path."
   echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
