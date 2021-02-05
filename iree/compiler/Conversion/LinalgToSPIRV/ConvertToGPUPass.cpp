@@ -637,6 +637,9 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   }
 
  private:
+  /// In cases where we know by construction that the iteration space is always
+  /// less than the number of local invocations within a workgroup, the
+  /// loop-control overhead can be reduced to just a single if-statement.
   bool optimizeControlFlow;
 };
 

@@ -57,7 +57,7 @@ StringRef getVectorizeMarker();
 /// a marker that can be used later to delete these operations.
 StringRef getDeleteMarker();
 
-/// Returns the marker set on an operation, or "" if no marker is set
+/// Returns the marker set on an operation, or "" if no marker is set.
 StringRef getMarkerOrNull(Operation *op);
 
 /// Returns true if an operation has the specified `marker`. When `marker` is
