@@ -452,9 +452,9 @@ class HALModuleState final {
   }
 
   Status BufferViewTrace(
-      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views,
-      absl::string_view trace_info) {
-    fprintf(stderr, "=== %s ===\n", std::string(trace_info).c_str());
+      absl::string_view key,
+      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views) {
+    fprintf(stderr, "=== %s ===\n", std::string(key).c_str());
     for (auto& view : buffer_views) {
       std::string result_str(4096, '\0');
       iree_status_t status;

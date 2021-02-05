@@ -918,12 +918,14 @@ def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   let summary = [{trace value(s) operation}];
   let description = [{
-    Trace point for dispatchable functions.
+    Traces out to a runtime trace sink (console, log file, etc) the given buffer
+    views and titles them with the given key. The key is informational only and
+    useful for titling/marking specific sets of buffers for easier searching.
   }];
 
   let arguments = (ins
-    Variadic<HAL_BufferView>:$operands,
-    StrAttr:$trace_info
+    StrAttr:$key,
+    Variadic<HAL_BufferView>:$operands
   );
 
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";

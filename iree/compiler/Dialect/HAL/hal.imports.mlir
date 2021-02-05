@@ -184,10 +184,10 @@ vm.import @buffer_view.dims.4(
 ) -> (i32, i32, i32, i32)
 attributes {nosideeffects}
 
-// Prints out the content of buffers.
+// Prints out the content of buffer views.
 vm.import @buffer_view.trace(
-  %operands : !vm.ref<!hal.buffer_view> ...,
-  %trace_info : !vm.ref<!iree.byte_buffer>
+  %key : !vm.ref<!iree.byte_buffer>,
+  %operands : !vm.ref<!hal.buffer_view> ...
 )
 
 //===----------------------------------------------------------------------===//
