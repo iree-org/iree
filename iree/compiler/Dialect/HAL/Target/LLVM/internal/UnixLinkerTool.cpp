@@ -15,7 +15,9 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Process.h"
 
 #define DEBUG_TYPE "llvmaot-linker"
 
@@ -30,30 +32,32 @@ class UnixLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
+    // Ideally a user specifies the linker so they can match whatever they are
+    // building with.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
-// Attempt to find a linker on the path. Ideally a user specifies the linker so
-// they can match whatever they are building with.
-//
-// TODO(ataei): support discovery of linkers on Windows/etc; popen is
-// linux-only. There may be infra in LLVM to do this kind of stuff in a
-// cross-platform way.
-#if !defined(WIN32)
-#define UNIX_SYS_LINKER_PATH_LENGTH 255
-    auto sysLinkers = {"ld", "ld.gold", "lld.ld"};
-    for (auto syslinker : sysLinkers) {
-      FILE *pipe =
-          popen(llvm::Twine("which ").concat(syslinker).str().c_str(), "r");
-      char linkerPath[UNIX_SYS_LINKER_PATH_LENGTH];
-      if (fgets(linkerPath, sizeof(linkerPath), pipe) != NULL) {
-        return strtok(linkerPath, "\n");
+    // If no linker was specified, attempt to find one.
+    auto sysLinkers = {"ld", "ld.gold", "ld.lld"};
+
+    // First search the current directory.
+    for (auto sysLinker : sysLinkers) {
+      if (llvm::sys::fs::exists(sysLinker)) {
+        llvm::SmallString<256> absolutePath(sysLinker);
+        llvm::sys::fs::make_absolute(absolutePath);
+        return std::string(absolutePath);
       }
     }
-#undef UNIX_SYS_LINKER_PATH_LENGTH
-#endif  // WIN32
 
-    return toolPath;
+    // Next search the environment path.
+    for (auto sysLinker : sysLinkers) {
+      if (auto result = llvm::sys::Process::FindInEnvPath("PATH", sysLinker)) {
+        return *result;
+      }
+    }
+
+    llvm::errs() << "No Unix linker tool specified or discovered";
+    return "";
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,
