@@ -200,6 +200,8 @@ static iree_status_t iree_vm_bytecode_external_enter(
   const uint8_t* p = arguments.data;
   for (iree_host_size_t i = 0; i < cconv_arguments.size; ++i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         uint16_t dst_reg = i32_reg++;
         memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
@@ -241,6 +243,8 @@ static iree_status_t iree_vm_bytecode_external_leave(
   for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
     uint16_t src_reg = src_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
                sizeof(int32_t));
@@ -380,6 +384,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
   for (iree_host_size_t i = 0, seg_i = 0, reg_i = 0; i < cconv_arguments.size;
        ++i, ++seg_i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p,
                &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -423,6 +429,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
                ++i) {
             // TODO(benvanik): share with switch above.
             switch (cconv_arguments.data[i]) {
+              case IREE_VM_CCONV_TYPE_VOID:
+                break;
               case IREE_VM_CCONV_TYPE_INT32: {
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -484,6 +492,8 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
        ++i) {
     uint16_t dst_reg = dst_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32:
         memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
                sizeof(int32_t));

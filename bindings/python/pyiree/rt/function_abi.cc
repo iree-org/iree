@@ -573,7 +573,11 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
   py::object this_object =
       py::cast(this, py::return_value_policy::take_ownership);
   if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
-    throw RaiseValueError("Mismatched RawUnpack() result arity");
+    std::string s = std::string("Mismatched RawUnpack() result arity; descs=") +
+                    std::to_string(descs.size()) +
+                    ", f_results=" + std::to_string(f_results.size()) +
+                    ", py_results=" + std::to_string(py_results.size());
+    throw RaiseValueError(s.c_str());
   }
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];

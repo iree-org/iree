@@ -23,24 +23,30 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
     iree_byte_span_t arguments) {
   // We are 1:1 right now with no variadic args, so do a quick verification on
   // the input list.
-  if (!inputs) {
-    if (cconv_arguments.size > 0) {
+  iree_host_size_t expected_input_count =
+      cconv_arguments.size > 0
+          ? (cconv_arguments.data[0] == 'v' ? 0 : cconv_arguments.size)
+          : 0;
+  if (IREE_UNLIKELY(!inputs)) {
+    if (IREE_UNLIKELY(expected_input_count > 0)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "no input provided to a function that has inputs");
     }
     return iree_ok_status();
-  } else if (cconv_arguments.size != iree_vm_list_size(inputs)) {
+  } else if (IREE_UNLIKELY(expected_input_count != iree_vm_list_size(inputs))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "input list and function mismatch; expected %zu "
                             "arguments but passed %zu",
-                            cconv_arguments.size, iree_vm_list_size(inputs));
+                            expected_input_count, iree_vm_list_size(inputs));
   }
 
   uint8_t* p = arguments.data;
   for (iree_host_size_t cconv_i = 0, arg_i = 0; cconv_i < cconv_arguments.size;
        ++cconv_i, ++arg_i) {
     switch (cconv_arguments.data[cconv_i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
@@ -71,8 +77,12 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
 static iree_status_t iree_vm_invoke_marshal_outputs(
     iree_string_view_t cconv_results, iree_byte_span_t results,
     iree_vm_list_t* outputs) {
-  if (!outputs) {
-    if (cconv_results.size > 0) {
+  iree_host_size_t expected_output_count =
+      cconv_results.size > 0
+          ? (cconv_results.data[0] == 'v' ? 0 : cconv_results.size)
+          : 0;
+  if (IREE_UNLIKELY(!outputs)) {
+    if (IREE_UNLIKELY(expected_output_count > 0)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "no output provided to a function that has outputs");
@@ -83,12 +93,14 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
   // Resize the output list to hold all results (and kill anything that may
   // have been in there).
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(outputs, 0));
-  IREE_RETURN_IF_ERROR(iree_vm_list_resize(outputs, cconv_results.size));
+  IREE_RETURN_IF_ERROR(iree_vm_list_resize(outputs, expected_output_count));
 
   uint8_t* p = results.data;
   for (iree_host_size_t cconv_i = 0, arg_i = 0; cconv_i < cconv_results.size;
        ++cconv_i, ++arg_i) {
     switch (cconv_results.data[cconv_i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         iree_vm_value_t value = iree_vm_value_make_i32(*(int32_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
