@@ -23,42 +23,6 @@ func @buffer_fill(%arg0 : !hal.buffer) {
 
 // -----
 
-// CHECK-LABEL: @buffer_read_data
-func @buffer_read_data(%arg0 : !hal.buffer, %arg1 : !iree.mutable_byte_buffer) {
-  %c42 = constant 42 : index
-  %c42_0 = constant 42 : index
-  %c42_1 = constant 42 : index
-  // CHECK: vm.call @hal.buffer.read_data(%arg0, %c42, %arg1, %c42_0, %c42_1) : (!vm.ref<!hal.buffer>, i32, !vm.ref<!iree.mutable_byte_buffer>, i32, i32) -> ()
-  hal.buffer.read_data %arg0, %c42, %arg1, %c42_0, %c42_1 : !iree.mutable_byte_buffer
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_write_data
-func @buffer_write_data(%arg0 : !hal.buffer, %arg1 : !iree.mutable_byte_buffer) {
-  %c42 = constant 42 : index
-  %c42_0 = constant 42 : index
-  %c42_1 = constant 42 : index
-  // CHECK: vm.call @hal.buffer.write_data(%arg1, %c42, %arg0, %c42_0, %c42_1) : (!vm.ref<!iree.mutable_byte_buffer>, i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
-  hal.buffer.write_data %arg1, %c42, %arg0, %c42_0, %c42_1 : !iree.mutable_byte_buffer
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_copy_data
-func @buffer_copy_data(%arg0 : !hal.buffer, %arg1 : !hal.buffer) {
-  %c42 = constant 42 : index
-  %c42_0 = constant 42 : index
-  %c42_1 = constant 42 : index
-  // CHECK: vm.call @hal.buffer.copy_data(%arg0, %c42, %arg1, %c42_0, %c42_1) : (!vm.ref<!hal.buffer>, i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
-  hal.buffer.copy_data %arg0, %c42, %arg1, %c42_0, %c42_1
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0 : !hal.buffer) -> (i8, i16, i32) {
   %c42 = constant 42 : index

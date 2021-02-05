@@ -414,6 +414,7 @@ def HAL_OrdinalAttr : SignlessIntegerAttrBase<
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
+def HAL_ElementType : TypeAlias<I32>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
