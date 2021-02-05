@@ -114,14 +114,43 @@ Value cloneOpTreeIntoBlock(Value sourceValue, Block *targetBlock,
   return clonedOp->getResult(resultIndex);
 }
 
+// Modify the second operand of the SegmentSize attribute
+// TODO(ataei): Remove this once we have flow.dispatch.workgroups only here.
+template <typename DispatchOpType>
+void modifyOperandSegmentSizeAttr(MLIRContext *context,
+                                  DispatchOpType dispatchOp, int32_t argCount);
+
+template <>
+void modifyOperandSegmentSizeAttr(MLIRContext *context,
+                                  DispatchRegionOp dispatchRegionOp,
+                                  int32_t argCount) {}
+
+template <>
+void modifyOperandSegmentSizeAttr(MLIRContext *context,
+                                  DispatchWorkgroupsOp dispatchWorkgroupsOp,
+                                  int32_t argCount) {
+  dispatchWorkgroupsOp.getOperation()->setAttr(
+      DispatchWorkgroupsOp::getOperandSegmentSizeAttr(),
+      DenseIntElementsAttr::get(
+          VectorType::get(2, IntegerType::get(context, 32)),
+          ArrayRef<int32_t>(
+              {static_cast<int32_t>(
+                   dispatchWorkgroupsOp.workgroup_count().size()),
+               static_cast<int32_t>(dispatchWorkgroupsOp.operands().size() -
+                                    argCount)})));
+}
+
 // Inlines use of the given |value| from outside of a dispatch region to inside
 // of it and removes the argument. Supports multiple arguments that reference
 // |value| and will clone the entire value tree.
-LogicalResult inlineDispatchRegionOperandsUsingValue(
-    DispatchRegionOp dispatchRegionOp, Value value) {
+template <typename DispatchOpType>
+LogicalResult inlineDispatchRegionOperandsUsingValue(MLIRContext *context,
+                                                     DispatchOpType dispatchOp,
+                                                     ValueRange args,
+                                                     Value value) {
   // Find all args that are using this value.
   SmallVector<unsigned, 4> argIndices;
-  for (auto arg : llvm::enumerate(dispatchRegionOp.args())) {
+  for (auto arg : llvm::enumerate(args)) {
     if (arg.value() == value) {
       argIndices.push_back(arg.index());
     }
@@ -132,7 +161,7 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
   }
 
   // Clone the value (and the ops required to create it) into the entry block.
-  auto &entryBlock = dispatchRegionOp.body().getBlocks().front();
+  auto &entryBlock = dispatchOp.body().getBlocks().front();
   BlockAndValueMapping mapping;
   auto clonedValue = cloneOpTreeIntoBlock(value, &entryBlock, &mapping);
 
@@ -144,18 +173,20 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
   // Remove the dispatch region args and the block args that have been
   // replaced.
   for (unsigned argIndex : llvm::reverse(argIndices)) {
-    dispatchRegionOp.getOperation()->eraseOperand(
-        dispatchRegionOp.mapArgOperandToOpOperand(argIndex));
+    dispatchOp.getOperation()->eraseOperand(
+        dispatchOp.mapArgOperandToOpOperand(argIndex));
     entryBlock.eraseArgument(argIndex);
   }
+  modifyOperandSegmentSizeAttr(context, dispatchOp, argIndices.size());
 
   return success();
 }
 
 // Rematerializes a constant inside of all dispatch regions that use it.
-// Afterward the constant is only removed if there are no other uses within the
-// non-dispatch block (such as by sequencer ops).
-LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
+// Afterward the constant is only removed if there are no other uses within
+// the non-dispatch block (such as by sequencer ops).
+LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp,
+                                                     MLIRContext *context) {
   Value constantValue = constantOp.getResult();
   SmallVector<DispatchRegionOp, 4> usingRegionOps;
   for (auto *user : constantValue.getUsers()) {
@@ -171,17 +202,27 @@ LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
     }
   }
   for (auto &dispatchRegionOp : usingRegionOps) {
-    if (failed(inlineDispatchRegionOperandsUsingValue(dispatchRegionOp,
-                                                      constantValue))) {
+    if (failed(inlineDispatchRegionOperandsUsingValue<DispatchRegionOp>(
+            context, dispatchRegionOp, dispatchRegionOp.args(),
+            constantValue))) {
       return failure();
     }
   }
+  return success();
+}
 
-  // Remove if there are no other uses within the block.
-  if (constantOp.use_empty()) {
-    constantOp.erase();
+LogicalResult rematerializeConstantInDispatchWorkgroupsRegions(
+    ConstantOp constantOp, MLIRContext *context) {
+  Value constantValue = constantOp.getResult();
+  for (auto *user : constantValue.getUsers()) {
+    if (auto dispatchWorkgroupsOp = dyn_cast<DispatchWorkgroupsOp>(user)) {
+      if (failed(inlineDispatchRegionOperandsUsingValue<DispatchWorkgroupsOp>(
+              context, dispatchWorkgroupsOp, dispatchWorkgroupsOp.operands(),
+              constantValue))) {
+        return failure();
+      }
+    }
   }
-
   return success();
 }
 
@@ -202,7 +243,9 @@ class RematerializeDispatchConstantsPass
     : public PassWrapper<RematerializeDispatchConstantsPass, FunctionPass> {
  public:
   void runOnFunction() override {
-    for (auto &block : getFunction()) {
+    FuncOp funcOp = getFunction();
+    auto context = funcOp.getContext();
+    for (auto &block : funcOp) {
       SmallVector<ConstantOp, 8> smallConstantOps;
       for (auto constantOp : block.getOps<ConstantOp>()) {
         if (isSplatConstant(constantOp)) {
@@ -212,8 +255,17 @@ class RematerializeDispatchConstantsPass
       // Note: we iterate in reverse so that the rematerialized constants appear
       // in the same order they did originally (as insertion is at the top).
       for (auto constantOp : llvm::reverse(smallConstantOps)) {
-        if (failed(rematerializeConstantInDispatchRegions(constantOp))) {
+        if (failed(
+                rematerializeConstantInDispatchRegions(constantOp, context))) {
           return signalPassFailure();
+        }
+        if (failed(rematerializeConstantInDispatchWorkgroupsRegions(constantOp,
+                                                                    context))) {
+          return signalPassFailure();
+        }
+        // Remove if there are no other uses within the block.
+        if (constantOp.use_empty()) {
+          constantOp.erase();
         }
       }
     }

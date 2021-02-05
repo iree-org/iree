@@ -167,4 +167,5 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
+    "-iree-flow-dispatch-linalg-on-tensors-enable-fusion"
 )
