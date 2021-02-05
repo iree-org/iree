@@ -644,27 +644,6 @@ void CommandBufferCreateOp::getAsmResultNames(
 // hal.command_buffer.execution_barrier
 //===----------------------------------------------------------------------===//
 
-void CommandBufferExecutionBarrierOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    IREE::HAL::ExecutionStageBitfield sourceStageMask,
-    IREE::HAL::ExecutionStageBitfield targetStageMask,
-    ValueRange memoryBarriers, ValueRange bufferBarriers) {
-  state.addAttribute(
-      "source_stage_mask",
-      builder.getI32IntegerAttr(static_cast<int32_t>(sourceStageMask)));
-  state.addAttribute(
-      "target_stage_mask",
-      builder.getI32IntegerAttr(static_cast<int32_t>(targetStageMask)));
-  state.addOperands(commandBuffer);
-  state.addOperands(memoryBarriers);
-  state.addOperands(bufferBarriers);
-  state.addAttribute("operand_segment_sizes",
-                     DenseIntElementsAttr::get(
-                         VectorType::get({3}, builder.getIntegerType(32)),
-                         {1, static_cast<int>(memoryBarriers.size()),
-                          static_cast<int>(bufferBarriers.size())}));
-}
-
 static ParseResult parseCommandBufferExecutionBarrierOp(
     OpAsmParser &parser, OperationState *result) {
   OpAsmParser::OperandType commandBuffer;
@@ -677,42 +656,12 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
                                                    result->attributes)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<ExecutionStageBitfield>(parser, "target_stage_mask",
-                                                   result->attributes))) {
+                                                   result->attributes)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<ExecutionBarrierFlagBitfield>(parser, "flags",
+                                                         result->attributes))) {
     return failure();
   }
-  SmallVector<OpAsmParser::OperandType, 4> memoryBarriers;
-  bool expectMoreOperands = succeeded(parser.parseOptionalComma());
-  if (expectMoreOperands &&
-      succeeded(parser.parseOptionalKeyword("memory_barriers"))) {
-    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
-        failed(parser.parseOperandList(memoryBarriers)) ||
-        failed(parser.parseRSquare()) ||
-        failed(parser.resolveOperands(
-            memoryBarriers, MemoryBarrierType::get(result->getContext()),
-            result->operands))) {
-      return failure();
-    }
-    expectMoreOperands = succeeded(parser.parseOptionalComma());
-  }
-  SmallVector<OpAsmParser::OperandType, 4> bufferBarriers;
-  if (expectMoreOperands &&
-      succeeded(parser.parseOptionalKeyword("buffer_barriers"))) {
-    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
-        failed(parser.parseOperandList(bufferBarriers)) ||
-        failed(parser.parseRSquare()) ||
-        failed(parser.resolveOperands(
-            bufferBarriers, BufferBarrierType::get(result->getContext()),
-            result->operands))) {
-      return failure();
-    }
-    expectMoreOperands = succeeded(parser.parseOptionalComma());
-  }
-  result->addAttribute(
-      "operand_segment_sizes",
-      DenseIntElementsAttr::get(
-          VectorType::get({3}, parser.getBuilder().getIntegerType(32)),
-          {1, static_cast<int>(memoryBarriers.size()),
-           static_cast<int>(bufferBarriers.size())}));
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -727,22 +676,14 @@ static void printCommandBufferExecutionBarrierOp(
   p << stringifyExecutionStageBitfield(op.source_stage_mask());
   p << "\", \"";
   p << stringifyExecutionStageBitfield(op.target_stage_mask());
+  p << "\", \"";
+  p << stringifyExecutionBarrierFlagBitfield(op.flags());
   p << "\"";
-  if (!op.memory_barriers().empty()) {
-    p << ", memory_barriers=[";
-    p.printOperands(op.memory_barriers());
-    p << "]";
-  }
-  if (!op.buffer_barriers().empty()) {
-    p << ", buffer_barriers=[";
-    p.printOperands(op.buffer_barriers());
-    p << "]";
-  }
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{
                                          "source_stage_mask",
                                          "target_stage_mask",
-                                         "operand_segment_sizes",
+                                         "flags",
                                      });
 }
 

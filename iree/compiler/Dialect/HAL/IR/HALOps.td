@@ -1008,30 +1008,20 @@ def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
   let hasCanonicalizer = 1;
 }
 
-def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
-    AttrSizedOperandSegments,
-  ]> {
+def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
   let summary = [{command buffer execution barrier recording operation}];
   let description = [{
-    Defines a memory dependency between commands recorded before and after the
-    barrier.
+    Defines an execution dependency between all commands recorded before the
+    barrier and all commands recorded after the barrier. Only the stages
+    provided will be affected.
   }];
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_ExecutionStageBitfieldAttr:$source_stage_mask,
     HAL_ExecutionStageBitfieldAttr:$target_stage_mask,
-    Variadic<HAL_MemoryBarrier>:$memory_barriers,
-    Variadic<HAL_BufferBarrier>:$buffer_barriers
+    HAL_ExecutionBarrierFlagBitfieldAttr:$flags
   );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilderDAG<(ins "Value":$commandBuffer,
-      "IREE::HAL::ExecutionStageBitfield":$sourceStageMask,
-      "IREE::HAL::ExecutionStageBitfield":$targetStageMask,
-      "ValueRange":$memoryBarriers, "ValueRange":$bufferBarriers)>,
-  ];
 }
 
 // TODO(benvanik): event ops.

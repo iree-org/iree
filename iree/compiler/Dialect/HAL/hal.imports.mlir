@@ -212,15 +212,14 @@ vm.import @command_buffer.end(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
-// Defines a memory dependency between commands recorded before and after the
-// barrier.
+// Defines an execution dependency between all commands recorded before the
+// barrier and all commands recorded after the barrier. Only the stages provided
+// will be affected.
 vm.import @command_buffer.execution_barrier(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_stage_mask : i32,
   %target_stage_mask : i32,
-  // TODO(benvanik): tuple types.
-  %memory_barriers : i32 ...,
-  %buffer_barriers : i32 ...
+  %flags : i32
 )
 
 // Fills the target buffer with the given repeating value.

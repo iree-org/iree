@@ -503,14 +503,12 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       iree_hal_execution_stage_t source_stage_mask,
       iree_hal_execution_stage_t target_stage_mask,
-      absl::Span<const int32_t> memory_barriers,
-      absl::Span<const int32_t> buffer_barriers) {
-    // TODO(benvanik): decode barriers.
+      iree_hal_execution_barrier_flags_t flags) {
     iree_hal_memory_barrier_t global_barrier;
     global_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
     global_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_READ;
     return iree_hal_command_buffer_execution_barrier(
-        command_buffer.get(), source_stage_mask, target_stage_mask, 1,
+        command_buffer.get(), source_stage_mask, target_stage_mask, flags, 1,
         &global_barrier, 0, nullptr);
   }
 
