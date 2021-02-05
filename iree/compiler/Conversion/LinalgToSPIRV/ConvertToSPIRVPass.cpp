@@ -47,29 +47,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace llvm {
-template <>
-struct DenseMapInfo<mlir::iree_compiler::IREE::PlaceholderOp> {
-  static mlir::iree_compiler::IREE::PlaceholderOp getEmptyKey() {
-    auto pointer = DenseMapInfo<void *>::getEmptyKey();
-    return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
-        pointer);
-  }
-  static mlir::iree_compiler::IREE::PlaceholderOp getTombstoneKey() {
-    auto pointer = DenseMapInfo<void *>::getTombstoneKey();
-    return mlir::iree_compiler::IREE::PlaceholderOp::getFromOpaquePointer(
-        pointer);
-  }
-  static unsigned getHashValue(mlir::iree_compiler::IREE::PlaceholderOp val) {
-    return hash_value(val.getAsOpaquePointer());
-  }
-  static bool isEqual(mlir::iree_compiler::IREE::PlaceholderOp LHS,
-                      mlir::iree_compiler::IREE::PlaceholderOp RHS) {
-    return LHS == RHS;
-  }
-};
-}  // namespace llvm
-
 namespace mlir {
 namespace iree_compiler {
 namespace {
@@ -166,29 +143,42 @@ spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
   return variable;
 }
 
+/// Returns the IREE::HAL::InterfaceBindingOp from an interface op.
+IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
+  if (auto placeholderOp = dyn_cast<IREE::PlaceholderOp>(op)) {
+    return cast<IREE::HAL::InterfaceBindingOp>(
+        SymbolTable::lookupNearestSymbolFrom(
+            op, op->getAttrOfType<SymbolRefAttr>("binding")));
+  }
+  if (auto bindingSubspanOp =
+          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
+    return bindingSubspanOp.queryBindingOp();
+  }
+  llvm_unreachable("unknown interface binding op");
+}
+
 /// Returns the (set, binding) pair for the given placeholder op.
-std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(
-    IREE::PlaceholderOp op) {
-  auto bindingOp =
-      cast<IREE::HAL::InterfaceBindingOp>(SymbolTable::lookupNearestSymbolFrom(
-          op, op->getAttrOfType<SymbolRefAttr>("binding")));
+std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(Operation *op) {
+  IREE::HAL::InterfaceBindingOp bindingOp = getBindingOp(op);
   return {bindingOp.set(), bindingOp.binding()};
 }
 
 /// Returns the set of resources that should be marked as aliased in SPIR-V.
-llvm::DenseSet<IREE::PlaceholderOp> getAliasedResources(ModuleOp module) {
-  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
+llvm::DenseSet<Operation *> getAliasedResources(ModuleOp module) {
+  llvm::DenseSet<Operation *> aliasedResources;
 
   for (FuncOp func : module.getOps<FuncOp>()) {
     // Collect all placeholder ops and their (set, binding) pairs in this
     // function.
-    SmallVector<IREE::PlaceholderOp, 4> placeholderOps;
+    SmallVector<Operation *, 4> placeholderOps;
     SmallVector<std::pair<uint32_t, uint32_t>, 4> setBindings;
     llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
-    func.walk([&](IREE::PlaceholderOp op) {
-      placeholderOps.emplace_back(op);
-      setBindings.emplace_back(getPlaceholderSetAndBinding(op));
-      ++setBindingCount[setBindings.back()];
+    func.walk([&](Operation *op) {
+      if (isa<IREE::PlaceholderOp, IREE::HAL::InterfaceBindingSubspanOp>(op)) {
+        placeholderOps.emplace_back(op);
+        setBindings.emplace_back(getPlaceholderSetAndBinding(op));
+        ++setBindingCount[setBindings.back()];
+      }
     });
 
     // Perform analysis to determine whether we need to mark the resource as
@@ -222,22 +212,64 @@ struct HALInterfaceLoadConstantConverter final
       ConversionPatternRewriter &rewriter) const override;
 };
 
-/// A pattern to convert iree.placeholdder into a sequence of SPIR-V ops to get
-/// the address to a global variable representing the resource buffer.
-struct IREEPlaceholderConverter final
-    : public OpConversionPattern<IREE::PlaceholderOp> {
-  IREEPlaceholderConverter(TypeConverter &typeConverter, MLIRContext *context,
-                           llvm::DenseSet<IREE::PlaceholderOp> aliasedResources,
-                           PatternBenefit benefit = 1)
-      : OpConversionPattern(typeConverter, context, benefit),
-        aliasedResources(std::move(aliasedResources)) {}
+/// A pattern to convert hal.interface.workgroup.id/count into corresponding
+/// SPIR-V Builtin ops.
+template <typename InterfaceOpTy, spirv::BuiltIn builtin>
+struct HALInterfaceWorkgroupIdAndCountConverter final
+    : public OpConversionPattern<InterfaceOpTy> {
+  using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
+      InterfaceOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
+    Value spirvBuiltin = spirv::getBuiltinVariableValue(op, builtin, rewriter);
+    rewriter.replaceOpWithNewOp<spirv::CompositeExtractOp>(
+        op, rewriter.getIntegerType(32), spirvBuiltin,
+        rewriter.getI32ArrayAttr({index}));
+    return success();
+  }
+};
+
+/// A pattern to convert iree.placeholdder/hal.interface.binding.subspan into a
+/// sequence of SPIR-V ops to get the address to a global variable representing
+/// the resource buffer.
+template <typename InterfaceOpTy>
+struct InterfaceOpConverter final : public OpConversionPattern<InterfaceOpTy> {
+  InterfaceOpConverter(TypeConverter &typeConverter, MLIRContext *context,
+                       llvm::DenseSet<Operation *> &aliasedResources,
+                       PatternBenefit benefit = 1)
+      : OpConversionPattern<InterfaceOpTy>(typeConverter, context, benefit),
+        aliasedResources(aliasedResources) {}
+
+  LogicalResult matchAndRewrite(
+      InterfaceOpTy interfaceOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto moduleOp = interfaceOp->template getParentOfType<ModuleOp>();
+
+    Type resultType = interfaceOp.getOperation()->getResult(0).getType();
+    Type convertedType = this->getTypeConverter()->convertType(resultType);
+    if (!convertedType) {
+      return interfaceOp.emitError()
+             << "SPIRV type conversion failed: " << resultType;
+    }
+    auto bindingOp = getBindingOp(interfaceOp.getOperation());
+
+    // We always create a new resource variable for the placeholder and use the
+    // placeholder op's pointer address as the `id`.
+    spirv::GlobalVariableOp varOp = insertResourceVariable(
+        interfaceOp.getLoc(), convertedType,
+        reinterpret_cast<uint64_t>(interfaceOp.getOperation()), bindingOp.set(),
+        bindingOp.binding(),
+        aliasedResources.contains(interfaceOp.getOperation()),
+        *moduleOp.getBody(), rewriter);
+
+    rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(interfaceOp, varOp);
+    return success();
+  }
 
  private:
-  llvm::DenseSet<IREE::PlaceholderOp> aliasedResources;
+  const llvm::DenseSet<Operation *> &aliasedResources;
 };
 
 /// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
@@ -448,32 +480,6 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
   return success();
 }
 
-LogicalResult IREEPlaceholderConverter::matchAndRewrite(
-    IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) const {
-  auto moduleOp = phOp->getParentOfType<ModuleOp>();
-
-  Type convertedType = getTypeConverter()->convertType(phOp.getType());
-  if (!convertedType) {
-    return phOp.emitError()
-           << "SPIRV type conversion failed: " << phOp.getType();
-  }
-  auto bindingOp = dyn_cast_or_null<IREE::HAL::InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(
-          phOp, phOp->getAttrOfType<SymbolRefAttr>("binding")));
-
-  // We always create a new resource variable for the placeholder and use the
-  // placeholder op's pointer address as the `id`.
-  spirv::GlobalVariableOp varOp = insertResourceVariable(
-      phOp.getLoc(), convertedType,
-      reinterpret_cast<uint64_t>(phOp.getOperation()), bindingOp.set(),
-      bindingOp.binding(), aliasedResources.contains(phOp), *moduleOp.getBody(),
-      rewriter);
-
-  rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
-  return success();
-}
-
 static void populateVectorToSPIRVPatterns(
     MLIRContext *context, SPIRVTypeConverter &converter,
     OwningRewritePatternList &patterns,
@@ -507,10 +513,17 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   populateVectorToSPIRVPatterns(context, typeConverter, patterns,
                                 cooperativeMatrixAnalysis);
-  patterns.insert<HALInterfaceLoadConstantConverter>(typeConverter, context);
+  patterns.insert<
+      HALInterfaceLoadConstantConverter,
+      HALInterfaceWorkgroupIdAndCountConverter<
+          IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
+      HALInterfaceWorkgroupIdAndCountConverter<
+          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
+      typeConverter, context);
   auto aliasedResources = getAliasedResources(moduleOp);
-  patterns.insert<IREEPlaceholderConverter>(typeConverter, context,
-                                            std::move(aliasedResources));
+  patterns.insert<InterfaceOpConverter<IREE::PlaceholderOp>,
+                  InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(
+      typeConverter, context, aliasedResources);
   patterns.insert<LinalgReshapeConverter>(typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =

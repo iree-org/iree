@@ -16,6 +16,7 @@
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -34,8 +35,8 @@ namespace iree_compiler {
 /// "x" is used to tile the innermost loop, along "y" for the next innermost (if
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
-std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
-    const SPIRVCodegenOptions &options);
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createLinalgTileAndFusePass(const SPIRVCodegenOptions &options);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
@@ -74,7 +75,8 @@ std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass();
 /// Pass that materializes new hal.executable.entry_point ops for
 /// spv.EntryPoints that are added by other passes.
 /// To be removed along with SplitDispatchFunctionPass.
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeEntryPointsPass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createMaterializeEntryPointsPass();
 
 //===----------------------------------------------------------------------===//
 // Pipelines

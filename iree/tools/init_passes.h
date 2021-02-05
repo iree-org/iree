@@ -30,6 +30,7 @@ namespace iree_compiler {
 // Registers IREE core passes and other important passes to the global registry.
 inline void registerAllPasses() {
   registerAllIreePasses();
+  registerCommonConversionPasses();
   registerMlirPasses();
   registerHALConversionPasses();
   registerLinalgToSPIRVPasses();

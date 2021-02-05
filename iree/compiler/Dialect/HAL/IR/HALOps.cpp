@@ -1637,6 +1637,15 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.binding.subspan
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface.workgroup.*
 //===----------------------------------------------------------------------===//
 
