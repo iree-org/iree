@@ -179,8 +179,8 @@ IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
 //                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
 // ```
 //
-// Rewrites iree.placeholder into the proper memref descriptor
-// extracted from `packed_buffer_args`.
+// Rewrites BindingOp into the proper memref descriptor extracted from
+// `packed_buffer_args`.
 template <typename BindingOp>
 class ConvertBindingOp : public ConvertToLLVMPattern {
  public:

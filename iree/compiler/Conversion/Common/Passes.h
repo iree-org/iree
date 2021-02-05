@@ -19,7 +19,10 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Alias for callback function that allocates workgroup level memory.
+/// Alias for callback function that allocates workgroup level memory. The
+/// callback expects the type of the memref to be allocated (`allocationType`)
+/// and the SSA values that represent the size of dynamic dimensions in the
+/// `allocationType`. The callback is expected to return a MemRefType Value.
 using WorkgroupMemoryAllocationFn = std::function<Value(
     OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
     MemRefType allocationType)>;
@@ -38,7 +41,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
 /// launch to be runnable on the host.
 std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 
-/// Pass to perform linalg on tensor bufferization.
+/// Pass to perform linalg on tensor bufferization. The function passed into the
+/// pass through the `allocationFn` argument is invoked whenever a new buffer is
+/// to be created. The callback will be passed the Values for the dynamic
+/// dimensions in the memref type that is to be allocated.  The callback is
+/// expected to return a MemRefType Value.  When no `allocationFn` is specified,
+/// the default allocator generates an `std.alloc` instruction with the
+/// allocated MemRefType having no stride map (i.e. default row-major striding)
+/// and default memory space.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 

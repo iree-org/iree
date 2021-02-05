@@ -261,7 +261,7 @@ class SetWorkgroupSizePattern
 };
 }  // namespace
 
-/// Given the tile sizes to use add a region to the entry point operation that
+/// Given the tile sizes to use adds a region to the entry point operation that
 /// describes the maximum number of workgroups for a given workload. For now it
 /// is computed as (workload + tilesize - 1) / tilesize along each dimension and
 /// restricted to be 3D dimensional.
@@ -290,9 +290,7 @@ static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
       entryPointOp.interfaceAttr(), entryPointOp.signatureAttr(),
       entryPointOp.workgroup_sizeAttr(), 1);
   Region *region = clonedOp.getBody();
-  Block *entryBlock = new Block();
-  region->push_back(entryBlock);
-  builder.setInsertionPointToStart(entryBlock);
+  Block *entryBlock = builder.createBlock(region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
   SmallVector<BlockArgument, 4> workload = llvm::to_vector<4>(

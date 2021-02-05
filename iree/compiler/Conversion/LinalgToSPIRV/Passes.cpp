@@ -225,15 +225,16 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (clEnableLinalgOnTensorsSPIRV) {
-    addLinalgBufferizePasses(
-        pm.nest<ModuleOp>(),
-        [](OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
-           MemRefType allocationType) {
-          MemRefType allocType = MemRefType::get(
-              allocationType.getShape(), allocationType.getElementType(), {},
-              getWorkgroupMemorySpace());
-          return builder.create<AllocOp>(loc, allocType, dynamicSizes);
-        });
+    WorkgroupMemoryAllocationFn allocationFn = [](OpBuilder &builder,
+                                                  Location loc,
+                                                  ArrayRef<Value> dynamicSizes,
+                                                  MemRefType allocationType) {
+      MemRefType allocType = MemRefType::get(allocationType.getShape(),
+                                             allocationType.getElementType(),
+                                             {}, getWorkgroupMemorySpace());
+      return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+    };
+    addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
   } else {
     //===--------------------------------------------------------------------===//
     // Inject shape calculation for output buffers.

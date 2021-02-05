@@ -213,7 +213,7 @@ struct HALInterfaceLoadConstantConverter final
 };
 
 /// A pattern to convert hal.interface.workgroup.id/count into corresponding
-/// SPIR-V Builtin ops
+/// SPIR-V Builtin ops.
 template <typename InterfaceOpTy, spirv::BuiltIn builtin>
 struct HALInterfaceWorkgroupIdAndCountConverter final
     : public OpConversionPattern<InterfaceOpTy> {
