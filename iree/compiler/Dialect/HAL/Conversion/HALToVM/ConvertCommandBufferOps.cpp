@@ -21,84 +21,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-class RemoveMakeMemoryBarrierOpConversion
-    : public OpConversionPattern<IREE::HAL::MakeMemoryBarrierOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-class CommandBufferExecutionBarrierOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferExecutionBarrierOp> {
- public:
-  CommandBufferExecutionBarrierOpConversion(MLIRContext *context,
-                                            SymbolTable &importSymbols,
-                                            TypeConverter &typeConverter,
-                                            StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferExecutionBarrierOp op,
-      llvm::ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getType();
-
-    SmallVector<Value, 8> callOperands = {
-        operands[0],
-        rewriter.create<mlir::ConstantOp>(
-            op.getLoc(), rewriter.getI32IntegerAttr(
-                             static_cast<int32_t>(op.source_stage_mask()))),
-        rewriter.create<mlir::ConstantOp>(
-            op.getLoc(), rewriter.getI32IntegerAttr(
-                             static_cast<int32_t>(op.target_stage_mask()))),
-    };
-    SmallVector<int16_t, 5> segmentSizes = {
-        /*command_buffer=*/-1,
-        /*source_stage_mask=*/-1,
-        /*target_stage_mask=*/-1,
-        /*memory_barriers=*/
-        static_cast<int16_t>(std::distance(op.memory_barriers().begin(),
-                                           op.memory_barriers().end())),
-        /*buffer_barriers=*/
-        static_cast<int16_t>(std::distance(op.buffer_barriers().begin(),
-                                           op.buffer_barriers().end())),
-    };
-    if (!op.buffer_barriers().empty()) {
-      op.emitOpError()
-          << "tuples not yet fully supported; don't use buffer barriers";
-      return failure();
-    }
-    for (auto memoryBarrier : op.memory_barriers()) {
-      assert(memoryBarrier.getDefiningOp());
-      auto makeMemoryBarrierOp =
-          cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier.getDefiningOp());
-      callOperands.push_back(rewriter.create<mlir::ConstantOp>(
-          op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
-                           makeMemoryBarrierOp.source_scope()))));
-      callOperands.push_back(rewriter.create<mlir::ConstantOp>(
-          op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
-                           makeMemoryBarrierOp.target_scope()))));
-    }
-
-    rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
-        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
-        segmentSizes, importType.getInputs(), callOperands);
-    return success();
-  }
-
- private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
  public:
@@ -168,17 +90,16 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
                                           SymbolTable &importSymbols,
                                           TypeConverter &typeConverter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<RemoveMakeMemoryBarrierOpConversion>(context);
-
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCreateOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.begin");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferEndOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.end");
-  patterns.insert<CommandBufferExecutionBarrierOpConversion>(
-      context, importSymbols, typeConverter,
-      "hal.command_buffer.execution_barrier");
+  patterns
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferExecutionBarrierOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.execution_barrier");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFillBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(

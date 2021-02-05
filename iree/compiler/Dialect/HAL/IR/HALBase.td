@@ -186,6 +186,16 @@ def HAL_ExecutionStageBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_ExecutionBarrierFlag_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutionBarrierFlag_Reserved : BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ExecutionBarrierFlagBitfieldAttr :
+    BitEnumAttr<"ExecutionBarrierFlagBitfield", "valid ExecutionBarrierFlag", [
+      HAL_ExecutionBarrierFlag_None,
+      HAL_ExecutionBarrierFlag_Reserved,
+    ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_AccessScope_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_AccessScope_IndirectCommandRead : BitEnumAttrCase<"IndirectCommandRead", 0x0001>;
 def HAL_AccessScope_ConstantRead : BitEnumAttrCase<"ConstantRead", 0x0002>;

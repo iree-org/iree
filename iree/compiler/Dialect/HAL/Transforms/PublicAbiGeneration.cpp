@@ -205,7 +205,7 @@ LogicalResult generateAsynchronousBody(
 
         // Build buffer_view.
         funcResults.push_back(builder.create<BufferViewCreateOp>(
-            loc, nextCallResult, dimValues, *elementType));
+            loc, nextCallResult, *elementType, dimValues));
         break;
       }
       case RawSignatureParser::Type::kScalar: {

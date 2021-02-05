@@ -69,6 +69,7 @@ iree_hal_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
+    iree_hal_execution_barrier_flags_t flags,
     iree_host_size_t memory_barrier_count,
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
@@ -76,7 +77,7 @@ iree_hal_command_buffer_execution_barrier(
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, execution_barrier)(
-      command_buffer, source_stage_mask, target_stage_mask,
+      command_buffer, source_stage_mask, target_stage_mask, flags,
       memory_barrier_count, memory_barriers, buffer_barrier_count,
       buffer_barriers);
   IREE_TRACE_ZONE_END(z0);

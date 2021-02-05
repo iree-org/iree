@@ -41,9 +41,9 @@ iree_hal_vulkan_native_executable_layout_cast(
 
 static iree_status_t iree_hal_vulkan_create_pipeline_layout(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    iree_host_size_t set_layout_count,
+    iree_host_size_t push_constant_count, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constant_count, VkPipelineLayout* out_handle) {
+    VkPipelineLayout* out_handle) {
   VkDescriptorSetLayout* set_layout_handles =
       (VkDescriptorSetLayout*)iree_alloca(set_layout_count *
                                           sizeof(VkDescriptorSetLayout));
@@ -82,9 +82,8 @@ static void iree_hal_vulkan_destroy_pipeline_layout(
 
 iree_status_t iree_hal_vulkan_native_executable_layout_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    iree_host_size_t set_layout_count,
+    iree_host_size_t push_constant_count, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constant_count,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
@@ -94,9 +93,9 @@ iree_status_t iree_hal_vulkan_native_executable_layout_create(
 
   VkPipelineLayout handle = VK_NULL_HANDLE;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_vulkan_create_pipeline_layout(logical_device,
-                                                 set_layout_count, set_layouts,
-                                                 push_constant_count, &handle));
+      z0, iree_hal_vulkan_create_pipeline_layout(
+              logical_device, push_constant_count, set_layout_count,
+              set_layouts, &handle));
 
   iree_hal_vulkan_native_executable_layout_t* executable_layout = NULL;
   iree_host_size_t total_size =

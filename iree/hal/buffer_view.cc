@@ -128,8 +128,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   }
 
   // Wrap and pass ownership of the buffer to the buffer view.
-  status = iree_hal_buffer_view_create(buffer, shape.data(), shape.size(),
-                                       element_type, out_buffer_view);
+  status = iree_hal_buffer_view_create(buffer, element_type, shape.data(),
+                                       shape.size(), out_buffer_view);
   iree_hal_buffer_release(buffer);
   return status;
 }

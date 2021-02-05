@@ -355,12 +355,12 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewCreate(
-      const vm::ref<iree_hal_buffer_t>& buffer, absl::Span<const int32_t> shape,
-      iree_hal_element_type_t element_type) {
+      const vm::ref<iree_hal_buffer_t>& buffer,
+      iree_hal_element_type_t element_type, absl::Span<const int32_t> shape) {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    element_type, &buffer_view),
+        iree_hal_buffer_view_create(buffer.get(), element_type, shape.data(),
+                                    shape.size(), &buffer_view),
         "failed to create buffer view");
     return std::move(buffer_view);
   }
@@ -452,9 +452,9 @@ class HALModuleState final {
   }
 
   Status BufferViewTrace(
-      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views,
-      absl::string_view trace_info) {
-    fprintf(stderr, "=== %s ===\n", std::string(trace_info).c_str());
+      absl::string_view key,
+      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views) {
+    fprintf(stderr, "=== %s ===\n", std::string(key).c_str());
     for (auto& view : buffer_views) {
       std::string result_str(4096, '\0');
       iree_status_t status;
@@ -503,14 +503,12 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       iree_hal_execution_stage_t source_stage_mask,
       iree_hal_execution_stage_t target_stage_mask,
-      absl::Span<const int32_t> memory_barriers,
-      absl::Span<const int32_t> buffer_barriers) {
-    // TODO(benvanik): decode barriers.
+      iree_hal_execution_barrier_flags_t flags) {
     iree_hal_memory_barrier_t global_barrier;
     global_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
     global_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_READ;
     return iree_hal_command_buffer_execution_barrier(
-        command_buffer.get(), source_stage_mask, target_stage_mask, 1,
+        command_buffer.get(), source_stage_mask, target_stage_mask, flags, 1,
         &global_barrier, 0, nullptr);
   }
 
@@ -719,9 +717,8 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_executable_layout_t>> ExecutableLayoutCreate(
-      const vm::ref<iree_hal_device_t>& device,
-      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
-      int32_t push_constants) {
+      const vm::ref<iree_hal_device_t>& device, int32_t push_constants,
+      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts) {
     iree_hal_descriptor_set_layout_t** set_layouts_ptr =
         (iree_hal_descriptor_set_layout_t**)iree_alloca(
             sizeof(set_layouts_ptr[0]) * set_layouts.size());
@@ -731,7 +728,7 @@ class HALModuleState final {
 
     vm::ref<iree_hal_executable_layout_t> executable_layout;
     IREE_RETURN_IF_ERROR(iree_hal_executable_layout_create(
-        device.get(), set_layouts.size(), set_layouts_ptr, push_constants,
+        device.get(), push_constants, set_layouts.size(), set_layouts_ptr,
         &executable_layout));
     return std::move(executable_layout);
   }
