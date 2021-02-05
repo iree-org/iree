@@ -180,8 +180,8 @@ struct ExpandAllocatorComputeSizeOp
     // TODO(benvanik): use buffer constraints for alignment.
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
 
-    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
-        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto elementSize =
+        getElementByteCount(op.getLoc(), op.element_type(), rewriter);
     auto byteSize =
         getElementCount(op.getLoc(), elementSize, op.shape(), rewriter);
 
@@ -225,8 +225,8 @@ struct ExpandAllocatorComputeOffsetOp
       offset =
           rewriter.createOrFold<mlir::AddIOp>(op.getLoc(), offset, axisOffset);
     }
-    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
-        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto elementSize =
+        getElementByteCount(op.getLoc(), op.element_type(), rewriter);
     auto byteOffset =
         rewriter.createOrFold<mlir::MulIOp>(op.getLoc(), offset, elementSize);
 
@@ -266,13 +266,13 @@ struct ExpandAllocatorComputeRangeOp
 
     auto startByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_typeAttr(), op.indices());
+        op.element_type(), op.indices());
     auto endByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_typeAttr(), endIndices);
+        op.element_type(), endIndices);
 
-    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
-        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto elementSize =
+        getElementByteCount(op.getLoc(), op.element_type(), rewriter);
     auto offsetLength = rewriter.createOrFold<mlir::AddIOp>(
         op.getLoc(),
         rewriter.createOrFold<mlir::SubIOp>(op.getLoc(), endByteOffset,
@@ -459,6 +459,75 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
 void BufferViewBufferOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SkipBufferViewBufferOp>(context);
+}
+
+namespace {
+
+/// Expands a hal.buffer_view.compute_offset op to use
+/// hal.allocator.compute_offset. This allows for all of the shape math to
+/// happen in the VM where we can better optimize it.
+struct ExpandBufferViewComputeOffsetOp
+    : public OpRewritePattern<BufferViewComputeOffsetOp> {
+  using OpRewritePattern<BufferViewComputeOffsetOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferViewComputeOffsetOp op,
+                                PatternRewriter &rewriter) const override {
+    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
+        op.getLoc(), op.buffer_view());
+    auto allocatorValue =
+        rewriter.createOrFold<BufferAllocatorOp>(op.getLoc(), bufferValue);
+    int rank = op.indices().size();
+    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
+    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
+                                                    op.buffer_view());
+    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
+        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
+    rewriter.replaceOpWithNewOp<AllocatorComputeOffsetOp>(
+        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices());
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewComputeOffsetOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandBufferViewComputeOffsetOp>(context);
+}
+
+namespace {
+
+/// Expands a hal.buffer_view.compute_range op to use
+/// hal.allocator.compute_range. This allows for all of the shape math to
+/// happen in the VM where we can better optimize it.
+struct ExpandBufferViewComputeRangeOp
+    : public OpRewritePattern<BufferViewComputeRangeOp> {
+  using OpRewritePattern<BufferViewComputeRangeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BufferViewComputeRangeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
+        op.getLoc(), op.buffer_view());
+    auto allocatorValue =
+        rewriter.createOrFold<BufferAllocatorOp>(op.getLoc(), bufferValue);
+    int rank = op.indices().size();
+    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
+    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
+                                                    op.buffer_view());
+    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
+        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
+    rewriter.replaceOpWithNewOp<AllocatorComputeRangeOp>(
+        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices(),
+        op.lengths());
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewComputeRangeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandBufferViewComputeRangeOp>(context);
 }
 
 namespace {

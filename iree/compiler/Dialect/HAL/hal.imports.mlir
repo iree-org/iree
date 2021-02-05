@@ -129,21 +129,6 @@ vm.import @buffer_view.byte_length(
 ) -> i32
 attributes {nosideeffects}
 
-// Computes an element byte offset within a buffer.
-vm.import @buffer_view.compute_offset(
-  %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...
-) -> i32
-attributes {nosideeffects}
-
-// Computes a byte range within a buffer for one or more elements.
-vm.import @buffer_view.compute_range(
-  %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...,
-  %lengths : i32 ...
-) -> (i32, i32)
-attributes {nosideeffects}
-
 // Returns the element type of the buffer view.
 vm.import @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
