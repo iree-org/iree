@@ -15,9 +15,11 @@
 #include "experimental/ModelBuilder/ModelRunner.h"
 
 #include "llvm/Support/TargetSelect.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
@@ -151,6 +153,9 @@ static void addCPULoweringPass(mlir::PassManager& manager) {
   manager.addNestedPass<mlir::FuncOp>(mlir::createConvertVectorToSCFPass());
   manager.addNestedPass<mlir::FuncOp>(mlir::createConvertLinalgToLoopsPass());
   manager.addPass(mlir::createConvertLinalgToLLVMPass());
+  manager.addPass(mlir::createConvertLinalgToLoopsPass());
+  manager.addPass(mlir::createLowerAffinePass());
+  manager.addPass(mlir::createLowerToCFGPass());
   manager.addPass(mlir::createConvertVectorToLLVMPass());
   manager.addPass(mlir::createLowerToLLVMPass());
 }
