@@ -719,9 +719,8 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_executable_layout_t>> ExecutableLayoutCreate(
-      const vm::ref<iree_hal_device_t>& device,
-      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
-      int32_t push_constants) {
+      const vm::ref<iree_hal_device_t>& device, int32_t push_constants,
+      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts) {
     iree_hal_descriptor_set_layout_t** set_layouts_ptr =
         (iree_hal_descriptor_set_layout_t**)iree_alloca(
             sizeof(set_layouts_ptr[0]) * set_layouts.size());
@@ -731,7 +730,7 @@ class HALModuleState final {
 
     vm::ref<iree_hal_executable_layout_t> executable_layout;
     IREE_RETURN_IF_ERROR(iree_hal_executable_layout_create(
-        device.get(), set_layouts.size(), set_layouts_ptr, push_constants,
+        device.get(), push_constants, set_layouts.size(), set_layouts_ptr,
         &executable_layout));
     return std::move(executable_layout);
   }

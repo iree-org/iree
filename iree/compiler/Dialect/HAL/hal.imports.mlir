@@ -358,8 +358,8 @@ attributes {nosideeffects}
 // required size.
 vm.import @executable_layout.create(
   %device : !vm.ref<!hal.device>,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...,
-  %push_constants : i32
+  %push_constants : i32,
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 

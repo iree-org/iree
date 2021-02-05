@@ -2556,23 +2556,24 @@ def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
     %set0 = hal.descriptor_set_layout.create ...
     %set1 = hal.descriptor_set_layout.create ...
     %layout = hal.executable_layout.create %device,
-                                           set_layouts = [%set0, %set1],
-                                           push_constants = 3 : !hal.executable_layout
+                                           push_constants = 3,
+                                           set_layouts = [%set0, %set1] : !hal.executable_layout
     ```
   }];
 
   let arguments = (ins
     HAL_Device:$device,
-    Variadic<HAL_DescriptorSetLayout>:$set_layouts,
-    I32Attr:$push_constants
+    I32Attr:$push_constants,
+    Variadic<HAL_DescriptorSetLayout>:$set_layouts
   );
   let results = (outs
     HAL_ExecutableLayout:$result
   );
 
   let assemblyFormat = [{
-    $device `,` `set_layouts` `=` `[` $set_layouts `]` `,`
-    `push_constants` `=` $push_constants
+    $device `,`
+    `push_constants` `=` $push_constants `,`
+    `set_layouts` `=` `[` $set_layouts `]`
     attr-dict-with-keyword `:` type($result)
   }];
 }
