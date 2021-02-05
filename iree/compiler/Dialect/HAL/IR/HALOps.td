@@ -715,7 +715,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 
   let arguments = (ins
     HAL_Buffer:$buffer,
-    HAL_ElementTypeAttr:$element_type,
+    HAL_ElementType:$element_type,
     HAL_Shape:$shape
   );
   let results = (outs
@@ -730,6 +730,8 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilderDAG<(ins "Value":$buffer, "int32_t":$elementType,
+                  "ValueRange":$shape)>,
+    OpBuilderDAG<(ins "Value":$buffer, "Value":$elementType,
                   "ValueRange":$shape)>,
   ];
 }
@@ -757,6 +759,8 @@ def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
     $buffer_view `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
     $lengths `]` `:` type($result) attr-dict
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
@@ -866,6 +870,22 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   ];
 }
 
+def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
+  let summary = [{buffer view element type query}];
+  let description = [{
+    Returns the element type of the buffer view.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view
+  );
+  let results = (outs
+    HAL_ElementType:$result
+  );
+
+  let assemblyFormat = [{$buffer_view attr-dict `:` type($result)}];
+}
+
 def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank"> {
   let summary = [{buffer view rank query}];
   let description = [{
@@ -913,6 +933,8 @@ def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
   );
 
   let assemblyFormat = [{$buffer_view attr-dict `:` type($result)}];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {

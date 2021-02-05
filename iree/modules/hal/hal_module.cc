@@ -365,17 +365,6 @@ class HALModuleState final {
     return std::move(buffer_view);
   }
 
-  StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewSubview(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> indices, absl::Span<const int32_t> lengths) {
-    vm::ref<iree_hal_buffer_view_t> new_buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_subview(
-                             buffer_view.get(), indices.data(), indices.size(),
-                             lengths.data(), lengths.size(), &new_buffer_view),
-                         "failed to create subview");
-    return std::move(new_buffer_view);
-  }
-
   StatusOr<vm::ref<iree_hal_buffer_t>> BufferViewBuffer(
       const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
     return vm::retain_ref(iree_hal_buffer_view_buffer(buffer_view.get()));
@@ -409,6 +398,12 @@ class HALModuleState final {
         static_cast<int32_t>(subspan_length));
   }
 
+  StatusOr<int32_t> BufferViewElementType(
+      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
+    return static_cast<int32_t>(
+        iree_hal_buffer_view_element_type(buffer_view.get()));
+  }
+
   StatusOr<int32_t> BufferViewRank(
       const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
     return static_cast<int32_t>(
@@ -419,36 +414,6 @@ class HALModuleState final {
       const vm::ref<iree_hal_buffer_view_t>& buffer_view, int32_t index) {
     return static_cast<int32_t>(
         iree_hal_buffer_view_shape_dim(buffer_view.get(), index));
-  }
-
-  template <size_t N>
-  StatusOr<std::array<int32_t, N>> BufferViewDimsN(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    std::array<int32_t, N> value;
-    iree_host_size_t rank = 0;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_shape(buffer_view.get(), N, value.data(), &rank));
-    return value;
-  }
-
-  StatusOr<std::array<int32_t, 1>> BufferViewDims1(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<1>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 2>> BufferViewDims2(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<2>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 3>> BufferViewDims3(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<3>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 4>> BufferViewDims4(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<4>(buffer_view);
   }
 
   Status BufferViewTrace(
@@ -816,8 +781,6 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
 
     vm::MakeNativeFunction("buffer_view.create",
                            &HALModuleState::BufferViewCreate),
-    vm::MakeNativeFunction("buffer_view.subview",
-                           &HALModuleState::BufferViewSubview),
     vm::MakeNativeFunction("buffer_view.buffer",
                            &HALModuleState::BufferViewBuffer),
     vm::MakeNativeFunction("buffer_view.byte_length",
@@ -826,16 +789,10 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferViewComputeOffset),
     vm::MakeNativeFunction("buffer_view.compute_range",
                            &HALModuleState::BufferViewComputeRange),
+    vm::MakeNativeFunction("buffer_view.element_type",
+                           &HALModuleState::BufferViewElementType),
     vm::MakeNativeFunction("buffer_view.rank", &HALModuleState::BufferViewRank),
     vm::MakeNativeFunction("buffer_view.dim", &HALModuleState::BufferViewDim),
-    vm::MakeNativeFunction("buffer_view.dims.1",
-                           &HALModuleState::BufferViewDims1),
-    vm::MakeNativeFunction("buffer_view.dims.2",
-                           &HALModuleState::BufferViewDims2),
-    vm::MakeNativeFunction("buffer_view.dims.3",
-                           &HALModuleState::BufferViewDims3),
-    vm::MakeNativeFunction("buffer_view.dims.4",
-                           &HALModuleState::BufferViewDims4),
     vm::MakeNativeFunction("buffer_view.trace",
                            &HALModuleState::BufferViewTrace),
 
