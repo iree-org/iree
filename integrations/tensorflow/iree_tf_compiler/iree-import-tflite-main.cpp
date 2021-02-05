@@ -17,6 +17,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
@@ -25,6 +26,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
+#include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -63,6 +65,10 @@ int main(int argc, char **argv) {
 
   // Initialize dialects.
   DialectRegistry registry;
+  registry.insert<mlir::TFL::TensorFlowLiteDialect>();
+  registry.insert<mlir::tosa::TosaDialect>();
+  registry.insert<quant::QuantizationDialect>();
+  registry.insert<StandardOpsDialect>();
 
   // Convert the Module proto into MLIR.
   MLIRContext context;

@@ -85,7 +85,9 @@ cc_binary(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
+        "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
     ],
 )
 
