@@ -580,13 +580,14 @@ typedef struct iree_status_handle_t* iree_status_t;
 #define IREE_STATUS_IMPL_MAKE_(code, ...) \
   (iree_status_t)(uintptr_t)((code)&IREE_STATUS_CODE_MASK)
 #undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_
-#define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, expr, ...) \
-  iree_status_t var = (expr);                                 \
+#define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, ...)                      \
+  iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))); \
   if (IREE_UNLIKELY(var)) return var;
 #undef IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_
-#define IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_(tail_expr, var, expr, \
-                                                       ...)                  \
-  iree_status_t var = (expr);                                                \
+#define IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_(tail_expr, var, ...)  \
+  iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))); \
   if (IREE_UNLIKELY(var)) {                                                  \
     (tail_expr);                                                             \
     return var;                                                              \
