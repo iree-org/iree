@@ -193,7 +193,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
-        "-iree-flow-dispatch-linalg-on-tensors-enable-fusion",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",

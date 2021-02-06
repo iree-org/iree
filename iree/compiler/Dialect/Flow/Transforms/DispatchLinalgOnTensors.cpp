@@ -273,7 +273,7 @@ struct TileAndDistributeOnTensorsPattern
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) return failure();
+    if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
     IntegerAttr rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr);
     if (!rootOpAttr) return failure();
 
@@ -314,6 +314,8 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
+/// Returns true if an operation is to always be cloned into the dispatch region
+/// when its value is used within it.
 bool isAlwaysClonedIntoDispatchOp(Operation *op) {
   if (isa<linalg::InitTensorOp>(op)) {
     return true;
