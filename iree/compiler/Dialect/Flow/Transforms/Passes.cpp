@@ -33,17 +33,6 @@ static llvm::cl::opt<bool> clEnableLinalgOnTensorsDispatch(
         "Enable use of Linalg on tensors for dispatch region creation"),
     llvm::cl::init(false));
 
-static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
-    "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
-    llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
-    llvm::cl::CommaSeparated);
-
-// TODO(ravishankarm): Remove this option after addressing fusion.
-static llvm::cl::opt<bool> clLinalgOnTensorsEnableFusion(
-    "iree-flow-dispatch-linalg-on-tensors-enable-fusion",
-    llvm::cl::desc("Enable fusion on linalg on tensors path"),
-    llvm::cl::init(false));
-
 // TODO(benvanik): change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
@@ -80,8 +69,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager);
-    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass(
-        clLinalgOnTensorsTileSizes, clLinalgOnTensorsEnableFusion));
+    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
   }
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
