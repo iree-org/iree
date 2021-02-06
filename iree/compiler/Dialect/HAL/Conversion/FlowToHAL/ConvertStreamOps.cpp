@@ -305,8 +305,10 @@ static LogicalResult recordPushBindings(Value device, Value commandBuffer,
     auto byteLength = value->getByteLength();
     if (!byteLength) return failure();
 
-    bindings.push_back(std::make_tuple(bindingOrdinal++, value->getBuffer(),
-                                       zeroOffset, byteLength));
+    bindings.push_back(
+        std::make_tuple(rewriter.createOrFold<mlir::ConstantIndexOp>(
+                            dispatchOp.getLoc(), bindingOrdinal++),
+                        value->getBuffer(), zeroOffset, byteLength));
     return success();
   };
   for (auto it : llvm::enumerate(dispatchOp.operands())) {
