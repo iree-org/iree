@@ -213,13 +213,13 @@ std::string VmVariantList::DebugString() const {
       absl::StrAppend(&s, variant.i32);
     } else if (iree_vm_variant_is_ref(variant)) {
       // Pretty print a subset of ABI impacting known types.
-      if (iree_hal_buffer_isa(&variant.ref)) {
-        auto* hal_buffer = iree_hal_buffer_deref(&variant.ref);
+      if (iree_hal_buffer_isa(variant.ref)) {
+        auto* hal_buffer = iree_hal_buffer_deref(variant.ref);
         assert(hal_buffer);
         absl::StrAppend(&s, "HalBuffer(",
                         iree_hal_buffer_byte_length(hal_buffer), ")");
-      } else if (iree_hal_buffer_view_isa(&variant.ref)) {
-        auto hal_bv = iree_hal_buffer_view_deref(&variant.ref);
+      } else if (iree_hal_buffer_view_isa(variant.ref)) {
+        auto hal_bv = iree_hal_buffer_view_deref(variant.ref);
         absl::StrAppend(&s, "HalBufferView(");
         absl::InlinedVector<int32_t, 5> shape(
             iree_hal_buffer_view_shape_rank(hal_bv));

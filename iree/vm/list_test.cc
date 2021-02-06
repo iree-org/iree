@@ -146,8 +146,8 @@ TEST_F(VMListTest, UsageRef) {
   for (iree_host_size_t i = 0; i < 5; ++i) {
     iree_vm_ref_t ref_a{0};
     IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i, &ref_a));
-    EXPECT_TRUE(test_a_isa(&ref_a));
-    auto* a = test_a_deref(&ref_a);
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
     EXPECT_EQ(i, a->data());
     iree_vm_ref_release(&ref_a);
   }
@@ -192,8 +192,8 @@ TEST_F(VMListTest, UsageVariant) {
   for (iree_host_size_t i = 5; i < 10; ++i) {
     iree_vm_ref_t ref_a{0};
     IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i, &ref_a));
-    EXPECT_TRUE(test_a_isa(&ref_a));
-    auto* a = test_a_deref(&ref_a);
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
     EXPECT_EQ(i, a->data());
     iree_vm_ref_release(&ref_a);
   }

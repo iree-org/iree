@@ -132,7 +132,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
       (ref_type##_t**)iree_alloca((args)->vla_count * sizeof(ref_type##_t*)); \
   for (iree_host_size_t i = 0; i < (args)->vla_count; ++i) {                  \
     IREE_RETURN_IF_ERROR(                                                     \
-        ref_type##_check_deref(&(args)->vla_field[i].r0, &(*(out_ptrs))[i])); \
+        ref_type##_check_deref((args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
   }
 
 #define IREE_VM_ABI_VLA_HEAP_DEREF(args, vla_count, vla_field, ref_type,         \
@@ -141,7 +141,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
   IREE_RETURN_IF_ERROR(iree_alloca((args)->vla_count * sizeof(ref_type##_t*));  \
   for (iree_host_size_t i = 0; i < (args)->vla_count; ++i) {                   \
     IREE_RETURN_IF_ERROR(                                                      \
-        ref_type##_check_deref(&(args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
+        ref_type##_check_deref((args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
   }
 
 //===----------------------------------------------------------------------===//

@@ -175,12 +175,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
     void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
 
 // Checks that the given reference-counted pointer |ref| is of |type|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type);
-
-#define IREE_VM_DEREF_OR_RETURN(value_type, value, ref, type) \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, type));         \
-  value_type* value = (value_type*)(ref)->ptr;
+static inline iree_status_t iree_vm_ref_check(const iree_vm_ref_t ref,
+                                              iree_vm_ref_type_t type) {
+  return ref.type == type ? iree_ok_status()
+                          : iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+}
 
 // Retains the reference-counted pointer |ref|.
 // |out_ref| will be released if it already contains a reference.
@@ -267,13 +266,13 @@ struct ref_type_descriptor {
 #define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                             \
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value); \
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value);   \
-  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref);       \
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(const iree_vm_ref_t ref);  \
   IREE_API_EXPORT iree_status_t IREE_API_CALL name##_check_deref(          \
-      iree_vm_ref_t* ref, T** out_ptr);                                    \
+      const iree_vm_ref_t ref, T** out_ptr);                               \
   IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL       \
       name##_get_descriptor();                                             \
-  inline bool name##_isa(iree_vm_ref_t* ref) {                             \
-    return name##_get_descriptor()->type == ref->type;                     \
+  static inline bool name##_isa(const iree_vm_ref_t ref) {                 \
+    return name##_get_descriptor()->type == ref.type;                      \
   }                                                                        \
   IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL name##_type_id();       \
   IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
@@ -290,18 +289,18 @@ struct ref_type_descriptor {
     iree_vm_ref_wrap_assign(value, name##_descriptor.type, &ref);           \
     return ref;                                                             \
   }                                                                         \
-  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref) {       \
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(const iree_vm_ref_t ref) {  \
     iree_status_t status = iree_vm_ref_check(ref, name##_descriptor.type);  \
-    if (!iree_status_is_ok(status)) {                                       \
-      iree_status_ignore(status);                                           \
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {                        \
+      IREE_IGNORE_ERROR(status);                                            \
       return NULL;                                                          \
     }                                                                       \
-    return (T*)ref->ptr;                                                    \
+    return (T*)ref.ptr;                                                     \
   }                                                                         \
   IREE_API_EXPORT iree_status_t IREE_API_CALL name##_check_deref(           \
-      iree_vm_ref_t* ref, T** out_ptr) {                                    \
+      const iree_vm_ref_t ref, T** out_ptr) {                               \
     IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_descriptor.type));   \
-    *out_ptr = (T*)ref->ptr;                                                \
+    *out_ptr = (T*)ref.ptr;                                                 \
     return iree_ok_status();                                                \
   }                                                                         \
   IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL        \

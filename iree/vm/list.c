@@ -494,7 +494,7 @@ IREE_API_EXPORT void* iree_vm_list_get_ref_deref(
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
     return NULL;
   }
-  status = iree_vm_ref_check(&value, type_descriptor->type);
+  status = iree_vm_ref_check(value, type_descriptor->type);
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
     return NULL;
   }

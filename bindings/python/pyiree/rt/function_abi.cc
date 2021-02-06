@@ -591,7 +591,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
         iree_hal_buffer_view_t* buffer_view =
-            iree_hal_buffer_view_deref(&f_result.ref);
+            iree_hal_buffer_view_deref(f_result.ref);
         if (!buffer_view) {
           throw RaiseValueError(
               "Could not deref result buffer view (wrong type?)");
@@ -793,8 +793,8 @@ std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
     if (iree_vm_variant_is_value(variant)) {
       results.push_back("i32=" + std::to_string(variant.i32));
     } else if (iree_vm_variant_is_ref(variant) &&
-               iree_hal_buffer_view_isa(&variant.ref)) {
-      auto buffer_view = iree_hal_buffer_view_deref(&variant.ref);
+               iree_hal_buffer_view_isa(variant.ref)) {
+      auto buffer_view = iree_hal_buffer_view_deref(variant.ref);
 
       std::string result_str(4096, '\0');
       iree_status_t status;
