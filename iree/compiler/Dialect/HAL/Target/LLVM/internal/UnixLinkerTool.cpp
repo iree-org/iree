@@ -17,7 +17,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/Process.h"
 
 #define DEBUG_TYPE "llvmaot-linker"
 
@@ -32,31 +31,15 @@ class UnixLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
-    // Ideally a user specifies the linker so they can match whatever they are
-    // building with.
+    // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
-    // If no linker was specified, attempt to find one.
-    auto sysLinkers = {"ld", "ld.gold", "ld.lld"};
+    // No explicit linker specified, search the environment for common tools.
+    toolPath = findToolInEnvironment({"ld", "ld.gold", "ld.lld"});
+    if (!toolPath.empty()) return toolPath;
 
-    // First search the current directory.
-    for (auto sysLinker : sysLinkers) {
-      if (llvm::sys::fs::exists(sysLinker)) {
-        llvm::SmallString<256> absolutePath(sysLinker);
-        llvm::sys::fs::make_absolute(absolutePath);
-        return std::string(absolutePath);
-      }
-    }
-
-    // Next search the environment path.
-    for (auto sysLinker : sysLinkers) {
-      if (auto result = llvm::sys::Process::FindInEnvPath("PATH", sysLinker)) {
-        return *result;
-      }
-    }
-
-    llvm::errs() << "No Unix linker tool specified or discovered";
+    llvm::errs() << "No Unix linker tool specified or discovered\n";
     return "";
   }
 

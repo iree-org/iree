@@ -110,6 +110,10 @@ class LinkerTool {
   // Runs the given command line on the shell, logging failures.
   LogicalResult runLinkCommand(const std::string& commandLine);
 
+  // Returns the path to the first tool in |toolNames| found in the environment.
+  std::string findToolInEnvironment(
+      SmallVector<std::string, 4> toolNames) const;
+
   llvm::Triple targetTriple;
   LLVMTargetOptions targetOptions;
 };
