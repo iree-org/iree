@@ -100,7 +100,15 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   // HLO -> Linalg on buffers.
   if (clEnableLLVMLinalgOnTensors) {
     nestedModulePM.addPass(createLinalgVectorizePass());
-    addLinalgBufferizePasses(nestedModulePM);
+    // Use stack allocation on CPU side.
+    WorkgroupMemoryAllocationFn allocationFn =
+        [](OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
+           MemRefType allocationType) {
+          MemRefType allocType = MemRefType::get(
+              allocationType.getShape(), allocationType.getElementType());
+          return builder.create<AllocaOp>(loc, allocType, dynamicSizes);
+        };
+    addLinalgBufferizePasses(nestedModulePM, allocationFn);
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     // Propagates dynamic shapes computation on tensors.
