@@ -470,7 +470,8 @@ typedef struct iree_status_handle_t* iree_status_t;
   ((iree_status_code_t)(((uintptr_t)(value)) & IREE_STATUS_CODE_MASK))
 
 // Macros to check the value of a status code.
-#define iree_status_is_ok(value) ((uintptr_t)(value) == IREE_STATUS_OK)
+#define iree_status_is_ok(value) \
+  IREE_LIKELY((uintptr_t)(value) == IREE_STATUS_OK)
 #define iree_status_is_cancelled(value) \
   (iree_status_code(value) == IREE_STATUS_CANCELLED)
 #define iree_status_is_unknown(value) \
