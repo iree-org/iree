@@ -22,43 +22,43 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-// Pass to combine instructions across ForOp boundary. It is common when doing
-// incremental lowering to generate transient ops that cancel each others out.
-// Canonicalization usually clean up those operations. When the value is loop
-// carried, MLIR canonicalization currently doesn't remove the redundant
-// operations.
-//
-// This pass allow to workaround MLIR limitation and does ad hoc clean up of
-// instructions found in IREE. Once we have a more general mechanism in MLIR
-// this pass can be completely removed.
-// This pass does this kind of transformation:
-// ```
-// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
-// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %21)
-//    -> vector<1x4xf32> {
-//    [...]
-//    %100 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
-//    [...]
-//    %109 = vector.shape_cast %108 : vector<4xf32> to vector<1x4xf32>
-//    scf.yield %109 : vector<1x4xf32>
-//  }
-//  %24 = vector.shape_cast %22 : vector<1x4xf32> to vector<4xf32>
-// ```
-// ->
-// ```
-// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %20)
-//    -> vector<4xf32> {
-//    [...]
-//    scf.yield %108 : vector<4xf32>
-//  }
-// ```
-
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
-class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
- public:
+
+/// Pattern to combine instructions across ForOp boundary. It is common when
+/// doing incremental lowering to generate transient ops that cancel each others
+/// out. Canonicalization usually clean up those operations. When the value is
+/// loop carried, MLIR canonicalization currently doesn't remove the redundant
+/// operations.
+///
+/// This pass allow to workaround MLIR limitation and does ad hoc clean up of
+/// instructions found in IREE. Once we have a more general mechanism in MLIR
+/// this pass can be completely removed.
+/// This pass does this kind of transformation:
+/// ```
+/// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %21)
+///    -> vector<1x4xf32> {
+///    [...]
+///    %100 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
+///    [...]
+///    %109 = vector.shape_cast %108 : vector<4xf32> to vector<1x4xf32>
+///    scf.yield %109 : vector<1x4xf32>
+///  }
+///  %24 = vector.shape_cast %22 : vector<1x4xf32> to vector<4xf32>
+/// ```
+/// ->
+/// ```
+/// %22 = scf.for %arg3 = %c0 to %c4096 step %c4 iter_args(%arg4 = %20)
+///    -> vector<4xf32> {
+///    [...]
+///    scf.yield %108 : vector<4xf32>
+///  }
+/// ```
+struct CanonicalizeForOpInductionVarShape final
+    : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
   Value FoldCarryDep(scf::ForOp forOp, Operation* ivUser,
@@ -108,7 +108,7 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
       mapping.map(it.value(), initArgs[it.index()]);
       initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
     }
-    if (iteratorFolded.empty()) return success();
+    if (iteratorFolded.empty()) return failure();
     auto newLoop =
         rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.lowerBound(),
                                     forOp.upperBound(), forOp.step(), initArgs);
@@ -132,15 +132,98 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
   }
 };
 
+/// An ad-hoc pattern to convert scf.for loop-carried values from
+/// `vector<8xf16>` to `vector<4xf32>` by inserting `vector.bitcast` around
+/// scf.for boundaries.
+///
+/// Those loop-carried values will be lowered into SPIR-V local variables. This
+/// pattern allows packing f16 values into f32 variables tightly so that we can
+/// generate shader conformant SPIR-V.
+struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                PatternRewriter& rewriter) const override {
+    VectorType v8f16Type = VectorType::get({8}, rewriter.getF16Type());
+    VectorType v4f32Type = VectorType::get({4}, rewriter.getF32Type());
+
+    SmallVector<unsigned, 8> ivIndices;
+    for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
+      if (it.value().getType() == v8f16Type) ivIndices.push_back(it.index());
+    }
+    if (ivIndices.empty()) return failure();
+
+    // Bit cast all init values from v8f16 to v4f32.
+    auto ivInitValues = llvm::to_vector<8>(forOp.getIterOperands());
+    for (unsigned index : ivIndices) {
+      Value oldValue = ivInitValues[index];
+      ivInitValues[index] = rewriter.create<vector::BitCastOp>(
+          oldValue.getLoc(), v4f32Type, oldValue);
+    }
+
+    // Create a new loop with the casted init values. This also creates
+    // induction variables with proper type.
+    auto newLoop = rewriter.create<scf::ForOp>(
+        forOp.getLoc(), forOp.lowerBound(), forOp.upperBound(), forOp.step(),
+        ivInitValues);
+
+    // Move all operations to the new for op. This also replaces block
+    // arguments. to the new block arguments.
+    rewriter.mergeBlocks(forOp.getBody(), newLoop.getBody(),
+                         newLoop.getBody()->getArguments());
+
+    // Bit cast induction variables back to the original type to fix uses.
+    rewriter.setInsertionPointToStart(newLoop.getBody());
+    for (unsigned index : ivIndices) {
+      Value newIv = newLoop.getRegionIterArgs()[index];
+      auto bitcastOp =
+          rewriter.create<vector::BitCastOp>(newIv.getLoc(), v8f16Type, newIv);
+      // Replace all uses of the new induction variable with a bitcast. We need
+      // to exclude the bitcast op itself given it also uses the induction
+      // variable.
+      SmallPtrSet<Operation*, 1> exceptions{bitcastOp};
+      newIv.replaceAllUsesExcept(bitcastOp, exceptions);
+    }
+
+    auto yieldOp = cast<scf::YieldOp>(newLoop.getBody()->getTerminator());
+    auto ivRetValues = llvm::to_vector<8>(yieldOp.getOperands());
+
+    // Bit cast return values to the new type to fix yield.
+    rewriter.setInsertionPoint(yieldOp);
+    for (unsigned index : ivIndices) {
+      Value oldRet = ivRetValues[index];
+      ivRetValues[index] = rewriter.create<vector::BitCastOp>(
+          oldRet.getLoc(), v4f32Type, oldRet);
+    }
+    yieldOp->setOperands(ivRetValues);
+
+    SmallVector<Value, 8> forRetValues;
+    for (Value result : newLoop.getResults()) forRetValues.push_back(result);
+
+    // Bit cast return values to the old type to fix for op uses.
+    rewriter.setInsertionPointAfter(newLoop);
+    for (unsigned index : ivIndices) {
+      Value oldRet = forRetValues[index];
+      forRetValues[index] = rewriter.create<vector::BitCastOp>(
+          oldRet.getLoc(), v8f16Type, oldRet);
+    }
+
+    rewriter.replaceOp(forOp, forRetValues);
+    return success();
+  }
+};
+
 struct ForOpCanonicalizationPass
     : PassWrapper<ForOpCanonicalizationPass, FunctionPass> {
   void runOnFunction() override {
     FuncOp fn = getFunction();
     OwningRewritePatternList patterns;
-    patterns.insert<ForOpArgFolding>(fn.getContext());
+    patterns.insert<CanonicalizeForOpInductionVarShape,
+                    PackForOpInductionVarVector>(fn.getContext());
     (void)applyPatternsAndFoldGreedily(fn, std::move(patterns));
   }
 };
+
 }  // namespace
 
 std::unique_ptr<FunctionPass> createForOpCanonicalizationPass() {
@@ -149,8 +232,8 @@ std::unique_ptr<FunctionPass> createForOpCanonicalizationPass() {
 
 static PassRegistration<ForOpCanonicalizationPass> pass(
     "iree-codegen-canonicalize-scf-for",
-    "An ad-hoc pass to canonicalize selected loop carried dependencies on "
-    "scf.for",
+    "An ad-hoc pass to canonicalize selected loop-carried values and "
+    "dependencies around scf.for",
     [] { return std::make_unique<ForOpCanonicalizationPass>(); });
 
 }  // namespace iree_compiler
