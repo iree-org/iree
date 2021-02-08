@@ -19,6 +19,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/test/emitc/arithmetic_ops.vmfb"
+#include "iree/vm/test/emitc/conversion_ops.vmfb"
 #include "iree/vm/test/emitc/shift_ops.vmfb"
 
 namespace {
@@ -47,6 +48,7 @@ std::vector<TestParams> GetModuleTestParams() {
   // TODO(simon-camp): get these automatically
   std::vector<ModuleDescription> modules = {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
+      {conversion_ops_descriptor_, conversion_ops_create},
       {shift_ops_descriptor_, shift_ops_create}};
 
   for (size_t i = 0; i < modules.size(); i++) {

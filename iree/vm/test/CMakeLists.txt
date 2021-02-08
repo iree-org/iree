@@ -26,6 +26,7 @@ iree_cc_embed_data(
     "arithmetic_ops_i64.vmfb"
     "comparison_ops.vmfb"
     "control_flow_ops.vmfb"
+    "conversion_ops.vmfb"
     "list_ops.vmfb"
     "shift_ops.vmfb"
   CC_FILE_OUTPUT
@@ -73,6 +74,16 @@ iree_bytecode_module(
     control_flow_ops
   SRC
     "control_flow_ops.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    conversion_ops
+  SRC
+    "conversion_ops.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
