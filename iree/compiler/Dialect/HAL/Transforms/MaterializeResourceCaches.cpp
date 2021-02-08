@@ -131,8 +131,8 @@ class MaterializeResourceCachesPass
 
     // We key the layout cache on all attributes that compose an executable
     // layout.
-    auto cacheKey = ArrayAttr::get({setLayoutsArrayAttr, pushConstantsAttr},
-                                   loc.getContext());
+    auto cacheKey = ArrayAttr::get(loc.getContext(),
+                                   {setLayoutsArrayAttr, pushConstantsAttr});
 
     auto existingIt = executableLayoutCache_.find(cacheKey);
     if (existingIt != executableLayoutCache_.end()) {
@@ -258,10 +258,10 @@ class MaterializeResourceCachesPass
 
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
           loc, ExecutableType::get(loc.getContext()), caseDeviceValue,
-          SymbolRefAttr::get(executableOp.sym_name(),
-                             {SymbolRefAttr::get(executableTargetOp.sym_name(),
-                                                 loc.getContext())},
-                             loc.getContext()),
+          SymbolRefAttr::get(
+              loc.getContext(), executableOp.sym_name(),
+              {SymbolRefAttr::get(loc.getContext(),
+                                  executableTargetOp.sym_name())}),
           executableLayoutValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);

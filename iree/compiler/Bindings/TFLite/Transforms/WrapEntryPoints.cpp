@@ -131,7 +131,7 @@ class WrapEntryPointsPass
     attrs.push_back(buildIONamesAttr(entryFuncOp));
     // TODO(#3972): tfl.io.quant: quantization information.
     // TODO(#3978): tfl.io.types: tensor types (complex/strings/etc).
-    auto reflectionAttr = DictionaryAttr::get(attrs, &getContext());
+    auto reflectionAttr = DictionaryAttr::get(&getContext(), attrs);
     wrapperFuncOp->setAttr("iree.reflection", reflectionAttr);
   }
 
@@ -163,7 +163,7 @@ class WrapEntryPointsPass
     }
     return NamedAttribute{
         Identifier::get("tfl.io.names", &getContext()),
-        StringAttr::get(llvm::join(pieces, ";"), &getContext())};
+        StringAttr::get(&getContext(), llvm::join(pieces, ";"))};
   }
 };
 

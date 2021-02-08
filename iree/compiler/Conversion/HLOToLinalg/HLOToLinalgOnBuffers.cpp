@@ -377,7 +377,7 @@ LogicalResult ConvOpConversion::apply(
     auto range = windowStrides->getAttributeValues();
     strides.append(range.begin(), range.end());
   }
-  auto stridesArg = ArrayAttr::get(strides, op.getContext());
+  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
 
   // TODO(ataei): Only support dilated convolution for now. We need to consider
   // LHS dilation for deconvolution cases.
@@ -386,7 +386,7 @@ LogicalResult ConvOpConversion::apply(
     auto range = rhsDilation->getAttributeValues();
     dilation.append(range.begin(), range.end());
   }
-  auto dilationArg = ArrayAttr::get(dilation, op.getContext());
+  auto dilationArg = ArrayAttr::get(op.getContext(), dilation);
 
   // Set padding only if it is non-zero.
   DenseIntElementsAttr padding = op.paddingAttr();
@@ -704,7 +704,7 @@ LogicalResult ReduceWindowOpConversion::apply(
                    op.window_strides().getValue().getAttributeValues().begin(),
                    op.window_strides().getValue().getAttributeValues().end());
   }
-  auto stridesArg = ArrayAttr::get(strides, op.getContext());
+  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
 
   // TODO(hanchung): Use template lambda after migrating to C++20.
   auto createOp = [&](auto *type_ptr) -> linalg::LinalgOp {
