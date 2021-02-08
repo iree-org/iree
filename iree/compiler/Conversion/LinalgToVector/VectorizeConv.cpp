@@ -96,7 +96,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
 
     int64_t numInputChannels = filterViewOp.getStaticSize(2);
     int64_t numOutputChannels = filterViewOp.getStaticSize(3);
-    if (numInputChannels != 4 || numOutputChannels % 4 != 0) return failure();
+    if (numInputChannels > 4 || numOutputChannels % 4 != 0) return failure();
 
     int64_t numOutputHeights = outputViewOp.getStaticSize(1);
     int64_t numOutputWidths = outputViewOp.getStaticSize(2);
@@ -120,6 +120,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
     auto filterVectorType =
         VectorType::get({numInputChannels, numOutputChannels}, elementType);
     auto vector1x4Type = VectorType::get({1, 4}, elementType);
+    auto inputVectorType = VectorType::get({1, numInputChannels}, elementType);
     Value zero = rewriter.createOrFold<ConstantIndexOp>(loc, 0);
 
     // Load the entire filter subview.
@@ -173,7 +174,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
         inputIndices[2] =
             rewriter.createOrFold<ConstantIndexOp>(loc, ow * widthStride);
         Value inputVector = rewriter.create<vector::TransferReadOp>(
-            loc, vector1x4Type, inputViewOp, inputIndices);
+            loc, inputVectorType, inputViewOp, inputIndices);
 
         for (int oc = 0; oc < numOutputChannels / 4; ++oc) {
           // Read in the initial value for this output vector.
