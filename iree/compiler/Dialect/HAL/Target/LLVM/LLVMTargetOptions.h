@@ -25,7 +25,7 @@ namespace HAL {
 
 // Defines kinds of Sanitizer as enum
 // the order in enum class should be same as one in flat buffer schema
-enum class SanitizerKind : unsigned char {
+enum class SanitizerKind {
   kNone = 0,
   kAddress,
 };
