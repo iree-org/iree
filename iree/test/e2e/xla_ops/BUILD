@@ -143,7 +143,6 @@ iree_check_single_backend_test_suite(
         "broadcast.mlir",
         "broadcast_add.mlir",
         "broadcast_in_dim.mlir",
-        # https://github.com/google/iree/issues/4692
         "clamp.mlir",
         "compare.mlir",
         # https://github.com/google/iree/issues/4079
@@ -154,7 +153,7 @@ iree_check_single_backend_test_suite(
         "cosine.mlir",
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
-        # "dot.mlir",
+        "dot.mlir",
         # "dot_general.mlir",
         "exponential.mlir",
         # https://github.com/google/iree/issues/4692
@@ -193,7 +192,6 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
-        "-iree-flow-dispatch-linalg-on-tensors-enable-fusion",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",

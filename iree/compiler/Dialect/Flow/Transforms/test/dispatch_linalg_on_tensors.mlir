@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass='tile-sizes=1,2 enable-fusion=true' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -iree-flow-dispatch-linalg-on-tensors-tile-sizes="1,2" -iree-flow-dispatch-linalg-on-tensors-enable-fusion-always -canonicalize -cse %s | IreeFileCheck %s
 
 // CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0) -> (2, -d0 + 4)>
 
