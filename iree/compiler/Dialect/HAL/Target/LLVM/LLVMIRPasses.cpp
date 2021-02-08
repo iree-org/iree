@@ -89,7 +89,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
 
-  if (options.sanitizerKind == LLVMTargetOptions::SanitizerKind::Address) {
+  if (options.sanitizerKind == SanitizerKind::kAddress) {
     bool compileKernel = false;
     bool recover = false;
     bool useAfterScope = true;

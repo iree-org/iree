@@ -23,6 +23,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// Defines kinds of Sanitizer as enum
+// the order in enum should be same as one in flat buffer schema
+enum SanitizerKind : unsigned char {
+  kNone = 0,
+  kAddress,
+};
+
 struct LLVMTargetOptions {
   // Target machine configuration.
   std::string targetTriple;
@@ -39,10 +46,8 @@ struct LLVMTargetOptions {
   // and benchmarking
   bool debugSymbols = true;
 
-  // Define and declare kinds of Sanitizer as enum
-  // the order in enum should be same as one in flat buffer schema
-  enum SanitizerKind { None = 0, Address };
-  SanitizerKind sanitizerKind = SanitizerKind::None;
+  // Sanitizer Kind for CPU Kernels
+  SanitizerKind sanitizerKind = SanitizerKind::kNone;
 
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on
