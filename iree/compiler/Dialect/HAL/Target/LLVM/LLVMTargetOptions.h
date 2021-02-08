@@ -24,8 +24,8 @@ namespace IREE {
 namespace HAL {
 
 // Defines kinds of Sanitizer as enum
-// the order in enum should be same as one in flat buffer schema
-enum SanitizerKind : unsigned char {
+// the order in enum class should be same as one in flat buffer schema
+enum class SanitizerKind : unsigned char {
   kNone = 0,
   kAddress,
 };
