@@ -209,3 +209,38 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
 //       NOCHECK:              flow.dispatch.output.store %[[RESULT_TILE_2]], %[[ARG7]]
 //       NOCHECK:          flow.return
 //       NOCHECK:        }
+
+// -----
+
+func @dot_general_lower() attributes {iree.module.export} {
+  %cst = constant dense<[[[3.000000e-01, 5.000000e-01]]]> : tensor<1x1x2xf32>
+  %cst_0 = constant dense<[[1.000000e-01, 2.000000e-01, 3.000000e-01], [4.000000e-01, 5.000000e-01, 6.000000e-01]]> : tensor<2x3xf32>
+  %cst_1 = constant dense<[[2.300000e-01, 3.100000e-01, 3.900000e-01]]> : tensor<1x3xf32>
+  %cst_2 = constant 0.000000e+00 : f32
+  %0 = iree.do_not_optimize(%cst) : tensor<1x1x2xf32>
+  %1 = iree.do_not_optimize(%cst_0) : tensor<2x3xf32>
+  %2 = linalg.tensor_reshape %0 [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d2)>] : tensor<1x1x2xf32> into tensor<1x2xf32>
+  %3 = linalg.init_tensor [1, 3] : tensor<1x3xf32>
+  %4 = linalg.fill(%3, %cst_2) : tensor<1x3xf32>, f32 -> tensor<1x3xf32>
+  %5 = linalg.matmul ins(%2, %1 : tensor<1x2xf32>, tensor<2x3xf32>) outs(%4 : tensor<1x3xf32>) -> tensor<1x3xf32>
+  check.expect_almost_eq(%5, %cst_1) : tensor<1x3xf32>
+  return
+}
+// CHECK-LABEL: func @dot_general_lower
+//       CHECK:   flow.dispatch.workgroups[%{{.+}}, %{{.+}}, %{{.+}}]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]] : !flow.dispatch.input<1x1x2xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]] : !flow.dispatch.input<2x3xf32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]] : !flow.dispatch.output<1x3xf32>
+//   CHECK-DAG:   %[[ZERO:.+]] = constant 0.0
+//       CHECK:   %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG0]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]]
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//   CHECK-DAG:       %[[LHS:.+]] = subtensor %[[RESHAPE]]
+//   CHECK-DAG:       %[[RHS:.+]] =  flow.dispatch.input.load %[[ARG1]]
+//       CHECK:       %[[INIT:.+]] = linalg.init
+//       CHECK:       %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[ZERO]])
+//       CHECK:       %[[RESULT:.+]] = linalg.matmul
+//  CHECK-SAME:         ins(%[[LHS]], %[[RHS]] : tensor<?x2xf32>, tensor<2x?xf32>)
+//  CHECK-SAME:         outs(%[[FILL]] : tensor<?x?xf32>)
+//       CHECK:       flow.dispatch.output.store %[[RESULT]], %[[ARG2]]
