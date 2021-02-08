@@ -23,8 +23,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Defines kinds of Sanitizer as enum
-// the order in enum class should be same as one in flat buffer schema
+// Defines kinds of Sanitizer
+// The order in enum class should be same as one in flat buffer schema
 enum class SanitizerKind {
   kNone = 0,
   kAddress,
