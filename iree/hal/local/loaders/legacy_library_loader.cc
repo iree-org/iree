@@ -306,7 +306,8 @@ static void iree_hal_legacy_executable_destroy(
 
 static iree_status_t iree_hal_legacy_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id) {
   iree_hal_legacy_executable_t* executable =
       (iree_hal_legacy_executable_t*)base_executable;
 
@@ -327,10 +328,11 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
                                       entry_point_name.size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  executable->entry_fns[ordinal](call->bindings, call->push_constants,
-                                 (const uint32_t*)&call->workgroup_id,
-                                 (const uint32_t*)&call->workgroup_count,
-                                 (const uint32_t*)&call->workgroup_size);
+  executable->entry_fns[ordinal](
+      dispatch_state->binding_ptrs, dispatch_state->push_constants,
+      (const uint32_t*)workgroup_id,
+      (const uint32_t*)&dispatch_state->workgroup_count,
+      (const uint32_t*)&dispatch_state->workgroup_size);
 
   IREE_TRACE_ZONE_END(z0);
 
