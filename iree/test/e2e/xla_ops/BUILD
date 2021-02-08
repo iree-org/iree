@@ -156,17 +156,15 @@ iree_check_single_backend_test_suite(
         "dot.mlir",
         # "dot_general.mlir",
         "exponential.mlir",
-        # https://github.com/google/iree/issues/4692
-        # "exponential_minus_one.mlir",
+        "exponential_minus_one.mlir",
         "floor.mlir",
         # https://github.com/google/iree/issues/4692
         # "gather.mlir",
         "iota.mlir",
         "log.mlir",
-        # https://github.com/google/iree/issues/4692
-        # "log_plus_one.mlir",
-        # "maximum.mlir",
-        # "minimum.mlir",
+        "log_plus_one.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
         "multiply.mlir",
         "negate.mlir",
         # https://github.com/google/iree/issues/4079
@@ -175,7 +173,7 @@ iree_check_single_backend_test_suite(
         # "reduce_window.mlir",
         "remainder.mlir",
         # "reshape.mlir",
-        # "reverse.mlir",
+        "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
