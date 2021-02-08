@@ -44,6 +44,29 @@ static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
 //===------------------------------------------------------------------===//
+// Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_trunc_i32i8(int32_t operand) {
+  return (uint8_t)((uint32_t)operand);
+};
+static inline int32_t vm_trunc_i32i16(int32_t operand) {
+  return (uint16_t)((uint32_t)operand);
+};
+static inline int32_t vm_ext_i8i32s(int32_t operand) {
+  return (int32_t)((int8_t)operand);
+};
+static inline int32_t vm_ext_i8i32u(int32_t operand) {
+  return (uint32_t)((uint8_t)operand);
+};
+static inline int32_t vm_ext_i16i32s(int32_t operand) {
+  return (int32_t)((int16_t)operand);
+};
+static inline int32_t vm_ext_i16i32u(int32_t operand) {
+  return (uint32_t)((uint16_t)operand);
+};
+
+//===------------------------------------------------------------------===//
 // Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
