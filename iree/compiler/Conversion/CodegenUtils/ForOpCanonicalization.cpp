@@ -181,8 +181,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
       // Replace all uses of the new induction variable with a bitcast. We need
       // to exclude the bitcast op itself given it also uses the induction
       // variable.
-      SmallPtrSet<Operation*, 1> exceptions;
-      exceptions.insert(bitcastOp);
+      SmallPtrSet<Operation*, 1> exceptions{bitcastOp};
       newIv.replaceAllUsesExcept(bitcastOp, exceptions);
     }
 
