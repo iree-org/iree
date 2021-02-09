@@ -976,6 +976,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
+// TODO: unify macros, eg. DISPATCH_OP_CORE_UNARY_I32
 #define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
   DISPATCH_OP(CORE, op_name, {                           \
     int32_t operand = VM_DecOperandRegI32("operand");    \
@@ -1007,19 +1008,12 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CAST_I32(op_name, op_func)   \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int32_t operand = VM_DecOperandRegI32("operand"); \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(operand);                       \
-  });
-
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I8, vm_trunc_i32i8);
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I16, vm_trunc_i32i16);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32S, vm_ext_i8i32s);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32U, vm_ext_i8i32u);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32S, vm_ext_i16i32s);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32U, vm_ext_i16i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I8, vm_trunc_i32i8);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I16, vm_trunc_i32i16);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32S, vm_ext_i8i32s);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32U, vm_ext_i8i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32S, vm_ext_i16i32s);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32U, vm_ext_i16i32u);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
