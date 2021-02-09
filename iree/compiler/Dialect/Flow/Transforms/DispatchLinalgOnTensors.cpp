@@ -353,8 +353,15 @@ void getUsedValuesDefinedAboveAfterCloningOps(
   }
   // The cloned operations form a DAG. Return the cloned operations in reverse
   // so the leaves come first, and can be cloned in-order into the dispatch
-  // region.
+  // region. Do the same for `valuesDefinedAbove` to keep return values
+  // consistent with order gotten from `mlir::getUsedValuesDefinedAbove` (more
+  // for a convention that correctness)
   clonedOps = llvm::to_vector<4>(llvm::reverse(clonedOps));
+  llvm::SetVector<Value> reverseValuesDefinedAbove;
+  for (auto value : llvm::reverse(valuesDefinedAbove)) {
+    reverseValuesDefinedAbove.insert(value);
+  }
+  std::swap(reverseValuesDefinedAbove, valuesDefinedAbove);
 }
 
 /// Returns a valid insertion point for an operation based on the values used.
