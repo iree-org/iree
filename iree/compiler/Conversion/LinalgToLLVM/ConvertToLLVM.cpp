@@ -56,118 +56,164 @@ namespace {
 // versions in the same compiled output.
 class HALDispatchABI {
  public:
-  static constexpr int kIndexPackedBuffer = 0;
-  static constexpr int kIndexPushConstant = 1;
-  static constexpr int kIndexWorkGroupId = 2;
-  static constexpr int kIndexWorkGroupCount = 3;
-  static constexpr int kIndexWorkGroupSize = 4;
+  // Returns a Type representing iree_hal_vec3_t.
+  static Type getVec3Type(MLIRContext *context) {
+    auto uint32Type = IntegerType::get(context, 32);
+    return LLVM::LLVMArrayType::get(uint32Type, 3);
+  }
+
+  // Matches the field order in iree_hal_executable_dispatch_state_v0_t.
+  enum class Field {
+    workgroup_count = 0,
+    workgroup_size = 1,
+    push_constant_count = 2,
+    push_constants = 3,
+    binding_count = 4,
+    binding_ptrs = 5,
+    binding_lengths = 6,
+  };
+
+  // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
+  static LLVM::LLVMStructType getDispatchStateType(
+      MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    auto structType = LLVM::LLVMStructType::getIdentified(
+        context, "iree_hal_executable_dispatch_state_v0_t");
+    if (structType.isInitialized()) return structType;
+
+    auto indexType = typeConverter->convertType(IndexType::get(context));
+    auto int8Type = IntegerType::get(context, 8);
+    auto uint32Type = IntegerType::get(context, 32);
+    auto vec3Type = getVec3Type(context);
+    SmallVector<Type, 4> fieldTypes;
+
+    // iree_hal_vec3_t workgroup_count;
+    // iree_hal_vec3_t workgroup_size;
+    fieldTypes.push_back(vec3Type);
+    fieldTypes.push_back(vec3Type);
+
+    // size_t push_constant_count;
+    // const uint32_t * push_constants;
+    fieldTypes.push_back(indexType);
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(uint32Type));
+
+    // size_t binding_count;
+    // void *const * binding_ptrs;
+    // const size_t * binding_lengths;
+    fieldTypes.push_back(indexType);
+    fieldTypes.push_back(
+        LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(int8Type)));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
+
+    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
+    assert(succeeded(bodySet) &&
+           "could not set the body of an identified struct");
+    (void)bodySet;
+
+    return structType;
+  }
 
   // Returns the types of the LLVM function inputs for the ABI.
   // This matches the signature of `iree_hal_executable_dispatch_v0_t` in
   // `iree/hal/local/executable_library.h`.
-  static SmallVector<Type, 5> getInputTypes(MLIRContext *context) {
-    // func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-    //          %push_constant: !llvm.ptr<i32>,
-    //          workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-    //          workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-    //          workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
-    auto indexTy = IntegerType::get(context, 32);
+  static SmallVector<Type, 5> getInputTypes(MLIRContext *context,
+                                            LLVMTypeConverter *typeConverter) {
     return SmallVector<Type, 5>{
-        // %packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>
+        // const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT
+        //   dispatch_state
         LLVM::LLVMPointerType::get(
-            LLVM::LLVMPointerType::get(IntegerType::get(context, 8))),
-        // %push_constant: !llvm.ptr<i32>
-        LLVM::LLVMPointerType::get(indexTy),
-        // %workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>
-        LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
-        // %workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>
-        LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
-        // %workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>
-        LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3))};
+            getDispatchStateType(context, typeConverter)),
+        // const iree_hal_vec3_t* IREE_RESTRICT workgroup_id
+        LLVM::LLVMPointerType::get(getVec3Type(context)),
+    };
   }
 
   explicit HALDispatchABI(LLVM::LLVMFuncOp &funcOp,
                           LLVMTypeConverter *typeConverter)
-      : funcOp(funcOp), typeConverter(typeConverter) {}
+      : funcOp(funcOp),
+        typeConverter(typeConverter),
+        dispatchStateType(
+            getDispatchStateType(funcOp.getContext(), typeConverter)) {}
 
   // Loads the workgroup_id[dim] value (XYZ) and casts it to |resultType|.
   Value loadWorkgroupID(Location loc, int32_t dim, Type resultType,
                         OpBuilder &builder) {
-    auto xyzArrayPtr = funcOp.getArgument(kIndexWorkGroupId);
-    auto xyzArrayValue = builder.createOrFold<LLVM::LoadOp>(loc, xyzArrayPtr);
+    auto workgroupIdPtrValue = funcOp.getArgument(1);
+    auto workgroupIdValue =
+        builder.createOrFold<LLVM::LoadOp>(loc, workgroupIdPtrValue);
     auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, builder.getIntegerType(32), xyzArrayValue,
-        builder.getI32ArrayAttr({dim}));
+        loc, builder.getIntegerType(32), workgroupIdValue,
+        builder.getI64ArrayAttr({dim}));
     return castValueToType(loc, dimValue, resultType, builder);
   }
 
   // Loads the workgroup_count[dim] value (XYZ) and casts it to |resultType|.
   Value loadWorkgroupCount(Location loc, int32_t dim, Type resultType,
                            OpBuilder &builder) {
-    auto xyzArrayPtr = funcOp.getArgument(kIndexWorkGroupCount);
-    auto xyzArrayValue = builder.createOrFold<LLVM::LoadOp>(loc, xyzArrayPtr);
+    auto workgroupCountValue =
+        loadFieldValue(loc, Field::workgroup_count, builder);
     auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, builder.getIntegerType(32), xyzArrayValue,
-        builder.getI32ArrayAttr({dim}));
+        loc, builder.getIntegerType(32), workgroupCountValue,
+        builder.getI64ArrayAttr(dim));
     return castValueToType(loc, dimValue, resultType, builder);
   }
 
   // Loads the workgroup_size[dim] value (XYZ) and casts it to |resultType|.
   Value loadWorkgroupSize(Location loc, int32_t dim, Type resultType,
                           OpBuilder &builder) {
-    auto xyzArrayPtr = funcOp.getArgument(kIndexWorkGroupSize);
-    auto xyzArrayValue = builder.createOrFold<LLVM::LoadOp>(loc, xyzArrayPtr);
+    auto workgroupSizeValue =
+        loadFieldValue(loc, Field::workgroup_size, builder);
     auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, builder.getIntegerType(32), xyzArrayValue,
-        builder.getI32ArrayAttr({dim}));
+        loc, builder.getIntegerType(32), workgroupSizeValue,
+        builder.getI64ArrayAttr(dim));
     return castValueToType(loc, dimValue, resultType, builder);
   }
 
   // Returns the total push constant count as an index-converted type.
   Value loadPushConstantCount(Location loc, OpBuilder &builder) {
-    // TODO(#3580): switch to the executable_library ABI.
-    assert(false && "not yet implemented");
-    return {};
+    auto value = loadFieldValue(loc, Field::push_constant_count, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
   }
 
   // Loads a push constant at |offset| and casts it to |resultType|.
   Value loadPushConstant(Location loc, int64_t offset, Type resultType,
                          OpBuilder &builder) {
-    Value offsetValue = builder.create<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(builder.getIndexType()),
-        builder.create<ConstantIndexOp>(loc, offset));
-    Value pushConstantPtrValue = builder.create<LLVM::GEPOp>(
-        loc, funcOp.getArgument(kIndexPushConstant).getType(),
-        funcOp.getArgument(kIndexPushConstant), offsetValue);
-    Value pushConstantValue =
-        builder.create<LLVM::LoadOp>(loc, pushConstantPtrValue);
-    return castValueToType(loc, pushConstantValue, resultType, builder);
+    auto constantsPtrValue =
+        loadFieldValue(loc, Field::push_constants, builder);
+    auto offsetValue = getIndexValue(loc, offset, builder);
+    Value constantPtrValue = builder.create<LLVM::GEPOp>(
+        loc, constantsPtrValue.getType(), constantsPtrValue, offsetValue);
+    Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+    return castValueToType(loc, constantValue, resultType, builder);
   }
 
   // Returns the total binding count as an index-converted type.
   Value loadBindingCount(Location loc, OpBuilder &builder) {
-    // TODO(#3580): switch to the executable_library ABI.
-    assert(false && "not yet implemented");
-    return {};
+    auto value = loadFieldValue(loc, Field::binding_count, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
   }
 
   // Loads the base pointer of the binding |ordinal| as an `i8**`.
   // Equivalent to:
   //   int8_t** base_ptr = &state->binding_ptrs[ordinal];
   Value loadBindingPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
-    Value ordinalValue = builder.createOrFold<LLVM::DialectCastOp>(
-        loc, typeConverter->convertType(builder.getIndexType()),
-        builder.create<ConstantIndexOp>(loc, ordinal));
-    return builder.createOrFold<LLVM::GEPOp>(
-        loc, funcOp.getArgument(kIndexPackedBuffer).getType(),
-        funcOp.getArgument(kIndexPackedBuffer), ordinalValue);
+    auto ptrsPtrValue = loadFieldValue(loc, Field::binding_ptrs, builder);
+    auto ordinalValue = getIndexValue(loc, ordinal, builder);
+    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, ptrsPtrValue.getType(), ptrsPtrValue, ordinalValue);
+    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
   }
 
   // Loads the byte length of the binding |ordinal| as an index-converted type.
   Value loadBindingLength(Location loc, int64_t ordinal, OpBuilder &builder) {
-    // TODO(#3580): switch to the executable_library ABI.
-    assert(false && "not yet implemented");
-    return {};
+    auto lengthsPtrValue = loadFieldValue(loc, Field::binding_lengths, builder);
+    auto ordinalValue = getIndexValue(loc, ordinal, builder);
+    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, lengthsPtrValue.getType(), lengthsPtrValue, ordinalValue);
+    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
   }
 
   // Loads a binding as a constructed MemRefDescriptor.
@@ -176,8 +222,7 @@ class HALDispatchABI {
                                Value baseOffsetValue, MemRefType memRefType,
                                OpBuilder &builder) {
     // Load the base buffer pointer in the appropriate type (f32*, etc).
-    Value opaqueBasePtrValue = loadBindingPtr(loc, ordinal, builder);
-    Value basePtrValue = builder.create<LLVM::LoadOp>(loc, opaqueBasePtrValue);
+    Value basePtrValue = loadBindingPtr(loc, ordinal, builder);
 
     // Adjust by baseOffset (if needed).
     if (baseOffsetValue) {
@@ -211,6 +256,20 @@ class HALDispatchABI {
   }
 
  private:
+  Value loadFieldValue(Location loc, Field field, OpBuilder &builder) {
+    auto statePtrValue = funcOp.getArgument(0);
+    auto stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
+    auto fieldType = dispatchStateType.getBody()[(int)field];
+    return builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, fieldType, stateValue, builder.getI64ArrayAttr((int)field));
+  }
+
+  Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
+    return builder.createOrFold<LLVM::DialectCastOp>(
+        loc, typeConverter->convertType(builder.getIndexType()),
+        builder.createOrFold<ConstantIndexOp>(loc, value));
+  }
+
   Value castValueToType(Location loc, Value value, Type resultType,
                         OpBuilder &builder) {
     // NOTE: we should handle more cases here (and proper sign extension).
@@ -220,6 +279,7 @@ class HALDispatchABI {
 
   LLVM::LLVMFuncOp funcOp;
   LLVMTypeConverter *typeConverter;
+  LLVM::LLVMStructType dispatchStateType;
 };
 
 /// Converts Standard MLIR FuncOps to LLVMFuncOps matching the IREE HAL ABI.
@@ -268,7 +328,8 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     // Convert the function signature to take the HAL ABI LLVM pointers.
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     MLIRContext *context = rewriter.getContext();
-    auto abiInputTypes = HALDispatchABI::getInputTypes(context);
+    auto abiInputTypes =
+        HALDispatchABI::getInputTypes(context, getTypeConverter());
     signatureConverter.addInputs(abiInputTypes);
 
     // Copy all attributes onto the LLVM function except the ones handled by

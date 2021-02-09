@@ -88,12 +88,6 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
 // iree_hal_legacy_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef void (*iree_hal_legacy_executable_fn_ptr_t)(void* const*,
-                                                    const uint32_t*,
-                                                    const uint32_t*,
-                                                    const uint32_t*,
-                                                    const uint32_t*);
-
 typedef struct {
   iree_hal_local_executable_t base;
 
@@ -110,7 +104,7 @@ typedef struct {
 
   // Resolved entry points from the dynamic library.
   iree_host_size_t entry_fn_count;
-  iree_hal_legacy_executable_fn_ptr_t entry_fns[];
+  iree_hal_executable_dispatch_v0_t entry_fns[];
 } iree_hal_legacy_executable_t;
 
 extern const iree_hal_local_executable_vtable_t
@@ -204,7 +198,7 @@ static iree_status_t iree_hal_legacy_executable_resolve_symbols(
           "symbol %s not exported by the dynamic library, check visibility",
           entry_point_str);
     }
-    executable->entry_fns[i] = (iree_hal_legacy_executable_fn_ptr_t)symbol;
+    executable->entry_fns[i] = (iree_hal_executable_dispatch_v0_t)symbol;
   }
   return iree_ok_status();
 }
@@ -328,11 +322,7 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
                                       entry_point_name.size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  executable->entry_fns[ordinal](
-      dispatch_state->binding_ptrs, dispatch_state->push_constants,
-      (const uint32_t*)workgroup_id,
-      (const uint32_t*)&dispatch_state->workgroup_count,
-      (const uint32_t*)&dispatch_state->workgroup_size);
+  executable->entry_fns[ordinal](dispatch_state, workgroup_id);
 
   IREE_TRACE_ZONE_END(z0);
 
