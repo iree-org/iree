@@ -87,11 +87,11 @@ class ConvertFunctionMetadataPass
     }
     for (unsigned i = 0; i < inputNames.size(); ++i) {
       funcOp.setArgAttr(i, "iree.identifier",
-                        StringAttr::get(inputNames[i], &getContext()));
+                        StringAttr::get(&getContext(), inputNames[i]));
     }
     for (unsigned i = 0; i < outputNames.size(); ++i) {
       funcOp.setResultAttr(i, "iree.identifier",
-                           StringAttr::get(outputNames[i], &getContext()));
+                           StringAttr::get(&getContext(), outputNames[i]));
     }
   }
 };

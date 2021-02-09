@@ -177,7 +177,7 @@ spirv::ResourceLimitsAttr convertResourceLimits(
       vkCapabilities.maxComputeSharedMemorySize(),
       vkCapabilities.maxComputeWorkGroupInvocations(),
       vkCapabilities.maxComputeWorkGroupSize(), vkCapabilities.subgroupSize(),
-      ArrayAttr::get(spvAttrs, context), context);
+      ArrayAttr::get(context, spvAttrs), context);
 }
 }  // anonymous namespace
 

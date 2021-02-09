@@ -1128,7 +1128,7 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
     }
   } while (succeeded(parser.parseOptionalComma()));
   result->addAttribute("conditions",
-                       ArrayAttr::get(conditionAttrs, result->getContext()));
+                       ArrayAttr::get(result->getContext(), conditionAttrs));
 
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
