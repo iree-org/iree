@@ -328,45 +328,36 @@ bool isAlwaysClonedIntoDispatchOp(Operation *op) {
 
 /// Computes the values that will be eventually be used within the dispatch
 /// workgroup op but defined outside the op after all clonable operations are
-/// cloned into the region. Returns (by reference) the clonable operations too.
+/// cloned into the region. Returns (by reference) the clonable operations too,
+/// in order in which they can be cloned within the region to satisfy use-def
+/// relationships between them.
 void getUsedValuesDefinedAboveAfterCloningOps(
-    Region &region, OpBuilder &b, llvm::SetVector<Value> &valuesDefinedAbove,
-    llvm::SetVector<Operation *> &clonedOps) {
+    Region &region, llvm::SetVector<Value> &valuesDefinedAbove,
+    llvm::SmallVector<Operation *, 4> &clonedOps) {
   mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPointToStart(&region.front());
-  llvm::SetVector<Operation *> tempClonedOps;
-  for (Value operand : valuesDefinedAbove) {
-    Operation *definingOp = operand.getDefiningOp();
-    if (!definingOp || !isAlwaysClonedIntoDispatchOp(definingOp)) continue;
-    clonedOps.insert(definingOp);
-    // Temporarily clone this operation. This is just so that when the values
-    // defined from above is recomputed, we get the actual values that need to
-    // be captured as arguments. Fairly hacky, but anything more sophisticated
-    // will require computing multiple backward slices. These ops will be
-    // removed after the used values defined from above are recomputed and
-    // reinserted at the right position.
-    auto clonedOp = b.clone(*definingOp);
-    tempClonedOps.insert(clonedOp);
-  }
-
-  // Recompute the values captured from outside.
+  llvm::SetVector<Value> visited;
+  SmallVector<Value, 4> worklist;
+  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
   valuesDefinedAbove.clear();
-  mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
-
-  // Prune the set of values that are defined by cloned operations.
-  for (auto clonedOp : clonedOps) {
-    for (Value result : clonedOp->getResults()) {
-      valuesDefinedAbove.remove(result);
+  while (!worklist.empty()) {
+    Value outsideValue = worklist.pop_back_val();
+    if (visited.count(outsideValue)) continue;
+    visited.insert(outsideValue);
+    Operation *definingOp = outsideValue.getDefiningOp();
+    if (!definingOp || !isAlwaysClonedIntoDispatchOp(definingOp)) {
+      valuesDefinedAbove.insert(outsideValue);
+      continue;
     }
+    clonedOps.push_back(definingOp);
+    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
   }
-
-  // Remove the temporarily cloned operations.
-  for (auto tempClonedOp : tempClonedOps) {
-    tempClonedOp->erase();
-  }
+  // The cloned operations form a DAG. Return the cloned operations in reverse
+  // so the leaves come first, and can be cloned in-order into the dispatch
+  // region.
+  clonedOps = llvm::to_vector<4>(llvm::reverse(clonedOps));
 }
 
+/// Returns a valid insertion point for an operation based on the values used.
 static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
   Operation *insertAfter = &block.front();
   for (auto value : usedValues) {
@@ -392,7 +383,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
   llvm::SetVector<Value> valuesDefinedAbove;
-  llvm::SetVector<Operation *> clonedOps;
+  llvm::SmallVector<Operation *, 4> clonedOps;
   getUsedValuesDefinedAboveAfterCloningOps(dispatchOp.body(), b,
                                            valuesDefinedAbove, clonedOps);
 
@@ -418,15 +409,14 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     map.map(operand, repl);
   }
 
-  // The only existing argument are for the outputs. Just need to add a new
-  // argument for the outpts and remap the value to use the new argument.
+  // The only existing arguments are for the outputs. Just need to add a new
+  // argument for the outputs and remap the value to use the new argument.
   for (auto ba : block.getArguments().take_front(numOldBBArgs)) {
     assert(ba.getType().isa<IREE::Flow::DispatchOutputType>());
     map.map(ba, block.addArgument(ba.getType()));
   }
 
-  auto getUsesOfValueOutsideOfDispatchOp =
-      [&](Value v) -> SmallPtrSet<Operation *, 4> {
+  auto getUsesOfValueOutsideOfDispatchOp = [&](Value v) {
     SmallPtrSet<Operation *, 4> res;
     for (Operation *user : v.getUsers())
       if (!dispatchOp->isAncestor(user)) res.insert(user);
@@ -445,11 +435,12 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     Operation *insertionPoint = getInsertionPoint(block, clonedOpOperands);
     if (!insertionPoint) {
       return op->emitOpError(
-          "failed to clone operation into dispatch workgroup op");
+          "failed to find insetion point within dispatch workgroup op for "
+          "cloned operation");
     }
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(insertionPoint);
-    Operation *clonedOp = b.clone(*op, map);
+    b.clone(*op, map);
     for (Value result : op->getResults()) {
       auto uses = getUsesOfValueOutsideOfDispatchOp(result);
       result.replaceAllUsesExcept(map.lookup(result), uses);
@@ -617,9 +608,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // proper captures.
   if (funcOp
           .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
-            return succeeded(legalizeDispatchWorkgroupOperands(op))
-                       ? WalkResult::advance()
-                       : WalkResult::interrupt();
+            return legalizeDispatchWorkgroupOperands(op);
           })
           .wasInterrupted()) {
     return signalPassFailure();
