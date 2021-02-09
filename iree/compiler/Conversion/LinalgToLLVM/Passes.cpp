@@ -117,6 +117,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
         Shape::createMaterializeShapeCalculationsPass());
     nestedModulePM.addNestedPass<FuncOp>(
         Shape::createHoistShapeCalculationsPass());
+    nestedModulePM.addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
     nestedModulePM.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(nestedModulePM);
   }
