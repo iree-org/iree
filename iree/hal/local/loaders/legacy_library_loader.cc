@@ -86,12 +86,13 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
     case iree_SanitizerKind_None:
       break;
     case iree_SanitizerKind_Address: {
-      if (!IREE_SANITIZER_ADDRESS)
+      if (!IREE_SANITIZER_ADDRESS) {
         return iree_make_status(
             IREE_STATUS_UNAVAILABLE,
             "Dynamic library executable is compiled with ASAN support, but "
-            "this "
-            "host application failed to enable ASAN to load this executable");
+            "this host application failed to enable ASAN to load this "
+            "executable");
+      }
     } break;
   }
 
