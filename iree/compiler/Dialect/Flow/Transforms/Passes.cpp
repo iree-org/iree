@@ -62,16 +62,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert TOSA ops to Linalg-on-tensor ops.
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 
-  // Frontload linalg-on-tensors transformations and dispatch region creation.
-  if (clEnableLinalgOnTensorsDispatch) {
-    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
-    // will break VMLA backend.
-    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
-    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-    addHLOToLinalgOnTensorsPasses(passManager);
-    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
-  }
-
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
   //
@@ -191,6 +181,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
+
+  if (clEnableLinalgOnTensorsDispatch) {
+    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
+    // will break VMLA backend.
+    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    addHLOToLinalgOnTensorsPasses(passManager);
+    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
+  }
 
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only
