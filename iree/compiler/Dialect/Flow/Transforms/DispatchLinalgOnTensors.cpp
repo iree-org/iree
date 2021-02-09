@@ -607,7 +607,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.
   if (funcOp
-          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
+          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
             return legalizeDispatchWorkgroupOperands(op);
           })
           .wasInterrupted()) {
