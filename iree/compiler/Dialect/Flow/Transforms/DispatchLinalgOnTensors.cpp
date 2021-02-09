@@ -384,7 +384,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
 
   llvm::SetVector<Value> valuesDefinedAbove;
   llvm::SmallVector<Operation *, 4> clonedOps;
-  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp.body(), b,
+  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp.body(),
                                            valuesDefinedAbove, clonedOps);
 
   BlockAndValueMapping map;
