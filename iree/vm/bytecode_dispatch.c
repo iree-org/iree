@@ -976,44 +976,28 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-// TODO: unify macros, eg. DISPATCH_OP_CORE_UNARY_I32
-#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                           \
-    int32_t operand = VM_DecOperandRegI32("operand");    \
-    int32_t* result = VM_DecResultRegI32("result");      \
-    *result = op_func(operand);                          \
-  });
-
-#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                            \
-    int32_t lhs = VM_DecOperandRegI32("lhs");             \
-    int32_t rhs = VM_DecOperandRegI32("rhs");             \
-    int32_t* result = VM_DecResultRegI32("result");       \
-    *result = op_func(lhs, rhs);                          \
-  });
-
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, vm_add_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, vm_sub_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, vm_mul_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, vm_div_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, vm_div_i32u);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, vm_rem_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, vm_rem_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, vm_not_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, vm_and_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, vm_or_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, vm_xor_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AddI32, vm_add_i32);
+    DISPATCH_OP_CORE_BINARY_I32(SubI32, vm_sub_i32);
+    DISPATCH_OP_CORE_BINARY_I32(MulI32, vm_mul_i32);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32S, vm_div_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
+    DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
+    DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I8, vm_trunc_i32i8);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I16, vm_trunc_i32i16);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32S, vm_ext_i8i32s);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32U, vm_ext_i8i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32S, vm_ext_i16i32s);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32U, vm_ext_i16i32u);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I8, vm_trunc_i32i8);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I16, vm_trunc_i32i16);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32S, vm_ext_i8i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32U, vm_ext_i8i32u);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32S, vm_ext_i16i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32U, vm_ext_i16i32u);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -1035,11 +1019,11 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpEQI32, vm_cmp_eq_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpNEI32, vm_cmp_ne_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32S, vm_cmp_lt_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32U, vm_cmp_lt_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(CmpNZI32, vm_cmp_nz_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpEQI32, vm_cmp_eq_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpNEI32, vm_cmp_ne_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(CmpNZI32, vm_cmp_nz_i32);
 
     DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;
