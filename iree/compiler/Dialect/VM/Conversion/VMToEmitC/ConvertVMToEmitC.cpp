@@ -96,15 +96,23 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::ShrI32UOp>>(context,
                                                          "vm_shr_i32u");
 
+  // Comparison ops
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQI32Op>>(context,
+                                                          "vm_cmp_eq_i32");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEI32Op>>(context,
+                                                          "vm_cmp_ne_i32");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI32SOp>>(context,
+                                                           "vm_cmp_lt_i32s");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI32UOp>>(context,
+                                                           "vm_cmp_lt_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNZI32Op>>(context,
+                                                          "vm_cmp_nz_i32");
+
   // Check
   // TODO(simon-camp): These conversions to macro calls should be deleted once
   // support for control flow ops has landed in the c module target
   patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
                                                          "VM_CHECK_EQ");
-
-  // Compare
-  patterns.insert<CallOpConversion<IREE::VM::CmpNEI32Op>>(context,
-                                                          "vm_cmp_ne_i32");
 
   // Const
   patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
@@ -152,13 +160,17 @@ class ConvertVMToEmitCPass
     target.addIllegalOp<IREE::VM::ShrI32SOp>();
     target.addIllegalOp<IREE::VM::ShrI32UOp>();
 
+    // Comparison ops
+    target.addIllegalOp<IREE::VM::CmpEQI32Op>();
+    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
+    target.addIllegalOp<IREE::VM::CmpLTI32SOp>();
+    target.addIllegalOp<IREE::VM::CmpLTI32UOp>();
+    target.addIllegalOp<IREE::VM::CmpNZI32Op>();
+
     // Check ops
     // TODO(simon-camp): These conversions to macro calls should be deleted once
     // support for control flow ops has landed in the c module target
     target.addIllegalOp<IREE::VM::CheckEQOp>();
-
-    // Compare ops
-    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
 
     // Const ops
     target.addIllegalOp<IREE::VM::ConstI32Op>();

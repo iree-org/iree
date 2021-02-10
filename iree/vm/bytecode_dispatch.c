@@ -1041,23 +1041,11 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CMP_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                      \
-    int32_t lhs = VM_DecOperandRegI32("lhs");       \
-    int32_t rhs = VM_DecOperandRegI32("rhs");       \
-    int32_t* result = VM_DecResultRegI32("result"); \
-    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;   \
-  });
-
-    DISPATCH_OP_CORE_CMP_I32(CmpEQI32, int32_t, ==);
-    DISPATCH_OP_CORE_CMP_I32(CmpNEI32, int32_t, !=);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32S, int32_t, <);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP(CORE, CmpNZI32, {
-      int32_t operand = VM_DecOperandRegI32("operand");
-      int32_t* result = VM_DecResultRegI32("result");
-      *result = (operand != 0) ? 1 : 0;
-    });
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpEQI32, vm_cmp_eq_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpNEI32, vm_cmp_ne_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(CmpNZI32, vm_cmp_nz_i32);
 
     DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;
