@@ -15,8 +15,10 @@
 # Import the TF bazelrc config
 try-import %workspace%/../../third_party/tensorflow/.bazelrc
 
-# Non-monolithic builds are basically broken outside of the TF repository
-build --config=monolithic
+# Linking in the TF shared object with tf_cc_binary in non-monolithic mode
+# violates TF's visibility restrictions. We can investigate fixing this
+# upstream. In the meantime, this is easier.
+build --nocheck_visibility
 # Disk cache is incompatible with remote execution and caching.
 build:rbe --disk_cache=''
 
