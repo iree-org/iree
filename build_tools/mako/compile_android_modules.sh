@@ -58,6 +58,10 @@ do
   extra_flags=()
   case "${target}" in
     "dylib-llvm-aot")
+      # Note: this should match the phones the benchmarks will be run on.
+      # We could pass it in as an option or query the min/max in $ANDROID_NDK,
+      # but that will only be worth it if this script is used in different
+      # environments or for benchmarking on different phones.
       extra_flags+=('--iree-llvm-target-triple=aarch64-none-linux-android29')
       ;;
     *)
