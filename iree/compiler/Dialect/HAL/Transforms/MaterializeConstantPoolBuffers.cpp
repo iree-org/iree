@@ -95,7 +95,7 @@ class MaterializeConstantPoolBuffersPass
     // Find all the spans in the pool that map into this storage buffer so that
     // we can update them with their runtime offsets. Note that since we are
     // uploading 1:1 today all the offsets are the same as their storage ones.
-    auto variableSymRef = SymbolRefAttr::get(variableOp.getName(), context);
+    auto variableSymRef = SymbolRefAttr::get(context, variableOp.getName());
     for (auto spanOp : poolOp.getOps<ConstantPoolSpanOp>()) {
       if (spanOp.storage_buffer().getLeafReference() != storageOp.getName()) {
         continue;
@@ -108,7 +108,7 @@ class MaterializeConstantPoolBuffersPass
         variableOp.getName(), storageOp, poolOp.buffer_constraints());
     moduleSymbolTable.insert(initializerFunc, insertionPoint);
     variableOp.initializerAttr(
-        SymbolRefAttr::get(initializerFunc.getName(), context));
+        SymbolRefAttr::get(context, initializerFunc.getName()));
   }
 
   // Creates an initializer function that unpacks the given storage op into a
@@ -183,7 +183,7 @@ class MaterializeConstantPoolBuffersPass
     // Compute the ranges for all the splats at runtime and the required buffer
     // size based on the constraints provided.
     auto bufferConstraints = poolOp.buffer_constraints();
-    auto variableSymRef = SymbolRefAttr::get(variableOp.getName(), context);
+    auto variableSymRef = SymbolRefAttr::get(context, variableOp.getName());
     uint64_t bufferLength = 0;
     for (auto splatOp : poolOp.getOps<ConstantPoolSplatOp>()) {
       uint64_t splatOffset =
@@ -214,7 +214,7 @@ class MaterializeConstantPoolBuffersPass
         variableOp.getLoc(), variableOp.getName(), splatOps, bufferLength);
     moduleSymbolTable.insert(initializerFunc, insertionPoint);
     variableOp.initializerAttr(
-        SymbolRefAttr::get(initializerFunc.getName(), context));
+        SymbolRefAttr::get(context, initializerFunc.getName()));
   }
 
   // Creates an initializer function that allocates the runtime buffer and

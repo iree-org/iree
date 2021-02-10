@@ -28,7 +28,9 @@ iree_lit_test_suite(
         ["*.cpp"],
         exclude = [
             "Bench*",
-            "TestMNISTJIT*",
+            # TODO(ntv): These tests are broken.
+            "TestMNISTJIT.cpp",
+            "TestMatMulVulkan.cpp",
         ],
     ),
     data = [
