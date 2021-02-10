@@ -80,16 +80,23 @@ static unsigned calculateMemrefVecSize(SmallVectorImpl<Operation *> &uses) {
 static unsigned isMemRefAndVectorizable(Value v,
                                         SmallVectorImpl<Operation *> &uses) {
   auto memrefType = v.getType().dyn_cast<MemRefType>();
-  // To be able to vectorize the memref it needs to be a scalar memref with a
-  // static most inner dimension aligned on the vectorization size.
-  if (memrefType && !memrefType.getElementType().isa<VectorType>() &&
-      (kMaxVectorizationSizeInBits % memrefType.getElementTypeBitWidth() ==
-       0) &&
-      memrefType.getRank() > 0 &&
-      !ShapedType::isDynamic(memrefType.getShape().back()) &&
-      getUsesIfAllTransferOp(v, uses)) {
-    return calculateMemrefVecSize(uses);
-  }
+
+  // Require scalar element type
+  if (!memrefType || memrefType.getElementType().isa<VectorType>()) return 0;
+
+  // Require static innermost dimension.
+  if (memrefType.getRank() == 0 ||
+      ShapedType::isDynamic(memrefType.getShape().back()))
+    return 0;
+
+  // If we have an odd number of elements, it will require padding in the
+  // buffer.
+  if (memrefType.getShape().back() % 2 != 0) return 0;
+
+  if (kMaxVectorizationSizeInBits % memrefType.getElementTypeBitWidth() != 0)
+    return 0;
+
+  if (getUsesIfAllTransferOp(v, uses)) return calculateMemrefVecSize(uses);
   return 0;
 }
 
