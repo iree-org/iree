@@ -49,51 +49,12 @@ namespace VM {
 
 namespace {
 
-struct ModuleCounts {
-  int importFuncs = 0;
-  int exportFuncs = 0;
-  int internalFuncs = 0;
-  size_t globalBytes = 0;
-  int globalRefs = 0;
-  int rodatas = 0;
-  int rwdatas = 0;
-};
-
 struct TypeDef {
   Type type;
   std::string full_name;
 };
 
 }  // namespace
-
-// Computes symbol counts within the given |moduleOp|.
-// These counts, including the global byte reservation count, are expected to
-// match the actual values during serialization.
-//
-// Preconditions:
-//  - OrdinalAllocationPass has run on the module
-//  - All ordinals start from 0 and are contiguous
-static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
-  ModuleCounts counts;
-  for (auto &op : moduleOp.getBlock().getOperations()) {
-    if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
-      ++counts.internalFuncs;
-    } else if (isa<IREE::VM::ExportOp>(op)) {
-      ++counts.exportFuncs;
-    } else if (isa<IREE::VM::ImportOp>(op)) {
-      ++counts.importFuncs;
-    } else if (isa<IREE::VM::RodataOp>(op)) {
-      ++counts.rodatas;
-    } else if (isa<IREE::VM::GlobalRefOp>(op)) {
-      ++counts.globalRefs;
-    } else if (auto globalOp = dyn_cast<VMGlobalOp>(op)) {
-      counts.globalBytes =
-          std::max(counts.globalBytes,
-                   globalOp.getOrdinal() + globalOp.getStorageSize());
-    }
-  }
-  return counts;
-}
 
 // Finds all types in the module and builds a type table mapping the index in
 // the vector to the type represented by the type ordinal.
@@ -314,17 +275,34 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
                                            IREE::VM::ModuleOp moduleOp,
                                            FlatbufferBuilder &fbb) {
   SymbolTable symbolTable(moduleOp);
-  auto symbolCounts = computeModuleSymbolCounts(moduleOp);
+  if (!moduleOp.ordinal_counts().hasValue()) {
+    return moduleOp.emitError() << "ordinal_counts attribute not found. The "
+                                   "OrdinalAllocationPass must be run before.";
+  }
+  DictionaryAttr ordinalCounts = moduleOp.ordinal_counts().getValue();
 
   // Find all structural ops in the module.
   std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
   std::vector<IREE::VM::RodataOp> rodataOps;
-  importFuncOps.resize(symbolCounts.importFuncs);
-  exportFuncOps.resize(symbolCounts.exportFuncs);
-  internalFuncOps.resize(symbolCounts.internalFuncs);
-  rodataOps.resize(symbolCounts.rodatas);
+  importFuncOps.resize(ordinalCounts.get("import_funcs")
+                           .dyn_cast<IntegerAttr>()
+                           .getValue()
+                           .getLimitedValue());
+  exportFuncOps.resize(ordinalCounts.get("export_funcs")
+                           .dyn_cast<IntegerAttr>()
+                           .getValue()
+                           .getLimitedValue());
+  internalFuncOps.resize(ordinalCounts.get("internal_funcs")
+                             .dyn_cast<IntegerAttr>()
+                             .getValue()
+                             .getLimitedValue());
+  rodataOps.resize(ordinalCounts.get("rodatas")
+                       .dyn_cast<IntegerAttr>()
+                       .getValue()
+                       .getLimitedValue());
+
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
       internalFuncOps[funcOp.ordinal().getValue().getLimitedValue()] = funcOp;
@@ -480,12 +458,20 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
+  int32_t globalRefs = ordinalCounts.get("global_refs")
+                           .dyn_cast<IntegerAttr>()
+                           .getValue()
+                           .getLimitedValue();
+  int32_t globalBytes = ordinalCounts.get("global_bytes")
+                            .dyn_cast<IntegerAttr>()
+                            .getValue()
+                            .getLimitedValue();
+
   iree_vm_ModuleStateDef_ref_t moduleStateDef = 0;
-  if (symbolCounts.globalBytes || symbolCounts.globalRefs) {
+  if (globalBytes || globalRefs) {
     iree_vm_ModuleStateDef_start(fbb);
-    iree_vm_ModuleStateDef_global_bytes_capacity_add(fbb,
-                                                     symbolCounts.globalBytes);
-    iree_vm_ModuleStateDef_global_ref_count_add(fbb, symbolCounts.globalRefs);
+    iree_vm_ModuleStateDef_global_bytes_capacity_add(fbb, globalBytes);
+    iree_vm_ModuleStateDef_global_ref_count_add(fbb, globalRefs);
     moduleStateDef = iree_vm_ModuleStateDef_end(fbb);
   }
 
