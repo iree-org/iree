@@ -543,18 +543,18 @@ LogicalResult DepthwiseConvOpConversion::apply(
   if (const mhlo::ConvDimensionNumbers &dimension_numbers =
           op.dimension_numbers()) {
     // Make sure that this is 2-D convolution.
-    const int spatial_rank =
+    const int spatialRank =
         llvm::size(dimension_numbers.input_spatial_dimensions());
-    if (spatial_rank != 2) {
+    if (spatialRank != 2) {
       return rewriter.notifyMatchFailure(op, "only support 2-D cases for now");
     }
 
     // Make sure that this is depthwise convolution.
-    int64_t input_feature_dim =
+    int64_t inputFeatureDim =
         dimension_numbers.input_feature_dimension().getInt();
-    int64_t input_feature_count =
-        op.lhs().getType().cast<ShapedType>().getDimSize(input_feature_dim);
-    if (op.feature_group_count() != input_feature_count) {
+    int64_t inputFeatureCount =
+        op.lhs().getType().cast<ShapedType>().getDimSize(inputFeatureDim);
+    if (op.feature_group_count() != inputFeatureCount) {
       return rewriter.notifyMatchFailure(op, "not depth-wise convolution");
     }
 
@@ -579,17 +579,17 @@ LogicalResult DepthwiseConvOpConversion::apply(
   // into 3 dimensions (by droping the unit dimension). This is needed because
   // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
 
-  auto outputDims =
+  auto filterDims =
       llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
-  if (outputDims[2] * outputDims[3] != op.feature_group_count()) {
+  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
     return rewriter.notifyMatchFailure(
         op, "non-one channel multiplier unsupported yet");
   }
-  outputDims[2] = op.feature_group_count();
-  outputDims.pop_back();
+  filterDims[2] = op.feature_group_count();
+  filterDims.pop_back();
 
-  MemRefType outputShape = MemRefType::get(
-      outputDims, op.getType().getElementType(), ArrayRef<AffineMap>(),
+  MemRefType filterShape = MemRefType::get(
+      filterDims, op.getType().getElementType(), ArrayRef<AffineMap>(),
       resultBuffers[0].getType().cast<MemRefType>().getMemorySpace());
 
   auto getIndicesVector = [](int start, int end) {
@@ -600,7 +600,7 @@ LogicalResult DepthwiseConvOpConversion::apply(
       getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
 
   Value filterBuffer = rewriter.create<linalg::ReshapeOp>(
-      op.getLoc(), outputShape, inputBuffers[1], collapsedDimList);
+      op.getLoc(), filterShape, inputBuffers[1], collapsedDimList);
 
   rewriter.create<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
       op.getLoc(), TypeRange(), ValueRange{inputBuffers[0], filterBuffer},
