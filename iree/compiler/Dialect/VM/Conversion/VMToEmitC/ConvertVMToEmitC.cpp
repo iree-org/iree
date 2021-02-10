@@ -89,6 +89,20 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::OrI32Op>>(context, "vm_or_i32");
   patterns.insert<CallOpConversion<IREE::VM::XorI32Op>>(context, "vm_xor_i32");
 
+  // Casting and type conversion/emulation ops
+  patterns.insert<CallOpConversion<IREE::VM::TruncI32I8Op>>(context,
+                                                            "vm_trunc_i32i8");
+  patterns.insert<CallOpConversion<IREE::VM::TruncI32I16Op>>(context,
+                                                             "vm_trunc_i32i16");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI8I32SOp>>(context,
+                                                           "vm_ext_i8i32s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI8I32UOp>>(context,
+                                                           "vm_ext_i8i32u");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI16I32SOp>>(context,
+                                                            "vm_ext_i16i32s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI16I32UOp>>(context,
+                                                            "vm_ext_i16i32u");
+
   // Native bitwise shift and rotate ops
   patterns.insert<CallOpConversion<IREE::VM::ShlI32Op>>(context, "vm_shl_i32");
   patterns.insert<CallOpConversion<IREE::VM::ShrI32SOp>>(context,
@@ -96,15 +110,23 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::ShrI32UOp>>(context,
                                                          "vm_shr_i32u");
 
+  // Comparison ops
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQI32Op>>(context,
+                                                          "vm_cmp_eq_i32");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEI32Op>>(context,
+                                                          "vm_cmp_ne_i32");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI32SOp>>(context,
+                                                           "vm_cmp_lt_i32s");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI32UOp>>(context,
+                                                           "vm_cmp_lt_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNZI32Op>>(context,
+                                                          "vm_cmp_nz_i32");
+
   // Check
   // TODO(simon-camp): These conversions to macro calls should be deleted once
   // support for control flow ops has landed in the c module target
   patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
                                                          "VM_CHECK_EQ");
-
-  // Compare
-  patterns.insert<CallOpConversion<IREE::VM::CmpNEI32Op>>(context,
-                                                          "vm_cmp_ne_i32");
 
   // Const
   patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
@@ -147,18 +169,30 @@ class ConvertVMToEmitCPass
     target.addIllegalOp<IREE::VM::OrI32Op>();
     target.addIllegalOp<IREE::VM::XorI32Op>();
 
+    // Casting and type conversion/emulation ops
+    target.addIllegalOp<IREE::VM::TruncI32I8Op>();
+    target.addIllegalOp<IREE::VM::TruncI32I16Op>();
+    target.addIllegalOp<IREE::VM::ExtI8I32SOp>();
+    target.addIllegalOp<IREE::VM::ExtI8I32UOp>();
+    target.addIllegalOp<IREE::VM::ExtI16I32SOp>();
+    target.addIllegalOp<IREE::VM::ExtI16I32UOp>();
+
     // Native bitwise shift and rotate ops
     target.addIllegalOp<IREE::VM::ShlI32Op>();
     target.addIllegalOp<IREE::VM::ShrI32SOp>();
     target.addIllegalOp<IREE::VM::ShrI32UOp>();
 
+    // Comparison ops
+    target.addIllegalOp<IREE::VM::CmpEQI32Op>();
+    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
+    target.addIllegalOp<IREE::VM::CmpLTI32SOp>();
+    target.addIllegalOp<IREE::VM::CmpLTI32UOp>();
+    target.addIllegalOp<IREE::VM::CmpNZI32Op>();
+
     // Check ops
     // TODO(simon-camp): These conversions to macro calls should be deleted once
     // support for control flow ops has landed in the c module target
     target.addIllegalOp<IREE::VM::CheckEQOp>();
-
-    // Compare ops
-    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
 
     // Const ops
     target.addIllegalOp<IREE::VM::ConstI32Op>();
