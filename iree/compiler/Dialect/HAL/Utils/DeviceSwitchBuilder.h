@@ -52,8 +52,8 @@ class DeviceSwitchCaseBuilder {
     auto matchAttr =
         initialCondition_
             ? IREE::HAL::MatchAllAttr::get(ArrayAttr::get(
-                  ArrayRef<Attribute>{initialCondition_, conditionAttr},
-                  conditionAttr.getContext()))
+                  conditionAttr.getContext(),
+                  ArrayRef<Attribute>{initialCondition_, conditionAttr}))
             : conditionAttr;
     return DeviceSwitchCaseBuilder(loc_, resultTypes_, device_, matchAttr,
                                    caseOps_, builder_);

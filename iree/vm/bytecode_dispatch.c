@@ -976,6 +976,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
+// TODO: unify macros, eg. DISPATCH_OP_CORE_UNARY_I32
 #define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
   DISPATCH_OP(CORE, op_name, {                           \
     int32_t operand = VM_DecOperandRegI32("operand");    \
@@ -1007,19 +1008,12 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CAST_I32(op_name, src_type, dst_type) \
-  DISPATCH_OP(CORE, op_name, {                                 \
-    int32_t operand = VM_DecOperandRegI32("operand");          \
-    int32_t* result = VM_DecResultRegI32("result");            \
-    *result = (dst_type)((src_type)operand);                   \
-  });
-
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I8, uint32_t, uint8_t);
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I16, uint32_t, uint16_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32S, int8_t, int32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32S, int16_t, int32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I8, vm_trunc_i32i8);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I16, vm_trunc_i32i16);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32S, vm_ext_i8i32s);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32U, vm_ext_i8i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32S, vm_ext_i16i32s);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32U, vm_ext_i16i32u);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -1041,23 +1035,11 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CMP_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                      \
-    int32_t lhs = VM_DecOperandRegI32("lhs");       \
-    int32_t rhs = VM_DecOperandRegI32("rhs");       \
-    int32_t* result = VM_DecResultRegI32("result"); \
-    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;   \
-  });
-
-    DISPATCH_OP_CORE_CMP_I32(CmpEQI32, int32_t, ==);
-    DISPATCH_OP_CORE_CMP_I32(CmpNEI32, int32_t, !=);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32S, int32_t, <);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP(CORE, CmpNZI32, {
-      int32_t operand = VM_DecOperandRegI32("operand");
-      int32_t* result = VM_DecResultRegI32("result");
-      *result = (operand != 0) ? 1 : 0;
-    });
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpEQI32, vm_cmp_eq_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpNEI32, vm_cmp_ne_i32);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(CmpNZI32, vm_cmp_nz_i32);
 
     DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;

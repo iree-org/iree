@@ -39,8 +39,19 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message) {
   assert(!iree_status_is_ok(status));
-  auto full_message = absl::StrCat(
-      message, ": ", iree_status_code_string(iree_status_code(status)));
+  std::string full_message;
+
+  char* iree_message;
+  size_t iree_message_length;
+  if (iree_status_to_string(status, &iree_message, &iree_message_length)) {
+    full_message = absl::StrCat(
+        message, ": ", absl::string_view(iree_message, iree_message_length));
+    iree_allocator_free(iree_allocator_system(), iree_message);
+  } else {
+    full_message = absl::StrCat(
+        message, ": ", iree_status_code_string(iree_status_code(status)));
+  }
+
   PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());
   iree_status_ignore(status);
   return pybind11::error_already_set();
