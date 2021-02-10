@@ -907,7 +907,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t true_value = VM_DecOperandRegI32("true_value");
       int32_t false_value = VM_DecOperandRegI32("false_value");
       int32_t* result = VM_DecResultRegI32("result");
-      *result = condition ? true_value : false_value;
+      *result = vm_select_i32(condition, true_value, false_value);
     });
 
     DISPATCH_OP(CORE, SelectRef, {

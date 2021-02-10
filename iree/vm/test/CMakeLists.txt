@@ -24,6 +24,7 @@ iree_cc_embed_data(
   GENERATED_SRCS
     "arithmetic_ops.vmfb"
     "arithmetic_ops_i64.vmfb"
+    "assignment_ops.vmfb"
     "comparison_ops.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
@@ -54,6 +55,16 @@ iree_bytecode_module(
     arithmetic_ops_i64
   SRC
     "arithmetic_ops_i64.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    assignment_ops
+  SRC
+    "assignment_ops.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
