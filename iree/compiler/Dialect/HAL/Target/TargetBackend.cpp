@@ -111,7 +111,7 @@ static void mergeModuleInto(Operation *sourceModuleOp,
   auto allOps = llvm::to_vector<8>(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
   for (auto &op : allOps) {
-    if (op->isKnownTerminator()) continue;
+    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
     if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
       if (targetSymbolMap.count(symbolInterface.getName())) {
         // TODO(scotttodd): compare ops to ensure we aren't copying different

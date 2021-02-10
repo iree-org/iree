@@ -216,7 +216,7 @@ class IdentifyConstantPoolsPass
     }
 
     // Remove the pool if it didn't end up with any constants.
-    if (poolOp.getBody()->front().isKnownTerminator()) {
+    if (poolOp.getBody()->front().hasTrait<OpTrait::IsTerminator>()) {
       poolOp.erase();
       return None;
     }
