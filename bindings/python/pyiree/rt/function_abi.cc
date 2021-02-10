@@ -570,6 +570,8 @@ void FunctionAbi::RawPack(absl::Span<const Description> descs,
 void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
                             VmVariantList& f_results,
                             absl::Span<py::object> py_results) {
+  py::object this_object =
+      py::cast(this, py::return_value_policy::take_ownership);
   if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
     throw RaiseValueError("Mismatched RawUnpack() result arity");
   }
@@ -618,7 +620,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
             desc.buffer.scalar_type,
             absl::MakeConstSpan(reinterpret_cast<int*>(dims.data()),
                                 dims.size()),
-            std::move(buffer));
+            std::move(buffer), this_object);
         break;
       }
       case RawSignatureParser::Type::kRefObject:
@@ -677,8 +679,8 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                 desc.scalar.type)]);
         iree_hal_buffer_view_t* buffer_view;
         CheckApiStatus(
-            iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
-                                        element_type, &buffer_view),
+            iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
+                                        dims.size(), &buffer_view),
             "Error allocating buffer_view");
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
@@ -765,8 +767,8 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
   CheckApiStatus(
-      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
-                                  element_type, &buffer_view),
+      iree_hal_buffer_view_create(raw_buffer, element_type, dims.data(),
+                                  dims.size(), &buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);

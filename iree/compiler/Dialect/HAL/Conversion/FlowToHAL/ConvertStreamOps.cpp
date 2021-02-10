@@ -239,19 +239,13 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
 // Records a full execution barrier that forces visibility of all buffers.
 static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
                                        ConversionPatternRewriter &rewriter) {
-  auto memoryBarrier =
-      rewriter
-          .create<IREE::HAL::MakeMemoryBarrierOp>(
-              loc, IREE::HAL::AccessScopeBitfield::DispatchWrite,
-              IREE::HAL::AccessScopeBitfield::DispatchRead)
-          .getResult();
   rewriter.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
       loc, commandBuffer,
       IREE::HAL::ExecutionStageBitfield::CommandRetire |
           IREE::HAL::ExecutionStageBitfield::Dispatch,
       IREE::HAL::ExecutionStageBitfield::CommandIssue |
           IREE::HAL::ExecutionStageBitfield::Dispatch,
-      ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
+      IREE::HAL::ExecutionBarrierFlagBitfield::None);
 }
 
 static void recordPushConstants(Value device, Value commandBuffer,

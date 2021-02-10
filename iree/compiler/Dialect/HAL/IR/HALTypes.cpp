@@ -102,8 +102,27 @@ size_t getElementBitCount(IntegerAttr elementType) {
   return static_cast<size_t>((elementType.getValue().getZExtValue()) & 0xFF);
 }
 
+Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder) {
+  return builder.createOrFold<AndOp>(
+      loc,
+      builder.createOrFold<IndexCastOp>(loc, builder.getIndexType(),
+                                        elementType),
+      builder.createOrFold<ConstantIndexOp>(loc, 0xFF));
+}
+
 size_t getElementByteCount(IntegerAttr elementType) {
   return (getElementBitCount(elementType) + 8 - 1) / 8;
+}
+
+Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
+  auto c1 = builder.createOrFold<ConstantIndexOp>(loc, 1);
+  auto c8 = builder.createOrFold<ConstantIndexOp>(loc, 8);
+  auto bitCount = getElementBitCount(loc, elementType, builder);
+  return builder.createOrFold<UnsignedDivIOp>(
+      loc,
+      builder.createOrFold<SubIOp>(
+          loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
+      c8);
 }
 
 //===----------------------------------------------------------------------===//

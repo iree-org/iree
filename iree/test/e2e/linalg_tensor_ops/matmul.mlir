@@ -14,3 +14,15 @@ func @tensor() attributes { iree.module.export } {
 
   return
 }
+
+
+func @large() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<250x1024xf32>
+  %rhs = iree.unfoldable_constant dense<0.4> : tensor<1024x500xf32>
+  %init = iree.unfoldable_constant dense<0.2> : tensor<250x500xf32>
+  %res = linalg.matmul
+    ins(%lhs, %rhs : tensor<250x1024xf32>, tensor<1024x500xf32>)
+    outs(%init : tensor<250x500xf32>) -> tensor<250x500xf32>
+  check.expect_almost_eq_const(%res, dense<409.796> : tensor<250x500xf32>) : tensor<250x500xf32>
+  return
+}

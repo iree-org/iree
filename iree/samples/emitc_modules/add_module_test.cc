@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/samples/emitc_modules/add_module.module"
+#include "iree/samples/emitc_modules/add_module.vmfb"
 
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"

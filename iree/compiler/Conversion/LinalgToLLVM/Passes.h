@@ -52,18 +52,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVM2Pass();
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 
-/// Pass to rewrite Linalg on tensors destructive updates into updates through
-/// memory.
-std::unique_ptr<OperationPass<FuncOp>>
-createLinalgRewriteDestructiveUpdatesPass();
-
 /// Pass to perform tiling and distribution of Linalg ops with tensor semantics
 /// to sequentialized SPMD loops.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLinalgTileAndDistributeOnTensorsPass();
-
-/// Pass to perform linalg on tensor bufferization.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgLLVMBufferizePass();
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

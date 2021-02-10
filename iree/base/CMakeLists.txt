@@ -34,6 +34,7 @@ iree_cc_library(
     core_headers
   HDRS
     "alignment.h"
+    "attributes.h"
     "math.h"
     "target_platform.h"
   DEPS
@@ -101,8 +102,8 @@ iree_cc_library(
   SRCS
     "logging.cc"
   DEPS
+    ::core_headers
     ::tracing
-    absl::core_headers
     absl::flags
     absl::str_format
   PUBLIC
@@ -248,7 +249,10 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-# TODO(benvanik): redirect to internal/tracing/ or something.
+# TODO(benvanik): evaluate if we want this as part of the API. Could restrict it
+# to excusively static linkage scenarios and note that it's unstable. It's just
+# really really useful and the only way for applications to interleave with our
+# tracing (today).
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
@@ -261,7 +265,6 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
       "tracing.cc"
     DEPS
       ::core_headers
-      absl::core_headers
     DEFINES
       # TODO(#2114): Change the mode to 2.
       "IREE_TRACING_MODE=1"
@@ -274,7 +277,7 @@ else()
     HDRS
       "tracing.h"
     DEPS
-      absl::core_headers
+      ::core_headers
     PUBLIC
   )
 endif()

@@ -166,7 +166,7 @@ Value TensorRewriteAdaptor::getBufferView() {
     auto shapeDims = getShapeDims();
     if (!shapeDims) return {};
     return rewriter_.createOrFold<IREE::HAL::BufferViewCreateOp>(
-        loc_, newValue_, *shapeDims, getElementType());
+        loc_, newValue_, getElementType(), *shapeDims);
   }
 }
 

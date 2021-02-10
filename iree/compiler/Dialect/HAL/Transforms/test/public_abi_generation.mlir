@@ -31,7 +31,7 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
   // CHECK-DAG: %[[R0:.+]] = call @staticTwoArg(%[[BUFFER0]], %[[BUFFER1]])
   // CHECK-DAG: %[[C5:.+]] = constant 5 : index
   // CHECK-DAG: %[[C6:.+]] = constant 6 : index
-  // CHECK-DAG: %[[VIEW:.+]] = hal.buffer_view.create %[[R0]], shape = [%[[C5]], %[[C6]]], element_type = 16777280 : !hal.buffer_view
+  // CHECK-DAG: %[[VIEW:.+]] = hal.buffer_view.create %[[R0]], element_type = %c16777280_i32, shape = [%[[C5]], %[[C6]]] : !hal.buffer_view
   // CHECK-DAG: hal.semaphore.signal %[[ARG4]], value = %[[ARG5]]
   // CHECK: return %[[VIEW]]
   return %arg1 : !hal.buffer
@@ -71,7 +71,7 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
 // CHECK-DAG: %[[DIM0:.+]] = hal.buffer_view.dim %[[ARG2]], 0 : index
 // CHECK-DAG: %[[DIM1:.+]] = hal.buffer_view.dim %[[ARG2]], 1 : index
 // CHECK-DAG: %[[RESULT:.+]]:3 = call @dynamicTwoDims(%[[BUFFER]], %[[DIM0]], %[[DIM1]])
-// CHECK-DAG: %[[RESULT_VIEW:.+]] = hal.buffer_view.create %[[RESULT]]#0, shape = [%[[RESULT]]#1, %[[RESULT]]#2], element_type = 50331680 : !hal.buffer_view
+// CHECK-DAG: %[[RESULT_VIEW:.+]] = hal.buffer_view.create %[[RESULT]]#0, element_type = %c50331680_i32, shape = [%[[RESULT]]#1, %[[RESULT]]#2] : !hal.buffer_view
 // CHECK-DAG: hal.semaphore.signal %[[ARG3]], value = %[[ARG4]]
 // CHECK: return %[[RESULT_VIEW]]
 // A new function with $sync suffix based on buffer_view should be generated.

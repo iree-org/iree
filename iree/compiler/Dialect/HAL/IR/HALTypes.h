@@ -54,9 +54,11 @@ IntegerAttr getElementTypeAttr(Type type);
 
 // Returns the total bit count of elements of the given type.
 size_t getElementBitCount(IntegerAttr elementType);
+Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder);
 
 // Returns the rounded-up byte count of elements of the given type.
 size_t getElementByteCount(IntegerAttr elementType);
+Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder);
 
 //===----------------------------------------------------------------------===//
 // Object types

@@ -1,43 +1,54 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="iree-codegen-linalg-tile-and-fuse,canonicalize,cse" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
-module attributes {
-  spv.target_env =
-    #spv.target_env<#spv.vce<v1.3,
-      [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-       StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-       UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-       GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-       GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-       VariablePointersStorageBuffer],
-      [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-       SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
-      ARM:IntegratedGPU,
-      {max_compute_shared_memory_size = 32768 : i32,
-       max_compute_workgroup_invocations = 512 : i32,
-       max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>} {
-  func @batch_matmul_static_shape()
-    attributes {vkspv.num_workgroups_fn = @matmul_static_shape__num_workgroups__} {
-    %arg0 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
-    %arg1 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
-    %ret0 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
-    linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
-    return
-  }
-  func private @matmul_static_shape__num_workgroups__
-    (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
-     !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan, filter="dylib*" {
+    hal.executable.entry_point @batch_matmul_static_shape attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
+        !flow.dispatch.output<?x?xf32>) -> ()}
+    module attributes {
+      spv.target_env =
+        #spv.target_env<#spv.vce<v1.3,
+          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
+           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
+           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
+           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
+           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
+           VariablePointersStorageBuffer],
+          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
+           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
+          ARM:IntegratedGPU,
+          {max_compute_shared_memory_size = 32768 : i32,
+           max_compute_workgroup_invocations = 512 : i32,
+           max_compute_workgroup_size = dense<512> : vector<3xi32>,
+           subgroup_size = 16 : i32}>} {
+      func @batch_matmul_static_shape()
+        attributes {vkspv.num_workgroups_fn = @matmul_static_shape__num_workgroups__} {
+        %arg0 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
+        %arg1 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
+        %ret0 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
+        linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
+        return
+      }
+      func private @matmul_static_shape__num_workgroups__
+        (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
+         !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
+      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
   }
 }
-
-
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 4)>
@@ -281,45 +292,57 @@ module attributes {
 
 // -----
 
-module attributes {
-  spv.target_env =
-    #spv.target_env<#spv.vce<v1.3,
-      [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-       StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-       UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-       GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-       GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-       VariablePointersStorageBuffer],
-      [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-       SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
-      ARM:IntegratedGPU,
-      {max_compute_shared_memory_size = 32768 : i32,
-       max_compute_workgroup_invocations = 512 : i32,
-       max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>} {
-  func @batch_matmul_fused_fillop()
-    attributes {vkspv.num_workgroups_fn = @batch_matmul_fused_fillop__num_workgroups__} {
-    %cst = constant 0.000000e+00 : f32
-    %arg0 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
-    %arg1 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
-    %ret0 = iree.placeholder for "interface buffer"
-      {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
-    linalg.fill(%ret0, %cst) : memref<4x1024x1024xf32>, f32
-    linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
-    return
-  }
-  func private @batch_matmul_fused_fillop__num_workgroups__
-    (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
-     !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+hal.executable @batch_matmul_fused_fillop attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan, filter="dylib*" {
+    hal.executable.entry_point @batch_matmul_fused_fillop attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
+        !flow.dispatch.output<?x?xf32>) -> ()}
+    module attributes {
+      spv.target_env =
+        #spv.target_env<#spv.vce<v1.3,
+          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
+           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
+           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
+           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
+           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
+           VariablePointersStorageBuffer],
+          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
+           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
+          ARM:IntegratedGPU,
+          {max_compute_shared_memory_size = 32768 : i32,
+           max_compute_workgroup_invocations = 512 : i32,
+           max_compute_workgroup_size = dense<512> : vector<3xi32>,
+           subgroup_size = 16 : i32}>} {
+      func @batch_matmul_fused_fillop()
+        attributes {vkspv.num_workgroups_fn = @batch_matmul_fused_fillop__num_workgroups__} {
+        %cst = constant 0.000000e+00 : f32
+        %arg0 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@arg0, operand_result_num = 0 : i32} : memref<4x1024x1024xf32>
+        %arg1 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<4x1024x1024xf32>
+        %ret0 = iree.placeholder for "interface buffer"
+          {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<4x1024x1024xf32>
+        linalg.fill(%ret0, %cst) : memref<4x1024x1024xf32>, f32
+        linalg.batch_matmul ins(%arg0, %arg1 : memref<4x1024x1024xf32>, memref<4x1024x1024xf32>) outs(%ret0 : memref<4x1024x1024xf32>)
+        return
+      }
+      func private @batch_matmul_fused_fillop__num_workgroups__
+        (!shapex.ranked_shape<[4096, 4096]>, !shapex.ranked_shape<[4096, 4096]>,
+         !shapex.ranked_shape<[4096, 4096]>) -> (index, index, index)
+      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
   }
 }
-
 //    CHECK-LABEL: func @batch_matmul_fused_fillop
 //  CHECK-COUNT-8:   vector.transfer_write
 //  CHECK-COUNT-8:   vector.transfer_read

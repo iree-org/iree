@@ -69,7 +69,7 @@ cc_test(
     # TODO(benvanik): bazel/cmake to include this generated file.
     # Checked in right now until I can figure it out.
     # data = [
-    #     "//bindings/tflite/testdata:add.module",
+    #     "//bindings/tflite/testdata:add.vmfb",
     # ],
     deps = [
         ":shim",

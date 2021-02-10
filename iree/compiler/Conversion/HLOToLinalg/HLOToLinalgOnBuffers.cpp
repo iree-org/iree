@@ -817,29 +817,6 @@ struct LinalgOpOnTensorConversion
   }
 };
 
-/// Converts linalg.matmul on tensors to linalg.matmul on buffers.
-struct DynamicTensorFromElementsOpConversion
-    : public ConvertToLinalgBufferOp<DynamicTensorFromElementsOpConversion,
-                                     tensor::GenerateOp> {
-  using ConvertToLinalgBufferOp<DynamicTensorFromElementsOpConversion,
-                                tensor::GenerateOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(tensor::GenerateOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const {
-    if (op.getBody(0)->getOperations().size() != 1) {
-      return op.emitError("expected only contain yield op");
-    }
-    auto yieldOp = dyn_cast<tensor::YieldOp>(op.getBody(0)->getTerminator());
-    if (!yieldOp) {
-      return op.emitError("expected to use a yield op as the terminator");
-    }
-
-    rewriter.create<linalg::FillOp>(op.getLoc(), resultBuffers[0],
-                                    yieldOp.value());
-    return success();
-  }
-};
-
 /// Converts linalg.matmul-ish on tensors to linalg.matmul-ish on buffers.
 template <typename LinalgOpTy>
 struct MatmulOnTensorConversion
@@ -1247,7 +1224,6 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
   patterns.insert<ConvOpConversion, ConcatenateOpConversion,
-                  DynamicTensorFromElementsOpConversion,
                   FillOpOnTensorConversion, InitTensorOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
@@ -1285,7 +1261,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
                       IREE::HAL::InterfaceStoreTensorOp, SubTensorOp,
-                      tensor::ExtractOp, tensor::GenerateOp>();
+                      tensor::ExtractOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

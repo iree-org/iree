@@ -360,9 +360,16 @@ static LogicalResult verifyVariableStoreIndirectOp(
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
                                    int32_t elementType) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32));
+}
+
+void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
+                                   Value allocator, ValueRange shape,
+                                   Value elementType) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addTypes({builder.getIndexType()});
 }
 
@@ -378,9 +385,17 @@ void AllocatorComputeSizeOp::getAsmResultNames(
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
                                      int32_t elementType, ValueRange indices) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        indices);
+}
+
+void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
+                                     Value allocator, ValueRange shape,
+                                     Value elementType, ValueRange indices) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addOperands(indices);
   state.addTypes({builder.getIndexType()});
 }
@@ -398,9 +413,18 @@ void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
                                     int32_t elementType, ValueRange indices,
                                     ValueRange lengths) {
+  build(builder, state, allocator, shape,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        indices, lengths);
+}
+
+void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
+                                    Value allocator, ValueRange shape,
+                                    Value elementType, ValueRange indices,
+                                    ValueRange lengths) {
   state.addOperands({allocator});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
+  state.addOperands(elementType);
   state.addOperands(indices);
   state.addOperands(lengths);
   state.addTypes({builder.getIndexType(), builder.getIndexType()});
@@ -531,11 +555,18 @@ void BufferViewConstOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
-                               Value buffer, ValueRange shape,
-                               int32_t elementType) {
-  state.addOperands({buffer});
+                               Value buffer, int32_t elementType,
+                               ValueRange shape) {
+  build(builder, state, buffer,
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        shape);
+}
+
+void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
+                               Value buffer, Value elementType,
+                               ValueRange shape) {
+  state.addOperands({buffer, elementType});
   state.addOperands(shape);
-  state.addAttribute("element_type", builder.getI32IntegerAttr(elementType));
   state.addTypes({BufferViewType::get(builder.getContext())});
 }
 
@@ -644,27 +675,6 @@ void CommandBufferCreateOp::getAsmResultNames(
 // hal.command_buffer.execution_barrier
 //===----------------------------------------------------------------------===//
 
-void CommandBufferExecutionBarrierOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    IREE::HAL::ExecutionStageBitfield sourceStageMask,
-    IREE::HAL::ExecutionStageBitfield targetStageMask,
-    ValueRange memoryBarriers, ValueRange bufferBarriers) {
-  state.addAttribute(
-      "source_stage_mask",
-      builder.getI32IntegerAttr(static_cast<int32_t>(sourceStageMask)));
-  state.addAttribute(
-      "target_stage_mask",
-      builder.getI32IntegerAttr(static_cast<int32_t>(targetStageMask)));
-  state.addOperands(commandBuffer);
-  state.addOperands(memoryBarriers);
-  state.addOperands(bufferBarriers);
-  state.addAttribute("operand_segment_sizes",
-                     DenseIntElementsAttr::get(
-                         VectorType::get({3}, builder.getIntegerType(32)),
-                         {1, static_cast<int>(memoryBarriers.size()),
-                          static_cast<int>(bufferBarriers.size())}));
-}
-
 static ParseResult parseCommandBufferExecutionBarrierOp(
     OpAsmParser &parser, OperationState *result) {
   OpAsmParser::OperandType commandBuffer;
@@ -677,42 +687,12 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
                                                    result->attributes)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<ExecutionStageBitfield>(parser, "target_stage_mask",
-                                                   result->attributes))) {
+                                                   result->attributes)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<ExecutionBarrierFlagBitfield>(parser, "flags",
+                                                         result->attributes))) {
     return failure();
   }
-  SmallVector<OpAsmParser::OperandType, 4> memoryBarriers;
-  bool expectMoreOperands = succeeded(parser.parseOptionalComma());
-  if (expectMoreOperands &&
-      succeeded(parser.parseOptionalKeyword("memory_barriers"))) {
-    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
-        failed(parser.parseOperandList(memoryBarriers)) ||
-        failed(parser.parseRSquare()) ||
-        failed(parser.resolveOperands(
-            memoryBarriers, MemoryBarrierType::get(result->getContext()),
-            result->operands))) {
-      return failure();
-    }
-    expectMoreOperands = succeeded(parser.parseOptionalComma());
-  }
-  SmallVector<OpAsmParser::OperandType, 4> bufferBarriers;
-  if (expectMoreOperands &&
-      succeeded(parser.parseOptionalKeyword("buffer_barriers"))) {
-    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
-        failed(parser.parseOperandList(bufferBarriers)) ||
-        failed(parser.parseRSquare()) ||
-        failed(parser.resolveOperands(
-            bufferBarriers, BufferBarrierType::get(result->getContext()),
-            result->operands))) {
-      return failure();
-    }
-    expectMoreOperands = succeeded(parser.parseOptionalComma());
-  }
-  result->addAttribute(
-      "operand_segment_sizes",
-      DenseIntElementsAttr::get(
-          VectorType::get({3}, parser.getBuilder().getIntegerType(32)),
-          {1, static_cast<int>(memoryBarriers.size()),
-           static_cast<int>(bufferBarriers.size())}));
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -727,22 +707,14 @@ static void printCommandBufferExecutionBarrierOp(
   p << stringifyExecutionStageBitfield(op.source_stage_mask());
   p << "\", \"";
   p << stringifyExecutionStageBitfield(op.target_stage_mask());
+  p << "\", \"";
+  p << stringifyExecutionBarrierFlagBitfield(op.flags());
   p << "\"";
-  if (!op.memory_barriers().empty()) {
-    p << ", memory_barriers=[";
-    p.printOperands(op.memory_barriers());
-    p << "]";
-  }
-  if (!op.buffer_barriers().empty()) {
-    p << ", buffer_barriers=[";
-    p.printOperands(op.buffer_barriers());
-    p << "]";
-  }
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{
                                          "source_stage_mask",
                                          "target_stage_mask",
-                                         "operand_segment_sizes",
+                                         "flags",
                                      });
 }
 
@@ -1634,6 +1606,15 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
                                          "type",
                                          "access",
                                      });
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface.binding.subspan
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
 }
 
 //===----------------------------------------------------------------------===//
