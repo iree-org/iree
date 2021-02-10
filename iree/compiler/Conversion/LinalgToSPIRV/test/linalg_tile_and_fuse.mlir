@@ -659,26 +659,32 @@ hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"
 
 // -----
 
-module attributes {
-  spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
-}  {
-
-  func @depthwise_conv_tiled_and_vectorized() attributes {hal.num_workgroups_fn = @get_num_workgroups} {
-    %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x56x56x96xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x113x113x96xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x96xf32>
-    linalg.fill(%0, %cst) : memref<1x56x56x96xf32>, f32
-    linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%1, %2 : memref<1x113x113x96xf32>, memref<3x3x96xf32>) outs(%0 : memref<1x56x56x96xf32>)
-    return
-  }
-
-  func private @get_num_workgroups(!shapex.ranked_shape<[1,113,113,96]>, !shapex.ranked_shape<[3,3,96]>, !shapex.ranked_shape<[1,56,56,96]>) -> (index, index, index)
-
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan, filter="dylib*" {
+    hal.executable.entry_point @conv_tiled_and_vectorized attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
+        !flow.dispatch.output<?x?xf32>) -> ()}
+    module attributes {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
+    }  {
+      func @depthwise_conv_tiled_and_vectorized() attributes {hal.num_workgroups_fn = @get_num_workgroups} {
+        %cst = constant 0.000000e+00 : f32
+        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x56x56x96xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x113x113x96xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x96xf32>
+        linalg.fill(%0, %cst) : memref<1x56x56x96xf32>, f32
+        linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%1, %2 : memref<1x113x113x96xf32>, memref<3x3x96xf32>) outs(%0 : memref<1x56x56x96xf32>)
+        return
+      }
+
+      func private @get_num_workgroups(!shapex.ranked_shape<[1,113,113,96]>, !shapex.ranked_shape<[3,3,96]>, !shapex.ranked_shape<[1,56,56,96]>) -> (index, index, index)
+    }
   }
 }
 
