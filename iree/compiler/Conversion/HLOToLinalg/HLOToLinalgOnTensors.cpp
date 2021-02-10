@@ -215,12 +215,23 @@ struct ConvertHLOToLinalgOnTensorsPass
   }
 };
 
+/// Convert mhlo.constant op into std.const.
+struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::ConstOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<ConstantOp>(op, op.value());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion>(context);
+  patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
+                  ConstOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

@@ -31,6 +31,7 @@ iree_cc_test(
     iree::vm::ops
     iree::vm::shims
     ::arithmetic_ops_cc
+    ::shift_ops_cc
 )
 
 iree_bytecode_module(

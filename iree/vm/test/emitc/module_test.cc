@@ -18,8 +18,8 @@
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
-#include "iree/vm/test/emitc/arithmetic_ops.module"
-#include "iree/vm/test/emitc/shift_ops.module"
+#include "iree/vm/test/emitc/arithmetic_ops.vmfb"
+#include "iree/vm/test/emitc/shift_ops.vmfb"
 
 namespace {
 

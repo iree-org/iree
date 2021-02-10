@@ -67,7 +67,6 @@ iree_cc_library(
     iree::base::synchronization
     iree::base::threading
     iree::base::tracing
-    iree::hal::vulkan::util::ref_ptr
   PUBLIC
 )
 

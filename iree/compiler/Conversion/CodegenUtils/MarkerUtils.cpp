@@ -57,6 +57,13 @@ StringRef getVectorizeMarker() { return "vectorize"; }
 
 StringRef getDeleteMarker() { return "delete"; }
 
+StringRef getMarkerOrNull(Operation *op) {
+  StringAttr attr = op->getAttrOfType<StringAttr>(
+      linalg::LinalgTransforms::kLinalgTransformMarker);
+  if (!attr) return "";
+  return attr.getValue();
+}
+
 bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
       linalg::LinalgTransforms::kLinalgTransformMarker);

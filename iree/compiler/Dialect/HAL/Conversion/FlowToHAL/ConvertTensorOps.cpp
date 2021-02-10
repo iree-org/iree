@@ -150,7 +150,7 @@ class TensorTraceOpConversion
       bufferViews.emplace_back(adaptor.getBufferView());
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
-        traceOp, bufferViews, traceOp.trace_infoAttr());
+        traceOp, traceOp.keyAttr(), bufferViews);
     return success();
   }
 };

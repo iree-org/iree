@@ -26,8 +26,8 @@ class ExecutableLayoutTest : public CtsTestBase {};
 TEST_P(ExecutableLayoutTest, CreateWithNoLayouts) {
   iree_hal_executable_layout_t* executable_layout;
   IREE_ASSERT_OK(iree_hal_executable_layout_create(
-      device_, /*set_layout_count=*/0, NULL,
-      /*push_constants=*/0, &executable_layout));
+      device_, /*push_constants=*/0, /*set_layout_count=*/0, NULL,
+      &executable_layout));
 
   iree_hal_executable_layout_release(executable_layout);
 }
@@ -37,8 +37,8 @@ TEST_P(ExecutableLayoutTest, CreateWithPushConstants) {
   // Note: The Vulkan maxPushConstantsSize limit must be at least 128 bytes:
   // https://www.khronos.org/registry/vulkan/specs/1.2/html/vkspec.html#limits-minmax
   IREE_ASSERT_OK(iree_hal_executable_layout_create(
-      device_, /*set_layout_count=*/0, NULL,
-      /*push_constants=*/5, &executable_layout));
+      device_, /*push_constants=*/5, /*set_layout_count=*/0, NULL,
+      &executable_layout));
 
   iree_hal_executable_layout_release(executable_layout);
 }
@@ -58,8 +58,8 @@ TEST_P(ExecutableLayoutTest, CreateWithOneLayout) {
 
   iree_hal_executable_layout_t* executable_layout;
   IREE_ASSERT_OK(iree_hal_executable_layout_create(
-      device_, /*set_layout_count=*/1, &descriptor_set_layout,
-      /*push_constants=*/0, &executable_layout));
+      device_, /*push_constants=*/0, /*set_layout_count=*/1,
+      &descriptor_set_layout, &executable_layout));
 
   iree_hal_executable_layout_release(executable_layout);
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
@@ -93,8 +93,8 @@ TEST_P(ExecutableLayoutTest, CreateWithTwoLayouts) {
 
   iree_hal_executable_layout_t* executable_layout;
   IREE_ASSERT_OK(iree_hal_executable_layout_create(
-      device_, IREE_ARRAYSIZE(descriptor_set_layouts), descriptor_set_layouts,
-      /*push_constants=*/0, &executable_layout));
+      device_, /*push_constants=*/0, IREE_ARRAYSIZE(descriptor_set_layouts),
+      descriptor_set_layouts, &executable_layout));
 
   iree_hal_executable_layout_release(executable_layout);
   iree_hal_descriptor_set_layout_release(descriptor_set_layouts[0]);

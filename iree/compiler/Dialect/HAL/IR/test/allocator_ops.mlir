@@ -6,8 +6,9 @@
 func @allocator_compute_size() -> index {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
   %1:2 = "test_hal.shape"() : () -> (index, index)
-  // CHECK: %[[SZ:.+]] = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
-  %sz = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
+  %c32_i32 = constant 32 : i32
+  // CHECK: %[[SZ:.+]] = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = %c32_i32
+  %sz = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = %c32_i32
   // CHECK-NEXT: return %[[SZ]]
   return %sz : index
 }
@@ -19,8 +20,9 @@ func @allocator_compute_offset() -> index {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
   %1:2 = "test_hal.shape"() : () -> (index, index)
   %2:2 = "test_hal.indices"() : () -> (index, index)
-  // CHECK: %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1]
-  %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1]
+  %c32_i32 = constant 32 : i32
+  // CHECK: %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = %c32_i32, indices = [%2#0, %2#1]
+  %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = %c32_i32, indices = [%2#0, %2#1]
   return %off : index
 }
 
@@ -32,8 +34,9 @@ func @allocator_compute_range() -> (index, index) {
   %1:2 = "test_hal.shape"() : () -> (index, index)
   %2:2 = "test_hal.indices"() : () -> (index, index)
   %3:2 = "test_hal.lengths"() : () -> (index, index)
-  // CHECK: %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1], lengths = [%3#0, %3#1]
-  %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1], lengths=[%3#0, %3#1]
+  %c32_i32 = constant 32 : i32
+  // CHECK: %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = %c32_i32, indices = [%2#0, %2#1], lengths = [%3#0, %3#1]
+  %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = %c32_i32, indices = [%2#0, %2#1], lengths=[%3#0, %3#1]
   return %off, %len : index, index
 }
 

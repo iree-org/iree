@@ -26,110 +26,40 @@ namespace iree_compiler {
 
 namespace {
 
-// Convert operations which don't have attributes
+SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
+  return llvm::to_vector<4>(
+      llvm::map_range(llvm::seq<int64_t>(0, n), [&ctx](int64_t i) -> Attribute {
+        return IntegerAttr::get(IndexType::get(ctx), i);
+      }));
+}
+
+// Convert vm operations to emitc calls. The resultiong call has the ops
+// operands as arguments followed by an argument for every attribute.
 template <typename SrcOpTy>
-class NoAttributeOpConversion : public OpConversionPattern<SrcOpTy> {
+class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
  public:
-  NoAttributeOpConversion(MLIRContext *context, StringRef funcName)
+  CallOpConversion(MLIRContext *context, StringRef funcName)
       : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
 
  private:
   LogicalResult matchAndRewrite(
       SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Attribute, 4> args_ =
+        indexSequence(operands.size(), op.getContext());
+
+    for (NamedAttribute attr : op.getAttrs()) {
+      args_.push_back(attr.second);
+    }
+
+    auto type = op.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args;
+    ArrayAttr args = rewriter.getArrayAttr(args_);
     ArrayAttr templateArgs;
 
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
-                                               templateArgs, operands);
-
-    return success();
-  }
-
-  StringRef funcName;
-};
-
-template <typename SrcOpTy>
-class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
-  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-
- public:
-  ShiftArithmeticOpConversion(MLIRContext *context, StringRef funcName)
-      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
-
- private:
-  LogicalResult matchAndRewrite(
-      SrcOpTy op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::Adaptor srcAdaptor(
-        operands, op.getOperation()->getAttrDictionary());
-
-    StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args = rewriter.getArrayAttr(
-        {IntegerAttr::get(rewriter.getIndexType(), 0), srcAdaptor.amount()});
-    ArrayAttr templateArgs;
-
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
-                                               templateArgs, operands);
-
-    return success();
-  }
-
-  StringRef funcName;
-};
-
-// TODO(simon-camp): These conversions to macro calls should be deleted once
-// support for control flow ops has landed in the c module target
-template <typename SrcOpTy>
-class BinaryCheckOpConversion : public OpConversionPattern<SrcOpTy> {
-  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-
- public:
-  BinaryCheckOpConversion(MLIRContext *context, StringRef funcName)
-      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
-
- private:
-  LogicalResult matchAndRewrite(
-      SrcOpTy op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::Adaptor srcAdaptor(
-        operands, op.getOperation()->getAttrDictionary());
-
-    StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args = rewriter.getArrayAttr(
-        {IntegerAttr::get(rewriter.getIndexType(), 0),
-         IntegerAttr::get(rewriter.getIndexType(), 1), srcAdaptor.message()});
-    ArrayAttr templateArgs;
-
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, mlir::TypeRange{}, callee,
-                                               args, templateArgs, operands);
-
-    return success();
-  }
-
-  StringRef funcName;
-};
-
-template <typename SrcOpTy>
-class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
-  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-
- public:
-  ConstOpConversion(MLIRContext *context, StringRef funcName)
-      : OpConversionPattern<SrcOpTy>(context), funcName(funcName) {}
-
- private:
-  LogicalResult matchAndRewrite(
-      SrcOpTy op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args = ArrayAttr::get({op.value()}, op.getContext());
-    ArrayAttr templateArgs;
-
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, op.getType(), callee, args,
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(op, type, callee, args,
                                                templateArgs, operands);
 
     return success();
@@ -143,50 +73,42 @@ class ConstOpConversion : public OpConversionPattern<SrcOpTy> {
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
   // Native integer arithmetic ops
-  patterns.insert<NoAttributeOpConversion<IREE::VM::AddI32Op>>(context,
-                                                               "vm_add_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::SubI32Op>>(context,
-                                                               "vm_sub_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::MulI32Op>>(context,
-                                                               "vm_mul_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::DivI32SOp>>(context,
-                                                                "vm_div_i32s");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::DivI32UOp>>(context,
-                                                                "vm_div_i32u");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::RemI32SOp>>(context,
-                                                                "vm_rem_i32s");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::RemI32UOp>>(context,
-                                                                "vm_rem_i32u");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::NotI32Op>>(context,
-                                                               "vm_not_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::AndI32Op>>(context,
-                                                               "vm_and_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::OrI32Op>>(context,
-                                                              "vm_or_i32");
-  patterns.insert<NoAttributeOpConversion<IREE::VM::XorI32Op>>(context,
-                                                               "vm_xor_i32");
+  patterns.insert<CallOpConversion<IREE::VM::AddI32Op>>(context, "vm_add_i32");
+  patterns.insert<CallOpConversion<IREE::VM::SubI32Op>>(context, "vm_sub_i32");
+  patterns.insert<CallOpConversion<IREE::VM::MulI32Op>>(context, "vm_mul_i32");
+  patterns.insert<CallOpConversion<IREE::VM::DivI32SOp>>(context,
+                                                         "vm_div_i32s");
+  patterns.insert<CallOpConversion<IREE::VM::DivI32UOp>>(context,
+                                                         "vm_div_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::RemI32SOp>>(context,
+                                                         "vm_rem_i32s");
+  patterns.insert<CallOpConversion<IREE::VM::RemI32UOp>>(context,
+                                                         "vm_rem_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::NotI32Op>>(context, "vm_not_i32");
+  patterns.insert<CallOpConversion<IREE::VM::AndI32Op>>(context, "vm_and_i32");
+  patterns.insert<CallOpConversion<IREE::VM::OrI32Op>>(context, "vm_or_i32");
+  patterns.insert<CallOpConversion<IREE::VM::XorI32Op>>(context, "vm_xor_i32");
 
   // Native bitwise shift and rotate ops
-  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShlI32Op>>(
-      context, "vm_shl_i32");
-  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShrI32SOp>>(
-      context, "vm_shr_i32s");
-  patterns.insert<ShiftArithmeticOpConversion<IREE::VM::ShrI32UOp>>(
-      context, "vm_shr_i32u");
+  patterns.insert<CallOpConversion<IREE::VM::ShlI32Op>>(context, "vm_shl_i32");
+  patterns.insert<CallOpConversion<IREE::VM::ShrI32SOp>>(context,
+                                                         "vm_shr_i32s");
+  patterns.insert<CallOpConversion<IREE::VM::ShrI32UOp>>(context,
+                                                         "vm_shr_i32u");
 
   // Check
   // TODO(simon-camp): These conversions to macro calls should be deleted once
   // support for control flow ops has landed in the c module target
-  patterns.insert<BinaryCheckOpConversion<IREE::VM::CheckEQOp>>(context,
-                                                                "VM_CHECK_EQ");
+  patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
+                                                         "VM_CHECK_EQ");
 
   // Compare
-  patterns.insert<NoAttributeOpConversion<IREE::VM::CmpNEI32Op>>(
-      context, "vm_cmp_ne_i32");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEI32Op>>(context,
+                                                          "vm_cmp_ne_i32");
 
   // Const
-  patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context,
-                                                           "vm_const_i32");
+  patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
+                                                          "vm_const_i32");
 }
 
 namespace IREE {

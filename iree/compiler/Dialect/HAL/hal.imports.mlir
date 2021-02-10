@@ -55,39 +55,15 @@ vm.import @buffer.subspan(
   %length : i32
 ) -> !vm.ref<!hal.buffer>
 
+// DEPRECATED: this will be removed in future versions and replaced with
+// transfer queue operations by the compiler.
+//
 // Fills the target buffer with the given repeating value.
 vm.import @buffer.fill(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i32,
   %length : i32,
   %pattern : i32
-)
-
-// Reads a block of byte data from the resource at the given offset.
-vm.import @buffer.read_data(
-  %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i32,
-  %target_buffer : !vm.ref<!iree.mutable_byte_buffer>,
-  %target_offset : i32,
-  %length : i32
-)
-
-// Writes a block of byte data into the resource at the given offset.
-vm.import @buffer.write_data(
-  %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
-  %source_buffer : !vm.ref<!iree.byte_buffer>,
-  %source_offset : i32,
-  %length : i32
-)
-
-// Copies data from the provided source_buffer into the buffer.
-vm.import @buffer.copy_data(
-  %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i32,
-  %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
-  %length : i32
 )
 
 // Loads a value from a buffer by mapping it.
@@ -112,17 +88,8 @@ vm.import @buffer.store(
 // Creates a reference to a buffer with a particular shape and element type.
 vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %element_type : i32
-) -> !vm.ref<!hal.buffer_view>
-attributes {nosideeffects}
-
-// Returns a view into a buffer. The buffer is not copied and both the original
-// and sliced references must be synchronized.
-vm.import @buffer_view.subview(
-  %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...,
-  %lengths : i32 ...
+  %element_type : i32,
+  %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
@@ -138,19 +105,10 @@ vm.import @buffer_view.byte_length(
 ) -> i32
 attributes {nosideeffects}
 
-// Computes an element byte offset within a buffer.
-vm.import @buffer_view.compute_offset(
+// Returns the element type of the buffer view.
+vm.import @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...
 ) -> i32
-attributes {nosideeffects}
-
-// Computes a byte range within a buffer for one or more elements.
-vm.import @buffer_view.compute_range(
-  %buffer_view : !vm.ref<!hal.buffer_view>,
-  %indices : i32 ...,
-  %lengths : i32 ...
-) -> (i32, i32)
 attributes {nosideeffects}
 
 // Returns the rank of the buffer view.
@@ -166,28 +124,10 @@ vm.import @buffer_view.dim(
 ) -> i32
 attributes {nosideeffects}
 
-// Returns N dimension values.
-vm.import @buffer_view.dims.1(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.2(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.3(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32, i32)
-attributes {nosideeffects}
-vm.import @buffer_view.dims.4(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> (i32, i32, i32, i32)
-attributes {nosideeffects}
-
-// Prints out the content of buffers.
+// Prints out the content of buffer views.
 vm.import @buffer_view.trace(
-  %operands : !vm.ref<!hal.buffer_view> ...,
-  %trace_info : !vm.ref<!iree.byte_buffer>
+  %key : !vm.ref<!iree.byte_buffer>,
+  %operands : !vm.ref<!hal.buffer_view> ...
 )
 
 //===----------------------------------------------------------------------===//
@@ -212,15 +152,14 @@ vm.import @command_buffer.end(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
-// Defines a memory dependency between commands recorded before and after the
-// barrier.
+// Defines an execution dependency between all commands recorded before the
+// barrier and all commands recorded after the barrier. Only the stages provided
+// will be affected.
 vm.import @command_buffer.execution_barrier(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_stage_mask : i32,
   %target_stage_mask : i32,
-  // TODO(benvanik): tuple types.
-  %memory_barriers : i32 ...,
-  %buffer_barriers : i32 ...
+  %flags : i32
 )
 
 // Fills the target buffer with the given repeating value.
@@ -358,8 +297,8 @@ attributes {nosideeffects}
 // required size.
 vm.import @executable_layout.create(
   %device : !vm.ref<!hal.device>,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...,
-  %push_constants : i32
+  %push_constants : i32,
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 

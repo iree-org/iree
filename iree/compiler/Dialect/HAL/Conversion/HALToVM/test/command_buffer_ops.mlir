@@ -22,14 +22,8 @@ func @command_buffer_begin_end(%arg0 : !hal.command_buffer) {
 
 // CHECK-LABEL: @command_buffer_execution_barrier
 func @command_buffer_execution_barrier(%arg0 : !hal.command_buffer, %arg1 : !hal.buffer) {
-  %c100 = constant 100 : index
-  %c200 = constant 200 : index
-  %memory_barrier = hal.make_memory_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite" : tuple<i32, i32>
-  // TODO(benvanik): buffer barriers.
-  // %buffer_barrier = hal.make_buffer_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite", %0, %1, %2 : tuple<i32, i32, !vm.ref<!hal.buffer>, i32, i32>
-  // CHECK: vm.call.variadic @hal.command_buffer.execution_barrier(%arg0, %c1, %c2, [%c192, %c768], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
-  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess",
-      memory_barriers=[%memory_barrier, %memory_barrier]
+  // CHECK: vm.call @hal.command_buffer.execution_barrier(%arg0, %c1, %c2, %zero) : (!vm.ref<!hal.command_buffer>, i32, i32, i32)
+  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", "None"
   return
 }
 

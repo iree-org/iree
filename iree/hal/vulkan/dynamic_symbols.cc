@@ -16,10 +16,10 @@
 
 #include <cstddef>
 
-#include "absl/base/attributes.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
+#include "iree/base/attributes.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -43,7 +43,7 @@ struct FunctionPtrInfo {
   // An offset in bytes from the base of &syms to where the PFN_vkSomeFunction
   // member is located.
   uint32_t member_offset : 30;
-} ABSL_ATTRIBUTE_PACKED;
+} IREE_ATTRIBUTE_PACKED;
 
 namespace {
 

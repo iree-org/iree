@@ -26,7 +26,7 @@ func @descriptorSetLayoutLookup(%arg0 : !hal.device) -> !hal.descriptor_set_layo
 // CHECK-NEXT: func private @_executable_layout_0_initializer() -> !hal.executable_layout {
 // CHECK-NEXT:   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %dev = hal.ex.shared_device : !hal.device
-// CHECK-NEXT:   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0], push_constants = 0 : !hal.executable_layout
+// CHECK-NEXT:   %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
 // CHECK-NEXT:   return %executable_layout : !hal.executable_layout
 // CHECK-NEXT: }
 
@@ -53,7 +53,7 @@ func @exeLayoutLookup(%arg0 : !hal.device) -> !hal.executable_layout {
 // CHECK-NEXT:   %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %1 = hal.variable.load @_descriptor_set_layout_1 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %dev = hal.ex.shared_device : !hal.device
-// CHECK-NEXT:   %executable_layout = hal.executable_layout.create %dev, set_layouts = [%0, %1], push_constants = 0 : !hal.executable_layout
+// CHECK-NEXT:   %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0, %1] : !hal.executable_layout
 // CHECK-NEXT:   return %executable_layout : !hal.executable_layout
 // CHECK-NEXT: }
 

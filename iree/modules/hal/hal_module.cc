@@ -290,30 +290,6 @@ class HALModuleState final {
     return OkStatus();
   }
 
-  Status BufferReadData(const vm::ref<iree_hal_buffer_t>& source_buffer,
-                        int32_t source_offset,
-                        const vm::ref<iree_vm_rw_byte_buffer_t>& target_buffer,
-                        int32_t target_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferReadData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferReadData");
-  }
-
-  Status BufferWriteData(const vm::ref<iree_hal_buffer_t>& target_buffer,
-                         int32_t target_offset,
-                         const vm::ref<iree_vm_ro_byte_buffer_t>& source_buffer,
-                         int32_t source_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferWriteData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferWriteData");
-  }
-
-  Status BufferCopyData(const vm::ref<iree_hal_buffer_t>& source_buffer,
-                        int32_t source_offset,
-                        const vm::ref<iree_hal_buffer_t>& target_buffer,
-                        int32_t target_offset, int32_t length) {
-    IREE_TRACE_SCOPE0("HALModuleState::BufferCopyData");
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "BufferCopyData");
-  }
-
   StatusOr<int32_t> BufferLoad(const vm::ref<iree_hal_buffer_t>& source_buffer,
                                int32_t source_offset, int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferLoad");
@@ -356,25 +332,14 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewCreate(
-      const vm::ref<iree_hal_buffer_t>& buffer, absl::Span<const int32_t> shape,
-      iree_hal_element_type_t element_type) {
+      const vm::ref<iree_hal_buffer_t>& buffer,
+      iree_hal_element_type_t element_type, absl::Span<const int32_t> shape) {
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    element_type, &buffer_view),
+        iree_hal_buffer_view_create(buffer.get(), element_type, shape.data(),
+                                    shape.size(), &buffer_view),
         "failed to create buffer view");
     return std::move(buffer_view);
-  }
-
-  StatusOr<vm::ref<iree_hal_buffer_view_t>> BufferViewSubview(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> indices, absl::Span<const int32_t> lengths) {
-    vm::ref<iree_hal_buffer_view_t> new_buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_subview(
-                             buffer_view.get(), indices.data(), indices.size(),
-                             lengths.data(), lengths.size(), &new_buffer_view),
-                         "failed to create subview");
-    return std::move(new_buffer_view);
   }
 
   StatusOr<vm::ref<iree_hal_buffer_t>> BufferViewBuffer(
@@ -387,27 +352,10 @@ class HALModuleState final {
     return iree_hal_buffer_view_byte_length(buffer_view.get());
   }
 
-  StatusOr<int32_t> BufferViewComputeOffset(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> indices) {
-    iree_device_size_t offset = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_offset(
-        buffer_view.get(), indices.data(), indices.size(), &offset));
-    return offset;
-  }
-
-  StatusOr<std::tuple<int32_t, int32_t>> BufferViewComputeRange(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view,
-      absl::Span<const int32_t> start_indices,
-      absl::Span<const int32_t> lengths) {
-    iree_device_size_t start_offset = 0;
-    iree_device_size_t subspan_length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
-        buffer_view.get(), start_indices.data(), start_indices.size(),
-        lengths.data(), lengths.size(), &start_offset, &subspan_length));
-    return std::make_tuple<int32_t, int32_t>(
-        static_cast<int32_t>(start_offset),
-        static_cast<int32_t>(subspan_length));
+  StatusOr<int32_t> BufferViewElementType(
+      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
+    return static_cast<int32_t>(
+        iree_hal_buffer_view_element_type(buffer_view.get()));
   }
 
   StatusOr<int32_t> BufferViewRank(
@@ -422,40 +370,10 @@ class HALModuleState final {
         iree_hal_buffer_view_shape_dim(buffer_view.get(), index));
   }
 
-  template <size_t N>
-  StatusOr<std::array<int32_t, N>> BufferViewDimsN(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    std::array<int32_t, N> value;
-    iree_host_size_t rank = 0;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_shape(buffer_view.get(), N, value.data(), &rank));
-    return value;
-  }
-
-  StatusOr<std::array<int32_t, 1>> BufferViewDims1(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<1>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 2>> BufferViewDims2(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<2>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 3>> BufferViewDims3(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<3>(buffer_view);
-  }
-
-  StatusOr<std::array<int32_t, 4>> BufferViewDims4(
-      const vm::ref<iree_hal_buffer_view_t>& buffer_view) {
-    return BufferViewDimsN<4>(buffer_view);
-  }
-
   Status BufferViewTrace(
-      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views,
-      absl::string_view trace_info) {
-    fprintf(stderr, "=== %s ===\n", std::string(trace_info).c_str());
+      absl::string_view key,
+      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views) {
+    fprintf(stderr, "=== %s ===\n", std::string(key).c_str());
     for (auto& view : buffer_views) {
       std::string result_str(4096, '\0');
       iree_status_t status;
@@ -504,14 +422,12 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       iree_hal_execution_stage_t source_stage_mask,
       iree_hal_execution_stage_t target_stage_mask,
-      absl::Span<const int32_t> memory_barriers,
-      absl::Span<const int32_t> buffer_barriers) {
-    // TODO(benvanik): decode barriers.
+      iree_hal_execution_barrier_flags_t flags) {
     iree_hal_memory_barrier_t global_barrier;
     global_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
     global_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_READ;
     return iree_hal_command_buffer_execution_barrier(
-        command_buffer.get(), source_stage_mask, target_stage_mask, 1,
+        command_buffer.get(), source_stage_mask, target_stage_mask, flags, 1,
         &global_barrier, 0, nullptr);
   }
 
@@ -720,9 +636,8 @@ class HALModuleState final {
   //===--------------------------------------------------------------------===//
 
   StatusOr<vm::ref<iree_hal_executable_layout_t>> ExecutableLayoutCreate(
-      const vm::ref<iree_hal_device_t>& device,
-      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
-      int32_t push_constants) {
+      const vm::ref<iree_hal_device_t>& device, int32_t push_constants,
+      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts) {
     iree_hal_descriptor_set_layout_t** set_layouts_ptr =
         (iree_hal_descriptor_set_layout_t**)iree_alloca(
             sizeof(set_layouts_ptr[0]) * set_layouts.size());
@@ -732,7 +647,7 @@ class HALModuleState final {
 
     vm::ref<iree_hal_executable_layout_t> executable_layout;
     IREE_RETURN_IF_ERROR(iree_hal_executable_layout_create(
-        device.get(), set_layouts.size(), set_layouts_ptr, push_constants,
+        device.get(), push_constants, set_layouts.size(), set_layouts_ptr,
         &executable_layout));
     return std::move(executable_layout);
   }
@@ -811,35 +726,19 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferAllocator),
     vm::MakeNativeFunction("buffer.subspan", &HALModuleState::BufferSubspan),
     vm::MakeNativeFunction("buffer.fill", &HALModuleState::BufferFill),
-    vm::MakeNativeFunction("buffer.read_data", &HALModuleState::BufferReadData),
-    vm::MakeNativeFunction("buffer.write_data",
-                           &HALModuleState::BufferWriteData),
-    vm::MakeNativeFunction("buffer.copy_data", &HALModuleState::BufferCopyData),
     vm::MakeNativeFunction("buffer.load", &HALModuleState::BufferLoad),
     vm::MakeNativeFunction("buffer.store", &HALModuleState::BufferStore),
 
     vm::MakeNativeFunction("buffer_view.create",
                            &HALModuleState::BufferViewCreate),
-    vm::MakeNativeFunction("buffer_view.subview",
-                           &HALModuleState::BufferViewSubview),
     vm::MakeNativeFunction("buffer_view.buffer",
                            &HALModuleState::BufferViewBuffer),
     vm::MakeNativeFunction("buffer_view.byte_length",
                            &HALModuleState::BufferViewByteLength),
-    vm::MakeNativeFunction("buffer_view.compute_offset",
-                           &HALModuleState::BufferViewComputeOffset),
-    vm::MakeNativeFunction("buffer_view.compute_range",
-                           &HALModuleState::BufferViewComputeRange),
+    vm::MakeNativeFunction("buffer_view.element_type",
+                           &HALModuleState::BufferViewElementType),
     vm::MakeNativeFunction("buffer_view.rank", &HALModuleState::BufferViewRank),
     vm::MakeNativeFunction("buffer_view.dim", &HALModuleState::BufferViewDim),
-    vm::MakeNativeFunction("buffer_view.dims.1",
-                           &HALModuleState::BufferViewDims1),
-    vm::MakeNativeFunction("buffer_view.dims.2",
-                           &HALModuleState::BufferViewDims2),
-    vm::MakeNativeFunction("buffer_view.dims.3",
-                           &HALModuleState::BufferViewDims3),
-    vm::MakeNativeFunction("buffer_view.dims.4",
-                           &HALModuleState::BufferViewDims4),
     vm::MakeNativeFunction("buffer_view.trace",
                            &HALModuleState::BufferViewTrace),
 

@@ -66,7 +66,7 @@ static int64_t getMinIfShapeStatic(int64_t shape, int64_t tileSize) {
 
 namespace {
 struct LaunchConfigInfo {
-  std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {32, 1, 1};
   std::array<int64_t, 3> numSubgroups = {1, 1, 1};
   bool vectorize = false;
 };

@@ -450,8 +450,13 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
 }
 
 /// Distributes scf.parallel to workitems using local invocation ID.
-static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
-                                            scf::ParallelOp pLoopOp) {
+static LogicalResult mapToLocalInvocationId(
+    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
+    bool useCyclicDistribution = false) {
+  if (useCyclicDistribution) {
+    return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
+        rewriter, pLoopOp);
+  }
   return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
                                                gpu::BlockDimOp>(rewriter,
                                                                 pLoopOp);
@@ -505,16 +510,21 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-struct ConvertToGPUPass
+class ConvertToGPUPass
     : public PassWrapper<ConvertToGPUPass, OperationPass<ModuleOp>> {
-  ConvertToGPUPass() = default;
-  ConvertToGPUPass(const ConvertToGPUPass &pass) {}
+ public:
+  ConvertToGPUPass(const SPIRVCodegenOptions &passOptions)
+      : options(passOptions) {}
+  ConvertToGPUPass(const ConvertToGPUPass &pass) : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
                     ShapeDialect>();
   }
   void runOnOperation() override;
+
+ private:
+  SPIRVCodegenOptions options;
 };
 
 struct SerializeParallelLoopPattern
@@ -532,7 +542,7 @@ struct SerializeParallelLoopPattern
 template <typename LinalgOpTy>
 static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
     LinalgOpTy linalgOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) {
+    ConversionPatternRewriter &rewriter, bool optimizeControlFlow) {
   // Check for marker that specifies that the linalg op is to be partitioned
   // across threads within a workgroup.
   if (!hasMarker(linalgOp)) return failure();
@@ -542,7 +552,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   if (loops.getValue().empty()) return success();
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
-  return mapToLocalInvocationId(rewriter, pLoopOp);
+  return mapToLocalInvocationId(rewriter, pLoopOp, optimizeControlFlow);
 }
 
 static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
@@ -580,14 +590,19 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
 template <>
 LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
     linalg::CopyOp copyOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) {
-  if (!hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) return failure();
+    ConversionPatternRewriter &rewriter, bool optimizeControlFlow) {
+  if (!hasMarker(copyOp,
+                 {getCopyToWorkgroupMemoryMarker(), getWorkgroupMarker()}))
+    return failure();
   Optional<linalg::LinalgLoops> loops =
       linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, copyOp);
   if (!loops) return failure();
   if (loops.getValue().empty()) return success();
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
+  if (hasMarker(copyOp, getWorkgroupMarker())) {
+    return mapToLocalInvocationId(rewriter, pLoopOp, optimizeControlFlow);
+  }
   return distributeCopyOp(copyOp, pLoopOp, rewriter);
 }
 
@@ -595,12 +610,15 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
 /// partitioning it to workitems.
 template <typename LinalgOpTy>
 struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
-  using OpConversionPattern<LinalgOpTy>::OpConversionPattern;
+  MapLinalgOpToLocalInvocationId(MLIRContext *context, bool optimizeControlFlow,
+                                 PatternBenefit benefit = 1)
+      : OpConversionPattern<LinalgOpTy>(context, benefit),
+        optimizeControlFlow(optimizeControlFlow) {}
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (failed(
-            mapLinalgOpToLocalInvocationIdImpl(linalgOp, operands, rewriter)))
+    if (failed(mapLinalgOpToLocalInvocationIdImpl(linalgOp, operands, rewriter,
+                                                  optimizeControlFlow)))
       return failure();
 
     // If the `linalgOp` writes to workgroup memory insert barrier after the
@@ -617,6 +635,12 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     rewriter.eraseOp(linalgOp);
     return success();
   }
+
+ private:
+  /// In cases where we know by construction that the iteration space is always
+  /// less than the number of local invocations within a workgroup, the
+  /// loop-control overhead can be reduced to just a single if-statement.
+  bool optimizeControlFlow;
 };
 
 /// Map linalg operation to execute on GPU in parallel by mapping the parallel
@@ -761,7 +785,8 @@ void ConvertToGPUPass::runOnOperation() {
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
-                  RemoveLinalgRange, SerializeParallelLoopPattern>(context);
+                  RemoveLinalgRange, SerializeParallelLoopPattern>(
+      context, options.useLinalgOnTensors);
   FrozenRewritePatternList frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getOps<FuncOp>()) {
@@ -776,13 +801,16 @@ void ConvertToGPUPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass() {
-  return std::make_unique<ConvertToGPUPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass(
+    const SPIRVCodegenOptions &options) {
+  return std::make_unique<ConvertToGPUPass>(options);
 }
 
 static PassRegistration<ConvertToGPUPass> pass(
-    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
-    [] { return std::make_unique<ConvertToGPUPass>(); });
+    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU", [] {
+      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
+      return std::make_unique<ConvertToGPUPass>(options);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

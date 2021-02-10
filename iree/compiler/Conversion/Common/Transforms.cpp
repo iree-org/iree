@@ -261,6 +261,57 @@ class SetWorkgroupSizePattern
 };
 }  // namespace
 
+/// Given the tile sizes to use adds a region to the entry point operation that
+/// describes the maximum number of workgroups for a given workload. For now it
+/// is computed as (workload + tilesize - 1) / tilesize along each dimension and
+/// restricted to be 3D dimensional.
+static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
+                                             ArrayRef<int64_t> tileSizes) {
+  auto targetOp =
+      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
+  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+    if (op.sym_name() == funcOp.getName()) {
+      entryPointOp = op;
+      break;
+    }
+  }
+  if (!entryPointOp)
+    return funcOp.emitOpError("unable to find corresponding entry point op");
+  if (entryPointOp.getBody())
+    return entryPointOp.emitOpError("cannot override workgroup_count_region");
+  Location loc = entryPointOp.getLoc();
+
+  OpBuilder::InsertionGuard guard(builder);
+  // Create the cloned operation but with a single region.
+  builder.setInsertionPoint(entryPointOp);
+  auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
+      loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
+      entryPointOp.interfaceAttr(), entryPointOp.signatureAttr(),
+      entryPointOp.workgroup_sizeAttr(), 1);
+  Region *region = clonedOp.getBody();
+  Block *entryBlock = builder.createBlock(region);
+  // Add 3 index arguments for the workload.
+  auto indexType = builder.getIndexType();
+  SmallVector<BlockArgument, 4> workload = llvm::to_vector<4>(
+      entryBlock->addArguments({indexType, indexType, indexType}));
+  // Make the number of workgroups workload / tile size.
+  SmallVector<Value, 4> returnValues;
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  assert(tileSizes.size() <= 3 &&
+         "expected only three tile size values for num workgroups computation");
+  for (auto ts : llvm::enumerate(llvm::reverse(tileSizes))) {
+    Value tsVal = builder.create<ConstantIndexOp>(loc, ts.value());
+    Value tsMinusOne = builder.create<SubIOp>(loc, tsVal, one);
+    Value num = builder.create<AddIOp>(loc, workload[ts.index()], tsMinusOne);
+    returnValues.push_back(builder.create<SignedDivIOp>(loc, num, tsVal));
+  }
+  returnValues.resize(3, one);
+  builder.create<IREE::HAL::ReturnOp>(loc, returnValues);
+  entryPointOp.erase();
+  return success();
+}
+
 LogicalResult materializeStaticLaunchInformation(
     FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup) {
   OwningRewritePatternList patterns;
@@ -269,7 +320,8 @@ LogicalResult materializeStaticLaunchInformation(
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
-  return success();
+  OpBuilder builder(funcOp.getContext());
+  return initNumWorkgroupsRegion(builder, funcOp, workloadPerWorkgroup);
 }
 
 LogicalResult tileAndFuseLinalgBufferOps(

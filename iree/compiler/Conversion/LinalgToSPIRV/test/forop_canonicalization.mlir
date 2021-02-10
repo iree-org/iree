@@ -53,3 +53,34 @@ func @loop_carried_extract(%arg0: f32) -> f32 {
 //       CHECK:     }
 //   CHECK-NOT:     vector.extract
 //       CHECK:     return {{.*}} : f32
+
+func @loop_pack_v8f16(%arg0: vector<8xf16>, %arg1: vector<8xf16>, %arg2: vector<4xf16>)
+                  -> (vector<8xf16>, vector<8xf16>, vector<4xf16>) {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c10 = constant 10 : index
+
+  %0:3 = scf.for %iv = %c0 to %c10 step %c1
+                 iter_args(%forarg0 = %arg0, %forarg1 = %arg1, %forarg2 = %arg2)
+              -> (vector<8xf16>, vector<8xf16>, vector<4xf16>) {
+    %add = addf %forarg0, %forarg1: vector<8xf16>
+    scf.yield %add, %forarg1, %forarg2: vector<8xf16>, vector<8xf16>, vector<4xf16>
+  }
+
+  return %0#0, %0#1, %0#2 : vector<8xf16>, vector<8xf16>, vector<4xf16>
+}
+
+// CHECK-LABEL: func @loop_pack_v8f16
+//  CHECK-SAME: (%[[ARG0:.+]]: vector<8xf16>, %[[ARG1:.+]]: vector<8xf16>, %[[ARG2:.+]]: vector<4xf16>)
+//       CHECK:    %[[CAST_ARG0:.+]] = vector.bitcast %[[ARG0]] : vector<8xf16> to vector<4xf32>
+//       CHECK:    %[[CAST_ARG1:.+]] = vector.bitcast %[[ARG1]] : vector<8xf16> to vector<4xf32>
+//       CHECK:    %[[FOR:.+]]:3 = scf.for %{{.+}} = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[FOR_ARG0:.+]] = %[[CAST_ARG0]], %[[FOR_ARG1:.+]] = %[[CAST_ARG1]], %[[FOR_ARG2:.+]] = %[[ARG2]]) -> (vector<4xf32>, vector<4xf32>, vector<4xf16>) {
+//       CHECK:      %[[CAST_FOR_ARG0:.+]] = vector.bitcast %[[FOR_ARG0]] : vector<4xf32> to vector<8xf16>
+//       CHECK:      %[[CAST_FOR_ARG1:.+]] = vector.bitcast %[[FOR_ARG1]] : vector<4xf32> to vector<8xf16>
+//       CHECK:      %[[ADD:.+]] = addf %[[CAST_FOR_ARG0]], %[[CAST_FOR_ARG1]] : vector<8xf16>
+//       CHECK:      %[[CAST_ADD:.+]] = vector.bitcast %[[ADD]] : vector<8xf16> to vector<4xf32>
+//       CHECK:      scf.yield %[[CAST_ADD]], %[[FOR_ARG1]], %[[FOR_ARG2]] : vector<4xf32>, vector<4xf32>, vector<4xf16>
+//       CHECK:    }
+//       CHECK:    %[[CAST_FOR0:.+]] = vector.bitcast %[[FOR]]#0 : vector<4xf32> to vector<8xf16>
+//       CHECK:    %[[CAST_FOR1:.+]] = vector.bitcast %[[FOR]]#1 : vector<4xf32> to vector<8xf16>
+//       CHECK:    return %[[CAST_FOR0]], %[[CAST_FOR1]], %[[FOR]]#2 : vector<8xf16>, vector<8xf16>, vector<4xf16>

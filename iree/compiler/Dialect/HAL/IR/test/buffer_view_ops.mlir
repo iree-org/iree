@@ -16,9 +16,10 @@ func @buffer_view_const() -> !hal.buffer_view {
 
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0 : !hal.buffer) -> !hal.buffer_view {
+  %c32 = constant 32 : i32
   %0:2 = "test_hal.shape"() : () -> (index, index)
-  // CHECK: %view = hal.buffer_view.create %arg0, shape = [%0#0, %0#1], element_type = 32 : !hal.buffer_view
-  %view = hal.buffer_view.create %arg0, shape=[%0#0, %0#1], element_type=32 : !hal.buffer_view
+  // CHECK: %view = hal.buffer_view.create %arg0, element_type = %c32_i32, shape = [%0#0, %0#1] : !hal.buffer_view
+  %view = hal.buffer_view.create %arg0, element_type = %c32, shape = [%0#0, %0#1] : !hal.buffer_view
   return %view : !hal.buffer_view
 }
 

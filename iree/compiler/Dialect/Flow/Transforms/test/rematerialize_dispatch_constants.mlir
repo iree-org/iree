@@ -124,3 +124,30 @@ func @constant_capture(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
 //       CHECK:         linalg.yield %[[T2]]
 //       CHECK:       }
 //       CHECK:     flow.return %[[RESULT]]
+
+// -----
+
+func @rematerialize_dispatch_workgroups(%arg0: tensor<8x8xf32>, %arg1: tensor<8x8xf32>) -> tensor<8x8xf32> {
+  %cst_0 = constant 0.0 : f32
+  %c2 = constant 1 : index
+  %0 = flow.dispatch.workgroups[%c2, %c2, %c2] (%cst_0, %arg0, %arg1) : (f32, tensor<8x8xf32>, tensor<8x8xf32>) -> tensor<8x8xf32> = (%arg2 : f32, %arg3 : !flow.dispatch.input<8x8xf32>, %arg4 : !flow.dispatch.input<8x8xf32>, %arg5 : !flow.dispatch.output<8x8xf32>) {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %c8 = constant 8 : index
+    %1 = linalg.init_tensor [8, 8] : tensor<8x8xf32>
+    %2 = linalg.fill(%1, %arg2) : tensor<8x8xf32>, f32 -> tensor<8x8xf32>
+    %3 = flow.dispatch.input.load %arg3, offsets = [%c0, %c0], sizes = [%c8, %c8], strides = [%c1, %c1] : !flow.dispatch.input<8x8xf32> -> tensor<8x8xf32>
+    %4 = flow.dispatch.input.load %arg4, offsets = [%c0, %c0], sizes = [%c8, %c8], strides = [%c1, %c1] : !flow.dispatch.input<8x8xf32> -> tensor<8x8xf32>
+    %5 = linalg.matmul ins(%3, %4 : tensor<8x8xf32>, tensor<8x8xf32>) outs(%2 : tensor<8x8xf32>) -> tensor<8x8xf32>
+    flow.dispatch.output.store %5, %arg5, offsets = [%c0, %c0], sizes = [%c8, %c8], strides = [%c1, %c1] : tensor<8x8xf32> -> !flow.dispatch.output<8x8xf32>
+    flow.return
+  }
+  return %0: tensor<8x8xf32>
+}
+
+// CHECK: func @rematerialize_dispatch_workgroups(%[[ARG1:.+]]: tensor<8x8xf32>, %[[ARG2:.+]]: tensor<8x8xf32>)
+// CHECK: %[[CONST1:.+]] = constant 1 : index
+//       CHECK:   flow.dispatch.workgroups[%[[CONST1]], %[[CONST1]], %[[CONST1]]] (%[[ARG1]], %[[ARG2]])
+//            CHECK: %[[CONST0:.+]] = constant 0.000000e+00 : f32
+//            CHECK: %[[INIT_TENSOR:.+]] = linalg.init_tensor [8, 8] : tensor<8x8xf32>
+//            CHECK:  linalg.fill(%[[INIT_TENSOR]], %[[CONST0]]) : tensor<8x8xf32>, f32 -> tensor<8x8xf32>
