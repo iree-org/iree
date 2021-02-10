@@ -62,7 +62,7 @@ struct SplitIndependentReductionOpConversion
     mhlo::ReduceOp::Adaptor newOperands(operands);
     SmallVector<Value, 4> setResults;
     for (auto &op : block) {
-      if (op.isKnownTerminator()) {
+      if (op.hasTrait<OpTrait::IsTerminator>()) {
         continue;
       } else if (op.getOperands().size() != 2) {
         // Only binary ops are supported for builtins.
@@ -94,7 +94,7 @@ struct SplitIndependentReductionOpConversion
       }
       for (auto result : op.getResults()) {
         for (auto *user : result.getUsers()) {
-          if (!user->isKnownTerminator()) {
+          if (!user->hasTrait<OpTrait::IsTerminator>()) {
             // Result is not directly returned from the block; unsupported.
             return failure();
           }
