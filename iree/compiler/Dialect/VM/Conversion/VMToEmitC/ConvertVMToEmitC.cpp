@@ -89,6 +89,20 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::OrI32Op>>(context, "vm_or_i32");
   patterns.insert<CallOpConversion<IREE::VM::XorI32Op>>(context, "vm_xor_i32");
 
+  // Casting and type conversion/emulation ops
+  patterns.insert<CallOpConversion<IREE::VM::TruncI32I8Op>>(context,
+                                                            "vm_trunc_i32i8");
+  patterns.insert<CallOpConversion<IREE::VM::TruncI32I16Op>>(context,
+                                                             "vm_trunc_i32i16");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI8I32SOp>>(context,
+                                                           "vm_ext_i8i32s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI8I32UOp>>(context,
+                                                           "vm_ext_i8i32u");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI16I32SOp>>(context,
+                                                            "vm_ext_i16i32s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI16I32UOp>>(context,
+                                                            "vm_ext_i16i32u");
+
   // Native bitwise shift and rotate ops
   patterns.insert<CallOpConversion<IREE::VM::ShlI32Op>>(context, "vm_shl_i32");
   patterns.insert<CallOpConversion<IREE::VM::ShrI32SOp>>(context,
@@ -154,6 +168,14 @@ class ConvertVMToEmitCPass
     target.addIllegalOp<IREE::VM::AndI32Op>();
     target.addIllegalOp<IREE::VM::OrI32Op>();
     target.addIllegalOp<IREE::VM::XorI32Op>();
+
+    // Casting and type conversion/emulation ops
+    target.addIllegalOp<IREE::VM::TruncI32I8Op>();
+    target.addIllegalOp<IREE::VM::TruncI32I16Op>();
+    target.addIllegalOp<IREE::VM::ExtI8I32SOp>();
+    target.addIllegalOp<IREE::VM::ExtI8I32UOp>();
+    target.addIllegalOp<IREE::VM::ExtI16I32SOp>();
+    target.addIllegalOp<IREE::VM::ExtI16I32UOp>();
 
     // Native bitwise shift and rotate ops
     target.addIllegalOp<IREE::VM::ShlI32Op>();
