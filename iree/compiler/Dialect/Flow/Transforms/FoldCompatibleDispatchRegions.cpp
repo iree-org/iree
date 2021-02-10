@@ -301,7 +301,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
     // we have those new values).
     //
     // We avoid the return op here as we have already merged it above.
-    if (!op.isKnownTerminator()) {
+    if (!op.hasTrait<OpTrait::IsTerminator>()) {
       regionBuilder.clone(op, mapping);
     }
   }
