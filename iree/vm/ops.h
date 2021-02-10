@@ -18,6 +18,15 @@
 #include <stdint.h>
 
 //===------------------------------------------------------------------===//
+// Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_select_i32(int32_t condition, int32_t true_value,
+                                    int32_t false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
 // Native integer arithmetic
 //===------------------------------------------------------------------===//
 

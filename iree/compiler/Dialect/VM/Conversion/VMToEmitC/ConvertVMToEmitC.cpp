@@ -72,6 +72,10 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
+  // Conditional assignment ops
+  patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
+                                                           "vm_select_i32");
+
   // Native integer arithmetic ops
   patterns.insert<CallOpConversion<IREE::VM::AddI32Op>>(context, "vm_add_i32");
   patterns.insert<CallOpConversion<IREE::VM::SubI32Op>>(context, "vm_sub_i32");
@@ -155,6 +159,9 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
     target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
+
+    // Conditional assignment ops
+    target.addIllegalOp<IREE::VM::SelectI32Op>();
 
     // Native integer arithmetic ops
     target.addIllegalOp<IREE::VM::AddI32Op>();
