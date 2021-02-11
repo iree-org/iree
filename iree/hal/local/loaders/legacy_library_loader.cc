@@ -159,24 +159,25 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
   if (flatbuffers_string_len(debug_database_filename) &&
       flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
     IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
-    auto debug_database_path = iree::file_path::JoinPaths(
-        iree::file_path::DirectoryName(library_temp_path),
-        absl::string_view(debug_database_filename,
-                          flatbuffers_string_len(debug_database_filename)));
-    iree_string_view_t debug_database_file = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_allocator_clone(
-        host_allocator,
-        iree_make_const_byte_span(debug_database_path.data(),
-                                  debug_database_path.size()),
-        (void**)&debug_database_file.data));
-    debug_database_file.size = debug_database_path.size();
-    executable->temp_files[executable->temp_file_count++] = debug_database_file;
+    iree_string_view_t library_temp_path_sv = iree_make_string_view(
+        library_temp_path.data(), library_temp_path.size());
+    iree_string_view_t debug_database_filename_sv =
+        iree_make_string_view(debug_database_filename,
+                              flatbuffers_string_len(debug_database_filename));
+    char* debug_database_path = NULL;
+    IREE_RETURN_IF_ERROR(iree_file_path_join(
+        iree_file_path_dirname(library_temp_path_sv),
+        debug_database_filename_sv, host_allocator, &debug_database_path));
+    iree_string_view_t debug_database_path_sv =
+        iree_make_cstring_view(debug_database_path);
+    executable->temp_files[executable->temp_file_count++] =
+        debug_database_path_sv;
     IREE_IGNORE_ERROR(iree::file_io::SetFileContents(
         debug_database_path,
         absl::string_view(
             reinterpret_cast<const char*>(debug_database_embedded_vec),
             flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
-    library->AttachDebugDatabase(debug_database_path.c_str());
+    library->AttachDebugDatabase(debug_database_path);
   }
 
   executable->library = library.release();

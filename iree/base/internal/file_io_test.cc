@@ -16,7 +16,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/internal/file_path.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
@@ -31,8 +30,8 @@ using ::iree::testing::status::StatusIs;
 std::string GetUniquePath(absl::string_view unique_name) {
   char* test_tmpdir = getenv("TEST_TMPDIR");
   IREE_CHECK(test_tmpdir) << "TEST_TMPDIR not defined";
-  return file_path::JoinPaths(test_tmpdir,
-                              absl::StrCat(unique_name, "_test.txt"));
+  return test_tmpdir + std::string("/") + std::string(unique_name) +
+         "_test.txt";
 }
 
 std::string GetUniqueContents(absl::string_view unique_name) {
