@@ -88,7 +88,8 @@ static void iree_hal_system_executable_destroy(
 
 static iree_status_t iree_hal_system_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call) {
+    const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT dispatch_state,
+    const iree_hal_vec3_t* IREE_RESTRICT workgroup_id) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
 
@@ -108,13 +109,16 @@ static iree_status_t iree_hal_system_executable_issue_call(
                                       entry_point_name.size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  executable->library.v0->entry_points[ordinal](
-      call->state, &call->workgroup_id, &call->workgroup_size,
-      &call->workgroup_count, call->push_constants, call->bindings);
+  int ret = executable->library.v0->entry_points[ordinal](dispatch_state,
+                                                          workgroup_id);
 
   IREE_TRACE_ZONE_END(z0);
 
-  return iree_ok_status();
+  return ret == 0 ? iree_ok_status()
+                  : iree_make_status(
+                        IREE_STATUS_INTERNAL,
+                        "executable entry point returned catastrophic error %d",
+                        ret);
 }
 
 static const iree_hal_local_executable_vtable_t
