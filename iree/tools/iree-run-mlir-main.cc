@@ -186,7 +186,7 @@ Status PrepareModule(std::string target_backend,
   out_module->clear();
 
   mlir::MLIRContext context;
-  registry.appendTo(context.getDialectRegistry());
+  context.appendDialectRegistry(registry);
 
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;

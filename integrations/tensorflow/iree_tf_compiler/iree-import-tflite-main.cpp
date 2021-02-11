@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 
   // Convert the Module proto into MLIR.
   MLIRContext context;
-  registry.loadAll(&context);
+  context.loadAllAvailableDialects();
 
   // Load input buffer.
   std::string errorMessage;
