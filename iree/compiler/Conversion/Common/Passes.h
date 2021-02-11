@@ -20,12 +20,13 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Alias for callback function that allocates workgroup level memory. The
-/// callback expects the type of the memref to be allocated (`allocationType`)
-/// and the SSA values that represent the size of dynamic dimensions in the
-/// `allocationType`. The callback is expected to return a MemRefType Value.
+/// callback expects a Sha ShapedType for which the memref is being allocated.of
+/// the memref to be allocated (`allocationType`) and the SSA values that
+/// represent the size of dynamic dimensions in the `allocationType`. The
+/// callback is expected to return a MemRefType Value.
 using WorkgroupMemoryAllocationFn = std::function<Value(
-    OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
-    MemRefType allocationType)>;
+    OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+    Type elementType, ArrayRef<Value> dynamicSizes)>;
 
 /// Adds passes to convert tiled+distributed linalg on tensors code to linalg on
 /// buffers.

@@ -28,6 +28,7 @@ cc_library(
         "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
+        "MaterializeCPULaunchConfigurationPass.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
     ],
