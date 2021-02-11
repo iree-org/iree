@@ -85,15 +85,20 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
   switch (iree_DyLibExecutableDef_sanitized_kind_get(executable_def)) {
     case iree_SanitizerKind_None:
       break;
-    case iree_SanitizerKind_Address: {
-      if (!IREE_SANITIZER_ADDRESS) {
-        return iree_make_status(
-            IREE_STATUS_UNAVAILABLE,
-            "Dynamic library executable is compiled with ASAN support, but "
-            "this host application failed to enable ASAN to load this "
-            "executable");
-      }
-    } break;
+#if !defined(IREE_SANITIZER_ADDRESS)
+    case iree_SanitizerKind_Address:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Executable library is compiled with ASAN support but the host "
+          "runtime is not compiled with it enabled; add -fsanitize=address to "
+          "the runtime compilation options");
+#endif  // !IREE_SANITIZER_ADDRESS
+    default:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Executable library requires a sanitizer the host runtime is not "
+          "compiled to enable/understand: %u",
+          (uint32_t)iree_DyLibExecutableDef_sanitized_kind_get(executable_def));
   }
 
   return iree_ok_status();
