@@ -595,7 +595,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
 #if IREE_STATUS_FEATURES == 0
   // More advanced status code features like source location and messages are
   // disabled. All statuses are just the codes.
-  return (iree_status_t)(code & IREE_STATUS_CODE_MASK);
+  return iree_status_from_code(code);
 #else
   // No-op for OK statuses; we won't get these from the macros but may be called
   // with this from marshaling code.

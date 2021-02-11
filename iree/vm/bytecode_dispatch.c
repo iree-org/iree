@@ -827,7 +827,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListReserve, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -838,7 +838,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -849,7 +849,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListResize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -860,7 +860,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListGetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -875,7 +875,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (!list) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -1328,7 +1328,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListGetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
@@ -1343,7 +1343,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListSetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }

@@ -317,11 +317,14 @@ if(${IREE_SIZE_OPTIMIZED})
       "/Gy"
       "/DNDEBUG"
       "/DIREE_STATUS_MODE=0"
+      "/PDB"
+      "/Os"
+      "/Oy"
   )
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
     MSVC_OR_CLANG_CL
-      "/LTCG"
-      "/opt:ref,icf"
+      "-LTCG"
+      "-opt:ref,icf"
   )
   # TODO(#898): make this only impact the runtime (IREE_RUNTIME_DEFAULT_...).
   set(IREE_DEFAULT_COPTS

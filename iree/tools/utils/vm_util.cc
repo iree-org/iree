@@ -212,7 +212,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
               "variant %d has value type %d but descriptor information %s", i,
               (int)variant.type.value_type, desc_str.c_str());
         }
-        auto* buffer_view = iree_hal_buffer_view_deref(&variant.ref);
+        auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
         if (!buffer_view) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "failed dereferencing variant %d", i);

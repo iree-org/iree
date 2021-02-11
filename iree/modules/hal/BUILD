@@ -20,17 +20,21 @@ package(
 
 cc_library(
     name = "hal",
-    srcs = ["hal_module.cc"],
-    hdrs = ["hal_module.h"],
+    srcs = [
+        "hal_module.c",
+        "shims.c",
+        "shims.h",
+    ],
+    hdrs = [
+        "hal_module.h",
+    ],
+    textual_hdrs = [
+        "exports.inl",
+    ],
     deps = [
         "//iree/base:api",
         "//iree/base:tracing",
         "//iree/hal:api",
         "//iree/vm",
-        "//iree/vm:cc",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/types:span",
     ],
 )

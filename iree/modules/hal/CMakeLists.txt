@@ -19,17 +19,16 @@ iree_cc_library(
     hal
   HDRS
     "hal_module.h"
+  TEXTUAL_HDRS
+    "exports.inl"
   SRCS
-    "hal_module.cc"
+    "hal_module.c"
+    "shims.c"
+    "shims.h"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::memory
-    absl::span
     iree::base::api
     iree::base::tracing
     iree::hal::api
     iree::vm
-    iree::vm::cc
   PUBLIC
 )

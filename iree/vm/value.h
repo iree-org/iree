@@ -21,6 +21,11 @@
 extern "C" {
 #endif  // __cplusplus
 
+// TODO(benvanik): support variable size in modules. vm.imports would need index
+// type and we'd have to make sure all native modules used this size type. It
+// would be a compiler runtime flag and runtime compile flag.
+typedef int32_t iree_vm_size_t;
+
 // Defines the type of a primitive value.
 typedef enum {
   // Not a value type.
