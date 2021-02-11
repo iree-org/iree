@@ -251,6 +251,7 @@ class HALDispatchABI {
           builder, loc, typeConverter->convertType(memRefType));
       desc.setAllocatedPtr(builder, loc, typedPtrValue);
       desc.setAlignedPtr(builder, loc, typedPtrValue);
+      desc.setConstantOffset(builder, loc, 0);
       return desc;
     }
   }
