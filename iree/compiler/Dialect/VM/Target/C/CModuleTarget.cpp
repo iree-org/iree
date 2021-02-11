@@ -78,16 +78,7 @@ static LogicalResult printShim(IREE::VM::FuncOp &funcOp,
   if (!callingConvention) {
     return funcOp.emitError("Couldn't create calling convention string");
   }
-  auto s = callingConvention.getValue();
-  output << "call_";
-  if (s.size() == 0) {
-    output << "0_";
-  } else {
-    std::replace(s.begin(), s.end(), '.', '_');
-    output << s;
-  }
-  output << "_shim";
-
+  output << "call_" << callingConvention.getValue() << "_shim";
   return success();
 }
 

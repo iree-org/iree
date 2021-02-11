@@ -101,8 +101,8 @@ static iree_status_t module_a_sub_1(iree_vm_stack_t* stack, module_a_t* module,
 }
 
 static const iree_vm_native_export_descriptor_t module_a_exports_[] = {
-    {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i.i"), 0, NULL},
-    {iree_make_cstring_view("sub_1"), iree_make_cstring_view("0i.i"), 0, NULL},
+    {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i_i"), 0, NULL},
+    {iree_make_cstring_view("sub_1"), iree_make_cstring_view("0i_i"), 0, NULL},
 };
 static const iree_vm_native_function_ptr_t module_a_funcs_[] = {
     {(iree_vm_native_function_shim_t)call_shim_i32_i32,
@@ -257,7 +257,7 @@ static const iree_vm_reflection_attr_t module_b_entry_attrs_[] = {
     {iree_make_cstring_view("key1"), iree_make_cstring_view("value1")},
 };
 static const iree_vm_native_export_descriptor_t module_b_exports_[] = {
-    {iree_make_cstring_view("entry"), iree_make_cstring_view("0i.i"),
+    {iree_make_cstring_view("entry"), iree_make_cstring_view("0i_i"),
      IREE_ARRAYSIZE(module_b_entry_attrs_), module_b_entry_attrs_},
 };
 static_assert(IREE_ARRAYSIZE(module_b_funcs_) ==
