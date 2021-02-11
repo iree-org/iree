@@ -69,6 +69,7 @@ TileSizesListTypeRef LaunchConfig::getTileSizes(Operation *op) const {
   auto key = getKey(op);
   if (!key) return {};
   auto it = tileSizes.find(*key);
+  if (it == tileSizes.end()) return {};
   return it->second;
 }
 
@@ -79,36 +80,12 @@ ArrayRef<int64_t> LaunchConfig::getTileSizes(Operation *op,
   return t[level];
 }
 
-Optional<SmallVector<int64_t, 4>> LaunchConfig::getWorkloadPerWorkgroup(
-    unsigned numWorkgroupDims,
-    ArrayRef<int64_t> defaultWorkloadPerWorkgroup) const {
-  // The first level of tile + fuse happens at the flow level. So here need to
-  // just get the tile sizes that are decided by the launch config.  Check the
-  // tile sizes of all the operations and make sure they match upto
-  // `numWorkgroupDims`.
-  // TODO(ravishankarm): Not a great way of doing this. An alternative is to use
-  // a "rootOperation" and just return the tile sizes of the root
-  // operation. Currently the LaunchConfig has no concept of root operation, so
-  // avoiding this for now. Revisit if this doesnt work.
-  Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup = llvm::None;
-  for (auto &it : tileSizes) {
-    TileSizesListTypeRef opTileSizesList(it.second);
-    if (opTileSizesList.empty()) return llvm::None;
-    ArrayRef<int64_t> opFirstLevelTileSize(opTileSizesList.front());
-    if (opFirstLevelTileSize.size() < numWorkgroupDims) return llvm::None;
-    opFirstLevelTileSize = opFirstLevelTileSize.take_front(numWorkgroupDims);
-    if (!workloadPerWorkgroup) {
-      workloadPerWorkgroup = llvm::to_vector<4>(opFirstLevelTileSize);
-    } else if (workloadPerWorkgroup.getValue() != opFirstLevelTileSize) {
-      return llvm::None;
-    }
+Operation *LaunchConfig::getRootOperation(ArrayRef<Operation *> ops) {
+  for (auto op : ops) {
+    auto key = getKey(op);
+    if (key && key.getValue() == rootOperationKey) return op;
   }
-  if (!workloadPerWorkgroup) {
-    assert(numWorkgroupDims == defaultWorkloadPerWorkgroup.size());
-    workloadPerWorkgroup = llvm::to_vector<4>(defaultWorkloadPerWorkgroup);
-  }
-  return workloadPerWorkgroup;
-  ;
+  return nullptr;
 }
 
 void LaunchConfig::setTileSizes(Operation *op, TileSizesListType vTileSizes) {
@@ -134,6 +111,11 @@ void LaunchConfig::setWorkgroupSize(ArrayRef<int64_t> vWorkgroupSize) {
 
 void LaunchConfig::setNumSubgroups(ArrayRef<int64_t> vNumSubgroups) {
   setArrayVals(numSubgroups, vNumSubgroups);
+}
+
+void LaunchConfig::setRootOperation(Operation *op) {
+  Optional<StringRef> key = getKey(op);
+  if (key) rootOperationKey = *key;
 }
 
 void LaunchConfig::setSameConfig(Operation *source, Operation *target) {

@@ -79,6 +79,7 @@ inline void registerLinalgToLLVMPasses() {
     createLinalgTileAndDistributePass();
     createLinalgTileAndDistributeOnTensorsPass();
     createLinalgTileAndVectorizeWorkgroupsPass();
+    createMaterializeCPULaunchConfigurationPass();
     return true;
   }();
   (void)init_once;

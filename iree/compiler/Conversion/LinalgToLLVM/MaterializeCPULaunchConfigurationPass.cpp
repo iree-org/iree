@@ -35,8 +35,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-class LinalgTileAndDistributePass
-    : public PassWrapper<LinalgTileAndDistributePass,
+class MaterializeCPULaunchConfigurationPass
+    : public PassWrapper<MaterializeCPULaunchConfigurationPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -44,41 +44,14 @@ class LinalgTileAndDistributePass
                     scf::SCFDialect>();
   }
 
-  LinalgTileAndDistributePass() = default;
-  LinalgTileAndDistributePass(const LinalgTileAndDistributePass &pass) {}
+  MaterializeCPULaunchConfigurationPass() = default;
+  MaterializeCPULaunchConfigurationPass(
+      const MaterializeCPULaunchConfigurationPass &pass) {}
   void runOnOperation() override;
 };
 }  // namespace
 
-Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
-                                          ArrayRef<Value> boundingSubViewSize,
-                                          OperationFolder *folder) {
-  // Allocate the memory into the entry block of the parent FuncOp. This better
-  // aligns with the semantics of this memory which is available at the entry of
-  // the function.
-  OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    subview.emitError("expected op to be within std.func");
-    return llvm::None;
-  }
-  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType());
-  Value buffer = b.create<AllocaOp>(subview.getLoc(), allocType);
-  return buffer;
-}
-
-void LinalgTileAndDistributePass::runOnOperation() {
+void MaterializeCPULaunchConfigurationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
@@ -96,8 +69,7 @@ void LinalgTileAndDistributePass::runOnOperation() {
     Optional<LaunchConfig> launchConfigOpt =
         initCPULaunchConfig(context, dependenceGraph, linalgOps);
     if (!launchConfigOpt) {
-      funcOp.emitError("unable to find launch configuration");
-      return signalPassFailure();
+      return;
     }
     LaunchConfig &launchConfig = *launchConfigOpt;
 
@@ -118,45 +90,53 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
     });
 
-    linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-        [](OpBuilder &builder, Location loc,
-           ArrayRef<Range> parallelLoopRanges) {
-          auto numParallelDims = parallelLoopRanges.size();
-          SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-          for (size_t dim = 0,
-                      e = std::min(numParallelDims, static_cast<size_t>(3));
-               dim < e; ++dim) {
-            procInfo[numParallelDims - dim - 1] = {
-                builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
-                    loc, builder.getIndexType(), APInt(64, dim)),
-                builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
-                    loc, builder.getIndexType(), APInt(64, dim)),
-            };
-          }
-          return procInfo;
-        },
-        {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-         linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-         linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-    TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
-                                             allocateThreadLocalMemory};
-    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
-                                          launchConfig, tileAndFuseOptions))) {
+    // Find the root operation for the dispatch region and get the tile sizes.
+    Operation *rootOperation =
+        launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
+            linalgOps, [](linalg::LinalgOp op) { return op.getOperation(); })));
+    if (!rootOperation) {
+      // By default just set the number of workgroups to be {1, 1, 1}.
+      WorkgroupCountRegionBuilder regionBuilder =
+          [](OpBuilder &b, Location loc,
+             std::array<Value, 3> workload) -> std::array<Value, 3> {
+        Value one = b.create<ConstantIndexOp>(loc, 1);
+        return {one, one, one};
+      };
+      OpBuilder builder(context);
+      if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
+        return signalPassFailure();
+      }
+      launchConfig.finalize(funcOp);
+      return;
+    }
+
+    ArrayRef<int64_t> rootOperationTileSizes =
+        launchConfig.getTileSizes(rootOperation, 0);
+    // Only use the tile sizes for parallel loops of the root operation.
+    rootOperationTileSizes = rootOperationTileSizes.take_front(
+        getNumOuterParallelLoops(rootOperation));
+
+    SmallVector<int64_t, 4> workloadPerWorkgroup =
+        llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
+    if (failed(
+            materializeStaticLaunchInformation(funcOp, workloadPerWorkgroup))) {
+      funcOp.emitOpError("failed to materialize static launch information");
       return signalPassFailure();
     }
+
     launchConfig.finalize(funcOp);
   }
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createLinalgTileAndDistributePass() {
-  return std::make_unique<LinalgTileAndDistributePass>();
+createMaterializeCPULaunchConfigurationPass() {
+  return std::make_unique<MaterializeCPULaunchConfigurationPass>();
 }
 
-static PassRegistration<LinalgTileAndDistributePass> pass(
-    "iree-codegen-llvm-linalg-tile-and-distribute",
+static PassRegistration<MaterializeCPULaunchConfigurationPass> pass(
+    "iree-codegen-llvm-materialize-launch-configuration",
     "Tile and distribute Linalg operations on buffers",
-    [] { return std::make_unique<LinalgTileAndDistributePass>(); });
+    [] { return std::make_unique<MaterializeCPULaunchConfigurationPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

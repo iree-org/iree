@@ -487,6 +487,7 @@ Optional<LaunchConfig> initGPULaunchConfig(
       return llvm::None;                                                     \
     }                                                                        \
     launchConfig.setTileSizes(op, tileSizesInfo);                            \
+    launchConfig.setRootOperation(op);                                       \
     continue;                                                                \
   }
 
