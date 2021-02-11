@@ -93,9 +93,11 @@ IREE aims to
     algorithms, and other are all good examples of exciting ML evolution. We are
     trying to build IREE from the ground-up to enable these models and run them
     efficiently on modern hardware, especially on mobile/edge devices.
+    
 *   Demonstrate MLIR's ability to develop non-traditional ML compiler backends
     and runtimes. MLIR enables IREE's holistic approach of focusing on the math
     being performed and how that math is scheduled rather than graphs of "ops".
+    
 *   Embrace standard-based ML via Vulkan. The graphics world is shifting towards
     favoring modern explicit APIs for performance and predictability and Vulkan
     is emerging as the "compatibility" layer. We would love to allow hardware
