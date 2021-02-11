@@ -467,19 +467,19 @@ class HALModuleState final {
   Status CommandBufferPushDescriptorSet(
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_executable_layout_t>& executable_layout,
-      uint32_t set, absl::Span<const uint32_t> binding_ordinals,
-      absl::Span<const vm::ref<iree_hal_buffer_t>> binding_buffers,
-      absl::Span<const int32_t> binding_offsets,
-      absl::Span<const int32_t> binding_lengths) {
+      uint32_t set,
+      absl::Span<const std::tuple<uint32_t, vm::ref<iree_hal_buffer_t>, int32_t,
+                                  int32_t>>
+          bindings) {
     ExDeferRelease(executable_layout);
     absl::InlinedVector<iree_hal_descriptor_set_binding_t, 16> binding_structs(
-        binding_ordinals.size());
-    for (int i = 0; i < binding_ordinals.size(); ++i) {
+        bindings.size());
+    for (int i = 0; i < bindings.size(); ++i) {
       binding_structs[i] = {
-          binding_ordinals[i], binding_buffers[i].get(),
-          static_cast<iree_device_size_t>(binding_offsets[i]),
-          static_cast<iree_device_size_t>(binding_lengths[i])};
-      ExDeferRelease(binding_buffers[i]);
+          std::get<0>(bindings[i]), std::get<1>(bindings[i]).get(),
+          static_cast<iree_device_size_t>(std::get<2>(bindings[i])),
+          static_cast<iree_device_size_t>(std::get<3>(bindings[i]))};
+      ExDeferRelease(std::get<1>(bindings[i]));
     }
     return iree_hal_command_buffer_push_descriptor_set(
         command_buffer.get(), executable_layout.get(), set,
@@ -534,18 +534,17 @@ class HALModuleState final {
   StatusOr<vm::ref<iree_hal_descriptor_set_t>> DescriptorSetCreate(
       const vm::ref<iree_hal_device_t>& device,
       const vm::ref<iree_hal_descriptor_set_layout_t>& set_layout,
-      absl::Span<const uint32_t> binding_ordinals,
-      absl::Span<const vm::ref<iree_hal_buffer_t>> binding_buffers,
-      absl::Span<const uint32_t> binding_offsets,
-      absl::Span<const uint32_t> binding_lengths) {
+      absl::Span<const std::tuple<uint32_t, vm::ref<iree_hal_buffer_t>, int32_t,
+                                  int32_t>>
+          bindings) {
     absl::InlinedVector<iree_hal_descriptor_set_binding_t, 4> binding_structs(
-        binding_ordinals.size());
-    for (int i = 0; i < binding_ordinals.size(); ++i) {
+        bindings.size());
+    for (int i = 0; i < bindings.size(); ++i) {
       binding_structs[i] = {
-          binding_ordinals[i],                                   // binding
-          binding_buffers[i].get(),                              // buffer
-          static_cast<iree_device_size_t>(binding_offsets[i]),   // offset
-          static_cast<iree_device_size_t>(binding_lengths[i])};  // length
+          /*ordinal=*/std::get<0>(bindings[i]),
+          /*buffer=*/std::get<1>(bindings[i]).get(),
+          /*offset=*/static_cast<iree_device_size_t>(std::get<2>(bindings[i])),
+          /*length=*/static_cast<iree_device_size_t>(std::get<3>(bindings[i]))};
     }
     vm::ref<iree_hal_descriptor_set_t> descriptor_set;
     IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_create(

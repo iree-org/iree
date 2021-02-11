@@ -724,11 +724,18 @@ static void printCommandBufferExecutionBarrierOp(
 
 void CommandBufferPushDescriptorSetOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value executableLayout, uint32_t set,
+    Value executableLayout, int64_t set,
     ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({commandBuffer, executableLayout});
-  state.addAttribute("set", builder.getI32IntegerAttr(set));
-  SmallVector<int32_t, 4> bindingOrdinals;
+  build(builder, state, commandBuffer, executableLayout,
+        builder.createOrFold<ConstantIndexOp>(state.location, set), bindings);
+}
+
+void CommandBufferPushDescriptorSetOp::build(
+    OpBuilder &builder, OperationState &state, Value commandBuffer,
+    Value executableLayout, Value set,
+    ArrayRef<DescriptorSetBindingValue> bindings) {
+  state.addOperands({commandBuffer, executableLayout, set});
+  SmallVector<Value, 4> bindingOrdinals;
   SmallVector<Value, 4> bindingBuffers;
   SmallVector<Value, 4> bindingOffsets;
   SmallVector<Value, 4> bindingLengths;
@@ -738,7 +745,7 @@ void CommandBufferPushDescriptorSetOp::build(
     bindingOffsets.push_back(std::get<2>(binding));
     bindingLengths.push_back(std::get<3>(binding));
   }
-  state.addAttribute("bindings", builder.getI32ArrayAttr(bindingOrdinals));
+  state.addOperands(bindingOrdinals);
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
@@ -746,20 +753,19 @@ void CommandBufferPushDescriptorSetOp::build(
 
 static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
                                               OperationState *result) {
-  auto i32Type = parser.getBuilder().getIntegerType(32);
   auto indexType = parser.getBuilder().getIndexType();
-  SmallVector<Attribute, 4> bindingAttrs;
+  SmallVector<Value, 4> bindingOrdinals;
   SmallVector<Value, 4> bindingBuffers;
   SmallVector<Value, 4> bindingOffsets;
   SmallVector<Value, 4> bindingLengths;
   do {
-    IntegerAttr bindingAttr;
     NamedAttrList attrList;
+    OpAsmParser::OperandType ordinal;
     OpAsmParser::OperandType buffer;
     OpAsmParser::OperandType bufferOffset;
     OpAsmParser::OperandType bufferLength;
-    if (failed(
-            parser.parseAttribute(bindingAttr, i32Type, "binding", attrList)) ||
+    if (failed(parser.parseOperand(ordinal)) ||
+        failed(parser.resolveOperand(ordinal, indexType, bindingOrdinals)) ||
         failed(parser.parseEqual()) || failed(parser.parseLParen()) ||
         failed(parser.parseOperand(buffer)) ||
         failed(parser.resolveOperand(
@@ -775,10 +781,8 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
         failed(parser.parseRParen())) {
       return failure();
     }
-    bindingAttrs.push_back(bindingAttr);
   } while (succeeded(parser.parseOptionalComma()));
-  result->addAttribute("bindings",
-                       parser.getBuilder().getArrayAttr(bindingAttrs));
+  result->addOperands(bindingOrdinals);
   result->addOperands(bindingBuffers);
   result->addOperands(bindingOffsets);
   result->addOperands(bindingLengths);
@@ -789,25 +793,24 @@ static ParseResult parseCommandBufferPushDescriptorSetOp(
     OpAsmParser &parser, OperationState *result) {
   OpAsmParser::OperandType commandBuffer;
   OpAsmParser::OperandType executableLayout;
-  IntegerAttr setAttr;
+  OpAsmParser::OperandType set;
   auto operandsLoc = parser.getCurrentLocation();
   if (failed(parser.parseOperand(commandBuffer)) ||
       failed(parser.parseComma()) ||
       failed(parser.parseOperand(executableLayout)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(setAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "set", result->attributes)) ||
+      failed(parser.parseEqual()) || failed(parser.parseOperand(set)) ||
       failed(parser.parseComma()) ||
       failed(parser.resolveOperands(
           ArrayRef<OpAsmParser::OperandType>{
               commandBuffer,
               executableLayout,
+              set,
           },
           ArrayRef<Type>{
               CommandBufferType::get(result->getContext()),
               ExecutableLayoutType::get(result->getContext()),
+              IndexType::get(result->getContext()),
           },
           operandsLoc, result->operands)) ||
       failed(parser.parseKeyword("bindings")) || failed(parser.parseEqual()) ||
@@ -822,8 +825,8 @@ static ParseResult parseCommandBufferPushDescriptorSetOp(
 
 template <typename T>
 static void printDescriptorSetBindings(OpAsmPrinter &p, T op) {
-  for (int i = 0; i < op.bindings().size(); ++i) {
-    p << op.bindings()[i].template cast<IntegerAttr>().getValue();
+  for (int i = 0; i < op.binding_ordinals().size(); ++i) {
+    p.printOperand(op.binding_ordinals()[i]);
     p << " = (";
     p.printOperand(op.binding_buffers()[i]);
     p << ", ";
@@ -831,7 +834,7 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, T op) {
     p << ", ";
     p.printOperand(op.binding_lengths()[i]);
     p << ")";
-    if (i < op.bindings().size() - 1) p << ", ";
+    if (i < op.binding_ordinals().size() - 1) p << ", ";
   }
 }
 
@@ -841,8 +844,9 @@ static void printCommandBufferPushDescriptorSetOp(
   p.printOperand(op.command_buffer());
   p << ", ";
   p.printOperand(op.executable_layout());
-  p << ", set=" << op.set();
-  p << ", bindings=[";
+  p << ", set = ";
+  p.printOperand(op.set());
+  p << ", bindings = [";
   printDescriptorSetBindings(p, op);
   p << "]";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
@@ -859,11 +863,20 @@ void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
                                              OperationState &state,
                                              Value commandBuffer,
                                              Value executableLayout,
-                                             uint32_t set, Value descriptorSet,
+                                             int64_t set, Value descriptorSet,
                                              ValueRange dynamicOffsets) {
-  state.addOperands({commandBuffer, executableLayout, descriptorSet});
-  state.addAttribute("set",
-                     builder.getIntegerAttr(builder.getIntegerType(32), set));
+  build(builder, state, commandBuffer, executableLayout,
+        builder.createOrFold<ConstantIndexOp>(state.location, set),
+        descriptorSet, dynamicOffsets);
+}
+
+void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
+                                             OperationState &state,
+                                             Value commandBuffer,
+                                             Value executableLayout, Value set,
+                                             Value descriptorSet,
+                                             ValueRange dynamicOffsets) {
+  state.addOperands({commandBuffer, executableLayout, set, descriptorSet});
   state.addOperands(dynamicOffsets);
 }
 
@@ -966,7 +979,7 @@ void DescriptorSetCreateOp::build(
     OpBuilder &builder, OperationState &state, Value device, Value setLayout,
     ArrayRef<DescriptorSetBindingValue> bindings) {
   state.addOperands({device, setLayout});
-  SmallVector<int32_t, 4> bindingOrdinals;
+  SmallVector<Value, 4> bindingOrdinals;
   SmallVector<Value, 4> bindingBuffers;
   SmallVector<Value, 4> bindingOffsets;
   SmallVector<Value, 4> bindingLengths;
@@ -976,7 +989,7 @@ void DescriptorSetCreateOp::build(
     bindingOffsets.push_back(std::get<2>(binding));
     bindingLengths.push_back(std::get<3>(binding));
   }
-  state.addAttribute("bindings", builder.getI32ArrayAttr(bindingOrdinals));
+  state.addOperands(bindingOrdinals);
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
@@ -1015,7 +1028,7 @@ static void printDescriptorSetCreateOp(OpAsmPrinter &p,
   p.printOperand(op.device());
   p << ", ";
   p.printOperand(op.set_layout());
-  p << ", bindings=[";
+  p << ", bindings = [";
   printDescriptorSetBindings(p, op);
   p << "]";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{

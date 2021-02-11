@@ -194,10 +194,8 @@ vm.import @command_buffer.push_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable_layout : !vm.ref<!hal.executable_layout>,
   %set : i32,
-  %bindings : i32 ...,
-  %binding_buffers : !vm.ref<!hal.buffer>...,
-  %binding_offsets : i32 ...,
-  %binding_lengths : i32 ...
+  // <binding, buffer, offset, length>
+  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32>...
 )
 
 // Binds a descriptor set to the given set number.
@@ -237,10 +235,8 @@ vm.import @command_buffer.dispatch.indirect(
 vm.import @descriptor_set.create(
   %device : !vm.ref<!hal.device>,
   %set_layout : !vm.ref<!hal.descriptor_set_layout>,
-  %bindings : i32 ...,
-  %binding_buffers : !vm.ref<!hal.buffer>...,
-  %binding_offsets : i32 ...,
-  %binding_lengths : i32 ...
+  // <binding, buffer, offset, length>
+  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set>
 
 //===----------------------------------------------------------------------===//
