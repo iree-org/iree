@@ -12,17 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Links in the TF shared object if --config=monolithic is not set. If this gets
-# borked you'll end up with a ton of undefined symbols errors.
-load("@org_tensorflow//tensorflow:tensorflow.bzl", "tf_cc_binary")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-tf_cc_binary(
+cc_binary(
     name = "iree-tf-opt",
     srcs = ["iree-tf-opt-main.cpp"],
     deps = [
@@ -40,7 +36,7 @@ tf_cc_binary(
     ],
 )
 
-tf_cc_binary(
+cc_binary(
     name = "iree-opt-tflite",
     srcs = ["iree-opt-tflite-main.cpp"],
     deps = [
@@ -57,7 +53,7 @@ tf_cc_binary(
     ],
 )
 
-tf_cc_binary(
+cc_binary(
     name = "iree-tf-import",
     srcs = ["iree-tf-import-main.cpp"],
     deps = [
@@ -80,7 +76,7 @@ tf_cc_binary(
     }),
 )
 
-tf_cc_binary(
+cc_binary(
     name = "iree-import-tflite",
     srcs = ["iree-import-tflite-main.cpp"],
     deps = [
@@ -95,7 +91,7 @@ tf_cc_binary(
     ],
 )
 
-tf_cc_binary(
+cc_binary(
     name = "iree-import-xla",
     srcs = ["iree-import-xla-main.cpp"],
     deps = [
