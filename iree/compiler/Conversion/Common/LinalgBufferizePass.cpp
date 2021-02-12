@@ -247,9 +247,10 @@ static LogicalResult convertTensorReshapeOp(
   }
   // Fallback is to create an allocation and copy the output.
   // Compute the shape of the new tensor based on shape of the input tensor.
-  SmallVector<Value, 4> dynamicDims = linalg::getReshapeOutputShapeFromInput(
-      b, loc, inputBuffer, resultTensorType.getShape(),
-      op.getReassociationMaps());
+  SmallVector<Value, 4> dynamicDims =
+      linalg::getReshapeOutputShapeFromInputShape(b, loc, inputBuffer,
+                                                  resultTensorType.getShape(),
+                                                  op.getReassociationMaps());
   Value alloc = allocationFn(b, loc, resultTensorType.getShape(),
                              resultTensorType.getElementType(), dynamicDims);
   createCopyOp(b, loc, bufferReshape, alloc, getMarkerOrNull(op));
