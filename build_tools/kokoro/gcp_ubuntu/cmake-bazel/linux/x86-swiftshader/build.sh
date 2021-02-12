@@ -43,7 +43,7 @@ echo "Initializing submodules"
 pushd integrations/tensorflow
 
 BAZEL_BINDIR="$(bazel info bazel-bin)"
-bazel build //iree_tf_compiler:all
+bazel build --config=generic_clang //iree_tf_compiler:all
 
 popd
 
