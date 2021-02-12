@@ -38,7 +38,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
-    MLIRMathDialect
+    MLIRMath
     MLIRMathTransforms
     MLIRPass
     MLIRSCF
