@@ -39,7 +39,7 @@ func @log_plus_one() {
    outs(%0 : memref<4xf32>) {
   ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
     %2 = addf %arg0, %cst : f32
-    %3 = log %2 : f32
+    %3 = math.log %2 : f32
     linalg.yield %3 : f32
   }
   return
@@ -53,7 +53,7 @@ func @log_plus_one() {
 //  CHECK-SAME:   outs(%[[BUF1]] :
 //       CHECK: ^bb0(%[[ARG0:.+]]: vector<4xf32>, %[[ARG1:.+]]: vector<4xf32>)
 //       CHECK:   %[[T1:.+]] = addf %[[ARG0]], %[[CST]] : vector<4xf32>
-//       CHECK:   %[[T2:.+]] = log %[[T1]] : vector<4xf32>
+//       CHECK:   %[[T2:.+]] = math.log %[[T1]] : vector<4xf32>
 //       CHECK:   linalg.yield %[[T2]] : vector<4xf32>
 
 // -----
@@ -167,7 +167,7 @@ func @cst() {
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%0 : memref<4xf32>) {
   ^bb0(%arg0: f32):  // no predecessors
-    %1 = rsqrt %cst : f32
+    %1 = math.rsqrt %cst : f32
     linalg.yield %1 : f32
   }
   return

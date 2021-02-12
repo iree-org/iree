@@ -20,7 +20,7 @@ attributes {iree.dispatch_fn_name = ""} {
 // CHECK-SAME:     ins(%[[ARG0]] : tensor<?x?xf32>)
 // CHECK-SAME:     outs(%[[T2]] : tensor<?x?xf32>)
 // CHECK-NEXT:     ^{{.+}}(%[[OPERAND_IN:[a-zA-Z0-9_]+]]: f32, %{{.+}}: f32):
-// CHECK-NEXT:       %[[RESULT:.+]] = exp %[[OPERAND_IN]] : f32
+// CHECK-NEXT:       %[[RESULT:.+]] = math.exp %[[OPERAND_IN]] : f32
 // CHECK-NEXT:       linalg.yield %[[RESULT]] : f32
 //      CHECK:   return %[[T3]]
 

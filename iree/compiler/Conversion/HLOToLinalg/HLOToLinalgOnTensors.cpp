@@ -27,6 +27,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -190,7 +191,8 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect, ShapeDialect>();
+    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect, ShapeDialect,
+                    math::MathDialect>();
   }
 
   void runOnFunction() override {

@@ -31,6 +31,8 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -676,21 +678,22 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addLegalOp<ModuleOp, ModuleTerminatorOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
-                           IREE::HAL::HALDialect>();
+                           IREE::HAL::HALDialect, math::MathDialect>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
-                                    IREEDialect, IREE::HAL::HALDialect>(
-      [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
-        if (!funcParent) return false;
-        if (isEntryPoint(funcParent)) return false;
-        return true;
-      });
+  target
+      .addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
+                                  IREE::HAL::HALDialect, math::MathDialect>(
+          [&](Operation *op) {
+            auto funcParent = op->getParentOfType<FuncOp>();
+            if (!funcParent) return false;
+            if (isEntryPoint(funcParent)) return false;
+            return true;
+          });
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
