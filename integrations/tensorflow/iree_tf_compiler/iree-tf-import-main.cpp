@@ -170,9 +170,9 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   RegisterAllTensorFlowDialects(registry);
 
-  MLIRContext context;
+  MLIRContext context(registry);
+  context.loadAllAvailableDialects();
   OwningModuleRef module;
-  registry.loadAll(&context);
 
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
     auto outputFile = openOutputFile(savePath);

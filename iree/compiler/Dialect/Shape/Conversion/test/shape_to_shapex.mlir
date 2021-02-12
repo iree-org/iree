@@ -25,22 +25,22 @@ func @f(%arg0: tensor<?xf32>) {
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>) {
   %0 = "shape.shape_of"(%arg0) : (tensor<?xf32>) -> !shape.shape
-  %index = constant 0 : i32
+  %index = constant 0 : index
   // CHECK: %[[RS:.+]] = shapex.get_ranked_shape %arg0
   // CHECK: %[[HEAD:.+]] = "shapex.gather_extents"(%[[RS]]) {indices = dense<> : tensor<0xi64>} : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[]>
   // CHECK: %[[TAIL:.+]] = "shapex.gather_extents"(%[[RS]]) {indices = dense<0> : tensor<1xi64>} : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]>
   // CHECK: "foo.use"(%[[HEAD]], %[[TAIL]])
-  %head, %tail = "shape.split_at"(%0, %index) : (!shape.shape, i32) -> (!shape.shape, !shape.shape)
+  %head, %tail = "shape.split_at"(%0, %index) : (!shape.shape, index) -> (!shape.shape, !shape.shape)
   "foo.use"(%head, %tail) : (!shape.shape, !shape.shape) -> ()
   return
 }
 
 // -----
 // No conversion -- index is dynamic.
-func @f(%arg0: tensor<?xf32>, %index: i32) {
+func @f(%arg0: tensor<?xf32>, %index: index) {
   %0 = "shape.shape_of"(%arg0) : (tensor<?xf32>) -> !shape.shape
   // expected-error @+1 {{failed to legalize operation}}
-  %head, %tail = "shape.split_at"(%0, %index) : (!shape.shape, i32) -> (!shape.shape, !shape.shape)
+  %head, %tail = "shape.split_at"(%0, %index) : (!shape.shape, index) -> (!shape.shape, !shape.shape)
   "foo.use"(%head, %tail) : (!shape.shape, !shape.shape) -> ()
   return
 }
