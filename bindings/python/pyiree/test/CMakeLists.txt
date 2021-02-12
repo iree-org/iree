@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
+iree_py_library(
+  NAME
+    test
+  SRCS
+    "__init__.py"
+    "tree_utils.py"
+)
 
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
-# Namespace packages.
-add_subdirectory(pyiree/rt)
-add_subdirectory(pyiree/test)
-
-if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler2)
-add_subdirectory(pyiree/tools/core)
-endif()
-
-if(${IREE_BUILD_XLA_COMPILER})
-add_subdirectory(pyiree/jax)
-endif()
-
-# Tests.
-add_subdirectory(tests)
+iree_py_test(
+  NAME
+    tree_utils_test
+  SRCS
+    "tree_utils_test.py"
+)
