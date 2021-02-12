@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
@@ -45,89 +44,298 @@ namespace iree_compiler {
 
 namespace {
 
-static constexpr int kIndexPackedBuffer = 0;
-static constexpr int kIndexPushConstant = 1;
-static constexpr int kIndexWorkGroupId = 2;
-static constexpr int kIndexWorkGroupCount = 3;
-static constexpr int kIndexWorkGroupSize = 4;
+// NOTE: HALDispatchABI and the associated conversion patterns should live under
+// iree/compiler/Dialect/HAL/Target/LLVM/ instead of here as they have nothing
+// to do with linalg. If we need to use the patterns in this conversion we can
+// expose a populate*Patterns() function to access them without needing them
+// defined here.
 
-// Return the index type: i32.
-static Type getIndexTy(MLIRContext *context) {
-  return IntegerType::get(context, 32);
-}
-
-// func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-//          %push_constant: !llvm.ptr<i32>,
-//          workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//          workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//          workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
-static SmallVector<Type, 5> getABITypes(MLIRContext *context) {
-  auto indexTy = getIndexTy(context);
-  return SmallVector<Type, 5>{
-      // %packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>
-      LLVM::LLVMPointerType::get(
-          LLVM::LLVMPointerType::get(IntegerType::get(context, 8))),
-      // %push_constant: !llvm.ptr<i32>
-      LLVM::LLVMPointerType::get(indexTy),
-      // %workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>
-      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
-      // %workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>
-      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3)),
-      // %workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>
-      LLVM::LLVMPointerType::get(LLVM::LLVMArrayType::get(indexTy, 3))};
-}
-
-// Convert to an LLVMFuncOp form with LLVM types. This implements an ABI that is
-// compatible with IREE and which cannot be represented in std atm.
-// Since it cannot be represented in std, this is an IREE-specific conversion.
-// The conversion rewrites the argument-less and return-less function:
-//
-// ```
-//    func @foo() { ... }
-// ```
-//
-// into:
-//
-// ```
-//    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-//                  %push_constant: !llvm.ptr<i32>,
-//                  workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
-// ```
-//
-// Bump the benefit of the pattern to 100 to pick this pattern instead of a
-// competing pattern inserted by `populateStdToLLVMConversionPatterns`.
-class ConvertFunc : public ConvertToLLVMPattern {
+// Utility for accessing the IREE HAL dispatch function ABI values.
+// All accesses should route through this vs directly manipulating LLVM function
+// arguments so that we can adjust the ABI over time and support multiple
+// versions in the same compiled output.
+class HALDispatchABI {
  public:
-  explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
+  // Returns a Type representing iree_hal_vec3_t.
+  static Type getVec3Type(MLIRContext *context) {
+    auto uint32Type = IntegerType::get(context, 32);
+    return LLVM::LLVMArrayType::get(uint32Type, 3);
+  }
+
+  // Matches the field order in iree_hal_executable_dispatch_state_v0_t.
+  enum class Field {
+    workgroup_count = 0,
+    workgroup_size = 1,
+    push_constant_count = 2,
+    push_constants = 3,
+    binding_count = 4,
+    binding_ptrs = 5,
+    binding_lengths = 6,
+  };
+
+  // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
+  static LLVM::LLVMStructType getDispatchStateType(
+      MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    auto structType = LLVM::LLVMStructType::getIdentified(
+        context, "iree_hal_executable_dispatch_state_v0_t");
+    if (structType.isInitialized()) return structType;
+
+    auto indexType = typeConverter->convertType(IndexType::get(context));
+    auto int8Type = IntegerType::get(context, 8);
+    auto uint32Type = IntegerType::get(context, 32);
+    auto vec3Type = getVec3Type(context);
+    SmallVector<Type, 4> fieldTypes;
+
+    // iree_hal_vec3_t workgroup_count;
+    // iree_hal_vec3_t workgroup_size;
+    fieldTypes.push_back(vec3Type);
+    fieldTypes.push_back(vec3Type);
+
+    // size_t push_constant_count;
+    // const uint32_t * push_constants;
+    fieldTypes.push_back(indexType);
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(uint32Type));
+
+    // size_t binding_count;
+    // void *const * binding_ptrs;
+    // const size_t * binding_lengths;
+    fieldTypes.push_back(indexType);
+    fieldTypes.push_back(
+        LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(int8Type)));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
+
+    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
+    assert(succeeded(bodySet) &&
+           "could not set the body of an identified struct");
+    (void)bodySet;
+
+    return structType;
+  }
+
+  // Returns the types of the LLVM function inputs for the ABI.
+  // This matches the signature of `iree_hal_executable_dispatch_v0_t` in
+  // `iree/hal/local/executable_library.h`.
+  static SmallVector<Type, 5> getInputTypes(MLIRContext *context,
+                                            LLVMTypeConverter *typeConverter) {
+    return SmallVector<Type, 5>{
+        // const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT
+        //   dispatch_state
+        LLVM::LLVMPointerType::get(
+            getDispatchStateType(context, typeConverter)),
+        // const iree_hal_vec3_t* IREE_RESTRICT workgroup_id
+        LLVM::LLVMPointerType::get(getVec3Type(context)),
+    };
+  }
+
+  explicit HALDispatchABI(LLVM::LLVMFuncOp &funcOp,
+                          LLVMTypeConverter *typeConverter)
+      : funcOp(funcOp),
+        typeConverter(typeConverter),
+        dispatchStateType(
+            getDispatchStateType(funcOp.getContext(), typeConverter)) {}
+
+  // Loads the workgroup_id[dim] value (XYZ) and casts it to |resultType|.
+  Value loadWorkgroupID(Location loc, int32_t dim, Type resultType,
+                        OpBuilder &builder) {
+    auto workgroupIdPtrValue = funcOp.getArgument(1);
+    auto workgroupIdValue =
+        builder.createOrFold<LLVM::LoadOp>(loc, workgroupIdPtrValue);
+    auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, builder.getIntegerType(32), workgroupIdValue,
+        builder.getI64ArrayAttr({dim}));
+    return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Loads the workgroup_count[dim] value (XYZ) and casts it to |resultType|.
+  Value loadWorkgroupCount(Location loc, int32_t dim, Type resultType,
+                           OpBuilder &builder) {
+    auto workgroupCountValue =
+        loadFieldValue(loc, Field::workgroup_count, builder);
+    auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, builder.getIntegerType(32), workgroupCountValue,
+        builder.getI64ArrayAttr(dim));
+    return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Loads the workgroup_size[dim] value (XYZ) and casts it to |resultType|.
+  Value loadWorkgroupSize(Location loc, int32_t dim, Type resultType,
+                          OpBuilder &builder) {
+    auto workgroupSizeValue =
+        loadFieldValue(loc, Field::workgroup_size, builder);
+    auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, builder.getIntegerType(32), workgroupSizeValue,
+        builder.getI64ArrayAttr(dim));
+    return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Returns the total push constant count as an index-converted type.
+  Value loadPushConstantCount(Location loc, OpBuilder &builder) {
+    auto value = loadFieldValue(loc, Field::push_constant_count, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
+  }
+
+  // Loads a push constant at |offset| and casts it to |resultType|.
+  Value loadPushConstant(Location loc, int64_t offset, Type resultType,
+                         OpBuilder &builder) {
+    auto constantsPtrValue =
+        loadFieldValue(loc, Field::push_constants, builder);
+    auto offsetValue = getIndexValue(loc, offset, builder);
+    Value constantPtrValue = builder.create<LLVM::GEPOp>(
+        loc, constantsPtrValue.getType(), constantsPtrValue, offsetValue);
+    Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+    return castValueToType(loc, constantValue, resultType, builder);
+  }
+
+  // Returns the total binding count as an index-converted type.
+  Value loadBindingCount(Location loc, OpBuilder &builder) {
+    auto value = loadFieldValue(loc, Field::binding_count, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
+  }
+
+  // Loads the base pointer of the binding |ordinal| as an `i8**`.
+  // Equivalent to:
+  //   int8_t** base_ptr = &state->binding_ptrs[ordinal];
+  Value loadBindingPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
+    auto ptrsPtrValue = loadFieldValue(loc, Field::binding_ptrs, builder);
+    auto ordinalValue = getIndexValue(loc, ordinal, builder);
+    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, ptrsPtrValue.getType(), ptrsPtrValue, ordinalValue);
+    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
+  }
+
+  // Loads the byte length of the binding |ordinal| as an index-converted type.
+  Value loadBindingLength(Location loc, int64_t ordinal, OpBuilder &builder) {
+    auto lengthsPtrValue = loadFieldValue(loc, Field::binding_lengths, builder);
+    auto ordinalValue = getIndexValue(loc, ordinal, builder);
+    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, lengthsPtrValue.getType(), lengthsPtrValue, ordinalValue);
+    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
+  }
+
+  // Loads a binding as a constructed MemRefDescriptor.
+  // |baseOffset| can optionally adjust the base byte offset of the buffer.
+  MemRefDescriptor loadBinding(Location loc, int64_t ordinal,
+                               Value baseOffsetValue, MemRefType memRefType,
+                               OpBuilder &builder) {
+    // Load the base buffer pointer in the appropriate type (f32*, etc).
+    Value basePtrValue = loadBindingPtr(loc, ordinal, builder);
+
+    // Adjust by baseOffset (if needed).
+    if (baseOffsetValue) {
+      basePtrValue = builder.createOrFold<LLVM::GEPOp>(
+          loc, basePtrValue.getType(), basePtrValue, baseOffsetValue);
+    }
+
+    // NOTE: if we wanted to check the range was in bounds here would be the
+    // place to do it.
+
+    // Cast to the desired memref element type.
+    auto elementType = typeConverter->convertType(memRefType.getElementType());
+    Value typedPtrValue = builder.createOrFold<LLVM::BitcastOp>(
+        loc,
+        LLVM::LLVMPointerType::get(elementType, memRefType.getMemorySpace()),
+        basePtrValue);
+
+    // Construct the MemRefDescriptor type based on the information we have.
+    // NOTE: we could use the binding length to clamp this/check that the
+    // requested range is valid.
+    if (memRefType.hasStaticShape()) {
+      return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
+                                               memRefType, typedPtrValue);
+    } else {
+      auto desc = MemRefDescriptor::undef(
+          builder, loc, typeConverter->convertType(memRefType));
+      desc.setAllocatedPtr(builder, loc, typedPtrValue);
+      desc.setAlignedPtr(builder, loc, typedPtrValue);
+      return desc;
+    }
+  }
+
+ private:
+  Value loadFieldValue(Location loc, Field field, OpBuilder &builder) {
+    auto statePtrValue = funcOp.getArgument(0);
+    auto stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
+    auto fieldType = dispatchStateType.getBody()[(int)field];
+    return builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, fieldType, stateValue, builder.getI64ArrayAttr((int)field));
+  }
+
+  Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
+    return builder.createOrFold<LLVM::DialectCastOp>(
+        loc, typeConverter->convertType(builder.getIndexType()),
+        builder.createOrFold<ConstantIndexOp>(loc, value));
+  }
+
+  Value castValueToType(Location loc, Value value, Type resultType,
+                        OpBuilder &builder) {
+    // NOTE: we should handle more cases here (and proper sign extension).
+    if (value.getType() == resultType) return value;
+    return builder.createOrFold<LLVM::ZExtOp>(loc, resultType, value);
+  }
+
+  LLVM::LLVMFuncOp funcOp;
+  LLVMTypeConverter *typeConverter;
+  LLVM::LLVMStructType dispatchStateType;
+};
+
+/// Converts Standard MLIR FuncOps to LLVMFuncOps matching the IREE HAL ABI.
+/// This is an IREE-specific conversion that assumes the input function is
+/// `() -> ()` and that hal.interface.* ops are used to access all state.
+///
+/// Source function:
+///
+/// ```
+/// func @foo() {
+///   %0 = hal.interface.binding.subspan ...
+/// }
+/// ```
+///
+/// into:
+///
+/// ```
+/// llvm.func foo(%state: !llvm.ptr<!...>,
+///               %workgroup_id : !llvm.ptr<!llvm.array<i32, 3>>) {
+///   %0 = <GEP/loads to access binding in %state>
+/// }
+/// ```
+///
+/// See `iree/hal/local/executable_library.h` for more information.
+///
+/// NOTE: we bump the benefit of the pattern to 100 to pick this pattern instead
+/// of a competing pattern inserted by `populateStdToLLVMConversionPatterns`.
+class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALEntryPointFuncOp(MLIRContext *context,
+                                      LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
                              converter, 100) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = cast<FuncOp>(op);
-    FunctionType fnType = funcOp.getType();
-    (void)fnType;
-    if (!funcOp.isPublic()) return failure();
+    auto stdFuncOp = cast<FuncOp>(op);
+    if (!stdFuncOp.isPublic()) return failure();
+    FunctionType fnType = stdFuncOp.getType();
+    if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
+      op->emitWarning() << "public functions on executables must be () -> ()";
+      return failure();
+    }
 
-    // illegal FuncOp must have 0 inputs.
-    assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
-
-    // func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-    //          %push_constant: !llvm.ptr<i32>,
-    //          workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-    //          workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-    //          workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
+    // Convert the function signature to take the HAL ABI LLVM pointers.
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     MLIRContext *context = rewriter.getContext();
-    SmallVector<Type, 5> llvmInputTypes = getABITypes(context);
-    signatureConverter.addInputs(llvmInputTypes);
+    auto abiInputTypes =
+        HALDispatchABI::getInputTypes(context, getTypeConverter());
+    signatureConverter.addInputs(abiInputTypes);
 
-    // Construct newFunc with all attributes except return type & symbol name.
+    // Copy all attributes onto the LLVM function except the ones handled by
+    // MLIR implicitly.
     SmallVector<NamedAttribute, 4> funcAttrs;
-    for (auto attr : funcOp.getAttrs()) {
+    for (auto attr : stdFuncOp.getAttrs()) {
       if (attr.first == SymbolTable::getSymbolAttrName() ||
           attr.first == mlir::impl::getTypeAttrName()) {
         continue;
@@ -135,103 +343,197 @@ class ConvertFunc : public ConvertToLLVMPattern {
       funcAttrs.push_back(attr);
     }
 
+    // Clone the function as an LLVMFuncOp and convert all interior types.
     auto llvmFuncType = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(rewriter.getContext()), llvmInputTypes);
-    auto newFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), funcOp.getName(), llvmFuncType,
+        LLVM::LLVMVoidType::get(rewriter.getContext()), abiInputTypes);
+    auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
+        stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
         LLVM::Linkage::External, funcAttrs);
-
-    // Copy all of funcOp's operations into newFuncOp's body and perform region
-    // type conversion.
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), *typeConverter,
-                                           &signatureConverter)))
+    rewriter.inlineRegionBefore(stdFuncOp.getBody(), llvmFuncOp.getBody(),
+                                llvmFuncOp.end());
+    if (failed(rewriter.convertRegionTypes(
+            &llvmFuncOp.getBody(), *typeConverter, &signatureConverter))) {
       return failure();
+    }
 
-    rewriter.eraseOp(funcOp);
+    rewriter.eraseOp(stdFuncOp);
     return success();
   }
 };
 
-/// Returns the IREE::HAL::InterfaceBindingOp from an interface op.
-// TODO(ravishankarm) : Copy of similar method in LinalgToSPIRV path. Consider
-// combining them.
-IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
-  if (auto placeholderOp = dyn_cast<IREE::PlaceholderOp>(op)) {
-    return cast<IREE::HAL::InterfaceBindingOp>(
-        SymbolTable::lookupNearestSymbolFrom(
-            op, op->getAttrOfType<SymbolRefAttr>("binding")));
-  }
-  if (auto bindingSubspanOp =
-          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
-    return bindingSubspanOp.queryBindingOp();
-  }
-  llvm_unreachable("unknown interface binding op");
-}
-
-// Assumes the enclosing FuncOp has been converted to IREE-compatible ABI:
-// ```
-//    llvm.func foo(%packed_buffer_args: !llvm.ptr<!llvm.ptr<i8>>,
-//                  %push_constant: !llvm.ptr<i32>,
-//                  workgroup_id[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_count[3]: !llvm.ptr<!llvm.array<i32, 3>>,
-//                  workgroup_size[3]: !llvm.ptr<!llvm.array<i32, 3>>)
-// ```
-//
-// Rewrites BindingOp into the proper memref descriptor extracted from
-// `packed_buffer_args`.
-template <typename BindingOp>
-class ConvertBindingOp : public ConvertToLLVMPattern {
+/// Rewrites hal.interface.workgroup.id to ops loading from the ABI structs.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALInterfaceWorkgroupIDOp : public ConvertToLLVMPattern {
  public:
-  explicit ConvertBindingOp(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(BindingOp::getOperationName(), context,
+  explicit ConvertHALInterfaceWorkgroupIDOp(MLIRContext *context,
+                                            LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceWorkgroupIDOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupIDOp>(op)
+                      .dimension()
+                      .getZExtValue();
+    auto resultType = typeConverter->convertType(op->getResult(0).getType());
+    rewriter.replaceOp(
+        op, abi.loadWorkgroupID(op->getLoc(), dim, resultType, rewriter));
+    return success();
+  }
+};
+
+/// Rewrites hal.interface.workgroup.size to ops loading from the ABI structs.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALInterfaceWorkgroupSizeOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALInterfaceWorkgroupSizeOp(MLIRContext *context,
+                                              LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceWorkgroupSizeOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)
+                      .dimension()
+                      .getZExtValue();
+    auto resultType = typeConverter->convertType(op->getResult(0).getType());
+    rewriter.replaceOp(
+        op, abi.loadWorkgroupSize(op->getLoc(), dim, resultType, rewriter));
+    return success();
+  }
+};
+
+/// Rewrites hal.interface.workgroup.count to ops loading from the ABI structs.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALInterfaceWorkgroupCountOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALInterfaceWorkgroupCountOp(MLIRContext *context,
+                                               LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceWorkgroupCountOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
+                      .dimension()
+                      .getZExtValue();
+    auto resultType = typeConverter->convertType(op->getResult(0).getType());
+    rewriter.replaceOp(
+        op, abi.loadWorkgroupCount(op->getLoc(), dim, resultType, rewriter));
+    return success();
+  }
+};
+
+/// Rewrites hal.interface.load.constant to ops loading from the ABI structs.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
+                                           LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    auto loadConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
+    int64_t offset = loadConstantOp.offset().getZExtValue();
+    auto resultType = typeConverter->convertType(op->getResult(0).getType());
+    rewriter.replaceOp(
+        op, abi.loadPushConstant(op->getLoc(), offset, resultType, rewriter));
+    return success();
+  }
+};
+
+/// Rewrites hal.interface.binding.subspan to ops loading from the ABI structs.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALInterfaceBindingSubspanOp(MLIRContext *context,
+                                               LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    auto interfaceBindingOp =
+        cast<IREE::HAL::InterfaceBindingSubspanOp>(op).queryBindingOp();
+    IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(operands);
+    MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
+    auto memRefDesc =
+        abi.loadBinding(op->getLoc(), interfaceBindingOp.binding(),
+                        newOperands.byte_offset(), memRefType, rewriter);
+    rewriter.replaceOp(op, {memRefDesc});
+    return success();
+  }
+};
+
+/// DEPRECATED: delete this as soon as linalg on buffers and iree.placeholder
+/// are gone.
+class ConvertLegacyPlaceholderOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertLegacyPlaceholderOp(MLIRContext *context,
+                                      LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(IREE::PlaceholderOp::getOperationName(), context,
                              converter) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
     if (!llvmFuncOp) return failure();
-    assert(llvmFuncOp.getNumArguments() > 0);
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    auto interfaceBindingOp = cast<IREE::HAL::InterfaceBindingOp>(
+        SymbolTable::lookupNearestSymbolFrom(
+            op, op->getAttrOfType<SymbolRefAttr>("binding")));
+    MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
+    auto memRefDesc =
+        abi.loadBinding(op->getLoc(), interfaceBindingOp.binding(),
+                        /*baseOffset=*/{}, memRefType, rewriter);
+    rewriter.replaceOp(op, {memRefDesc});
+    return success();
+  }
+};
 
-    auto llvmTypeConverter = getTypeConverter();
-    Location loc = op->getLoc();
-    MemRefType memrefType = op->getResult(0).getType().dyn_cast<MemRefType>();
-    auto elementType = typeConverter->convertType(memrefType.getElementType());
-
-    // Fetch the interface binding op and extract the buffer index from void**.
-    auto interfaceBindingOp = getBindingOp(op);
-    Value bufferIndex =
-        rewriter.create<ConstantIndexOp>(loc, interfaceBindingOp.binding());
-    Value llvmBufferIndex = rewriter.create<LLVM::DialectCastOp>(
-        loc, llvmTypeConverter->convertType(bufferIndex.getType()),
-        bufferIndex);
-    Value llvmBufferBasePtrAddr = rewriter.create<LLVM::GEPOp>(
-        loc, llvmFuncOp.getArgument(kIndexPackedBuffer).getType(),
-        llvmFuncOp.getArgument(kIndexPackedBuffer), llvmBufferIndex);
-
-    Value packedBuffersArgsPtrCasted = rewriter.create<LLVM::BitcastOp>(
-        loc,
-        LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(
-            elementType, memrefType.getMemorySpace())),
-        llvmBufferBasePtrAddr);
-
-    Value llvmBufferBasePtr =
-        rewriter.create<LLVM::LoadOp>(loc, packedBuffersArgsPtrCasted);
-    if (memrefType.hasStaticShape()) {
-      auto desc = MemRefDescriptor::fromStaticShape(
-          rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
-      rewriter.replaceOp(op, {desc});
-    } else {
-      auto desc = MemRefDescriptor::undef(
-          rewriter, loc, typeConverter->convertType(memrefType));
-      desc.setAllocatedPtr(rewriter, loc, llvmBufferBasePtr);
-      desc.setAlignedPtr(rewriter, loc, llvmBufferBasePtr);
-      rewriter.replaceOp(op, {desc});
-    }
-
+class RemoveHALInterfaceOpPattern : public ConvertToLLVMPattern {
+ public:
+  explicit RemoveHALInterfaceOpPattern(MLIRContext *context,
+                                       LLVMTypeConverter &typeconverter)
+      : ConvertToLLVMPattern(IREE::HAL::InterfaceOp::getOperationName(),
+                             context, typeconverter) {}
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -304,90 +606,6 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
     rewriter.replaceOp(tieShapeOp, {sourceMemRef});
     return success();
   }
-};  // namespace iree_compiler
-
-class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
- public:
-  explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
-                                           LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
-            converter) {}
-
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    // Bail until nested under an LLVMFuncOp.
-    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    if (!llvmFuncOp) return failure();
-
-    assert(llvmFuncOp.getNumArguments() > 0);
-
-    auto llvmTypeConverter = getTypeConverter();
-    Location loc = op->getLoc();
-    auto interfaceLoadConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
-    Value pushConstantOffset = rewriter.create<ConstantIndexOp>(
-        loc, interfaceLoadConstantOp.offset().getSExtValue());
-    Value llvmPushConstantOffset = rewriter.create<LLVM::DialectCastOp>(
-        loc, llvmTypeConverter->convertType(pushConstantOffset.getType()),
-        pushConstantOffset);
-    Value llvmPushConstantOffsetAddr = rewriter.create<LLVM::GEPOp>(
-        loc, llvmFuncOp.getArgument(kIndexPushConstant).getType(),
-        llvmFuncOp.getArgument(kIndexPushConstant), llvmPushConstantOffset);
-    Value llvmPushConstantValue =
-        rewriter.create<LLVM::LoadOp>(loc, llvmPushConstantOffsetAddr);
-    if (interfaceLoadConstantOp.result().getType().isIndex()) {
-      llvmPushConstantValue = rewriter.create<LLVM::ZExtOp>(
-          loc, llvmTypeConverter->convertType(rewriter.getIndexType()),
-          llvmPushConstantValue);
-    }
-    rewriter.replaceOp(op, llvmPushConstantValue);
-    return success();
-  }
-};
-
-class RemoveInterfaceOpPattern : public ConvertToLLVMPattern {
- public:
-  explicit RemoveInterfaceOpPattern(MLIRContext *context,
-                                    LLVMTypeConverter &typeconverter)
-      : ConvertToLLVMPattern(IREE::HAL::InterfaceOp::getOperationName(),
-                             context, typeconverter) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-// ArgIndex hardcodes knowledge of argument position of `Op` in the
-// IREE-compatible ABI.
-template <typename Op, int ArgIndex>
-class ConvertWorkgroupInfoOpPattern : public ConvertToLLVMPattern {
- public:
-  explicit ConvertWorkgroupInfoOpPattern(MLIRContext *context,
-                                         LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(Op::getOperationName(), context, converter) {}
-
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto newFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
-    // Bail until enclosing FuncOp has been converted.
-    if (!newFuncOp) return failure();
-
-    Location loc = op->getLoc();
-    auto xyzArrayPtr = newFuncOp.getArgument(ArgIndex);
-    auto xyzArrayValue = rewriter.createOrFold<LLVM::LoadOp>(loc, xyzArrayPtr);
-    auto dimValue = rewriter.createOrFold<LLVM::ExtractValueOp>(
-        loc, getIndexTy(op->getContext()), xyzArrayValue,
-        rewriter.getI32ArrayAttr(ArrayRef<int>(
-            op->getAttrOfType<IntegerAttr>("dimension").getInt())));
-
-    rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(
-        op, typeConverter->convertType(op->getResult(0).getType()), dimValue);
-    return success();
-  }
 };
 
 struct ConvertToLLVMPass
@@ -439,19 +657,16 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // clang-format off
   patterns.insert<
-      ConvertBindingOp<IREE::HAL::InterfaceBindingSubspanOp>,
-      ConvertBindingOp<IREE::PlaceholderOp>,
-    ConvertFunc,
-    ConvertTieShapePattern,
-    RemoveMakeRankedShape,
-    RemoveInterfaceOpPattern,
+    ConvertHALEntryPointFuncOp,
+    ConvertHALInterfaceWorkgroupIDOp,
+    ConvertHALInterfaceWorkgroupSizeOp,
+    ConvertHALInterfaceWorkgroupCountOp,
     ConvertHALInterfaceLoadConstant,
-    ConvertWorkgroupInfoOpPattern<
-      IREE::HAL::InterfaceWorkgroupIDOp, kIndexWorkGroupId>,
-    ConvertWorkgroupInfoOpPattern<
-      IREE::HAL::InterfaceWorkgroupCountOp, kIndexWorkGroupCount>,
-    ConvertWorkgroupInfoOpPattern<
-      IREE::HAL::InterfaceWorkgroupSizeOp, kIndexWorkGroupSize>
+    ConvertHALInterfaceBindingSubspanOp,
+    ConvertLegacyPlaceholderOp,
+    RemoveHALInterfaceOpPattern,
+    ConvertTieShapePattern,
+    RemoveMakeRankedShape
   >(&getContext(), converter);
   // clang-format on
 
@@ -461,7 +676,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addLegalOp<ModuleOp, ModuleTerminatorOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
-                           IREE::HAL::HALDialect, IREE::Flow::FlowDialect>();
+                           IREE::HAL::HALDialect>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
@@ -469,8 +684,7 @@ void ConvertToLLVMPass::runOnOperation() {
     return true;
   });
   target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
-                                    IREEDialect, IREE::HAL::HALDialect,
-                                    IREE::Flow::FlowDialect>(
+                                    IREEDialect, IREE::HAL::HALDialect>(
       [&](Operation *op) {
         auto funcParent = op->getParentOfType<FuncOp>();
         if (!funcParent) return false;

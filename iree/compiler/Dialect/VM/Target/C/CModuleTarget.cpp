@@ -78,16 +78,7 @@ static LogicalResult printShim(IREE::VM::FuncOp &funcOp,
   if (!callingConvention) {
     return funcOp.emitError("Couldn't create calling convention string");
   }
-  auto s = callingConvention.getValue();
-  output << "call_";
-  if (s.size() == 0) {
-    output << "0_";
-  } else {
-    std::replace(s.begin(), s.end(), '.', '_');
-    output << s;
-  }
-  output << "_shim";
-
+  output << "call_" << callingConvention.getValue() << "_shim";
   return success();
 }
 
@@ -438,13 +429,9 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     output << "#include \"" << include << "\"\n";
   };
 
-  printInclude("iree/vm/context.h");
-  printInclude("iree/vm/instance.h");
-  printInclude("iree/vm/native_module.h");
+  printInclude("iree/vm/api.h");
   printInclude("iree/vm/ops.h");
-  printInclude("iree/vm/ref.h");
   printInclude("iree/vm/shims.h");
-  printInclude("iree/vm/stack.h");
   output << "\n";
 
   printModuleComment(moduleOp, output);

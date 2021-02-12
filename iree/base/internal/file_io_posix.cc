@@ -26,7 +26,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/internal/file_path.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -143,7 +142,7 @@ Status GetTempFile(absl::string_view base_name, std::string* out_path) {
 
   std::string temp_path = GetTempPath();
   std::string template_path =
-      file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
+      temp_path + "/" + std::string(base_name) + "XXXXXX";
 
   if (::mkstemp(&template_path[0]) != -1) {
     // Should have been modified by mkstemp.

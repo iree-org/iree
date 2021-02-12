@@ -219,11 +219,11 @@ struct cconv_map<std::tuple<Ts...>> {
 template <typename U>
 struct cconv_map<absl::Span<U>> {
   static constexpr const auto conv_chars = concat_literals(
-      literal("["), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
-      literal("]"));
+      literal("C"), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
+      literal("D"));
 };
 
-template <typename Result, typename... Params>
+template <typename Result, size_t ParamsCount, typename... Params>
 struct cconv_storage {
   static const iree_string_view_t value() {
     static constexpr const auto value = concat_literals(
@@ -231,7 +231,7 @@ struct cconv_storage {
         concat_literals(
             cconv_map<
                 typename impl::remove_cvref<Params>::type>::conv_chars...),
-        literal("."),
+        literal("_"),
         concat_literals(
             cconv_map<typename impl::remove_cvref<Result>::type>::conv_chars));
     static constexpr const auto str =
@@ -240,14 +240,38 @@ struct cconv_storage {
   }
 };
 
-template <typename... Params>
+template <typename Result>
+struct cconv_storage<Result, 0> {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(
+        literal("0v_"),
+        concat_literals(
+            cconv_map<typename impl::remove_cvref<Result>::type>::conv_chars));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
+
+template <size_t ParamsCount, typename... Params>
 struct cconv_storage_void {
   static const iree_string_view_t value() {
     static constexpr const auto value = concat_literals(
         literal("0"),
         concat_literals(
             cconv_map<
-                typename impl::remove_cvref<Params>::type>::conv_chars...));
+                typename impl::remove_cvref<Params>::type>::conv_chars...),
+        literal("_v"));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
+
+template <>
+struct cconv_storage_void<0> {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(literal("0v_v"));
     static constexpr const auto str =
         iree_string_view_t{value.data(), value.size()};
     return str;
@@ -628,7 +652,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
     absl::string_view name, StatusOr<Result> (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
   return {{name.data(), name.size()},
-          packing::cconv_storage<Result, Params...>::value(),
+          packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
           (void (Owner::*)())fn,
           &dispatch_functor_t::Call};
 }
@@ -638,7 +662,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
     absl::string_view name, Status (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
   return {{name.data(), name.size()},
-          packing::cconv_storage_void<Params...>::value(),
+          packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
           (void (Owner::*)())fn,
           &dispatch_functor_t::Call};
 }

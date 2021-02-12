@@ -19,22 +19,21 @@
 #include "iree/vm/stack.h"
 
 // see Calling convetion in module.h
-// We use the same format but replace '.' by '_'
 // Variadic arguments are not supported
 
-// 0.
-typedef iree_status_t (*call_0__t)(iree_vm_stack_t* stack, void* module_ptr,
-                                   void* module_state);
+// 0v_v
+typedef iree_status_t (*call_0v_v_t)(iree_vm_stack_t* stack, void* module_ptr,
+                                     void* module_state);
 
-static iree_status_t call_0__shim(iree_vm_stack_t* stack,
-                                  const iree_vm_function_call_t* call,
-                                  call_0__t target_fn, void* module,
-                                  void* module_state,
-                                  iree_vm_execution_result_t* out_result) {
+static iree_status_t call_0v_v_shim(iree_vm_stack_t* stack,
+                                    const iree_vm_function_call_t* call,
+                                    call_0v_v_t target_fn, void* module,
+                                    void* module_state,
+                                    iree_vm_execution_result_t* out_result) {
   return target_fn(stack, module, module_state);
 }
 
-// 0i.i
+// 0i_i
 typedef iree_status_t (*call_0i_i_t)(iree_vm_stack_t* stack, void* module_ptr,
                                      void* module_state, int32_t arg0,
                                      int32_t* res0);
@@ -56,7 +55,8 @@ static iree_status_t call_0i_i_shim(iree_vm_stack_t* stack,
 
   return target_fn(stack, module, module_state, args->arg0, &results->ret0);
 }
-// 0ii.i
+
+// 0ii_i
 typedef iree_status_t (*call_0ii_i_t)(iree_vm_stack_t* stack, void* module_ptr,
                                       void* module_state, int32_t arg0,
                                       int32_t arg1, int32_t* res0);

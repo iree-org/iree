@@ -230,6 +230,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                      "dialect to the native llvm::Module";
     }
 
+    switch (options_.sanitizerKind) {
+      case SanitizerKind::kNone:
+        break;
+      case SanitizerKind::kAddress: {
+        for (auto &function : llvmModule->getFunctionList())
+          function.addFnAttr(llvm::Attribute::SanitizeAddress);
+      } break;
+    }
+
     // Try to grab a linker tool based on the options (and target environment).
     auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
     if (!linkerTool) {
@@ -340,6 +349,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         builder, debugDatabaseFilenameRef);
     iree_DyLibExecutableDef_debug_database_embedded_add(builder,
                                                         debugDatabaseRef);
+    iree_DyLibExecutableDef_sanitized_kind_add(
+        builder, static_cast<unsigned char>(options_.sanitizerKind));
     iree_DyLibExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

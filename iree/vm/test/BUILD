@@ -36,6 +36,7 @@ cc_embed_data(
     srcs = [
         ":arithmetic_ops.vmfb",
         ":arithmetic_ops_i64.vmfb",
+        ":assignment_ops.vmfb",
         ":comparison_ops.vmfb",
         ":control_flow_ops.vmfb",
         ":conversion_ops.vmfb",
@@ -57,6 +58,12 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "arithmetic_ops_i64",
     src = "arithmetic_ops_i64.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "assignment_ops",
+    src = "assignment_ops.mlir",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 

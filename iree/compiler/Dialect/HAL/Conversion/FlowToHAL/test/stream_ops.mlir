@@ -1,4 +1,4 @@
-// RUN: iree-opt -print-ir-after-all -split-input-file -iree-convert-to-hal -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-to-hal -canonicalize %s | IreeFileCheck %s
 
 hal.executable @ex0 {
   hal.interface @interface {
@@ -26,7 +26,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
     //  CHECK-DAG: %[[EXE_LAYOUT:.+]] = hal.executable_layout.lookup
-    //      CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %[[EXE_LAYOUT]], set=0, bindings=[0 = (%arg0, %c0, %c512), 1 = (%[[TMP_BUF]], %c0, %c512)]
+    //      CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %[[EXE_LAYOUT]], set = %c0, bindings = [%c0 = (%arg0, %c0, %c512), %c1 = (%[[TMP_BUF]], %c0, %c512)]
     //      CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex0::@vmla::@entry0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1] (%arg2) : (tensor<128xf32>) -> tensor<128xf32>
@@ -137,7 +137,7 @@ func @static_tiled_dispatch(%arg0: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
       %arg6 = %c1024 : index,
       %arg7 = %c512 : index
     ) -> tensor<4x7x1024xf32> {
-    // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %c2688), 1 = (%buffer, %c0, %c114688)]
+    // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c2688), %c1 = (%buffer, %c0, %c114688)]
     // CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex::@tgt::@entry, workgroup_xyz
     %0 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7] (%arg3) : (tensor<7x4x24xf32>) -> tensor<4x7x1024xf32>
     flow.return %0 : tensor<4x7x1024xf32>
@@ -180,7 +180,7 @@ func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: i
     %4 = shapex.make_ranked_shape %arg5, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?,1024]>
     %5 = shapex.tie_shape %arg3, %3 : tensor<7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>
     // CHECK: hal.command_buffer.push_constants %[[CMD]], %executable_layout, offset = 0, values = [%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] : i32
-    // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %9), 1 = (%buffer, %c0, %12)]
+    // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %9), %c1 = (%buffer, %c0, %12)]
 
     // CHECK: #hal.device.match.id<"dylib*">(
     // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,

@@ -200,6 +200,8 @@ static iree_status_t iree_vm_bytecode_external_enter(
   const uint8_t* p = arguments.data;
   for (iree_host_size_t i = 0; i < cconv_arguments.size; ++i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         uint16_t dst_reg = i32_reg++;
         memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
@@ -241,6 +243,8 @@ static iree_status_t iree_vm_bytecode_external_leave(
   for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
     uint16_t src_reg = src_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
                sizeof(int32_t));
@@ -380,6 +384,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
   for (iree_host_size_t i = 0, seg_i = 0, reg_i = 0; i < cconv_arguments.size;
        ++i, ++seg_i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p,
                &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -423,6 +429,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
                ++i) {
             // TODO(benvanik): share with switch above.
             switch (cconv_arguments.data[i]) {
+              case IREE_VM_CCONV_TYPE_VOID:
+                break;
               case IREE_VM_CCONV_TYPE_INT32: {
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -484,6 +492,8 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
        ++i) {
     uint16_t dst_reg = dst_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32:
         memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
                sizeof(int32_t));
@@ -817,7 +827,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListReserve, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -828,7 +838,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -839,7 +849,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListResize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -850,7 +860,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListGetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -865,7 +875,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (!list) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -907,7 +917,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t true_value = VM_DecOperandRegI32("true_value");
       int32_t false_value = VM_DecOperandRegI32("false_value");
       int32_t* result = VM_DecResultRegI32("result");
-      *result = condition ? true_value : false_value;
+      *result = vm_select_i32(condition, true_value, false_value);
     });
 
     DISPATCH_OP(CORE, SelectRef, {
@@ -976,44 +986,28 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-// TODO: unify macros, eg. DISPATCH_OP_CORE_UNARY_I32
-#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                           \
-    int32_t operand = VM_DecOperandRegI32("operand");    \
-    int32_t* result = VM_DecResultRegI32("result");      \
-    *result = op_func(operand);                          \
-  });
-
-#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                            \
-    int32_t lhs = VM_DecOperandRegI32("lhs");             \
-    int32_t rhs = VM_DecOperandRegI32("rhs");             \
-    int32_t* result = VM_DecResultRegI32("result");       \
-    *result = op_func(lhs, rhs);                          \
-  });
-
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, vm_add_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, vm_sub_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, vm_mul_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, vm_div_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, vm_div_i32u);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, vm_rem_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, vm_rem_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, vm_not_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, vm_and_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, vm_or_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, vm_xor_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AddI32, vm_add_i32);
+    DISPATCH_OP_CORE_BINARY_I32(SubI32, vm_sub_i32);
+    DISPATCH_OP_CORE_BINARY_I32(MulI32, vm_mul_i32);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32S, vm_div_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
+    DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
+    DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I8, vm_trunc_i32i8);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(TruncI32I16, vm_trunc_i32i16);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32S, vm_ext_i8i32s);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI8I32U, vm_ext_i8i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32S, vm_ext_i16i32s);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(ExtI16I32U, vm_ext_i16i32u);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I8, vm_trunc_i32i8);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I16, vm_trunc_i32i16);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32S, vm_ext_i8i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32U, vm_ext_i8i32u);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32S, vm_ext_i16i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32U, vm_ext_i16i32u);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -1035,11 +1029,11 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpEQI32, vm_cmp_eq_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpNEI32, vm_cmp_ne_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32S, vm_cmp_lt_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(CmpLTI32U, vm_cmp_lt_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(CmpNZI32, vm_cmp_nz_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpEQI32, vm_cmp_eq_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpNEI32, vm_cmp_ne_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(CmpNZI32, vm_cmp_nz_i32);
 
     DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;
@@ -1334,7 +1328,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListGetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
@@ -1349,7 +1343,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListSetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }

@@ -160,7 +160,8 @@ static void iree_hal_vmla_executable_destroy(
 
 static iree_status_t iree_hal_vmla_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id) {
   iree_hal_vmla_executable_t* executable =
       (iree_hal_vmla_executable_t*)base_executable;
 
@@ -195,17 +196,19 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
       /*element_type=*/NULL,
       /*interface*/ 1 + /*workgroup_xyz[3]*/ 3, &input_list));
   iree_vm_list_push_ref_retain(input_list, &interface_ref);
-  iree_vm_value_t workgroup_id_x = iree_vm_value_make_i32(call->workgroup_id.x);
-  iree_vm_value_t workgroup_id_y = iree_vm_value_make_i32(call->workgroup_id.y);
-  iree_vm_value_t workgroup_id_z = iree_vm_value_make_i32(call->workgroup_id.z);
+  iree_vm_value_t workgroup_id_x = iree_vm_value_make_i32(workgroup_id->x);
+  iree_vm_value_t workgroup_id_y = iree_vm_value_make_i32(workgroup_id->y);
+  iree_vm_value_t workgroup_id_z = iree_vm_value_make_i32(workgroup_id->z);
   iree_vm_list_push_value(input_list, &workgroup_id_x);
   iree_vm_list_push_value(input_list, &workgroup_id_y);
   iree_vm_list_push_value(input_list, &workgroup_id_z);
 
   iree_hal_local_executable_layout_t* local_layout =
       executable->base.executable_layouts[ordinal];
-  IREE_CHECK_OK(interface.SetConstants(
-      absl::MakeConstSpan(call->push_constants, local_layout->push_constants)));
+  IREE_CHECK_EQ(local_layout->push_constants,
+                dispatch_state->push_constant_count);
+  IREE_CHECK_OK(interface.SetConstants(absl::MakeConstSpan(
+      dispatch_state->push_constants, dispatch_state->push_constant_count)));
 
   for (iree_host_size_t set_ordinal = 0;
        set_ordinal < local_layout->set_layout_count; ++set_ordinal) {
@@ -214,7 +217,8 @@ static iree_status_t iree_hal_vmla_executable_issue_call(
             local_layout->set_layouts[set_ordinal]);
     for (iree_host_size_t i = 0; i < local_set_layout->binding_count; ++i) {
       auto buffer_or = iree::hal::vmla::Buffer::WrapMutable(
-          call->bindings[i], call->binding_lengths[i], iree_allocator_null());
+          dispatch_state->binding_ptrs[i], dispatch_state->binding_lengths[i],
+          iree_allocator_null());
       if (!buffer_or.ok()) {
         IREE_CHECK_OK(std::move(buffer_or).status());
       }
