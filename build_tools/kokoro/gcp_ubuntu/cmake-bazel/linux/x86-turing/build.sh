@@ -40,15 +40,11 @@ nvidia-smi || true
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
-# BUILD the integrations binaries
-BAZEL_INTEGRATIONS_DIR="$PWD/integrations/tensorflow"
+# BUILD the integrations binaries with Bazel
+pushd integrations/tensorflow
 
-pushd "${BAZEL_INTEGRATIONS_DIR?}"
-
-bazel build \
-   --config=rbe_linux_cuda_clang_py36 \
-   --config=tensorflow_testing_rbe_linux \
-   //iree_tf_compiler:all
+BAZEL_BINDIR="$(bazel info bazel-bin)"
+bazel build --config=generic_clang //iree_tf_compiler:all
 
 popd
 
@@ -59,7 +55,7 @@ CMAKE_BUILD_DIR="$HOME/iree/build/tf"
 # we can still run the other tests.
 echo "Configuring CMake"
 "${CMAKE_BIN}" -B "${CMAKE_BUILD_DIR?}" -G Ninja \
-   -DIREE_TF_TOOLS_ROOT="${BAZEL_INTEGRATIONS_DIR?}/bazel-bin/iree_tf_compiler/" \
+   -DIREE_TF_TOOLS_ROOT="${BAZEL_BINDIR?}/iree_tf_compiler/" \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DIREE_BUILD_COMPILER=ON \
    -DIREE_BUILD_TESTS=ON \
@@ -68,6 +64,7 @@ echo "Configuring CMake"
    -DIREE_BUILD_XLA_COMPILER=ON \
    -DIREE_BUILD_TFLITE_COMPILER=ON \
    -DIREE_BUILD_TENSORFLOW_COMPILER=ON .
+
 echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
