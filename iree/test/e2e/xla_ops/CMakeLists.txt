@@ -147,6 +147,7 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
+    "dot_general.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"

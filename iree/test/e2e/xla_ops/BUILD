@@ -154,7 +154,7 @@ iree_check_single_backend_test_suite(
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
         "dot.mlir",
-        # "dot_general.mlir",
+        "dot_general.mlir",
         "exponential.mlir",
         "exponential_minus_one.mlir",
         "floor.mlir",
