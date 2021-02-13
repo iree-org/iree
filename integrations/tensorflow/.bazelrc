@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Import the main bazelrc config. This is in a separate file so that it's
-# possible to turn off all user bazelrc options by specifying
-# `--nosystem_rc --nohome_rc --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc`
+# Import the main bazelrc config.
 try-import %workspace%/../../build_tools/bazel/iree.bazelrc
 
 # Run the configure_bazel.py script to generate.
