@@ -366,8 +366,8 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
   };
 
   for (const auto &pair : tileWorkgroupSizePairs) {
-    const auto &tileSize = pair.tileSize;
-    const auto &workgroupSize = pair.workgroupSize;
+    const std::array<int64_t, 3> &tileSize = pair.tileSize;
+    const std::array<int64_t, 3> &workgroupSize = pair.workgroupSize;
 
     auto outputShape = outputType.getShape();
     bool isOutputTilable = (outputShape[0] == 1) &&
@@ -441,8 +441,8 @@ static LogicalResult getMaliSpecificConfig(
   };
 
   for (const auto &pair : tileWorkgroupSizePairs) {
-    const auto &tileSize = pair.tileSize;
-    const auto &workgroupSize = pair.workgroupSize;
+    const std::array<int64_t, 3> &tileSize = pair.tileSize;
+    const std::array<int64_t, 3> &workgroupSize = pair.workgroupSize;
 
     auto outputShape = outputType.getShape();
     bool isOutputTilable = outputShape[0] == 1 &&
