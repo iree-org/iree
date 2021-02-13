@@ -61,6 +61,7 @@ int main(int argc, char **argv) {
   // Register any command line options.
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
+  registerPassManagerCLOptions();
   cl::ParseCommandLineOptions(argc, argv);
 
   // Initialize dialects.
