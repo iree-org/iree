@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
   registry.insert<StandardOpsDialect>();
 
   // Convert the Module proto into MLIR.
-  MLIRContext context;
+  MLIRContext context(registry);
   context.loadAllAvailableDialects();
 
   // Load input buffer.
