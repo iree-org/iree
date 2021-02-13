@@ -22,28 +22,28 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Check these exist and print the versions for later debugging
-export CMAKE_BIN="$(which cmake)"
-"${CMAKE_BIN?}" --version
-"${CC?}" --version
-"${CXX?}" --version
-python3 --version
-python3 -c 'import tensorflow as tf; print(tf.__version__)'
-python3 -c 'import jax; print(jax.__version__)'
+# # Check these exist and print the versions for later debugging
+# export CMAKE_BIN="$(which cmake)"
+# "${CMAKE_BIN?}" --version
+# "${CC?}" --version
+# "${CXX?}" --version
+# python3 --version
+# python3 -c 'import tensorflow as tf; print(tf.__version__)'
+# python3 -c 'import jax; print(jax.__version__)'
 
-./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
+# ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
-# Print SwiftShader git commit
-cat /swiftshader/git-commit
+# # Print SwiftShader git commit
+# cat /swiftshader/git-commit
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+# echo "Initializing submodules"
+# ./scripts/git/submodule_versions.py init
 
 # BUILD the integrations binaries with Bazel
 pushd integrations/tensorflow
-BAZEL="bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc"
-BAZEL_BINDIR="$(${BAZEL?} info bazel-bin)"
-"${BAZEL?} build --config=generic_clang //iree_tf_compiler:all"
+BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
+BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
+"${BAZEL_CMD[@]?}" build --config=generic_clang //iree_tf_compiler:all
 popd
 
 CMAKE_BUILD_DIR="$HOME/iree/build/tf"
