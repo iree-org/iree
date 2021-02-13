@@ -47,7 +47,6 @@ namespace {
 /// - For filter:
 ///   - Hf must be 1.
 ///   - Hf must be 1.
-///   - Ci must be 4.
 /// - No dilation.
 /// - No padding.
 ///
@@ -220,7 +219,6 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
 /// - Output: NHoWoC format
 /// - For output:
 ///   - N must be 1.
-///   - Ho must be 1.
 ///   - C must be a multiple of 4.
 /// - For filter:
 ///   - Hf must be 1.
@@ -251,12 +249,8 @@ struct VectorizeLinalgDepthwiseConv
       return failure();
     }
 
-    // The output batch and height dimensions should be 1. If not, other
-    // patterns can generate parallel loops can distribute them.
-    if (outputViewOp.getStaticSize(0) != 1 ||
-        outputViewOp.getStaticSize(1) != 1) {
-      return failure();
-    }
+    // The output batch dimension should be 1.
+    if (outputViewOp.getStaticSize(0) != 1) return failure();
 
     // We addtionally expect the filter height/width dimensions are both 1 to
     // simplify vectorization. Other patterns can generate loops to create 1x1
@@ -269,13 +263,18 @@ struct VectorizeLinalgDepthwiseConv
     int64_t numChannels = outputViewOp.getStaticSize(3);
     if (numChannels % 4 != 0) return failure();
 
+    int64_t numOutputHeights = outputViewOp.getStaticSize(1);
     int64_t numOutputWidths = outputViewOp.getStaticSize(2);
+    int64_t heightStride = convOp.strides().getValue<int64_t>({0});
     int64_t widthStride = convOp.strides().getValue<int64_t>({1});
 
-    // This invocation handles a batch of (numOutputWidths * numOutputChannels).
+    // This invocation handles a batch of (numOutputHeights * numOutputWidths *
+    // numChannels).
     LLVM_DEBUG({
+      llvm::dbgs() << "# output height: " << numOutputHeights << "\n";
       llvm::dbgs() << "# output width: " << numOutputWidths << "\n";
       llvm::dbgs() << "# channels: " << numChannels << "\n";
+      llvm::dbgs() << "height stride: " << heightStride << "\n";
       llvm::dbgs() << "width stride: " << widthStride << "\n";
     });
 
@@ -291,35 +290,42 @@ struct VectorizeLinalgDepthwiseConv
     Value wholeFilter = rewriter.create<vector::TransferReadOp>(
         loc, filterVectorType, filterViewOp, filterIndices);
 
-    // Compute the (numOutputWidths * numOutputChannels) output batch. We only
-    // contribute numChannels accumulation along the reduction dimension.
+    // Compute the (numOutputHeights * numOutputWidths * numChannels) output
+    // batch. We only contribute numChannels accumulation along the reduction
+    // dimension.
     for (int oc = 0; oc < numChannels / 4; ++oc) {
       Value filterVector = rewriter.create<vector::ExtractStridedSliceOp>(
           loc, wholeFilter, /*offsets=*/oc * 4, /*sizes=*/4, /*strides=*/1);
 
-      for (int ow = 0; ow < numOutputWidths; ++ow) {
-        // Read in the initial value for this output vector.
-        SmallVector<Value, 4> outputIndices(4, zero);
-        outputIndices[2] = rewriter.createOrFold<ConstantIndexOp>(loc, ow);
-        outputIndices[3] = rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
-        Value outputVector = rewriter.create<vector::TransferReadOp>(
-            loc, vector4Type, outputViewOp, outputIndices);
+      for (int oh = 0; oh < numOutputHeights; ++oh) {
+        for (int ow = 0; ow < numOutputWidths; ++ow) {
+          // Read in the initial value for this output vector.
+          SmallVector<Value, 4> outputIndices(4, zero);
+          outputIndices[1] = rewriter.createOrFold<ConstantIndexOp>(loc, oh);
+          outputIndices[2] = rewriter.createOrFold<ConstantIndexOp>(loc, ow);
+          outputIndices[3] =
+              rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
+          Value outputVector = rewriter.create<vector::TransferReadOp>(
+              loc, vector4Type, outputViewOp, outputIndices);
 
-        // Read in the input vector for these 4 input channels a a batch.
-        SmallVector<Value, 4> inputIndices(4, zero);
-        inputIndices[2] =
-            rewriter.createOrFold<ConstantIndexOp>(loc, ow * widthStride);
-        inputIndices[3] = rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
-        Value inputVector = rewriter.create<vector::TransferReadOp>(
-            loc, vector4Type, inputViewOp, inputIndices);
+          // Read in the input vector for these 4 input channels a a batch.
+          SmallVector<Value, 4> inputIndices(4, zero);
+          inputIndices[1] =
+              rewriter.createOrFold<ConstantIndexOp>(loc, oh * heightStride);
+          inputIndices[2] =
+              rewriter.createOrFold<ConstantIndexOp>(loc, ow * widthStride);
+          inputIndices[3] = rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
+          Value inputVector = rewriter.create<vector::TransferReadOp>(
+              loc, vector4Type, inputViewOp, inputIndices);
 
-        // Peform element-wise product and accumulation.
-        outputVector = rewriter.create<vector::FMAOp>(
-            loc, inputVector, filterVector, outputVector);
+          // Peform element-wise product and accumulation.
+          outputVector = rewriter.create<vector::FMAOp>(
+              loc, inputVector, filterVector, outputVector);
 
-        // Write out the output vector.
-        rewriter.create<vector::TransferWriteOp>(loc, outputVector,
-                                                 outputViewOp, outputIndices);
+          // Write out the output vector.
+          rewriter.create<vector::TransferWriteOp>(loc, outputVector,
+                                                   outputViewOp, outputIndices);
+        }
       }
     }
 
