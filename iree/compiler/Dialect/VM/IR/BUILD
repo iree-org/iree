@@ -38,6 +38,7 @@ cc_library(
         "VMOpInterface.cpp.inc",
         "VMOps.cpp",
         "VMOps.cpp.inc",
+        "VMStructs.cpp.inc",
         "VMTypes.cpp",
     ],
     hdrs = [
@@ -47,6 +48,7 @@ cc_library(
         "VMOpInterface.h.inc",
         "VMOps.h",
         "VMOps.h.inc",
+        "VMStructs.h.inc",
         "VMTraits.h",
         "VMTypes.h",
     ],
@@ -55,6 +57,7 @@ cc_library(
         ":VMOpEncoderGen",
         ":VMOpInterfaceGen",
         ":VMOpsGen",
+        ":VMStructsGen",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -127,6 +130,21 @@ gentbl(
         ("-gen-op-interface-defs", "VMOpInterface.cpp.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VMBase.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+gentbl(
+    name = "VMStructsGen",
+    tbl_outs = [
+        ("-gen-iree-struct-attr-decls", "VMStructs.h.inc"),
+        ("-gen-iree-struct-attr-defs", "VMStructs.cpp.inc"),
+    ],
+    tblgen = "//iree/tools:iree-tblgen",
     td_file = "VMBase.td",
     td_srcs = [
         ":td_files",

@@ -643,4 +643,23 @@ class VM_ConstIntValueAttr<I type> : Attr<
   let constBuilderCall = "$0";
 }
 
+//===----------------------------------------------------------------------===//
+// VM structs
+//===----------------------------------------------------------------------===//
+
+def VM_OrdinalCountsAttr :
+  IREE_StructAttr<"ordinal_counts",
+                  "OrdinalCountsAttr",
+                  VM_Dialect, [
+    IREE_StructFieldAttr<"import_funcs", I32Attr>,
+    IREE_StructFieldAttr<"export_funcs", I32Attr>,
+    IREE_StructFieldAttr<"internal_funcs", I32Attr>,
+    IREE_StructFieldAttr<"global_bytes", I32Attr>,
+    IREE_StructFieldAttr<"global_refs", I32Attr>,
+    IREE_StructFieldAttr<"rodatas", I32Attr>,
+    IREE_StructFieldAttr<"rwdatas", I32Attr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::VM";
+}
+
 #endif  // IREE_DIALECT_VM_BASE

@@ -42,7 +42,7 @@ def VM_ModuleOp : VM_Op<"module", [
   let arguments = (ins
     StrAttr:$sym_name,
     // TODO(benvanik): add compatibility and versioning attributes.
-    OptionalAttr<DictionaryAttr>:$ordinal_counts
+    OptionalAttr<VM_OrdinalCountsAttr>:$ordinal_counts
   );
 
   let regions = (region SizedRegion<1>:$body);

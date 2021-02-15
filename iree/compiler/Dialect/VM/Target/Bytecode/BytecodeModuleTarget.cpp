@@ -279,29 +279,17 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
                                    "OrdinalAllocationPass must be run before.";
   }
-  DictionaryAttr ordinalCounts = moduleOp.ordinal_counts().getValue();
+  OrdinalCountsAttr ordinalCounts = moduleOp.ordinal_counts().getValue();
 
   // Find all structural ops in the module.
   std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
   std::vector<IREE::VM::RodataOp> rodataOps;
-  importFuncOps.resize(ordinalCounts.get("import_funcs")
-                           .dyn_cast<IntegerAttr>()
-                           .getValue()
-                           .getLimitedValue());
-  exportFuncOps.resize(ordinalCounts.get("export_funcs")
-                           .dyn_cast<IntegerAttr>()
-                           .getValue()
-                           .getLimitedValue());
-  internalFuncOps.resize(ordinalCounts.get("internal_funcs")
-                             .dyn_cast<IntegerAttr>()
-                             .getValue()
-                             .getLimitedValue());
-  rodataOps.resize(ordinalCounts.get("rodatas")
-                       .dyn_cast<IntegerAttr>()
-                       .getValue()
-                       .getLimitedValue());
+  importFuncOps.resize(ordinalCounts.import_funcs());
+  exportFuncOps.resize(ordinalCounts.export_funcs());
+  internalFuncOps.resize(ordinalCounts.internal_funcs());
+  rodataOps.resize(ordinalCounts.rodatas());
 
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
@@ -458,14 +446,8 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
-  int32_t globalRefs = ordinalCounts.get("global_refs")
-                           .dyn_cast<IntegerAttr>()
-                           .getValue()
-                           .getLimitedValue();
-  int32_t globalBytes = ordinalCounts.get("global_bytes")
-                            .dyn_cast<IntegerAttr>()
-                            .getValue()
-                            .getLimitedValue();
+  int32_t globalRefs = ordinalCounts.global_refs();
+  int32_t globalBytes = ordinalCounts.global_bytes();
 
   iree_vm_ModuleStateDef_ref_t moduleStateDef = 0;
   if (globalBytes || globalRefs) {

@@ -78,7 +78,7 @@ class OrdinalAllocationPass
     // Assign byte offset values to primitive globals, ensuring that we meet
     // natural alignment requirements on each size type.
     int nextGlobalBytesOrdinal = 0;
-    size_t globalBytes = 0;
+    int globalBytes = 0;
     for (auto sizeGlobalOps : llvm::enumerate(primitiveGlobalOps)) {
       size_t storageSize = sizeGlobalOps.index();
       if (sizeGlobalOps.value().empty()) continue;
@@ -88,26 +88,14 @@ class OrdinalAllocationPass
         globalOp->setAttr("ordinal",
                           builder.getI32IntegerAttr(nextGlobalBytesOrdinal));
         nextGlobalBytesOrdinal += storageSize;
-        globalBytes =
-            std::max(globalBytes, nextGlobalBytesOrdinal + storageSize);
+        globalBytes = std::max(globalBytes, nextGlobalBytesOrdinal);
       }
     }
 
     // Assign ordinal counts to module op.
-    getOperation().ordinal_countsAttr(builder.getDictionaryAttr(
-        {{builder.getIdentifier("import_funcs"),
-          builder.getI32IntegerAttr(nextImportOrdinal)},
-         {builder.getIdentifier("export_funcs"),
-          builder.getI32IntegerAttr(nextExportOrdinal)},
-         {builder.getIdentifier("internal_funcs"),
-          builder.getI32IntegerAttr(nextFuncOrdinal)},
-         {builder.getIdentifier("global_bytes"),
-          builder.getI32IntegerAttr(globalBytes)},
-         {builder.getIdentifier("global_refs"),
-          builder.getI32IntegerAttr(nextGlobalRefOrdinal)},
-         {builder.getIdentifier("rodatas"),
-          builder.getI32IntegerAttr(nextRodataOrdinal)},
-         {builder.getIdentifier("rwdatas"), builder.getI32IntegerAttr(0)}}));
+    getOperation().ordinal_countsAttr(OrdinalCountsAttr::get(
+        nextImportOrdinal, nextExportOrdinal, nextFuncOrdinal, globalBytes,
+        nextGlobalRefOrdinal, nextRodataOrdinal, 0, &getContext()));
 
     SymbolTable symbolTable(getOperation());
 
