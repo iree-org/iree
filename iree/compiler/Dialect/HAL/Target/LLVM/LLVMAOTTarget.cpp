@@ -78,6 +78,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
+    mlir::registerLLVMDialectTranslation(*moduleOp->getContext());
+
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps =

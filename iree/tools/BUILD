@@ -265,6 +265,7 @@ cc_binary(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
 
@@ -322,6 +323,7 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:Translation",
     ],
 )
