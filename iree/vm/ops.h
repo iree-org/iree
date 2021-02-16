@@ -18,6 +18,12 @@
 #include <stdint.h>
 
 //===------------------------------------------------------------------===//
+// Constants
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_const_i32(int32_t a) { return a; }
+
+//===------------------------------------------------------------------===//
 // Conditional assignment
 //===------------------------------------------------------------------===//
 
@@ -109,6 +115,9 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
   return (operand != 0) ? 1 : 0;
 }
 
+//===------------------------------------------------------------------===//
+// Additional ops
+//===------------------------------------------------------------------===//
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
 // supported in the c module target
@@ -118,7 +127,5 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
                                 iree_make_cstring_view("message"));         \
   }
 
-// Const ops
-inline int32_t vm_const_i32(int32_t a) { return a; }
 
 #endif  // IREE_VM_OPS_H_

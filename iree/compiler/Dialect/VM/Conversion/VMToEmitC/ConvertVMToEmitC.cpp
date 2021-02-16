@@ -72,6 +72,10 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
+  // Constants
+  patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
+                                                          "vm_const_i32");
+
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
                                                            "vm_select_i32");
@@ -132,9 +136,6 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
                                                          "VM_CHECK_EQ");
 
-  // Const
-  patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
-                                                          "vm_const_i32");
 }
 
 namespace IREE {
@@ -159,6 +160,9 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
     target.addLegalDialect<iree_compiler::IREEDialect>();
     target.addLegalDialect<IREE::VM::VMDialect>();
+
+    // Constants
+    target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     // Conditional assignment ops
     target.addIllegalOp<IREE::VM::SelectI32Op>();
@@ -201,8 +205,6 @@ class ConvertVMToEmitCPass
     // support for control flow ops has landed in the c module target
     target.addIllegalOp<IREE::VM::CheckEQOp>();
 
-    // Const ops
-    target.addIllegalOp<IREE::VM::ConstI32Op>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
