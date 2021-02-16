@@ -110,6 +110,7 @@ function run_and_log {
       ;;
   esac
 
+  # TODO(#4852): Turn the number of repetitions back to 10.
   driver="$(echo ${target} | cut -d '-' -f1)"
   test_out="${OUTPUT_DIR}/${model}-${target}_output.txt"
   adb shell LD_LIBRARY_PATH=/data/local/tmp taskset 80 \
@@ -118,7 +119,7 @@ function run_and_log {
     "--module_file=${DEVICE_ROOT}/${model}-${target}.vmfb" \
     "--driver=${driver}" \
     "${extra_flags[@]}" \
-    --benchmark_repetitions=10 | tee "${test_out}"
+    --benchmark_repetitions=5 | tee "${test_out}"
   while read -r ms; do
     append_mako_sample "${mako_log}" "${ms}" "${TAG}"
   done < <(sed -En -e "${SED_EXPR}" "${test_out}")
