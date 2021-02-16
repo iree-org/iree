@@ -57,25 +57,6 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // Utility functions.
 // -----------------------------------------------------------------------------
 
-/// Returns the constant value associated with the init value if the defining
-/// operation is a constant.
-static Attribute getInitValueAsConst(Value init) {
-  Attribute attr;
-  if (!matchPattern(init, m_Constant(&attr))) return {};
-  if (attr.getType().isa<IntegerType, FloatType>()) return attr;
-
-  auto splatAttr = attr.dyn_cast<SplatElementsAttr>();
-  if (!splatAttr) return {};
-  auto type = splatAttr.getType().dyn_cast<ShapedType>();
-  if (!type) return {};
-  if (auto intType = type.getElementType().dyn_cast<IntegerType>()) {
-    return IntegerAttr::get(intType, splatAttr.getSplatValue<APInt>());
-  } else if (auto floatType = type.getElementType().dyn_cast<FloatType>()) {
-    return FloatAttr::get(floatType, splatAttr.getSplatValue<APFloat>());
-  }
-  return {};
-}
-
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
@@ -554,51 +535,36 @@ LogicalResult ConcatenateOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// mhlo.pad conversion patterns and utility functions.
+// linalg.pad_tensor conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.pad operation to linalg.indexed_generic op.
-// TODO(#1604): Lower the pad op to a Linalg named op.
-struct PadOpConversion
-    : public ConvertToLinalgBufferOp<PadOpConversion, mhlo::PadOp> {
-  using ConvertToLinalgBufferOp<PadOpConversion,
-                                mhlo::PadOp>::ConvertToLinalgBufferOp;
+/// Converts linalg.pad_tensor operation to fill + subview + copy ops.
+struct PadTensorOpConversion
+    : public ConvertToLinalgBufferOp<PadTensorOpConversion,
+                                     linalg::PadTensorOp> {
+  using ConvertToLinalgBufferOp<PadTensorOpConversion,
+                                linalg::PadTensorOp>::ConvertToLinalgBufferOp;
 
-  LogicalResult apply(mhlo::PadOp op, ArrayRef<Value> inputBuffers,
+  LogicalResult apply(linalg::PadTensorOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
-LogicalResult PadOpConversion::apply(
-    mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
-    ConversionPatternRewriter &rewriter) const {
-  mhlo::PadOp::Adaptor adaptor(inputBuffers);
+LogicalResult PadTensorOpConversion::apply(
+    linalg::PadTensorOp op, ArrayRef<Value> inputBuffers,
+    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
-
-  Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
-  Value paddingVal =
-      paddingConstVal
-          ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
-          : rewriter.create<LoadOp>(loc, adaptor.padding_value());
-
-  const auto &edgePaddingLow = op.edge_padding_low();
-  const auto &interiorPadding = op.interior_padding();
-  SmallVector<Value, 3> offsets, sizes, strides;
-  for (auto it : llvm::enumerate(llvm::zip(edgePaddingLow, interiorPadding))) {
-    Value startIndex = rewriter.create<ConstantIndexOp>(
-        loc, std::get<0>(it.value()).getZExtValue());
-    offsets.push_back(startIndex);
-    Value size = rewriter.create<DimOp>(loc, inputBuffers[0], it.index());
-    sizes.push_back(size);
-    Value stride = rewriter.create<ConstantIndexOp>(
-        loc, std::get<1>(it.value()).getZExtValue() + 1);
-    strides.push_back(stride);
+  auto yieldOp = cast<linalg::YieldOp>(op.region().begin()->getTerminator());
+  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], yieldOp.values()[0]);
+  SmallVector<Value, 4> sizes, strides;
+  int rank = op.getSourceType().getRank();
+  for (int i = 0; i < rank; ++i) {
+    sizes.push_back(rewriter.create<DimOp>(loc, inputBuffers[0], i));
+    strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
   }
-
-  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
-  auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
+  auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], op.low(),
                                               sizes, strides);
   if (auto cstOp = dyn_cast<ConstantOp>(inputBuffers[0].getDefiningOp())) {
     auto inputConstAttr =
@@ -1229,7 +1195,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
                   MatmulOnTensorConversion<linalg::MatmulOp>,
                   MatmulOnTensorConversion<linalg::BatchMatmulOp>,
-                  PadOpConversion, ReduceWindowOpConversion,
+                  PadTensorOpConversion, ReduceWindowOpConversion,
                   SubTensorOpConversion, TensorReshapeOpConversion>(
       context, resultTensorToBufferMap);
 }
@@ -1266,8 +1232,8 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();
       });
-  // Also convert away linalg.tensor_reshape.
-  target.addIllegalOp<linalg::TensorReshapeOp>();
+  // Also convert away linalg.tensor_reshape and linalg.pad_tensor.
+  target.addIllegalOp<linalg::TensorReshapeOp, linalg::PadTensorOp>();
   target.addDynamicallyLegalDialect<linalg::LinalgDialect>(
       Optional<ConversionTarget::DynamicLegalityCallbackFn>([](Operation *op) {
         // The generated structured Linalg ops should have buffer

@@ -35,6 +35,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -149,6 +150,69 @@ struct TorchIndexSelectOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// mhlo.pad conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Returns the constant value associated with the init value if the defining
+/// operation is a constant.
+static Attribute getInitValueAsConst(Value init) {
+  Attribute attr;
+  if (!matchPattern(init, m_Constant(&attr))) return {};
+  if (attr.getType().isa<IntegerType, FloatType>()) return attr;
+
+  auto splatAttr = attr.dyn_cast<SplatElementsAttr>();
+  if (!splatAttr) return {};
+  auto type = splatAttr.getType().dyn_cast<ShapedType>();
+  if (!type) return {};
+  if (auto intType = type.getElementType().dyn_cast<IntegerType>()) {
+    return IntegerAttr::get(intType, splatAttr.getSplatValue<APInt>());
+  } else if (auto floatType = type.getElementType().dyn_cast<FloatType>()) {
+    return FloatAttr::get(floatType, splatAttr.getSplatValue<APFloat>());
+  }
+  return {};
+}
+
+/// Converts mhlo.pad operation to linalg.pad_tensor op.
+struct PadOpConversion : public OpConversionPattern<mhlo::PadOp> {
+  using OpConversionPattern<mhlo::PadOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::PadOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    mhlo::PadOp::Adaptor adaptor(args);
+    if (llvm::any_of(op.interior_padding().getValues<APInt>(),
+                     [](APInt intVal) { return intVal.getZExtValue() != 0; })) {
+      return rewriter.notifyMatchFailure(op, "expected no interior padding");
+    }
+    auto loc = op.getLoc();
+
+    Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
+    Value paddingVal =
+        paddingConstVal
+            ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
+            : rewriter.create<tensor::ExtractOp>(loc, adaptor.padding_value());
+
+    const auto &edgePaddingLow = op.edge_padding_low();
+    const auto &edgePaddingHigh = op.edge_padding_high();
+    SmallVector<OpFoldResult, 4> low, high;
+    for (auto it :
+         llvm::enumerate(llvm::zip(edgePaddingLow, edgePaddingHigh))) {
+      low.push_back(rewriter.createOrFold<ConstantIndexOp>(
+          loc, std::get<0>(it.value()).getZExtValue()));
+      high.push_back(rewriter.createOrFold<ConstantIndexOp>(
+          loc, std::get<1>(it.value()).getZExtValue()));
+    }
+    Type resultType = op.getResult().getType();
+    auto padTensorOp = linalg::PadTensorOp::createPadScalarOp(
+        resultType, adaptor.operand(), paddingVal, low, high, loc, rewriter);
+    rewriter.replaceOp(op, padTensorOp.getResult());
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
 // mhlo.slice conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -231,7 +295,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
-                  ConstOpConversion>(context);
+                  ConstOpConversion, PadOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
