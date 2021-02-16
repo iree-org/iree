@@ -402,8 +402,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t src_reg = src_reg_list->registers[reg_i++];
-        iree_vm_ref_retain_or_move(
-            src_reg & IREE_REF_REGISTER_MOVE_BIT,
+        iree_vm_ref_assign(
             &caller_registers.ref[src_reg & caller_registers.ref_mask],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
@@ -447,8 +446,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
-                iree_vm_ref_retain_or_move(
-                    src_reg & IREE_REF_REGISTER_MOVE_BIT,
+                iree_vm_ref_assign(
                     &caller_registers.ref[src_reg & caller_registers.ref_mask],
                     (iree_vm_ref_t*)p);
                 p += sizeof(iree_vm_ref_t);

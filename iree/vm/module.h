@@ -192,9 +192,8 @@ typedef struct {
   // Argument buffer in the format described above.
   // This is only read on beginning the function and need not live beyond that.
   //
-  // Refs contained will be moved into the target function or released if not
-  // needed. Callers must ensure they move or retain arguments when populating
-  // the arguments buffer.
+  // Refs contained are retained by the caller and callees must retain them if
+  // they need them to live beyond the call.
   iree_byte_span_t arguments;
 
   // Storage for the result buffer; assumed undefined and then populated with

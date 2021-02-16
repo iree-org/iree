@@ -87,6 +87,7 @@ typedef struct {
   { {IREE_VM_VALUE_TYPE_NONE, IREE_VM_REF_TYPE_NULL}, {0}, }
 #define iree_vm_variant_is_value(v) iree_vm_type_def_is_value(&(v).type)
 #define iree_vm_variant_is_ref(v) iree_vm_type_def_is_ref(&(v).type)
+#define iree_vm_variant_is_empty(v) iree_vm_type_def_is_variant(&(v).type)
 
 #ifdef __cplusplus
 }  // extern "C"

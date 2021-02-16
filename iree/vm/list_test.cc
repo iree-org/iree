@@ -229,11 +229,161 @@ TEST_F(VMListTest, Reserve) {
   iree_vm_list_release(list);
 }
 
-// TODO(benvanik): test resize value.
+// Tests the behavior of resize for truncation and extension on primitives.
+TEST_F(VMListTest, ResizeI32) {
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+  iree_host_size_t initial_capacity = 4;
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &list));
+  EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
+  EXPECT_EQ(0, iree_vm_list_size(list));
 
-// TODO(benvanik): test resize ref.
+  // Extend and zero-initialize.
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value;
+    IREE_ASSERT_OK(
+        iree_vm_list_get_value_as(list, i, IREE_VM_VALUE_TYPE_I32, &value));
+    EXPECT_EQ(0, value.i32);
+  }
 
-// TODO(benvanik): test resize variant.
+  // Overwrite with [0, 5).
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
+    IREE_ASSERT_OK(iree_vm_list_set_value(list, i, &value));
+  }
+
+  // Truncate to [0, 2) and then extend again.
+  // This ensures that we test the primitive clearing path during cleanup:
+  // [int, int, int, int, int]
+  //            |___________| <- truncation region
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 2));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+
+  // Ensure that elements 2+ are zeroed after having been reset while 0 and 1
+  // are still valid as before.
+  for (iree_host_size_t i = 0; i < 2; ++i) {
+    iree_vm_value_t value;
+    IREE_ASSERT_OK(
+        iree_vm_list_get_value_as(list, i, IREE_VM_VALUE_TYPE_I32, &value));
+    EXPECT_EQ(i, value.i32);
+  }
+  for (iree_host_size_t i = 2; i < 5; ++i) {
+    iree_vm_value_t value;
+    IREE_ASSERT_OK(
+        iree_vm_list_get_value_as(list, i, IREE_VM_VALUE_TYPE_I32, &value));
+    EXPECT_EQ(0, value.i32);
+  }
+
+  iree_vm_list_release(list);
+}
+
+// Tests the behavior of resize for truncation and extension on refs.
+TEST_F(VMListTest, ResizeRef) {
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_ref_type(test_a_type_id());
+  iree_host_size_t initial_capacity = 4;
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &list));
+  EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
+  EXPECT_EQ(0, iree_vm_list_size(list));
+
+  // Extend and zero-initialize.
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, i, &ref_a));
+    EXPECT_TRUE(iree_vm_ref_is_null(&ref_a));
+  }
+
+  // Overwrite with [0, 5).
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, i, &ref_a));
+  }
+
+  // Truncate to [0, 2) and then extend again.
+  // This ensures that we test the ref path during cleanup:
+  // [ref, ref, ref, ref, ref]
+  //            |___________| <- truncation region
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 2));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+
+  // Ensure that elements 2+ are reset after having been reset while 0 and 1
+  // are still valid as before.
+  for (iree_host_size_t i = 0; i < 2; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i, &ref_a));
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
+    EXPECT_EQ(i, a->data());
+    iree_vm_ref_release(&ref_a);
+  }
+  for (iree_host_size_t i = 2; i < 5; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, i, &ref_a));
+    EXPECT_TRUE(iree_vm_ref_is_null(&ref_a));
+  }
+
+  iree_vm_list_release(list);
+}
+
+// Tests the behavior of resize for truncation and extension on variants.
+TEST_F(VMListTest, ResizeVariant) {
+  iree_vm_type_def_t element_type = iree_vm_type_def_make_variant_type();
+  iree_host_size_t initial_capacity = 4;
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &list));
+  EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
+  EXPECT_EQ(0, iree_vm_list_size(list));
+
+  // Extend and zero-initialize.
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_variant_t value = iree_vm_variant_empty();
+    IREE_ASSERT_OK(iree_vm_list_get_variant(list, i, &value));
+    EXPECT_TRUE(iree_vm_variant_is_empty(value));
+  }
+
+  // Overwrite with [0, 5) in mixed types.
+  for (iree_host_size_t i = 0; i < 4; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, i, &ref_a));
+  }
+  for (iree_host_size_t i = 4; i < 5; ++i) {
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
+    IREE_ASSERT_OK(iree_vm_list_set_value(list, i, &value));
+  }
+
+  // Truncate to [0, 2) and then extend again.
+  // This ensures that we test the variant path during cleanup:
+  // [ref, ref, ref, ref, int]
+  //            |___________| <- truncation region
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 2));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
+
+  // Ensure that elements 2+ are reset after having been reset while 0 and 1
+  // are still valid as before.
+  for (iree_host_size_t i = 0; i < 2; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i, &ref_a));
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
+    EXPECT_EQ(i, a->data());
+    iree_vm_ref_release(&ref_a);
+  }
+  for (iree_host_size_t i = 2; i < 5; ++i) {
+    iree_vm_variant_t value = iree_vm_variant_empty();
+    IREE_ASSERT_OK(iree_vm_list_get_variant(list, i, &value));
+    EXPECT_TRUE(iree_vm_variant_is_empty(value));
+  }
+
+  iree_vm_list_release(list);
+}
 
 // TODO(benvanik): test value get/set.
 

@@ -70,21 +70,27 @@ static void iree_vm_list_reset_range(iree_vm_list_t* list,
                                      iree_host_size_t offset,
                                      iree_host_size_t length) {
   switch (list->storage_mode) {
-    case IREE_VM_LIST_STORAGE_MODE_VALUE:
-      // Nothing special, freeing the storage is all we need.
+    case IREE_VM_LIST_STORAGE_MODE_VALUE: {
+      void* base_ptr =
+          (void*)((uintptr_t)list->storage + offset * list->element_size);
+      memset(base_ptr, 0, length * list->element_size);
       break;
+    }
     case IREE_VM_LIST_STORAGE_MODE_REF: {
       iree_vm_ref_t* ref_storage = (iree_vm_ref_t*)list->storage;
-      for (iree_host_size_t i = offset; i < length; ++i) {
+      for (iree_host_size_t i = offset; i < offset + length; ++i) {
         iree_vm_ref_release(&ref_storage[i]);
       }
       break;
     }
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant_storage = (iree_vm_variant_t*)list->storage;
-      for (iree_host_size_t i = offset; i < length; ++i) {
+      for (iree_host_size_t i = offset; i < offset + length; ++i) {
         if (iree_vm_type_def_is_ref(&variant_storage[i].type)) {
           iree_vm_ref_release(&variant_storage[i].ref);
+          memset(&variant_storage[i].type, 0, sizeof(variant_storage[i].type));
+        } else {
+          memset(&variant_storage[i], 0, sizeof(variant_storage[i]));
         }
       }
       break;
@@ -243,7 +249,7 @@ iree_vm_list_resize(iree_vm_list_t* list, iree_host_size_t new_size) {
     return iree_ok_status();
   } else if (new_size < list->count) {
     // Truncating.
-    iree_vm_list_reset_range(list, new_size + 1, list->count - new_size);
+    iree_vm_list_reset_range(list, new_size, list->count - new_size);
     list->count = new_size;
   } else if (new_size > list->capacity) {
     // Extending beyond capacity.
