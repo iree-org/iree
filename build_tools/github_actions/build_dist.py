@@ -47,12 +47,9 @@ a directory and:
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
   python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-xla-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-tflite-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-tf-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
 
 
 That is not a perfect approximation but is close.
@@ -197,6 +194,24 @@ def build_py_runtime_pkg():
                  check=True)
 
 
+def bazel_build_tf_binary(target):
+  subprocess.run([
+      "bazel",
+      "build",
+      "--config=release",
+      target,
+  ],
+                 cwd=TF_INTEGRATIONS_DIR,
+                 check=True,
+                 universal_newlines=True)
+
+  process = subprocess.run(["bazel", "info", "bazel-bin"],
+                           cwd=TF_INTEGRATIONS_DIR,
+                           check=True,
+                           universal_newlines=True)
+  return process.stdout
+
+
 def build_py_xla_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_xla package."""
   # Clean up install and build trees.
@@ -204,17 +219,7 @@ def build_py_xla_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building XLA import tool with Bazel ***")
-  subprocess.run([
-      "bazel", "build", "--config=release", "//iree_tf_compiler:iree-import-xla"
-  ],
-                 cwd=TF_INTEGRATIONS_DIR,
-                 check=True,
-                 universal_newlines=True)
-  process = subprocess.run(["bazel", "info", "bazel-bin"],
-                           cwd=TF_INTEGRATIONS_DIR,
-                           check=True,
-                           universal_newlines=True)
-  bazel_bin_dir = process.stdout
+  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-import-xla")
 
   # CMake configure.
   print("*** Configuring ***")
@@ -251,17 +256,7 @@ def build_py_tflite_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TFLite import tool with Bazel ***")
-  subprocess.run([
-      "bazel", "build", "--config=release",
-      "//iree_tf_compiler:iree-import-tflite"
-  ],
-                 cwd=TF_INTEGRATIONS_DIR,
-                 check=True)
-  process = subprocess.run(["bazel", "info", "bazel-bin"],
-                           cwd=TF_INTEGRATIONS_DIR,
-                           check=True,
-                           universal_newlines=True)
-  bazel_bin_dir = process.stdout
+  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tflite")
 
   # CMake configure.
   print("*** Configuring ***")
@@ -297,17 +292,8 @@ def build_py_tf_compiler_tools_pkg():
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
 
-  print("*** Building TFLite import tool with Bazel ***")
-  subprocess.run([
-      "bazel", "build", "--config=release", "//iree_tf_compiler:iree-tf-import"
-  ],
-                 cwd=TF_INTEGRATIONS_DIR,
-                 check=True)
-  process = subprocess.run(["bazel", "info", "bazel-bin"],
-                           cwd=TF_INTEGRATIONS_DIR,
-                           check=True,
-                           universal_newlines=True)
-  bazel_bin_dir = process.stdout
+  print("*** Building TF import tool with Bazel ***")
+  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
 
   # CMake configure.
   print("*** Configuring ***")

@@ -168,7 +168,6 @@ build:generic_gcc_release --linkopt=-Wl,--strip-all
 # nothing needs to be stripped.
 build:msvc_release --compilation_mode=opt
 
-
 ###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
