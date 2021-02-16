@@ -25,11 +25,14 @@ iree_cc_embed_data(
     "arithmetic_ops.vmfb"
     "arithmetic_ops_i64.vmfb"
     "assignment_ops.vmfb"
+    "assignment_ops_i64.vmfb"
     "comparison_ops.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
+    "conversion_ops_i64.vmfb"
     "list_ops.vmfb"
     "shift_ops.vmfb"
+    "shift_ops_i64.vmfb"
   CC_FILE_OUTPUT
     "all_bytecode_modules.cc"
   H_FILE_OUTPUT
@@ -72,6 +75,16 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    assignment_ops_i64
+  SRC
+    "assignment_ops_i64.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     comparison_ops
   SRC
     "comparison_ops.mlir"
@@ -102,6 +115,16 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    conversion_ops_i64
+  SRC
+    "conversion_ops_i64.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     list_ops
   SRC
     "list_ops.mlir"
@@ -117,6 +140,18 @@ iree_bytecode_module(
     shift_ops
   SRC
     "shift_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    shift_ops_i64
+  SRC
+    "shift_ops_i64.mlir"
   CC_NAMESPACE
     "iree::vm::test"
   FLAGS
