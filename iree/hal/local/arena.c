@@ -52,6 +52,8 @@ void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool) {
 
 iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
                                             iree_arena_block_t** out_block) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_arena_block_t* block =
       iree_atomic_arena_block_slist_pop(&block_pool->available_slist);
 
@@ -63,23 +65,28 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
     // that's fine - it's just one block and the contention means there's likely
     // to be a need for more anyway.
     uint8_t* block_base = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(block_pool->block_allocator,
-                                               block_pool->total_block_size,
-                                               (void**)&block_base));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(block_pool->block_allocator,
+                                  block_pool->total_block_size,
+                                  (void**)&block_base));
     block = (iree_arena_block_t*)(block_base + (block_pool->total_block_size -
                                                 sizeof(iree_arena_block_t)));
   }
 
   block->next = NULL;
   *out_block = block;
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 void iree_arena_block_pool_release(iree_arena_block_pool_t* block_pool,
                                    iree_arena_block_t* block_head,
                                    iree_arena_block_t* block_tail) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_atomic_arena_block_slist_concat(&block_pool->available_slist, block_head,
                                        block_tail);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
