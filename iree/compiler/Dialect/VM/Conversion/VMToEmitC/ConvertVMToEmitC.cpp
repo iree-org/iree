@@ -136,6 +136,36 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
                                                          "VM_CHECK_EQ");
 
+  // ExtI64: Constants
+  patterns.insert<CallOpConversion<IREE::VM::ConstI64Op>>(context,
+                                                          "vm_const_i64");
+
+  // ExtI64: Conditional assignment ops
+  patterns.insert<CallOpConversion<IREE::VM::SelectI64Op>>(context,
+                                                           "vm_select_i64");
+  // ExtI64: Native integer arithmetic ops
+  patterns.insert<CallOpConversion<IREE::VM::AddI64Op>>(context, "vm_add_i64");
+  patterns.insert<CallOpConversion<IREE::VM::SubI64Op>>(context, "vm_sub_i64");
+  patterns.insert<CallOpConversion<IREE::VM::MulI64Op>>(context, "vm_mul_i64");
+  patterns.insert<CallOpConversion<IREE::VM::DivI64SOp>>(context,
+                                                         "vm_div_i64s");
+  patterns.insert<CallOpConversion<IREE::VM::DivI64UOp>>(context,
+                                                         "vm_div_i64u");
+  patterns.insert<CallOpConversion<IREE::VM::RemI64SOp>>(context,
+                                                         "vm_rem_i64s");
+  patterns.insert<CallOpConversion<IREE::VM::RemI64UOp>>(context,
+                                                         "vm_rem_i64u");
+  patterns.insert<CallOpConversion<IREE::VM::NotI64Op>>(context, "vm_not_i64");
+  patterns.insert<CallOpConversion<IREE::VM::AndI64Op>>(context, "vm_and_i64");
+  patterns.insert<CallOpConversion<IREE::VM::OrI64Op>>(context, "vm_or_i64");
+  patterns.insert<CallOpConversion<IREE::VM::XorI64Op>>(context, "vm_xor_i64");
+
+  // ExtI64: Native bitwise shift and rotate ops
+  patterns.insert<CallOpConversion<IREE::VM::ShlI64Op>>(context, "vm_shl_i64");
+  patterns.insert<CallOpConversion<IREE::VM::ShrI64SOp>>(context,
+                                                         "vm_shr_i64s");
+  patterns.insert<CallOpConversion<IREE::VM::ShrI64UOp>>(context,
+                                                         "vm_shr_i64u");
 }
 
 namespace IREE {
@@ -205,6 +235,29 @@ class ConvertVMToEmitCPass
     // support for control flow ops has landed in the c module target
     target.addIllegalOp<IREE::VM::CheckEQOp>();
 
+    // ExtI64: Constants
+    target.addIllegalOp<IREE::VM::ConstI64Op>();
+
+    // ExtI64: Conditional assignment ops
+    target.addIllegalOp<IREE::VM::SelectI64Op>();
+
+    // ExtI64: Native integer arithmetic ops
+    target.addIllegalOp<IREE::VM::AddI64Op>();
+    target.addIllegalOp<IREE::VM::SubI64Op>();
+    target.addIllegalOp<IREE::VM::MulI64Op>();
+    target.addIllegalOp<IREE::VM::DivI64SOp>();
+    target.addIllegalOp<IREE::VM::DivI64UOp>();
+    target.addIllegalOp<IREE::VM::RemI64SOp>();
+    target.addIllegalOp<IREE::VM::RemI64UOp>();
+    target.addIllegalOp<IREE::VM::NotI64Op>();
+    target.addIllegalOp<IREE::VM::AndI64Op>();
+    target.addIllegalOp<IREE::VM::OrI64Op>();
+    target.addIllegalOp<IREE::VM::XorI64Op>();
+
+    // ExtI64: Native bitwise shift and rotate ops
+    target.addIllegalOp<IREE::VM::ShlI64Op>();
+    target.addIllegalOp<IREE::VM::ShrI64SOp>();
+    target.addIllegalOp<IREE::VM::ShrI64UOp>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
