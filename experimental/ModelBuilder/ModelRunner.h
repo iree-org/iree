@@ -103,7 +103,8 @@ class ModelRunner {
   llvm::Error invokeIndirect(StringRef funcName, void **args) {
     const std::string adapterName =
         std::string("_mlir_ciface_") + funcName.str();
-    return engine->invoke(adapterName, llvm::MutableArrayRef<void *>{*args});
+    return engine->invokePacked(adapterName,
+                                llvm::MutableArrayRef<void *>{*args});
   }
 
   // Get the underlying data for a StridedMemRefType wrapped in a unique_ptr.
@@ -130,8 +131,8 @@ class ModelRunner {
     std::array<void *, sizeof...(Args)> argsArray2;
     for (unsigned i = 0; i < sizeof...(Args); ++i)
       argsArray2[i] = &argsArray[i];
-    return engine->invoke(adapterName,
-                          llvm::MutableArrayRef<void *>{argsArray2});
+    return engine->invokePacked(adapterName,
+                                llvm::MutableArrayRef<void *>{argsArray2});
   }
 
  protected:

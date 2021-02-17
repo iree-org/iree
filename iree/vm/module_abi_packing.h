@@ -219,11 +219,11 @@ struct cconv_map<std::tuple<Ts...>> {
 template <typename U>
 struct cconv_map<absl::Span<U>> {
   static constexpr const auto conv_chars = concat_literals(
-      literal("["), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
-      literal("]"));
+      literal("C"), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
+      literal("D"));
 };
 
-template <typename Result, typename... Params>
+template <typename Result, size_t ParamsCount, typename... Params>
 struct cconv_storage {
   static const iree_string_view_t value() {
     static constexpr const auto value = concat_literals(
@@ -231,7 +231,7 @@ struct cconv_storage {
         concat_literals(
             cconv_map<
                 typename impl::remove_cvref<Params>::type>::conv_chars...),
-        literal("."),
+        literal("_"),
         concat_literals(
             cconv_map<typename impl::remove_cvref<Result>::type>::conv_chars));
     static constexpr const auto str =
@@ -240,14 +240,38 @@ struct cconv_storage {
   }
 };
 
-template <typename... Params>
+template <typename Result>
+struct cconv_storage<Result, 0> {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(
+        literal("0v_"),
+        concat_literals(
+            cconv_map<typename impl::remove_cvref<Result>::type>::conv_chars));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
+
+template <size_t ParamsCount, typename... Params>
 struct cconv_storage_void {
   static const iree_string_view_t value() {
     static constexpr const auto value = concat_literals(
         literal("0"),
         concat_literals(
             cconv_map<
-                typename impl::remove_cvref<Params>::type>::conv_chars...));
+                typename impl::remove_cvref<Params>::type>::conv_chars...),
+        literal("_v"));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
+
+template <>
+struct cconv_storage_void<0> {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(literal("0v_v"));
     static constexpr const auto str =
         iree_string_view_t{value.data(), value.size()};
     return str;
@@ -338,7 +362,7 @@ template <>
 struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
-    iree_vm_ref_move(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
+    iree_vm_ref_retain(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
     ptr += sizeof(iree_vm_ref_t);
   }
 };
@@ -352,7 +376,7 @@ struct ParamUnpack<ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status =
@@ -377,7 +401,7 @@ struct ParamUnpack<const ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status =
@@ -628,7 +652,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
     absl::string_view name, StatusOr<Result> (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
   return {{name.data(), name.size()},
-          packing::cconv_storage<Result, Params...>::value(),
+          packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
           (void (Owner::*)())fn,
           &dispatch_functor_t::Call};
 }
@@ -638,7 +662,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
     absl::string_view name, Status (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
   return {{name.data(), name.size()},
-          packing::cconv_storage_void<Params...>::value(),
+          packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
           (void (Owner::*)())fn,
           &dispatch_functor_t::Call};
 }

@@ -25,16 +25,6 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct {
-  const iree_hal_executable_dispatch_state_v0_t* state;
-  iree_hal_vec3_t workgroup_id;
-  iree_hal_vec3_t workgroup_size;
-  iree_hal_vec3_t workgroup_count;
-  iree_hal_executable_push_constants_ptr_t push_constants;
-  const iree_hal_executable_binding_ptr_t* bindings;
-  const iree_device_size_t* binding_lengths;
-} iree_hal_local_executable_call_t;
-
-typedef struct {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t executable_layout_count;
@@ -46,7 +36,8 @@ typedef struct {
 
   iree_status_t(IREE_API_PTR* issue_call)(
       iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
-      const iree_hal_local_executable_call_t* call);
+      const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+      const iree_hal_vec3_t* workgroup_id);
 } iree_hal_local_executable_vtable_t;
 
 // Callers must allocate memory for |target_executable_layouts| with at least
@@ -67,7 +58,8 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call);
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id);
 
 #ifdef __cplusplus
 }  // extern "C"

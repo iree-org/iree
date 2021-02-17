@@ -48,7 +48,7 @@ static Optional<StringRef> getKey(Operation *op) {
 static void setKey(Operation *op, StringRef key) {
   MLIRContext *context = op->getContext();
   op->setAttr(Identifier::get(kLaunchInfoKey, op->getContext()),
-              StringAttr::get(key, context));
+              StringAttr::get(context, key));
 }
 
 static std::string getOrSetNewKey(Operation *op, int64_t suffix) {

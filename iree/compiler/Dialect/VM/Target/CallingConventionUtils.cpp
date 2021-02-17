@@ -66,9 +66,9 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
 
 LogicalResult encodeVariadicCallingConventionType(Operation *op, Type type,
                                                   SmallVectorImpl<char> &s) {
-  s.push_back('[');
+  s.push_back('C');
   auto result = encodeCallingConventionType(op, type, s);
-  s.push_back(']');
+  s.push_back('D');
   return result;
 }
 
@@ -76,31 +76,37 @@ Optional<std::string> makeImportCallingConventionString(
     IREE::VM::ImportOp importOp) {
   auto functionType = importOp.getType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string{};  // Valid but empty.
+    return std::string("0v_v");  // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
-  for (int i = 0; i < functionType.getNumInputs(); ++i) {
-    if (importOp.isFuncArgumentVariadic(i)) {
-      if (failed(encodeVariadicCallingConventionType(
-              importOp, functionType.getInput(i), s))) {
-        return None;
-      }
-    } else {
-      if (failed(encodeCallingConventionType(importOp, functionType.getInput(i),
-                                             s))) {
-        return None;
+  if (functionType.getNumInputs() > 0) {
+    for (int i = 0; i < functionType.getNumInputs(); ++i) {
+      if (importOp.isFuncArgumentVariadic(i)) {
+        if (failed(encodeVariadicCallingConventionType(
+                importOp, functionType.getInput(i), s))) {
+          return None;
+        }
+      } else {
+        if (failed(encodeCallingConventionType(importOp,
+                                               functionType.getInput(i), s))) {
+          return None;
+        }
       }
     }
+  } else {
+    s.push_back('v');
   }
+  s.push_back('_');
   if (functionType.getNumResults() > 0) {
-    s.push_back('.');
     for (int i = 0; i < functionType.getNumResults(); ++i) {
       if (failed(encodeCallingConventionType(importOp,
                                              functionType.getResult(i), s))) {
         return None;
       }
     }
+  } else {
+    s.push_back('v');
   }
   return std::string(s.data(), s.size());
 }
@@ -108,24 +114,30 @@ Optional<std::string> makeImportCallingConventionString(
 Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
   auto functionType = funcOp.getType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string{};  // Valid but empty.
+    return std::string("0v_v");  // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
-  for (int i = 0; i < functionType.getNumInputs(); ++i) {
-    if (failed(
-            encodeCallingConventionType(funcOp, functionType.getInput(i), s))) {
-      return None;
+  if (functionType.getNumInputs() > 0) {
+    for (int i = 0; i < functionType.getNumInputs(); ++i) {
+      if (failed(encodeCallingConventionType(funcOp, functionType.getInput(i),
+                                             s))) {
+        return None;
+      }
     }
+  } else {
+    s.push_back('v');
   }
+  s.push_back('_');
   if (functionType.getNumResults() > 0) {
-    s.push_back('.');
     for (int i = 0; i < functionType.getNumResults(); ++i) {
       if (failed(encodeCallingConventionType(funcOp, functionType.getResult(i),
                                              s))) {
         return None;
       }
     }
+  } else {
+    s.push_back('v');
   }
   return std::string(s.data(), s.size());
 }

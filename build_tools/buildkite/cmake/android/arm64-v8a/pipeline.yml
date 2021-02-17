@@ -26,6 +26,7 @@ steps:
   - wait
 
   - label: "test on exynos-990 (mali-g77)"
+    skip: true
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
@@ -38,7 +39,6 @@ steps:
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
-    skip: true
 
   - label: "test on exynos-9820 (mali-g76)"
     commands:
@@ -55,6 +55,7 @@ steps:
     timeout_in_minutes: "15"
 
   - label: "test on snapdragon-835 (adreno-540)"
+    skip: true
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
@@ -69,9 +70,10 @@ steps:
     timeout_in_minutes: "15"
     soft_fail:
       - exit_status: "*"
-    skip: true
 
   - label: "test on snapdragon-855 (adreno-640)"
+    # TODO(#4861): Re-enable when phone is fixed
+    skip: "Phone is borked. See https://github.com/google/iree/issues/4861"
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
@@ -87,6 +89,7 @@ steps:
     timeout_in_minutes: "15"
 
   - label: "test on snapdragon-855 (adreno-640) (Android 11)"
+    skip: true
     commands:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
@@ -102,7 +105,6 @@ steps:
     branches: "main"
     timeout_in_minutes: "20"
     soft_fail: true
-    skip: true
 
   - label: "test on snapdragon-865 (adreno-650)"
     commands:

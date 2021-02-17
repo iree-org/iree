@@ -43,35 +43,20 @@ class CommandBufferPushDescriptorSetOpConversion
     SmallVector<Value, 8> callOperands = {
         newOperands.command_buffer(),
         newOperands.executable_layout(),
-        rewriter.create<mlir::ConstantOp>(
-            op.getLoc(), rewriter.getI32IntegerAttr(
-                             static_cast<int32_t>(op.setAttr().getInt()))),
+        newOperands.set(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
         /*executable_layout=*/-1,
         /*set=*/-1,
-        /*bindings_ordinals=*/
-        static_cast<int16_t>(op.bindings().size()),
-        /*bindings_buffers=*/
-        static_cast<int16_t>(op.bindings().size()),
-        /*bindings_offsets=*/
-        static_cast<int16_t>(op.bindings().size()),
-        /*bindings_lengths=*/
-        static_cast<int16_t>(op.bindings().size()),
+        /*bindings=*/
+        static_cast<int16_t>(newOperands.binding_ordinals().size()),
     };
-    for (auto bindingAttr : op.bindings()) {
-      callOperands.push_back(
-          rewriter.create<mlir::ConstantOp>(op.getLoc(), bindingAttr));
-    }
-    for (auto bindingBuffer : newOperands.binding_buffers()) {
-      callOperands.push_back(bindingBuffer);
-    }
-    for (auto bindingOffset : newOperands.binding_offsets()) {
-      callOperands.push_back(bindingOffset);
-    }
-    for (auto bindingLength : newOperands.binding_lengths()) {
-      callOperands.push_back(bindingLength);
+    for (size_t i = 0; i < newOperands.binding_ordinals().size(); ++i) {
+      callOperands.push_back(newOperands.binding_ordinals()[i]);
+      callOperands.push_back(newOperands.binding_buffers()[i]);
+      callOperands.push_back(newOperands.binding_offsets()[i]);
+      callOperands.push_back(newOperands.binding_lengths()[i]);
     }
 
     rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

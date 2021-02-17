@@ -75,7 +75,7 @@ bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
 
 void setMarker(Operation *op, StringRef marker) {
   op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
-              StringAttr::get(marker, op->getContext()));
+              StringAttr::get(op->getContext(), marker));
 }
 
 }  // namespace iree_compiler

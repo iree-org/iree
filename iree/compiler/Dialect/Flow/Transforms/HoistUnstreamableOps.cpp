@@ -41,7 +41,7 @@ static bool isStreamableOp(Operation *op) {
 static llvm::SmallVector<Operation *, 16> getOpsToHoist(Block &block) {
   llvm::SmallVector<Operation *, 16> opsToHoist;
   for (Operation &op : block) {
-    if (!isStreamableOp(&op) && !op.isKnownTerminator() &&
+    if (!isStreamableOp(&op) && !op.hasTrait<OpTrait::IsTerminator>() &&
         MemoryEffectOpInterface::hasNoEffect(&op)) {
       opsToHoist.push_back(&op);
     }

@@ -143,7 +143,8 @@ int main(int argc, char **argv) {
   // Convert the Module proto into MLIR.
   MLIRContext context;
   OwningModuleRef module = ModuleOp::create(mlir::UnknownLoc::get(&context));
-  registry.loadAll(&context);
+  context.appendDialectRegistry(registry);
+  context.loadAllAvailableDialects();
 
   auto status =
       ConvertHloToMlirHlo(module.get(), hloProto.mutable_hlo_module());

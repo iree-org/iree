@@ -130,6 +130,26 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_last_of(
+    iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
+  if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
+    return IREE_STRING_VIEW_NPOS;
+  }
+  bool lookup_table[UCHAR_MAX + 1] = {0};
+  for (iree_host_size_t i = 0; i < s.size; ++i) {
+    lookup_table[(uint8_t)s.data[i]] = true;
+  }
+  pos = iree_min(pos, value.size);
+  iree_host_size_t i = pos;
+  while (i != 0) {
+    --i;
+    if (lookup_table[(uint8_t)value.data[i]]) {
+      return i;
+    }
+  }
+  return IREE_STRING_VIEW_NPOS;
+}
+
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
   if (n >= value.size) {
@@ -575,7 +595,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
 #if IREE_STATUS_FEATURES == 0
   // More advanced status code features like source location and messages are
   // disabled. All statuses are just the codes.
-  return (iree_status_t)(code & IREE_STATUS_CODE_MASK);
+  return iree_status_from_code(code);
 #else
   // No-op for OK statuses; we won't get these from the macros but may be called
   // with this from marshaling code.

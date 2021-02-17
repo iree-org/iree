@@ -49,10 +49,12 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id) {
   IREE_ASSERT_ARGUMENT(executable);
-  IREE_ASSERT_ARGUMENT(call);
+  IREE_ASSERT_ARGUMENT(dispatch_state);
+  IREE_ASSERT_ARGUMENT(workgroup_id);
   return ((const iree_hal_local_executable_vtable_t*)
               executable->resource.vtable)
-      ->issue_call(executable, ordinal, call);
+      ->issue_call(executable, ordinal, dispatch_state, workgroup_id);
 }

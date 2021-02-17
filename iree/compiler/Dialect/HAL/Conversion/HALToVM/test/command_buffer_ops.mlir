@@ -58,11 +58,12 @@ func @command_buffer_bind_descriptor_set(
     %arg0 : !hal.command_buffer,
     %arg1 : !hal.executable_layout,
     %arg2 : !hal.descriptor_set) {
+  %c0 = constant 0 : index
   %c100 = constant 100 : index
   // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
-  hal.command_buffer.bind_descriptor_set %arg0, %arg1, set=0, %arg2
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero_0, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
-  hal.command_buffer.bind_descriptor_set %arg0, %arg1, set=0, %arg2, offsets=[%c100]
+  hal.command_buffer.bind_descriptor_set %arg0, %arg1, set = %c0, %arg2
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
+  hal.command_buffer.bind_descriptor_set %arg0, %arg1, set = %c0, %arg2, offsets = [%c100]
   return
 }
 

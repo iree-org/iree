@@ -16,57 +16,46 @@
 
 #include "llvm/Support/CommandLine.h"
 
-static llvm::cl::opt<bool> clEnableVectorization(
-    "iree-spirv-enable-vectorization",
-    llvm::cl::desc(
-        "Enable vectorization transformations in SPIR-V code generation"),
-    llvm::cl::init(false));
-
-static llvm::cl::list<unsigned> clTileSizes(
-    "iree-spirv-tile-size",
-    llvm::cl::desc("Set tile sizes to use for tiling Linalg operations in "
-                   "SPIR-V code generation"),
-    llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
-
-static llvm::cl::opt<bool> clUseWorkgroupMemory(
-    "iree-spirv-use-workgroup-memory",
-    llvm::cl::desc("Use workgroup memory in SPIR-V code generation"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clVectorizeMemref(
-    "iree-spirv-enable-memref-vectorization",
-    llvm::cl::desc("Vectorize memref if possible in SPIR-V code generation"),
-    llvm::cl::init(false));
-
-static llvm::cl::list<unsigned> clWorkgroupSizes(
-    "iree-spirv-workgroup-size",
-    llvm::cl::desc("Set workgroup size to use for SPIR-V code generation"),
-    llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
-
-static llvm::SmallVector<unsigned, 3> getSPIRVTileSizeClOption() {
-  llvm::SmallVector<unsigned, 3> sizes;
-  sizes.assign(clTileSizes.begin(), clTileSizes.end());
-  return sizes;
-}
-
-static llvm::SmallVector<unsigned, 3> getSPIRVWorkgroupSizeClOption() {
-  llvm::SmallVector<unsigned, 3> sizes;
-  sizes.assign(clWorkgroupSizes.begin(), clWorkgroupSizes.end());
-  return sizes;
-}
-
-static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
-    "iree-codegen-spirv-experimental-linalg-on-tensors",
-    llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
-    llvm::cl::init(false));
-
 namespace mlir {
 namespace iree_compiler {
 
 SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
+  static llvm::cl::opt<bool> clEnableVectorization(
+      "iree-spirv-enable-vectorization",
+      llvm::cl::desc(
+          "Enable vectorization transformations in SPIR-V code generation"),
+      llvm::cl::init(false));
+
+  static llvm::cl::list<unsigned> clTileSizes(
+      "iree-spirv-tile-size",
+      llvm::cl::desc("Set tile sizes to use for tiling Linalg operations in "
+                     "SPIR-V code generation"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
+  static llvm::cl::opt<bool> clUseWorkgroupMemory(
+      "iree-spirv-use-workgroup-memory",
+      llvm::cl::desc("Use workgroup memory in SPIR-V code generation"),
+      llvm::cl::init(false));
+
+  static llvm::cl::opt<bool> clVectorizeMemref(
+      "iree-spirv-enable-memref-vectorization",
+      llvm::cl::desc("Vectorize memref if possible in SPIR-V code generation"),
+      llvm::cl::init(false));
+
+  static llvm::cl::list<unsigned> clWorkgroupSizes(
+      "iree-spirv-workgroup-size",
+      llvm::cl::desc("Set workgroup size to use for SPIR-V code generation"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
+  static llvm::cl::opt<bool> clEnableLinalgOnTensorsSPIRV(
+      "iree-codegen-spirv-experimental-linalg-on-tensors",
+      llvm::cl::desc("Enable the linalg on tensors on SPIR-V path"),
+      llvm::cl::init(false));
+
   SPIRVCodegenOptions options;
-  options.workgroupSize = getSPIRVWorkgroupSizeClOption();
-  options.tileSizes = getSPIRVTileSizeClOption();
+  options.workgroupSize.assign(clWorkgroupSizes.begin(),
+                               clWorkgroupSizes.end());
+  options.tileSizes.assign(clTileSizes.begin(), clTileSizes.end());
   options.enableVectorization = clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
   options.vectorizeMemref = clVectorizeMemref;

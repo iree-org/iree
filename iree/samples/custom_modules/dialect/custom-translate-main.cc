@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
     mlir::MLIRContext context;
-    registry.appendTo(context.getDialectRegistry());
+    context.appendDialectRegistry(registry);
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
     mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);

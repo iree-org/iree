@@ -62,7 +62,7 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
     LLVM_DEBUG(llvm::dbgs() << "  NOT DISPATCHABLE (Flow Dialect): "
                             << op->getName() << "\n");
     return false;
-  } else if (op->isKnownTerminator()) {
+  } else if (op->hasTrait<OpTrait::IsTerminator>()) {
     // Currently we skip all terminators as we want to leave them in the block
     // to keep it valid. Future folding passes may take care of them if they are
     // worth bringing into the dispatch region.

@@ -59,16 +59,9 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-/// Returns a Linalg marker that replaces existing markers.
-linalg::LinalgTransformationFilter getLinalgReplaceMarker(
-    StringRef maker, MLIRContext *context) {
-  return linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
-                                            Identifier::get(maker, context));
-}
-
 /// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
 /// it with `replaceMarker`.
-linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
+static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, StringRef replaceMarker,
     MLIRContext *context) {
   SmallVector<Identifier, 2> markers;
@@ -318,7 +311,9 @@ static void populateTilingToInvocationPatterns(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::ConvOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -411,6 +406,15 @@ static void populateTilingConvFilterPatterns(
     return tileSizes;
   };
 
+  auto depthWiseConvTilingOptions =
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::Loops)
+          .setTileSizeComputationFunction(getTileSizeFn);
+
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
+      context, depthWiseConvTilingOptions, marker);
+
   // TODO(antiagainst): move this to launch configuration.
   SmallVector<unsigned, 8> loopOrder = {
       /*batch=*/0,
@@ -422,13 +426,13 @@ static void populateTilingConvFilterPatterns(
       /*input_channel=*/4,
   };
 
-  auto tilingOptions = linalg::LinalgTilingOptions()
-                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setInterchange(loopOrder)
-                           .setTileSizeComputationFunction(getTileSizeFn);
+  auto convTilingOptions = linalg::LinalgTilingOptions()
+                               .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                               .setInterchange(loopOrder)
+                               .setTileSizeComputationFunction(getTileSizeFn);
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
-      context, tilingOptions, marker);
+      context, convTilingOptions, marker);
 }
 
 //====---------------------------------------------------------------------===//
@@ -597,7 +601,7 @@ void LinalgTileAndFusePass::runOnOperation() {
         applyCanonicalizationPatternsForTiling(context, funcOp);
 
         LLVM_DEBUG({
-          llvm::dbgs() << "--- After tiling linalg.conv  ---\n";
+          llvm::dbgs() << "--- After tiling convolution filter  ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
@@ -626,6 +630,34 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
 
       applyVectorTransformation(funcOp);
+    }
+
+    // Invoke patterns to generalize linalg.depthwise_conv_2d_nhwc ops to Linalg
+    // generic ops. This can handle those cases that failed tiling and
+    // vectorization in the above.
+    // TODO(antiagainst): remove this once we have depthwise convolution
+    // vectorization applicable everywhere.
+    {
+      // Carry over the Linalg marker because it is load-bearing and affects
+      // later passes.
+      linalg::LinalgTransformationFilter marker =
+          getLinalgMatchAndReplaceMarker({getWorkgroupMarker()},
+                                         getWorkgroupMarker(), context);
+      marker.addFilter([](Operation *op) -> LogicalResult {
+        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
+      });
+
+      OwningRewritePatternList patterns;
+      linalg::populateLinalgNamedOpsGeneralizationPatterns(context, patterns,
+                                                           marker);
+
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After generalization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     launchConfig.finalize(funcOp);

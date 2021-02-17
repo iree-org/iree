@@ -317,7 +317,7 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 /// Returns true if an operation is to always be cloned into the dispatch region
 /// when its value is used within it.
 bool isAlwaysClonedIntoDispatchOp(Operation *op) {
-  if (isa<linalg::InitTensorOp>(op)) {
+  if (isa<linalg::InitTensorOp, linalg::TensorReshapeOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
@@ -326,48 +326,75 @@ bool isAlwaysClonedIntoDispatchOp(Operation *op) {
   return false;
 }
 
+/// Computes the values that will be eventually be used within the dispatch
+/// workgroup op but defined outside the op after all clonable operations are
+/// cloned into the region. Returns (by reference) the clonable operations too,
+/// in order in which they can be cloned within the region to satisfy use-def
+/// relationships between them.
+void getUsedValuesDefinedAboveAfterCloningOps(
+    Region &region, llvm::SetVector<Value> &valuesDefinedAbove,
+    llvm::SmallVector<Operation *, 4> &clonedOps) {
+  mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
+  llvm::SetVector<Value> visited;
+  SmallVector<Value, 4> worklist;
+  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
+  valuesDefinedAbove.clear();
+  while (!worklist.empty()) {
+    Value outsideValue = worklist.pop_back_val();
+    if (visited.count(outsideValue)) continue;
+    visited.insert(outsideValue);
+    Operation *definingOp = outsideValue.getDefiningOp();
+    if (!definingOp || !isAlwaysClonedIntoDispatchOp(definingOp)) {
+      valuesDefinedAbove.insert(outsideValue);
+      continue;
+    }
+    clonedOps.push_back(definingOp);
+    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
+  }
+  // The cloned operations form a DAG. Return the cloned operations in reverse
+  // so the leaves come first, and can be cloned in-order into the dispatch
+  // region. Do the same for `valuesDefinedAbove` to keep return values
+  // consistent with order gotten from `mlir::getUsedValuesDefinedAbove` (more
+  // for a convention that correctness)
+  clonedOps = llvm::to_vector<4>(llvm::reverse(clonedOps));
+  llvm::SetVector<Value> reverseValuesDefinedAbove;
+  for (auto value : llvm::reverse(valuesDefinedAbove)) {
+    reverseValuesDefinedAbove.insert(value);
+  }
+  std::swap(reverseValuesDefinedAbove, valuesDefinedAbove);
+}
+
+/// Returns a valid insertion point for an operation based on the values used.
+static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
+  Operation *insertAfter = &block.front();
+  for (auto value : usedValues) {
+    Operation *definingOp = value.getDefiningOp();
+    if (!definingOp) continue;
+    if (definingOp->getBlock() != &block) return nullptr;
+    if (insertAfter->isBeforeInBlock(definingOp)) {
+      insertAfter = definingOp;
+    }
+  }
+  return insertAfter->getNextNode();
+}
+
 // After outlining in dispatch region we can rewrite the dispatch ops with
 // proper captures.
 // A later RematerializeDispatchConstants should be called to avoid passing
 // unnecessary constant arguments.
-static void legalizeDispatchWorkgroupOperands(
+static LogicalResult legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = dispatchOp.getLoc();
   Block &block = dispatchOp.body().front();
   unsigned numOldBBArgs = block.getNumArguments();
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
-  llvm::SetVector<Value> valuesSet;
-  mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
+  llvm::SetVector<Value> valuesDefinedAbove;
+  llvm::SmallVector<Operation *, 4> clonedOps;
+  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp.body(),
+                                           valuesDefinedAbove, clonedOps);
 
-  auto getUsesOfValueOutsideOfDispatchOp =
-      [&](Value v) -> SmallVector<Operation *, 4> {
-    SmallVector<Operation *, 4> res;
-    for (Operation *user : v.getUsers())
-      if (!dispatchOp->isAncestor(user)) res.push_back(user);
-    return res;
-  };
-
-  // Go through the captured values and check for any `init_tensor`. These can
-  // be pulled into the dispatch region
   BlockAndValueMapping map;
-  for (Value operand : valuesSet) {
-    Operation *definingOp = operand.getDefiningOp();
-    if (!definingOp || !isAlwaysClonedIntoDispatchOp(definingOp) ||
-        definingOp->getNumResults() != 1)
-      continue;
-    auto clonedOp = b.clone(*definingOp, map);
-    auto outsideUses = getUsesOfValueOutsideOfDispatchOp(operand);
-    operand.replaceAllUsesExcept(
-        clonedOp->getResult(0),
-        SmallPtrSet<Operation *, 8>(outsideUses.begin(), outsideUses.end()));
-  }
-
-  // Recompute the values captured from outside.
-  valuesSet.clear();
-  mlir::getUsedValuesDefinedAbove(dispatchOp.body(), valuesSet);
-  ValueRange valuesDefinedAbove{valuesSet.getArrayRef()};
-
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
   for (Value operand : valuesDefinedAbove) {
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
@@ -378,7 +405,6 @@ static void legalizeDispatchWorkgroupOperands(
     }
 
     Value bbArg = block.getArguments().back();
-    auto uses = getUsesOfValueOutsideOfDispatchOp(operand);
     Value repl = bbArg;
     if (bbArg.getType().isa<IREE::Flow::DispatchInputType>()) {
       repl = b.create<IREE::Flow::DispatchInputLoadOp>(loc, operand.getType(),
@@ -387,22 +413,59 @@ static void legalizeDispatchWorkgroupOperands(
       // TODO(nicolasvasilache): do something useful.
       continue;
     }
-    operand.replaceAllUsesExcept(
-        repl, SmallPtrSet<Operation *, 8>(uses.begin(), uses.end()));
+    map.map(operand, repl);
   }
 
-  // Reinsert and replace old BB args.
-  for (BlockArgument ba : block.getArguments().take_front(numOldBBArgs)) {
-    block.addArgument(ba.getType());
-    ba.replaceAllUsesWith(block.getArguments().back());
+  // The only existing arguments are for the outputs. Just need to add a new
+  // argument for the outputs and remap the value to use the new argument.
+  for (auto ba : block.getArguments().take_front(numOldBBArgs)) {
+    assert(ba.getType().isa<IREE::Flow::DispatchOutputType>());
+    map.map(ba, block.addArgument(ba.getType()));
+  }
+
+  auto getUsesOfValueOutsideOfDispatchOp = [&](Value v) {
+    SmallPtrSet<Operation *, 4> res;
+    for (Operation *user : v.getUsers())
+      if (!dispatchOp->isAncestor(user)) res.insert(user);
+    return res;
+  };
+  // Replace all uses of mapped values within the dispatch op to the new value.
+  for (Value value : valuesDefinedAbove) {
+    auto uses = getUsesOfValueOutsideOfDispatchOp(value);
+    value.replaceAllUsesExcept(map.lookup(value), uses);
+  }
+
+  // Clone the marked operations.
+  for (Operation *op : clonedOps) {
+    SmallVector<Value, 2> clonedOpOperands = llvm::to_vector<2>(llvm::map_range(
+        op->getOperands(), [&map](Value v) { return map.lookup(v); }));
+    Operation *insertionPoint = getInsertionPoint(block, clonedOpOperands);
+    if (!insertionPoint) {
+      return op->emitOpError(
+          "failed to find insetion point within dispatch workgroup op for "
+          "cloned operation");
+    }
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(insertionPoint);
+    b.clone(*op, map);
+    for (Value result : op->getResults()) {
+      auto uses = getUsesOfValueOutsideOfDispatchOp(result);
+      result.replaceAllUsesExcept(map.lookup(result), uses);
+    }
+  }
+
+  for (Value ba : block.getArguments().take_front(numOldBBArgs)) {
+    ba.replaceAllUsesWith(map.lookup(ba));
   }
 
   // Drop old BB args.
   block.eraseArguments(
       llvm::to_vector<4>(llvm::seq<unsigned>(0, numOldBBArgs)));
 
-  // Set the operands.
-  dispatchOp.operandsMutable().assign(valuesDefinedAbove);
+  // Set the values captured from above as the new operands.
+  dispatchOp.operandsMutable().assign(llvm::to_vector<4>(valuesDefinedAbove));
+
+  return success();
 }
 
 /// Checks if the `producer` can be fused into the dispatch region of the
@@ -550,7 +613,13 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.
-  funcOp.walk(legalizeDispatchWorkgroupOperands);
+  if (funcOp
+          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
+            return legalizeDispatchWorkgroupOperands(op);
+          })
+          .wasInterrupted()) {
+    return signalPassFailure();
+  }
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
