@@ -127,5 +127,59 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
                                 iree_make_cstring_view("message"));         \
   }
 
+//===------------------------------------------------------------------===//
+// ExtI64: Constants
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_const_i64(int64_t a) { return a; }
+
+//===------------------------------------------------------------------===//
+// ExtI64: Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_select_i64(int32_t condition, int64_t true_value,
+                                    int64_t false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: Native integer arithmetic ops
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_add_i64(int64_t lhs, int64_t rhs) { return lhs + rhs; }
+static inline int64_t vm_sub_i64(int64_t lhs, int64_t rhs) { return lhs - rhs; }
+static inline int64_t vm_mul_i64(int64_t lhs, int64_t rhs) { return lhs * rhs; }
+static inline int64_t vm_div_i64s(int64_t lhs, int64_t rhs) {
+  return lhs / rhs;
+}
+static inline int64_t vm_div_i64u(int64_t lhs, int64_t rhs) {
+  return (int64_t)(((uint64_t)lhs) / ((uint64_t)rhs));
+}
+static inline int64_t vm_rem_i64s(int64_t lhs, int64_t rhs) {
+  return lhs % rhs;
+}
+static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
+  return (int64_t)(((uint64_t)lhs) % ((uint64_t)rhs));
+}
+static inline int64_t vm_not_i64(int64_t operand) {
+  return (int64_t)(~((uint64_t)operand));
+}
+static inline int64_t vm_and_i64(int64_t lhs, int64_t rhs) { return lhs & rhs; }
+static inline int64_t vm_or_i64(int64_t lhs, int64_t rhs) { return lhs | rhs; }
+static inline int64_t vm_xor_i64(int64_t lhs, int64_t rhs) { return lhs ^ rhs; }
+
+//===------------------------------------------------------------------===//
+// Native bitwise shifts and rotates
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_shl_i64(int64_t operand, int8_t amount) {
+  return (int64_t)(operand << amount);
+};
+static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
+  return (int64_t)(operand >> amount);
+};
+static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
+  return (int64_t)(((uint32_t)operand) >> amount);
+};
 
 #endif  // IREE_VM_OPS_H_

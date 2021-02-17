@@ -31,9 +31,12 @@ iree_cc_test(
     iree::vm::ops
     iree::vm::shims
     ::arithmetic_ops_cc
+    ::arithmetic_ops_i64_cc
     ::assignment_ops_cc
+    ::assignment_ops_i64_cc
     ::conversion_ops_cc
     ::shift_ops_cc
+    ::shift_ops_i64_cc
 )
 
 iree_bytecode_module(
@@ -50,9 +53,33 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    arithmetic_ops_i64
+  SRC
+    "../arithmetic_ops_i64.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     assignment_ops
   SRC
     "../assignment_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    assignment_ops_i64
+  SRC
+    "../assignment_ops_i64.mlir"
   CC_NAMESPACE
     "iree::vm::test::emitc"
   FLAGS
@@ -77,6 +104,18 @@ iree_bytecode_module(
     shift_ops
   SRC
     "../shift_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    shift_ops_i64
+  SRC
+    "../shift_ops_i64.mlir"
   CC_NAMESPACE
     "iree::vm::test::emitc"
   FLAGS
