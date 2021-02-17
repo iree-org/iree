@@ -184,7 +184,6 @@ func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   %D = linalg.matmul ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
                     outs(%CC: tensor<?x?xf32>) -> tensor<?x?xf32>
 
-  // CHECK: %[[retD:.*]] = shapex.tie_shape %[[D]]
-  // CHECK: return %[[retD]], %[[origCC]]
+  // CHECK: return %[[D]], %[[origCC]]
   return %D, %CC: tensor<?x?xf32>, tensor<?x?xf32>
 }

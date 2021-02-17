@@ -236,50 +236,6 @@ static void pullInProducersInSameGroup(
   }
 }
 
-// Add tie_shape for all outputs. This provides necessary information for
-// a subsequent OutlineDispatchRegion2 pass invocation to work properly.
-// TODO(nicolasvasilache): get rid of this once we have a proper shape +
-// subshape in core and DispatchWorkgroupOp takes output shape parameters.
-static SmallVector<Value, 4> createDispatchTieShapeOp(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  assert(dispatchOp->getNumResults() == linalgOp.getNumOutputs());
-  MLIRContext *context = linalgOp->getContext();
-  Location loc = linalgOp->getLoc();
-  SmallVector<Value, 4> shapedResults;
-  for (auto it : llvm::zip(linalgOp.getOutputs(), dispatchOp->getResults())) {
-    // Insert DimOp and MakeRankedShapeOp just before the dispatchOp to play
-    // nicely with a (much later) OutlineDispatchRegions2 which requires all
-    // dims and shapes to dominate the dispatchOp region.
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(dispatchOp);
-
-    assert(std::get<0>(it).getType() == std::get<1>(it).getType());
-    auto rankedTensorType = std::get<0>(it).getType().cast<RankedTensorType>();
-    if (rankedTensorType.hasStaticShape()) {
-      shapedResults.push_back(std::get<1>(it));
-      continue;
-    }
-    auto rank = rankedTensorType.getRank();
-    SmallVector<Value, 4> dims;
-    dims.reserve(rank);
-    for (unsigned d = 0, e = rank; d < e; ++d) {
-      if (rankedTensorType.isDynamicDim(d)) {
-        dims.push_back(rewriter.create<DimOp>(loc, std::get<0>(it), d));
-      }
-    }
-    auto shapeOp = rewriter.create<Shape::MakeRankedShapeOp>(
-        loc, Shape::RankedShapeType::get(rankedTensorType.getShape(), context),
-        dims);
-
-    // The TieShapeOp use the dispatchOp results.
-    rewriter.setInsertionPointAfter(dispatchOp);
-    shapedResults.push_back(
-        rewriter.create<Shape::TieShapeOp>(loc, std::get<1>(it), shapeOp));
-  }
-  return shapedResults;
-}
-
 // Rewrite pattern to ensure only ops with tensor semantics are tiled.
 struct TileAndDistributeOnTensorsPattern
     : public linalg::LinalgBaseTilingPattern {
@@ -340,11 +296,9 @@ struct TileAndDistributeOnTensorsPattern
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
-    // TODO(nicolasvasilache): return `clonedOp->getResults()` once we have
-    // shape operands and we drop tie_shape.
-    SmallVector<Value, 4> shapedResults =
-        createDispatchTieShapeOp(rewriter, linalgOp, dispatchOp);
-    rewriter.replaceOp(op, shapedResults);
+    rewriter.replaceOpWithIf(
+        op, dispatchOp.getOperation()->getResults(),
+        [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
     return success();
   }
 };
