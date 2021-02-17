@@ -1400,17 +1400,17 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, TruncI64I32, {
         int64_t operand = VM_DecOperandRegI64("operand");
         int32_t* result = VM_DecResultRegI32("result");
-        *result = (uint32_t)((uint64_t)operand);
+        *result = vm_trunc_i64i32(operand);
       });
       DISPATCH_OP(EXT_I64, ExtI32I64S, {
         int32_t operand = VM_DecOperandRegI32("operand");
         int64_t* result = VM_DecResultRegI64("result");
-        *result = (int64_t)((int32_t)operand);
+        *result = vm_ext_i32i64s(operand);
       });
       DISPATCH_OP(EXT_I64, ExtI32I64U, {
         int32_t operand = VM_DecOperandRegI32("operand");
         int64_t* result = VM_DecResultRegI64("result");
-        *result = (uint64_t)((uint32_t)operand);
+        *result = vm_ext_i32i64u(operand);
       });
 
       //===----------------------------------------------------------------===//
@@ -1433,22 +1433,22 @@ iree_status_t iree_vm_bytecode_dispatch(
       // ExtI64: Comparison ops
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_CMP_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                      \
-    int64_t lhs = VM_DecOperandRegI64("lhs");          \
-    int64_t rhs = VM_DecOperandRegI64("rhs");          \
-    int32_t* result = VM_DecResultRegI32("result");    \
-    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;      \
+#define DISPATCH_OP_EXT_I64_CMP_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                     \
+    int64_t lhs = VM_DecOperandRegI64("lhs");         \
+    int64_t rhs = VM_DecOperandRegI64("rhs");         \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
   });
 
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpEQI64, int64_t, ==);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpNEI64, int64_t, !=);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64S, int64_t, <);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64U, uint64_t, <);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpEQI64, vm_cmp_eq_i64);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpNEI64, vm_cmp_ne_i64);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64S, vm_cmp_lt_i64s);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64U, vm_cmp_lt_i64u);
       DISPATCH_OP(EXT_I64, CmpNZI64, {
         int64_t operand = VM_DecOperandRegI64("operand");
         int32_t* result = VM_DecResultRegI32("result");
-        *result = (operand != 0) ? 1 : 0;
+        *result = vm_cmp_nz_i64(operand);
       });
 #else
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
