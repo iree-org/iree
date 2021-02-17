@@ -257,11 +257,74 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
 
 namespace {
 
-bool isDepthwiseConv(mhlo::ConvOp op) {
+static bool isDepthwiseConv(mhlo::ConvOp op) {
   auto shape = op.rhs().getType().cast<ShapedType>().getShape();
   auto numGroups =
       shape[op.dimension_numbers().kernel_input_feature_dimension().getInt()];
   return op.feature_group_count() > 1u && op.feature_group_count() == numGroups;
+}
+
+/// Returns true if the given `dimensionNumbers` from a mhlo.convolution op
+/// follows a canonical form:
+///
+/// * Input dimensions have order: (batch_count, spatial_dims,
+///   input_channel_count).
+/// * Filter dimensions have order: (spatial_dims, input_channel_count,
+///   output_channel_count).
+/// * Output dimensions have order: (batch_count, spatial_dims,
+///   output_channel_count).
+static bool hasCanonicalDimensionNumbers(
+    const mhlo::ConvDimensionNumbers &dimensionNumbers) {
+  const int inputSpatialRank =
+      llvm::size(dimensionNumbers.input_spatial_dimensions());
+  // The dimensions for input should follow the order of
+  // batch_count, spatial_dims..., input_feature_count.
+  if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.input_feature_dimension().getInt() !=
+          (inputSpatialRank + 1)) {
+    return false;
+  }
+
+  const int kernelSpatialRank =
+      llvm::size(dimensionNumbers.kernel_spatial_dimensions());
+  // The dimensions for filter should follow the order of
+  // spatial_dims..., input_feature_count, num_output_feature_count.
+  if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
+          kernelSpatialRank ||
+      dimensionNumbers.kernel_output_feature_dimension().getInt() !=
+          (kernelSpatialRank + 1)) {
+    return false;
+  }
+
+  const int outputSpatialRank =
+      llvm::size(dimensionNumbers.output_spatial_dimensions());
+  // The dimensions for output should follow the order of
+  // batch_count, spatial_dims.., output_feature_count.
+  if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.output_feature_dimension().getInt() !=
+          (outputSpatialRank + 1)) {
+    return false;
+  }
+
+  if (inputSpatialRank != outputSpatialRank ||
+      inputSpatialRank != kernelSpatialRank) {
+    return false;
+  }
+
+  auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
+  auto kernelSpatialDim = dimensionNumbers.kernel_spatial_dimensions().begin();
+  auto outputSpatialDim = dimensionNumbers.output_spatial_dimensions().begin();
+  // Check spatial dims are ordred correctly.
+  for (int i = 0; i < inputSpatialRank; ++i) {
+    const int dim = i + 1;
+    if ((*inputSpatialDim++).getZExtValue() != dim ||
+        (*outputSpatialDim++).getZExtValue() != dim ||
+        (*kernelSpatialDim++).getZExtValue() != i) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /// Converts mhlo.conv operation to linalg named op.
@@ -271,71 +334,13 @@ struct ConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
   LogicalResult matchAndRewrite(
       mhlo::ConvOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const override {
+    if (!hasCanonicalDimensionNumbers(op.dimension_numbers())) return failure();
     if (isDepthwiseConv(op)) return failure();
 
     mhlo::ConvOp::Adaptor adaptor(args);
     Location loc = op.getLoc();
     Value input = adaptor.lhs();
     Value filter = adaptor.rhs();
-    if (const auto dimensionNumbers = op.dimension_numbers()) {
-      const int inputSpatialRank =
-          llvm::size(dimensionNumbers.input_spatial_dimensions());
-      // The dimensions for input should follow the order of
-      // batch_count, spatial_dims..., input_feature_count.
-      if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
-          dimensionNumbers.input_feature_dimension().getInt() !=
-              (inputSpatialRank + 1)) {
-        return rewriter.notifyMatchFailure(
-            op, "expected input to be NXXXC data layout");
-      }
-
-      const int kernelSpatialRank =
-          llvm::size(dimensionNumbers.kernel_spatial_dimensions());
-      // The dimensions for filter should follow the order of
-      // spatial_dims..., input_feature_count, num_output_feature_count.
-      if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
-              kernelSpatialRank ||
-          dimensionNumbers.kernel_output_feature_dimension().getInt() !=
-              (kernelSpatialRank + 1)) {
-        return rewriter.notifyMatchFailure(
-            op, "expected kernel/filter to be XXXCF data layout");
-      }
-
-      const int outputSpatialRank =
-          llvm::size(dimensionNumbers.output_spatial_dimensions());
-      // The dimensions for output should follow the order of
-      // batch_count, spatial_dims.., output_feature_count.
-      if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
-          dimensionNumbers.output_feature_dimension().getInt() !=
-              (outputSpatialRank + 1)) {
-        return rewriter.notifyMatchFailure(
-            op, "expected output to be NXXXF data layout");
-      }
-
-      if (inputSpatialRank != outputSpatialRank ||
-          inputSpatialRank != kernelSpatialRank) {
-        return rewriter.notifyMatchFailure(
-            op, "expected all the spatial rank be the same");
-      }
-
-      auto inputSpatialDim =
-          dimensionNumbers.input_spatial_dimensions().begin();
-      auto kernelSpatialDim =
-          dimensionNumbers.kernel_spatial_dimensions().begin();
-      auto outputSpatialDim =
-          dimensionNumbers.output_spatial_dimensions().begin();
-      // Check spatial dims are ordred correctly.
-      for (int i = 0; i < inputSpatialRank; ++i) {
-        const int dim = i + 1;
-        if ((*inputSpatialDim++).getZExtValue() != dim ||
-            (*outputSpatialDim++).getZExtValue() != dim ||
-            (*kernelSpatialDim++).getZExtValue() != i) {
-          return rewriter.notifyMatchFailure(
-              op, "expected spatial dims to be continuous");
-        }
-      }
-    }
-
     auto resultType = op.getResult().getType().cast<ShapedType>();
     int rank = resultType.getRank();
 
