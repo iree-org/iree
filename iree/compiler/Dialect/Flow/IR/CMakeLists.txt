@@ -17,7 +17,7 @@ iree_cc_library(
   HDRS
     "FlowDialect.h"
     "FlowEnums.h.inc"
-    "FlowOpInterface.h.inc"
+    "FlowInterfaces.h.inc"
     "FlowOpUtils.h"
     "FlowOps.h"
     "FlowOps.h.inc"
@@ -25,8 +25,8 @@ iree_cc_library(
   SRCS
     "FlowDialect.cpp"
     "FlowEnums.cpp.inc"
+    "FlowInterfaces.cpp.inc"
     "FlowOpFolders.cpp"
-    "FlowOpInterface.cpp.inc"
     "FlowOpUtils.cpp"
     "FlowOps.cpp"
     "FlowOps.cpp.inc"
@@ -58,12 +58,12 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    FlowOpInterfaceGen
+    FlowInterfacesGen
   TD_FILE
     "FlowBase.td"
   OUTS
-    -gen-op-interface-decls FlowOpInterface.h.inc
-    -gen-op-interface-defs FlowOpInterface.cpp.inc
+    -gen-op-interface-decls FlowInterfaces.h.inc
+    -gen-op-interface-defs FlowInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

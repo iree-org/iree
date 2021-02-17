@@ -30,7 +30,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.cpp.inc"
 
 namespace {
 
