@@ -85,6 +85,8 @@ steps:
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
+    # TODO(#4861): Re-enable when phone is fixed
+    skip: "Phone is borked. See https://github.com/google/iree/issues/4861"
 
   - label: "test on snapdragon-855 (adreno-640) (Android 11)"
     commands:
