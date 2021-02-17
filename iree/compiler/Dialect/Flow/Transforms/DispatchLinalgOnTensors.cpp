@@ -142,7 +142,7 @@ static size_t getNumTilableLoops(linalg::LinalgOp op) {
 /// Given the `shape` of the computation with the first element being the
 /// slowest varying and last element being the fastest warying returns the
 /// workload value with
-/// - fastest varying dimension first, i.e., x, y, x order
+/// - fastest varying dimension first, i.e., x, y, z order
 /// - the workload padded to `kNumMaxParallelDims` with ones if needed.
 /// The `shape` is expected to be of size less than or equal to
 /// `kNumMaxParallelDims`.
@@ -375,9 +375,10 @@ static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
   return outputShapes;
 }
 
-/// Rewrite pattern to put ops that are not-tilable or arent tiled. For example
-/// tile and distribute of element-wise operations is not beneficial. These are
-/// handled appropriately by the backends.
+/// Puts ops that are not-tilable or arent tiled into a
+/// `flow.dispatch.workgroups` operation. For example tile and distribute of
+/// element-wise operations is not beneficial. These are handled appropriately
+/// by the backends.
 struct MakeDispatchWorkgroupsOp : public RewritePattern {
   MakeDispatchWorkgroupsOp(PatternBenefit benefit = 1)
       : RewritePattern(benefit, MatchAnyOpTypeTag()) {}

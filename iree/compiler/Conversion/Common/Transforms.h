@@ -58,9 +58,9 @@ LogicalResult getLinalgOps(FuncOp funcOp,
                            SmallVectorImpl<Operation *> &tiledLoops);
 
 /// Specifies the number of workgroups to use for a particular entry point
-/// functio, by updating the `worgroup_count` region in the
+/// function, by updating the `worgroup_count` region in the
 /// `hal.executable.entry_point` op for this operation. The method takes a
-/// callback function, which computes the workgroup count (x,y, z) given the
+/// callback function, which computes the workgroup count (x,y,z) given the
 /// workload along (x,y,z).
 using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
     OpBuilder &b, Location loc, std::array<Value, 3> workload)>;

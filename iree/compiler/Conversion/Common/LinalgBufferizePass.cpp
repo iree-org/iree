@@ -231,8 +231,7 @@ static LogicalResult convertTensorReshapeOp(
 
   // Case 1: If the output tensor has already been mapped to a different buffer,
   // need to copy.
-  Value outputBuffer = bvm.lookupOrNull(resultTensor);
-  if (outputBuffer) {
+  if (Value outputBuffer = bvm.lookupOrNull(resultTensor)) {
     if (inputBuffer != outputBuffer) {
       createCopyOp(b, loc, bufferReshape, outputBuffer, getMarkerOrNull(op));
     }
@@ -474,33 +473,29 @@ void LinalgBufferizePass::runOnFunction() {
           .wasInterrupted()) {
     return signalPassFailure();
   }
-  if (funcOp
-          .walk([&](Operation *op) -> WalkResult {
-            return TypeSwitch<Operation *, LogicalResult>(op)
-                .Case<IREE::Flow::DispatchInputLoadOp>(
-                    [&](IREE::Flow::DispatchInputLoadOp loadOp) {
-                      return convertInterfaceLoadTensorOp(b, loadOp, bvm);
-                    })
-                .Case<IREE::Flow::DispatchOutputStoreOp>(
-                    [&](IREE::Flow::DispatchOutputStoreOp storeOp) {
-                      return convertInterfaceStoreTensorOp(b, storeOp, bvm);
-                    })
-                .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-                  return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
-                })
-                .Case<linalg::TensorReshapeOp>(
-                    [&](linalg::TensorReshapeOp reshapeOp) {
-                      return convertTensorReshapeOp(b, allocationFn, reshapeOp,
-                                                    bvm);
-                    })
-                .Case<VectorTransferOpInterface>(
-                    [&](VectorTransferOpInterface vectorTransferOp) {
-                      return convertTransferOp(b, allocationFn,
-                                               vectorTransferOp, bvm);
-                    })
-                .Default([](Operation *) { return success(); });
-          })
-          .wasInterrupted()) {
+  auto conversionDispatch = [&](Operation *op) -> WalkResult {
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<IREE::Flow::DispatchInputLoadOp>(
+            [&](IREE::Flow::DispatchInputLoadOp loadOp) {
+              return convertInterfaceLoadTensorOp(b, loadOp, bvm);
+            })
+        .Case<IREE::Flow::DispatchOutputStoreOp>(
+            [&](IREE::Flow::DispatchOutputStoreOp storeOp) {
+              return convertInterfaceStoreTensorOp(b, storeOp, bvm);
+            })
+        .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+          return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
+        })
+        .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
+          return convertTensorReshapeOp(b, allocationFn, reshapeOp, bvm);
+        })
+        .Case<VectorTransferOpInterface>(
+            [&](VectorTransferOpInterface vectorTransferOp) {
+              return convertTransferOp(b, allocationFn, vectorTransferOp, bvm);
+            })
+        .Default([](Operation *) { return success(); });
+  };
+  if (funcOp.walk(conversionDispatch).wasInterrupted()) {
     return signalPassFailure();
   }
 }

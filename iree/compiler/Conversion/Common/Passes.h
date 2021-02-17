@@ -20,10 +20,10 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Alias for callback function that allocates workgroup level memory. The
-/// callback expects a Sha ShapedType for which the memref is being allocated.of
-/// the memref to be allocated (`allocationType`) and the SSA values that
-/// represent the size of dynamic dimensions in the `allocationType`. The
-/// callback is expected to return a MemRefType Value.
+/// callback expects the static shape and element-type of the result memref
+/// type. Also expects values for the dynamic dimension of the allocated memref,
+/// where each dynamic dimension corresponds to a `ShapedType::kDynamicSize`
+/// value in `staticShape`.
 using WorkgroupMemoryAllocationFn = std::function<Value(
     OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
     Type elementType, ArrayRef<Value> dynamicSizes)>;
