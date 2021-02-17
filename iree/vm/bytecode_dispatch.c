@@ -1412,16 +1412,21 @@ iree_status_t iree_vm_bytecode_dispatch(
       // ExtI64: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_CAST_I64(op_name, src_type, dst_type) \
-  DISPATCH_OP(EXT_I64, op_name, {                                 \
-    int64_t operand = VM_DecOperandRegI64("operand");             \
-    int64_t* result = VM_DecResultRegI64("result");               \
-    *result = (dst_type)((src_type)operand);                      \
-  });
-
-      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I32, uint64_t, uint32_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64S, int32_t, int64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64U, uint32_t, uint64_t);
+      DISPATCH_OP(EXT_I64, TruncI64I32, {
+        int64_t operand = VM_DecOperandRegI64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = (uint32_t)((uint64_t)operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64S, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = (int64_t)((int32_t)operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64U, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = (uint64_t)((uint32_t)operand);
+      });
 
       //===----------------------------------------------------------------===//
       // ExtI64: Native bitwise shifts and rotates
