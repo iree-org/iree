@@ -30,6 +30,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir {
 namespace iree_compiler {
