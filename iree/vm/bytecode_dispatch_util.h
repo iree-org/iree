@@ -377,4 +377,19 @@ static const int kRegSize = sizeof(uint16_t);
     *result = op_func(lhs, rhs);                      \
   });
 
+#define DISPATCH_OP_EXT_I64_UNARY_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                       \
+    int64_t operand = VM_DecOperandRegI64("operand");   \
+    int64_t* result = VM_DecResultRegI64("result");     \
+    *result = op_func(operand);                         \
+  });
+
+#define DISPATCH_OP_EXT_I64_BINARY_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                        \
+    int64_t lhs = VM_DecOperandRegI64("lhs");            \
+    int64_t rhs = VM_DecOperandRegI64("rhs");            \
+    int64_t* result = VM_DecResultRegI64("result");      \
+    *result = op_func(lhs, rhs);                         \
+  });
+
 #endif  // IREE_VM_BYTECODE_DISPATCH_UTIL_H_
