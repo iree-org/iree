@@ -59,16 +59,9 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-/// Returns a Linalg marker that replaces existing markers.
-linalg::LinalgTransformationFilter getLinalgReplaceMarker(
-    StringRef maker, MLIRContext *context) {
-  return linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
-                                            Identifier::get(maker, context));
-}
-
 /// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
 /// it with `replaceMarker`.
-linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
+static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, StringRef replaceMarker,
     MLIRContext *context) {
   SmallVector<Identifier, 2> markers;
@@ -637,6 +630,34 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
 
       applyVectorTransformation(funcOp);
+    }
+
+    // Invoke patterns to generalize linalg.depthwise_conv_2d_nhwc ops to Linalg
+    // generic ops. This can handle those cases that failed tiling and
+    // vectorization in the above.
+    // TODO(antiagainst): remove this once we have depthwise convolution
+    // vectorization applicable everywhere.
+    {
+      // Carry over the Linalg marker because it is load-bearing and affects
+      // later passes.
+      linalg::LinalgTransformationFilter marker =
+          getLinalgMatchAndReplaceMarker({getWorkgroupMarker()},
+                                         getWorkgroupMarker(), context);
+      marker.addFilter([](Operation *op) -> LogicalResult {
+        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
+      });
+
+      OwningRewritePatternList patterns;
+      linalg::populateLinalgNamedOpsGeneralizationPatterns(context, patterns,
+                                                           marker);
+
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After generalization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     launchConfig.finalize(funcOp);
