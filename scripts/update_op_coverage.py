@@ -91,7 +91,13 @@ def get_tested_ops_for_backends(build_dir):
   for t in tests:
     if not t.endswith('.mlir'):
       continue
-    backend, op = get_backend_op_pair(t)
+    try:
+      backend, op = get_backend_op_pair(t)
+    except LookupError:
+      # Linalg on tensors are WIP; explicitly ignore them for now.
+      if "linalg_on_tensors" in t:
+        continue
+      raise
     res[backend].append(op)
   return res
 
