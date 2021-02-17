@@ -136,7 +136,7 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::CheckEQOp>>(context,
                                                          "VM_CHECK_EQ");
 
-  // ExtI64: Constants{shift_ops_descriptor_, shift_ops_create}};
+  // ExtI64: Constants
   patterns.insert<CallOpConversion<IREE::VM::ConstI64Op>>(context,
                                                           "vm_const_i64");
 

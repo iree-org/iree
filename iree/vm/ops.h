@@ -64,22 +64,22 @@ static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
 static inline int32_t vm_trunc_i32i8(int32_t operand) {
   return (uint8_t)((uint32_t)operand);
-};
+}
 static inline int32_t vm_trunc_i32i16(int32_t operand) {
   return (uint16_t)((uint32_t)operand);
-};
+}
 static inline int32_t vm_ext_i8i32s(int32_t operand) {
   return (int32_t)((int8_t)operand);
-};
+}
 static inline int32_t vm_ext_i8i32u(int32_t operand) {
   return (uint32_t)((uint8_t)operand);
-};
+}
 static inline int32_t vm_ext_i16i32s(int32_t operand) {
   return (int32_t)((int16_t)operand);
-};
+}
 static inline int32_t vm_ext_i16i32u(int32_t operand) {
   return (uint32_t)((uint16_t)operand);
-};
+}
 
 //===------------------------------------------------------------------===//
 // Native bitwise shifts and rotates
@@ -87,13 +87,13 @@ static inline int32_t vm_ext_i16i32u(int32_t operand) {
 
 static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
   return (int32_t)(operand << amount);
-};
+}
 static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
   return (int32_t)(operand >> amount);
-};
+}
 static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
   return (int32_t)(((uint32_t)operand) >> amount);
-};
+}
 
 //===------------------------------------------------------------------===//
 // Comparison ops
@@ -169,17 +169,17 @@ static inline int64_t vm_or_i64(int64_t lhs, int64_t rhs) { return lhs | rhs; }
 static inline int64_t vm_xor_i64(int64_t lhs, int64_t rhs) { return lhs ^ rhs; }
 
 //===------------------------------------------------------------------===//
-// Native bitwise shifts and rotates
+// ExtI64: Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
 static inline int64_t vm_shl_i64(int64_t operand, int8_t amount) {
   return (int64_t)(operand << amount);
-};
+}
 static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
   return (int64_t)(operand >> amount);
-};
+}
 static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
-  return (int64_t)(((uint32_t)operand) >> amount);
-};
+  return (int64_t)(((uint64_t)operand) >> amount);
+}
 
 #endif  // IREE_VM_OPS_H_
