@@ -5,7 +5,7 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
   // CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
@@ -55,7 +55,7 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.multiply %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
@@ -87,8 +87,9 @@ func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[RESULT:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>, %arg2 = %[[INITIAL]] : tensor<f32>) -> tensor<4xf32>
-  // CHECK-NEXT: = "mhlo.reduce"(%arg1, %arg2)
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>) -> (tensor<4xf32>)
+  // CHECK-NEXT: %[[CST_0:.+]] = constant dense<0.0
+  // CHECK-NEXT: = "mhlo.reduce"(%arg1, %[[CST_0]])
   %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):
     %2 = mhlo.add %arg1, %arg2 : tensor<f32>
@@ -110,8 +111,10 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
   // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %arg1 : tensor<4x8xf32>, %arg4 = %[[INITIALA]] : tensor<f32>, %arg5 = %[[INITIALB]] : tensor<f32>) -> (tensor<4xf32>, tensor<4xf32>)
-  // CHECK-NEXT: = "mhlo.reduce"(%arg2, %arg3, %arg4, %arg5)
+  // CHECK-SAME: (%arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %arg1 : tensor<4x8xf32>) -> (tensor<4xf32>, tensor<4xf32>)
+  // CHECK-NEXT: %[[CST_0:.+]] = constant dense<0.0
+  // CHECK-NEXT: %[[CST_1:.+]] = constant dense<1.0
+  // CHECK-NEXT: = "mhlo.reduce"(%arg2, %arg3, %[[CST_0]], %[[CST_1]])
   %2, %3 = "mhlo.reduce"(%arg0, %arg1, %0, %1) ( {
   ^bb0(%arg0_lhs : tensor<f32>, %arg1_lhs : tensor<f32>, %arg0_rhs : tensor<f32>, %arg1_rhs : tensor<f32>):
     %4 = mhlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
@@ -127,7 +130,7 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
 
 // -----
 
-// CHECK-LABEL: @clone_broadcas
+// CHECK-LABEL: @clone_broadcast
 func @clone_broadcast(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
   %splatCst = constant dense<1.0> : tensor<f32>
   // CHECK: flow.dispatch.region
@@ -140,7 +143,7 @@ func @clone_broadcast(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<
   // CHECK:     mhlo.add
   %0 = "mhlo.broadcast"(%splatCst) {broadcast_sizes = dense<[4, 4]> : tensor<2xi64>} : (tensor<f32>) -> tensor<4x4xf32>
   %1 = "mhlo.add"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %2 = "mhlo.dot"(%1, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   %3 = "mhlo.add"(%0, %2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   return %3: tensor<4x4xf32>
 }

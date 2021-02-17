@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/Utils/TypeConversion.h"
@@ -59,21 +60,6 @@ static inline bool usefulStreamOp(Operation *op) {
 
 static inline bool usefulStreamWork(ArrayRef<Operation *> currentStreamOps) {
   return llvm::any_of(currentStreamOps, usefulStreamOp);
-}
-
-// Expand any compound types to primitive types in the stream fragment.
-static void expandFragmentToPrimitiveTypes(ExStreamFragmentOp fragmentOp) {
-  auto loc = fragmentOp.getLoc();
-  Block *entryBlock = &fragmentOp.body().front();
-  auto &typeExpander = Shape::getShapeToPrimitiveTypeExpander();
-  OpBuilder expandBuilder(fragmentOp.getContext());
-  (void)typeExpander.expandBlockSignature(loc, entryBlock, expandBuilder);
-  SmallVector<Value, 4> origFragmentArgs(fragmentOp.args());
-  SmallVector<Value, 4> newFragmentArgs;
-  expandBuilder.setInsertionPoint(fragmentOp);
-  (void)typeExpander.expandSourceValuesToTarget(loc, origFragmentArgs,
-                                                newFragmentArgs, expandBuilder);
-  fragmentOp.getOperation()->setOperands(newFragmentArgs);
 }
 
 // Temporary hack to get the experimental stream ops constructed. In the future
@@ -130,10 +116,10 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     llvm::SmallSetVector<Operation *, 8> streamOpSet{streamOps.begin(),
                                                      streamOps.end()};
     SmallVector<Value, 8> fragmentOperands;
+    SmallVector<Value, 8> fragmentOperandDims;
     SmallVector<Value, 8> fragmentResults;
+    SmallVector<Value, 8> fragmentResultDims;
     SmallVector<Type, 8> fragmentResultTypes;
-    SmallVector<Operation *, 4> tieShapeOps;
-    SmallVector<Value, 8> outsideTieShapeOperands;
     for (auto *op : streamOps) {
       for (auto operand : op->getOperands()) {
         if (std::find(fragmentOperands.begin(), fragmentOperands.end(),
@@ -141,16 +127,10 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
           if (!operand.getDefiningOp() ||
               !streamOpSet.count(operand.getDefiningOp())) {
             fragmentOperands.push_back(operand);
-
-            auto operandDefiningOp = operand.getDefiningOp();
-            if (operandDefiningOp &&
-                llvm::isa<Shape::TieShapeOp>(operandDefiningOp)) {
-              tieShapeOps.push_back(operand.getDefiningOp());
-              auto definingOp =
-                  dyn_cast<Shape::TieShapeOp>(operand.getDefiningOp());
-              for (auto arg : definingOp.getOperands()) {
-                outsideTieShapeOperands.push_back(arg);
-              }
+            if (operand.getType().isa<ShapedType>()) {
+              auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+                  fragmentLoc, operand, blockBuilder);
+              fragmentOperandDims.append(dynamicDims);
             }
           }
         }
@@ -167,32 +147,28 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
         if (!onlyStreamUses) {
           fragmentResults.push_back(result);
           fragmentResultTypes.push_back(result.getType());
+          if (result.getType().isa<ShapedType>()) {
+            auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+                fragmentLoc, result, blockBuilder);
+            fragmentResultDims.append(dynamicDims);
+          }
         }
       }
     }
 
-    // TODO(Tao Peng): pass args(operand and shape) which need by outside
-    // tie_shape into fragment body, and ignore the tie_shape arg passed into
-    // the fragment, it will not be used, and will be deleted by canonicalizer
-    // later.
-    outsideTieShapeOperands.append(fragmentOperands.begin(),
-                                   fragmentOperands.end());
-    fragmentOperands = outsideTieShapeOperands;
-
     // Create the fragment and clone in all of the ops.
     auto fragmentOp = blockBuilder.create<ExStreamFragmentOp>(
-        fragmentLoc, fragmentResultTypes, fragmentOperands);
+        fragmentLoc, fragmentResultTypes, fragmentResultDims, fragmentOperands,
+        fragmentOperandDims);
     auto *entryBlock = new Block();
     fragmentOp.body().getBlocks().push_back(entryBlock);
-    entryBlock->addArguments(llvm::to_vector<8>(fragmentOp.getOperandTypes()));
+    entryBlock->addArguments(TypeRange(fragmentOp.operands()));
     BlockAndValueMapping mapping;
-    for (auto arg : entryBlock->getArguments()) {
+    for (unsigned i = 0; i < fragmentOperands.size(); ++i) {
+      auto arg = entryBlock->getArgument(i);
       mapping.map(fragmentOperands[arg.getArgNumber()], arg);
     }
     OpBuilder fragmentBuilder = OpBuilder::atBlockEnd(entryBlock);
-    for (auto *op : tieShapeOps) {
-      fragmentBuilder.clone(*op, mapping);
-    }
     for (auto *op : streamOps) {
       fragmentBuilder.clone(*op, mapping);
     }
@@ -201,20 +177,18 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
         llvm::to_vector<8>(llvm::map_range(fragmentResults, [&](Value value) {
           return mapping.lookup(value);
         })));
-    for (auto resultOldNew :
-         llvm::zip(fragmentResults, fragmentOp.getResults())) {
+    for (auto resultOldNew : llvm::zip(fragmentResults, fragmentOp.results())) {
       auto oldValue = std::get<0>(resultOldNew);
       auto newValue = std::get<1>(resultOldNew);
       oldValue.replaceAllUsesWith(newValue);
     }
 
     // Erase the ops from the block now that we've cloned them.
+    // Note the backwards order as the ops may have dependencies on each other
+    // and we have to erase the consumers before the producers.
     for (auto *op : llvm::reverse(streamOps)) {
       op->erase();
     }
-
-    // Expand any shape types to corresponding primitives.
-    expandFragmentToPrimitiveTypes(fragmentOp);
   }
 };
 

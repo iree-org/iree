@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -41,41 +42,56 @@ namespace IREE {
 namespace Flow {
 
 //===----------------------------------------------------------------------===//
+// Folding utilities
+//===----------------------------------------------------------------------===//
+
+// Returns a new set of dynamic dimensions for a shape carrying op when a type
+// is being changed. This attempts to reuse the existing dimension values if
+// they are available and will drop/insert new ones as required.
+static SmallVector<Value, 4> refreshDimsOnTypeChange(
+    Operation *op, Type oldType, Type newType, ValueRange oldDims,
+    PatternRewriter &rewriter) {
+  if (oldType == newType) return llvm::to_vector<4>(oldDims);
+
+  // Build an expanded list of all the dims - constants will be nullptr.
+  // This lets us map back the new types without worrying about whether some
+  // subset become static or dynamic.
+  auto oldShapedType = oldType.cast<ShapedType>();
+  SmallVector<Value, 4> allOldDims(oldShapedType.getRank());
+  for (unsigned i = 0; i < oldShapedType.getRank(); ++i) {
+    if (oldShapedType.isDynamicDim(i)) {
+      allOldDims[i] = oldDims.front();
+      oldDims = oldDims.drop_front();
+    }
+  }
+
+  auto newShapedType = newType.cast<ShapedType>();
+  SmallVector<Value, 4> newDims;
+  for (unsigned i = 0; i < newShapedType.getRank(); ++i) {
+    if (newShapedType.isDynamicDim(i)) {
+      auto oldValue = allOldDims[i];
+      if (oldValue) {
+        // Old value valid; reuse.
+        newDims.push_back(oldValue);
+      } else {
+        // Dimension has changed to be dynamic; insert a constant to use.
+        // This sometimes happens during folding of casts and usually is cleaned
+        // up pretty quickly.
+        newDims.push_back(rewriter.createOrFold<ConstantIndexOp>(
+            op->getLoc(), oldShapedType.getDimSize(i)));
+      }
+    }
+  }
+  return newDims;
+}
+
+//===----------------------------------------------------------------------===//
 // Streams
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-// Optimizes stream fragment arguments by:
-//   - Removing any that are not used in the body
-//   - Deduping arguments that refer to the same Value
-struct DceStreamFragment : public OpRewritePattern<ExStreamFragmentOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ExStreamFragmentOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.body().empty()) return failure();
-    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/0);
-    if (!dce.needsOptimization()) return failure();
-
-    bool newOperation = dce.needsNewOperation();
-    if (!newOperation) {
-      rewriter.startRootUpdate(op);
-      dce.optimize(rewriter);
-      rewriter.finalizeRootUpdate(op);
-    } else {
-      dce.optimize(rewriter, /*eraseOriginal=*/false);
-      rewriter.eraseOp(op);
-    }
-    return success();
-  }
-};
-
-}  // namespace
-
 void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<DceStreamFragment>(context);
+  results.insert<ClosureOptimizationPattern<ExStreamFragmentOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -223,70 +239,14 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 // Dispatch ops
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-struct DceDispatchRegion : public OpRewritePattern<DispatchRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(DispatchRegionOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.body().empty()) return failure();
-    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/1);
-    if (!dce.needsOptimization()) return failure();
-
-    bool newOperation = dce.needsNewOperation();
-    if (!newOperation) {
-      rewriter.startRootUpdate(op);
-      dce.optimize(rewriter);
-      rewriter.finalizeRootUpdate(op);
-    } else {
-      dce.optimize(rewriter, /*eraseOriginal=*/false);
-      rewriter.eraseOp(op);
-    }
-    return success();
-  }
-};
-
-}  // namespace
-
 void DispatchRegionOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<DceDispatchRegion>(context);
+  results.insert<ClosureOptimizationPattern<DispatchRegionOp>>(context);
 }
-
-namespace {
-
-struct DceDispatchWorkgroups : public OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.body().empty()) return failure();
-    ClosureOpDce dce(op, op.body().front(),
-                     /*variadicOffset=*/op.workgroup_count().size());
-    if (!dce.needsOptimization()) return failure();
-
-    bool newOperation = dce.needsNewOperation();
-    if (!newOperation) {
-      rewriter.startRootUpdate(op);
-      dce.optimize(rewriter);
-      rewriter.finalizeRootUpdate(op);
-    } else {
-      dce.optimize(rewriter, /*eraseOriginal=*/false);
-      rewriter.eraseOp(op);
-    }
-    return success();
-  }
-};
-
-}  // namespace
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  // TODO(benvanik): add DCE support; it's tricky here because the ClosureOpDce
-  // assumes 1:1 operands/results between the outer op and inner region, but we
-  // don't do that there.
-  // results.insert<DceDispatchWorkgroups>(context);
+  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -444,14 +404,6 @@ OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
     // No-op.
     return source();
   }
-
-  // Skip intermediate reshapes.
-  if (auto definingOp =
-          dyn_cast_or_null<TensorReshapeOp>(source().getDefiningOp())) {
-    setOperand(definingOp.getOperand());
-    return result();
-  }
-
   return {};
 }
 
@@ -606,12 +558,15 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
 }
 
 OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
-  auto indices = operands.drop_front(2);
+  auto targetIndex = getODSOperandIndexAndLength(0).first;
+  auto startIndices = getODSOperandIndexAndLength(2);
+  auto updateIndex = getODSOperandIndexAndLength(3).first;
+  auto indices = operands.slice(startIndices.first, startIndices.second);
   bool allIndicesConstant = llvm::count(indices, nullptr) == 0;
-  if (operands[0] && operands[1] && allIndicesConstant) {
+  if (operands[updateIndex] && operands[targetIndex] && allIndicesConstant) {
     // Fully constant arguments so we can perform the update here.
-    return tensorUpdate(operands[0].cast<ElementsAttr>(),
-                        operands[1].cast<ElementsAttr>(), indices);
+    return tensorUpdate(operands[updateIndex].cast<ElementsAttr>(),
+                        operands[targetIndex].cast<ElementsAttr>(), indices);
   } else {
     // Replace the entire tensor when the sizes match.
     auto updateType = update().getType().cast<ShapedType>();
@@ -622,6 +577,42 @@ OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
     }
   }
   return {};
+}
+
+namespace {
+
+// When the target tensor is a result of a tensor.cast operation, the op needs
+// to be updated to use the source of the cast as the target tensor.
+struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
+  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
+                                PatternRewriter &rewriter) const override {
+    auto targetCastOp = updateOp.target().getDefiningOp<tensor::CastOp>();
+    auto updateCastOp = updateOp.update().getDefiningOp<tensor::CastOp>();
+    if (!targetCastOp && !updateCastOp) return failure();
+    auto target = (targetCastOp ? targetCastOp.source() : updateOp.target());
+    auto update = (updateCastOp ? updateCastOp.source() : updateOp.update());
+    auto newOp = rewriter.create<TensorUpdateOp>(
+        updateOp.getLoc(), target.getType(), target,
+        refreshDimsOnTypeChange(updateOp, updateOp.target().getType(),
+                                target.getType(), updateOp.target_dims(),
+                                rewriter),
+        updateOp.start_indices(), update,
+        refreshDimsOnTypeChange(updateOp, updateOp.update().getType(),
+                                update.getType(), updateOp.update_dims(),
+                                rewriter));
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(
+        updateOp, updateOp.getResult().getType(), newOp.getResult());
+    return success();
+  }
+};
+
+}  // namespace
+
+void TensorUpdateOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldTensorUpdateOpWithCasts>(context);
 }
 
 }  // namespace Flow

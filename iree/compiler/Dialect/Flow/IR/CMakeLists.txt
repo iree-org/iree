@@ -60,7 +60,7 @@ iree_tablegen_library(
   NAME
     FlowInterfacesGen
   TD_FILE
-    "FlowBase.td"
+    "FlowInterfaces.td"
   OUTS
     -gen-op-interface-decls FlowInterfaces.h.inc
     -gen-op-interface-defs FlowInterfaces.cpp.inc

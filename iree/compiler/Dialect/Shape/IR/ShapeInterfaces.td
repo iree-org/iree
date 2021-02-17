@@ -30,25 +30,27 @@ def Shape_ShapeCarryingOpInterface : OpInterface<"ShapeCarryingInterface"> {
 
   let methods = [
     StaticInterfaceMethod<
-      [{Returns a RankedShape for the given shaped result value.}],
-      "Value", "buildResultValueRankedShape",
-      (ins "Value":$result, "OpBuilder &":$builder), [{
+      /*desc=*/[{Returns a RankedShape for the given shaped result value.}],
+      /*retTy=*/"Value",
+      /*methodName=*/"buildResultValueRankedShape",
+      /*args=*/(ins "Value":$result, "OpBuilder &":$builder),
+      /*methodBody=*/[{
         auto carryingOp = dyn_cast<ShapeCarryingInterface>(result.getDefiningOp());
-        for (unsigned idx = 0; idx < carryingOp->getNumResults(); ++idx) {
-          if (carryingOp->getResult(idx) == result) {
-            return carryingOp.buildResultRankedShape(idx, builder);
-          }
-        }
-        llvm_unreachable("called on result not from a shape-aware-op");
+        return carryingOp.buildResultRankedShape(
+            result.cast<mlir::OpResult>().getResultNumber(), builder);
       }]
     >,
     InterfaceMethod<
-      [{Returns a RankedShape for the given shaped operand index.}],
-      "Value", "buildOperandRankedShape", (ins "unsigned":$idx, "OpBuilder &":$builder)
+      /*desc=*/[{Returns a RankedShape for the given shaped operand index.}],
+      /*retTy=*/"Value",
+      /*methodName=*/"buildOperandRankedShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder)
     >,
     InterfaceMethod<
-      [{Returns a RankedShape for the given shaped result index.}],
-      "Value", "buildResultRankedShape", (ins "unsigned":$idx, "OpBuilder &":$builder)
+      /*desc=*/[{Returns a RankedShape for the given shaped result index.}],
+      /*retTy=*/"Value",
+      /*methodName=*/"buildResultRankedShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder)
     >,
   ];
 }

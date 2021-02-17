@@ -11,7 +11,7 @@ func @noFolding(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: func @noFolding
 // CHECK-NEXT: %[[WORKLOAD0:.+]] = constant 4 : index
-// CHECK-NEXT: %0 = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-NEXT: %0 = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
 // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
 // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
 // CHECK-NEXT: }
@@ -38,7 +38,7 @@ func @elementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: func @elementwiseOps
 // CHECK: %[[WORKLOAD0:.+]] = constant 4
-// CHECK: %[[R0:.+]] = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+// CHECK: %[[R0:.+]] = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
 // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
 // CHECK-NEXT:   %2 = mhlo.subtract %1, %arg1 : tensor<4xf32>
 // CHECK-NEXT:   %3 = mhlo.multiply %arg1, %2 : tensor<4xf32>
@@ -69,17 +69,17 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // CHECK-LABEL: func @interleavedDot
 // CHECK-NEXT: %[[WORKLOAD0:.+]] = constant 16 : index
-// CHECK-NEXT: %[[R0:.+]] = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-NEXT: %[[R0:.+]] = flow.dispatch.region[%[[WORKLOAD0]] : index](%arg1 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
 // CHECK-NEXT:   %3 = mhlo.add %arg1, %arg1 : tensor<4x4xf32>
 // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
 // CHECK-NEXT: }
 // CHECK-NEXT: %[[WORKLOAD1:.+]] = constant 16 : index
-// CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region[%[[WORKLOAD1]] : index](%arg1 = %[[R0]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region[%[[WORKLOAD1]] : index](%arg1 = %[[R0]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
 // CHECK-NEXT:   %3 = "mhlo.dot"(%arg1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
 // CHECK-NEXT: }
 // CHECK-NEXT: %[[WORKLOAD2:.+]] = constant 16 : index
-// CHECK-NEXT: %[[R2:.+]] = flow.dispatch.region[%[[WORKLOAD2]] : index](%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-NEXT: %[[R2:.+]] = flow.dispatch.region[%[[WORKLOAD2]] : index](%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
 // CHECK-NEXT:   %3 = mhlo.multiply %arg1, %arg2 : tensor<4x4xf32>
 // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
 // CHECK-NEXT: }

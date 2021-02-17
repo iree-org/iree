@@ -2,14 +2,15 @@
 
 // CHECK-LABEL: @workgroupStaticShapeDims
 func @workgroupStaticShapeDims(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
+  %c128 = constant 128 : index
   %x = constant 100 : index
   %y = constant 50 : index
   // CHECK: flow.dispatch.workgroups
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<?x4xf32>) -> (tensor<4x?xf32>) = (
-    // CHECK-SAME: = (%[[ARG0:.+]] : !flow.dispatch.input<?x4xf32>
-    %arg0_capture : !flow.dispatch.input<?x4xf32>,
-    // CHECK-SAME: %[[RET0:.+]] : !flow.dispatch.output<4x?xf32>)
-    %ret0 : !flow.dispatch.output<4x?xf32>
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<?x4xf32>{%c128}) -> tensor<4x?xf32>{%c128} = (
+    // CHECK-NEXT: (%[[ARG0:.+]]: !flow.dispatch.input<?x4xf32>,
+    %arg0_capture: !flow.dispatch.input<?x4xf32>,
+    // CHECK-SAME:  %[[RET0:.+]]: !flow.dispatch.output<4x?xf32>)
+    %ret0: !flow.dispatch.output<4x?xf32>
   ) {
     // CHECK: %[[DIM_4:.+]] = constant 4 : index
 
@@ -38,12 +39,13 @@ func @workgroupStaticShapeDims(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
 
 // CHECK-LABEL: @workgroupRankFolding
 func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
+  %c128 = constant 128 : index
   %x = constant 100 : index
   %y = constant 50 : index
   // CHECK: flow.dispatch.workgroups
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<?x4xf32>) -> (tensor<4x?xf32>) = (
-    %arg0_capture : !flow.dispatch.input<?x4xf32>,
-    %ret0 : !flow.dispatch.output<4x?xf32>
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<?x4xf32>{%c128}) -> tensor<4x?xf32>{%c128} = (
+    %arg0_capture: !flow.dispatch.input<?x4xf32>,
+    %ret0: !flow.dispatch.output<4x?xf32>
   ) {
     // CHECK: %[[RANK:.+]] = constant 2 : index
     %workgroup_rank = flow.dispatch.workgroup.rank : index

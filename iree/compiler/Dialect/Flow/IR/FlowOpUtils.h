@@ -12,56 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Clones an operation with new result types.
-// The original operation will be erased and a new operation constructed
-// in its place.
-Operation *cloneWithNewResultTypes(Operation *op, TypeRange newResultTypes);
+//------------------------------------------------------------------------------
+// Closure optimization
+//------------------------------------------------------------------------------
 
-// Utility class to optimize a "closure" op, which maintains a variadic
-// list of operands corresponding to entry block arguments.
-class ClosureOpDce {
- public:
-  ClosureOpDce(Operation *closureOp, Block &entryBlock,
-               unsigned variadicOffset);
+// Modifies in-place the operand results vectors for a closure operation.
+// |excludedOperandIndices| and |excludedResultIndices| are sets containing the
+// operands and results in the lists to remove.
+void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
+                                      ArrayRef<unsigned> excludedOperandIndices,
+                                      SmallVector<Type, 4> &resultTypes,
+                                      ArrayRef<unsigned> excludedResultIndices);
+void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
+                                      SmallVector<Value, 4> &operandDims,
+                                      ArrayRef<unsigned> excludedOperandIndices,
+                                      SmallVector<Type, 4> &resultTypes,
+                                      SmallVector<Value, 4> &resultDims,
+                                      ArrayRef<unsigned> excludedResultIndices);
 
-  bool needsOptimization() { return needsOperandElision || needsResultElision; }
+// Erases the given result indices from terminators in the given region.
+void eraseRegionResults(Region &region,
+                        ArrayRef<unsigned> excludedResultIndices);
 
-  // Whether the operation needs to be replaced.
-  bool needsNewOperation() { return needsResultElision; }
+// Optimizes closure |closureOp| to remove duplicate operands and unused
+// results. The op may be mutated, destroyed, or replaced with a new one. If an
+// optional |rewriter| is provided then it will be notified of the operations
+// performed on the op. Returns true if the op was optimized.
+bool optimizeClosureLikeOp(ClosureOpInterface &closureOp,
+                           PatternRewriter *rewriter = nullptr);
+template <typename T>
+inline bool optimizeClosureOp(T &op, PatternRewriter *rewriter = nullptr) {
+  auto closureOp = cast<ClosureOpInterface>(op.getOperation());
+  bool didOptimize = optimizeClosureLikeOp(closureOp, rewriter);
+  op = dyn_cast_or_null<DispatchRegionOp>(closureOp.getOperation());
+  return didOptimize;
+}
 
-  // Performs the optimization. If the optional eraseOriginal=false and
-  // needsNewOperation(), then the original will not be erased, leaving that
-  // to the caller (which is needed in some pattern rewriting scenarios).
-  // TODO(laurenzo): Fix OpBuilder upstream so that this eraseOriginal
-  // workaround is not required to write a safe rewriter pattern that uses this
-  // utility.
-  Operation *optimize(OpBuilder &builder, bool eraseOriginal = true) {
-    if (needsResultElision) elideUnusedResults(builder, eraseOriginal);
-    if (needsOperandElision) elideUnusedOperands(builder);
-    return closureOp;
+// A pattern that optimizes the given region-containing op T (CSE, DCE, etc).
+// Duplicate operands will be combined and unused operands and results will be
+// removed.
+//
+// T must implement the IREE::Flow::ClosureOpInterface.
+template <typename T>
+struct ClosureOptimizationPattern : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    auto closureOp = cast<ClosureOpInterface>(op.getOperation());
+    return optimizeClosureLikeOp(closureOp, &rewriter) ? success() : failure();
   }
-
- private:
-  void elideUnusedOperands(OpBuilder &builder);
-  void elideUnusedResults(OpBuilder &builder, bool eraseOriginal);
-
-  Operation *closureOp;
-  Block &entryBlock;
-  unsigned variadicOffset;
-  llvm::SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements;
-  llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
-  bool needsOperandElision = false;
-  bool needsResultElision = false;
 };
 
 }  // namespace Flow

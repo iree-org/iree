@@ -195,8 +195,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
-    passManager.addPass(createCanonicalizerPass());
-    passManager.addPass(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   }
 
   // First perform module-level analysis that following passes will use to query
@@ -258,14 +257,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
   passManager.addPass(createOutlineLargeConstantsPass());
+
+  // Forming streams involves a fair amount of subgraph stitching, which can
+  // cause duplication. Run CSE to collapse.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.

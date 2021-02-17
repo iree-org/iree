@@ -172,8 +172,10 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
     // Pull outputs that terminate on identities to operands.
     for (auto &op : llvm::reverse(streamOp.body().front())) {
       if (isIdentityOp(&op)) {
-        auto result = op.getResult(0);
         auto operand = op.getOperand(0);
+        auto result = op.getResult(0);
+        if (!operand.getType().isa<ShapedType>()) continue;
+        if (!result.getType().isa<ShapedType>()) continue;
         if (bufferSet.rangeMap[result].buffer &&
             !bufferSet.rangeMap[operand].buffer) {
           LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY RESULT->OPERAND: "
@@ -190,6 +192,8 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
       if (isIdentityOp(&op)) {
         auto operand = op.getOperand(0);
         auto result = op.getResult(0);
+        if (!operand.getType().isa<ShapedType>()) continue;
+        if (!result.getType().isa<ShapedType>()) continue;
         if (bufferSet.rangeMap[operand].buffer &&
             !bufferSet.rangeMap[result].buffer) {
           LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY OPERAND->RESULT: "
@@ -219,6 +223,7 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
     if (isNoOp(&op) || isIdentityOp(&op)) continue;
     for (auto it : llvm::enumerate(op.getResults())) {
       auto result = it.value();
+      if (!result.getType().isa<ShapedType>()) continue;
       // If the result is an output buffer we can just use that directly.
       if (bufferSet.rangeMap[result].buffer) {
         LLVM_DEBUG(llvm::dbgs() << "    -- SKIP ALREADY SET BUFFER RESULT("
@@ -519,6 +524,10 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
     } else if (isNoOp(&op) || isIdentityOp(&op)) {
       // No work to perform. For identity ops, all buffers have been pushed
       // to "real" ops.
+    } else if (isa<ConstantOp>(op)) {
+      // HACK: all this code is going away soon.
+      auto newOp = rewriter.clone(op);
+      op.replaceAllUsesWith(newOp);
     } else {
       return op.emitOpError() << "unexpected in stream";
     }
@@ -532,8 +541,11 @@ class ExStreamFragmentOpConversion
   using OpConversionPattern<
       IREE::Flow::ExStreamFragmentOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ExStreamFragmentOp streamOp, llvm::ArrayRef<Value> operands,
+      IREE::Flow::ExStreamFragmentOp streamOp, ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
+    IREE::Flow::ExStreamFragmentOp::Adaptor adaptor(
+        newOperands, streamOp->getAttrDictionary());
+
     // TODO(benvanik): choose buffer mode/category based on stream commands.
     auto mode = IREE::HAL::CommandBufferModeBitfield::OneShot;
     auto category = IREE::HAL::CommandCategoryBitfield::Dispatch |
@@ -551,13 +563,13 @@ class ExStreamFragmentOpConversion
 
     // Remap non-tensor operands (such as workloads).
     auto &entryBlock = streamOp.body().front();
-    for (int i = 0; i < operands.size(); ++i) {
+    for (int i = 0; i < adaptor.operands().size(); ++i) {
       if (streamOp.getOperand(i).getType().isa<TensorType>()) {
         bufferSet.rangeMap[entryBlock.getArgument(i)] =
-            BufferRange{operands[i]};
+            BufferRange{adaptor.operands()[i]};
       } else {
         rewriter.replaceUsesOfBlockArgument(entryBlock.getArgument(i),
-                                            operands[i]);
+                                            adaptor.operands()[i]);
       }
     }
 
@@ -591,10 +603,10 @@ class ExStreamFragmentOpConversion
     // It's annoying, but we need to do this replacement at the very end as
     // otherwise we lose access to the original values (which we need for
     // shape information).
-    for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i].getType().isa<IREE::HAL::BufferType>()) {
+    for (int i = 0; i < adaptor.operands().size(); ++i) {
+      if (adaptor.operands()[i].getType().isa<IREE::HAL::BufferType>()) {
         rewriter.replaceUsesOfBlockArgument(entryBlock.getArgument(i),
-                                            operands[i]);
+                                            adaptor.operands()[i]);
       }
     }
 

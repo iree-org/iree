@@ -90,7 +90,7 @@ gentbl(
         ("-gen-op-interface-defs", "FlowInterfaces.cpp.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "FlowBase.td",
+    td_file = "FlowInterfaces.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",

@@ -17,12 +17,12 @@ func @tensor() -> tensor<2x4xf32> {
   %C = iree.unfoldable_constant dense<1000.0> : tensor<2x4xf32>
 
   // %[[C2]] will be handled by a later RematerializeDispatchConstants
-  //      CHECK: flow.dispatch.workgroups[%[[C4wg]], %[[C2wg]], %[[C1wg]]] (%[[outerA]], %[[outerB]], %[[outerC]]) :
-  // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> tensor<2x4xf32> =
-  // CHECK-SAME:    (%[[A:[0-9a-z]*]] : !flow.dispatch.input<2x3xf32>,
-  // CHECK-SAME:     %[[B:[0-9a-z]*]] : !flow.dispatch.input<3x4xf32>,
-  // CHECK-SAME:     %[[C:[0-9a-z]*]] : !flow.dispatch.input<2x4xf32>,
-  // CHECK-SAME:     %[[OUT:[0-9a-z]*]] : !flow.dispatch.output<2x4xf32>) {
+  //      CHECK: flow.dispatch.workgroups[%[[C4wg]], %[[C2wg]], %[[C1wg]]](%[[outerA]], %[[outerB]], %[[outerC]]) :
+  // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> (tensor<2x4xf32>) =
+  // CHECK-NEXT:    (%[[A:[0-9a-z]*]]: !flow.dispatch.input<2x3xf32>,
+  // CHECK-SAME:     %[[B:[0-9a-z]*]]: !flow.dispatch.input<3x4xf32>,
+  // CHECK-SAME:     %[[C:[0-9a-z]*]]: !flow.dispatch.input<2x4xf32>,
+  // CHECK-SAME:     %[[OUT:[0-9a-z]*]]: !flow.dispatch.output<2x4xf32>) {
   //  CHECK-DAG:   %[[C0:.*]] = constant 0 : index
   //  CHECK-DAG:   %[[C1:.*]] = constant 1 : index
   //  CHECK-DAG:   %[[C2:.*]] = constant 2 : index
@@ -63,6 +63,8 @@ func @tensor() -> tensor<2x4xf32> {
   return %E : tensor<2x4xf32>
 }
 
+// -----
+
 // CHECK-LABEL: func @tensor2
 func @tensor2(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   -> tensor<?x?xf32> attributes {iree.module.export}
@@ -88,6 +90,8 @@ func @tensor2(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
                     outs(%C: tensor<?x?xf32>) -> tensor<?x?xf32>
   return %D: tensor<?x?xf32>
 }
+
+// -----
 
 // CHECK-LABEL: func @tensor3
 func @tensor3(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
@@ -115,6 +119,7 @@ func @tensor3(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   return %D: tensor<?x?xf32>
 }
 
+// -----
 
 // CHECK-LABEL: func @tensor4
 func @tensor4(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
@@ -143,6 +148,8 @@ func @tensor4(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   return %D: tensor<?x?xf32>
 }
 
+// -----
+
 //       CHECK: func @tensor5
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -155,9 +162,9 @@ func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   //  CHECK-DAG: %[[C1:.+]] = constant 1 : index
   //  CHECK-DAG: %[[D0:.+]] = dim %[[ARG2]], %[[C0]]
   //  CHECK-DAG: %[[D1:.+]] = dim %[[ARG2]], %[[C1]]
-  //      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]] (%[[ARG2]])
-  // CHECK-SAME:   %[[ARG3:.+]] : !flow.dispatch.input<?x?xf32>
-  // CHECK-SAME:   %[[ARG4:.+]] : !flow.dispatch.output<?x?xf32>
+  //      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]](%[[ARG2]])
+  // CHECK-NEXT:   %[[ARG3:.+]]: !flow.dispatch.input<?x?xf32>
+  // CHECK-SAME:   %[[ARG4:.+]]: !flow.dispatch.output<?x?xf32>
   //      CHECK:   %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG3]]
   //      CHECK:   %[[STOREVAL:.+]] = linalg.generic
   // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)

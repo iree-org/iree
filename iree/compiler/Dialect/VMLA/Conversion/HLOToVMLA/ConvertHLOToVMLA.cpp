@@ -598,7 +598,9 @@ struct DynamicSliceOpConversion
 };
 
 struct CompareOpConversion : public OpConversionPattern<mhlo::CompareOp> {
-  using OpConversionPattern::OpConversionPattern;
+  CompareOpConversion(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern(typeConverter, context,
+                            /*benefit=*/9999) {}
 
   LogicalResult matchAndRewrite(
       mhlo::CompareOp srcOp, ArrayRef<Value> rawOperands,

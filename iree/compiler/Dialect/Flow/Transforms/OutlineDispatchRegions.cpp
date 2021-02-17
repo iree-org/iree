@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Shape/Utils/TypeConversion.h"
@@ -76,10 +77,26 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
                                   getTensorTypeArgs(newArgs));
   }
 
+  SmallVector<Value, 4> operandDynamicDims;
+  for (auto operand : regionOp.args()) {
+    if (operand.getType().isa<ShapedType>()) {
+      operandDynamicDims.append(Shape::buildOrFindDynamicDimsForValue(
+          regionOp.getLoc(), operand, builder));
+    }
+  }
+  SmallVector<Value, 4> resultDynamicDims;
+  for (auto result : regionOp.results()) {
+    if (result.getType().isa<ShapedType>()) {
+      resultDynamicDims.append(Shape::buildOrFindDynamicDimsForValue(
+          regionOp.getLoc(), result, builder));
+    }
+  }
+
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, ValueRange{regionOp.workload()},
-      outlinedFuncOp.getType().getResults(), newArgs);
+      outlinedFuncOp.getType().getResults(), resultDynamicDims, newArgs,
+      operandDynamicDims);
 
   if (traceDispatchTensors) {
     std::string str = "Output for " + std::string(outlinedFuncOp.getName());

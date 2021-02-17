@@ -6,19 +6,20 @@ func @complexWorkgroupsUsage(
     %arg0 : tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
     %arg1 : index) -> tensor<4x?xf32> {
+  %c128 = constant 128 : index
   // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = constant 100
   %x = constant 100 : index
   // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = constant 50
   %y = constant 50 : index
   // CHECK: %[[OUTER_RET0:.+]] = flow.dispatch.workgroups[
   // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
-  // CHECK-SAME: ] (%[[ARG0]], %[[ARG1]])
-  // CHECK-SAME: : (tensor<?x4xf32>, index) -> tensor<4x?xf32> = (
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1) : (tensor<?x4xf32>, index) -> (tensor<4x?xf32>) =
-  // CHECK-SAME: %[[INNER_ARG0:.+]] : !flow.dispatch.input<?x4xf32>
-  // CHECK-SAME: %[[INNER_ARG1:.+]] : index
-  // CHECK-SAME: %[[INNER_RET0:.+]] : !flow.dispatch.output<4x?xf32>
-  (%arg0_capture : !flow.dispatch.input<?x4xf32>, %arg1_capture : index, %ret0 : !flow.dispatch.output<4x?xf32>) {
+  // CHECK-SAME: ](%[[ARG0]], %[[ARG1]])
+  // CHECK-SAME: : (tensor<?x4xf32>{%c128}, index) -> (tensor<4x?xf32>{%c128}) =
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1) : (tensor<?x4xf32>{%c128}, index) -> tensor<4x?xf32>{%c128} =
+  // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.input<?x4xf32>
+  // CHECK-SAME:  %[[INNER_ARG1:.+]]: index
+  // CHECK-SAME:  %[[INNER_RET0:.+]]: !flow.dispatch.output<4x?xf32>) {
+  (%arg0_capture: !flow.dispatch.input<?x4xf32>, %arg1_capture: index, %ret0: !flow.dispatch.output<4x?xf32>) {
 
     // Query symbolic workgroup info:
 

@@ -117,25 +117,22 @@ Value cloneOpTreeIntoBlock(Value sourceValue, Block *targetBlock,
 // Modify the second operand of the SegmentSize attribute
 // TODO(ataei): Remove this once we have flow.dispatch.workgroups only here.
 template <typename DispatchOpType>
-void modifyOperandSegmentSizeAttr(DispatchOpType dispatchOp, int32_t argCount);
+void dropOperands(DispatchOpType dispatchOp, ArrayRef<unsigned> deadIndices);
 
 template <>
-void modifyOperandSegmentSizeAttr(DispatchRegionOp dispatchRegionOp,
-                                  int32_t argCount) {}
+void dropOperands(DispatchRegionOp dispatchRegionOp,
+                  ArrayRef<unsigned> deadIndices) {
+  for (unsigned argIndex : llvm::reverse(deadIndices)) {
+    dispatchRegionOp.argsMutable().erase(argIndex);
+  }
+}
 
 template <>
-void modifyOperandSegmentSizeAttr(DispatchWorkgroupsOp dispatchWorkgroupsOp,
-                                  int32_t argCount) {
-  dispatchWorkgroupsOp.getOperation()->setAttr(
-      DispatchWorkgroupsOp::getOperandSegmentSizeAttr(),
-      DenseIntElementsAttr::get(
-          VectorType::get(
-              2, IntegerType::get(dispatchWorkgroupsOp.getContext(), 32)),
-          ArrayRef<int32_t>(
-              {static_cast<int32_t>(
-                   dispatchWorkgroupsOp.workgroup_count().size()),
-               static_cast<int32_t>(dispatchWorkgroupsOp.operands().size() -
-                                    argCount)})));
+void dropOperands(DispatchWorkgroupsOp dispatchWorkgroupsOp,
+                  ArrayRef<unsigned> deadIndices) {
+  for (unsigned argIndex : llvm::reverse(deadIndices)) {
+    dispatchWorkgroupsOp.operandsMutable().erase(argIndex);
+  }
 }
 
 // Inlines use of the given |value| from outside of a dispatch region to inside
@@ -170,11 +167,9 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(DispatchOpType dispatchOp,
   // Remove the dispatch region args and the block args that have been
   // replaced.
   for (unsigned argIndex : llvm::reverse(argIndices)) {
-    dispatchOp.getOperation()->eraseOperand(
-        dispatchOp.mapArgOperandToOpOperand(argIndex));
     entryBlock.eraseArgument(argIndex);
   }
-  modifyOperandSegmentSizeAttr(dispatchOp, argIndices.size());
+  dropOperands(dispatchOp, argIndices);
 
   return success();
 }

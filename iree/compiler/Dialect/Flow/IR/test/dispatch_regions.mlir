@@ -37,7 +37,7 @@ func @multipleArgs(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) {
 // CHECK-LABEL: @singleResult
 func @singleResult(%arg0 : tensor<?xf32>) -> tensor<?xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = "some.shape"
-  // CHECK-NEXT: %1 = flow.dispatch.region[%[[WORKLOAD]] : index](%arg1 = %arg0 : tensor<?xf32>) -> tensor<?xf32> {
+  // CHECK-NEXT: %1 = flow.dispatch.region[%[[WORKLOAD]] : index](%arg1 = %arg0 : tensor<?xf32>) -> (tensor<?xf32>) {
   // CHECK-NEXT:   flow.return %arg1 : tensor<?xf32>
   // CHECK-NEXT: }
   %workload = "some.shape"(%arg0) : (tensor<?xf32>) -> index
