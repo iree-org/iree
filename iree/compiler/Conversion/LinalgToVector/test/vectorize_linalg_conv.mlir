@@ -119,3 +119,95 @@ func @do_not_vectorize_conv_with_non_1_dilation(%filter: memref<1x1x4x4xf32>, %i
   linalg.conv(%0, %1, %2) {dilations = [2, 1], strides = [2, 2]} : memref<1x1x4x4xf32>, memref<1x1x7x4xf32>, memref<1x1x4x4xf32>
   return
 }
+
+// -----
+
+func @vectorize_depthwise_conv(%input: memref<1x3x3x8xf32>, %filter: memref<1x1x8xf32>, %output: memref<1x2x2x8xf32>) {
+  %0 = subview %input[0, 0, 0, 0] [1, 3, 3, 8] [1, 1, 1, 1]  : memref<1x3x3x8xf32> to memref<1x3x3x8xf32>
+  %1 = subview %filter[0, 0, 0] [1, 1, 8] [1, 1, 1]  : memref<1x1x8xf32> to memref<1x1x8xf32>
+  %2 = subview %output[0, 0, 0, 0] [1, 2, 2, 8] [1, 1, 1, 1]  : memref<1x2x2x8xf32> to memref<1x2x2x8xf32>
+  linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%0, %1 : memref<1x3x3x8xf32>, memref<1x1x8xf32>) outs(%2 : memref<1x2x2x8xf32>)
+  return
+}
+
+// CHECK-LABEL: func @vectorize_depthwise_conv
+// CHECK-SAME: %[[INPUT_ARG:.+]]: memref<1x3x3x8xf32>,
+// CHECK-SAME: %[[FILTER_ARG:.+]]: memref<1x1x8xf32>,
+// CHECK-SAME: %[[OUTPUT_ARG:.+]]: memref<1x2x2x8xf32>
+
+// CHECK: %[[FLOAT_ZERO:.+]] = constant 0.000000e+00 : f32
+// CHECK:      %[[INPUT:.+]] = subview %[[INPUT_ARG]]
+// CHECK:     %[[FILTER:.+]] = subview %[[FILTER_ARG]]
+// CHECK:     %[[OUTPUT:.+]] = subview %[[OUTPUT_ARG]]
+
+// CHECK: %[[FILTER_VECTOR:.+]] = vector.transfer_read %[[FILTER]][%c0, %c0, %c0], %cst {masked = [false]} : memref<1x1x8xf32>, vector<8xf32>
+
+// Common filter #0
+// CHECK:      %[[FILTER_0:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
+
+// CHECK: %[[OUTPUT_0_0:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c0, %c0], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_0_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c0, %c0], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_0_0:.+]] = vector.fma %[[INPUT_0_0]], %[[FILTER_0]], %[[OUTPUT_0_0]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_0_0]], %[[OUTPUT]][%c0, %c0, %c0, %c0] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_0_1:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c1, %c0], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_0_1:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c2, %c0], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_0_1:.+]] = vector.fma %[[INPUT_0_1]], %[[FILTER_0]], %[[OUTPUT_0_1]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_0_1]], %[[OUTPUT]][%c0, %c0, %c1, %c0] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_1_0:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c0, %c0], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_1_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c2, %c0, %c0], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_1_0:.+]] = vector.fma %[[INPUT_1_0]], %[[FILTER_0]], %[[OUTPUT_1_0]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_1_0]], %[[OUTPUT]][%c0, %c1, %c0, %c0] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_1_1:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c1, %c0], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_1_1:.+]] = vector.transfer_read %[[INPUT]][%c0, %c2, %c2, %c0], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_1_1:.+]] = vector.fma %[[INPUT_1_1]], %[[FILTER_0]], %[[OUTPUT_1_1]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_1_1]], %[[OUTPUT]][%c0, %c1, %c1, %c0] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// Common filter #1
+// CHECK: %[[FILTER_1:.+]] = vector.extract_strided_slice %[[FILTER_VECTOR]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
+
+// CHECK: %[[OUTPUT_0_0:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c0, %c4], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_0_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c0, %c4], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_0_0:.+]] = vector.fma %[[INPUT_0_0]], %[[FILTER_1]], %[[OUTPUT_0_0]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_0_0]], %[[OUTPUT]][%c0, %c0, %c0, %c4] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_0_1:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c1, %c4], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_0_1:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c2, %c4], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_0_1:.+]] = vector.fma %[[INPUT_0_1]], %[[FILTER_1]], %[[OUTPUT_0_1]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_0_1]], %[[OUTPUT]][%c0, %c0, %c1, %c4] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_1_0:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c0, %c4], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_1_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c2, %c0, %c4], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_1_0:.+]] = vector.fma %[[INPUT_1_0]], %[[FILTER_1]], %[[OUTPUT_1_0]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_1_0]], %[[OUTPUT]][%c0, %c1, %c0, %c4] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// CHECK: %[[OUTPUT_1_1:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c1, %c4], %cst {masked = [false]} : memref<1x2x2x8xf32>, vector<4xf32>
+// CHECK:  %[[INPUT_1_1:.+]] = vector.transfer_read %[[INPUT]][%c0, %c2, %c2, %c4], %cst {masked = [false]} : memref<1x3x3x8xf32>, vector<4xf32>
+// CHECK:    %[[FMA_1_1:.+]] = vector.fma %[[INPUT_1_1]], %[[FILTER_1]], %[[OUTPUT_1_1]] : vector<4xf32>
+// CHECK: vector.transfer_write %[[FMA_1_1]], %[[OUTPUT]][%c0, %c1, %c1, %c4] {masked = [false]} : vector<4xf32>, memref<1x2x2x8xf32>
+
+// -----
+
+// CHECK-LABEL: func @do_not_vectorize_depthwise_conv_with_non_1_filter_height
+func @do_not_vectorize_depthwise_conv_with_non_1_filter_height(%input: memref<1x2x3x4xf32>, %filter: memref<2x1x4xf32>, %output: memref<1x1x2x4xf32>) {
+  %0 = subview %input[0, 0, 0, 0] [1, 2, 3, 4] [1, 1, 1, 1]  : memref<1x2x3x4xf32> to memref<1x2x3x4xf32>
+  %1 = subview %filter[0, 0, 0] [2, 1, 4] [1, 1, 1]  : memref<2x1x4xf32> to memref<2x1x4xf32>
+  %2 = subview %output[0, 0, 0, 0] [1, 1, 2, 4] [1, 1, 1, 1]  : memref<1x1x2x4xf32> to memref<1x1x2x4xf32>
+  // CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+  linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%0, %1 : memref<1x2x3x4xf32>, memref<2x1x4xf32>) outs(%2 : memref<1x1x2x4xf32>)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func @do_not_vectorize_depthwise_conv_with_non_1_filter_width
+func @do_not_vectorize_depthwise_conv_with_non_1_filter_width(%input: memref<1x1x4x4xf32>, %filter: memref<1x2x4xf32>, %output: memref<1x1x2x4xf32>) {
+  %0 = subview %input[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
+  %1 = subview %filter[0, 0, 0] [1, 2, 4] [1, 1, 1]  : memref<1x2x4xf32> to memref<1x2x4xf32>
+  %2 = subview %output[0, 0, 0, 0] [1, 1, 2, 4] [1, 1, 1, 1]  : memref<1x1x2x4xf32> to memref<1x1x2x4xf32>
+  // CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+  linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%0, %1 : memref<1x1x4x4xf32>, memref<1x2x4xf32>) outs(%2 : memref<1x1x2x4xf32>)
+  return
+}

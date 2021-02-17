@@ -318,7 +318,9 @@ static void populateTilingToInvocationPatterns(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::ConvOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -411,6 +413,15 @@ static void populateTilingConvFilterPatterns(
     return tileSizes;
   };
 
+  auto depthWiseConvTilingOptions =
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::Loops)
+          .setTileSizeComputationFunction(getTileSizeFn);
+
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
+      context, depthWiseConvTilingOptions, marker);
+
   // TODO(antiagainst): move this to launch configuration.
   SmallVector<unsigned, 8> loopOrder = {
       /*batch=*/0,
@@ -422,13 +433,13 @@ static void populateTilingConvFilterPatterns(
       /*input_channel=*/4,
   };
 
-  auto tilingOptions = linalg::LinalgTilingOptions()
-                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setInterchange(loopOrder)
-                           .setTileSizeComputationFunction(getTileSizeFn);
+  auto convTilingOptions = linalg::LinalgTilingOptions()
+                               .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                               .setInterchange(loopOrder)
+                               .setTileSizeComputationFunction(getTileSizeFn);
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
-      context, tilingOptions, marker);
+      context, convTilingOptions, marker);
 }
 
 //====---------------------------------------------------------------------===//
@@ -597,7 +608,7 @@ void LinalgTileAndFusePass::runOnOperation() {
         applyCanonicalizationPatternsForTiling(context, funcOp);
 
         LLVM_DEBUG({
-          llvm::dbgs() << "--- After tiling linalg.conv  ---\n";
+          llvm::dbgs() << "--- After tiling convolution filter  ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
