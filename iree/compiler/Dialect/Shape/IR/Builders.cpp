@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -23,27 +24,68 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
-namespace {
-
-Value getRankedShapeFromOp(Operation *op) {
-  auto tieOp = llvm::dyn_cast_or_null<TieShapeOp>(op);
-  if (!tieOp) return nullptr;
-  auto shape = tieOp.shape();
-  if (!shape.getType().isa<RankedShapeType>()) return nullptr;
-  return shape;
+static Value getRankedShapeFromOpResult(Operation *op, Value resultValue,
+                                        OpBuilder &builder) {
+  if (!op) return nullptr;
+  if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(op)) {
+    return carryingOp.buildResultValueRankedShape(resultValue, builder);
+  } else {
+    return nullptr;
+  }
 }
 
-Value findRankedShapeFromUse(Value value) {
-  Value rs = getRankedShapeFromOp(value.getDefiningOp());
+static Value getRankedShapeFromOpOperand(Operation *op, unsigned idx,
+                                         OpBuilder &builder) {
+  auto carryingOp = dyn_cast_or_null<ShapeCarryingInterface>(op);
+  if (!carryingOp) {
+    auto value = op->getOperand(idx);
+    auto definingOp = value.getDefiningOp();
+    if (!definingOp) return nullptr;
+    return getRankedShapeFromOpResult(definingOp, value, builder);
+  }
+  return carryingOp.buildOperandRankedShape(idx, builder);
+}
+
+static Value findRankedShapeFromUse(Value value, OpBuilder &builder) {
+  Value rs = getRankedShapeFromOpResult(value.getDefiningOp(), value, builder);
   if (rs) return rs;
   for (auto &use : value.getUses()) {
-    rs = getRankedShapeFromOp(use.getOwner());
+    rs = getRankedShapeFromOpOperand(use.getOwner(), use.getOperandNumber(),
+                                     builder);
     if (rs) return rs;
   }
   return nullptr;
 }
 
-}  // namespace
+Value buildRankedShapeForValue(Location loc, Value shapedValue,
+                               ValueRange dynamicDims, OpBuilder &builder) {
+  auto shapedType = shapedValue.getType().dyn_cast<ShapedType>();
+  assert(shapedType && "only valid to call on shaped types");
+  return builder.createOrFold<Shape::MakeRankedShapeOp>(
+      loc, Shape::RankedShapeType::get(shapedType), dynamicDims);
+}
+
+// Slices out a range of |dynamicDims| corresponding to the value at |index|.
+static ValueRange sliceDynamicDims(unsigned index, ValueRange values,
+                                   ValueRange dynamicDims) {
+  auto valueType = values[index].getType().dyn_cast<ShapedType>();
+  assert(valueType && "must be a shaped type to get dims");
+  unsigned dimsIndex = 0;
+  for (unsigned i = 0; i < index; ++i) {
+    if (auto shapedType = values[i].getType().dyn_cast<ShapedType>()) {
+      dimsIndex += shapedType.getNumDynamicDims();
+    }
+  }
+  return dynamicDims.slice(dimsIndex, valueType.getNumDynamicDims());
+}
+
+Value buildRankedShapeForValueInList(Location loc, unsigned index,
+                                     ValueRange flatValues,
+                                     ValueRange flatDynamicDims,
+                                     OpBuilder &builder) {
+  auto dynamicDims = sliceDynamicDims(index, flatValues, flatDynamicDims);
+  return buildRankedShapeForValue(loc, flatValues[index], dynamicDims, builder);
+}
 
 Value buildCastInputsToResultShape(Location loc,
                                    RankedShapeType resultShapeType,
@@ -121,9 +163,10 @@ Value buildDegenerateBroadcastRankedShape(
   }
 }
 
-LogicalResult getRankedDimsFromRankedShape(
-    Location loc, Value rsValue, bool createIntermediateOps,
-    SmallVectorImpl<Value> &outDims, ConversionPatternRewriter &rewriter) {
+LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
+                                           bool createIntermediateOps,
+                                           SmallVectorImpl<Value> &outDims,
+                                           OpBuilder &builder) {
   Operation *op = rsValue.getDefiningOp();
   if (op &&
       (llvm::isa<MakeRankedShapeOp>(op) || llvm::isa<ConstRankedShapeOp>(op))) {
@@ -134,28 +177,26 @@ LogicalResult getRankedDimsFromRankedShape(
         if (dynamicDimIndex >= op->getNumOperands()) {
           return emitError(loc, "mismatched dynamic dimensions");
         }
-        Value remappedValue =
-            rewriter.getRemappedValue(op->getOperand(dynamicDimIndex++));
-        if (!remappedValue) {
+        Value dimValue = op->getOperand(dynamicDimIndex++);
+        if (!dimValue) {
           return emitError(
               loc, "unable to find remapped value for ranked dim value");
         }
-        outDims.push_back(remappedValue);
+        outDims.push_back(dimValue);
       } else {
         outDims.push_back(
-            rewriter.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
+            builder.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
       }
     }
-    return success();
   } else if (createIntermediateOps) {
-    auto dimsOp = rewriter.create<Shape::RankedDimsOp>(loc, rsValue);
+    auto dimsOp = builder.create<Shape::RankedDimsOp>(loc, rsValue);
     outDims.resize(dimsOp.result().size());
     std::copy(dimsOp.result().begin(), dimsOp.result().end(), outDims.begin());
-    return success();
   } else {
     return emitError(loc,
                      "could not resolve ranked dimensions from metadata ops");
   }
+  return success();
 }
 
 Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
@@ -174,7 +215,7 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
 
   // Dynamic - walk the uses to find a tie_shape op (either this op or an
   // immediate use).
-  Value rs = findRankedShapeFromUse(value);
+  Value rs = findRankedShapeFromUse(value, builder);
   if (!rs) {
     builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
         << "dynamically shaped value is missing a shape association via "
@@ -190,6 +231,49 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
     return nullptr;
   }
   return rs;
+}
+
+SmallVector<Value, 4> buildOrFindDynamicDimsForValue(Location loc, Value value,
+                                                     OpBuilder &builder) {
+  auto valueSt = value.getType().dyn_cast<ShapedType>();
+  if (!valueSt) {
+    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+        << "cannot construct shape for non shaped value: " << value.getType();
+    return {};
+  }
+
+  // Bail if all dimensions are static.
+  if (valueSt.hasStaticShape()) {
+    return {};
+  }
+
+  // Dynamic - walk the uses to find a tie_shape op (either this op or an
+  // immediate use).
+  SmallVector<Value, 4> result;
+  Value rs = findRankedShapeFromUse(value, builder);
+  if (rs) {
+    auto rsType = rs.getType().dyn_cast<RankedShapeType>();
+    if (!rsType) {
+      builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+          << "dynamically shaped value is not ranked (which is not yet "
+          << "supported)";
+      return {};
+    }
+    for (unsigned i = 0; i < rsType.getRank(); ++i) {
+      if (rsType.isDimDynamic(i)) {
+        result.push_back(builder.createOrFold<Shape::RankedDimOp>(loc, rs, i));
+      }
+    }
+  } else {
+    // No tie information - insert std.dim ops that may later be used and
+    // hopefully converted to ranked shape types.
+    for (unsigned i = 0; i < valueSt.getRank(); ++i) {
+      if (valueSt.isDynamicDim(i)) {
+        result.push_back(builder.createOrFold<DimOp>(loc, value, i));
+      }
+    }
+  }
+  return result;
 }
 
 }  // namespace Shape

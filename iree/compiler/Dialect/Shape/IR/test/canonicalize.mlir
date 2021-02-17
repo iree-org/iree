@@ -123,8 +123,8 @@ func @elideDuplicateTieShapePattern_match(%arg0 : tensor<?xf32>, %arg1 : !shapex
 func @elideDuplicateTieShapePattern_different_shapes(%arg0 : tensor<?xf32>, %arg1 : !shapex.ranked_shape<[?]>, %arg2 : !shapex.ranked_shape<[?]>) -> (tensor<?xf32>) {
   %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
   %1 = shapex.tie_shape %0, %arg2 : tensor<?xf32>, !shapex.ranked_shape<[?]>
-  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS1]]
-  // CHECK: shapex.tie_shape %[[T]], %[[ARGRS2]]
+  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS2]]
+  // CHECK: return %[[T]]
   return %1 : tensor<?xf32>
 }
 

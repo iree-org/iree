@@ -79,6 +79,10 @@ RankedShapeType RankedShapeType::getChecked(
   return Base::getChecked(emitError, context, dims);
 }
 
+RankedShapeType RankedShapeType::get(ShapedType shapedType) {
+  return Base::get(shapedType.getContext(), shapedType.getShape());
+}
+
 LogicalResult RankedShapeType::verify(
     function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> dims) {
   for (auto dim : dims) {
