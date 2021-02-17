@@ -53,7 +53,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
     # Cuda
-    "@cuda_headers//:cuda_headers": ["cuda_headers"],
+    "@cuda_headers": ["cuda_headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
@@ -63,7 +63,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@pffft": ["pffft"],
-    "@cpuinfo//:cpuinfo": ["cpuinfo"],
+    "@cpuinfo": ["cpuinfo"],
     "@half//:includes": ["half::includes"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
