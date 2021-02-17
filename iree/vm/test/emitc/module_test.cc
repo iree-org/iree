@@ -19,9 +19,12 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/test/emitc/arithmetic_ops.vmfb"
+#include "iree/vm/test/emitc/arithmetic_ops_i64.vmfb"
 #include "iree/vm/test/emitc/assignment_ops.vmfb"
+#include "iree/vm/test/emitc/assignment_ops_i64.vmfb"
 #include "iree/vm/test/emitc/conversion_ops.vmfb"
 #include "iree/vm/test/emitc/shift_ops.vmfb"
+#include "iree/vm/test/emitc/shift_ops_i64.vmfb"
 
 namespace {
 
@@ -49,9 +52,12 @@ std::vector<TestParams> GetModuleTestParams() {
   // TODO(simon-camp): get these automatically
   std::vector<ModuleDescription> modules = {
       {arithmetic_ops_descriptor_, arithmetic_ops_create},
+      {arithmetic_ops_i64_descriptor_, arithmetic_ops_i64_create},
       {assignment_ops_descriptor_, assignment_ops_create},
+      {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
       {conversion_ops_descriptor_, conversion_ops_create},
-      {shift_ops_descriptor_, shift_ops_create}};
+      {shift_ops_descriptor_, shift_ops_create},
+      {shift_ops_i64_descriptor_, shift_ops_i64_create}};
 
   for (size_t i = 0; i < modules.size(); i++) {
     iree_vm_native_module_descriptor_t descriptor = modules[i].descriptor;

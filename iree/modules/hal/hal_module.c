@@ -226,8 +226,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait, rr, v) {
   // Block and wait for the semaphore to be signaled (or fail).
   status = iree_hal_semaphore_wait_with_deadline(semaphore, 1ull,
                                                  IREE_TIME_INFINITE_FUTURE);
+  iree_hal_semaphore_release(semaphore);
   if (!iree_status_is_ok(status)) {
-    iree_hal_semaphore_release(semaphore);
     return status;
   }
 

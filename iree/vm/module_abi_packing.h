@@ -362,7 +362,7 @@ template <>
 struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
-    iree_vm_ref_move(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
+    iree_vm_ref_retain(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
     ptr += sizeof(iree_vm_ref_t);
   }
 };
@@ -376,7 +376,7 @@ struct ParamUnpack<ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status =
@@ -401,7 +401,7 @@ struct ParamUnpack<const ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status =

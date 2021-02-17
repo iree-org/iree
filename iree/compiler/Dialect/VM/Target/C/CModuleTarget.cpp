@@ -164,7 +164,7 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     return failure();
   }
 
-  if (funcOp.getNumResults() > 0) {
+  if (funcOp.getNumResults() > 0 && funcOp.getNumArguments() > 0) {
     output << ", ";
   }
 

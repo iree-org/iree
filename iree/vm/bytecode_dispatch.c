@@ -402,8 +402,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t src_reg = src_reg_list->registers[reg_i++];
-        iree_vm_ref_retain_or_move(
-            src_reg & IREE_REF_REGISTER_MOVE_BIT,
+        iree_vm_ref_assign(
             &caller_registers.ref[src_reg & caller_registers.ref_mask],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
@@ -447,8 +446,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
-                iree_vm_ref_retain_or_move(
-                    src_reg & IREE_REF_REGISTER_MOVE_BIT,
+                iree_vm_ref_assign(
                     &caller_registers.ref[src_reg & caller_registers.ref_mask],
                     (iree_vm_ref_t*)p);
                 p += sizeof(iree_vm_ref_t);
@@ -1362,7 +1360,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         int64_t true_value = VM_DecOperandRegI64("true_value");
         int64_t false_value = VM_DecOperandRegI64("false_value");
         int64_t* result = VM_DecResultRegI64("result");
-        *result = condition ? true_value : false_value;
+        *result = vm_select_i64(condition, true_value, false_value);
       });
 
       DISPATCH_OP(EXT_I64, SwitchI64, {
@@ -1383,63 +1381,53 @@ iree_status_t iree_vm_bytecode_dispatch(
       // ExtI64: Native integer arithmetic
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_UNARY_ALU_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                            \
-    int64_t operand = VM_DecOperandRegI64("operand");        \
-    int64_t* result = VM_DecResultRegI64("result");          \
-    *result = (int64_t)(op((type)operand));                  \
-  });
-
-#define DISPATCH_OP_EXT_I64_BINARY_ALU_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                             \
-    int64_t lhs = VM_DecOperandRegI64("lhs");                 \
-    int64_t rhs = VM_DecOperandRegI64("rhs");                 \
-    int64_t* result = VM_DecResultRegI64("result");           \
-    *result = (int64_t)(((type)lhs)op((type)rhs));            \
-  });
-
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AddI64, int64_t, +);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(SubI64, int64_t, -);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(MulI64, int64_t, *);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64S, int64_t, /);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64U, uint64_t, /);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64S, int64_t, %);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64U, uint64_t, %);
-      DISPATCH_OP_EXT_I64_UNARY_ALU_I64(NotI64, uint64_t, ~);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AndI64, uint64_t, &);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(OrI64, uint64_t, |);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(XorI64, uint64_t, ^);
+      DISPATCH_OP_EXT_I64_BINARY_I64(AddI64, vm_add_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(SubI64, vm_sub_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(MulI64, vm_mul_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(DivI64S, vm_div_i64s);
+      DISPATCH_OP_EXT_I64_BINARY_I64(DivI64U, vm_div_i64u);
+      DISPATCH_OP_EXT_I64_BINARY_I64(RemI64S, vm_rem_i64s);
+      DISPATCH_OP_EXT_I64_BINARY_I64(RemI64U, vm_rem_i64u);
+      DISPATCH_OP_EXT_I64_UNARY_I64(NotI64, vm_not_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(AndI64, vm_and_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(OrI64, vm_or_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(XorI64, vm_xor_i64);
 
       //===----------------------------------------------------------------===//
       // ExtI64: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_CAST_I64(op_name, src_type, dst_type) \
-  DISPATCH_OP(EXT_I64, op_name, {                                 \
-    int64_t operand = VM_DecOperandRegI64("operand");             \
-    int64_t* result = VM_DecResultRegI64("result");               \
-    *result = (dst_type)((src_type)operand);                      \
-  });
-
-      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I32, uint64_t, uint32_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64S, int32_t, int64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64U, uint32_t, uint64_t);
+      DISPATCH_OP(EXT_I64, TruncI64I32, {
+        int64_t operand = VM_DecOperandRegI64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = (uint32_t)((uint64_t)operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64S, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = (int64_t)((int32_t)operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64U, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = (uint64_t)((uint32_t)operand);
+      });
 
       //===----------------------------------------------------------------===//
       // ExtI64: Native bitwise shifts and rotates
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                        \
-    int64_t operand = VM_DecOperandRegI64("operand");    \
-    int8_t amount = VM_DecConstI8("amount");             \
-    int64_t* result = VM_DecResultRegI64("result");      \
-    *result = (int64_t)(((type)operand)op amount);       \
+#define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                       \
+    int64_t operand = VM_DecOperandRegI64("operand");   \
+    int8_t amount = VM_DecConstI8("amount");            \
+    int64_t* result = VM_DecResultRegI64("result");     \
+    *result = op_func(operand, amount);                 \
   });
 
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShlI64, int64_t, <<);
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64S, int64_t, >>);
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64U, uint64_t, >>);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShlI64, vm_shl_i64);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64S, vm_shr_i64s);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64U, vm_shr_i64u);
 
       //===----------------------------------------------------------------===//
       // ExtI64: Comparison ops
