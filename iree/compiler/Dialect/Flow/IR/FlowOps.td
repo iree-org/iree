@@ -683,8 +683,6 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
-    bool isUsableInStream() { return true; }
-    bool isStreamOnly() { return true; }
   }];
 
   let assemblyFormat = [{
@@ -722,9 +720,6 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a shape manipulation.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize away if resulting ops don't care.
@@ -809,9 +804,6 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.fill.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize splat+slice to smaller splat.
@@ -839,9 +831,6 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize away entirely in most cases.
@@ -877,9 +866,6 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.slice.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
@@ -915,9 +901,6 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize contiguous updates/across slices.

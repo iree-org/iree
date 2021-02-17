@@ -90,22 +90,13 @@ def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
 
     The goal of the stream forming process is to move as many operations that
     can be used within a stream into one and only using non-streamed ops as a
-    last resort. Ops that are isStreamOnly may force the creation of single-op
-    command buffers and synchronous dispatches.
+    last resort.
   }];
 
   let methods = [
     InterfaceMethod<
       [{Returns true if the op is transfer operation (as defined by the HAL).}],
       "bool", "isTransfer", (ins)
-    >,
-    InterfaceMethod<
-      [{Returns true if the op *can* be used within a stream.}],
-      "bool", "isUsableInStream", (ins)
-    >,
-    InterfaceMethod<
-      [{Returns true if the op *must* be used within a stream.}],
-      "bool", "isStreamOnly", (ins)
     >,
   ];
 }
