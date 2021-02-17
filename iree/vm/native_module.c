@@ -26,9 +26,12 @@ typedef struct {
   iree_vm_module_t base_interface;
 
   // Interface with optional user-provided function pointers.
-  // user_interface.self will contain the user's module pointer that must be
-  // passed to all functions.
   iree_vm_module_t user_interface;
+
+  // The self passed to user_interface functions. Will either be the value of
+  // user_interface.self when initialized and the base pointer of the base
+  // native module otherwise.
+  void* self;
 
   // Allocator this module was allocated with and must be freed with.
   iree_allocator_t allocator;
@@ -36,6 +39,10 @@ typedef struct {
   // Module descriptor used for reflection.
   const iree_vm_native_module_descriptor_t* descriptor;
 } iree_vm_native_module_t;
+
+IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size() {
+  return sizeof(iree_vm_native_module_t);
+}
 
 #if defined(NDEBUG)
 static iree_status_t iree_vm_native_module_verify_descriptor(
@@ -69,17 +76,23 @@ static void IREE_API_PTR iree_vm_native_module_destroy(void* self) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
 
   // Destroy the optional user-provided self.
-  if (module->user_interface.destroy) {
-    module->user_interface.destroy(module->user_interface.self);
+  if (module->self == module) {
+    iree_allocator_t allocator = module->allocator;
+    if (module->user_interface.destroy) {
+      module->user_interface.destroy(module->self);
+    }
+    iree_allocator_free(allocator, module);
+  } else {
+    if (module->user_interface.destroy) {
+      module->user_interface.destroy(module->self);
+    }
   }
-
-  iree_allocator_free(module->allocator, module);
 }
 
 static iree_string_view_t IREE_API_PTR iree_vm_native_module_name(void* self) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.name) {
-    return module->user_interface.name(module->user_interface.self);
+    return module->user_interface.name(module->self);
   }
   return module->descriptor->module_name;
 }
@@ -88,7 +101,7 @@ static iree_vm_module_signature_t IREE_API_PTR
 iree_vm_native_module_signature(void* self) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.signature) {
-    return module->user_interface.signature(module->user_interface.self);
+    return module->user_interface.signature(module->self);
   }
   iree_vm_module_signature_t signature;
   memset(&signature, 0, sizeof(signature));
@@ -155,9 +168,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_function(
   if (out_name) memset(out_name, 0, sizeof(*out_name));
   if (out_signature) memset(out_signature, 0, sizeof(*out_signature));
   if (module->user_interface.get_function) {
-    return module->user_interface.get_function(module->user_interface.self,
-                                               linkage, ordinal, out_function,
-                                               out_name, out_signature);
+    return module->user_interface.get_function(
+        module->self, linkage, ordinal, out_function, out_name, out_signature);
   }
   switch (linkage) {
     case IREE_VM_FUNCTION_LINKAGE_IMPORT:
@@ -181,7 +193,7 @@ iree_vm_native_module_get_function_reflection_attr(
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.get_function_reflection_attr) {
     return module->user_interface.get_function_reflection_attr(
-        module->user_interface.self, linkage, ordinal, index, key, value);
+        module->self, linkage, ordinal, index, key, value);
   }
   // TODO(benvanik): implement native module reflection.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -194,8 +206,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_lookup_function(
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   memset(out_function, 0, sizeof(*out_function));
   if (module->user_interface.lookup_function) {
-    return module->user_interface.lookup_function(module->user_interface.self,
-                                                  linkage, name, out_function);
+    return module->user_interface.lookup_function(module->self, linkage, name,
+                                                  out_function);
   }
 
   if (IREE_UNLIKELY(linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT)) {
@@ -234,8 +246,8 @@ iree_vm_native_module_alloc_state(void* self, iree_allocator_t allocator,
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   *out_module_state = NULL;
   if (module->user_interface.alloc_state) {
-    return module->user_interface.alloc_state(module->user_interface.self,
-                                              allocator, out_module_state);
+    return module->user_interface.alloc_state(module->self, allocator,
+                                              out_module_state);
   }
   // Default to no state.
   return iree_ok_status();
@@ -245,8 +257,7 @@ static void IREE_API_PTR iree_vm_native_module_free_state(
     void* self, iree_vm_module_state_t* module_state) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.free_state) {
-    module->user_interface.free_state(module->user_interface.self,
-                                      module_state);
+    module->user_interface.free_state(module->self, module_state);
     return;
   }
   // No-op in the default implementation.
@@ -260,9 +271,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_resolve_import(
     const iree_vm_function_signature_t* signature) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.resolve_import) {
-    return module->user_interface.resolve_import(module->user_interface.self,
-                                                 module_state, ordinal,
-                                                 function, signature);
+    return module->user_interface.resolve_import(module->self, module_state,
+                                                 ordinal, function, signature);
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "native module does not support imports");
@@ -282,8 +292,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
                             module->descriptor->export_count);
   }
   if (module->user_interface.begin_call) {
-    return module->user_interface.begin_call(module->user_interface.self, stack,
-                                             call, out_result);
+    return module->user_interface.begin_call(module->self, stack, call,
+                                             out_result);
   }
 
   // NOTE: VM stack is currently unused. We could stash things here for the
@@ -320,8 +330,7 @@ iree_vm_native_module_resume_call(void* self, iree_vm_stack_t* stack,
                                   iree_vm_execution_result_t* out_result) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.resume_call) {
-    return module->user_interface.resume_call(module->user_interface.self,
-                                              stack, out_result);
+    return module->user_interface.resume_call(module->self, stack, out_result);
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "native module does not support resume");
@@ -361,11 +370,52 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
   iree_vm_native_module_t* module = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_vm_native_module_t), (void**)&module));
+
+  iree_status_t status = iree_vm_native_module_initialize(
+      interface, module_descriptor, allocator, (iree_vm_module_t*)module);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(allocator, module);
+    return status;
+  }
+
+  *out_module = &module->base_interface;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_initialize(
+    const iree_vm_module_t* interface,
+    const iree_vm_native_module_descriptor_t* module_descriptor,
+    iree_allocator_t allocator, iree_vm_module_t* base_module) {
+  IREE_ASSERT_ARGUMENT(interface);
+  IREE_ASSERT_ARGUMENT(module_descriptor);
+  IREE_ASSERT_ARGUMENT(base_module);
+  iree_vm_native_module_t* module = (iree_vm_native_module_t*)base_module;
+
+  if (IREE_UNLIKELY(!interface->begin_call) &&
+      IREE_UNLIKELY(!module_descriptor->functions)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "native modules must provide call support or function pointers");
+  } else if (IREE_UNLIKELY(!interface->begin_call) &&
+             IREE_UNLIKELY(module_descriptor->export_count !=
+                           module_descriptor->function_count)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "native modules using the default call support "
+                            "must have 1:1 exports:function pointers");
+  }
+
+  // Perform some optional debug-only verification of the descriptor.
+  // Since native modules are designed to be compiled in we don't need to do
+  // this in release builds.
+  IREE_RETURN_IF_ERROR(
+      iree_vm_native_module_verify_descriptor(module_descriptor));
   module->allocator = allocator;
   module->descriptor = module_descriptor;
 
   // TODO(benvanik): version interface and copy only valid bytes.
   memcpy(&module->user_interface, interface, sizeof(*interface));
+  module->self =
+      module->user_interface.self ? module->user_interface.self : module;
 
   // Base interface that routes through our thunks.
   iree_vm_module_initialize(&module->base_interface, module);
@@ -383,6 +433,5 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_native_module_create(
   module->base_interface.begin_call = iree_vm_native_module_begin_call;
   module->base_interface.resume_call = iree_vm_native_module_resume_call;
 
-  *out_module = &module->base_interface;
   return iree_ok_status();
 }

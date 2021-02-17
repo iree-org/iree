@@ -36,11 +36,15 @@ cc_embed_data(
     srcs = [
         ":arithmetic_ops.vmfb",
         ":arithmetic_ops_i64.vmfb",
+        ":assignment_ops.vmfb",
+        ":assignment_ops_i64.vmfb",
         ":comparison_ops.vmfb",
         ":control_flow_ops.vmfb",
         ":conversion_ops.vmfb",
+        ":conversion_ops_i64.vmfb",
         ":list_ops.vmfb",
         ":shift_ops.vmfb",
+        ":shift_ops_i64.vmfb",
     ],
     cc_file_output = "all_bytecode_modules.cc",
     cpp_namespace = "iree::vm::test",
@@ -57,6 +61,18 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "arithmetic_ops_i64",
     src = "arithmetic_ops_i64.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "assignment_ops",
+    src = "assignment_ops.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "assignment_ops_i64",
+    src = "assignment_ops_i64.mlir",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
@@ -79,6 +95,12 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+    name = "conversion_ops_i64",
+    src = "conversion_ops_i64.mlir",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
     name = "list_ops",
     src = "list_ops.mlir",
     cc_namespace = "iree::vm::test",
@@ -88,6 +110,13 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "shift_ops",
     src = "shift_ops.mlir",
+    cc_namespace = "iree::vm::test",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "shift_ops_i64",
+    src = "shift_ops_i64.mlir",
     cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )

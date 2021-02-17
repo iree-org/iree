@@ -161,18 +161,18 @@ TEST(VMRefTest, WrappingReleasesExisting) {
 // Checking null refs is fine.
 TEST(VMRefTest, CheckNull) {
   iree_vm_ref_t null_ref = {0};
-  IREE_EXPECT_OK(iree_vm_ref_check(&null_ref, IREE_VM_REF_TYPE_NULL));
+  IREE_EXPECT_OK(iree_vm_ref_check(null_ref, IREE_VM_REF_TYPE_NULL));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         ::iree::Status(iree_vm_ref_check(
-                            &null_ref, static_cast<iree_vm_ref_type_t>(1234))));
+                            null_ref, static_cast<iree_vm_ref_type_t>(1234))));
 }
 
 // Tests type checks.
 TEST(VMRefTest, Check) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
-  IREE_EXPECT_OK(iree_vm_ref_check(&a_ref, A::kTypeID));
+  IREE_EXPECT_OK(iree_vm_ref_check(a_ref, A::kTypeID));
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        ::iree::Status(iree_vm_ref_check(&a_ref, B::kTypeID)));
+                        ::iree::Status(iree_vm_ref_check(a_ref, B::kTypeID)));
   iree_vm_ref_release(&a_ref);
 }
 
@@ -248,7 +248,7 @@ TEST(VMRefTest, RetainOrMoveMoving) {
   iree_vm_ref_t a_ref_0 = MakeRef<A>("AType");
   iree_vm_ref_t a_ref_1 = {0};
   iree_vm_ref_retain_or_move(/*is_move=*/1, &a_ref_0, &a_ref_1);
-  IREE_EXPECT_OK(iree_vm_ref_check(&a_ref_0, IREE_VM_REF_TYPE_NULL));
+  IREE_EXPECT_OK(iree_vm_ref_check(a_ref_0, IREE_VM_REF_TYPE_NULL));
   iree_vm_ref_release(&a_ref_1);
 }
 
@@ -269,7 +269,7 @@ TEST(VMRefTest, RetainOrMoveRetainingIntoSelf) {
 TEST(VMRefTest, RetainOrMoveMovingIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
   iree_vm_ref_retain_or_move(/*is_move=*/1, &a_ref, &a_ref);
-  IREE_EXPECT_OK(iree_vm_ref_check(&a_ref, A::kTypeID));
+  IREE_EXPECT_OK(iree_vm_ref_check(a_ref, A::kTypeID));
   iree_vm_ref_release(&a_ref);
 }
 
@@ -413,7 +413,7 @@ TEST(VMRefTest, MovingResetsSource) {
   iree_vm_ref_t a_ref_0 = MakeRef<A>("AType");
   iree_vm_ref_t a_ref_1 = {0};
   iree_vm_ref_move(&a_ref_0, &a_ref_1);
-  IREE_EXPECT_OK(iree_vm_ref_check(&a_ref_0, IREE_VM_REF_TYPE_NULL));
+  IREE_EXPECT_OK(iree_vm_ref_check(a_ref_0, IREE_VM_REF_TYPE_NULL));
   iree_vm_ref_release(&a_ref_1);
 }
 
@@ -421,7 +421,7 @@ TEST(VMRefTest, MovingResetsSource) {
 TEST(VMRefTest, MovingIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
   iree_vm_ref_move(&a_ref, &a_ref);
-  IREE_EXPECT_OK(iree_vm_ref_check(&a_ref, A::kTypeID));
+  IREE_EXPECT_OK(iree_vm_ref_check(a_ref, A::kTypeID));
   iree_vm_ref_release(&a_ref);
 }
 

@@ -22,6 +22,7 @@
 #  "@bazel_skylib//"
 #  "@com_google_benchmark//"
 #  "@cpuinfo//"
+#  "@cuda_headers//"
 #  "@com_github_dvidelabs_flatcc//"
 #  "@half//"
 #  "@com_google_googletest//"

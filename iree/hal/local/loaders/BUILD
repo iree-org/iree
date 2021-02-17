@@ -32,6 +32,7 @@ cc_library(
     ],
     deps = [
         "//iree/base:api",
+        "//iree/base:core_headers",
         "//iree/base:dynamic_library",
         "//iree/base:flatcc",
         "//iree/base:tracing",

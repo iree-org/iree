@@ -114,6 +114,7 @@ endif()
 
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
+  Cuda
   DyLib
   VMLA
   Vulkan
@@ -125,6 +126,10 @@ if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
+  endif()
+  # Remove Cuda from Android and Apple platforms.
+  if(ANDROID OR APPLE)
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Cuda)
   endif()
 endif()
 message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
@@ -382,6 +387,7 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/cuda_headers EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)

@@ -29,6 +29,8 @@ steps:
   - wait
 
   - label: "benchmark on snapdragon-855 (adreno-640) (Pixel 4)"
+    # TODO(#4861): Re-enable when phone is fixed
+    skip: "Phone is borked. See https://github.com/google/iree/issues/4861"
     commands:
       - "buildkite-agent artifact download --step build model-artifacts.tgz ./"
       - "tar xzvf model-artifacts.tgz"

@@ -360,4 +360,36 @@ static const int kRegSize = sizeof(uint16_t);
 
 #endif  // IREE_DISPATCH_MODE_COMPUTED_GOTO
 
+// Common dispatch op macros
+
+#define DISPATCH_OP_CORE_UNARY_I32(op_name, op_func)  \
+  DISPATCH_OP(CORE, op_name, {                        \
+    int32_t operand = VM_DecOperandRegI32("operand"); \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(operand);                       \
+  });
+
+#define DISPATCH_OP_CORE_BINARY_I32(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                        \
+    int32_t lhs = VM_DecOperandRegI32("lhs");         \
+    int32_t rhs = VM_DecOperandRegI32("rhs");         \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
+  });
+
+#define DISPATCH_OP_EXT_I64_UNARY_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                       \
+    int64_t operand = VM_DecOperandRegI64("operand");   \
+    int64_t* result = VM_DecResultRegI64("result");     \
+    *result = op_func(operand);                         \
+  });
+
+#define DISPATCH_OP_EXT_I64_BINARY_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                        \
+    int64_t lhs = VM_DecOperandRegI64("lhs");            \
+    int64_t rhs = VM_DecOperandRegI64("rhs");            \
+    int64_t* result = VM_DecResultRegI64("result");      \
+    *result = op_func(lhs, rhs);                         \
+  });
+
 #endif  // IREE_VM_BYTECODE_DISPATCH_UTIL_H_

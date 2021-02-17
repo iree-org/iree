@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Import the TF bazelrc config
-try-import %workspace%/../../third_party/tensorflow/.bazelrc
+# Import the main bazelrc config. This is in a separate file so that it's
+# possible to turn off all user bazelrc options by specifying
+# `--nosystem_rc --nohome_rc --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc`
+try-import %workspace%/../../build_tools/bazel/iree.bazelrc
 
-# Linking in the TF shared object with tf_cc_binary in non-monolithic mode
-# violates TF's visibility restrictions. We can investigate fixing this
-# upstream. In the meantime, this is easier.
-build --nocheck_visibility
-# Disk cache is incompatible with remote execution and caching.
-build:rbe --disk_cache=''
+# Run the configure_bazel.py script to generate.
+try-import %workspace%/../../configured.bazelrc
 
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.
-try-import %workspace%/user.bazelrc
+try-import %workspace%/../../user.bazelrc

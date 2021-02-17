@@ -27,6 +27,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -87,6 +88,31 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.registerLoopAnalyses(loopAnalysisManager);
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
+
+  switch (options.sanitizerKind) {
+    case SanitizerKind::kNone:
+      break;
+    case SanitizerKind::kAddress: {
+      passBuilder.registerOptimizerLastEPCallback(
+          [](llvm::ModulePassManager &modulePassManager,
+             llvm::PassBuilder::OptimizationLevel Level) {
+            bool compileKernel = false;
+            bool recover = false;
+            bool useAfterScope = true;
+            bool moduleUseAfterScope = false;
+            bool useOdrIndicator = false;
+            modulePassManager.addPass(
+                llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis,
+                                          llvm::Module>());
+            modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
+                compileKernel, recover, moduleUseAfterScope, useOdrIndicator));
+            modulePassManager.addPass(
+                createModuleToFunctionPassAdaptor(llvm::AddressSanitizerPass(
+                    compileKernel, recover, useAfterScope)));
+          });
+    } break;
+  }
+
   if (options.optLevel != llvm::PassBuilder::OptimizationLevel::O0) {
     llvm::ModulePassManager modulePassManager;
     modulePassManager =

@@ -149,12 +149,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type) {
-  return ref->type == type ? iree_ok_status()
-                           : iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-}
-
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
                                                       iree_vm_ref_t* out_ref) {
   if (ref != out_ref && ref->ptr != out_ref->ptr) {

@@ -44,7 +44,7 @@ static iree_status_t native_import_module_add_1(
 
 static const iree_vm_native_export_descriptor_t
     native_import_module_exports_[] = {
-        {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i.i"), 0,
+        {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i_i"), 0,
          NULL},
 };
 static const iree_vm_native_function_ptr_t native_import_module_funcs_[] = {

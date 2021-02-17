@@ -125,21 +125,17 @@ Status GetModuleContentsFromFlags(std::string* out_contents) {
 // benchmarking.
 class IREEBenchmark {
  public:
-  IREEBenchmark()
-      : instance_(nullptr),
-        device_(nullptr),
-        hal_module_(nullptr),
-        context_(nullptr),
-        input_module_(nullptr){};
+  IREEBenchmark() = default;
+
   ~IREEBenchmark() {
     IREE_TRACE_SCOPE0("IREEBenchmark::dtor");
 
     // Order matters.
     inputs_.reset();
+    iree_vm_context_release(context_);
     iree_vm_module_release(hal_module_);
     iree_vm_module_release(input_module_);
     iree_hal_device_release(device_);
-    iree_vm_context_release(context_);
     iree_vm_instance_release(instance_);
   };
 
@@ -247,11 +243,11 @@ class IREEBenchmark {
   }
 
   std::string module_data_;
-  iree_vm_instance_t* instance_;
-  iree_hal_device_t* device_;
-  iree_vm_module_t* hal_module_;
-  iree_vm_context_t* context_;
-  iree_vm_module_t* input_module_;
+  iree_vm_instance_t* instance_ = nullptr;
+  iree_hal_device_t* device_ = nullptr;
+  iree_vm_module_t* hal_module_ = nullptr;
+  iree_vm_context_t* context_ = nullptr;
+  iree_vm_module_t* input_module_ = nullptr;
   iree::vm::ref<iree_vm_list_t> inputs_;
 };
 }  // namespace

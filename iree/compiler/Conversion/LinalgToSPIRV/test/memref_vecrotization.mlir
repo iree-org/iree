@@ -110,3 +110,25 @@ hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = 
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
+
+// -----
+
+// CHECK-LABEL: func @do_not_vectorize_odd_vector_size
+func @do_not_vectorize_odd_vector_size() {
+  %cst = constant 0.0 : f32
+  %c0 = constant 0 : index
+  // CHECK: iree.placeholder
+  // CHECK-SAME: memref<4x3xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x3xf32>
+  // CHECK: iree.placeholder
+  // CHECK-SAME: memref<4x3xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x3xf32>
+  %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4x3xf32>, vector<3xf32>
+  vector.transfer_write %v, %1[%c0, %c0] : vector<3xf32>, memref<4x3xf32>
+  return
+}
+
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+}
