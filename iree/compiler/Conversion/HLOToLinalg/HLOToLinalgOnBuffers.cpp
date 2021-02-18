@@ -382,13 +382,6 @@ LogicalResult ConvOpConversion::apply(
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   if (!hasCanonicalDimensionNumbers(op.dimension_numbers())) return failure();
 
-  llvm::SmallVector<Attribute, 4> strides;
-  if (auto windowStrides = op.window_strides()) {
-    auto range = windowStrides->getAttributeValues();
-    strides.append(range.begin(), range.end());
-  }
-  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
-
   // TODO(ataei): Only support dilated convolution for now. We need to consider
   // LHS dilation for deconvolution cases.
   llvm::SmallVector<Attribute, 4> dilation;
@@ -396,7 +389,6 @@ LogicalResult ConvOpConversion::apply(
     auto range = rhsDilation->getAttributeValues();
     dilation.append(range.begin(), range.end());
   }
-  auto dilationArg = ArrayAttr::get(op.getContext(), dilation);
 
   // Set padding only if it is non-zero.
   DenseIntElementsAttr padding = op.paddingAttr();
