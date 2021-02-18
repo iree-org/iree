@@ -359,7 +359,10 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
   // Only support NHWC conv.
-  if (inputType.getRank() != 4) return failure();
+  if (!isa<linalg::ConvOp, linalg::ConvInputNHWCFilterHWCFOp>(
+          op.getOperation())) {
+    return failure();
+  }
 
   bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
   if (!isInputTilable) return failure();
