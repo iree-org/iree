@@ -20,9 +20,13 @@
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 constexpr int kMaxVectorizationSizeInBits = 128;
 constexpr int kMaxVectorNumElements = 4;
@@ -360,6 +364,38 @@ class ProcessPlaceHolder final
   }
 };
 
+// Folds linalg.reshape op that directly reshaping an iree.placeholder op into
+// the iree.placeholder op itself.
+class FoldReshapeIntoPlaceholder final
+    : public OpRewritePattern<linalg::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::ReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto placeholderOp = reshapeOp.src().getDefiningOp<IREE::PlaceholderOp>();
+    if (!placeholderOp) return failure();
+    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
+        reshapeOp, reshapeOp.getResultType(), ValueRange(),
+        placeholderOp.getAttrs());
+    return success();
+  }
+};
+
+/// Removes iree.placeholder ops that has no uses.
+class RemoveDeadPlaceholder final
+    : public OpRewritePattern<IREE::PlaceholderOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::PlaceholderOp placeholderOp,
+                                PatternRewriter &rewriter) const override {
+    if (placeholderOp.use_empty()) {
+      rewriter.eraseOp(placeholderOp);
+      return success();
+    }
+    return failure();
+  }
+};
+
 class VectorizeMemRefPass final
     : public PassWrapper<VectorizeMemRefPass, OperationPass<ModuleOp>> {
   void runOnOperation() override;
@@ -402,6 +438,17 @@ void VectorizeMemRefPass::runOnOperation() {
   // framework to implement the conversion.
   ModuleOp module = getOperation();
   MLIRContext *context = &getContext();
+
+  // Preliminary transformations to increase further chances of memref
+  // vectorziation.
+  for (FuncOp funcOp : module.getOps<FuncOp>()) {
+    if (!isEntryPoint(funcOp)) continue;
+    OwningRewritePatternList foldingPatterns;
+    foldingPatterns.insert<FoldReshapeIntoPlaceholder, RemoveDeadPlaceholder>(
+        context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(foldingPatterns));
+  }
+
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
 
   OwningRewritePatternList patterns;

@@ -358,12 +358,19 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 
-  bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
+  bool isInputTilable =
+      inputType.getDimSize(3) % 4 == 0 || inputType.getDimSize(3) < 4;
   if (!isInputTilable) return failure();
 
+  // A list of preferred tile sizes and workgroup sizes. This is for Mali
+  // G77 now and it's fairly ad-hoc. We need to have a better story for
+  // incorporating such information.
   static const TileWorkgroupSizePair tileWorkgroupSizePairs[] = {
-      {{1, 8, 32}, {8, 2, 1}},
-  };
+      {{4, 4, 16}, {4, 4, 1}},
+      {{2, 2, 64}, {16, 1, 1}},
+      {{4, 8, 8}, {2, 4, 2}},
+      {{2, 2, 32}, {8, 2, 1}},
+      {{1, 1, 32}, {8, 1, 1}}};
 
   for (const auto &pair : tileWorkgroupSizePairs) {
     const std::array<int64_t, 3> &tileSize = pair.tileSize;
@@ -436,8 +443,13 @@ static LogicalResult getMaliSpecificConfig(
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 
+  // A list of preferred tile sizes and workgroup sizes. This is for Mali
+  // G77 now and it's fairly ad-hoc. We need to have a better story for
+  // incorporating such information.
   static const TileWorkgroupSizePair tileWorkgroupSizePairs[] = {
       {{2, 2, 32}, {8, 2, 2}},
+      {{1, 4, 16}, {4, 4, 1}},
+      {{1, 1, 64}, {16, 1, 1}},
   };
 
   for (const auto &pair : tileWorkgroupSizePairs) {

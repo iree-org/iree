@@ -132,3 +132,30 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
+
+// -----
+
+// CHECK-LABEL: func @vectorize_reshaped_buffer
+func @vectorize_reshaped_buffer() {
+  %cst = constant 0.0 : f32
+  %c0 = constant 0 : index
+  // CHECK: iree.placeholder
+  // CHECK-SAME: memref<4x1xvector<4xf32>>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
+  // CHECK: iree.placeholder
+  // CHECK-SAME: memref<3x3x24xvector<4xf32>>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3x3x96x1xf32>
+  %2 = linalg.reshape %1 [
+         affine_map<(d0, d1, d2, d3) -> (d0)>,
+         affine_map<(d0, d1, d2, d3) -> (d1)>,
+         affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+       ] : memref<3x3x96x1xf32> into memref<3x     3x96xf32>
+  %v = vector.transfer_read %2[%c0, %c0, %c0], %cst {masked = [false]} : memref<3x3x96xf32>, vector<4xf32>
+  vector.transfer_write %v, %0[%c0, %c0] : vector<4xf32>, memref<4x4xf32>
+  return
+}
+
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+}
