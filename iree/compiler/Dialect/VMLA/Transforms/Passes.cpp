@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
@@ -57,6 +58,9 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
 
   // Unroll multi-dimensional reductions to one reduction per dimension.
   passManager.addNestedPass<FuncOp>(createUnrollReductionsPass());
+
+  // Converts mhlo.convolution ops with 1x1 kernels into mhlo.dot ops.
+  passManager.addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
 
   // Tensor-level pattern-based lowerings. Thrown into one pass for simplicity.
   passManager.addNestedPass<FuncOp>(createPreConversionLoweringPass());

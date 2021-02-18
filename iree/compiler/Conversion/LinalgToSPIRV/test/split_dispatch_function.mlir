@@ -1,30 +1,110 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-codegen-split-dispatch-function -verify-diagnostics %s | IreeFileCheck %s
 
 module {
-  //     CHECK: func @kernel_fusable_fill_conv_ops
+  //     CHECK: func @kernel_fusable_fill_conv1d_ops
   //     CHECK:   linalg.fill
   // CHECK-NOT:   return
-  //     CHECK:   linalg.conv
+  //     CHECK:   linalg.conv_1d_input_nwc_filter_wcf
   //     CHECK:   return
 
-  func @kernel_fusable_fill_conv_ops()
+  func @kernel_fusable_fill_conv1d_ops()
   attributes {hal.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dim = hal.interface.load.constant offset = 0 : index
-    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
+    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,3,512]>
+    %shape2 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,1,512]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x512xf32>
+    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x3x512xf32>, !shapex.ranked_shape<[?,3,512]>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x512x1xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x512xf32>
+    %ts2 = shapex.tie_shape %2, %shape2 : memref<?x1x512xf32>, !shapex.ranked_shape<[?,1,512]>
+    linalg.fill(%ts2, %cst) : memref<?x1x512xf32>, f32
+    linalg.conv_1d_input_nwc_filter_wcf {
+      dilations = dense<1> : tensor<1xi64>,
+      strides = dense<2> : tensor<1xi64>}
+       ins(%ts1, %1 : memref<?x3x512xf32>, memref<3x512x1xf32>)
+      outs(%ts2 : memref<?x1x512xf32>)
+    return
+  }
+  func private @kernel_fusable_fill_conv_ops_num_workgroups__
+    (!shapex.ranked_shape<[?,3,512]>, !shapex.ranked_shape<[3,512,1]>,
+     !shapex.ranked_shape<[?,1,512]>) -> (index, index, index)
+  hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// -----
+
+module {
+  //     CHECK: func @kernel_fusable_fill_conv2d_ops
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
+  //     CHECK:   return
+
+  func @kernel_fusable_fill_conv2d_ops()
+  attributes {hal.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
+    %cst = constant 0.000000e+00 : f32
+    %dim = hal.interface.load.constant offset = 0 : index
+    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,3,3,512]>
     %shape2 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,1,1,512]>
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
-    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x2x2x512xf32>, !shapex.ranked_shape<[?,2,2,512]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x512xf32>
+    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x3x3x512xf32>, !shapex.ranked_shape<[?,3,3,512]>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
     %ts2 = shapex.tie_shape %2, %shape2 : memref<?x1x1x512xf32>, !shapex.ranked_shape<[?,1,1,512]>
     linalg.fill(%ts2, %cst) : memref<?x1x1x512xf32>, f32
-    linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
+    linalg.conv_2d_input_nhwc_filter_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      strides = dense<2> : tensor<2xi64>}
+       ins(%ts1, %1 : memref<?x3x3x512xf32>, memref<3x3x512x1xf32>)
+      outs(%ts2 : memref<?x1x1x512xf32>)
     return
   }
   func private @kernel_fusable_fill_conv_ops_num_workgroups__
-    (!shapex.ranked_shape<[?,2,2,512]>, !shapex.ranked_shape<[3,3,512,1]>,
+    (!shapex.ranked_shape<[?,3,3,512]>, !shapex.ranked_shape<[3,3,512,1]>,
      !shapex.ranked_shape<[?,1,1,512]>) -> (index, index, index)
+  hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// -----
+
+module {
+  //     CHECK: func @kernel_fusable_fill_conv3d_ops
+  //     CHECK:   linalg.fill
+  // CHECK-NOT:   return
+  //     CHECK:   linalg.conv_3d_input_ndhwc_filter_dhwcf
+  //     CHECK:   return
+
+  func @kernel_fusable_fill_conv3d_ops()
+  attributes {hal.num_workgroups_fn = @kernel_fusable_fill_conv_ops_num_workgroups__} {
+    %cst = constant 0.000000e+00 : f32
+    %dim = hal.interface.load.constant offset = 0 : index
+    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,3,3,3,512]>
+    %shape2 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,1,1,1,512]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x3x512xf32>
+    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x3x3x3x512xf32>, !shapex.ranked_shape<[?,3,3,3,512]>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x3x512x1xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x1x512xf32>
+    %ts2 = shapex.tie_shape %2, %shape2 : memref<?x1x1x1x512xf32>, !shapex.ranked_shape<[?,1,1,1,512]>
+    linalg.fill(%ts2, %cst) : memref<?x1x1x1x512xf32>, f32
+    linalg.conv_3d_input_ndhwc_filter_dhwcf {
+      dilations = dense<1> : tensor<3xi64>,
+      strides = dense<2> : tensor<3xi64>}
+       ins(%ts1, %1 : memref<?x3x3x3x512xf32>, memref<3x3x3x512x1xf32>)
+      outs(%ts2 : memref<?x1x1x1x512xf32>)
+    return
+  }
+  func private @kernel_fusable_fill_conv_ops_num_workgroups__
+    (!shapex.ranked_shape<[?,3,3,3,512]>, !shapex.ranked_shape<[3,3,3,512,1]>,
+     !shapex.ranked_shape<[?,1,1,1,512]>) -> (index, index, index)
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -118,29 +198,35 @@ module {
   // CHECK:   %[[DIM:.+]] = hal.interface.load.constant
   // CHECK:   %[[SHAPE1:.+]] = shapex.make_ranked_shape %[[DIM]]
   // CHECK:   %[[SHAPE2:.+]] = shapex.make_ranked_shape %[[DIM]]
-  // CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
+  // CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x512xf32>
   // CHECK:   %[[TS1:.+]] = shapex.tie_shape %[[IN1]], %[[SHAPE1]]
   // CHECK:   %[[IN2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
   // CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
   // CHECK:   %[[TS2:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE2]]
-  // CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
+  // CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
+  // CHECK-SAME: ins(%[[TS1]], %[[IN2]] : memref<?x3x3x512xf32>, memref<3x3x512x1xf32>)
+  // CHECK-SAME: outs(%[[TS2]] : memref<?x1x1x512xf32>)
   // CHECK:   return
 
   func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dim = hal.interface.load.constant offset = 0 : index
-    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
+    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,3,3,512]>
     %shape2 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,1,1,512]>
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
-    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x2x2x512xf32>, !shapex.ranked_shape<[?,2,2,512]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x512xf32>
+    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x3x3x512xf32>, !shapex.ranked_shape<[?,3,3,512]>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
     %ts2 = shapex.tie_shape %2, %shape2 : memref<?x1x1x512xf32>, !shapex.ranked_shape<[?,1,1,512]>
-    linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
+    linalg.conv_2d_input_nhwc_filter_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      strides = dense<2> : tensor<2xi64>}
+       ins(%ts1, %1 : memref<?x3x3x512xf32>, memref<3x3x512x1xf32>)
+      outs(%ts2 : memref<?x1x1x512xf32>)
     linalg.fill(%ts2, %cst) : memref<?x1x1x512xf32>, f32
     return
   }
-  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,3,3,512]>,
                                  !shapex.ranked_shape<[3,3,512,1]>,
                                  !shapex.ranked_shape<[?,1,1,512]>)
                                  -> (index, index, index)
@@ -160,12 +246,14 @@ module {
 //      CHECK:   %[[DIM:.+]] = hal.interface.load.constant
 //      CHECK:   %[[SHAPE1:.+]] = shapex.make_ranked_shape %[[DIM]]
 //      CHECK:   %[[SHAPE2:.+]] = shapex.make_ranked_shape %[[DIM]]
-//      CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
+//      CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x512xf32>
 //      CHECK:   %[[TS1:.+]] = shapex.tie_shape %[[IN1]], %[[SHAPE1]]
 //      CHECK:   %[[IN2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
 //      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
 //      CHECK:   %[[TS2:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE2]]
-//      CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
+//      CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK-SAME:     ins(%[[TS1]], %[[IN2]] : memref<?x3x3x512xf32>, memref<3x3x512x1xf32>)
+// CHECK-SAME:     outs(%[[TS2]] : memref<?x1x1x512xf32>)
 //      CHECK:   return
 
 //      CHECK: func private @[[NUM_WORKGROUPS_FN2]]
@@ -197,10 +285,10 @@ module {
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %dim = hal.interface.load.constant offset = 0 : index
-    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
+    %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,3,3,512]>
     %shape2 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,1,1,512]>
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
-    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x2x2x512xf32>, !shapex.ranked_shape<[?,2,2,512]>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x3x3x512xf32>
+    %ts1 = shapex.tie_shape %0, %shape1 : memref<?x3x3x512xf32>, !shapex.ranked_shape<[?,3,3,512]>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
     %ts2 = shapex.tie_shape %2, %shape2 : memref<?x1x1x512xf32>, !shapex.ranked_shape<[?,1,1,512]>
@@ -208,10 +296,14 @@ module {
     scf.parallel (%iv) = (%c0) to (%c1) step (%c1) {
       scf.yield
     }
-    linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
+    linalg.conv_2d_input_nhwc_filter_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      strides = dense<2> : tensor<2xi64>}
+       ins(%ts1, %1 : memref<?x3x3x512xf32>, memref<3x3x512x1xf32>)
+      outs(%ts2 : memref<?x1x1x512xf32>)
     return
   }
-  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+  func private @kernel__num_workgroups__(!shapex.ranked_shape<[?,3,3,512]>,
                                  !shapex.ranked_shape<[3,3,512,1]>,
                                  !shapex.ranked_shape<[?,1,1,512]>)
                                  -> (index, index, index)
@@ -231,10 +323,14 @@ module {
   // CHECK-LABEL: @kernel()
   func @kernel() attributes {hal.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x2x2x512xf32>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x3x3x512xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x1x1x512xf32>
-    linalg.conv(%1, %0, %2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<1x2x2x512xf32>, memref<1x1x1x512xf32>
+    linalg.conv_2d_input_nhwc_filter_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      strides = dense<2> : tensor<2xi64>}
+       ins(%0, %1 : memref<1x3x3x512xf32>, memref<3x3x512x1xf32>)
+      outs(%2 : memref<1x1x1x512xf32>)
     return
   }
   // CHECK-LABEL: @kernel__num_workgroups__
@@ -256,12 +352,16 @@ module {
   // expected-error @+1 {{cannot separate Linalg/Parallel ops into multiple kernels}}
   func @kernel() {
     %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x2x2x512xf32>
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x3x3x512xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x1x1x512xf32>
     linalg.fill(%2, %cst) : memref<1x1x1x512xf32>, f32
     "some_op"() : () -> ()
-    linalg.conv(%1, %0, %2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<1x2x2x512xf32>, memref<1x1x1x512xf32>
+    linalg.conv_2d_input_nhwc_filter_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      strides = dense<2> : tensor<2xi64>}
+       ins(%0, %1 : memref<1x3x3x512xf32>, memref<3x3x512x1xf32>)
+      outs(%2 : memref<1x1x1x512xf32>)
     return
   }
   hal.interface @legacy_io attributes {sym_visibility = "private"} {

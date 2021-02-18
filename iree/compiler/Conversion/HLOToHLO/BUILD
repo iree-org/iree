@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "HLOToHLO",
     srcs = [
+        "Convert1x1ConvToDot.cpp",
         "DecomposeHLOClamp.cpp",
         "DemoteF32ToF16.cpp",
     ],

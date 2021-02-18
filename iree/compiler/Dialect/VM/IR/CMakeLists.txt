@@ -25,6 +25,7 @@ iree_cc_library(
     "VMOpInterface.h.inc"
     "VMOps.h"
     "VMOps.h.inc"
+    "VMStructs.h.inc"
     "VMTraits.h"
     "VMTypes.h"
   SRCS
@@ -35,6 +36,7 @@ iree_cc_library(
     "VMOpInterface.cpp.inc"
     "VMOps.cpp"
     "VMOps.cpp.inc"
+    "VMStructs.cpp.inc"
     "VMTypes.cpp"
   DEPS
     LLVMSupport
@@ -88,6 +90,18 @@ iree_tablegen_library(
   OUTS
     -gen-op-interface-decls VMOpInterface.h.inc
     -gen-op-interface-defs VMOpInterface.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    VMStructsGen
+  TD_FILE
+    "VMBase.td"
+  OUTS
+    -gen-iree-struct-attr-decls VMStructs.h.inc
+    -gen-iree-struct-attr-defs VMStructs.cpp.inc
+  TBLGEN
+    IREE
 )
 
 iree_tablegen_doc(

@@ -354,9 +354,12 @@ module attributes {
       %26 = dim %arg2, %c3 : memref<?x?x?x?xf32>
       %27 = subview %arg2[%arg3, %arg4, %arg5, 0] [%23, %24, %25, %26] [1, 1, 1, 1]
               : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
-      linalg.conv(%arg0, %21, %27)
-        {__internal_linalg_transform__ = "workgroup", dilations = [1, 1], strides = [1, 1]}
-        : memref<?x?x?x?xf32>, memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32, #map5>
+      linalg.conv_2d_input_nhwc_filter_hwcf {
+        __internal_linalg_transform__ = "workgroup",
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<2> : tensor<2xi64>}
+         ins(%21, %arg0 : memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32>)
+        outs(%27 : memref<?x?x?x?xf32, #map5>)
       scf.yield
     }
     return
@@ -407,7 +410,7 @@ module attributes {
 //       CHECK:             scf.for
 //       CHECK:               scf.for
 //       CHECK:                 scf.for
-//   CHECK-NOT:                   linalg.conv
+//   CHECK-NOT:                   linalg.conv_2d_input_nhwc_filter_hwcf
 
 // -----
 

@@ -48,6 +48,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#define DEBUG_TYPE "iree-hlo-to-linalg-on-buffers"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -56,6 +58,11 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // -----------------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------------------
+
+/// Returns true if the given `attr` is a splat of the given `value`.
+static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
+  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
+}
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
@@ -225,68 +232,11 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// mhlo.dot_general conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts mhlo.dot_general operation to linalg.batchmatmul op
-struct DotGeneralOpConversion
-    : public ConvertToLinalgBufferOp<DotGeneralOpConversion,
-                                     mhlo::DotGeneralOp> {
-  using ConvertToLinalgBufferOp<DotGeneralOpConversion,
-                                mhlo::DotGeneralOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::DotGeneralOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const {
-    auto extract1DVector = [](DenseIntElementsAttr elements) {
-      SmallVector<int64_t, 6> ret;
-      for (const APInt &element : elements) {
-        ret.push_back(element.getLimitedValue());
-      }
-      return ret;
-    };
-    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
-    auto lhsBatchingDims =
-        extract1DVector(dimNumbers.lhs_batching_dimensions());
-    auto rhsBatchingDims =
-        extract1DVector(dimNumbers.rhs_batching_dimensions());
-    auto lhsContractingDims =
-        extract1DVector(dimNumbers.lhs_contracting_dimensions());
-    auto rhsContractingDims =
-        extract1DVector(dimNumbers.rhs_contracting_dimensions());
-    if (lhsBatchingDims.size() != 1 || lhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs batching dimensions exactly {0}");
-    }
-    if (rhsBatchingDims.size() != 1 || rhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs batching dimensions exactly {0}");
-    }
-    if (lhsContractingDims.size() != 1 || lhsContractingDims[0] != 2) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs contracting dimensions exactly {2}");
-    }
-    if (rhsContractingDims.size() != 1 || rhsContractingDims[0] != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs contracting dimensions exactly {1}");
-    }
-    if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-      return rewriter.notifyMatchFailure(op,
-                                         "failed to zero fill result buffer");
-    }
-    rewriter.create<linalg::BatchMatmulOp>(op.getLoc(), inputBuffers,
-                                           resultBuffers);
-    return success();
-  }
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // mhlo.convolution conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.convolution operation to linalg.conv op.
+/// Converts mhlo.convolution operation to linalg.conv or linalg.generic op.
 struct ConvOpConversion
     : public ConvertToLinalgBufferOp<ConvOpConversion, mhlo::ConvOp> {
   using ConvertToLinalgBufferOp<ConvOpConversion,
@@ -295,70 +245,85 @@ struct ConvOpConversion
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
+
+/// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
+struct DepthwiseConvOpConversion
+    : public ConvertToLinalgBufferOp<DepthwiseConvOpConversion, mhlo::ConvOp> {
+  using ConvertToLinalgBufferOp<DepthwiseConvOpConversion,
+                                mhlo::ConvOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const;
+};
 }  // namespace
+
+/// Returns true if the given `dimensionNumbers` from a mhlo.convolution op
+/// follows a canonical form:
+///
+/// * Input dimensions have order: (batch_count, spatial_dims,
+///   input_channel_count).
+/// * Filter dimensions have order: (spatial_dims, input_channel_count,
+///   output_channel_count).
+/// * Output dimensions have order: (batch_count, spatial_dims,
+///   output_channel_count).
+static bool hasCanonicalDimensionNumbers(
+    const mhlo::ConvDimensionNumbers &dimensionNumbers) {
+  const int inputSpatialRank =
+      llvm::size(dimensionNumbers.input_spatial_dimensions());
+  // The dimensions for input should follow the order of
+  // batch_count, spatial_dims..., input_feature_count.
+  if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.input_feature_dimension().getInt() !=
+          (inputSpatialRank + 1)) {
+    return false;
+  }
+
+  const int kernelSpatialRank =
+      llvm::size(dimensionNumbers.kernel_spatial_dimensions());
+  // The dimensions for filter should follow the order of
+  // spatial_dims..., input_feature_count, num_output_feature_count.
+  if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
+          kernelSpatialRank ||
+      dimensionNumbers.kernel_output_feature_dimension().getInt() !=
+          (kernelSpatialRank + 1)) {
+    return false;
+  }
+
+  const int outputSpatialRank =
+      llvm::size(dimensionNumbers.output_spatial_dimensions());
+  // The dimensions for output should follow the order of
+  // batch_count, spatial_dims.., output_feature_count.
+  if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.output_feature_dimension().getInt() !=
+          (outputSpatialRank + 1)) {
+    return false;
+  }
+
+  if (inputSpatialRank != outputSpatialRank ||
+      inputSpatialRank != kernelSpatialRank) {
+    return false;
+  }
+
+  auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
+  auto kernelSpatialDim = dimensionNumbers.kernel_spatial_dimensions().begin();
+  auto outputSpatialDim = dimensionNumbers.output_spatial_dimensions().begin();
+  // Check spatial dims are ordred correctly.
+  for (int i = 0; i < inputSpatialRank; ++i) {
+    const int dim = i + 1;
+    if ((*inputSpatialDim++).getZExtValue() != dim ||
+        (*outputSpatialDim++).getZExtValue() != dim ||
+        (*kernelSpatialDim++).getZExtValue() != i) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 LogicalResult ConvOpConversion::apply(
     mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  if (const auto dimensionNumbers = op.dimension_numbers()) {
-    const int inputSpatialRank =
-        llvm::size(dimensionNumbers.input_spatial_dimensions());
-    // The dimensions for input should follow the order of
-    // batch_count, spatial_dims..., input_feature_count.
-    if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
-        dimensionNumbers.input_feature_dimension().getInt() !=
-            (inputSpatialRank + 1)) {
-      return failure();
-    }
-
-    const int kernelSpatialRank =
-        llvm::size(dimensionNumbers.kernel_spatial_dimensions());
-    // The dimensions for filter should follow the order of
-    // spatial_dims..., input_feature_count, num_output_feature_count.
-    if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
-            kernelSpatialRank ||
-        dimensionNumbers.kernel_output_feature_dimension().getInt() !=
-            (kernelSpatialRank + 1)) {
-      return failure();
-    }
-
-    const int outputSpatialRank =
-        llvm::size(dimensionNumbers.output_spatial_dimensions());
-    // The dimensions for output should follow the order of
-    // batch_count, spatial_dims.., output_feature_count.
-    if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
-        dimensionNumbers.output_feature_dimension().getInt() !=
-            (outputSpatialRank + 1)) {
-      return failure();
-    }
-
-    if (inputSpatialRank != outputSpatialRank ||
-        inputSpatialRank != kernelSpatialRank) {
-      return failure();
-    }
-
-    auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
-    auto kernelSpatialDim =
-        dimensionNumbers.kernel_spatial_dimensions().begin();
-    auto outputSpatialDim =
-        dimensionNumbers.output_spatial_dimensions().begin();
-    // Check spatial dims are ordred correctly.
-    for (int i = 0; i < inputSpatialRank; ++i) {
-      const int dim = i + 1;
-      if ((*inputSpatialDim++).getZExtValue() != dim ||
-          (*outputSpatialDim++).getZExtValue() != dim ||
-          (*kernelSpatialDim++).getZExtValue() != i) {
-        return failure();
-      }
-    }
-  }
-
-  llvm::SmallVector<Attribute, 4> strides;
-  if (auto windowStrides = op.window_strides()) {
-    auto range = windowStrides->getAttributeValues();
-    strides.append(range.begin(), range.end());
-  }
-  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
+  if (!hasCanonicalDimensionNumbers(op.dimension_numbers())) return failure();
 
   // TODO(ataei): Only support dilated convolution for now. We need to consider
   // LHS dilation for deconvolution cases.
@@ -367,7 +332,6 @@ LogicalResult ConvOpConversion::apply(
     auto range = rhsDilation->getAttributeValues();
     dilation.append(range.begin(), range.end());
   }
-  auto dilationArg = ArrayAttr::get(op.getContext(), dilation);
 
   // Set padding only if it is non-zero.
   DenseIntElementsAttr padding = op.paddingAttr();
@@ -389,92 +353,171 @@ LogicalResult ConvOpConversion::apply(
       shape[op.dimension_numbers().kernel_input_feature_dimension().getInt()];
   auto groupSize =
       shape[op.dimension_numbers().kernel_output_feature_dimension().getInt()];
-  // Depthwise conv path...
-  if (op.feature_group_count() > 1u && op.feature_group_count() == numGroups) {
-    // Lowering depthwise convolution to linalg.generic op. The idea is to use
-    // the group convolution formulation to perform the separable depthwise
-    // convolution as the following, given an n-dimensional input x and filter w
-    // the direct convolution operation can be written as:
-    //  y[n, d1, d2, ....dn, ci * groupSize + co] = sum(k1, k2, ....kn,
-    // x[n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn]
-    // * w[k1, k2, ...kn, ci, co])
-
-    // TODO(ataei): Support dilation.
-    if (llvm::any_of(dilation, [](Attribute attr) {
-          return (attr.dyn_cast<IntegerAttr>().getInt() != 1);
-        })) {
-      return failure();
-    }
-
-    SmallVector<AffineExpr, 4> inputExprs;
-    SmallVector<AffineExpr, 4> filterExprs;
-    SmallVector<AffineExpr, 4> outputExprs;
-
-    const auto spatialDims =
-        llvm::size(op.dimension_numbers().input_spatial_dimensions());
-    const int d1Index = 1;
-    const int coIndex = d1Index + spatialDims;
-    const int ciIndex = coIndex + 1;
-    const int k1Index = ciIndex + 1;
-    // n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn
-    inputExprs.push_back(rewriter.getAffineDimExpr(0));
-    for (int i = 0; i < spatialDims; ++i) {
-      if (op.window_stridesAttr()) {
-        auto stride = op.window_stridesAttr().getValue<APInt>(i);
-        inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) *
-                                 stride.getZExtValue() +
-                             rewriter.getAffineDimExpr(k1Index + i));
-      } else {
-        inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) +
-                             rewriter.getAffineDimExpr(k1Index + i));
-      }
-    }
-    inputExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
-
-    // k1, k2, ...kn, ci, co
-    for (int i = 0; i < spatialDims; ++i) {
-      filterExprs.push_back(rewriter.getAffineDimExpr(k1Index + i));
-    }
-    filterExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
-    filterExprs.push_back(rewriter.getAffineDimExpr(coIndex));
-
-    // n, d1, d2, ....dn, ci * groupSize + co
-    outputExprs.push_back(rewriter.getAffineDimExpr(0));
-    for (int i = 0; i < spatialDims; ++i) {
-      outputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i));
-    }
-    outputExprs.push_back(rewriter.getAffineDimExpr(ciIndex) * groupSize +
-                          rewriter.getAffineDimExpr(coIndex));
-
-    // nloops = |d| + |k| + |{n, ci, co}|
-    int nloops = spatialDims * 2 + 3;
-    SmallVector<AffineMap, 4> indexingMaps;
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, inputExprs, rewriter.getContext()));
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, filterExprs, rewriter.getContext()));
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, outputExprs, rewriter.getContext()));
-
-    Location loc = op.getLoc();
-
-    SmallVector<StringRef, 3> loopAttributeTypes(spatialDims + 3, "parallel");
-    loopAttributeTypes.append(spatialDims, "reduction");
-    rewriter.create<linalg::GenericOp>(
-        loc,
-        /*resultTensorTypes=*/ArrayRef<Type>{},
-        /*inputs=*/inputBuffers,
-        /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
-          Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
-          nestedBuilder.create<linalg::YieldOp>(loc, add);
-        });
-  } else {
-    rewriter.create<linalg::ConvOp>(op.getLoc(), inputBuffers[1],
-                                    inputBuffers[0], resultBuffers[0],
-                                    stridesArg, dilationArg, padding);
+  if (op.feature_group_count() <= 1u || op.feature_group_count() != numGroups) {
+    return failure();
   }
+  // Lowering depthwise convolution to linalg.generic op. The idea is to use
+  // the group convolution formulation to perform the separable depthwise
+  // convolution as the following, given an n-dimensional input x and filter w
+  // the direct convolution operation can be written as:
+  //  y[n, d1, d2, ....dn, ci * groupSize + co] = sum(k1, k2, ....kn,
+  // x[n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn]
+  // * w[k1, k2, ...kn, ci, co])
+
+  // TODO(ataei): Support dilation.
+  if (llvm::any_of(dilation, [](Attribute attr) {
+        return (attr.dyn_cast<IntegerAttr>().getInt() != 1);
+      })) {
+    return failure();
+  }
+
+  SmallVector<AffineExpr, 4> inputExprs;
+  SmallVector<AffineExpr, 4> filterExprs;
+  SmallVector<AffineExpr, 4> outputExprs;
+
+  const auto spatialDims =
+      llvm::size(op.dimension_numbers().input_spatial_dimensions());
+  const int d1Index = 1;
+  const int coIndex = d1Index + spatialDims;
+  const int ciIndex = coIndex + 1;
+  const int k1Index = ciIndex + 1;
+  // n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn
+  inputExprs.push_back(rewriter.getAffineDimExpr(0));
+  for (int i = 0; i < spatialDims; ++i) {
+    if (op.window_stridesAttr()) {
+      auto stride = op.window_stridesAttr().getValue<APInt>(i);
+      inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) *
+                               stride.getZExtValue() +
+                           rewriter.getAffineDimExpr(k1Index + i));
+    } else {
+      inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) +
+                           rewriter.getAffineDimExpr(k1Index + i));
+    }
+  }
+  inputExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
+
+  // k1, k2, ...kn, ci, co
+  for (int i = 0; i < spatialDims; ++i) {
+    filterExprs.push_back(rewriter.getAffineDimExpr(k1Index + i));
+  }
+  filterExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
+  filterExprs.push_back(rewriter.getAffineDimExpr(coIndex));
+
+  // n, d1, d2, ....dn, ci * groupSize + co
+  outputExprs.push_back(rewriter.getAffineDimExpr(0));
+  for (int i = 0; i < spatialDims; ++i) {
+    outputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i));
+  }
+  outputExprs.push_back(rewriter.getAffineDimExpr(ciIndex) * groupSize +
+                        rewriter.getAffineDimExpr(coIndex));
+
+  // nloops = |d| + |k| + |{n, ci, co}|
+  int nloops = spatialDims * 2 + 3;
+  SmallVector<AffineMap, 4> indexingMaps;
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           inputExprs, rewriter.getContext()));
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           filterExprs, rewriter.getContext()));
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           outputExprs, rewriter.getContext()));
+
+  Location loc = op.getLoc();
+
+  SmallVector<StringRef, 3> loopAttributeTypes(spatialDims + 3, "parallel");
+  loopAttributeTypes.append(spatialDims, "reduction");
+  rewriter.create<linalg::GenericOp>(
+      loc,
+      /*resultTensorTypes=*/ArrayRef<Type>{},
+      /*inputs=*/inputBuffers,
+      /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
+        Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
+        nestedBuilder.create<linalg::YieldOp>(loc, add);
+      });
+  return success();
+}
+
+LogicalResult DepthwiseConvOpConversion::apply(
+    mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
+    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
+  if (op.batch_group_count() != 1) return failure();
+
+  if (op.padding() && !isSplatValue(*op.padding(), 0)) {
+    return rewriter.notifyMatchFailure(op, "non-zero padding unsupported yet");
+  }
+
+  if ((op.lhs_dilation() && !isSplatValue(*op.lhs_dilation(), 1)) ||
+      (op.rhs_dilation() && !isSplatValue(*op.rhs_dilation(), 1))) {
+    return rewriter.notifyMatchFailure(op, "non-one dialation unsupported yet");
+  }
+
+  if (const mhlo::ConvDimensionNumbers &dimension_numbers =
+          op.dimension_numbers()) {
+    // Make sure that this is 2-D convolution.
+    const int spatialRank =
+        llvm::size(dimension_numbers.input_spatial_dimensions());
+    if (spatialRank != 2) {
+      return rewriter.notifyMatchFailure(op, "only support 2-D cases for now");
+    }
+
+    // Make sure that this is depthwise convolution.
+    int64_t inputFeatureDim =
+        dimension_numbers.input_feature_dimension().getInt();
+    int64_t inputFeatureCount =
+        op.lhs().getType().cast<ShapedType>().getDimSize(inputFeatureDim);
+    if (op.feature_group_count() != inputFeatureCount) {
+      return rewriter.notifyMatchFailure(op, "not depth-wise convolution");
+    }
+
+    // Make sure that this convolution has a canonical form.
+    if (!hasCanonicalDimensionNumbers(dimension_numbers)) {
+      return rewriter.notifyMatchFailure(op, "does not have canonical form");
+    }
+  }
+
+  DenseIntElementsAttr windowStrides;
+  if (op.window_strides()) {
+    windowStrides = op.window_strides().getValue();
+  } else {
+    windowStrides = rewriter.getI64VectorAttr({1, 1});
+  }
+
+  if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
+    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
+  }
+
+  // Create a Linalg reshape op that converts the filter from 4 dimensions
+  // into 3 dimensions (by droping the unit dimension). This is needed because
+  // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
+
+  auto filterDims =
+      llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
+  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
+    return rewriter.notifyMatchFailure(
+        op, "non-one channel multiplier unsupported yet");
+  }
+  filterDims[2] = op.feature_group_count();
+  filterDims.pop_back();
+
+  MemRefType filterShape = MemRefType::get(
+      filterDims, op.getType().getElementType(), ArrayRef<AffineMap>(),
+      resultBuffers[0].getType().cast<MemRefType>().getMemorySpace());
+
+  auto getIndicesVector = [](int start, int end) {
+    return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
+  };
+
+  SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
+      getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
+
+  Value filterBuffer = rewriter.create<linalg::ReshapeOp>(
+      op.getLoc(), filterShape, inputBuffers[1], collapsedDimList);
+
+  rewriter.create<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
+      op.getLoc(), TypeRange(), ValueRange{inputBuffers[0], filterBuffer},
+      resultBuffers, windowStrides);
+
   return success();
 }
 
@@ -783,20 +826,26 @@ struct LinalgOpOnTensorConversion
   }
 };
 
-/// Converts linalg.matmul-ish on tensors to linalg.matmul-ish on buffers.
+/// Converts a linalg named op on tensors to linalg named op on buffers.
 template <typename LinalgOpTy>
-struct MatmulOnTensorConversion
-    : public ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+struct NamedOpConversion
+    : public ConvertToLinalgBufferOp<NamedOpConversion<LinalgOpTy>,
                                      LinalgOpTy> {
-  using ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+  using ConvertToLinalgBufferOp<NamedOpConversion<LinalgOpTy>,
                                 LinalgOpTy>::ConvertToLinalgBufferOp;
   LogicalResult apply(LinalgOpTy op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
-    // The last one is a init tensor.
-    rewriter.create<LinalgOpTy>(
-        op.getLoc(), inputBuffers.drop_back(op.getNumResults()), resultBuffers);
+    auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+    SmallVector<Value, 8> newOperands;
+    newOperands.append(inputBuffers.begin(),
+                       inputBuffers.end() - op.getNumResults());
+    newOperands.append(resultBuffers.begin(), resultBuffers.end());
+    auto otherOperands = linalgOp.getAssumedNonShapedOperands();
+    newOperands.append(otherOperands.begin(), otherOperands.end());
+    Location loc = op.getLoc();
+    linalgOp.clone(rewriter, loc, /*resultTypes=*/TypeRange{}, newOperands);
     return success();
   }
 };
@@ -1189,15 +1238,23 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns.insert<ConvOpConversion, ConcatenateOpConversion,
-                  FillOpOnTensorConversion, InitTensorOpConversion,
+  patterns.insert<ConvOpConversion, DepthwiseConvOpConversion,
+                  ConcatenateOpConversion, FillOpOnTensorConversion,
+                  InitTensorOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-                  MatmulOnTensorConversion<linalg::MatmulOp>,
-                  MatmulOnTensorConversion<linalg::BatchMatmulOp>,
+                  NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
+                  NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
+                  NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
+                  NamedOpConversion<linalg::MatmulOp>,
+                  NamedOpConversion<linalg::BatchMatmulOp>,
                   PadTensorOpConversion, ReduceWindowOpConversion,
                   SubTensorOpConversion, TensorReshapeOpConversion>(
       context, resultTensorToBufferMap);
+
+  // Prefer lowering to named Linalg dpethwise convolution when possible.
+  patterns.insert<DepthwiseConvOpConversion>(context, resultTensorToBufferMap,
+                                             /*benefit=*/2);
 }
 
 void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {

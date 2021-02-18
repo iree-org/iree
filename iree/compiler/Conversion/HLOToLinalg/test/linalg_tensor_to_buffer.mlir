@@ -569,3 +569,34 @@ module {
 //  CHECK-SAME:     ) outs(%[[RET0]]
 //  CHECK-SAME:     )
 //       CHECK:   return
+
+// -----
+
+module {
+  func @dot_general() {
+    %c0 = constant 0 : index
+    %cst = constant 0.000000e+00 : f32
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2x3xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x3x4xf32>
+    %2 = linalg.init_tensor [2, 2, 4] : tensor<2x2x4xf32>
+    %3 = linalg.fill(%2, %cst) : tensor<2x2x4xf32>, f32 -> tensor<2x2x4xf32>
+    %4 = linalg.batch_matmul ins(%0, %1 : tensor<2x2x3xf32>, tensor<2x3x4xf32>)
+                            outs(%3 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+    hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<2x2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
+}
+// CHECK-LABEL: func @dot_general
+//   CHECK-DAG:   %[[RET:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x2x4xf32>
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2x3xf32>
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x3x4xf32>
+//   CHECK-DAG:   %[[ZERO:.+]] = constant 0.000000e+00 : f32
+//       CHECK:   linalg.fill(%[[RET]], %[[ZERO]]) : memref<2x2x4xf32>, f32
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] : memref<2x2x3xf32>, memref<2x3x4xf32>)
+//  CHECK-SAME:    outs(%[[RET]] : memref<2x2x4xf32>)

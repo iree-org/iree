@@ -771,22 +771,25 @@ void ConvertToGPUPass::runOnOperation() {
 
   OwningRewritePatternList patterns;
 
-  patterns.insert<MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
-                  MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
-                  MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
-                  MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::FillOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::GenericOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::IndexedGenericOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
-                  MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
-                  RemoveLinalgRange, SerializeParallelLoopPattern>(
-      context, options.useLinalgOnTensors);
+  patterns.insert<
+      MapLinalgOpToGlobalInvocationId<linalg::CopyOp>,
+      MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
+      MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
+      MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
+      MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
+      MapLinalgOpToLocalInvocationId<linalg::ConvInputNWCFilterWCFOp>,
+      MapLinalgOpToLocalInvocationId<linalg::ConvInputNHWCFilterHWCFOp>,
+      MapLinalgOpToLocalInvocationId<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
+      MapLinalgOpToLocalInvocationId<linalg::FillOp>,
+      MapLinalgOpToLocalInvocationId<linalg::GenericOp>,
+      MapLinalgOpToLocalInvocationId<linalg::IndexedGenericOp>,
+      MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
+      MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
+      MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>, RemoveLinalgRange,
+      SerializeParallelLoopPattern>(context, options.useLinalgOnTensors);
   FrozenRewritePatternList frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getOps<FuncOp>()) {
