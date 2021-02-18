@@ -30,6 +30,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -78,6 +79,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
+    mlir::registerLLVMDialectTranslation(*moduleOp->getContext());
+
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps =

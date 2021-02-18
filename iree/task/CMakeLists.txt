@@ -47,6 +47,7 @@ iree_cc_library(
     cpuinfo
     iree::base::api
     iree::base::core_headers
+    iree::base::internal
     iree::base::internal::atomic_slist
     iree::base::internal::prng
     iree::base::internal::wait_handle
@@ -153,4 +154,6 @@ iree_cc_test(
     iree::base::api
     iree::testing::gtest
     iree::testing::gtest_main
+  LABELS
+    "noasan"
 )

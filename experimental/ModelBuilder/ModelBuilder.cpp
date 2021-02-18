@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Target/LLVMIR.h"
 
 using namespace mlir;
 using namespace mlir::edsc;
@@ -59,6 +60,7 @@ mlir::ModelBuilder::ModelBuilder()
   ctx.getOrLoadDialect<spirv::SPIRVDialect>();
   ctx.getOrLoadDialect<StandardOpsDialect>();
   ctx.getOrLoadDialect<vector::VectorDialect>();
+  registerLLVMDialectTranslation(ctx);
 }
 
 Value mlir::ModelBuilder::constant_f32(float v) {

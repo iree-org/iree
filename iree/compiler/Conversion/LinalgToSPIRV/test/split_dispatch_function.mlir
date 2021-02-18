@@ -427,7 +427,7 @@ module {
       ins(%2 : memref<2x4xf32>)
      outs(%0 : memref<2x4xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
-      %4 = tanh %arg0 : f32
+      %4 = math.tanh %arg0 : f32
       linalg.yield %4 : f32
     }
     %3 = linalg.reshape %0 [#map1, #map2] : memref<2x4xf32> into memref<1x2x4xf32>

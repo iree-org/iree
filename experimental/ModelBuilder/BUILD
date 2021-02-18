@@ -34,6 +34,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:VectorOps",
     ],
 )

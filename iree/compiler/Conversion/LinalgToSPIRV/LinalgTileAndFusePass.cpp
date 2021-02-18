@@ -368,6 +368,8 @@ static void applyVectorTransformation(FuncOp funcOp) {
         canonicalizationPatterns1, funcOp.getContext());
     vector::populateVectorToVectorTransformationPatterns(
         canonicalizationPatterns1, funcOp.getContext());
+    vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1,
+                                                funcOp.getContext());
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns1));
 

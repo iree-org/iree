@@ -663,6 +663,14 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
 }
 
 template <>
+Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::FMAOp>(
+    vector::FMAOp op) {
+  SmallVector<int64_t, 4> size(op.getType().getRank(), 1);
+  size.back() = 4;
+  return size;
+}
+
+template <>
 Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     vector::TransferReadOp op) {
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
@@ -707,6 +715,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
   }
 
   DISPATCH(vector::ContractionOp)
+  DISPATCH(vector::FMAOp)
   DISPATCH(vector::TransferReadOp)
   DISPATCH(vector::TransferWriteOp)
 

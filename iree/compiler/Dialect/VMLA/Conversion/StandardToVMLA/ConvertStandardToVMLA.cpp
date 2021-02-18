@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -213,15 +214,15 @@ void populateStandardToVMLAPatterns(MLIRContext *context,
       typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::RemFOp, IREE::VMLA::RemOp>>(
       typeConverter, context);
-  patterns.insert<VMLAOpConversion<mlir::LogOp, IREE::VMLA::LogOp>>(
+  patterns.insert<VMLAOpConversion<mlir::math::LogOp, IREE::VMLA::LogOp>>(
       typeConverter, context);
-  patterns.insert<VMLAOpConversion<mlir::ExpOp, IREE::VMLA::ExpOp>>(
+  patterns.insert<VMLAOpConversion<mlir::math::ExpOp, IREE::VMLA::ExpOp>>(
       typeConverter, context);
-  patterns.insert<VMLAOpConversion<mlir::SqrtOp, IREE::VMLA::SqrtOp>>(
+  patterns.insert<VMLAOpConversion<mlir::math::SqrtOp, IREE::VMLA::SqrtOp>>(
       typeConverter, context);
-  patterns.insert<VMLAOpConversion<mlir::CosOp, IREE::VMLA::CosOp>>(
+  patterns.insert<VMLAOpConversion<mlir::math::CosOp, IREE::VMLA::CosOp>>(
       typeConverter, context);
-  patterns.insert<VMLAOpConversion<mlir::TanhOp, IREE::VMLA::TanhOp>>(
+  patterns.insert<VMLAOpConversion<mlir::math::TanhOp, IREE::VMLA::TanhOp>>(
       typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::NegFOp, IREE::VMLA::NegOp>>(
       typeConverter, context);
