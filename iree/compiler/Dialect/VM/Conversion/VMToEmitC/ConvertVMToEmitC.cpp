@@ -160,12 +160,32 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::OrI64Op>>(context, "vm_or_i64");
   patterns.insert<CallOpConversion<IREE::VM::XorI64Op>>(context, "vm_xor_i64");
 
+  // ExtI64: Casting and type conversion/emulation ops
+  patterns.insert<CallOpConversion<IREE::VM::TruncI64I32Op>>(context,
+                                                             "vm_trunc_i64i32");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI32I64SOp>>(context,
+                                                            "vm_ext_i32i64s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI32I64UOp>>(context,
+                                                            "vm_ext_i32i64u");
+
   // ExtI64: Native bitwise shift and rotate ops
   patterns.insert<CallOpConversion<IREE::VM::ShlI64Op>>(context, "vm_shl_i64");
   patterns.insert<CallOpConversion<IREE::VM::ShrI64SOp>>(context,
                                                          "vm_shr_i64s");
   patterns.insert<CallOpConversion<IREE::VM::ShrI64UOp>>(context,
                                                          "vm_shr_i64u");
+
+  // ExtI64: Comparison ops
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQI64Op>>(context,
+                                                          "vm_cmp_eq_i64");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEI64Op>>(context,
+                                                          "vm_cmp_ne_i64");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI64SOp>>(context,
+                                                           "vm_cmp_lt_i64s");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI64UOp>>(context,
+                                                           "vm_cmp_lt_i64u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNZI64Op>>(context,
+                                                          "vm_cmp_nz_i64");
 }
 
 namespace IREE {
@@ -254,10 +274,22 @@ class ConvertVMToEmitCPass
     target.addIllegalOp<IREE::VM::OrI64Op>();
     target.addIllegalOp<IREE::VM::XorI64Op>();
 
+    // ExtI64: Casting and type conversion/emulation ops
+    target.addIllegalOp<IREE::VM::TruncI64I32Op>();
+    target.addIllegalOp<IREE::VM::ExtI32I64SOp>();
+    target.addIllegalOp<IREE::VM::ExtI32I64UOp>();
+
     // ExtI64: Native bitwise shift and rotate ops
     target.addIllegalOp<IREE::VM::ShlI64Op>();
     target.addIllegalOp<IREE::VM::ShrI64SOp>();
     target.addIllegalOp<IREE::VM::ShrI64UOp>();
+
+    // ExtI64: Comparison ops
+    target.addIllegalOp<IREE::VM::CmpEQI64Op>();
+    target.addIllegalOp<IREE::VM::CmpNEI64Op>();
+    target.addIllegalOp<IREE::VM::CmpLTI64SOp>();
+    target.addIllegalOp<IREE::VM::CmpLTI64UOp>();
+    target.addIllegalOp<IREE::VM::CmpNZI64Op>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {

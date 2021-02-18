@@ -23,6 +23,7 @@
 #include "iree/vm/test/emitc/assignment_ops.vmfb"
 #include "iree/vm/test/emitc/assignment_ops_i64.vmfb"
 #include "iree/vm/test/emitc/conversion_ops.vmfb"
+#include "iree/vm/test/emitc/conversion_ops_i64.vmfb"
 #include "iree/vm/test/emitc/shift_ops.vmfb"
 #include "iree/vm/test/emitc/shift_ops_i64.vmfb"
 
@@ -56,6 +57,7 @@ std::vector<TestParams> GetModuleTestParams() {
       {assignment_ops_descriptor_, assignment_ops_create},
       {assignment_ops_i64_descriptor_, assignment_ops_i64_create},
       {conversion_ops_descriptor_, conversion_ops_create},
+      {conversion_ops_i64_descriptor_, conversion_ops_i64_create},
       {shift_ops_descriptor_, shift_ops_create},
       {shift_ops_i64_descriptor_, shift_ops_i64_create}};
 
