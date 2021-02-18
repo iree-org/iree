@@ -325,13 +325,6 @@ LogicalResult ConvOpConversion::apply(
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   if (!hasCanonicalDimensionNumbers(op.dimension_numbers())) return failure();
 
-  llvm::SmallVector<Attribute, 4> strides;
-  if (auto windowStrides = op.window_strides()) {
-    auto range = windowStrides->getAttributeValues();
-    strides.append(range.begin(), range.end());
-  }
-  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
-
   // TODO(ataei): Only support dilated convolution for now. We need to consider
   // LHS dilation for deconvolution cases.
   llvm::SmallVector<Attribute, 4> dilation;
@@ -339,7 +332,6 @@ LogicalResult ConvOpConversion::apply(
     auto range = rhsDilation->getAttributeValues();
     dilation.append(range.begin(), range.end());
   }
-  auto dilationArg = ArrayAttr::get(op.getContext(), dilation);
 
   // Set padding only if it is non-zero.
   DenseIntElementsAttr padding = op.paddingAttr();
@@ -361,92 +353,88 @@ LogicalResult ConvOpConversion::apply(
       shape[op.dimension_numbers().kernel_input_feature_dimension().getInt()];
   auto groupSize =
       shape[op.dimension_numbers().kernel_output_feature_dimension().getInt()];
-  // Depthwise conv path...
-  if (op.feature_group_count() > 1u && op.feature_group_count() == numGroups) {
-    // Lowering depthwise convolution to linalg.generic op. The idea is to use
-    // the group convolution formulation to perform the separable depthwise
-    // convolution as the following, given an n-dimensional input x and filter w
-    // the direct convolution operation can be written as:
-    //  y[n, d1, d2, ....dn, ci * groupSize + co] = sum(k1, k2, ....kn,
-    // x[n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn]
-    // * w[k1, k2, ...kn, ci, co])
-
-    // TODO(ataei): Support dilation.
-    if (llvm::any_of(dilation, [](Attribute attr) {
-          return (attr.dyn_cast<IntegerAttr>().getInt() != 1);
-        })) {
-      return failure();
-    }
-
-    SmallVector<AffineExpr, 4> inputExprs;
-    SmallVector<AffineExpr, 4> filterExprs;
-    SmallVector<AffineExpr, 4> outputExprs;
-
-    const auto spatialDims =
-        llvm::size(op.dimension_numbers().input_spatial_dimensions());
-    const int d1Index = 1;
-    const int coIndex = d1Index + spatialDims;
-    const int ciIndex = coIndex + 1;
-    const int k1Index = ciIndex + 1;
-    // n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn
-    inputExprs.push_back(rewriter.getAffineDimExpr(0));
-    for (int i = 0; i < spatialDims; ++i) {
-      if (op.window_stridesAttr()) {
-        auto stride = op.window_stridesAttr().getValue<APInt>(i);
-        inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) *
-                                 stride.getZExtValue() +
-                             rewriter.getAffineDimExpr(k1Index + i));
-      } else {
-        inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) +
-                             rewriter.getAffineDimExpr(k1Index + i));
-      }
-    }
-    inputExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
-
-    // k1, k2, ...kn, ci, co
-    for (int i = 0; i < spatialDims; ++i) {
-      filterExprs.push_back(rewriter.getAffineDimExpr(k1Index + i));
-    }
-    filterExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
-    filterExprs.push_back(rewriter.getAffineDimExpr(coIndex));
-
-    // n, d1, d2, ....dn, ci * groupSize + co
-    outputExprs.push_back(rewriter.getAffineDimExpr(0));
-    for (int i = 0; i < spatialDims; ++i) {
-      outputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i));
-    }
-    outputExprs.push_back(rewriter.getAffineDimExpr(ciIndex) * groupSize +
-                          rewriter.getAffineDimExpr(coIndex));
-
-    // nloops = |d| + |k| + |{n, ci, co}|
-    int nloops = spatialDims * 2 + 3;
-    SmallVector<AffineMap, 4> indexingMaps;
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, inputExprs, rewriter.getContext()));
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, filterExprs, rewriter.getContext()));
-    indexingMaps.emplace_back(AffineMap::get(
-        nloops, /*symbolCount=*/0, outputExprs, rewriter.getContext()));
-
-    Location loc = op.getLoc();
-
-    SmallVector<StringRef, 3> loopAttributeTypes(spatialDims + 3, "parallel");
-    loopAttributeTypes.append(spatialDims, "reduction");
-    rewriter.create<linalg::GenericOp>(
-        loc,
-        /*resultTensorTypes=*/ArrayRef<Type>{},
-        /*inputs=*/inputBuffers,
-        /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
-          Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
-          nestedBuilder.create<linalg::YieldOp>(loc, add);
-        });
-  } else {
-    rewriter.create<linalg::ConvOp>(op.getLoc(), inputBuffers[1],
-                                    inputBuffers[0], resultBuffers[0],
-                                    stridesArg, dilationArg, padding);
+  if (op.feature_group_count() <= 1u || op.feature_group_count() != numGroups) {
+    return failure();
   }
+  // Lowering depthwise convolution to linalg.generic op. The idea is to use
+  // the group convolution formulation to perform the separable depthwise
+  // convolution as the following, given an n-dimensional input x and filter w
+  // the direct convolution operation can be written as:
+  //  y[n, d1, d2, ....dn, ci * groupSize + co] = sum(k1, k2, ....kn,
+  // x[n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn]
+  // * w[k1, k2, ...kn, ci, co])
+
+  // TODO(ataei): Support dilation.
+  if (llvm::any_of(dilation, [](Attribute attr) {
+        return (attr.dyn_cast<IntegerAttr>().getInt() != 1);
+      })) {
+    return failure();
+  }
+
+  SmallVector<AffineExpr, 4> inputExprs;
+  SmallVector<AffineExpr, 4> filterExprs;
+  SmallVector<AffineExpr, 4> outputExprs;
+
+  const auto spatialDims =
+      llvm::size(op.dimension_numbers().input_spatial_dimensions());
+  const int d1Index = 1;
+  const int coIndex = d1Index + spatialDims;
+  const int ciIndex = coIndex + 1;
+  const int k1Index = ciIndex + 1;
+  // n, d1 * stride1 + k1, d1 * stride2 + k2, ...dn * striden + kn
+  inputExprs.push_back(rewriter.getAffineDimExpr(0));
+  for (int i = 0; i < spatialDims; ++i) {
+    if (op.window_stridesAttr()) {
+      auto stride = op.window_stridesAttr().getValue<APInt>(i);
+      inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) *
+                               stride.getZExtValue() +
+                           rewriter.getAffineDimExpr(k1Index + i));
+    } else {
+      inputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i) +
+                           rewriter.getAffineDimExpr(k1Index + i));
+    }
+  }
+  inputExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
+
+  // k1, k2, ...kn, ci, co
+  for (int i = 0; i < spatialDims; ++i) {
+    filterExprs.push_back(rewriter.getAffineDimExpr(k1Index + i));
+  }
+  filterExprs.push_back(rewriter.getAffineDimExpr(ciIndex));
+  filterExprs.push_back(rewriter.getAffineDimExpr(coIndex));
+
+  // n, d1, d2, ....dn, ci * groupSize + co
+  outputExprs.push_back(rewriter.getAffineDimExpr(0));
+  for (int i = 0; i < spatialDims; ++i) {
+    outputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i));
+  }
+  outputExprs.push_back(rewriter.getAffineDimExpr(ciIndex) * groupSize +
+                        rewriter.getAffineDimExpr(coIndex));
+
+  // nloops = |d| + |k| + |{n, ci, co}|
+  int nloops = spatialDims * 2 + 3;
+  SmallVector<AffineMap, 4> indexingMaps;
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           inputExprs, rewriter.getContext()));
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           filterExprs, rewriter.getContext()));
+  indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0,
+                                           outputExprs, rewriter.getContext()));
+
+  Location loc = op.getLoc();
+
+  SmallVector<StringRef, 3> loopAttributeTypes(spatialDims + 3, "parallel");
+  loopAttributeTypes.append(spatialDims, "reduction");
+  rewriter.create<linalg::GenericOp>(
+      loc,
+      /*resultTensorTypes=*/ArrayRef<Type>{},
+      /*inputs=*/inputBuffers,
+      /*outputs=*/resultBuffers, indexingMaps, loopAttributeTypes,
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
+        Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
+        nestedBuilder.create<linalg::YieldOp>(loc, add);
+      });
   return success();
 }
 
@@ -838,20 +826,26 @@ struct LinalgOpOnTensorConversion
   }
 };
 
-/// Converts linalg.matmul-ish on tensors to linalg.matmul-ish on buffers.
+/// Converts a linalg named op on tensors to linalg named op on buffers.
 template <typename LinalgOpTy>
-struct MatmulOnTensorConversion
-    : public ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+struct NamedOpConversion
+    : public ConvertToLinalgBufferOp<NamedOpConversion<LinalgOpTy>,
                                      LinalgOpTy> {
-  using ConvertToLinalgBufferOp<MatmulOnTensorConversion<LinalgOpTy>,
+  using ConvertToLinalgBufferOp<NamedOpConversion<LinalgOpTy>,
                                 LinalgOpTy>::ConvertToLinalgBufferOp;
   LogicalResult apply(LinalgOpTy op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (!op.hasTensorSemantics()) return failure();
-    // The last one is a init tensor.
-    rewriter.create<LinalgOpTy>(
-        op.getLoc(), inputBuffers.drop_back(op.getNumResults()), resultBuffers);
+    auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+    SmallVector<Value, 8> newOperands;
+    newOperands.append(inputBuffers.begin(),
+                       inputBuffers.end() - op.getNumResults());
+    newOperands.append(resultBuffers.begin(), resultBuffers.end());
+    auto otherOperands = linalgOp.getAssumedNonShapedOperands();
+    newOperands.append(otherOperands.begin(), otherOperands.end());
+    Location loc = op.getLoc();
+    linalgOp.clone(rewriter, loc, /*resultTypes=*/TypeRange{}, newOperands);
     return success();
   }
 };
@@ -1244,12 +1238,16 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns.insert<ConvOpConversion, ConcatenateOpConversion,
-                  FillOpOnTensorConversion, InitTensorOpConversion,
+  patterns.insert<ConvOpConversion, DepthwiseConvOpConversion,
+                  ConcatenateOpConversion, FillOpOnTensorConversion,
+                  InitTensorOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>,
                   LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-                  MatmulOnTensorConversion<linalg::MatmulOp>,
-                  MatmulOnTensorConversion<linalg::BatchMatmulOp>,
+                  NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
+                  NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
+                  NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
+                  NamedOpConversion<linalg::MatmulOp>,
+                  NamedOpConversion<linalg::BatchMatmulOp>,
                   PadTensorOpConversion, ReduceWindowOpConversion,
                   SubTensorOpConversion, TensorReshapeOpConversion>(
       context, resultTensorToBufferMap);

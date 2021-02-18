@@ -251,6 +251,156 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
 };
 }  // namespace
 
+//===----------------------------------------------------------------------===//
+// mhlo.conv conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+static bool isDepthwiseConv(mhlo::ConvOp op) {
+  auto shape = op.rhs().getType().cast<ShapedType>().getShape();
+  auto numGroups =
+      shape[op.dimension_numbers().kernel_input_feature_dimension().getInt()];
+  return op.feature_group_count() > 1u && op.feature_group_count() == numGroups;
+}
+
+/// Returns true if the given `dimensionNumbers` from a mhlo.convolution op
+/// follows a canonical form:
+///
+/// * Input dimensions have order: (batch_count, spatial_dims,
+///   input_channel_count).
+/// * Filter dimensions have order: (spatial_dims, input_channel_count,
+///   output_channel_count).
+/// * Output dimensions have order: (batch_count, spatial_dims,
+///   output_channel_count).
+static bool hasCanonicalDimensionNumbers(
+    const mhlo::ConvDimensionNumbers &dimensionNumbers) {
+  const int inputSpatialRank =
+      llvm::size(dimensionNumbers.input_spatial_dimensions());
+  // The dimensions for input should follow the order of
+  // batch_count, spatial_dims..., input_feature_count.
+  if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.input_feature_dimension().getInt() !=
+          (inputSpatialRank + 1)) {
+    return false;
+  }
+
+  const int kernelSpatialRank =
+      llvm::size(dimensionNumbers.kernel_spatial_dimensions());
+  // The dimensions for filter should follow the order of
+  // spatial_dims..., input_feature_count, num_output_feature_count.
+  if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
+          kernelSpatialRank ||
+      dimensionNumbers.kernel_output_feature_dimension().getInt() !=
+          (kernelSpatialRank + 1)) {
+    return false;
+  }
+
+  const int outputSpatialRank =
+      llvm::size(dimensionNumbers.output_spatial_dimensions());
+  // The dimensions for output should follow the order of
+  // batch_count, spatial_dims.., output_feature_count.
+  if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
+      dimensionNumbers.output_feature_dimension().getInt() !=
+          (outputSpatialRank + 1)) {
+    return false;
+  }
+
+  if (inputSpatialRank != outputSpatialRank ||
+      inputSpatialRank != kernelSpatialRank) {
+    return false;
+  }
+
+  auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
+  auto kernelSpatialDim = dimensionNumbers.kernel_spatial_dimensions().begin();
+  auto outputSpatialDim = dimensionNumbers.output_spatial_dimensions().begin();
+  // Check spatial dims are ordred correctly.
+  for (int i = 0; i < inputSpatialRank; ++i) {
+    const int dim = i + 1;
+    if ((*inputSpatialDim++).getZExtValue() != dim ||
+        (*outputSpatialDim++).getZExtValue() != dim ||
+        (*kernelSpatialDim++).getZExtValue() != i) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// Converts mhlo.conv operation to linalg named op. This only covers normal
+/// convolution cases. The op must have canonical dimension numbers. Depthwise
+/// convolution and pointwise convolution are not handled in the conversion.
+struct NormalConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
+  using OpConversionPattern<mhlo::ConvOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ConvOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!hasCanonicalDimensionNumbers(op.dimension_numbers())) return failure();
+    if (isDepthwiseConv(op)) return failure();
+
+    mhlo::ConvOp::Adaptor adaptor(args);
+    Location loc = op.getLoc();
+    Value input = adaptor.lhs();
+    Value filter = adaptor.rhs();
+    auto resultType = op.getResult().getType().cast<ShapedType>();
+    int rank = resultType.getRank();
+
+    // Check if padding is zero.
+    DenseIntElementsAttr padding = op.paddingAttr();
+    if (padding &&
+        (!padding.isSplat() || padding.getSplatValue<int64_t>() != 0)) {
+      return rewriter.notifyMatchFailure(op, "expected no padding");
+    }
+
+    // The output shape is N spatial_dims F.
+    SmallVector<Value, 8> dynSizes;
+    for (int i = 0, e = rank - 1; i < e; ++i) {
+      if (!resultType.isDynamicDim(i)) continue;
+      dynSizes.push_back(rewriter.create<DimOp>(loc, input, i));
+    }
+    if (resultType.isDynamicDim(rank - 1)) {
+      dynSizes.push_back(rewriter.create<DimOp>(loc, filter, rank - 1));
+    }
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, dynSizes, resultType.getShape(), resultType.getElementType());
+    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
+    Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    Value zeroTensor =
+        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+    linalg::LinalgOp res;
+    Attribute strides = op.window_stridesAttr();
+    // TODO(ataei): Only support dilated kernel right now. We need to consider
+    // input dilation for deconvolution cases.
+    Attribute dilations = op.rhs_dilationAttr();
+    switch (rank) {
+      case 3: {
+        res = rewriter.create<linalg::ConvInputNWCFilterWCFOp>(
+            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+            dilations, strides);
+        break;
+      }
+      case 4: {
+        res = rewriter.create<linalg::ConvInputNHWCFilterHWCFOp>(
+            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+            dilations, strides);
+        break;
+      }
+      case 5: {
+        res = rewriter.create<linalg::ConvInputNDHWCFilterDHWCFOp>(
+            loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
+            dilations, strides);
+        break;
+      }
+      default:
+        return rewriter.notifyMatchFailure(op, "expected 1/2/3D conv op");
+    }
+    rewriter.replaceOp(op, res.getOperation()->getResults());
+    return success();
+  }
+};
+}  // namespace
+
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -295,7 +445,8 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
-                  ConstOpConversion, PadOpConversion>(context);
+                  ConstOpConversion, PadOpConversion, NormalConvOpConversion>(
+      context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

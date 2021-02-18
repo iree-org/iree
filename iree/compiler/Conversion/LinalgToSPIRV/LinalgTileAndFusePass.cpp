@@ -159,13 +159,14 @@ struct PromoteMatmulSubviewsPattern
 // 2) Maybe there are better alternatives for handling filter like using
 //    different storage classes, since for inference workloads these are model
 //    constants. This is TBD.
+template <typename ConvOpTy>
 struct PromoteConvSubviewsPattern
-    : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
+    : public linalg::LinalgPromotionPattern<ConvOpTy> {
   PromoteConvSubviewsPattern(MLIRContext *context,
                              linalg::LinalgPromotionOptions options,
                              linalg::LinalgTransformationFilter marker,
                              PatternBenefit benefit = 1)
-      : linalg::LinalgPromotionPattern<linalg::ConvOp>(
+      : linalg::LinalgPromotionPattern<ConvOpTy>(
             context,
             options.setOperandsToPromote({1}).setUseFullTileBuffers(
                 {false, false}),
@@ -175,7 +176,11 @@ struct PromoteConvSubviewsPattern
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern>(
+  patterns.insert<
+      PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern<linalg::ConvOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNWCFilterWCFOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -313,6 +318,9 @@ static void populateTilingToInvocationPatterns(
 
   patterns.insert<
       linalg::LinalgTilingPattern<linalg::ConvOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
@@ -431,8 +439,12 @@ static void populateTilingConvFilterPatterns(
                                .setInterchange(loopOrder)
                                .setTileSizeComputationFunction(getTileSizeFn);
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
-      context, convTilingOptions, marker);
+  patterns
+      .insert<linalg::LinalgTilingPattern<linalg::ConvOp>,
+              linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
+              linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+              linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
+          context, convTilingOptions, marker);
 }
 
 //====---------------------------------------------------------------------===//
