@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
+from typing import Sequence
 
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
+from .utils import ParsableConstants
+from .compilation.stages import Stage
 
-# Namespace packages.
-add_subdirectory(pyiree/rt)
+__all__ = [
+    "Lowering",
+    "Lowerings",
+]
 
-if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler2)
-add_subdirectory(pyiree/tools/core)
-add_subdirectory(pyiree/testing)
-endif()
 
-if(${IREE_BUILD_XLA_COMPILER})
-add_subdirectory(pyiree/jax)
-endif()
+# TODO(meadowlark): Add runtime_module in execution testing PR.
+class Lowering:
 
-# Tests.
-add_subdirectory(tests)
+  def __init__(self, stages: Sequence[Stage]):
+    self.stages = stages
+
+  def __str__(self):
+    return f"Lowering({self.stages})"
+
+  def __repr__(self):
+    return str(self)
+
+
+class Lowerings(ParsableConstants):
+  """Lowerings for the core IREE compiler."""
+  REFERENCE = Lowering(tuple())
