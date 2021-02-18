@@ -375,19 +375,19 @@ struct ConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
       case 3: {
         res = rewriter.create<linalg::ConvInputNWCFilterWCFOp>(
             loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations);
+            dilations, strides);
         break;
       }
       case 4: {
         res = rewriter.create<linalg::ConvInputNHWCFilterHWCFOp>(
             loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations);
+            dilations, strides);
         break;
       }
       case 5: {
         res = rewriter.create<linalg::ConvInputNDHWCFilterDHWCFOp>(
             loc, resultType, ValueRange{input, filter}, ValueRange{zeroTensor},
-            strides, dilations);
+            dilations, strides);
         break;
       }
       default:
