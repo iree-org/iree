@@ -232,63 +232,6 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// mhlo.dot_general conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts mhlo.dot_general operation to linalg.batchmatmul op
-struct DotGeneralOpConversion
-    : public ConvertToLinalgBufferOp<DotGeneralOpConversion,
-                                     mhlo::DotGeneralOp> {
-  using ConvertToLinalgBufferOp<DotGeneralOpConversion,
-                                mhlo::DotGeneralOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::DotGeneralOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const {
-    auto extract1DVector = [](DenseIntElementsAttr elements) {
-      SmallVector<int64_t, 6> ret;
-      for (const APInt &element : elements) {
-        ret.push_back(element.getLimitedValue());
-      }
-      return ret;
-    };
-    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
-    auto lhsBatchingDims =
-        extract1DVector(dimNumbers.lhs_batching_dimensions());
-    auto rhsBatchingDims =
-        extract1DVector(dimNumbers.rhs_batching_dimensions());
-    auto lhsContractingDims =
-        extract1DVector(dimNumbers.lhs_contracting_dimensions());
-    auto rhsContractingDims =
-        extract1DVector(dimNumbers.rhs_contracting_dimensions());
-    if (lhsBatchingDims.size() != 1 || lhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs batching dimensions exactly {0}");
-    }
-    if (rhsBatchingDims.size() != 1 || rhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs batching dimensions exactly {0}");
-    }
-    if (lhsContractingDims.size() != 1 || lhsContractingDims[0] != 2) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs contracting dimensions exactly {2}");
-    }
-    if (rhsContractingDims.size() != 1 || rhsContractingDims[0] != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs contracting dimensions exactly {1}");
-    }
-    if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-      return rewriter.notifyMatchFailure(op,
-                                         "failed to zero fill result buffer");
-    }
-    rewriter.create<linalg::BatchMatmulOp>(op.getLoc(), inputBuffers,
-                                           resultBuffers);
-    return success();
-  }
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // mhlo.convolution conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
