@@ -47,11 +47,6 @@ static llvm::cl::opt<bool> orderConvFeatures(
     llvm::cl::desc("Guarantees input/output features ordered for conv kernel"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> conv1x1toDot(
-    "iree-flow-1x1-conv-to-dot",
-    llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
-    llvm::cl::init(true));
-
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;
   return attr.getSplatValue<IntegerAttr>().getInt() == 0;
@@ -438,104 +433,6 @@ class ExtractReduceWindowOpPaddingAttributes
         /*padding=*/nullptr);
     rewriter.inlineRegionBefore(op.body(), newOp.body(), newOp.body().begin());
     rewriter.replaceOp(op, newOp.getResult());
-    return success();
-  }
-};
-
-// Rewrites an n-d (n, d1, d2, d3, ..., ci) * (1, 1, 1, ..., ci, co)
-// as (n * d1 * d2 * d3, ..., ci) . (ci, co)
-class Lower1x1ConvolutionToDotOp : public OpRewritePattern<mhlo::ConvOp> {
- public:
-  using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::ConvOp op,
-                                PatternRewriter &rewriter) const override {
-    // Only 1x1 convolution no groups will match.
-    if (op.feature_group_count() != 1) return failure();
-
-    Value input = op.lhs();
-    Value filter = op.rhs();
-    Value output = op.getResult();
-    auto inputShapeType = input.getType().dyn_cast_or_null<RankedTensorType>();
-    auto filterShapeType =
-        filter.getType().dyn_cast_or_null<RankedTensorType>();
-    auto outputShapeType =
-        output.getType().dyn_cast_or_null<RankedTensorType>();
-
-    if (!inputShapeType || !filterShapeType || !outputShapeType) {
-      return failure();
-    }
-
-    auto inputShape = inputShapeType.getShape();
-    auto filterShape = filterShapeType.getShape();
-
-    auto inputBatchDim =
-        op.dimension_numbers().input_batch_dimension().getInt();
-    auto inputFeatureDim =
-        op.dimension_numbers().input_feature_dimension().getInt();
-    auto kernelInputFeatureDim =
-        op.dimension_numbers().kernel_input_feature_dimension().getInt();
-    auto kernelOutputFeatureDim =
-        op.dimension_numbers().kernel_output_feature_dimension().getInt();
-
-    // Match input (n, d1, d2, ..., ci) format
-    if (inputFeatureDim != (inputShape.size() - 1) || inputBatchDim != 0) {
-      return failure();
-    }
-
-    // Match filter (k1, k2, ..., ci, co) format
-    if (kernelInputFeatureDim != (filterShape.size() - 2) ||
-        kernelOutputFeatureDim != (filterShape.size() - 1)) {
-      return failure();
-    }
-
-    // Check 1x1x... kernel spatial size.
-    for (auto dim : op.dimension_numbers().kernel_spatial_dimensions()) {
-      if (filterShape[dim.getZExtValue()] != 1) return failure();
-    }
-
-    // Check dilation & strides are ones.
-    if (op.window_strides()) {
-      for (auto stride : op.window_strides()->getValues<int64_t>()) {
-        if (stride != 1) return failure();
-      }
-    }
-    if (op.rhs_dilation()) {
-      for (auto dilation : op.rhs_dilation()->getValues<int64_t>()) {
-        if (dilation != 1) return failure();
-      }
-    }
-
-    int64_t spatialSize = inputShape[0];
-    for (auto dim : op.dimension_numbers().input_spatial_dimensions()) {
-      spatialSize *= inputShape[dim.getZExtValue()];
-    }
-
-    Type reshapedInputType =
-        RankedTensorType::get({spatialSize, inputShape[inputFeatureDim]},
-                              inputShapeType.getElementType());
-    Type reshapedFilterTYpe =
-        RankedTensorType::get({filterShape[kernelInputFeatureDim],
-                               filterShape[kernelOutputFeatureDim]},
-                              filterShapeType.getElementType());
-    Type dotResultType = RankedTensorType::get(
-        {spatialSize, filterShape[kernelOutputFeatureDim]},
-        outputShapeType.getElementType());
-
-    Value reshapedInput =
-        rewriter.create<mhlo::ReshapeOp>(op.getLoc(), reshapedInputType, input);
-    Value reshapedFilter = rewriter.create<mhlo::ReshapeOp>(
-        op.getLoc(), reshapedFilterTYpe, filter);
-
-    Value dotResult = rewriter.create<mhlo::DotOp>(
-        op.getLoc(), dotResultType, reshapedInput, reshapedFilter,
-        rewriter.getStrArrayAttr({"HIGHEST", "HIGHEST"}));
-
-    Value reshapedResult = rewriter.create<mhlo::ReshapeOp>(
-        op.getLoc(), outputShapeType, dotResult);
-
-    rewriter.replaceOp(op, reshapedResult);
-
     return success();
   }
 };
@@ -976,9 +873,6 @@ struct HLOToHLOPreprocessing
       patterns.insert<ReorderConvOpInputDimensions>(context);
       patterns.insert<ReorderConvOpKernelDimensions>(context);
       patterns.insert<ReorderConvOpOutputDimensions>(context);
-    }
-    if (conv1x1toDot) {
-      patterns.insert<Lower1x1ConvolutionToDotOp>(context);
     }
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

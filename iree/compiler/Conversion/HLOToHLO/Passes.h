@@ -30,6 +30,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Creates a pass to convert mhlo.convolution ops with 1x1 kernels into
+/// mhlo.dot ops.
+std::unique_ptr<OperationPass<FuncOp>> createConvert1x1ConvToDotPass();
+
 /// Creates a pass to decompose XLA-HLO clamp ops into primitive ops.
 std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
 

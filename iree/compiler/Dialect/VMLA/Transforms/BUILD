@@ -30,6 +30,7 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
