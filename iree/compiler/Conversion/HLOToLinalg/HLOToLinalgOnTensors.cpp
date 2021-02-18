@@ -344,7 +344,7 @@ struct ConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
     auto resultType = op.getResult().getType().cast<ShapedType>();
     int rank = resultType.getRank();
 
-    // Set padding only if it is non-zero.
+    // Check if padding is zero.
     DenseIntElementsAttr padding = op.paddingAttr();
     if (padding &&
         (!padding.isSplat() || padding.getSplatValue<int64_t>() != 0)) {
