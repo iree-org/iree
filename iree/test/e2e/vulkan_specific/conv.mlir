@@ -81,3 +81,28 @@ func @conv() attributes { iree.module.export } {
         : tensor<1x3x4x3xf32>) : tensor<1x3x4x3xf32>
    return
 }
+
+func @conv_3d() {
+  %inputs = iree.unfoldable_constant dense<1.0> : tensor<2x8x8x8x3xf32>
+  %weights = iree.unfoldable_constant dense<1.0> : tensor<2x2x2x3x2xf32>
+  %res = "mhlo.convolution"(%inputs, %weights) {
+    batch_group_count = 1 : i64,
+    dimension_numbers = {
+      input_batch_dimension = 0 : i64,
+      input_feature_dimension = 4 : i64,
+      input_spatial_dimensions = dense<[1, 2, 3]> : tensor<3xi64>,
+      kernel_input_feature_dimension = 3 : i64,
+      kernel_output_feature_dimension = 4 : i64,
+      kernel_spatial_dimensions = dense<[0, 1, 2]> : tensor<3xi64>,
+      output_batch_dimension = 0 : i64,
+      output_feature_dimension = 4 : i64,
+      output_spatial_dimensions = dense<[1, 2, 3]> : tensor<3xi64>
+    },
+    feature_group_count = 1 : i64,
+    padding = dense<0> : tensor<3x2xi64>,
+    rhs_dilation = dense<1> : tensor<3xi64>,
+    window_strides = dense<1> : tensor<3xi64>
+  } : (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>
+  check.expect_almost_eq_const(%res, dense<24.0> : tensor<2x7x7x7x2xf32>) : tensor<2x7x7x7x2xf32>
+  return
+}
