@@ -327,8 +327,10 @@ static bool hasCanonicalDimensionNumbers(
   return true;
 }
 
-/// Converts mhlo.conv operation to linalg named op.
-struct ConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
+/// Converts mhlo.conv operation to linalg named op. This only covers normal
+/// convolution cases. The op must have canonical dimension numbers. Depthwise
+//convolution and pointwise convolution are not handled in the conversion.
+struct NormalConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
   using OpConversionPattern<mhlo::ConvOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -443,7 +445,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
-                  ConstOpConversion, PadOpConversion, ConvOpConversion>(
+                  ConstOpConversion, PadOpConversion, NormalConvOpConversion>(
       context);
 }
 

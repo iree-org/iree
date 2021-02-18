@@ -358,6 +358,8 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
   auto outputType = op.getOutputBufferTypes()[0].template cast<MemRefType>();
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
+  // Only support NHWC conv.
+  if (inputType.getRank() != 4) return failure();
 
   bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
   if (!isInputTilable) return failure();
