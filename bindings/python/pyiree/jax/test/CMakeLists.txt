@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("testing")
-add_subdirectory("test")
-
-iree_py_library(
-  NAME
-    jax
-  SRCS
-    "__init__.py"
-    "frontend.py"
+# TODO(meadowlark): figure out how to put these in jax/testing/
+set(ALL_JAX_LOWERINGS
+    "reference"
+    "vmla_via_mhlo"
+    "llvmaot_via_mhlo"
+    "vulkan_via_mhlo"
+)
+set(ALL_JAX_LABELS
+    "driver=jax"
+    "driver=vmla"
+    "driver=llvmaot"
+    "driver=vulkan"
 )
 
-iree_py_test(
-  NAME
-    frontend_test
-  SRCS
-    "frontend_test.py"
-)
+file(GLOB _all_files RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*_test.py")
+foreach(_filename ${_all_files})
+  iree_e2e_test(${_filename} "${ALL_JAX_LOWERINGS}" "${ALL_JAX_LABELS}")
+endforeach()

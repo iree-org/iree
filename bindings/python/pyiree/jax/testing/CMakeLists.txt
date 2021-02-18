@@ -12,20 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("testing")
-add_subdirectory("test")
+add_subdirectory("compilation")
 
 iree_py_library(
   NAME
-    jax
+    testing
   SRCS
     "__init__.py"
-    "frontend.py"
-)
-
-iree_py_test(
-  NAME
-    frontend_test
-  SRCS
-    "frontend_test.py"
+    "lowerings.py"
 )

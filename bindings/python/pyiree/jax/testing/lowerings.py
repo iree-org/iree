@@ -12,20 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("testing")
-add_subdirectory("test")
+import pyiree as iree
+import pyiree.testing
+from .compilation.stages import Stages
 
-iree_py_library(
-  NAME
-    jax
-  SRCS
-    "__init__.py"
-    "frontend.py"
-)
+__all__ = [
+    "Lowerings",
+]
 
-iree_py_test(
-  NAME
-    frontend_test
-  SRCS
-    "frontend_test.py"
-)
+
+# TODO(meadowlark): Add runtime_module in execution testing PR.
+class Lowerings(iree.testing.Lowerings):
+  REFERENCE = iree.testing.Lowering([])
+  VMLA_VIA_MHLO = iree.testing.Lowering([
+      Stages.JAX_TO_MHLO,
+      Stages.MHLO_TO_VMLA,
+  ])
+  LLVMAOT_VIA_MHLO = iree.testing.Lowering([
+      Stages.JAX_TO_MHLO,
+      Stages.MHLO_TO_LLVMAOT,
+  ])
+  VULKAN_VIA_MHLO = iree.testing.Lowering([
+      Stages.JAX_TO_MHLO,
+      Stages.MHLO_TO_VULKAN,
+  ])

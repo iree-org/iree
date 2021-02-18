@@ -12,20 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("testing")
-add_subdirectory("test")
+from .compilation.stages import Stages
+from .compilation.module import ArraySpec, CompilationDefModule
+from .lowerings import *
 
-iree_py_library(
-  NAME
-    jax
-  SRCS
-    "__init__.py"
-    "frontend.py"
-)
-
-iree_py_test(
-  NAME
-    frontend_test
-  SRCS
-    "frontend_test.py"
-)
+# Import main test-execution names to allow tests to be written with one module.
+from pyiree.testing import run_compilation_tests
