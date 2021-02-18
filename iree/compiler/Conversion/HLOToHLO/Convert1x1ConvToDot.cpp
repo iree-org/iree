@@ -24,6 +24,8 @@ namespace {
 
 // Rewrites an n-d (n, d1, d2, d3, ..., ci) * (1, 1, 1, ..., ci, co)
 // as (n * d1 * d2 * d3, ..., ci) . (ci, co)
+// TODO(#4876): this pattern should be replaced by a pattern that converts
+// linalg.conv to linalg.matmul.
 class Convert1x1ConvolutionToDotOp : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
