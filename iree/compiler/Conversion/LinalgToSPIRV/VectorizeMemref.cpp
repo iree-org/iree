@@ -18,9 +18,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
