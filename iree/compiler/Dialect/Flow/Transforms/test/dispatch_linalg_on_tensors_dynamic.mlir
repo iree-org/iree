@@ -266,3 +266,43 @@ func @reshapeop(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
 //      CHECK:       %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG1]]
 //      CHECK:       %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]] [#[[MAP1]]]
 //      CHECK:       flow.dispatch.output.store %[[RESHAPE]], %[[ARG2]]
+
+// -----
+
+func @generic_op_4D
+  (%A: tensor<?x?x?x?xf32>, %B: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %d0 = dim %A, %c0 : tensor<?x?x?x?xf32>
+  %d1 = dim %A, %c1 : tensor<?x?x?x?xf32>
+  %d2 = dim %A, %c2 : tensor<?x?x?x?xf32>
+  %d3 = dim %A, %c3 : tensor<?x?x?x?xf32>
+  %0 = linalg.init_tensor [%d0, %d1, %d2, %d3] : tensor<?x?x?x?xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins (%A, %B: tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>)
+    outs (%0 : tensor<?x?x?x?xf32>) {
+      ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):
+        %2 = addf %arg0, %arg1 : f32
+        linalg.yield %2 : f32
+    } -> tensor<?x?x?x?xf32>
+  return %1 : tensor<?x?x?x?xf32>
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//      CHECK: func @generic_op_4D
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//  CHECK-DAG:   %[[C3:.+]] = constant 3 : index
+//  CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[D3:.+]] = dim %[[ARG0]], %[[C3]]
+//      CHECK:   %[[WORKLOAD_Z:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
+//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[WORKLOAD_Z]]]

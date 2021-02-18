@@ -362,11 +362,21 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
             return rewriter.create<DimOp>(loc, op->getResult(0), d);
           }));
     }
+    // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
+    // workload count of 3, though it should be generalized. For now making sure
+    // the flow has three elements of workload size (x, y, z) by linearizing the
+    // workloads for all higher dimensions greater than or equal to
+    // kNumMaxParallelDims.
     if (count.size() > kNumMaxParallelDims) {
-      for (int64_t i = 0; i < count.size() - kNumMaxParallelDims; i++) {
-        count[count.size() - kNumMaxParallelDims] = rewriter.create<MulIOp>(
-            loc, count[i], count[count.size() - kNumMaxParallelDims]);
+      unsigned numSymbols = 0;
+      AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
+      for (int64_t i = 1; i < count.size() - kNumMaxParallelDims + 1; i++) {
+        expr = expr * rewriter.getAffineSymbolExpr(numSymbols++);
       }
+      count[count.size() - kNumMaxParallelDims] = linalg::applyMapToValues(
+          rewriter, loc, AffineMap::get(0, numSymbols, expr),
+          ArrayRef<Value>(count).take_front(count.size() - kNumMaxParallelDims +
+                                            1))[0];
       count = llvm::to_vector<4>(
           ArrayRef<Value>(count).take_back(kNumMaxParallelDims));
     }
