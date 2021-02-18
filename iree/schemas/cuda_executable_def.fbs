@@ -14,18 +14,18 @@
 
 namespace iree;
 
-// 'Cuda Executable'.
+// 'CUDA Executable'.
 file_identifier "CUDA";
 file_extension "cuda";
 
 // A struct for the kernel block size along each dimensions.
-struct block_size {
+struct CUDABlockSizeDef {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
-table CudaExecutableDef {
+table CUDAExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];
@@ -33,13 +33,13 @@ table CudaExecutableDef {
   // Block sizes for each entry point.
   //
   // Currently the thread group size/block size is decided during code gen but
-  // in Cuda it is set by the runtime.
-  block_sizes:[block_size];
+  // in CUDA it is set by the runtime.
+  block_sizes:[CUDABlockSizeDef];
 
-  // Ptx string of the module.
-  kernel_library:string;
+  // PTX string of the module.
+  ptx_image:string;
   
   // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
 }
 
-root_type CudaExecutableDef;
+root_type CUDAExecutableDef;
