@@ -40,6 +40,7 @@ iree_cc_library(
     LLVMX86AsmParser
     LLVMX86CodeGen
     MLIRLLVMIR
+    MLIRLLVMIRModuleTranslation
     MLIRTargetLLVMIR
     iree::base::flatcc
     iree::compiler::Conversion::CodegenUtils
