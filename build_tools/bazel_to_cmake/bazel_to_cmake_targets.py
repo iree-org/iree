@@ -36,7 +36,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMIRModuleTranslation": [
-      "MLIRTargetLLVMIRModuleTranslation"
+        "MLIRTargetLLVMIRModuleTranslation"
     ],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
