@@ -22,7 +22,11 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class SemaphoreTest : public CtsTestBase {};
+class SemaphoreTest : public CtsTestBase {
+ public:
+  // Disable cuda backend for this test as semaphores are not implemented yet.
+  SemaphoreTest() { declareUnavailableDriver("cuda"); }
+};
 
 // Tests that a semaphore that is unused properly cleans itself up.
 TEST_P(SemaphoreTest, NoOp) {

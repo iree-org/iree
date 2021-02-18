@@ -16,6 +16,10 @@
 
 #include "iree/base/tracing.h"
 
+#if defined(IREE_HAL_HAVE_CUDA_DRIVER_MODULE)
+#include "iree/hal/cuda/registration/driver_module.h"
+#endif  // IREE_HAL_HAVE_CUDA_DRIVER_MODULE
+
 #if defined(IREE_HAL_HAVE_DYLIB_DRIVER_MODULE)
 #include "iree/hal/dylib/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_DYLIB_DRIVER_MODULE
@@ -31,6 +35,11 @@
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
+#if defined(IREE_HAL_HAVE_CUDA_DRIVER_MODULE)
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_cuda_driver_module_register(registry));
+#endif  // IREE_HAL_HAVE_CUDA_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_DYLIB_DRIVER_MODULE)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

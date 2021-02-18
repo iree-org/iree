@@ -33,6 +33,9 @@ namespace cts {
 using ::testing::ContainerEq;
 
 class CommandBufferTest : public CtsTestBase {
+ public:
+  CommandBufferTest() { declareUnimplementedDriver("cuda"); }
+
  protected:
   static constexpr iree_device_size_t kBufferSize = 4096;
 };
@@ -96,26 +99,28 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   // Fill the device buffer with segments of different values so that we can
   // test both fill and offset/size.
   uint8_t val1 = 0x07;
-  iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer, device_buffer,
       /*target_offset=*/0, /*length=*/kBufferSize / 4, /*pattern=*/&val1,
-      /*pattern_length=*/sizeof(val1));
+      /*pattern_length=*/sizeof(val1)));
   std::memset(reference_buffer.data(), val1, kBufferSize / 4);
 
   uint8_t val2 = 0xbe;
-  iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
-                                      /*target_offset=*/kBufferSize / 4,
-                                      /*length=*/kBufferSize / 4,
-                                      /*pattern=*/&val2,
-                                      /*pattern_length=*/sizeof(val2));
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
+                                          /*target_offset=*/kBufferSize / 4,
+                                          /*length=*/kBufferSize / 4,
+                                          /*pattern=*/&val2,
+                                          /*pattern_length=*/sizeof(val2)));
   std::memset(reference_buffer.data() + kBufferSize / 4, val2, kBufferSize / 4);
 
   uint8_t val3 = 0x54;
-  iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
-                                      /*target_offset=*/kBufferSize / 2,
-                                      /*length=*/kBufferSize / 2,
-                                      /*pattern=*/&val3,
-                                      /*pattern_length=*/sizeof(val3));
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
+                                          /*target_offset=*/kBufferSize / 2,
+                                          /*length=*/kBufferSize / 2,
+                                          /*pattern=*/&val3,
+                                          /*pattern_length=*/sizeof(val3)));
   std::memset(reference_buffer.data() + kBufferSize / 2, val3, kBufferSize / 2);
 
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));

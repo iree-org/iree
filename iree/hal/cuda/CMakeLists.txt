@@ -8,6 +8,37 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    cuda
+  HDRS
+    "api.h"
+  SRCS
+    "api.h"
+    "context_wrapper.h"
+    "cuda_allocator.c"
+    "cuda_allocator.h"
+    "cuda_buffer.c"
+    "cuda_buffer.h"
+    "cuda_device.c"
+    "cuda_device.h"
+    "cuda_driver.c"
+    "status_util.c"
+    "status_util.h"
+  DEPS
+    ::dynamic_symbols
+    iree::base::api
+    iree::base::core_headers
+    iree::base::flatcc
+    iree::base::internal
+    iree::base::logging
+    iree::base::status
+    iree::base::synchronization
+    iree::base::tracing
+    iree::hal::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     dynamic_symbols
   HDRS
     "dynamic_symbols.h"
