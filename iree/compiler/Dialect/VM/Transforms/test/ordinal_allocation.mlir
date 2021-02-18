@@ -1,6 +1,17 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='vm.module(iree-vm-ordinal-allocation)' %s | IreeFileCheck %s
+// check the parser for vm.module.ordinal_counts
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(iree-vm-ordinal-allocation)' %s | iree-opt | IreeFileCheck %s
 
 // CHECK-LABEL: @global_address_propagation
+  // CHECK-SAME: attributes {ordinal_counts = #vm.ordinal_counts<
+  // CHECK-SAME: import_funcs = 0,
+  // CHECK-SAME: export_funcs = 0,
+  // CHECK-SAME: internal_funcs = 1,
+  // CHECK-SAME: global_bytes = 8,
+  // CHECK-SAME: global_refs = 0,
+  // CHECK-SAME: rodatas = 0,
+  // CHECK-SAME: rwdatas = 0
+  // CHECK-SAME: >}
 vm.module @global_address_propagation {
   // CHECK-DAG: vm.global.i32 @g0 mutable : i32 attributes {ordinal = 0 : i32}
   vm.global.i32 @g0 mutable : i32

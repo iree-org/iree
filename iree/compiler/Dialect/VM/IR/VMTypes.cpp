@@ -14,12 +14,15 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 
 // Order matters:
 #include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"
+#include "iree/compiler/Dialect/VM/IR/VMStructs.cpp.inc"
 
 namespace mlir {
 namespace iree_compiler {
@@ -119,6 +122,57 @@ RefType RefType::getChecked(Type objectType, Location location) {
 }
 
 Type RefType::getObjectType() { return getImpl()->objectType; }
+
+//===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute OrdinalCountsAttr::parse(DialectAsmParser &p) {
+  Type i32 = p.getBuilder().getIntegerType(32);
+  IntegerAttr importFuncsAttr;
+  IntegerAttr exportFuncsAttr;
+  IntegerAttr internalFuncsAttr;
+  IntegerAttr globalBytesAttr;
+  IntegerAttr globalRefsAttr;
+  IntegerAttr rodatasAttr;
+  IntegerAttr rwdatasAttr;
+  if (failed(p.parseLess()) || failed(p.parseKeyword("import_funcs")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(importFuncsAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("export_funcs")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(exportFuncsAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("internal_funcs")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(internalFuncsAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("global_bytes")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(globalBytesAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("global_refs")) ||
+      failed(p.parseEqual()) || failed(p.parseAttribute(globalRefsAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("rodatas")) ||
+      failed(p.parseEqual()) || failed(p.parseAttribute(rodatasAttr, i32)) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("rwdatas")) ||
+      failed(p.parseEqual()) || failed(p.parseAttribute(rwdatasAttr, i32)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(importFuncsAttr, exportFuncsAttr, internalFuncsAttr,
+             globalBytesAttr, globalRefsAttr, rodatasAttr, rwdatasAttr);
+}
+
+void OrdinalCountsAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << "import_funcs = " << import_funcs() << ", ";
+  os << "export_funcs = " << export_funcs() << ", ";
+  os << "internal_funcs = " << internal_funcs() << ", ";
+  os << "global_bytes = " << global_bytes() << ", ";
+  os << "global_refs = " << global_refs() << ", ";
+  os << "rodatas = " << rodatas() << ", ";
+  os << "rwdatas = " << rwdatas();
+  os << ">";
+}
 
 }  // namespace VM
 }  // namespace IREE
