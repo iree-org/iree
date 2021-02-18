@@ -129,9 +129,9 @@ func @conv_3d_input_ndhwc_filter_dhwcf(%arg0: tensor<?x?x?x?x?xf32>, %arg1: tens
 // CHECK-LABEL: func @conv2d_1452x2223_dilated_valid
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
-// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 2, 4, 3] : tensor<1x2x4x3xf32>
 // CHECK:         %[[ZERO:.+]] = constant 0.000000e+00 : f32
-// CHECK:         %[[FILL.+]] = linalg.fill(%[[INIT]], %[[ZERO]]) : tensor<1x2x4x3xf32>, f32 -> tensor<1x2x4x3xf32>
+// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 2, 4, 3] : tensor<1x2x4x3xf32>
+// CHECK:         %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[ZERO]]) : tensor<1x2x4x3xf32>, f32 -> tensor<1x2x4x3xf32>
 // CHECK:         linalg.conv_2d_input_nhwc_filter_hwcf
 // CHECK-SAME:      {dilations = dense<[2, 1]> : tensor<2xi64>
 // CHECK-SAME:       strides = dense<1> : tensor<2xi64>}
