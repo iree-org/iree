@@ -35,6 +35,9 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
+    "@llvm-project//mlir:LLVMIRModuleTranslation": [
+        "MLIRTargetLLVMIRModuleTranslation"
+    ],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
