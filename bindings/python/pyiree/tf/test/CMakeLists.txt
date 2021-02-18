@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(NUMPY_DEPS "")
+# TODO(meadowlark): figure out how to put these in tf/testing/
+set(ALL_TF_LOWERINGS
+    "reference"
+    "tflite"
+    "vmla_via_mhlo"
+    "llvmaot_via_mhlo"
+    "vulkan_via_mhlo"
+)
+set(ALL_TF_LABELS
+    "driver=tf"
+    "driver=tflite"
+    "driver=vmla"
+    "driver=llvmaot"
+    "driver=vulkan"
+)
 
-set(PYBIND_COPTS "-fexceptions")
-set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
-
-# Namespace packages.
-add_subdirectory(pyiree/rt)
-
-if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler2)
-add_subdirectory(pyiree/tools/core)
-add_subdirectory(pyiree/testing)
-endif()
-
-if(${IREE_BUILD_TENSORFLOW_COMPILER})
-add_subdirectory(pyiree/tf)
-endif()
-
-if(${IREE_BUILD_XLA_COMPILER})
-add_subdirectory(pyiree/jax)
-endif()
-
-# Tests.
-add_subdirectory(tests)
+file(GLOB _all_files RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*_test.py")
+foreach(_filename ${_all_files})
+  iree_e2e_test(${_filename} "${ALL_TF_LOWERINGS}" "${ALL_TF_LABELS}")
+endforeach()
