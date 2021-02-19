@@ -276,9 +276,7 @@ static LogicalResult convertSubTensorOp(
   b.setInsertionPoint(op);
   Location loc = op.getLoc();
   Value srcTensor = op.source();
-  RankedTensorType srcTensorType = op.getSourceType();
   Value resultTensor = op.result();
-  RankedTensorType resultTensorType = op.getType();
   Value inputBuffer = bvm.lookup(srcTensor);
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
 
