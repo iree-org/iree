@@ -219,6 +219,24 @@ LogicalResult getLinalgOps(FuncOp funcOp,
     forOps = body->getOps<scf::ForOp>();
   }
   linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+
+  // Propagate markers to all ops. If one of the ops has a marker all ops in
+  // this loop need to have marker since body of the loop maps to a workgroup.
+  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
+  // figured out.
+  Optional<StringRef> marker = llvm::None;
+  for (auto op : linalgOps) {
+    if (hasMarker(op)) {
+      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
+                            "expected all markers within op to be the same");
+      marker = getMarkerOrNull(op);
+    }
+  }
+  if (marker.hasValue()) {
+    for (auto op : linalgOps) {
+      setMarker(op, marker.getValue());
+    }
+  }
   return success();
 }
 

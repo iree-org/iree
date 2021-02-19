@@ -53,6 +53,11 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
 /// `scf.for` operations in the function return the linalg operations in the
 /// body of the function if it has a single basic block. Return failure in all
 /// other cases.
+///
+/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
+/// within the loop. The marker is the way to tie into rest of the
+/// codegen. Refactor the downstream passes and get rid of the markers once and
+/// for all.
 LogicalResult getLinalgOps(FuncOp funcOp,
                            SmallVectorImpl<linalg::LinalgOp> &linalgOps,
                            SmallVectorImpl<Operation *> &tiledLoops);

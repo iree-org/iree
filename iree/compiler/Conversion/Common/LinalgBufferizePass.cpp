@@ -25,8 +25,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
+#include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -47,6 +47,13 @@
 namespace mlir {
 namespace iree_compiler {
 
+static MemRefType getMemrefTypeForTensor(RankedTensorType tensorType,
+                                         ArrayRef<AffineMap> layout = {},
+                                         unsigned memorySpace = 0) {
+  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
+                         layout, memorySpace);
+}
+
 // Transfer all `dim` ops on `tensor` to `memref`.
 static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
                                      BlockAndValueMapping &bvm) {
@@ -65,17 +72,6 @@ static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
       bvm.map(flowTieShapeOp.getResult(), tieShapeOp.getResult());
       continue;
     }
-  }
-}
-
-// TODO(ravishankarm): Marker added to copy op to hook into rest of the
-// codegen. Mostly need to kill markers (or at least assume that default marker
-// is workgroup marker on the linalg on tensors path.
-static void createCopyOp(OpBuilder &b, Location loc, Value source, Value dest,
-                         StringRef marker = "") {
-  auto op = b.create<linalg::CopyOp>(loc, source, dest);
-  if (!marker.empty()) {
-    setMarker(op, marker);
   }
 }
 
@@ -141,7 +137,7 @@ static LogicalResult allocateBuffersForResults(
     // manually defined ops specifically.
     if (!isa<linalg::FillOp>(op.getOperation()) &&
         op.payloadUsesValueFromOutputOperandIndex(resultIndex)) {
-      createCopyOp(b, loc, bvm.lookup(outTensor), alloc, getMarkerOrNull(op));
+      b.create<linalg::CopyOp>(loc, bvm.lookup(outTensor), alloc);
     }
   }
   for (auto it : llvm::zip(op->getResults(), resultBuffers)) {
@@ -166,8 +162,7 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
     Value resultValue = result.value();
     Value resultBuffer = bvm.lookup(resultValue);
     if (resultBuffer != outputs[result.index()]) {
-      createCopyOp(b, loc, outputs[result.index()], resultBuffer,
-                   getMarkerOrNull(op));
+      b.create<linalg::CopyOp>(loc, outputs[result.index()], resultBuffer);
     }
   }
 }
@@ -207,6 +202,42 @@ LogicalResult convertAnyLinalgOp(OpBuilder &b,
   return success();
 }
 
+/// Avoids creating an allocation if the result tensor can just be aliased to
+/// use the same buffer (`inputBuffer`) that `srcTensor` is mapped to. This can
+/// be done if `srcTensor` has a single use, which is the operation which is
+/// being converted to buffers.
+/// Note that the mapping for `srcTensor` need not be mapped to `inputBuffer`
+/// directly. It could also be mapped to an alias of the `inputBuffer.
+static LogicalResult createAliasingBufferOrAllocationForResult(
+    OpBuilder &b, Location loc, WorkgroupMemoryAllocationFn allocationFn,
+    Value srcTensor, Value inputBuffer, Value resultTensor,
+    ArrayRef<Value> allocationDynamicDims, BlockAndValueMapping &bvm) {
+  // Case 1 : If result tensor is already mapped to a buffer just copy the
+  // value.
+  if (Value outputBuffer = bvm.lookupOrNull(resultTensor)) {
+    if (inputBuffer != outputBuffer) {
+      b.create<linalg::CopyOp>(loc, inputBuffer, outputBuffer);
+    }
+    return success();
+  }
+  // Case 2: If the input tensor has only one use (this operation, then no need
+  // to create a copy either.
+  if (srcTensor.hasOneUse()) {
+    bvm.map(resultTensor, inputBuffer);
+    return success();
+  }
+  // Fallback is to create an allocation and copy the output.
+  MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
+  assert(allocationDynamicDims.size() ==
+         static_cast<size_t>(inputBufferType.getRank()));
+  Value alloc = allocationFn(
+      b, loc, SmallVector<int64_t, 4>(inputBufferType.getRank(), -1),
+      inputBufferType.getElementType(), allocationDynamicDims);
+  b.create<linalg::CopyOp>(loc, inputBuffer, alloc);
+  bvm.map(resultTensor, alloc);
+  return success();
+}
+
 /// Converts a `linalg.tensor_reshape` operation to a `linalg.reshape`
 /// operation.
 static LogicalResult convertTensorReshapeOp(
@@ -220,41 +251,57 @@ static LogicalResult convertTensorReshapeOp(
   Value resultTensor = op.result();
   RankedTensorType resultTensorType = op.getResultType();
   Value inputBuffer = bvm.lookup(srcTensor);
+  MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   // Create the reshape op.
-  auto reshapeSrcType =
-      MemRefType::get(srcTensorType.getShape(), srcTensorType.getElementType());
+  auto reshapeSrcType = getMemrefTypeForTensor(
+      srcTensorType, {}, inputBufferType.getMemorySpace());
   Value reshapeSrc = b.create<MemRefCastOp>(loc, inputBuffer, reshapeSrcType);
-  auto reshapeResultType = MemRefType::get(resultTensorType.getShape(),
-                                           resultTensorType.getElementType());
+  auto reshapeResultType = getMemrefTypeForTensor(
+      resultTensorType, {}, inputBufferType.getMemorySpace());
   Value bufferReshape = b.create<linalg::ReshapeOp>(
       loc, reshapeResultType, reshapeSrc, op.reassociation());
+  auto allocationDynamicSizes = linalg::getReshapeOutputShapeFromInputShape(
+      b, loc, inputBuffer, resultTensorType.getShape(),
+      op.getReassociationMaps());
+  return createAliasingBufferOrAllocationForResult(
+      b, loc, allocationFn, srcTensor, bufferReshape, resultTensor,
+      allocationDynamicSizes, bvm);
+}
 
-  // Case 1: If the output tensor has already been mapped to a different buffer,
-  // need to copy.
-  if (Value outputBuffer = bvm.lookupOrNull(resultTensor)) {
-    if (inputBuffer != outputBuffer) {
-      createCopyOp(b, loc, bufferReshape, outputBuffer, getMarkerOrNull(op));
-    }
-    bvm.map(resultTensor, bufferReshape);
-    return success();
-  }
-  // Case 2: If the input tensor has only one use (this operation, then no need
-  // to create a copy either.
-  if (srcTensor.hasOneUse()) {
-    bvm.map(resultTensor, bufferReshape);
-    return success();
-  }
-  // Fallback is to create an allocation and copy the output.
-  // Compute the shape of the new tensor based on shape of the input tensor.
-  SmallVector<Value, 4> dynamicDims =
-      linalg::getReshapeOutputShapeFromInputShape(b, loc, inputBuffer,
-                                                  resultTensorType.getShape(),
-                                                  op.getReassociationMaps());
-  Value alloc = allocationFn(b, loc, resultTensorType.getShape(),
-                             resultTensorType.getElementType(), dynamicDims);
-  createCopyOp(b, loc, bufferReshape, alloc, getMarkerOrNull(op));
-  bvm.map(resultTensor, alloc);
-  return success();
+/// Converts a `subtensor` operation to a `subview` operation.
+static LogicalResult convertSubTensorOp(
+    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn, SubTensorOp op,
+    BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Location loc = op.getLoc();
+  Value srcTensor = op.source();
+  Value resultTensor = op.result();
+  Value inputBuffer = bvm.lookup(srcTensor);
+  MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
+
+  auto extractFromI64ArrayAttr = [](ArrayAttr attr) {
+    return llvm::to_vector<4>(llvm::map_range(attr, [](Attribute a) -> int64_t {
+      return a.cast<IntegerAttr>().getInt();
+    }));
+  };
+  auto subViewResultType = SubViewOp::inferResultType(
+      inputBufferType, extractFromI64ArrayAttr(op.static_offsets()),
+      extractFromI64ArrayAttr(op.static_sizes()),
+      extractFromI64ArrayAttr(op.static_strides()));
+  auto subViewOp =
+      b.create<SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
+                          op.sizes(), op.strides(), op.static_offsets(),
+                          op.static_sizes(), op.static_strides());
+  auto allocationDynamicSizes = llvm::to_vector<4>(
+      llvm::map_range(subViewOp.getOrCreateRanges(b, loc), [](Range range) {
+        assert(matchPattern(range.stride, m_One()) &&
+               "unhandled non-unit stride");
+        return range.size;
+      }));
+  return createAliasingBufferOrAllocationForResult(
+      b, loc, allocationFn, srcTensor, subViewOp, resultTensor,
+      allocationDynamicSizes, bvm);
 }
 
 static LogicalResult convertTransferOp(OpBuilder &b,
@@ -309,13 +356,6 @@ static SmallVector<int64_t, 4> extractFromI64ArrayAttr(Attribute attr) {
       [](Attribute a) -> int64_t { return a.cast<IntegerAttr>().getInt(); }));
 }
 
-static MemRefType getMemrefTypeForTensor(
-    RankedTensorType tensorType, ArrayRef<AffineMap> affineMapComposition = {},
-    unsigned memorySpace = 0) {
-  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
-                         affineMapComposition, memorySpace);
-}
-
 LogicalResult convertInterfaceLoadTensorOp(
     OpBuilder &b, IREE::Flow::DispatchInputLoadOp loadOp,
     BlockAndValueMapping &bvm) {
@@ -347,8 +387,9 @@ static Operation *getInsertionPointForReplacementStoreOp(
     if (!insertAfter || insertAfter->isBeforeInBlock(definingOp))
       insertAfter = definingOp;
   }
-  // All defining ops are outside of the block, so just insertBefore
-  if (!insertAfter) return insertBefore;
+  // All defining ops are outside of the block, so just insert at the start of
+  // the block.
+  if (!insertAfter) return &(op->getBlock()->front());
   if (insertAfter->isBeforeInBlock(insertBefore))
     return insertAfter->getNextNode();
   return nullptr;
@@ -383,6 +424,24 @@ LogicalResult preProcessConvertInterfaceStoreTensorOp(
       createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
                       storeOp.offsets(), storeOp.sizes(), storeOp.strides());
   bvm.map(storeOp.value(), subview);
+  return success();
+}
+
+/// Pre process linalg operations (on tensors) so that if the result of the
+/// linalg operation is mapped to a buffer, the out is mapped to the same buffer
+/// to make this an inplace update.
+LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
+                                  BlockAndValueMapping &bvm) {
+  if (!op.hasTensorSemantics()) return success();
+  for (auto en :
+       llvm::zip(op.getOperation()->getResults(), op.getOutputTensors())) {
+    Value resultTensor = std::get<0>(en);
+    Value outTensor = std::get<1>(en);
+    Value resultBuffer = bvm.lookupOrNull(resultTensor);
+    if (resultBuffer && outTensor.hasOneUse()) {
+      bvm.map(outTensor, resultBuffer);
+    }
+  }
   return success();
 }
 
@@ -472,6 +531,24 @@ void LinalgBufferizePass::runOnFunction() {
           .wasInterrupted()) {
     return signalPassFailure();
   }
+
+  /// Walk the linalg operations backwards (if they are all in the same basic
+  /// block) to propagate buffer usage backwards to reduce the need for
+  /// allocation. This works for simple cases where all the linalg operations
+  /// are within the same basic block. Fallback is to create a separate
+  /// allocation for the output.
+  {
+    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    SmallVector<Operation *, 4> tiledLoops;
+    if (succeeded(getLinalgOps(funcOp, linalgOps, tiledLoops))) {
+      for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
+        if (failed(preProcessLinalgOps(b, op, bvm))) {
+          return signalPassFailure();
+        }
+      }
+    }
+  }
+
   auto conversionDispatch = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<IREE::Flow::DispatchInputLoadOp>(
@@ -484,6 +561,9 @@ void LinalgBufferizePass::runOnFunction() {
             })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
+        })
+        .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
+          return convertSubTensorOp(b, allocationFn, subTensorOp, bvm);
         })
         .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
           return convertTensorReshapeOp(b, allocationFn, reshapeOp, bvm);
