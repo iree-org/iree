@@ -195,6 +195,67 @@ iree_check_single_backend_test_suite(
     target_backend = "dylib-llvm-aot",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
+    srcs = [
+        "abs.mlir",
+        "add.mlir",
+        "batch_norm_inference.mlir",
+        "broadcast.mlir",
+        "broadcast_add.mlir",
+        "broadcast_in_dim.mlir",
+        "clamp.mlir",
+        "compare.mlir",
+        # https://github.com/google/iree/issues/4079
+        # "concatenate.mlir",
+        "constant.mlir",
+        # https://github.com/google/iree/issues/4079
+        # "convolution.mlir",
+        "cosine.mlir",
+        "divide.mlir",
+        # https://github.com/google/iree/issues/4079
+        "dot.mlir",
+        "dot_general.mlir",
+        "exponential.mlir",
+        "exponential_minus_one.mlir",
+        "floor.mlir",
+        # https://github.com/google/iree/issues/4692
+        # "gather.mlir",
+        "iota.mlir",
+        "log.mlir",
+        "log_plus_one.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "multiply.mlir",
+        "negate.mlir",
+        # https://github.com/google/iree/issues/4079
+        # "pad.mlir",
+        # "reduce.mlir",
+        # "reduce_window.mlir",
+        "remainder.mlir",
+        "reshape.mlir",
+        "reverse.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sine.mlir",
+        # https://github.com/google/iree/issues/4692
+        # "slice.mlir",
+        "sqrt.mlir",
+        "subtract.mlir",
+        "tanh.mlir",
+        # https://github.com/google/iree/issues/4079
+        # "torch_index_select.mlir",
+        "transpose.mlir",
+        # "while.mlir",
+    ],
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-spirv-experimental-linalg-on-tensors",
+    ],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
 test_suite(
     name = "check",
     tests = [
