@@ -35,6 +35,7 @@ iree_cc_test(
     ::assignment_ops_cc
     ::assignment_ops_i64_cc
     ::conversion_ops_cc
+    ::conversion_ops_i64_cc
     ::shift_ops_cc
     ::shift_ops_i64_cc
 )
@@ -92,6 +93,18 @@ iree_bytecode_module(
     conversion_ops
   SRC
     "../conversion_ops.mlir"
+  CC_NAMESPACE
+    "iree::vm::test::emitc"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    conversion_ops_i64
+  SRC
+    "../conversion_ops_i64.mlir"
   CC_NAMESPACE
     "iree::vm::test::emitc"
   FLAGS

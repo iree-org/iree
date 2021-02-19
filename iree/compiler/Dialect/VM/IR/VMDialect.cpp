@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -191,6 +192,7 @@ struct VMFolderInterface : public DialectFoldInterface {
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()) {
+  addAttributes<IREE::VM::OrdinalCountsAttr>();
   addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
@@ -198,6 +200,27 @@ VMDialect::VMDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
       >();
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
+  StringRef attrKind;
+  if (failed(parser.parseKeyword(&attrKind))) return {};
+  if (attrKind == OrdinalCountsAttr::getKindName()) {
+    return OrdinalCountsAttr::parse(parser);
+  }
+  parser.emitError(parser.getNameLoc()) << "unknown VM attribute: " << attrKind;
+  return {};
+}
+
+void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
+  TypeSwitch<Attribute>(attr)
+      .Case<OrdinalCountsAttr>([&](auto typedAttr) { typedAttr.print(p); })
+      .Default(
+          [](Attribute) { llvm_unreachable("unhandled VM attribute kind"); });
 }
 
 //===----------------------------------------------------------------------===//

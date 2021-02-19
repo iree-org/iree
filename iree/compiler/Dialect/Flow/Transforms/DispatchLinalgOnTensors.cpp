@@ -115,55 +115,74 @@ static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
       .size();
 }
 
+/// Returns true if an operation is to always be cloned into the dispatch region
+/// when its value is used within it.
+bool isAlwaysClonedIntoDispatchOp(Operation *op) {
+  if (isa<linalg::InitTensorOp>(op)) {
+    return true;
+  }
+  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+    return constantOp.getResult().getType().isIntOrFloat();
+  }
+  return false;
+}
+
+/// Returns true if an operation is to always be fused with its producer
+/// dispatch. Difference between this and `isAlwaysClonedIntoDispatchOp` is that
+/// these ops have copy semantics and can live in their own dispatch region too.
+bool isAlwaysFusedIntoDispatchOp(Operation *op) {
+  return isa<linalg::TensorReshapeOp>(op);
+}
+
 /// Returns the number of loops of the operation that are to be tiled.
 static size_t getNumTilableLoops(linalg::LinalgOp op) {
   return std::min<size_t>(getNumOuterParallelLoops(op), kNumMaxParallelDims);
 }
 
+/// Given the `shape` of the computation with the first element being the
+/// slowest varying and last element being the fastest warying returns the
+/// workload value with
+/// - fastest varying dimension first, i.e., x, y, z order
+/// - the workload padded to `kNumMaxParallelDims` with ones if needed.
+/// The `shape` is expected to be of size less than or equal to
+/// `kNumMaxParallelDims`.
+static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
+                                               ArrayRef<Value> shape) {
+  assert(shape.size() <= kNumMaxParallelDims &&
+         "workload cannot be more than 3D for now");
+  SmallVector<Value, 4> workload = llvm::to_vector<4>(llvm::reverse(shape));
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  workload.resize(kNumMaxParallelDims, one);
+  return workload;
+}
+
 // Creates a flow.dispatch.workgroup op without arguments.
 // All the necessary operands are transiently captured and rewritten late as
 // operands. This greatly simplifies transformations into the resulting op.
-static IREE::Flow::DispatchWorkgroupsOp buildOperandLessFlowDispatchWorkgroupOp(
-    PatternRewriter &rewriter, linalg::LinalgOp root,
-    linalg::LinalgOp &clonedRoot) {
-  Location loc = root->getLoc();
-  Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
-      root.createLoopRanges(rewriter, loc), [](Range r) { return r.size; }));
-  count.resize(getNumTilableLoops(root));
-  count = llvm::to_vector<4>(llvm::reverse(count));
-  count.resize(kNumMaxParallelDims, one);
-
+static std::pair<IREE::Flow::DispatchWorkgroupsOp, Operation *>
+buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
+                                        ArrayRef<Value> count, Operation *op) {
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, count, root->getResultTypes(), ValueRange{});
+      loc, count, op->getResultTypes(), ValueRange{});
   Region &region = dispatchOp.body();
   Block *block = &region.front();
+  Operation *clonedOp;
   {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(block);
-    clonedRoot = cast<linalg::LinalgOp>(rewriter.clone(*root.getOperation()));
-    // Note: DispatchOutputStoreOp is an abstraction jump that consumes the SSA
-    // value produced by `clonedRoot` but it does not comply with the semantics
-    // of DispatchWorkgroupsOp which explicitly states:
-    // "behavior is undefined if multiple workgroups store to the same regions
-    // of the output tensors".
-    // Similarly to sequentialized SPMD loops, the semantics is valid assuming a
-    // sequential ordering of execution.
-    // After destructive update rewrites, the abstraction gap disappears.
-    for (auto it : llvm::zip(clonedRoot->getResults(),
+    clonedOp = rewriter.clone(*op);
+    for (auto it : llvm::zip(clonedOp->getResults(),
                              dispatchOp.body().getArguments().take_back(
-                                 clonedRoot->getNumResults()))) {
+                                 clonedOp->getNumResults()))) {
       rewriter.create<IREE::Flow::DispatchOutputStoreOp>(
           loc, std::get<0>(it), std::get<1>(it), llvm::None, llvm::None,
           llvm::None);
     }
-    // TODO(nicolasvasilache): return `clonedRoot->getResults()` once we have
-    // shape operands and we drop tie_shape.
     rewriter.create<IREE::Flow::ReturnOp>(loc);
   }
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell " << *dispatchOp
                           << "\n");
-  return dispatchOp;
+  return {dispatchOp, clonedOp};
 }
 
 // Only fuses the first producer for the purpose of connecting the pieces.
@@ -217,50 +236,6 @@ static void pullInProducersInSameGroup(
   }
 }
 
-// Add tie_shape for all outputs. This provides necessary information for
-// a subsequent OutlineDispatchRegion2 pass invocation to work properly.
-// TODO(nicolasvasilache): get rid of this once we have a proper shape +
-// subshape in core and DispatchWorkgroupOp takes output shape parameters.
-static SmallVector<Value, 4> createDispatchTieShapeOp(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  assert(dispatchOp->getNumResults() == linalgOp.getNumOutputs());
-  MLIRContext *context = linalgOp->getContext();
-  Location loc = linalgOp->getLoc();
-  SmallVector<Value, 4> shapedResults;
-  for (auto it : llvm::zip(linalgOp.getOutputs(), dispatchOp->getResults())) {
-    // Insert DimOp and MakeRankedShapeOp just before the dispatchOp to play
-    // nicely with a (much later) OutlineDispatchRegions2 which requires all
-    // dims and shapes to dominate the dispatchOp region.
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(dispatchOp);
-
-    assert(std::get<0>(it).getType() == std::get<1>(it).getType());
-    auto rankedTensorType = std::get<0>(it).getType().cast<RankedTensorType>();
-    if (rankedTensorType.hasStaticShape()) {
-      shapedResults.push_back(std::get<1>(it));
-      continue;
-    }
-    auto rank = rankedTensorType.getRank();
-    SmallVector<Value, 4> dims;
-    dims.reserve(rank);
-    for (unsigned d = 0, e = rank; d < e; ++d) {
-      if (rankedTensorType.isDynamicDim(d)) {
-        dims.push_back(rewriter.create<DimOp>(loc, std::get<0>(it), d));
-      }
-    }
-    auto shapeOp = rewriter.create<Shape::MakeRankedShapeOp>(
-        loc, Shape::RankedShapeType::get(rankedTensorType.getShape(), context),
-        dims);
-
-    // The TieShapeOp use the dispatchOp results.
-    rewriter.setInsertionPointAfter(dispatchOp);
-    shapedResults.push_back(
-        rewriter.create<Shape::TieShapeOp>(loc, std::get<1>(it), shapeOp));
-  }
-  return shapedResults;
-}
-
 // Rewrite pattern to ensure only ops with tensor semantics are tiled.
 struct TileAndDistributeOnTensorsPattern
     : public linalg::LinalgBaseTilingPattern {
@@ -277,10 +252,28 @@ struct TileAndDistributeOnTensorsPattern
     IntegerAttr rootOpAttr = op->getAttrOfType<IntegerAttr>(kRootOpAttr);
     if (!rootOpAttr) return failure();
 
-    linalg::LinalgOp clonedLinalgOp;
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp =
-        buildOperandLessFlowDispatchWorkgroupOp(rewriter, linalgOp,
-                                                clonedLinalgOp);
+    // Compute workgroup count to use for the dispatch op. These are the ranges
+    // of the outermost parallel loops that can be distributed.
+    Location loc = op->getLoc();
+    SmallVector<Value, 4> count = llvm::to_vector<4>(
+        llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
+                        [](Range r) { return r.size; }));
+    count.resize(getNumTilableLoops(op));
+    auto workload = convertToWorkload(rewriter, loc, count);
+
+    // Note: DispatchOutputStoreOp generated by the
+    // `buildOperandLessFlowDispatchWorkgroupOp` is an abstraction jump that
+    // consumes the SSA value produced by `clonedOp` but it does not comply with
+    // the semantics of DispatchWorkgroupsOp which explicitly states: "behavior
+    // is undefined if multiple workgroups store to the same regions of the
+    // output tensors".  Similarly to sequentialized SPMD loops, the semantics
+    // is valid assuming a sequential ordering of execution.  After destructive
+    // update rewrites, the abstraction gap disappears.
+    auto en =
+        buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload, op);
+    linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
+
     // Scoped within DispatchWorkgroupOp.
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(clonedLinalgOp);
@@ -302,9 +295,98 @@ struct TileAndDistributeOnTensorsPattern
                                tiledLinalgOp, rootOpAttr.getInt());
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
-    SmallVector<Value, 4> shapedResults =
-        createDispatchTieShapeOp(rewriter, linalgOp, dispatchOp);
-    rewriter.replaceOp(op, shapedResults);
+
+    rewriter.replaceOpWithIf(
+        op, dispatchOp.getOperation()->getResults(),
+        [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
+    return success();
+  }
+};
+
+static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
+    OpBuilder &builder, Operation *op) {
+  SmallVector<SmallVector<Value, 4>, 1> outputShapes;
+  for (auto outputType : op->getResultTypes()) {
+    // Add empty shape for scalar values.
+    if (outputType.isIntOrFloat()) {
+      outputShapes.push_back({});
+      continue;
+    }
+
+    // TODO(ravishankarm): For now only handle static shapes. For dynamic
+    // shapes, the shape of the output needs to be resolved using tie shapes,
+    // etc.
+    if (auto shapedType = outputType.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) return llvm::None;
+      outputShapes.push_back(llvm::to_vector<4>(
+          llvm::map_range(shapedType.getShape(), [&](int64_t dim) -> Value {
+            return builder.create<ConstantIndexOp>(op->getLoc(), dim);
+          })));
+      continue;
+    }
+    return llvm::None;
+  }
+  return outputShapes;
+}
+
+/// Puts ops that are not-tilable or arent tiled into a
+/// `flow.dispatch.workgroups` operation. For example tile and distribute of
+/// element-wise operations is not beneficial. These are handled appropriately
+/// by the backends.
+struct MakeDispatchWorkgroupsOp : public RewritePattern {
+  MakeDispatchWorkgroupsOp(PatternBenefit benefit = 1)
+      : RewritePattern(benefit, MatchAnyOpTypeTag()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    // Ignore operations alraedy in dispatch regions.
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>())
+      return failure();
+    // Do this only for Linalg ops right now.
+    if (op->getDialect() !=
+        op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) {
+      return failure();
+    }
+    if (isAlwaysClonedIntoDispatchOp(op)) return failure();
+    // The workgroup count is based on the result shape.
+    if (op->getNumResults() != 1) return failure();
+    SmallVector<Value, 4> count;
+    Location loc = op->getLoc();
+    // Since the workload depends on the output shape, set the insertion point
+    // to after the operation. After dim canonicalization, the original
+    // operation should become dead.
+    if (auto resultType = op->getResult(0).getType().dyn_cast<ShapedType>()) {
+      rewriter.setInsertionPointAfter(op);
+      count = llvm::to_vector<4>(llvm::map_range(
+          llvm::seq<int64_t>(0, resultType.getRank()), [&](int64_t d) -> Value {
+            return rewriter.create<DimOp>(loc, op->getResult(0), d);
+          }));
+    }
+    // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
+    // workload count of 3, though it should be generalized. For now making sure
+    // the flow has three elements of workload size (x, y, z) by linearizing the
+    // workloads for all higher dimensions greater than or equal to
+    // kNumMaxParallelDims.
+    if (count.size() > kNumMaxParallelDims) {
+      unsigned numSymbols = 0;
+      AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
+      for (int64_t i = 1; i < count.size() - kNumMaxParallelDims + 1; i++) {
+        expr = expr * rewriter.getAffineSymbolExpr(numSymbols++);
+      }
+      count[count.size() - kNumMaxParallelDims] = linalg::applyMapToValues(
+          rewriter, loc, AffineMap::get(0, numSymbols, expr),
+          ArrayRef<Value>(count).take_front(count.size() - kNumMaxParallelDims +
+                                            1))[0];
+      count = llvm::to_vector<4>(
+          ArrayRef<Value>(count).take_back(kNumMaxParallelDims));
+    }
+    auto workload = convertToWorkload(rewriter, loc, count);
+    auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, op->getLoc(),
+                                                      workload, op);
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
+    rewriter.replaceOpWithIf(
+        op, dispatchOp.getOperation()->getResults(),
+        [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
     return success();
   }
 };
@@ -314,27 +396,14 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
-/// Returns true if an operation is to always be cloned into the dispatch region
-/// when its value is used within it.
-bool isAlwaysClonedIntoDispatchOp(Operation *op) {
-  if (isa<linalg::InitTensorOp, linalg::TensorReshapeOp>(op)) {
-    return true;
-  }
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
-    return constantOp.getResult().getType().isIntOrFloat();
-  }
-  return false;
-}
-
 /// Computes the values that will be eventually be used within the dispatch
 /// workgroup op but defined outside the op after all clonable operations are
 /// cloned into the region. Returns (by reference) the clonable operations too,
 /// in order in which they can be cloned within the region to satisfy use-def
 /// relationships between them.
-void getUsedValuesDefinedAboveAfterCloningOps(
+static void getUsedValuesDefinedAboveAfterCloningOps(
     Region &region, llvm::SetVector<Value> &valuesDefinedAbove,
     llvm::SmallVector<Operation *, 4> &clonedOps) {
-  mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
   llvm::SetVector<Value> visited;
   SmallVector<Value, 4> worklist;
   worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
@@ -344,7 +413,8 @@ void getUsedValuesDefinedAboveAfterCloningOps(
     if (visited.count(outsideValue)) continue;
     visited.insert(outsideValue);
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !isAlwaysClonedIntoDispatchOp(definingOp)) {
+    if (!definingOp || !(isAlwaysClonedIntoDispatchOp(definingOp) ||
+                         isAlwaysFusedIntoDispatchOp(definingOp))) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
@@ -366,6 +436,7 @@ void getUsedValuesDefinedAboveAfterCloningOps(
 
 /// Returns a valid insertion point for an operation based on the values used.
 static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
+  if (usedValues.empty()) return &block.front();
   Operation *insertAfter = &block.front();
   for (auto value : usedValues) {
     Operation *definingOp = value.getDefiningOp();
@@ -385,14 +456,18 @@ static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
 static LogicalResult legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = dispatchOp.getLoc();
-  Block &block = dispatchOp.body().front();
+  Region &region = dispatchOp.body();
+  Block &block = region.front();
   unsigned numOldBBArgs = block.getNumArguments();
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
   llvm::SetVector<Value> valuesDefinedAbove;
   llvm::SmallVector<Operation *, 4> clonedOps;
-  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp.body(),
-                                           valuesDefinedAbove, clonedOps);
+  mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
+  if (valuesDefinedAbove.empty()) return success();
+
+  getUsedValuesDefinedAboveAfterCloningOps(region, valuesDefinedAbove,
+                                           clonedOps);
 
   BlockAndValueMapping map;
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
@@ -496,6 +571,14 @@ static bool isProducerFusableWithConsumer(linalg::LinalgOp producer,
          isElementWiseParallelOp(producer);
 }
 
+/// Dispatch regions created by tile + distribute need root operations that
+/// decide the tiling. This could be generalize to say something like "any
+/// operation that is not element-wise parallel", but for now, just hand code
+/// this.
+static bool isRootOp(Operation *op) {
+  return isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op);
+}
+
 /// For a given block partition the LinalgOps in the block into fusable
 /// groups. All analysis of what to fuse happens here. For now this is just
 /// hard-wiring from basic heuristic but this could be adapted to have 1) better
@@ -510,9 +593,9 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
     // Start with a root operation. Everything will be "fused with it".
     for (linalg::LinalgOp linalgOp : linalgOps) {
       Operation *op = linalgOp.getOperation();
-      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupAttr)) continue;
-      // For now only matmul op as root.
-      if (!isa<linalg::MatmulOp>(op)) continue;
+      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupAttr) ||
+          !isRootOp(op))
+        continue;
       unsigned currGroupNum = numRootOps++;
       op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
       for (auto operand : linalgOp.getShapedOperands()) {
@@ -526,13 +609,6 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
                               builder.getI64IntegerAttr(currGroupNum));
         }
       }
-    }
-
-    // Finally whatever is not marked for fusion becomes a root operation.
-    for (linalg::LinalgOp linalgOp : linalgOps) {
-      Operation *op = linalgOp.getOperation();
-      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupAttr)) continue;
-      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(numRootOps++));
     }
   }
 }
@@ -589,27 +665,46 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     return useTileSizes;
   };
 
-  // Use the workgroup size as a proxy for tile size here. At the flow level
-  // this represents the "workload" per processors and is not necessarily tied
-  // to the workgroup size specified by the backend.
-  OwningRewritePatternList patterns;
-  auto linalgTilingOptions =
-      linalg::LinalgTilingOptions()
-          .setDistributionOptions(workgroupDistributionOptions)
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizeComputationFunction(tileSizeFn);
-  assert(linalgTilingOptions.distribution.hasValue());
+  {
+    // Use the workgroup size as a proxy for tile size here. At the flow level
+    // this represents the "workload" per processors and is not necessarily tied
+    // to the workgroup size specified by the backend.
+    OwningRewritePatternList patterns;
+    auto linalgTilingOptions =
+        linalg::LinalgTilingOptions()
+            .setDistributionOptions(workgroupDistributionOptions)
+            .setLoopType(linalg::LinalgTilingLoopType::Loops)
+            .setTileSizeComputationFunction(tileSizeFn);
+    assert(linalgTilingOptions.distribution.hasValue());
 
-  patterns.insert<TileAndDistributeOnTensorsPattern>(
-      linalgTilingOptions,
-      // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
-      linalg::LinalgTransformationFilter(
-          ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
+    patterns.insert<TileAndDistributeOnTensorsPattern>(
+        linalgTilingOptions,
+        // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
+        linalg::LinalgTransformationFilter(
+            ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
 
-  // Add canonicalization patterns.
-  linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
-  patterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    // Add canonicalization patterns.
+    linalg::populateLinalgTilingCanonicalizationPatterns(patterns, context);
+    patterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
+  // After outlining in dispatch region we can rewrite the dispatch ops with
+  // proper captures.
+  if (funcOp
+          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
+            return legalizeDispatchWorkgroupOperands(op);
+          })
+          .wasInterrupted()) {
+    return signalPassFailure();
+  }
+
+  // Move other operations into their own dispatch regions.
+  {
+    OwningRewritePatternList patterns;
+    patterns.insert<MakeDispatchWorkgroupsOp>();
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.
@@ -623,8 +718,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
-  bool fail =
-      funcOp
+  if (funcOp
           .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
             if (failed(rewriteLinalgDestructiveUpdates(op))) {
               funcOp.emitError("Failed to rewrite destructive updates in:\n")
@@ -633,20 +727,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
             }
             return WalkResult::advance();
           })
-          .wasInterrupted();
-  fail |=
-      funcOp
-          .walk([&](IREE::Flow::DispatchOutputStoreOp op) {
-            if (op.offsets().empty() || op.sizes().empty() ||
-                op.strides().empty()) {
-              funcOp.emitError("Full-tensor DispatchOutputStoreOp remaining:\n")
-                  << *op.getOperation();
-              return WalkResult::interrupt();
-            }
-            return WalkResult::advance();
-          })
-          .wasInterrupted();
-  if (fail) {
+          .wasInterrupted()) {
     signalPassFailure();
   }
 }

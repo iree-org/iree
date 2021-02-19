@@ -350,13 +350,19 @@ struct TileWorkgroupSizePair {
   std::array<int64_t, 3> workgroupSize;
 };
 
-static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
+template <typename ConvOpTy>
+static LogicalResult getMaliSpecificConfig(ConvOpTy op,
                                            TileSizesListType &tileSizes,
                                            LaunchConfigInfo &config) {
-  auto inputType = op.getInput(1).getType().cast<MemRefType>();
-  auto outputType = op.getOutputBufferTypes()[0].cast<MemRefType>();
+  auto inputType = op.getInput(1).getType().template cast<MemRefType>();
+  auto outputType = op.getOutputBufferTypes()[0].template cast<MemRefType>();
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
+  // Only support NHWC conv.
+  if (!isa<linalg::ConvOp, linalg::ConvInputNHWCFilterHWCFOp>(
+          op.getOperation())) {
+    return failure();
+  }
 
   bool isInputTilable =
       inputType.getDimSize(3) % 4 == 0 || inputType.getDimSize(3) < 4;
@@ -413,12 +419,11 @@ static LogicalResult getMaliSpecificConfig(linalg::ConvOp op,
   return failure();
 }
 
-template <>
-LogicalResult getOpLaunchConfig(linalg::ConvOp op,
-                                const spirv::TargetEnv &targetEnv,
-                                const SPIRVCodegenOptions &options,
-                                TileSizesListType &tileSizes,
-                                LaunchConfigInfo &config) {
+template <typename T>
+LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
+                                    const SPIRVCodegenOptions &options,
+                                    TileSizesListType &tileSizes,
+                                    LaunchConfigInfo &config) {
   if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(getMaliSpecificConfig(op, tileSizes, config))) {
     return success();
@@ -434,6 +439,22 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
   config.workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
 }
+
+#define GET_CONV_LAUNCH_CONFIG(opType)                                       \
+  template <>                                                                \
+  LogicalResult getOpLaunchConfig(                                           \
+      opType op, const spirv::TargetEnv &targetEnv,                          \
+      const SPIRVCodegenOptions &options, TileSizesListType &tileSizes,      \
+      LaunchConfigInfo &config) {                                            \
+    return getConvOpLaunchConfig(op, targetEnv, options, tileSizes, config); \
+  }
+
+GET_CONV_LAUNCH_CONFIG(linalg::ConvOp)
+GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNWCFilterWCFOp)
+GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNHWCFilterHWCFOp)
+GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNDHWCFilterDHWCFOp)
+
+#undef GET_CONV_LAUNCH_CONFIG
 
 static LogicalResult getMaliSpecificConfig(
     linalg::DepthwiseConvInputNHWCFilterHWCOp op, TileSizesListType &tileSizes,
@@ -589,12 +610,16 @@ Optional<LaunchConfig> initGPULaunchConfig(
       return llvm::None;                                                     \
     }                                                                        \
     launchConfig.setTileSizes(op, tileSizesInfo);                            \
+    launchConfig.setRootOperation(op);                                       \
     continue;                                                                \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
     DISPATCH(linalg::ConvOp)
     DISPATCH(linalg::DepthwiseConvInputNHWCFilterHWCOp)
+    DISPATCH(linalg::ConvInputNWCFilterWCFOp)
+    DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
+    DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
     DISPATCH(linalg::MatmulOp)
     DISPATCH(linalg::PoolingMaxOp)
     DISPATCH(linalg::PoolingMinOp)
@@ -651,6 +676,14 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
 }
 
 template <>
+Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::FMAOp>(
+    vector::FMAOp op) {
+  SmallVector<int64_t, 4> size(op.getType().getRank(), 1);
+  size.back() = 4;
+  return size;
+}
+
+template <>
 Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     vector::TransferReadOp op) {
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
@@ -695,6 +728,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
   }
 
   DISPATCH(vector::ContractionOp)
+  DISPATCH(vector::FMAOp)
   DISPATCH(vector::TransferReadOp)
   DISPATCH(vector::TransferWriteOp)
 

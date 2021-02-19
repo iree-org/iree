@@ -191,7 +191,7 @@ module {
      ins(%0 : tensor<2x4xf32>)
     outs(%shape : tensor<2x4xf32>) {
     ^bb0(%arg0: f32, %s: f32):  // no predecessors
-      %2 = tanh %arg0 : f32
+      %2 = math.tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
     hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0
@@ -237,7 +237,7 @@ module {
      ins(%0 : tensor<2x4xf32>)
     outs(%shape : tensor<2x4xf32>) {
     ^bb0(%arg0: f32, %s: f32):  // no predecessors
-      %2 = tanh %arg0 : f32
+      %2 = math.tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
     %3 = linalg.tensor_reshape %1 [#map1, #map2]
@@ -287,7 +287,7 @@ module {
      ins(%0 : tensor<2x4xf32>)
     outs(%shape : tensor<2x4xf32>) {
     ^bb0(%arg0: f32, %s: f32):  // no predecessors
-      %2 = tanh %arg0 : f32
+      %2 = math.tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
     %3 = linalg.tensor_reshape %1 [#map1, #map2]
@@ -336,7 +336,7 @@ module {
      ins(%0 : tensor<2x4xf32>)
     outs(%shape : tensor<2x4xf32>) {
     ^bb0(%arg0: f32, %s: f32):  // no predecessors
-      %2 = tanh %arg0 : f32
+      %2 = math.tanh %arg0 : f32
       linalg.yield %2 : f32
     } -> tensor<2x4xf32>
     %3 = linalg.tensor_reshape %1 [#map1, #map2]

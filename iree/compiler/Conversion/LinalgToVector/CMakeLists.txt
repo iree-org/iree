@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMath
     MLIRPass
     MLIRStandard
     MLIRSupport

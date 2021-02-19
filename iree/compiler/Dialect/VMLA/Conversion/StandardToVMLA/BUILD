@@ -32,6 +32,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/IR",
         "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",

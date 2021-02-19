@@ -189,6 +189,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
   }
 
   // First perform module-level analysis that following passes will use to query
