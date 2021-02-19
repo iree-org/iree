@@ -86,9 +86,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
   // handle region conversion properly (parent cloned before children). Revisit
   // when using ops with regions such as scf.for and linalg.generic.
-  if (!clEnableLinalgOnTensorsDispatch) {
-    passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
-  }
+  passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
 
   //----------------------------------------------------------------------------
   // Shape and reflection ABI materialization.
