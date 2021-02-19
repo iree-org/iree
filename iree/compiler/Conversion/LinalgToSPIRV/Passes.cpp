@@ -262,6 +262,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //===--------------------------------------------------------------------===//
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
   }
 
   //===--------------------------------------------------------------------===//

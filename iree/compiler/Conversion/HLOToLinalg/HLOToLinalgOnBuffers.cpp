@@ -47,6 +47,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-hlo-to-linalg-on-buffers"
 
@@ -1227,6 +1228,27 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
 }
 
 //===----------------------------------------------------------------------===//
+// Canonicalization patterns.
+//===----------------------------------------------------------------------===//
+
+// Folds linalg.reshape op that directly reshaping an iree.placeholder op into
+// the iree.placeholder op itself.
+class FoldReshapeIntoPlaceholder final
+    : public OpRewritePattern<linalg::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::ReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto placeholderOp = reshapeOp.src().getDefiningOp<IREE::PlaceholderOp>();
+    if (!placeholderOp) return failure();
+    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
+        reshapeOp, reshapeOp.getResultType(), ValueRange(),
+        placeholderOp.getAttrs());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass specification.
 //===----------------------------------------------------------------------===//
 
@@ -1307,6 +1329,13 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
 
   if (failed(applyFullConversion(getFunction(), target, std::move(patterns)))) {
     return signalPassFailure();
+  }
+
+  // Perform additional canonicalizations.
+  {
+    OwningRewritePatternList foldingPatterns;
+    foldingPatterns.insert<FoldReshapeIntoPlaceholder>(context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(foldingPatterns));
   }
 }
 
