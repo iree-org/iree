@@ -46,6 +46,7 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
                                             Operation *op) {
   OwningRewritePatternList canonicalizationPatterns;
   canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
+  scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);

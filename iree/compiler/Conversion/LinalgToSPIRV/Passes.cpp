@@ -258,9 +258,9 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //   - All XLA HLO ops are converted.
     //   - All Linalg ops are operating on buffers.
     //===--------------------------------------------------------------------===//
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
   }
 
   //===--------------------------------------------------------------------===//
