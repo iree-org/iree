@@ -272,7 +272,6 @@ static LogicalResult convertTransferOp(OpBuilder &b,
           op->getResult(0).getType().dyn_cast<RankedTensorType>()) {
     // If the op return a Tensor allocate a buffer for the returned value.
     auto tensorShape = tensorType.getShape();
-    auto memrefType = MemRefType::get(tensorShape, tensorType.getElementType());
     SmallVector<Value, 4> dynOperands;
     for (size_t idx : llvm::seq(size_t(0), tensorShape.size())) {
       if (tensorType.isDynamicDim(idx)) {
