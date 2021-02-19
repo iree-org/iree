@@ -25,13 +25,6 @@ namespace iree_compiler {
 inline llvm::StringRef getEntryPointScheduleAttrName() {
   return "hal.entry_point_schedule";
 }
-
-/// Attribute on a entry point function that specifies which function computes
-/// the number of workgroups.
-inline llvm::StringRef getNumWorkgroupsFnAttrName() {
-  return "hal.num_workgroups_fn";
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

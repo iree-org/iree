@@ -251,19 +251,9 @@ static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
     Location loc, IREE::HAL::ExecutableEntryPointOp entryPointOp,
     ValueRange workload, OpBuilder &builder) {
   Block *body = entryPointOp.getBlock();
-  if (workload.size() != body->getNumArguments()) {
-    ::mlir::emitError(loc,
-                      "mismatch in number of workload values provided during "
-                      "lowering to HAL and provided");
-    return {
-        builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-        builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-        builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-    };
-  }
   BlockAndValueMapping bvm;
-  for (auto args : llvm::zip(workload, body->getArguments())) {
-    bvm.map(std::get<1>(args), std::get<0>(args));
+  for (auto args : llvm::enumerate(workload)) {
+    bvm.map(body->getArgument(args.index()), args.value());
   }
   for (Operation &op : body->without_terminator()) {
     builder.clone(op, bvm);

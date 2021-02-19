@@ -34,14 +34,6 @@ void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 
-/// Pass to initialize the function that computes the number of workgroups for
-/// each entry point function. The function is defined, but is populated later.
-std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
-
-/// Pass to legalize function that returns number of workgroups to use for
-/// launch to be runnable on the host.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
-
 /// Pass to perform linalg on tensor bufferization. The function passed into the
 /// pass through the `allocationFn` argument is invoked whenever a new buffer is
 /// to be created. The callback will be passed the Values for the dynamic

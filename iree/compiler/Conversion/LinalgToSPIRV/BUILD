@@ -41,7 +41,6 @@ cc_library(
         "KernelDispatchUtils.cpp",
         "LinalgTileAndFusePass.cpp",
         "MatMulVectorizationTest.cpp",
-        "MaterializeEntryPointsPass.cpp",
         "Passes.cpp",
         "SplitDispatchFunctionPass.cpp",
         "Utils.cpp",

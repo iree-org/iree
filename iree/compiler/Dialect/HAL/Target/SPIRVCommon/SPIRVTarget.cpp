@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -91,98 +90,79 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       spvModuleOp = *spvModuleOps.begin();
       entryPointScheduleAttr = innerModuleOp->getAttrOfType<ArrayAttr>(
           iree_compiler::getEntryPointScheduleAttrName());
-      break;
+      if (!spvModuleOp)
+        return executableOp.emitError("unable to find spv.module");
+
+      SmallVector<IREE::HAL::ExecutableEntryPointOp, 2> entryPoints;
+      if (!entryPointScheduleAttr) {
+        entryPoints = llvm::to_vector<2>(
+            executableTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
+        if (!llvm::hasSingleElement(entryPoints)) {
+          return executableTargetOp.emitError(
+                     "expected a single entry point, found ")
+                 << entryPoints.size();
+        }
+      } else {
+        SymbolTable symTable(executableTargetOp);
+        for (Attribute entryPointAttr : entryPointScheduleAttr) {
+          auto entryPointOp =
+              symTable.lookup<IREE::HAL::ExecutableEntryPointOp>(
+                  entryPointAttr.cast<FlatSymbolRefAttr>().getValue());
+          if (!entryPointOp) {
+            return executableTargetOp.emitError(
+                       "unable to find hal.executable.entry_point operation "
+                       "for ")
+                   << entryPointAttr.cast<FlatSymbolRefAttr>().getValue();
+          }
+          entryPoints.push_back(entryPointOp);
+        }
+      }
+
+      auto *region = switchRewriter.addConditionRegion(
+          IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
+          {
+              dispatchState.workgroupCount[0],
+              dispatchState.commandBuffer,
+          });
+
+      auto &entryBlock = region->front();
+      ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToEnd(&entryBlock);
+      auto workload = entryBlock.getArgument(0);
+      auto commandBuffer = entryBlock.getArgument(1);
+
+      // We have multiple entry points to dispatch. Record in the order
+      // specified by entry point schedule and insert barrier between sequential
+      // ones.
+      for (auto entryPoint : llvm::enumerate(entryPoints)) {
+        std::array<Value, 3> workgroupCount = calculateDispatchWorkgroupCount(
+            loc, executableOp, entryPoint.value(), workload, rewriter);
+
+        if (llvm::any_of(workgroupCount,
+                         [](Value v) -> bool { return v == nullptr; })) {
+          return entryPoint.value().emitError("unable to find workgroup count");
+        }
+
+        // Ordinals are fixed based on the precomputed schedule, so use
+        // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
+        auto executable = rewriter
+                              .create<IREE::HAL::ExecutableLookupOp>(
+                                  loc, dispatchState.device,
+                                  dispatchState.dispatchOp.executable())
+                              .getResult();
+        int32_t entryPointOrdinal = entryPoint.index();
+        rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
+            loc, commandBuffer, executable,
+            rewriter.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
+            workgroupCount[1], workgroupCount[2]);
+        if (entryPoint.index() + 1 != entryPoints.size()) {
+          recordFullExecutionBarrier(commandBuffer, loc, rewriter);
+        }
+      }
+      rewriter.create<IREE::HAL::ReturnOp>(loc);
     }
   }
-  if (!spvModuleOp) return executableOp.emitError("unable to find spv.module");
-
-  SmallVector<spirv::FuncOp, 2> spvEntryPointFns;
-  if (!entryPointScheduleAttr) {
-    for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
-      if (spvFuncOp.isPublic()) spvEntryPointFns.push_back(spvFuncOp);
-    }
-    if (!llvm::hasSingleElement(spvEntryPointFns)) {
-      return spvModuleOp.emitError(
-                 "expected a single entry point function, found ")
-             << spvEntryPointFns.size();
-    }
-  } else {
-    llvm::StringMap<spirv::FuncOp> publicFns;
-    for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
-      if (spvFuncOp.isPublic()) publicFns[spvFuncOp.sym_name()] = spvFuncOp;
-    }
-    for (Attribute entryNameAttr : entryPointScheduleAttr) {
-      StringRef entryName = entryNameAttr.cast<StringAttr>().getValue();
-      spirv::FuncOp spvFuncOp = publicFns.lookup(entryName);
-      if (!spvFuncOp)
-        return spvModuleOp.emitError("unable to find entry point function ")
-               << entryName;
-      spvEntryPointFns.push_back(spvFuncOp);
-    }
-  }
-
-  auto *region = switchRewriter.addConditionRegion(
-      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
-      {
-          dispatchState.workgroupCount[0],
-          dispatchState.commandBuffer,
-      });
-
-  auto &entryBlock = region->front();
-  ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToEnd(&entryBlock);
-  auto commandBuffer = entryBlock.getArgument(1);
-
-  // We have multiple entry points to dispatch. Record in the order
-  // specified by entry point schedule and insert barrier between sequential
-  // ones.
-  for (auto it : llvm::enumerate(spvEntryPointFns)) {
-    spirv::FuncOp spvFuncOp = it.value();
-
-    FlatSymbolRefAttr numWorkgroupsFnAttr =
-        spvFuncOp->template getAttrOfType<FlatSymbolRefAttr>(
-            getNumWorkgroupsFnAttrName());
-    if (!numWorkgroupsFnAttr) {
-      return spvFuncOp.emitError(
-          "expected vkspv.num_workgroups_fn attribute to refer to function "
-          "that computes number of workgroups to use");
-    }
-
-    std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
-    FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-        spvFuncOp->getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
-    if (!numWorkgroupsFn) {
-      return spvFuncOp.emitError("unable to find function ")
-             << numWorkgroupsFnAttr
-             << " that computes the number of workgroups to use";
-    }
-    workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-        loc, numWorkgroupsFn, dispatchState.interfaceOp, dispatchState.operands,
-        dispatchState.results, rewriter);
-
-    if (llvm::any_of(workgroupCount,
-                     [](Value v) -> bool { return v == nullptr; }))
-      return spvFuncOp.emitError("unable to find workgroup count");
-
-    // Ordinals are fixed based on the precomputed schedule, so use
-    // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
-    auto executable = rewriter
-                          .create<IREE::HAL::ExecutableLookupOp>(
-                              loc, dispatchState.device,
-                              dispatchState.dispatchOp.executable())
-                          .getResult();
-    int32_t entryPointOrdinal = it.index();
-    rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
-        loc, commandBuffer, executable,
-        rewriter.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
-        workgroupCount[1], workgroupCount[2]);
-    if (it.index() + 1 != spvEntryPointFns.size()) {
-      recordFullExecutionBarrier(commandBuffer, loc, rewriter);
-    }
-  }
-
-  rewriter.create<IREE::HAL::ReturnOp>(loc);
   return success();
 }
 

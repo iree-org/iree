@@ -19,7 +19,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
@@ -526,24 +525,6 @@ void LinalgTileAndFusePass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-
-    // In the above we distributed ops to workgroup dimensions and populated a
-    // function for calculating the number of workgroups. In the folling steps,
-    // we will need to query the workgroup count function to simplify GPU
-    // processor ID uses. It relies on constant upper bounds. So we need to
-    // canonicalize the workgroup count function first.
-    if (funcOp->getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName())) {
-      FuncOp numWorkGroupFunc =
-          getNumWorkgroupsFn(funcOp, getNumWorkgroupsFnAttrName());
-      applyIndexCalculationCanonicalization(numWorkGroupFunc);
-
-      LLVM_DEBUG({
-        llvm::dbgs()
-            << "--- After canonicalizing workgroup count function  ---\n";
-        numWorkGroupFunc.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
 
     if (options.useWorkgroupMemory) {
       // The promotion patterns are put separate from the tiling patterns to
