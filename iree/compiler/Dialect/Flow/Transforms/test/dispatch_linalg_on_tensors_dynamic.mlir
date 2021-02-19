@@ -306,3 +306,47 @@ func @generic_op_4D
 //  CHECK-DAG:   %[[D3:.+]] = dim %[[ARG0]], %[[C3]]
 //      CHECK:   %[[WORKLOAD_Z:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
 //      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[WORKLOAD_Z]]]
+
+// -----
+
+func @always_fuse_reshape
+  (%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
+  -> (tensor<?x?xf32>, tensor<?x?xf32>)
+{
+  %cst = constant 0.0 : f32
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = linalg.tensor_reshape %lhs [affine_map<(d0, d1) -> (d0, d1)>]
+    : tensor<?xf32> into tensor<?x4xf32>
+  %m = dim %0, %c0 : tensor<?x4xf32>
+  %n1 = dim %rhs1, %c1 : tensor<4x?xf32>
+  %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
+  %fill1 = linalg.fill(%init1, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %1 = linalg.matmul
+    ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %n2 = dim %rhs2, %c1 : tensor<4x?xf32>
+  %init2 = linalg.init_tensor [%m, %n2] : tensor<?x?xf32>
+  %fill2 = linalg.fill(%init2, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %2= linalg.matmul
+    ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 floordiv 4)>
+//      CHECK: func @always_fuse_reshape(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
+// CHECK-SAME:   %[[RHS1:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
+// CHECK-SAME:   %[[RHS2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//      CHECK:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[M:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
+//  CHECK-DAG:   %[[N1:.+]] = dim %[[ARG1]], %[[C1]]
+//      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
+// CHECK-SAME:     (%[[M]], %[[N1]], %[[ARG0]], %[[RHS1]])
+//      CHECK:   %[[N2:.+]] = dim %[[RHS2]], %[[C1]]
+//      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
+// CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[RHS2]])
+//      CHECK:   return %[[RESULT1]], %[[RESULT2]]
