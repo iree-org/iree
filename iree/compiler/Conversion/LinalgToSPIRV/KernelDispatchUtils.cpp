@@ -359,8 +359,7 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
   // Only support NHWC conv.
-  if (!isa<linalg::ConvOp, linalg::ConvInputNHWCFilterHWCFOp>(
-          op.getOperation())) {
+  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(op.getOperation())) {
     return failure();
   }
 
@@ -407,7 +406,7 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
     // Finally, for each invocation, we use tiling to generate loops to loop
     // over the filter's height (step 1), width (step 1), and input channel
     // (step 4) dimensions.
-    SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 4, 1, 1};
+    SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1, 4};
     tileSizes.emplace_back(fourthLevel);
 
     config.workgroupSize = workgroupSize;
