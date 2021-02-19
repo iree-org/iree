@@ -256,7 +256,6 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
-
 test_suite(
     name = "check",
     tests = [
