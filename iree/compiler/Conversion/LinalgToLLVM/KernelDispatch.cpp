@@ -163,28 +163,26 @@ Optional<LaunchConfig> initCPULaunchConfig(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
     ArrayRef<linalg::LinalgOp> linalgOps) {
   LaunchConfig config;
-  if (!clLLVMTileSizes.empty()) {
-    SmallVector<int64_t, 3> tileSizes(clLLVMTileSizes.begin(),
-                                      clLLVMTileSizes.end());
-    for (linalg::LinalgOp linalgOp : linalgOps) {
-      config.setTileSizes(linalgOp.getOperation(), tileSizes, 0);
-    }
-    return config;
-  }
 
   Optional<linalg::LinalgOp> rootOperation = llvm::None;
   for (auto linalgOp : linalgOps) {
-#define DISPATCH(opType)                                                     \
-  if (opType op = dyn_cast<opType>(linalgOp.getOperation())) {               \
-    if (rootOperation) {                                                     \
-      op.emitError("unhandled multiple root operations in dispatch region"); \
-      return llvm::None;                                                     \
-    }                                                                        \
-    rootOperation = linalgOp;                                                \
-    auto opTileSizes =                                                       \
-        TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op); \
-    config.setTileSizes(op, opTileSizes, 0);                                 \
-    continue;                                                                \
+#define DISPATCH(opType)                                                       \
+  if (opType op = dyn_cast<opType>(linalgOp.getOperation())) {                 \
+    if (rootOperation) {                                                       \
+      op.emitError("unhandled multiple root operations in dispatch region");   \
+      return llvm::None;                                                       \
+    }                                                                          \
+    rootOperation = linalgOp;                                                  \
+    SmallVector<int64_t, 4> opTileSizes;                                       \
+    if (!clLLVMTileSizes.empty()) {                                            \
+      opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());      \
+    } else {                                                                   \
+      opTileSizes =                                                            \
+          TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op); \
+    }                                                                          \
+    config.setTileSizes(op, opTileSizes, 0);                                   \
+    config.setRootOperation(op);                                               \
+    continue;                                                                  \
   }
 
     DISPATCH(linalg::MatmulOp)

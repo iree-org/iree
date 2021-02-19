@@ -499,34 +499,47 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    if (tiledLoops.empty()) {
+    if (!options.usingLinalgOnTensors) {
       TileAndFuseOptions tileAndFuseOptions = {
           getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
       if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
                                             launchConfig,
-                                            tileAndFuseOptions))) {
+                                            tileAndFuseOptions)) ||
+          failed(
+              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
         return signalPassFailure();
       }
     } else {
-      ArrayRef<int64_t> workgroupSize = launchConfig.getWorkgroupSize();
-      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup = llvm::to_vector<4>(
-          llvm::reverse(workgroupSize.take_front(tiledLoops.size())));
-      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
-          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
-                                               defaultWorkloadPerWorkgroup);
-      if (!workloadPerWorkgroup) {
-        funcOp.emitOpError("unable to find workload per workgroup");
-        return signalPassFailure();
+      // Find the root operation for the dispatch region and get the tile sizes.
+      Operation *rootOperation =
+          launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
+              linalgOps,
+              [](linalg::LinalgOp op) { return op.getOperation(); })));
+      if (!rootOperation) {
+        launchConfig.finalize(funcOp);
+        return;
       }
-      if (failed(materializeStaticLaunchInformation(
-              funcOp, workloadPerWorkgroup.getValue()))) {
-        funcOp.emitOpError("failed to set tile size to constant value");
-        return signalPassFailure();
-      }
-    }
 
-    if (failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
-      return signalPassFailure();
+      ArrayRef<int64_t> rootOperationTileSizes =
+          launchConfig.getTileSizes(rootOperation, 0);
+      if (rootOperationTileSizes.empty()) {
+        launchConfig.finalize(funcOp);
+        return;
+      }
+
+      // Only use the tile sizes for parallel loops of the root operation.
+      rootOperationTileSizes = rootOperationTileSizes.take_front(
+          getNumOuterParallelLoops(rootOperation));
+
+      SmallVector<int64_t, 4> workloadPerWorkgroup =
+          llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
+      if (failed(materializeStaticLaunchInformation(funcOp,
+                                                    workloadPerWorkgroup)) ||
+          failed(
+              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
+        funcOp.emitOpError("failed to materialize static launch information");
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
