@@ -103,13 +103,6 @@ def log(*args, **kwargs):
   print(*args, **kwargs, file=sys.stderr)
 
 
-def convert_directory_tree(root_directory_path, write_files,
-                           allow_partial_conversion):
-  log(f"Converting directory tree rooted at: {root_directory_path}")
-  convert_directories((root for root, _, _ in os.walk(root_directory_path)),
-                      write_files, allow_partial_conversion)
-
-
 def convert_directories(generator, write_files, allow_partial_conversion):
   failure_dirs = []
   skip_count = 0
@@ -198,8 +191,10 @@ def main(args):
   write_files = not args.preview
 
   if args.root_dir:
-    convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files,
-                           args.allow_partial_conversion)
+    root_directory_path = os.path.join(repo_root, args.root_dir)
+    log(f"Converting directory tree rooted at: {root_directory_path}")
+    convert_directories((root for root, _, _ in os.walk(root_directory_path)),
+                        write_files, args.allow_partial_conversion)
   elif args.dir:
     convert_directories([os.path.join(repo_root, args.dir)], write_files,
                         args.allow_partial_conversion)
