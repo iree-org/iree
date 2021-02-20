@@ -99,8 +99,11 @@ def repo_relpath(path):
   return os.path.relpath(path, repo_root)
 
 
-def log(*args, **kwargs):
-  print(*args, **kwargs, file=sys.stderr)
+def log(string, *args, indent=0, **kwargs):
+  print(textwrap.indent(string, prefix=(indent * " ")),
+        *args,
+        **kwargs,
+        file=sys.stderr)
 
 
 def convert_directories(directories, write_files, allow_partial_conversion):
@@ -120,7 +123,7 @@ def convert_directories(directories, write_files, allow_partial_conversion):
   if failure_dirs:
     log(f"ERROR: Encountered unexpected errors converting {len(failure_dirs)}"
         " directories:")
-    log(textwrap.indent("\n".join(failure_dirs), "  "))
+    log("\n".join(failure_dirs), indent=2)
     sys.exit(1)
 
 
@@ -166,19 +169,17 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
         print(converted_text, end="")
     except (NameError, NotImplementedError) as e:
       log(
-          textwrap.indent(
-              f"\nERROR.\n"
-              f"Missing a rule handler in bazel_to_cmake_converter.py?\n"
-              f"Reason: `{type(e).__name__}: {e}`",
-              prefix="  "))
+          f"\nERROR.\n"
+          f"Missing a rule handler in bazel_to_cmake_converter.py?\n"
+          f"Reason: `{type(e).__name__}: {e}`",
+          indent=2)
       return Status.FAILED
     except KeyError as e:
       log(
-          textwrap.indent(
-              f"\nERROR.\n"
-              f"Missing a conversion in bazel_to_cmake_targets.py?\n"
-              f"Reason: `{type(e).__name__}: {e}`",
-              prefix="  "))
+          f"\nERROR.\n"
+          f"Missing a conversion in bazel_to_cmake_targets.py?\n"
+          f"Reason: `{type(e).__name__}: {e}`",
+          indent=2)
       return Status.FAILED
   log(f"Success")
   return Status.SUCCEEDED
