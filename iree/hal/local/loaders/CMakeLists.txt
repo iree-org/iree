@@ -23,6 +23,7 @@ iree_cc_library(
     "legacy_library_loader.cc"
   DEPS
     iree::base::api
+    iree::base::core_headers
     iree::base::dynamic_library
     iree::base::flatcc
     iree::base::internal::file_io

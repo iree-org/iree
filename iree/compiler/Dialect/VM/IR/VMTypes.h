@@ -19,12 +19,14 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
 // Order matters.
 #include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc"
+#include "iree/compiler/Dialect/VM/IR/VMStructs.h.inc"
 
 namespace mlir {
 namespace iree_compiler {

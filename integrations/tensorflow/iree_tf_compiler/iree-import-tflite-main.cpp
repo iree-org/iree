@@ -61,6 +61,7 @@ int main(int argc, char **argv) {
   // Register any command line options.
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
+  registerPassManagerCLOptions();
   cl::ParseCommandLineOptions(argc, argv);
 
   // Initialize dialects.
@@ -71,8 +72,8 @@ int main(int argc, char **argv) {
   registry.insert<StandardOpsDialect>();
 
   // Convert the Module proto into MLIR.
-  MLIRContext context;
-  registry.loadAll(&context);
+  MLIRContext context(registry);
+  context.loadAllAvailableDialects();
 
   // Load input buffer.
   std::string errorMessage;

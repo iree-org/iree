@@ -17,6 +17,7 @@
 #include "iree/base/dynamic_library.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/file_path.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/local_executable.h"
 
@@ -81,18 +82,31 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
                             "executable library_embedded is missing/empty");
   }
 
+  switch (iree_DyLibExecutableDef_sanitized_kind_get(executable_def)) {
+    case iree_SanitizerKind_None:
+      break;
+#if !defined(IREE_SANITIZER_ADDRESS)
+    case iree_SanitizerKind_Address:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Executable library is compiled with ASAN support but the host "
+          "runtime is not compiled with it enabled; add -fsanitize=address to "
+          "the runtime compilation options");
+#endif  // !IREE_SANITIZER_ADDRESS
+    default:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Executable library requires a sanitizer the host runtime is not "
+          "compiled to enable/understand: %u",
+          (uint32_t)iree_DyLibExecutableDef_sanitized_kind_get(executable_def));
+  }
+
   return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
 // iree_hal_legacy_executable_t
 //===----------------------------------------------------------------------===//
-
-typedef void (*iree_hal_legacy_executable_fn_ptr_t)(void* const*,
-                                                    const uint32_t*,
-                                                    const uint32_t*,
-                                                    const uint32_t*,
-                                                    const uint32_t*);
 
 typedef struct {
   iree_hal_local_executable_t base;
@@ -110,7 +124,7 @@ typedef struct {
 
   // Resolved entry points from the dynamic library.
   iree_host_size_t entry_fn_count;
-  iree_hal_legacy_executable_fn_ptr_t entry_fns[];
+  iree_hal_executable_dispatch_v0_t entry_fns[];
 } iree_hal_legacy_executable_t;
 
 extern const iree_hal_local_executable_vtable_t
@@ -165,24 +179,25 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
   if (flatbuffers_string_len(debug_database_filename) &&
       flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
     IREE_TRACE_SCOPE0("DyLibExecutable::AttachDebugDatabase");
-    auto debug_database_path = iree::file_path::JoinPaths(
-        iree::file_path::DirectoryName(library_temp_path),
-        absl::string_view(debug_database_filename,
-                          flatbuffers_string_len(debug_database_filename)));
-    iree_string_view_t debug_database_file = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_allocator_clone(
-        host_allocator,
-        iree_make_const_byte_span(debug_database_path.data(),
-                                  debug_database_path.size()),
-        (void**)&debug_database_file.data));
-    debug_database_file.size = debug_database_path.size();
-    executable->temp_files[executable->temp_file_count++] = debug_database_file;
+    iree_string_view_t library_temp_path_sv = iree_make_string_view(
+        library_temp_path.data(), library_temp_path.size());
+    iree_string_view_t debug_database_filename_sv =
+        iree_make_string_view(debug_database_filename,
+                              flatbuffers_string_len(debug_database_filename));
+    char* debug_database_path = NULL;
+    IREE_RETURN_IF_ERROR(iree_file_path_join(
+        iree_file_path_dirname(library_temp_path_sv),
+        debug_database_filename_sv, host_allocator, &debug_database_path));
+    iree_string_view_t debug_database_path_sv =
+        iree_make_cstring_view(debug_database_path);
+    executable->temp_files[executable->temp_file_count++] =
+        debug_database_path_sv;
     IREE_IGNORE_ERROR(iree::file_io::SetFileContents(
         debug_database_path,
         absl::string_view(
             reinterpret_cast<const char*>(debug_database_embedded_vec),
             flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
-    library->AttachDebugDatabase(debug_database_path.c_str());
+    library->AttachDebugDatabase(debug_database_path);
   }
 
   executable->library = library.release();
@@ -204,7 +219,7 @@ static iree_status_t iree_hal_legacy_executable_resolve_symbols(
           "symbol %s not exported by the dynamic library, check visibility",
           entry_point_str);
     }
-    executable->entry_fns[i] = (iree_hal_legacy_executable_fn_ptr_t)symbol;
+    executable->entry_fns[i] = (iree_hal_executable_dispatch_v0_t)symbol;
   }
   return iree_ok_status();
 }
@@ -306,7 +321,8 @@ static void iree_hal_legacy_executable_destroy(
 
 static iree_status_t iree_hal_legacy_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
-    const iree_hal_local_executable_call_t* call) {
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_vec3_t* workgroup_id) {
   iree_hal_legacy_executable_t* executable =
       (iree_hal_legacy_executable_t*)base_executable;
 
@@ -327,10 +343,7 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
                                       entry_point_name.size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  executable->entry_fns[ordinal](call->bindings, call->push_constants,
-                                 (const uint32_t*)&call->workgroup_id,
-                                 (const uint32_t*)&call->workgroup_count,
-                                 (const uint32_t*)&call->workgroup_size);
+  executable->entry_fns[ordinal](dispatch_state, workgroup_id);
 
   IREE_TRACE_ZONE_END(z0);
 

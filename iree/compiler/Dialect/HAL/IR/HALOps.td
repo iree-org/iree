@@ -1139,10 +1139,10 @@ def HAL_CommandBufferPushDescriptorSetOp :
     Pushes an inline-defined descriptor set to the command buffer.
 
     ```mlir
-    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindings = [
-      0 = (%buffer_0, %buffer_offset_0, %buffer_length_0),
-      1 = (%buffer_1, %buffer_offset_1, %buffer_length_1),
-      2 = (%buffer_2, %buffer_offset_2, %buffer_length_2)
+    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [
+      %c0 = (%buffer_0, %buffer_offset_0, %buffer_length_0),
+      %c1 = (%buffer_1, %buffer_offset_1, %buffer_length_1),
+      %c2 = (%buffer_2, %buffer_offset_2, %buffer_length_2)
     ]
     ```
   }];
@@ -1150,8 +1150,8 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_ExecutableLayout:$executable_layout,
-    I32Attr:$set,
-    I32ArrayAttr:$bindings,
+    Index:$set,
+    Variadic<Index>:$binding_ordinals,
     Variadic<HAL_Buffer>:$binding_buffers,
     Variadic<HAL_DeviceSize>:$binding_offsets,
     Variadic<HAL_DeviceSize>:$binding_lengths
@@ -1160,7 +1160,9 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
-      "uint32_t":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
+      "int64_t":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
+    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+      "Value":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -1177,7 +1179,7 @@ def HAL_CommandBufferBindDescriptorSetOp :
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_ExecutableLayout:$executable_layout,
-    I32Attr:$set,
+    Index:$set,
     HAL_DescriptorSet:$descriptor_set,
     Variadic<HAL_DeviceSize>:$dynamic_offsets
   );
@@ -1191,7 +1193,10 @@ def HAL_CommandBufferBindDescriptorSetOp :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
-      "uint32_t":$set, "Value":$descriptorSet,
+      "int64_t":$set, "Value":$descriptorSet,
+      CArg<"ValueRange", "{}">:$dynamicOffsets)>,
+    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+      "Value":$set, "Value":$descriptorSet,
       CArg<"ValueRange", "{}">:$dynamicOffsets)>,
   ];
 }
@@ -1551,7 +1556,7 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
   let arguments = (ins
     HAL_Device:$device,
     HAL_DescriptorSetLayout:$set_layout,
-    I32ArrayAttr:$bindings,
+    Variadic<Index>:$binding_ordinals,
     Variadic<HAL_Buffer>:$binding_buffers,
     Variadic<HAL_DeviceSize>:$binding_offsets,
     Variadic<HAL_DeviceSize>:$binding_lengths

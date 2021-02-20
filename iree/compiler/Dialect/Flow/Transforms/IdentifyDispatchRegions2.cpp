@@ -165,7 +165,7 @@ class FusionWorklist {
     for (auto result : results) {
       for (auto &use : result.getUses()) {
         Operation *def = use.getOwner();
-        if (def->isKnownTerminator()) continue;
+        if (def->hasTrait<OpTrait::IsTerminator>()) continue;
         if (def->getBlock() != block) continue;
         if (!isValidItem(def)) continue;
         if (!visited.insert(def).second) continue;

@@ -59,6 +59,7 @@ cc_library(
         "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:TargetLLVMIRModuleTranslation",
     ],
 )
 
@@ -74,6 +75,7 @@ cc_library(
         ":LLVMTargetOptions",
         "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Instrumentation",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",

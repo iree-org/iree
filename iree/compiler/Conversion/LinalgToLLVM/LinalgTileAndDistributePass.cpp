@@ -35,13 +35,15 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LinalgTileAndDistributePass
+class LinalgTileAndDistributePass
     : public PassWrapper<LinalgTileAndDistributePass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
+ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect, AffineDialect,
                     scf::SCFDialect>();
   }
+
   LinalgTileAndDistributePass() = default;
   LinalgTileAndDistributePass(const LinalgTileAndDistributePass &pass) {}
   void runOnOperation() override;
@@ -116,53 +118,32 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
     });
 
-    if (tiledLoops.empty()) {
-      linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-          [](OpBuilder &builder, Location loc,
-             ArrayRef<Range> parallelLoopRanges) {
-            auto numParallelDims = parallelLoopRanges.size();
-            SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-            for (size_t dim = 0,
-                        e = std::min(numParallelDims, static_cast<size_t>(3));
-                 dim < e; ++dim) {
-              procInfo[numParallelDims - dim - 1] = {
-                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
-                      loc, builder.getIndexType(), APInt(64, dim)),
-                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
-                      loc, builder.getIndexType(), APInt(64, dim)),
-              };
-            }
-            return procInfo;
-          },
-          {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-           linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-           linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-      TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
-                                               allocateThreadLocalMemory};
-      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
-                                            launchConfig,
-                                            tileAndFuseOptions))) {
-        return signalPassFailure();
-      }
-    } else {
-      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup(tiledLoops.size(), 1);
-      if (!defaultWorkloadPerWorkgroup.empty()) {
-        defaultWorkloadPerWorkgroup.back() = 4;
-      }
-      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
-          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
-                                               defaultWorkloadPerWorkgroup);
-      if (!workloadPerWorkgroup) {
-        funcOp.emitOpError("unable to find workload per workgroup");
-        return signalPassFailure();
-      }
-      if (failed(materializeStaticLaunchInformation(
-              funcOp, workloadPerWorkgroup.getValue()))) {
-        funcOp.emitOpError("failed to materialize static launch information");
-        return signalPassFailure();
-      }
+    linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
+        [](OpBuilder &builder, Location loc,
+           ArrayRef<Range> parallelLoopRanges) {
+          auto numParallelDims = parallelLoopRanges.size();
+          SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+          for (size_t dim = 0,
+                      e = std::min(numParallelDims, static_cast<size_t>(3));
+               dim < e; ++dim) {
+            procInfo[numParallelDims - dim - 1] = {
+                builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
+                    loc, builder.getIndexType(), APInt(64, dim)),
+                builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
+                    loc, builder.getIndexType(), APInt(64, dim)),
+            };
+          }
+          return procInfo;
+        },
+        {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+         linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+         linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+    TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
+                                             allocateThreadLocalMemory};
+    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
+                                          launchConfig, tileAndFuseOptions))) {
+      return signalPassFailure();
     }
-
     launchConfig.finalize(funcOp);
   }
 }

@@ -49,7 +49,12 @@ static llvm::cl::opt<bool> fastExpConversion(
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
-  passManager.addPass(createLinalgTileAndDistributePass());
+  if (clEnableLLVMLinalgOnTensors) {
+    passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  } else {
+    passManager.addPass(createLinalgTileAndDistributePass());
+  }
+
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (!clEnableLLVMLinalgOnTensors) {
     nestedModulePM.addPass(createLegalizeNumWorkgroupsFnPass());
@@ -100,7 +105,14 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   // HLO -> Linalg on buffers.
   if (clEnableLLVMLinalgOnTensors) {
     nestedModulePM.addPass(createLinalgVectorizePass());
-    addLinalgBufferizePasses(nestedModulePM);
+    // Use stack allocation on CPU side.
+    WorkgroupMemoryAllocationFn allocationFn =
+        [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+           Type elementType, ArrayRef<Value> dynamicSizes) {
+          MemRefType allocType = MemRefType::get(staticShape, elementType);
+          return builder.create<AllocaOp>(loc, allocType, dynamicSizes);
+        };
+    addLinalgBufferizePasses(nestedModulePM, allocationFn);
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));
   } else {
     // Propagates dynamic shapes computation on tensors.
@@ -109,6 +121,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
         Shape::createMaterializeShapeCalculationsPass());
     nestedModulePM.addNestedPass<FuncOp>(
         Shape::createHoistShapeCalculationsPass());
+    nestedModulePM.addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
     nestedModulePM.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(nestedModulePM);
   }

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-linalg-bufferize-llvm -canonicalize -cse -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file | IreeFileCheck %s
 
 func @tile_from_tensor_load() {
   %c0 = constant 0 : index
@@ -93,6 +93,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //   CHECK-DAG:       %[[LHS:.+]] = subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
 //   CHECK-DAG:       %[[RHS:.+]] = subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
 //       CHECK:       %[[ALLOC:.+]] = alloc() : memref<1x3xf32>
@@ -100,7 +101,6 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //  CHECK-SAME:         ins(%[[LHS]] :
 //  CHECK-SAME:         outs(%[[ALLOC]]
 //   CHECK-DAG:       %[[INIT:.+]] = subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
@@ -151,18 +151,16 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //   CHECK-DAG:       %[[LHS:.+]] = subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
 //   CHECK-DAG:       %[[RHS:.+]] = subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
 //   CHECK-DAG:       %[[INIT:.+]] = subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       %[[ALLOC:.+]] = alloc() : memref<1x1xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[INIT]] :
-//  CHECK-SAME:         outs(%[[ALLOC]]
-//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//  CHECK-SAME:         outs(%[[RESULT]]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
-//  CHECK-SAME:         outs(%[[ALLOC]]
-//       CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT]])
+//  CHECK-SAME:         outs(%[[RESULT]]
 
 // -----
 
@@ -303,3 +301,221 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //     return
 //   }
 // }
+
+// -----
+
+func @reshape_simple() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %c4 = constant 4 : index
+  %c12 = constant 12 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<12xi32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<3x4xi32>
+  %2 = flow.dispatch.input.load %0, offsets = [%c0], sizes = [%c12], strides = [%c1] : !flow.dispatch.input<12xi32> -> tensor<12xi32>
+  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  flow.dispatch.output.store %3, %1, offsets = [%c0, %c0], sizes = [%c3, %c4], strides = [%c1, %c1] : tensor<3x4xi32> -> !flow.dispatch.output<3x4xi32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+//       CHECK: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//       CHECK: func @reshape_simple()
+//       CHECK:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
+//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
+//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP]]]
+//       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0V]])
+
+// -----
+
+func @reshape_fused_source() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %c4 = constant 4 : index
+  %c12 = constant 12 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<12xi32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<3x4xi32>
+  %2 = flow.dispatch.input.load %0, offsets = [%c0], sizes = [%c12], strides = [%c1] : !flow.dispatch.input<12xi32> -> tensor<12xi32>
+  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  %4 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
+  %5 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%3 : tensor<3x4xi32>) outs(%4 : tensor<3x4xi32>) {
+    ^bb0(%arg0 : i32, %arg1 : i32):
+      %6 = addi %arg0, %arg0 : i32
+      linalg.yield %6 : i32
+    } -> tensor<3x4xi32>
+  flow.dispatch.output.store %5, %1, offsets = [%c0, %c0], sizes = [%c3, %c4], strides = [%c1, %c1] : tensor<3x4xi32> -> !flow.dispatch.output<3x4xi32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 4 + d1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//       CHECK: func @reshape_fused_source()
+//       CHECK:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
+//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
+//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP1]]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
+//  CHECK-SAME:     outs(%[[RET0V]] : memref<3x4xi32, #[[MAP0]]>)
+
+// -----
+
+func @reshape_fused_source_and_copyout() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %c4 = constant 4 : index
+  %c12 = constant 12 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<12xi32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<3x4xi32>
+  %2 = hal.interface.binding.subspan @legacy_io::@ret1[%c0] : !flow.dispatch.output<3x4xi32>
+  %3 = flow.dispatch.input.load %0, offsets = [%c0], sizes = [%c12], strides = [%c1] : !flow.dispatch.input<12xi32> -> tensor<12xi32>
+  %4 = linalg.tensor_reshape %3 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<12xi32> into tensor<3x4xi32>
+  %5 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
+  %6 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%4 : tensor<3x4xi32>) outs(%5 : tensor<3x4xi32>) {
+    ^bb0(%arg0 : i32, %arg1 : i32):
+      %7 = addi %arg0, %arg0 : i32
+      linalg.yield %7 : i32
+    } -> tensor<3x4xi32>
+  flow.dispatch.output.store %6, %1, offsets = [%c0, %c0], sizes = [%c3, %c4], strides = [%c1, %c1] : tensor<3x4xi32> -> !flow.dispatch.output<3x4xi32>
+  flow.dispatch.output.store %4, %2, offsets = [%c0, %c0], sizes = [%c3, %c4], strides = [%c1, %c1] : tensor<3x4xi32> -> !flow.dispatch.output<3x4xi32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 4 + d1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//       CHECK: func @reshape_fused_source_and_copyout()
+//       CHECK:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
+//   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @legacy_io::@ret1[%[[C0]]] : memref<3x4xi32>
+//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
+//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET1V:.+]] = subview %[[RET1]][0, 0] [3, 4] [1, 1]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP1]]]
+//   CHECK-DAG:   linalg.copy(%[[RESHAPE]], %[[RET1V]])
+//   CHECK-DAG:   linalg.generic
+//  CHECK-SAME:     ins(%[[RET1V]] : memref<3x4xi32, #[[MAP0]]>)
+//  CHECK-SAME:     outs(%[[RET0V]] : memref<3x4xi32, #[[MAP0]]>)
+
+
+// -----
+
+func @reshape_fused_target() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %c4 = constant 4 : index
+  %c12 = constant 12 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<3x4xi32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<12xi32>
+  %2 = flow.dispatch.input.load %0, offsets = [%c0, %c0], sizes = [%c3, %c4], strides = [%c1, %c1] : !flow.dispatch.input<3x4xi32> -> tensor<3x4xi32>
+  %3 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
+  %4 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%2 : tensor<3x4xi32>) outs(%3 : tensor<3x4xi32>) {
+    ^bb0(%arg0 : i32, %arg1 : i32):
+      %5 = addi %arg0, %arg0 : i32
+      linalg.yield %5 : i32
+    } -> tensor<3x4xi32>
+  %5 = linalg.tensor_reshape %4 [affine_map<(d0, d1) -> (d0, d1)>] : tensor<3x4xi32> into tensor<12xi32>
+  flow.dispatch.output.store %5, %1, offsets = [%c0], sizes = [%c12], strides = [%c1] : tensor<12xi32> -> !flow.dispatch.output<12xi32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 4 + d1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//       CHECK: func @reshape_fused_target()
+//       CHECK:   %[[C0:.+]] = constant 0
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<3x4xi32>
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<12xi32>
+//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0] [12] [1]
+//       CHECK:   %[[ALLOC:.+]] = alloc() : memref<3x4xi32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0V]] : memref<3x4xi32, #[[MAP0]]>)
+//  CHECK-SAME:     outs(%[[ALLOC]] : memref<3x4xi32>)
+//       CHECK:   %[[RESULT:.+]] = linalg.reshape %[[ALLOC]] [#[[MAP1]]]
+//       CHECK:   linalg.copy(%[[RESULT]], %[[RET0V]])
+
+// -----
+
+func @dot_general_lowering() {
+  %cst = constant 0.000000e+00 : f32
+  %c3 = constant 3 : index
+  %c0 = constant 0 : index
+  %c2 = constant 2 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<1x1x2xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.input<2x3xf32>
+  %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<1x3xf32>
+  %3 = flow.dispatch.input.load %0 : !flow.dispatch.input<1x1x2xf32> -> tensor<1x1x2xf32>
+  %4 = linalg.tensor_reshape %3 [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d2)>] : tensor<1x1x2xf32> into tensor<1x2xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %5 = muli %workgroup_size_y, %workgroup_id_y : index
+  %6 = muli %workgroup_size_y, %workgroup_count_y : index
+  scf.for %arg0 = %5 to %c1 step %6 {
+    %7 = muli %workgroup_size_x, %workgroup_id_x : index
+    %8 = muli %workgroup_size_x, %workgroup_count_x : index
+    scf.for %arg1 = %7 to %c3 step %8 {
+      %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_y]
+      %10 = subtensor %4[%arg0, 0] [%9, 2] [1, 1] : tensor<1x2xf32> to tensor<?x2xf32>
+      %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3)>(%arg1)[%workgroup_size_x]
+      %12 = flow.dispatch.input.load %1, offsets = [%c0, %arg1], sizes = [%c2, %11], strides = [%c1, %c1] : !flow.dispatch.input<2x3xf32> -> tensor<2x?xf32>
+      %13 = linalg.init_tensor [%9, %11] : tensor<?x?xf32>
+      %14 = linalg.fill(%13, %cst) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+      %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%10, %12 : tensor<?x2xf32>, tensor<2x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      flow.dispatch.output.store %15, %2, offsets = [%arg0, %arg1], sizes = [%9, %11], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.output<1x3xf32>
+    }
+  }
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @arg1, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @dot_general_lowering()
+//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
+//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
+//   CHECK-DAG:   %[[RESHAPE_LHS:.+]] = linalg.reshape %[[LHS]]
+//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   CHECK-DAG:       %[[LHS_TILE:.+]] = subview %[[RESHAPE_LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS]][0, %[[IV1]]]
+//       CHECK:       linalg.fill(%[[RESULT_TILE]], %{{.+}})
+//       CHECK:       linalg.matmul
+//  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
+//  CHECK-SAME:         outs(%[[RESULT_TILE]]

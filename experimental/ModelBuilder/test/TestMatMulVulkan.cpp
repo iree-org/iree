@@ -105,7 +105,7 @@ void testMatMul() {
   auto lowering = [&](mlir::PassManager &pm) {
     pm.addPass(
         mlir::iree_compiler::createLinalgTileAndFusePass(codegenOptions));
-    pm.addPass(mlir::iree_compiler::createConvertToGPUPass());
+    pm.addPass(mlir::iree_compiler::createConvertToGPUPass(codegenOptions));
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
     pm.addPass(mlir::createCanonicalizerPass());

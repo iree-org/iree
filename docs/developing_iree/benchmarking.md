@@ -296,7 +296,7 @@ above. Now to run a command specifically on cpu7, use `taskset 80`
 (hex for 10000000):
 
 ```shell
-$ tasket 80 sleep 20 &
+$ taskset 80 sleep 20 &
 $ ps -o psr $!
 ```
 

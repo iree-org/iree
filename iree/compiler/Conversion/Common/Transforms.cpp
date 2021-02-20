@@ -27,6 +27,7 @@
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -45,6 +46,7 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
                                             Operation *op) {
   OwningRewritePatternList canonicalizationPatterns;
   canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
+  scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
@@ -218,6 +220,24 @@ LogicalResult getLinalgOps(FuncOp funcOp,
     forOps = body->getOps<scf::ForOp>();
   }
   linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+
+  // Propagate markers to all ops. If one of the ops has a marker all ops in
+  // this loop need to have marker since body of the loop maps to a workgroup.
+  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
+  // figured out.
+  Optional<StringRef> marker = llvm::None;
+  for (auto op : linalgOps) {
+    if (hasMarker(op)) {
+      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
+                            "expected all markers within op to be the same");
+      marker = getMarkerOrNull(op);
+    }
+  }
+  if (marker.hasValue()) {
+    for (auto op : linalgOps) {
+      setMarker(op, marker.getValue());
+    }
+  }
   return success();
 }
 
@@ -225,10 +245,10 @@ namespace {
 static size_t kMaxHALDimensions = 3;
 
 /// Sets the hal.interace.workgroup.size operation to the constant value passed
-/// in as `tileSizes`. The number of entries in `tileSizes` is at least as much
-/// as the dimensionality of the workgroup. It is assumed that the inner-most
-/// loop is mapped to the fastest varying dimension in
-/// flow.dispatch.workgroup_size.
+/// in as `workloadPerWorkgroup`. The number of entries in
+/// `workloadPerWorkgroup` is at least as much as the dimensionality of the
+/// workgroup. It is assumed that the inner-most loop is mapped to the fastest
+/// varying dimension in flow.dispatch.workgroup_size.
 class SetWorkgroupSizePattern
     : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
  public:
@@ -250,9 +270,8 @@ class SetWorkgroupSizePattern
           "expected at least as many static tile sizes as the workgroup "
           "dimensionality");
     }
-    rewriter.replaceOpWithNewOp<ConstantIndexOp>(
-        workgroupSizeOp,
-        workloadPerWorkgroup[workloadPerWorkgroup.size() - 1 - dim]);
+    rewriter.replaceOpWithNewOp<ConstantIndexOp>(workgroupSizeOp,
+                                                 workloadPerWorkgroup[dim]);
     return success();
   }
 
@@ -261,12 +280,9 @@ class SetWorkgroupSizePattern
 };
 }  // namespace
 
-/// Given the tile sizes to use adds a region to the entry point operation that
-/// describes the maximum number of workgroups for a given workload. For now it
-/// is computed as (workload + tilesize - 1) / tilesize along each dimension and
-/// restricted to be 3D dimensional.
-static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
-                                             ArrayRef<int64_t> tileSizes) {
+LogicalResult defineWorkgroupCountRegion(
+    OpBuilder &builder, FuncOp funcOp,
+    WorkgroupCountRegionBuilder regionBuilder) {
   auto targetOp =
       funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
   IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
@@ -293,21 +309,11 @@ static LogicalResult initNumWorkgroupsRegion(OpBuilder &builder, FuncOp funcOp,
   Block *entryBlock = builder.createBlock(region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
-  SmallVector<BlockArgument, 4> workload = llvm::to_vector<4>(
-      entryBlock->addArguments({indexType, indexType, indexType}));
-  // Make the number of workgroups workload / tile size.
-  SmallVector<Value, 4> returnValues;
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
-  assert(tileSizes.size() <= 3 &&
-         "expected only three tile size values for num workgroups computation");
-  for (auto ts : llvm::enumerate(llvm::reverse(tileSizes))) {
-    Value tsVal = builder.create<ConstantIndexOp>(loc, ts.value());
-    Value tsMinusOne = builder.create<SubIOp>(loc, tsVal, one);
-    Value num = builder.create<AddIOp>(loc, workload[ts.index()], tsMinusOne);
-    returnValues.push_back(builder.create<SignedDivIOp>(loc, num, tsVal));
-  }
-  returnValues.resize(3, one);
-  builder.create<IREE::HAL::ReturnOp>(loc, returnValues);
+  std::array<Value, 3> workload = {entryBlock->addArgument(indexType),
+                                   entryBlock->addArgument(indexType),
+                                   entryBlock->addArgument(indexType)};
+  std::array<Value, 3> workgroupCount = regionBuilder(builder, loc, workload);
+  builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
   entryPointOp.erase();
   return success();
 }
@@ -320,8 +326,24 @@ LogicalResult materializeStaticLaunchInformation(
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
+  assert(workloadPerWorkgroup.size() <= 3 &&
+         "workloadPerWorkgroup size greater than 3 not handled");
+  WorkgroupCountRegionBuilder regionBuilder =
+      [&workloadPerWorkgroup](
+          OpBuilder &b, Location loc,
+          std::array<Value, 3> workload) -> std::array<Value, 3> {
+    Value one = b.create<ConstantIndexOp>(loc, 1);
+    std::array<Value, 3> returnValues = {one, one, one};
+    for (auto ts : llvm::enumerate(workloadPerWorkgroup)) {
+      returnValues[ts.index()] = linalg::applyMapToValues(
+          b, loc,
+          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(ts.value())),
+          workload[ts.index()])[0];
+    }
+    return returnValues;
+  };
   OpBuilder builder(funcOp.getContext());
-  return initNumWorkgroupsRegion(builder, funcOp, workloadPerWorkgroup);
+  return defineWorkgroupCountRegion(builder, funcOp, regionBuilder);
 }
 
 LogicalResult tileAndFuseLinalgBufferOps(

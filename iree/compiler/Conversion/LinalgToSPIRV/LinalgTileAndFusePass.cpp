@@ -59,16 +59,9 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-/// Returns a Linalg marker that replaces existing markers.
-linalg::LinalgTransformationFilter getLinalgReplaceMarker(
-    StringRef maker, MLIRContext *context) {
-  return linalg::LinalgTransformationFilter(ArrayRef<Identifier>(),
-                                            Identifier::get(maker, context));
-}
-
 /// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
 /// it with `replaceMarker`.
-linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
+static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, StringRef replaceMarker,
     MLIRContext *context) {
   SmallVector<Identifier, 2> markers;
@@ -166,13 +159,14 @@ struct PromoteMatmulSubviewsPattern
 // 2) Maybe there are better alternatives for handling filter like using
 //    different storage classes, since for inference workloads these are model
 //    constants. This is TBD.
+template <typename ConvOpTy>
 struct PromoteConvSubviewsPattern
-    : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
+    : public linalg::LinalgPromotionPattern<ConvOpTy> {
   PromoteConvSubviewsPattern(MLIRContext *context,
                              linalg::LinalgPromotionOptions options,
                              linalg::LinalgTransformationFilter marker,
                              PatternBenefit benefit = 1)
-      : linalg::LinalgPromotionPattern<linalg::ConvOp>(
+      : linalg::LinalgPromotionPattern<ConvOpTy>(
             context,
             options.setOperandsToPromote({1}).setUseFullTileBuffers(
                 {false, false}),
@@ -182,7 +176,11 @@ struct PromoteConvSubviewsPattern
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern>(
+  patterns.insert<
+      PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern<linalg::ConvOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNWCFilterWCFOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      PromoteConvSubviewsPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -318,7 +316,12 @@ static void populateTilingToInvocationPatterns(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::ConvOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -365,6 +368,8 @@ static void applyVectorTransformation(FuncOp funcOp) {
         canonicalizationPatterns1, funcOp.getContext());
     vector::populateVectorToVectorTransformationPatterns(
         canonicalizationPatterns1, funcOp.getContext());
+    vector::populateSplitVectorTransferPatterns(canonicalizationPatterns1,
+                                                funcOp.getContext());
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns1));
 
@@ -411,23 +416,15 @@ static void populateTilingConvFilterPatterns(
     return tileSizes;
   };
 
-  // TODO(antiagainst): move this to launch configuration.
-  SmallVector<unsigned, 8> loopOrder = {
-      /*batch=*/0,
-      /*output_height=*/1,
-      /*output_width=*/2,
-      /*output_channel=*/3,
-      /*filter_height=*/5,
-      /*filter_width=*/6,
-      /*input_channel=*/4,
-  };
-
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setInterchange(loopOrder)
                            .setTileSizeComputationFunction(getTileSizeFn);
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>>(
+  patterns.insert<
+      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions, marker);
 }
 
@@ -481,34 +478,47 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    if (tiledLoops.empty()) {
+    if (!options.usingLinalgOnTensors) {
       TileAndFuseOptions tileAndFuseOptions = {
           getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
       if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
                                             launchConfig,
-                                            tileAndFuseOptions))) {
+                                            tileAndFuseOptions)) ||
+          failed(
+              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
         return signalPassFailure();
       }
     } else {
-      ArrayRef<int64_t> workgroupSize = launchConfig.getWorkgroupSize();
-      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup = llvm::to_vector<4>(
-          llvm::reverse(workgroupSize.take_front(tiledLoops.size())));
-      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
-          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
-                                               defaultWorkloadPerWorkgroup);
-      if (!workloadPerWorkgroup) {
-        funcOp.emitOpError("unable to find workload per workgroup");
-        return signalPassFailure();
+      // Find the root operation for the dispatch region and get the tile sizes.
+      Operation *rootOperation =
+          launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
+              linalgOps,
+              [](linalg::LinalgOp op) { return op.getOperation(); })));
+      if (!rootOperation) {
+        launchConfig.finalize(funcOp);
+        return;
       }
-      if (failed(materializeStaticLaunchInformation(
-              funcOp, workloadPerWorkgroup.getValue()))) {
-        funcOp.emitOpError("failed to set tile size to constant value");
-        return signalPassFailure();
-      }
-    }
 
-    if (failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
-      return signalPassFailure();
+      ArrayRef<int64_t> rootOperationTileSizes =
+          launchConfig.getTileSizes(rootOperation, 0);
+      if (rootOperationTileSizes.empty()) {
+        launchConfig.finalize(funcOp);
+        return;
+      }
+
+      // Only use the tile sizes for parallel loops of the root operation.
+      rootOperationTileSizes = rootOperationTileSizes.take_front(
+          getNumOuterParallelLoops(rootOperation));
+
+      SmallVector<int64_t, 4> workloadPerWorkgroup =
+          llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
+      if (failed(materializeStaticLaunchInformation(funcOp,
+                                                    workloadPerWorkgroup)) ||
+          failed(
+              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
+        funcOp.emitOpError("failed to materialize static launch information");
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -597,7 +607,7 @@ void LinalgTileAndFusePass::runOnOperation() {
         applyCanonicalizationPatternsForTiling(context, funcOp);
 
         LLVM_DEBUG({
-          llvm::dbgs() << "--- After tiling linalg.conv  ---\n";
+          llvm::dbgs() << "--- After tiling convolution filter  ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
           llvm::dbgs() << "\n\n";
         });
@@ -626,6 +636,34 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
 
       applyVectorTransformation(funcOp);
+    }
+
+    // Invoke patterns to generalize linalg.depthwise_conv_2d_nhwc ops to Linalg
+    // generic ops. This can handle those cases that failed tiling and
+    // vectorization in the above.
+    // TODO(antiagainst): remove this once we have depthwise convolution
+    // vectorization applicable everywhere.
+    {
+      // Carry over the Linalg marker because it is load-bearing and affects
+      // later passes.
+      linalg::LinalgTransformationFilter marker =
+          getLinalgMatchAndReplaceMarker({getWorkgroupMarker()},
+                                         getWorkgroupMarker(), context);
+      marker.addFilter([](Operation *op) -> LogicalResult {
+        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
+      });
+
+      OwningRewritePatternList patterns;
+      linalg::populateLinalgNamedOpsGeneralizationPatterns(context, patterns,
+                                                           marker);
+
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After generalization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     launchConfig.finalize(funcOp);

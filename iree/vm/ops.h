@@ -18,6 +18,21 @@
 #include <stdint.h>
 
 //===------------------------------------------------------------------===//
+// Constants
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_const_i32(int32_t a) { return a; }
+
+//===------------------------------------------------------------------===//
+// Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_select_i32(int32_t condition, int32_t true_value,
+                                    int32_t false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
 // Native integer arithmetic
 //===------------------------------------------------------------------===//
 
@@ -44,19 +59,65 @@ static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
 
 //===------------------------------------------------------------------===//
+// Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_trunc_i32i8(int32_t operand) {
+  return (uint8_t)((uint32_t)operand);
+}
+static inline int32_t vm_trunc_i32i16(int32_t operand) {
+  return (uint16_t)((uint32_t)operand);
+}
+static inline int32_t vm_ext_i8i32s(int32_t operand) {
+  return (int32_t)((int8_t)operand);
+}
+static inline int32_t vm_ext_i8i32u(int32_t operand) {
+  return (uint32_t)((uint8_t)operand);
+}
+static inline int32_t vm_ext_i16i32s(int32_t operand) {
+  return (int32_t)((int16_t)operand);
+}
+static inline int32_t vm_ext_i16i32u(int32_t operand) {
+  return (uint32_t)((uint16_t)operand);
+}
+
+//===------------------------------------------------------------------===//
 // Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
 static inline int32_t vm_shl_i32(int32_t operand, int8_t amount) {
   return (int32_t)(operand << amount);
-};
+}
 static inline int32_t vm_shr_i32s(int32_t operand, int8_t amount) {
   return (int32_t)(operand >> amount);
-};
+}
 static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
   return (int32_t)(((uint32_t)operand) >> amount);
-};
+}
 
+//===------------------------------------------------------------------===//
+// Comparison ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_cmp_eq_i32(int32_t lhs, int32_t rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_i32(int32_t lhs, int32_t rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i32s(int32_t lhs, int32_t rhs) {
+  return (lhs < rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i32u(int32_t lhs, int32_t rhs) {
+  return (((uint32_t)lhs) < ((uint32_t)rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nz_i32(int32_t operand) {
+  return (operand != 0) ? 1 : 0;
+}
+
+//===------------------------------------------------------------------===//
+// Additional ops
+//===------------------------------------------------------------------===//
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
 // supported in the c module target
@@ -66,10 +127,93 @@ static inline int32_t vm_shr_i32u(int32_t operand, int8_t amount) {
                                 iree_make_cstring_view("message"));         \
   }
 
-// Compare ops
-inline int32_t vm_cmp_ne_i32(int32_t a, int32_t b) { return a != b ? 1 : 0; }
+//===------------------------------------------------------------------===//
+// ExtI64: Constants
+//===------------------------------------------------------------------===//
 
-// Const ops
-inline int32_t vm_const_i32(int32_t a) { return a; }
+static inline int64_t vm_const_i64(int64_t a) { return a; }
+
+//===------------------------------------------------------------------===//
+// ExtI64: Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_select_i64(int32_t condition, int64_t true_value,
+                                    int64_t false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: Native integer arithmetic ops
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_add_i64(int64_t lhs, int64_t rhs) { return lhs + rhs; }
+static inline int64_t vm_sub_i64(int64_t lhs, int64_t rhs) { return lhs - rhs; }
+static inline int64_t vm_mul_i64(int64_t lhs, int64_t rhs) { return lhs * rhs; }
+static inline int64_t vm_div_i64s(int64_t lhs, int64_t rhs) {
+  return lhs / rhs;
+}
+static inline int64_t vm_div_i64u(int64_t lhs, int64_t rhs) {
+  return (int64_t)(((uint64_t)lhs) / ((uint64_t)rhs));
+}
+static inline int64_t vm_rem_i64s(int64_t lhs, int64_t rhs) {
+  return lhs % rhs;
+}
+static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
+  return (int64_t)(((uint64_t)lhs) % ((uint64_t)rhs));
+}
+static inline int64_t vm_not_i64(int64_t operand) {
+  return (int64_t)(~((uint64_t)operand));
+}
+static inline int64_t vm_and_i64(int64_t lhs, int64_t rhs) { return lhs & rhs; }
+static inline int64_t vm_or_i64(int64_t lhs, int64_t rhs) { return lhs | rhs; }
+static inline int64_t vm_xor_i64(int64_t lhs, int64_t rhs) { return lhs ^ rhs; }
+
+//===------------------------------------------------------------------===//
+// ExtI64: Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_trunc_i64i32(int64_t operand) {
+  return (uint32_t)((uint64_t)operand);
+}
+static inline int64_t vm_ext_i32i64s(int32_t operand) {
+  return (int64_t)((int32_t)operand);
+}
+static inline int64_t vm_ext_i32i64u(int32_t operand) {
+  return (uint64_t)((uint32_t)operand);
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: Native bitwise shifts and rotates
+//===------------------------------------------------------------------===//
+
+static inline int64_t vm_shl_i64(int64_t operand, int8_t amount) {
+  return (int64_t)(operand << amount);
+}
+static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
+  return (int64_t)(operand >> amount);
+}
+static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
+  return (int64_t)(((uint64_t)operand) >> amount);
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: Comparison ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_cmp_eq_i64(int64_t lhs, int64_t rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_i64(int64_t lhs, int64_t rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i64s(int64_t lhs, int64_t rhs) {
+  return (lhs < rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i64u(int64_t lhs, int64_t rhs) {
+  return (((uint64_t)lhs) < ((uint64_t)rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nz_i64(int64_t operand) {
+  return (operand != 0) ? 1 : 0;
+}
 
 #endif  // IREE_VM_OPS_H_

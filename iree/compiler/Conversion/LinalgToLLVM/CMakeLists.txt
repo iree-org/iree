@@ -28,6 +28,7 @@ iree_cc_library(
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
     "LinalgVectorizePass.cpp"
+    "MaterializeCPULaunchConfigurationPass.cpp"
     "Passes.cpp"
     "PlanConvLoopOrder.cpp"
   DEPS
@@ -38,6 +39,8 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
+    MLIRMath
+    MLIRMathTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard
@@ -55,8 +58,6 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LLVMToLLVM
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

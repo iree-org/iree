@@ -38,6 +38,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/ToolUtilities.h"
+#include "mlir/Target/LLVMIR.h"
 #include "mlir/Translation.h"
 
 #ifdef IREE_HAVE_EMITC_DIALECT
@@ -63,6 +64,7 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
+  mlir::registerLLVMDialectTranslation(registry);
 #ifdef IREE_HAVE_EMITC_DIALECT
   mlir::registerEmitCDialect(registry);
 #endif  // IREE_HAVE_EMITC_DIALECT
@@ -111,7 +113,7 @@ int main(int argc, char **argv) {
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
     mlir::MLIRContext context;
-    registry.appendTo(context.getDialectRegistry());
+    context.appendDialectRegistry(registry);
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
     mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);

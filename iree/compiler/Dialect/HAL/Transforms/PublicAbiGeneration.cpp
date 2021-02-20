@@ -330,7 +330,7 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   SmallVector<NamedAttribute, 1> asyncExportAttrs;
   asyncExportAttrs.push_back(moduleBuilder.getNamedAttr(
       "iree.module.export",
-      StringAttr::get((exportName + "$async").str(), ctx)));
+      StringAttr::get(ctx, (exportName + "$async").str())));
 
   auto asyncType = FunctionType::get(ctx, asyncInputTypes, resultTypes);
   auto asyncName = (rawCalleeFuncOp.getName() + "$async").str();
@@ -414,7 +414,7 @@ class PublicABIGenerationPass
 
         // Rename and remove reflection (it will go on the ABI entry point).
         funcOp->setAttr("iree.module.export",
-                        StringAttr::get((*exportName + "$raw").str(), ctx));
+                        StringAttr::get(ctx, (*exportName + "$raw").str()));
         funcOp.removeAttr("iree.reflection");
         funcOp->setAttr("noinline", UnitAttr::get(ctx));
 

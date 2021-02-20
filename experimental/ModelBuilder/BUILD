@@ -34,6 +34,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:VectorOps",
     ],
 )
@@ -67,6 +68,7 @@ cc_library(
     ],
     deps = [
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:GPUToSPIRV",
@@ -77,6 +79,7 @@ cc_library(
         "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:StandardToSPIRV",

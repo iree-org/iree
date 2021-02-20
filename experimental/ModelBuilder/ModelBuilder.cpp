@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Target/LLVMIR.h"
 
 using namespace mlir;
 using namespace mlir::edsc;
@@ -59,6 +60,7 @@ mlir::ModelBuilder::ModelBuilder()
   ctx.getOrLoadDialect<spirv::SPIRVDialect>();
   ctx.getOrLoadDialect<StandardOpsDialect>();
   ctx.getOrLoadDialect<vector::VectorDialect>();
+  registerLLVMDialectTranslation(ctx);
 }
 
 Value mlir::ModelBuilder::constant_f32(float v) {
@@ -281,16 +283,15 @@ MLIRFuncOpConfig &MLIRFuncOpConfig::setEmitCInterface(bool v) {
 void MLIRFuncOpConfig::apply(FuncOp &f) {
   MLIRContext *ctx = f.getContext();
   SmallVector<Attribute, 8> attrs;
-  if (noInline) attrs.push_back(StringAttr::get("noinline", ctx));
+  if (noInline) attrs.push_back(StringAttr::get(ctx, "noinline"));
   if (preferAvx512)
-    attrs.push_back(ArrayAttr::get({StringAttr::get("prefer-vector-width", ctx),
-                                    StringAttr::get("512", ctx)},
-                                   ctx));
+    attrs.push_back(
+        ArrayAttr::get(ctx, {StringAttr::get(ctx, "prefer-vector-width"),
+                             StringAttr::get(ctx, "512")}));
   if (!targetCpu.empty())
-    attrs.push_back(ArrayAttr::get(
-        {StringAttr::get("target-cpu", ctx), StringAttr::get(targetCpu, ctx)},
-        ctx));
-  if (!attrs.empty()) f->setAttr("passthrough", ArrayAttr::get(attrs, ctx));
+    attrs.push_back(ArrayAttr::get(ctx, {StringAttr::get(ctx, "target-cpu"),
+                                         StringAttr::get(ctx, targetCpu)}));
+  if (!attrs.empty()) f->setAttr("passthrough", ArrayAttr::get(ctx, attrs));
 
   if (emitCInterface)
     f->setAttr("llvm.emit_c_interface", mlir::UnitAttr::get(ctx));

@@ -182,7 +182,7 @@ class MemoryBarrierType {
 
 // A tuple containing runtime values for a descriptor set binding:
 // <binding ordinal, hal.buffer, buffer byte offset, buffer byte length>
-using DescriptorSetBindingValue = std::tuple<uint32_t, Value, Value, Value>;
+using DescriptorSetBindingValue = std::tuple<Value, Value, Value, Value>;
 
 }  // namespace HAL
 }  // namespace IREE

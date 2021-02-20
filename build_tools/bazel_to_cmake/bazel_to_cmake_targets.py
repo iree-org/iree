@@ -33,9 +33,11 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
+    "@llvm-project//mlir:LinalgInterfaces": ["MLIRLinalg"],
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
+    "@llvm-project//mlir:MathDialect": ["MLIRMath"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
     "@llvm-project//mlir:StandardOps": ["MLIRStandard"],
@@ -51,6 +53,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     # Vulkan
     "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
+    # Cuda
+    "@cuda_headers": ["cuda_headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets

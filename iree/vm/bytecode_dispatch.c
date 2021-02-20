@@ -200,6 +200,8 @@ static iree_status_t iree_vm_bytecode_external_enter(
   const uint8_t* p = arguments.data;
   for (iree_host_size_t i = 0; i < cconv_arguments.size; ++i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         uint16_t dst_reg = i32_reg++;
         memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
@@ -241,6 +243,8 @@ static iree_status_t iree_vm_bytecode_external_leave(
   for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
     uint16_t src_reg = src_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
                sizeof(int32_t));
@@ -380,6 +384,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
   for (iree_host_size_t i = 0, seg_i = 0, reg_i = 0; i < cconv_arguments.size;
        ++i, ++seg_i) {
     switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32: {
         memcpy(p,
                &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -396,8 +402,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t src_reg = src_reg_list->registers[reg_i++];
-        iree_vm_ref_retain_or_move(
-            src_reg & IREE_REF_REGISTER_MOVE_BIT,
+        iree_vm_ref_assign(
             &caller_registers.ref[src_reg & caller_registers.ref_mask],
             (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
@@ -423,6 +428,8 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
                ++i) {
             // TODO(benvanik): share with switch above.
             switch (cconv_arguments.data[i]) {
+              case IREE_VM_CCONV_TYPE_VOID:
+                break;
               case IREE_VM_CCONV_TYPE_INT32: {
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++] &
@@ -439,8 +446,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
-                iree_vm_ref_retain_or_move(
-                    src_reg & IREE_REF_REGISTER_MOVE_BIT,
+                iree_vm_ref_assign(
                     &caller_registers.ref[src_reg & caller_registers.ref_mask],
                     (iree_vm_ref_t*)p);
                 p += sizeof(iree_vm_ref_t);
@@ -484,6 +490,8 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
        ++i) {
     uint16_t dst_reg = dst_reg_list->registers[i];
     switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32:
         memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
                sizeof(int32_t));
@@ -817,7 +825,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListReserve, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -828,7 +836,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -839,7 +847,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListResize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -850,7 +858,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListGetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -865,7 +873,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, ListSetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (!list) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
@@ -907,7 +915,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t true_value = VM_DecOperandRegI32("true_value");
       int32_t false_value = VM_DecOperandRegI32("false_value");
       int32_t* result = VM_DecResultRegI32("result");
-      *result = condition ? true_value : false_value;
+      *result = vm_select_i32(condition, true_value, false_value);
     });
 
     DISPATCH_OP(CORE, SelectRef, {
@@ -976,50 +984,28 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                           \
-    int32_t operand = VM_DecOperandRegI32("operand");    \
-    int32_t* result = VM_DecResultRegI32("result");      \
-    *result = op_func(operand);                          \
-  });
-
-#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                            \
-    int32_t lhs = VM_DecOperandRegI32("lhs");             \
-    int32_t rhs = VM_DecOperandRegI32("rhs");             \
-    int32_t* result = VM_DecResultRegI32("result");       \
-    *result = op_func(lhs, rhs);                          \
-  });
-
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, vm_add_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, vm_sub_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, vm_mul_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, vm_div_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, vm_div_i32u);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, vm_rem_i32s);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, vm_rem_i32u);
-    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, vm_not_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, vm_and_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, vm_or_i32);
-    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, vm_xor_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AddI32, vm_add_i32);
+    DISPATCH_OP_CORE_BINARY_I32(SubI32, vm_sub_i32);
+    DISPATCH_OP_CORE_BINARY_I32(MulI32, vm_mul_i32);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32S, vm_div_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
+    DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
+    DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
+    DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CAST_I32(op_name, src_type, dst_type) \
-  DISPATCH_OP(CORE, op_name, {                                 \
-    int32_t operand = VM_DecOperandRegI32("operand");          \
-    int32_t* result = VM_DecResultRegI32("result");            \
-    *result = (dst_type)((src_type)operand);                   \
-  });
-
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I8, uint32_t, uint8_t);
-    DISPATCH_OP_CORE_CAST_I32(TruncI32I16, uint32_t, uint16_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32S, int8_t, int32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32S, int16_t, int32_t);
-    DISPATCH_OP_CORE_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I8, vm_trunc_i32i8);
+    DISPATCH_OP_CORE_UNARY_I32(TruncI32I16, vm_trunc_i32i16);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32S, vm_ext_i8i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32U, vm_ext_i8i32u);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32S, vm_ext_i16i32s);
+    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32U, vm_ext_i16i32u);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -1041,23 +1027,11 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_CMP_I32(op_name, type, op) \
-  DISPATCH_OP(CORE, op_name, {                      \
-    int32_t lhs = VM_DecOperandRegI32("lhs");       \
-    int32_t rhs = VM_DecOperandRegI32("rhs");       \
-    int32_t* result = VM_DecResultRegI32("result"); \
-    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;   \
-  });
-
-    DISPATCH_OP_CORE_CMP_I32(CmpEQI32, int32_t, ==);
-    DISPATCH_OP_CORE_CMP_I32(CmpNEI32, int32_t, !=);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32S, int32_t, <);
-    DISPATCH_OP_CORE_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP(CORE, CmpNZI32, {
-      int32_t operand = VM_DecOperandRegI32("operand");
-      int32_t* result = VM_DecResultRegI32("result");
-      *result = (operand != 0) ? 1 : 0;
-    });
+    DISPATCH_OP_CORE_BINARY_I32(CmpEQI32, vm_cmp_eq_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpNEI32, vm_cmp_ne_i32);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    DISPATCH_OP_CORE_UNARY_I32(CmpNZI32, vm_cmp_nz_i32);
 
     DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;
@@ -1352,7 +1326,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListGetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
@@ -1367,7 +1341,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP(EXT_I64, ListSetI64, {
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
-        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
@@ -1386,7 +1360,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         int64_t true_value = VM_DecOperandRegI64("true_value");
         int64_t false_value = VM_DecOperandRegI64("false_value");
         int64_t* result = VM_DecResultRegI64("result");
-        *result = condition ? true_value : false_value;
+        *result = vm_select_i64(condition, true_value, false_value);
       });
 
       DISPATCH_OP(EXT_I64, SwitchI64, {
@@ -1407,84 +1381,74 @@ iree_status_t iree_vm_bytecode_dispatch(
       // ExtI64: Native integer arithmetic
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_UNARY_ALU_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                            \
-    int64_t operand = VM_DecOperandRegI64("operand");        \
-    int64_t* result = VM_DecResultRegI64("result");          \
-    *result = (int64_t)(op((type)operand));                  \
-  });
-
-#define DISPATCH_OP_EXT_I64_BINARY_ALU_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                             \
-    int64_t lhs = VM_DecOperandRegI64("lhs");                 \
-    int64_t rhs = VM_DecOperandRegI64("rhs");                 \
-    int64_t* result = VM_DecResultRegI64("result");           \
-    *result = (int64_t)(((type)lhs)op((type)rhs));            \
-  });
-
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AddI64, int64_t, +);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(SubI64, int64_t, -);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(MulI64, int64_t, *);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64S, int64_t, /);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64U, uint64_t, /);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64S, int64_t, %);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64U, uint64_t, %);
-      DISPATCH_OP_EXT_I64_UNARY_ALU_I64(NotI64, uint64_t, ~);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AndI64, uint64_t, &);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(OrI64, uint64_t, |);
-      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(XorI64, uint64_t, ^);
+      DISPATCH_OP_EXT_I64_BINARY_I64(AddI64, vm_add_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(SubI64, vm_sub_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(MulI64, vm_mul_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(DivI64S, vm_div_i64s);
+      DISPATCH_OP_EXT_I64_BINARY_I64(DivI64U, vm_div_i64u);
+      DISPATCH_OP_EXT_I64_BINARY_I64(RemI64S, vm_rem_i64s);
+      DISPATCH_OP_EXT_I64_BINARY_I64(RemI64U, vm_rem_i64u);
+      DISPATCH_OP_EXT_I64_UNARY_I64(NotI64, vm_not_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(AndI64, vm_and_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(OrI64, vm_or_i64);
+      DISPATCH_OP_EXT_I64_BINARY_I64(XorI64, vm_xor_i64);
 
       //===----------------------------------------------------------------===//
       // ExtI64: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_CAST_I64(op_name, src_type, dst_type) \
-  DISPATCH_OP(EXT_I64, op_name, {                                 \
-    int64_t operand = VM_DecOperandRegI64("operand");             \
-    int64_t* result = VM_DecResultRegI64("result");               \
-    *result = (dst_type)((src_type)operand);                      \
-  });
-
-      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I32, uint64_t, uint32_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64S, int32_t, int64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64U, uint32_t, uint64_t);
+      DISPATCH_OP(EXT_I64, TruncI64I32, {
+        int64_t operand = VM_DecOperandRegI64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_trunc_i64i32(operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64S, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = vm_ext_i32i64s(operand);
+      });
+      DISPATCH_OP(EXT_I64, ExtI32I64U, {
+        int32_t operand = VM_DecOperandRegI32("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = vm_ext_i32i64u(operand);
+      });
 
       //===----------------------------------------------------------------===//
       // ExtI64: Native bitwise shifts and rotates
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                        \
-    int64_t operand = VM_DecOperandRegI64("operand");    \
-    int8_t amount = VM_DecConstI8("amount");             \
-    int64_t* result = VM_DecResultRegI64("result");      \
-    *result = (int64_t)(((type)operand)op amount);       \
+#define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                       \
+    int64_t operand = VM_DecOperandRegI64("operand");   \
+    int8_t amount = VM_DecConstI8("amount");            \
+    int64_t* result = VM_DecResultRegI64("result");     \
+    *result = op_func(operand, amount);                 \
   });
 
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShlI64, int64_t, <<);
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64S, int64_t, >>);
-      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64U, uint64_t, >>);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShlI64, vm_shl_i64);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64S, vm_shr_i64s);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64U, vm_shr_i64u);
 
       //===----------------------------------------------------------------===//
       // ExtI64: Comparison ops
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_I64_CMP_I64(op_name, type, op) \
-  DISPATCH_OP(EXT_I64, op_name, {                      \
-    int64_t lhs = VM_DecOperandRegI64("lhs");          \
-    int64_t rhs = VM_DecOperandRegI64("rhs");          \
-    int32_t* result = VM_DecResultRegI32("result");    \
-    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;      \
+#define DISPATCH_OP_EXT_I64_CMP_I64(op_name, op_func) \
+  DISPATCH_OP(EXT_I64, op_name, {                     \
+    int64_t lhs = VM_DecOperandRegI64("lhs");         \
+    int64_t rhs = VM_DecOperandRegI64("rhs");         \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
   });
 
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpEQI64, int64_t, ==);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpNEI64, int64_t, !=);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64S, int64_t, <);
-      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64U, uint64_t, <);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpEQI64, vm_cmp_eq_i64);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpNEI64, vm_cmp_ne_i64);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64S, vm_cmp_lt_i64s);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64U, vm_cmp_lt_i64u);
       DISPATCH_OP(EXT_I64, CmpNZI64, {
         int64_t operand = VM_DecOperandRegI64("operand");
         int32_t* result = VM_DecResultRegI32("result");
-        *result = (operand != 0) ? 1 : 0;
+        *result = vm_cmp_nz_i64(operand);
       });
 #else
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED);

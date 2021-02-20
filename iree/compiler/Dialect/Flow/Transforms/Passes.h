@@ -105,8 +105,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
 /// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 /// A dispatch region is created for each tiled loop nest.
-std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass(
-    ArrayRef<int64_t> sizes = {}, bool enableFusion = false);
+std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 
 // Analyzes a module to identify which functions are dispatchable.
 // This information is cached on the module and is used by other FuncOp-scoped

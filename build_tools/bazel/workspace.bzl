@@ -123,3 +123,10 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
         build_file = iree_repo_alias + "//:build_tools/third_party/spirv_cross/BUILD.overlay",
         path = paths.join(iree_path, "third_party/spirv_cross"),
     )
+
+    maybe(
+        native.new_local_repository,
+        name = "cuda_headers",
+        build_file = iree_repo_alias + "//:build_tools/third_party/cuda_headers/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/cuda_headers"),
+    )

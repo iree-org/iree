@@ -14,6 +14,13 @@
 
 namespace iree;
 
+// Define kinds of sanitizers (the order in enum should be same as enum in LLVM
+// TargetOptions)
+enum SanitizerKind : ubyte {
+  None = 0,
+  Address
+}
+
 // 'Dynamic Library (dylib) Executable'.
 
 file_identifier "DLIB";
@@ -21,7 +28,8 @@ file_extension "dlib";
 
 // Dynamic library (.so/.dll/.dylib) executable module.
 table DyLibExecutableDef {
-  // A map of entry points to string names with the same order as in the executable op.
+  // A map of entry points to string names with the same order as in the
+  // executable op.
   entry_points:[string];
   // An embedded (as opposed to external) dynamic library file.
   // TODO(scotttodd): List of embedded files?
@@ -30,6 +38,7 @@ table DyLibExecutableDef {
 
   debug_database_filename:string;
   debug_database_embedded:[ubyte];
+  sanitized_kind:SanitizerKind = None;
 
   // TODO(scotttodd): Relative file path from this flatbuffer file
 }

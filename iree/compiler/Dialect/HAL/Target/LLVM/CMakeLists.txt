@@ -41,6 +41,7 @@ iree_cc_library(
     LLVMX86CodeGen
     MLIRLLVMIR
     MLIRTargetLLVMIR
+    MLIRTargetLLVMIRModuleTranslation
     iree::base::flatcc
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common
@@ -62,6 +63,7 @@ iree_cc_library(
     ::LLVMTargetOptions
     LLVMAnalysis
     LLVMCore
+    LLVMInstrumentation
     LLVMPasses
     LLVMSupport
     LLVMTarget

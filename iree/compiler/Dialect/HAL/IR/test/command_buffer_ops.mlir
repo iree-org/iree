@@ -91,10 +91,11 @@ func @command_buffer_bind_descriptor_set(%arg0 : !hal.command_buffer) {
   %0 = "test_hal.executable_layout"() : () -> !hal.executable_layout
   %1 = "test_hal.descriptor_set"() : () -> !hal.descriptor_set
   %2 = "test_hal.offset"() : () -> index
-  // CHECK: hal.command_buffer.bind_descriptor_set %arg0, %0, set = 0, %1
-  hal.command_buffer.bind_descriptor_set %arg0, %0, set = 0, %1
-  // CHECK-NEXT: hal.command_buffer.bind_descriptor_set %arg0, %0, set = 0, %1, offsets = [%2]
-  hal.command_buffer.bind_descriptor_set %arg0, %0, set = 0, %1, offsets = [%2]
+  %c0 = constant 0 : index
+  // CHECK: hal.command_buffer.bind_descriptor_set %arg0, %0, set = %c0, %1
+  hal.command_buffer.bind_descriptor_set %arg0, %0, set = %c0, %1
+  // CHECK-NEXT: hal.command_buffer.bind_descriptor_set %arg0, %0, set = %c0, %1, offsets = [%2]
+  hal.command_buffer.bind_descriptor_set %arg0, %0, set = %c0, %1, offsets = [%2]
   return
 }
 

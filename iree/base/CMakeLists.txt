@@ -266,8 +266,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     DEPS
       ::core_headers
     DEFINES
-      # TODO(#2114): Change the mode to 2.
-      "IREE_TRACING_MODE=1"
+      "IREE_TRACING_MODE=2"
     PUBLIC
   )
 else()

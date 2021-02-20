@@ -23,6 +23,7 @@ iree_cc_library(
     "ConvertStandardToVMLA.cpp"
   DEPS
     MLIRIR
+    MLIRMath
     MLIRPass
     MLIRStandard
     MLIRSupport

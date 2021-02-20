@@ -35,7 +35,7 @@ iree_vm_function_call_get_cconv_fragments(
                             "unsupported cconv version %c", cconv.data[0]);
   }
   iree_string_view_t cconv_body = iree_string_view_substr(cconv, 1, INTPTR_MAX);
-  if (iree_string_view_split(cconv_body, '.', out_arguments, out_results) ==
+  if (iree_string_view_split(cconv_body, '_', out_arguments, out_results) ==
       -1) {
     *out_arguments = cconv_body;
   }
@@ -57,6 +57,8 @@ iree_vm_function_call_compute_cconv_fragment_size(
   for (iree_host_size_t i = 0, seg_i = 0; i < cconv_fragment.size;
        ++i, ++seg_i) {
     switch (cconv_fragment.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32:
         required_size += sizeof(int32_t);
         break;
@@ -80,6 +82,8 @@ iree_vm_function_call_compute_cconv_fragment_size(
                         cconv_fragment.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
              ++i) {
           switch (cconv_fragment.data[i]) {
+            case IREE_VM_CCONV_TYPE_VOID:
+              break;
             case IREE_VM_CCONV_TYPE_INT32:
               span_size += sizeof(int32_t);
               break;
@@ -118,11 +122,13 @@ iree_vm_function_call_release(iree_vm_function_call_t* call,
   uint8_t* p = call->arguments.data;
   for (iree_host_size_t i = 1; i < cconv.size; ++i) {
     char c = cconv.data[i];
-    if (c == '.') {
+    if (c == '_') {
       // Switch to results.
       p = call->results.data;
     }
     switch (c) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
       case IREE_VM_CCONV_TYPE_INT32:
         p += sizeof(int32_t);
         break;
