@@ -103,11 +103,11 @@ def log(*args, **kwargs):
   print(*args, **kwargs, file=sys.stderr)
 
 
-def convert_directories(generator, write_files, allow_partial_conversion):
+def convert_directories(directories, write_files, allow_partial_conversion):
   failure_dirs = []
   skip_count = 0
   success_count = 0
-  for directory in generator:
+  for directory in directories:
     status = convert_directory(directory, write_files, allow_partial_conversion)
     if status == Status.FAILED:
       failure_dirs.append(repo_relpath(directory))
