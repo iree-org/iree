@@ -27,13 +27,14 @@ iree_cc_library(
     "MetalSPIRVTarget.cpp"
   DEPS
     ::SPIRVToMSL
-    LLVMSupport
-    MLIRIR
+    MLIRAffine
+    MLIRGPU
+    MLIRLinalg
     MLIRSPIRV
     MLIRSPIRVSerialization
-    MLIRSupport
-    iree::base::flatcc
-    iree::compiler::Dialect::Flow::IR
+    MLIRVector
+    iree::compiler::Conversion::Common
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Utils
     iree::schemas::metal_executable_def_c_fbs

@@ -32,6 +32,8 @@ import datetime
 import os
 import re
 import sys
+import textwrap
+from enum import Enum
 
 import bazel_to_cmake_converter
 
@@ -40,6 +42,13 @@ repo_root = None
 EDIT_BLOCKING_PATTERN = re.compile(
     r"bazel[\s_]*to[\s_]*cmake[\s_]*:?[\s_]*do[\s_]*not[\s_]*edit",
     flags=re.IGNORECASE)
+
+
+class Status(Enum):
+  SUCCEEDED = 1
+  FAILED = 2
+  SKIPPED = 3
+  NO_BUILD_FILE = 4
 
 
 def parse_arguments():
@@ -86,15 +95,36 @@ def setup_environment():
       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def log(*args, **kwargs):
-  print(*args, **kwargs, file=sys.stderr)
+def repo_relpath(path):
+  return os.path.relpath(path, repo_root)
 
 
-def convert_directory_tree(root_directory_path, write_files,
-                           allow_partial_conversion):
-  log(f"convert_directory_tree: {root_directory_path}")
-  for root, _, _ in os.walk(root_directory_path):
-    convert_directory(root, write_files, allow_partial_conversion)
+def log(string, *args, indent=0, **kwargs):
+  print(textwrap.indent(string, prefix=(indent * " ")),
+        *args,
+        **kwargs,
+        file=sys.stderr)
+
+
+def convert_directories(directories, write_files, allow_partial_conversion):
+  failure_dirs = []
+  skip_count = 0
+  success_count = 0
+  for directory in directories:
+    status = convert_directory(directory, write_files, allow_partial_conversion)
+    if status == Status.FAILED:
+      failure_dirs.append(repo_relpath(directory))
+    elif status == Status.SKIPPED:
+      skip_count += 1
+    elif status == Status.SUCCEEDED:
+      success_count += 1
+
+  log(f"Updated {success_count} and skipped {skip_count} CMakeLists.txt files")
+  if failure_dirs:
+    log(f"ERROR: Encountered unexpected errors converting {len(failure_dirs)}"
+        " directories:")
+    log("\n".join(failure_dirs), indent=2)
+    sys.exit(1)
 
 
 def convert_directory(directory_path, write_files, allow_partial_conversion):
@@ -105,14 +135,13 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
   build_file_path = os.path.join(directory_path, "BUILD")
   cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
 
-  if os.path.isfile(skip_file_path) or not os.path.isfile(build_file_path):
-    # No Bazel BUILD file in this directory or explicit skip.
-    return
+  if os.path.isfile(skip_file_path):
+    return Status.SKIPPED
+  if not os.path.isfile(build_file_path):
+    return Status.NO_BUILD_FILE
 
-  global repo_root
-  rel_build_file_path = os.path.relpath(build_file_path, repo_root)
-  rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
-  log(f"Converting {rel_build_file_path} to {rel_cmakelists_file_path}")
+  rel_cmakelists_file_path = repo_relpath(cmakelists_file_path)
+  log(f"{rel_cmakelists_file_path}...", end="")
 
   cmake_file_exists = os.path.isfile(cmakelists_file_path)
   copyright_line = f"# Copyright {datetime.date.today().year} Google LLC"
@@ -123,19 +152,8 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
         if line.startswith("# Copyright"):
           copyright_line = line.rstrip()
         if EDIT_BLOCKING_PATTERN.search(line):
-          log(f"  {rel_cmakelists_file_path} already exists, and "
-              f"line {i + 1}: '{line.strip()}' prevents edits. "
-              f"Falling back to preview")
-          write_allowed = False
-
-  if write_allowed:
-    # TODO(scotttodd): Attempt to merge instead of overwrite?
-    #   Existing CMakeLists.txt may have special logic that should be preserved
-    if cmake_file_exists:
-      log(f"  {rel_cmakelists_file_path} already exists; overwriting")
-    else:
-      log(f"  {rel_cmakelists_file_path} does not exist yet; creating")
-  log("")
+          log(f"\n  Skipped. line {i + 1}: '{line.strip()}' prevents edits. ")
+          return Status.SKIPPED
 
   with open(build_file_path, "rt") as build_file:
     build_file_code = compile(build_file.read(), build_file_path, "exec")
@@ -150,13 +168,21 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
       else:
         print(converted_text, end="")
     except (NameError, NotImplementedError) as e:
-      log(f"Failed to convert {rel_build_file_path}.", end=" ")
-      log("Missing a rule handler in bazel_to_cmake.py?")
-      log(f"  Reason: `{type(e).__name__}: {e}`")
+      log(
+          f"\nERROR.\n"
+          f"Missing a rule handler in bazel_to_cmake_converter.py?\n"
+          f"Reason: `{type(e).__name__}: {e}`",
+          indent=2)
+      return Status.FAILED
     except KeyError as e:
-      log(f"Failed to convert {rel_build_file_path}.", end=" ")
-      log("Missing a conversion in bazel_to_cmake_targets.py?")
-      log(f"  Reason: `{type(e).__name__}: {e}`")
+      log(
+          f"\nERROR.\n"
+          f"Missing a conversion in bazel_to_cmake_targets.py?\n"
+          f"Reason: `{type(e).__name__}: {e}`",
+          indent=2)
+      return Status.FAILED
+  log(f"Success")
+  return Status.SUCCEEDED
 
 
 def main(args):
@@ -166,11 +192,13 @@ def main(args):
   write_files = not args.preview
 
   if args.root_dir:
-    convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files,
-                           args.allow_partial_conversion)
+    root_directory_path = os.path.join(repo_root, args.root_dir)
+    log(f"Converting directory tree rooted at: {root_directory_path}")
+    convert_directories((root for root, _, _ in os.walk(root_directory_path)),
+                        write_files, args.allow_partial_conversion)
   elif args.dir:
-    convert_directory(os.path.join(repo_root, args.dir), write_files,
-                      args.allow_partial_conversion)
+    convert_directories([os.path.join(repo_root, args.dir)], write_files,
+                        args.allow_partial_conversion)
 
 
 if __name__ == "__main__":
