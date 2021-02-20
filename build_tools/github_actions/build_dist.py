@@ -227,7 +227,7 @@ def build_py_xla_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/"
+      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_XLA_COMPILER=ON",
@@ -264,7 +264,7 @@ def build_py_tflite_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/"
+      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TFLITE_COMPILER=ON",
@@ -301,7 +301,7 @@ def build_py_tf_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/"
+      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TENSORFLOW_COMPILER=ON",
