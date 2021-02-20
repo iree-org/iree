@@ -208,8 +208,17 @@ def bazel_build_tf_binary(target):
   process = subprocess.run(["bazel", "info", "bazel-bin"],
                            cwd=TF_INTEGRATIONS_DIR,
                            check=True,
+                           capture_output=True,
                            universal_newlines=True)
-  return process.stdout
+  if len(process.stdout.splitlines()) != 1:
+    raise RuntimeError(
+        f"Unexpected output from `bazel info bazel-bin`:\n{process.stdout}")
+  bazel_bin_dir = process.stdout.strip()
+  if not os.path.isdir(bazel_bin_dir):
+    raise RuntimeError(
+        f"`bazel info bazel-bin` '{bazel_bin_dir}' is not a directory")
+
+  return bazel_bin_dir
 
 
 def build_py_xla_compiler_tools_pkg():
