@@ -31,5 +31,16 @@ unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
       .size();
 }
 
+IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
+  auto targetOp =
+      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+    if (op.sym_name() == funcOp.getName()) {
+      return op;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

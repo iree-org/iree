@@ -180,8 +180,9 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
     return llvm::None;
   }
 
-  // Only support static shapes here. This is on deprecation path. So doing this
-  // till this is needed.
+  // TODO(GH-4901) Only support static shapes here. This is on deprecation
+  // path. So doing this till this is needed. Remove this part when switched
+  // over to linalg on tensors.
   linalg::LinalgOp rootOp = fusableOps.back();
   Optional<SmallVector<int64_t, 4>> staticLoopRange =
       linalg::getStaticLoopRanges(rootOp);
@@ -313,15 +314,7 @@ class SetWorkgroupSizePattern
 LogicalResult defineWorkgroupCountRegion(
     OpBuilder &builder, FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder) {
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
-      entryPointOp = op;
-      break;
-    }
-  }
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp)
     return funcOp.emitOpError("unable to find corresponding entry point op");
   if (entryPointOp.getBody())

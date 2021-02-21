@@ -143,6 +143,29 @@ void LinalgTileAndDistributePass::runOnOperation() {
                                           launchConfig, tileAndFuseOptions))) {
       return signalPassFailure();
     }
+    // If the entry point op of the function isnt updated, set it to one since
+    // the op is going to be executed sequentially.
+    IREE::HAL::ExecutableEntryPointOp entryPoint = getEntryPoint(funcOp);
+    if (!entryPoint) {
+      funcOp.emitError("unable to find entry point for function");
+      return signalPassFailure();
+    }
+    if (entryPoint.workgroup_count_region().empty()) {
+      // Set the default number of workgroups to {1, 1, 1} since the op will be
+      // executed sequentially.
+      OpBuilder builder(funcOp.getContext());
+      if (failed(defineWorkgroupCountRegion(
+              builder, funcOp,
+              [](OpBuilder &b, Location loc,
+                 std::array<Value, 3> workload) -> std::array<Value, 3> {
+                Value one = b.create<ConstantIndexOp>(loc, 1);
+                return {one, one, one};
+              }))) {
+        funcOp.emitError(
+            "failed to set number of workgroups to {1, 1, 1} as fallback");
+        return signalPassFailure();
+      }
+    }
     launchConfig.finalize(funcOp);
   }
 }

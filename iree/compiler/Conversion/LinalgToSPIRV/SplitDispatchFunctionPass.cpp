@@ -213,18 +213,6 @@ void SplitDispatchFunctionPass::runOnOperation() {
   }
 }
 
-static IREE::HAL::ExecutableEntryPointOp getEntryPointForFunction(
-    FuncOp funcOp) {
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
-      return op;
-    }
-  }
-  return nullptr;
-}
-
 LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     FuncOp oldFn, OpBuilder &builder) {
   // Entry functions are supported to be of `void(void)` type.
@@ -234,8 +222,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   if (!llvm::hasSingleElement(oldFn.getBlocks())) {
     return oldFn.emitError("expected only one block");
   }
-  IREE::HAL::ExecutableEntryPointOp oldEntryPointOp =
-      getEntryPointForFunction(oldFn);
+  IREE::HAL::ExecutableEntryPointOp oldEntryPointOp = getEntryPoint(oldFn);
   if (!oldEntryPointOp) {
     return oldFn.emitError("unable to find iree.executable.entry_point for ")
            << oldFn.getName();
