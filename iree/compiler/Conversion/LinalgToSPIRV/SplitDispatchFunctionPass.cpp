@@ -217,7 +217,6 @@ static IREE::HAL::ExecutableEntryPointOp getEntryPointForFunction(
     FuncOp funcOp) {
   auto targetOp =
       funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
   for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       return op;

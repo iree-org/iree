@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-linalg-tile-and-distribute)),hal.executable(hal.executable.target(module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul_128x128x128 attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

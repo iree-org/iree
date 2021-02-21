@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul_tile attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

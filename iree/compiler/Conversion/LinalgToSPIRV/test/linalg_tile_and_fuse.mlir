@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse))" -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -65,7 +65,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -132,7 +132,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @pooling_sum_no_padding attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -192,7 +192,7 @@ hal.executable @pooling_sum_no_padding attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -252,7 +252,7 @@ hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -321,7 +321,7 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -389,7 +389,7 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -494,7 +494,7 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

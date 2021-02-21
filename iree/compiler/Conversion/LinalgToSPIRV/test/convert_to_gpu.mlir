@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))" -canonicalize -cse %s | IreeFileCheck %s
 
-// TODO(GH-####): Enable this test when linalg on tensors becomes default.
+// TODO(GH-4901): Enable this test when linalg on tensors becomes default.
 // #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // hal.executable @parallel_4D attributes {sym_visibility = "private"} {
 //   hal.interface @legacy_io {
@@ -213,7 +213,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
 
 // -----
 
-// TODO(GH-####): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @reduce_sum attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

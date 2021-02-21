@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-linalg-tile-and-distribute))" -iree-llvm-tile-size=2,4,1 -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
-// // TODO(GH-####): Enable the dynamic shape tests when linalg on tensors becomes default.
+// // TODO(GH-4901): Enable the dynamic shape tests when linalg on tensors becomes default.
 // hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 //   hal.interface @legacy_io {
 //     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

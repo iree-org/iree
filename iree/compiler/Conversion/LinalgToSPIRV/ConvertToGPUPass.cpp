@@ -634,6 +634,8 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   bool usingLinalgOnTensorsPath;
 };
 
+/// Given the workload return the workgroup count along X obtained by
+/// linearizing the workload and dividing by the workgroup size.
 static Value getWorkgroupCountX(OpBuilder &builder, Location loc,
                                 ArrayRef<Value> values,
                                 int64_t workgroupSizeX) {
@@ -695,6 +697,8 @@ struct MapLinalgOpToGlobalInvocationId
         return failure();
       }
     } else {
+      // TODO (GH-4901): Only support static shapes on this path. This should be
+      // removed when moved to linalg on tensors.
       Optional<SmallVector<int64_t, 4>> staticLoopRange =
           linalg::getStaticLoopRanges(linalgOp);
       if (!staticLoopRange ||
