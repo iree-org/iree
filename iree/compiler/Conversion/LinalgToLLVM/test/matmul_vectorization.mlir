@@ -1,16 +1,17 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-llvm-linalg-tile-and-distribute)),hal.executable(hal.executable.target(module(func(iree-codegen-linalg-to-llvm-workgroups-vectorization-pass))))" -split-input-file %s | IreeFileCheck %s
 
-hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
+hal.executable @matmul_128x128x128 attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @llvm_aot, filter="dylib*" {
-    hal.executable.entry_point @dynamic_matmul attributes {
+    hal.executable.entry_point @matmul_128x128x128 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.input<128x128xf32>, !flow.dispatch.input<128x128xf32>,
+        !flow.dispatch.output<128x128xf32>) -> ()}
     module {
       func @matmul_128x128x128(%arg0 : memref<128x128xf32>, %arg1: memref<128x128xf32>, %arg2: memref<128x128xf32>) {
         linalg.matmul ins(%arg0, %arg1 : memref<128x128xf32>, memref<128x128xf32>) outs(%arg2 : memref<128x128xf32>)

@@ -18,7 +18,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -93,12 +92,20 @@ int dimensionToIndex(StringRef dimension) {
 /// Gets the block processor ID's upper bound. This queries the workgroup count
 /// function.
 Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
-  auto numWorkgroupsFn = getNumWorkgroupsFn(
-      blockIDOp->getParentOfType<FuncOp>(), getNumWorkgroupsFnAttrName());
-  if (!numWorkgroupsFn) return llvm::None;
+  auto funcOp = blockIDOp->getParentOfType<FuncOp>();
+  auto targetOp =
+      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
+  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+    if (op.sym_name() == funcOp.getName()) {
+      entryPointOp = op;
+      break;
+    }
+  }
+  if (!entryPointOp) return llvm::None;
 
-  Operation *terminator = numWorkgroupsFn.getBlocks().back().getTerminator();
-  auto retOp = dyn_cast<ReturnOp>(terminator);
+  Operation *terminator = entryPointOp.getBlock()->getTerminator();
+  auto retOp = dyn_cast<IREE::HAL::ReturnOp>(terminator);
   if (!retOp || retOp.getNumOperands() != 3) return llvm::None;
   LLVM_DEBUG(llvm::dbgs() << "workgroup count function return op: " << retOp
                           << "\n");
@@ -232,18 +239,21 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
 
 /// Tests processor ID use folding patterns.
 struct FoldGPUProcessIDUsesPass
-    : public PassWrapper<FoldGPUProcessIDUsesPass, FunctionPass> {
+    : public PassWrapper<FoldGPUProcessIDUsesPass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
   FoldGPUProcessIDUsesPass() = default;
+  FoldGPUProcessIDUsesPass(const FoldGPUProcessIDUsesPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     populateFoldGPUProcessorIDUsesPatterns(context, patterns);
-    (void)applyPatternsAndFoldGreedily(getFunction(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation().getInnerModule(),
+                                       std::move(patterns));
   }
 };
 
@@ -255,7 +265,8 @@ void populateFoldGPUProcessorIDUsesPatterns(
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass() {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createFoldProcessorIDUsesPass() {
   return std::make_unique<FoldGPUProcessIDUsesPass>();
 }
 

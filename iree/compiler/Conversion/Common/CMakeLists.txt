@@ -23,9 +23,7 @@ iree_cc_library(
     "Passes.h"
     "Transforms.h"
   SRCS
-    "DeclareNumWorkgroupsFnPass.cpp"
     "LaunchConfig.cpp"
-    "LegalizeNumWorkgroupsFnPass.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
     "Passes.cpp"

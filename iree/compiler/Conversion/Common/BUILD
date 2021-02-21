@@ -21,9 +21,7 @@ package(
 cc_library(
     name = "Common",
     srcs = [
-        "DeclareNumWorkgroupsFnPass.cpp",
         "LaunchConfig.cpp",
-        "LegalizeNumWorkgroupsFnPass.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",
         "Passes.cpp",

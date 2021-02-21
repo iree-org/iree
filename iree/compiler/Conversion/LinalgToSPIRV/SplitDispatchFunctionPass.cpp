@@ -27,7 +27,6 @@
 #include <iterator>
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -185,7 +184,8 @@ static void collectAllReferencedOps(
 namespace {
 
 struct SplitDispatchFunctionPass
-    : public PassWrapper<SplitDispatchFunctionPass, OperationPass<ModuleOp>> {
+    : public PassWrapper<SplitDispatchFunctionPass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
   void runOnOperation() override;
   LogicalResult splitDispatchFunction(FuncOp oldFn, OpBuilder &builder);
 };
@@ -193,7 +193,8 @@ struct SplitDispatchFunctionPass
 }  // namespace
 
 void SplitDispatchFunctionPass::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
+  IREE::HAL::ExecutableTargetOp targetOp = getOperation();
+  ModuleOp moduleOp = targetOp.getInnerModule();
 
   // Collect all dispatch entry functions.
   SmallVector<FuncOp, 1> functions;
@@ -221,7 +222,11 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   if (!llvm::hasSingleElement(oldFn.getBlocks())) {
     return oldFn.emitError("expected only one block");
   }
-
+  IREE::HAL::ExecutableEntryPointOp oldEntryPointOp = getEntryPoint(oldFn);
+  if (!oldEntryPointOp) {
+    return oldFn.emitError("unable to find iree.executable.entry_point for ")
+           << oldFn.getName();
+  }
   // The dispatch function should have more than one separable ops. Otherwise
   // there is nothing to do.
   Block &fnBody = oldFn.getBlocks().front();
@@ -247,17 +252,13 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   ModuleOp moduleOp = cast<ModuleOp>(oldFn->getParentOp());
   Block &oldFnBlock = oldFn.getBlocks().front();
   Location loc = oldFn.getLoc();
-
-  SmallVector<std::string, 4> splitKernels;
-  splitKernels.reserve(separableOps.size());
-  llvm::SmallPtrSet<Operation *, 16> closure;
+  SmallVector<Attribute, 4> entryPoints;
 
   for (const auto &fusedOps : llvm::enumerate(fusedOpsList)) {
     if (fusedOps.value().empty()) continue;
     // Create a new function for hosting this op.
-    splitKernels.emplace_back(
-        llvm::formatv("{0}_dispatch_{1}", oldFn.getName(), fusedOps.index()));
-    StringRef newFnName = splitKernels.back();
+    std::string newFnName =
+        llvm::formatv("{0}_dispatch_{1}", oldFn.getName(), fusedOps.index());
     builder.setInsertionPointToStart(moduleOp.getBody());
     auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType());
     LLVM_DEBUG({
@@ -268,28 +269,24 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     // Copy over all attributes except type and name.
     for (const auto &namedAttr : oldFn.getAttrs()) {
       if (namedAttr.first != impl::getTypeAttrName() &&
-          namedAttr.first != SymbolTable::getSymbolAttrName() &&
-          namedAttr.first != getNumWorkgroupsFnAttrName())
+          namedAttr.first != SymbolTable::getSymbolAttrName())
         newFn->setAttr(namedAttr.first, namedAttr.second);
     }
-    // Need special handling for the number of workgroups function.
-    if (FuncOp numWorkgroupsFn =
-            getNumWorkgroupsFn(oldFn, getNumWorkgroupsFnAttrName())) {
-      FuncOp newNumWorkgroupsFn =
-          builder.create<FuncOp>(loc, newFnName.str() + "__num_workgroups__",
-                                 numWorkgroupsFn.getType());
-      newNumWorkgroupsFn.setVisibility(FuncOp::Visibility::Private);
-      newFn->setAttr(getNumWorkgroupsFnAttrName(),
-                     builder.getSymbolRefAttr(newNumWorkgroupsFn));
-      LLVM_DEBUG({
-        llvm::dbgs() << "Added func @" << newNumWorkgroupsFn.getName()
-                     << " as num workgroups fn for func @" << newFn.getName()
-                     << "\n";
-      });
+
+    // Add the entry point operations for the new fn.
+    {
+      OpBuilder::InsertionGuard g(builder);
+      builder.setInsertionPoint(oldEntryPointOp);
+      auto clonedEntryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
+          builder.clone(*oldEntryPointOp.getOperation()));
+      clonedEntryPointOp.sym_nameAttr(builder.getStringAttr(newFnName));
+      clonedEntryPointOp.ordinalAttr(
+          builder.getI32IntegerAttr(static_cast<int32_t>(entryPoints.size())));
+      entryPoints.push_back(builder.getSymbolRefAttr(clonedEntryPointOp));
     }
 
     // Collect the closure for the current Linalg op.
-    closure.clear();
+    llvm::SmallPtrSet<Operation *, 16> closure;
     collectAllReferencedOps(fusedOps.value(), closure);
 
     // Clone all ops in the closure to the new function.
@@ -303,27 +300,12 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     }
     builder.insert(oldFnBlock.getTerminator()->clone(remapper));
   }
-
-  // Add the entry point schedule to the module op.
-  SmallVector<Attribute, 4> entryPoints;
-  entryPoints.reserve(separableOps.size());
-  for (const std::string &kernel : splitKernels) {
-    entryPoints.emplace_back(builder.getStringAttr(kernel));
-  }
   moduleOp->setAttr(getEntryPointScheduleAttrName(),
                     builder.getArrayAttr(entryPoints));
 
-  if (FuncOp numWorkgroupsFn =
-          getNumWorkgroupsFn(oldFn, getNumWorkgroupsFnAttrName())) {
-    LLVM_DEBUG({
-      llvm::dbgs() << "Erased num workgroups fn func @"
-                   << numWorkgroupsFn.getName() << " for func @"
-                   << oldFn.getName() << "\n";
-    });
-    numWorkgroupsFn.erase();
-  }
   LLVM_DEBUG({ llvm::dbgs() << "Erased func @" << oldFn.getName() << "\n"; });
   oldFn.erase();
+  oldEntryPointOp.erase();
   return success();
 }
 
@@ -331,7 +313,8 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createSplitDispatchFunctionPass() {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createSplitDispatchFunctionPass() {
   return std::make_unique<SplitDispatchFunctionPass>();
 }
 

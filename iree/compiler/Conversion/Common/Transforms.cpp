@@ -21,10 +21,10 @@
 #include "iree/compiler/Conversion/Common/Transforms.h"
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -180,14 +180,45 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
     return llvm::None;
   }
 
-  // Update the launch configuration.
-  SmallVector<unsigned, 2> distributedLoops =
-      llvm::to_vector<2>(tiledAndFusedOps->fusedLoopDims);
-  if (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
-      failed(createNumWorkgroupsFromResultShape(
-          builder, fusableOps.back(), funcOp, getNumWorkgroupsFnAttrName(),
-          tileSizes, distributedLoops))) {
-    funcOp.emitError("failed to update launch configuration");
+  // TODO(GH-4901) Only support static shapes here. This is on deprecation
+  // path. So doing this till this is needed. Remove this part when switched
+  // over to linalg on tensors.
+  linalg::LinalgOp rootOp = fusableOps.back();
+  Optional<SmallVector<int64_t, 4>> staticLoopRange =
+      linalg::getStaticLoopRanges(rootOp);
+  if (!staticLoopRange ||
+      llvm::any_of(staticLoopRange.getValue(),
+                   [](int64_t d) { return d == ShapedType::kDynamicSize; })) {
+    rootOp.emitError("failed to find statlc loop bounds");
+    return llvm::None;
+  }
+  // Extract static tile sizes.
+  WorkgroupCountRegionBuilder regionBuilder =
+      [&tileSizes, &tiledAndFusedOps, &staticLoopRange](
+          OpBuilder &b, Location loc,
+          std::array<Value, 3> workload) -> std::array<Value, 3> {
+    Value one = b.create<ConstantIndexOp>(loc, 1);
+    SmallVector<Value, 4> workgroupCounts;
+    for (auto size : enumerate(tileSizes)) {
+      if (!size.value() ||
+          !tiledAndFusedOps->fusedLoopDims.count(size.index())) {
+        continue;
+      }
+      Value extent =
+          b.create<ConstantIndexOp>(loc, (*staticLoopRange)[size.index()]);
+      auto map =
+          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(size.value()));
+      Value workgroupCount = linalg::applyMapToValues(b, loc, map, extent)[0];
+      workgroupCounts.push_back(workgroupCount);
+    }
+    if (workgroupCounts.size() > 3) {
+      workgroupCounts.resize(3);
+    }
+    workgroupCounts = llvm::to_vector<4>(llvm::reverse(workgroupCounts));
+    workgroupCounts.resize(3, one);
+    return {workgroupCounts[0], workgroupCounts[1], workgroupCounts[2]};
+  };
+  if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder))) {
     return llvm::None;
   }
 
@@ -283,15 +314,7 @@ class SetWorkgroupSizePattern
 LogicalResult defineWorkgroupCountRegion(
     OpBuilder &builder, FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder) {
-  auto targetOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
-  for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
-      entryPointOp = op;
-      break;
-    }
-  }
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp)
     return funcOp.emitOpError("unable to find corresponding entry point op");
   if (entryPointOp.getBody())

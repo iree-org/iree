@@ -56,13 +56,10 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   }
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  if (!clEnableLLVMLinalgOnTensors) {
-    nestedModulePM.addPass(createLegalizeNumWorkgroupsFnPass());
-  }
-  // Linalg.ConvOp -> (Img2Col packing + matmul).
-  // After convolution is tiled and distributed among workgroups its converted
-  // before vectorize workgroup workload.
   if (convImg2ColConversion) {
+    // Linalg.ConvOp -> (Img2Col packing + matmul).  After convolution is tiled
+    // and distributed among workgroups its converted before vectorize workgroup
+    // workload.
     nestedModulePM.addNestedPass<FuncOp>(
         createConvImg2ColMatmulConversionPass());
   }
@@ -97,8 +94,6 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  if (!clEnableLLVMLinalgOnTensors)
-    nestedModulePM.addPass(createDeclareNumWorkgroupsFnPass());
 
   nestedModulePM.addPass(createInlinerPass());
 
