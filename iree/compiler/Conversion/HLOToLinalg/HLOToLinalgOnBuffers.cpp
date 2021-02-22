@@ -659,6 +659,16 @@ struct SubTensorOpConversion
 
 namespace {
 
+/// Returns the constant value associated with the init value if the defining
+/// operation is a constant.
+static Attribute GetInitValueAsConst(Value init) {
+  DenseElementsAttr attr;
+  if (!matchPattern(init, m_Constant(&attr))) return {};
+  auto type = attr.getType().dyn_cast<ShapedType>();
+  if (!type || type.getRank() != 0) return {};
+  return attr.getValue({});
+}
+
 /// mhlo.reduce_window is mapped to a linalg.pooling operation. The type of
 /// the pooling is determined based on the body of the reduce window
 /// operation. This class enumerates the different variants.
@@ -730,9 +740,16 @@ LogicalResult ReduceWindowOpConversion::apply(
   linalg::LinalgOp poolingOp;
   PoolingType poolingType = getPoolingType(op.body());
 
-  if (failed(zeroFillBuffer(loc, resultBuffers[0], rewriter))) {
-    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
+  Value initValue = inputBuffers[1];
+  Attribute initConstVal = GetInitValueAsConst(initValue);
+  if (initConstVal) {
+    initValue = rewriter.create<ConstantOp>(initValue.getDefiningOp()->getLoc(),
+                                            initConstVal);
+  } else {
+    initValue = rewriter.create<LoadOp>(loc, initValue);
   }
+  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], initValue);
+
   switch (poolingType) {
     case PoolingType::kMin: {
       poolingOp = createOp(static_cast<linalg::PoolingMinOp *>(nullptr));
