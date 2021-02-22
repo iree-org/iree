@@ -33,16 +33,9 @@ enum class TilingLevel {
   NumTileLevels = 3
 };
 
-class CPUKernelDispatch {
- public:
-  template <TilingLevel tilingLevel>
-  llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) const;
-};
-
 struct TileSizeFn {
   template <TilingLevel tilingLevel>
-  static llvm::SmallVector<Value, 4> get(CPUKernelDispatch cpuKernelDispatch,
-                                         OpBuilder &builder,
+  static llvm::SmallVector<Value, 4> get(OpBuilder &builder,
                                          Operation *operation);
 };
 

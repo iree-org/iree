@@ -16,6 +16,7 @@
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
@@ -68,89 +69,58 @@ static llvm::cl::opt<int> batchMatmulL2TileSize(
         "linalg.matmul tile size for workgroups spliting of M, N dimension"),
     llvm::cl::init(4));
 
-struct TileOpParameters {
-  template <typename OpT, TilingLevel tilingLevel>
-  static llvm::SmallVector<int64_t, 4> getSizes(OpT op);
-};
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::WorkGroupTiles>(
-    linalg::MatmulOp op) {
-  return {matmulWorkgroupTileSize, matmulWorkgroupTileSize};
-}
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::Level1Tiles>(
-    linalg::MatmulOp op) {
-  return {matmulL1TileSize, matmulL1TileSize, matmulL1TileSize};
-}
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::MatmulOp, TilingLevel::Level2Tiles>(
-    linalg::MatmulOp op) {
-  return {matmulL2TileSize, matmulL2TileSize, matmulL2TileSize};
-}
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::WorkGroupTiles>(
-    linalg::BatchMatmulOp op) {
-  return {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize};
-}
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::Level1Tiles>(
-    linalg::BatchMatmulOp op) {
-  return {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
-          batchMatmulL1TileSize};
-}
-
-template <>
-llvm::SmallVector<int64_t, 4>
-TileOpParameters::getSizes<linalg::BatchMatmulOp, TilingLevel::Level2Tiles>(
-    linalg::BatchMatmulOp op) {
-  return {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
-          batchMatmulL2TileSize};
-}
-
-#define DEFINE_TILE_OP_GET_SIZES(TileLevel)                                 \
-  template <>                                                               \
-  llvm::SmallVector<int64_t, 4> CPUKernelDispatch::getTileSizes<TileLevel>( \
-      Operation * op) const {                                               \
-    if (isa<linalg::MatmulOp>(op)) {                                        \
-      return TileOpParameters::getSizes<linalg::MatmulOp, TileLevel>(       \
-          dyn_cast<linalg::MatmulOp>(op));                                  \
-    }                                                                       \
-    if (isa<linalg::BatchMatmulOp>(op)) {                                   \
-      return TileOpParameters::getSizes<linalg::BatchMatmulOp, TileLevel>(  \
-          dyn_cast<linalg::BatchMatmulOp>(op));                             \
-    }                                                                       \
-    return {1, 1, 1};                                                       \
+namespace {
+template <TilingLevel tilingLevel>
+llvm::SmallVector<int64_t, 4> getTileSizes(Operation *op) {
+  if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
+    if (contractionOp.isRowMajorMatmul()) {
+      switch (tilingLevel) {
+        case TilingLevel::WorkGroupTiles: {
+          return {matmulWorkgroupTileSize, matmulWorkgroupTileSize};
+        }
+        case TilingLevel::Level1Tiles: {
+          return {matmulL1TileSize, matmulL1TileSize, matmulL1TileSize};
+        }
+        case TilingLevel::Level2Tiles: {
+          return {matmulL2TileSize, matmulL2TileSize, matmulL2TileSize};
+        }
+      }
+    }
+    if (contractionOp.isRowMajorBatchMatmul()) {
+      switch (tilingLevel) {
+        case TilingLevel::WorkGroupTiles: {
+          return {1, batchMatmulWorkgroupTileSize,
+                  batchMatmulWorkgroupTileSize};
+        }
+        case TilingLevel::Level1Tiles: {
+          return {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
+                  batchMatmulL1TileSize};
+        }
+        case TilingLevel::Level2Tiles: {
+          return {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
+                  batchMatmulL2TileSize};
+        }
+      }
+    }
   }
 
-DEFINE_TILE_OP_GET_SIZES(TilingLevel::WorkGroupTiles)
-DEFINE_TILE_OP_GET_SIZES(TilingLevel::Level1Tiles)
-DEFINE_TILE_OP_GET_SIZES(TilingLevel::Level2Tiles)
-#undef DEFINE_TILE_OP_GET_SIZES
+  return {1, 1, 1};
+}
+}  // namespace
 
-#define DEFINE_TILE_SIZE_FN(TileLevel)                                     \
-  template <>                                                              \
-  SmallVector<Value, 4> TileSizeFn::get<TileLevel>(                        \
-      CPUKernelDispatch cpuKernelDispatch, OpBuilder & builder,            \
-      Operation * operation) {                                             \
-    auto tileSizes = cpuKernelDispatch.getTileSizes<TileLevel>(operation); \
-    if (tileSizes.empty()) return {};                                      \
-    SmallVector<Value, 4> tileSizesVal;                                    \
-    tileSizesVal.reserve(tileSizes.size());                                \
-    for (auto val : tileSizes) {                                           \
-      tileSizesVal.push_back(                                              \
-          builder.create<ConstantIndexOp>(operation->getLoc(), val));      \
-    }                                                                      \
-    return tileSizesVal;                                                   \
+#define DEFINE_TILE_SIZE_FN(tilingLevel)                                      \
+  template <>                                                                 \
+  SmallVector<Value, 4> TileSizeFn::get<tilingLevel>(OpBuilder & builder,     \
+                                                     Operation * operation) { \
+    auto tileSizes = getTileSizes<tilingLevel>(operation);                    \
+    if (tileSizes.empty()) return {};                                         \
+    SmallVector<Value, 4> tileSizesVal;                                       \
+    tileSizesVal.reserve(tileSizes.size());                                   \
+    for (auto val : tileSizes) {                                              \
+      tileSizesVal.push_back(                                                 \
+          builder.create<ConstantIndexOp>(operation->getLoc(), val));         \
+    }                                                                         \
+    return tileSizesVal;                                                      \
   }
 
 DEFINE_TILE_SIZE_FN(TilingLevel::WorkGroupTiles)
@@ -166,29 +136,28 @@ Optional<LaunchConfig> initCPULaunchConfig(
 
   Optional<linalg::LinalgOp> rootOperation = llvm::None;
   for (auto linalgOp : linalgOps) {
-#define DISPATCH(opType)                                                       \
-  if (opType op = dyn_cast<opType>(linalgOp.getOperation())) {                 \
-    if (rootOperation) {                                                       \
-      op.emitError("unhandled multiple root operations in dispatch region");   \
-      return llvm::None;                                                       \
-    }                                                                          \
-    rootOperation = linalgOp;                                                  \
-    SmallVector<int64_t, 4> opTileSizes;                                       \
-    if (!clLLVMTileSizes.empty()) {                                            \
-      opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());      \
-    } else {                                                                   \
-      opTileSizes =                                                            \
-          TileOpParameters::getSizes<opType, TilingLevel::WorkGroupTiles>(op); \
-    }                                                                          \
-    config.setTileSizes(op, opTileSizes, 0);                                   \
-    config.setRootOperation(op);                                               \
-    continue;                                                                  \
-  }
-
-    DISPATCH(linalg::MatmulOp)
-    DISPATCH(linalg::BatchMatmulOp)
-
-#undef DISPATCH
+    if (auto contractionOp =
+            dyn_cast<linalg::ContractionOpInterface>(linalgOp.getOperation())) {
+      if (!contractionOp.isRowMajorMatmul() &&
+          !contractionOp.isRowMajorBatchMatmul()) {
+        continue;
+      }
+      if (rootOperation) {
+        contractionOp.emitError(
+            "unhandled multiple root operations in dispatch region");
+        return llvm::None;
+      }
+      rootOperation = linalgOp;
+      SmallVector<int64_t, 4> opTileSizes;
+      if (!clLLVMTileSizes.empty()) {
+        opTileSizes.assign(clLLVMTileSizes.begin(), clLLVMTileSizes.end());
+      } else {
+        opTileSizes = getTileSizes<TilingLevel::WorkGroupTiles>(contractionOp);
+      }
+      config.setTileSizes(contractionOp, opTileSizes, 0);
+      config.setRootOperation(contractionOp);
+      continue;
+    }
   }
   if (!rootOperation) {
     return config;
