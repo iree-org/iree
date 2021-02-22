@@ -95,6 +95,7 @@ module {
 // CHECK-SAME:      strides = [1, 2, 2, 1]
 
 // -----
+
 module {
   func @reduce_window_max_nhwc_with_cst() {
     %c0 = constant 0 : index
