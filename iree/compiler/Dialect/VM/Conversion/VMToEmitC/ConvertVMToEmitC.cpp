@@ -47,17 +47,27 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Attribute, 4> args_ =
-        indexSequence(operands.size(), op.getContext());
-
-    for (NamedAttribute attr : op.getAttrs()) {
-      args_.push_back(attr.second);
-    }
-
     auto type = op.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args = rewriter.getArrayAttr(args_);
+
+    // Default to an empty args attribute, which results in the operands being
+    // printed as the arguments to the function call.
+    ArrayAttr args;
     ArrayAttr templateArgs;
+
+    // If the operation has attributes, we need to explicitely build the args
+    // attribute of the emitc call op. This consists of index attributes for
+    // the operands, followed by the source op attributes themselves.
+    if (op.getAttrs().size() > 0) {
+      SmallVector<Attribute, 4> args_ =
+          indexSequence(operands.size(), op.getContext());
+
+      for (NamedAttribute attr : op.getAttrs()) {
+        args_.push_back(attr.second);
+      }
+
+      args = rewriter.getArrayAttr(args_);
+    }
 
     rewriter.replaceOpWithNewOp<emitc::CallOp>(op, type, callee, args,
                                                templateArgs, operands);
