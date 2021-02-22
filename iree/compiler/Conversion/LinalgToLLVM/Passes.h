@@ -46,16 +46,9 @@ void populateConvImg2ColMatmulConversionPatterns(
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
-/// Performs the revamped final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVM2Pass();
 
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
-
-/// Pass to perform tiling and distribution of Linalg ops with tensor semantics
-/// to sequentialized SPMD loops.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLinalgTileAndDistributeOnTensorsPass();
 
 /// Pass to materialize static launch information for a dispatch region when
 /// using the linalg on tensors path.

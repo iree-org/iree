@@ -1,81 +1,82 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-convert-to-gpu))" -canonicalize -cse %s | IreeFileCheck %s
 
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-hal.executable @parallel_4D attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @parallel_4D attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-      func @parallel_4D() {
-        %arg0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 4 : i32} : memref<?x?x?x?xf32>
-        %arg1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
-        %arg2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
-        linalg.generic {
-           indexing_maps = [#map0, #map0, #map0],
-           iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-          ins(%arg0, %arg1 : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
-         outs(%arg2 : memref<?x?x?x?xf32>) {
-        ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
-          %0 = addf %arg3, %arg4 : f32
-          linalg.yield %0 : f32
-        }
-        return
-      }
-      func private @parallel_4D__num_workgroups__
-        (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
-         !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
-    }
-  }
-}
-// CHECK-LABEL: func @parallel_4D
-//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
-//   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
-//   CHECK-DAG:     %[[C3:.+]] = constant 3 : index
-//   CHECK-DAG:     %[[UB0:.+]] = dim %{{.+}}, %[[C0]]
-//   CHECK-DAG:     %[[UB1:.+]] = dim %{{.+}}, %[[C1]]
-//   CHECK-DAG:     %[[UB2:.+]] = dim %{{.+}}, %[[C2]]
-//   CHECK-DAG:     %[[UB3:.+]] = dim %{{.+}}, %[[C3]]
-//       CHECK:     %[[T4:.+]] = muli %[[UB3]], %[[UB2]]
-//       CHECK:     %[[T5:.+]] = muli %[[T4]], %[[UB1]]
-//       CHECK:     %[[UB:.+]] = muli %[[T5]], %[[UB0]]
-//   CHECK-DAG:     %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:     %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
-//   CHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
-//       CHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
-//       CHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[UB]]
-//       CHECK:     scf.if %[[COND]]
-//       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
-//       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
-//       CHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[T4]]
-//       CHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[T4]]
-//       CHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[UB3]]
-//       CHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[UB3]]
-//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-//       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+// TODO(GH-4901): Enable this test when linalg on tensors becomes default.
+// #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// hal.executable @parallel_4D attributes {sym_visibility = "private"} {
+//   hal.interface @legacy_io {
+//     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+//     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+//     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+//   }
+//   hal.executable.target @vulkan, filter="vulkan*" {
+//     hal.executable.entry_point @parallel_4D attributes {
+//       interface = @legacy_io, ordinal = 0 : i32,
+//       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
+//         !flow.dispatch.output<?x?xf32>) -> ()}
+//     module attributes {
+//       spv.target_env =
+//         #spv.target_env<#spv.vce<v1.3,
+//         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+//         {max_compute_workgroup_invocations = 128 : i32,
+//          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+//       func @parallel_4D() {
+//         %arg0 = iree.placeholder for "interace buffer"
+//           {binding = @legacy_io::@arg0, operand_result_index = 4 : i32} : memref<?x?x?x?xf32>
+//         %arg1 = iree.placeholder for "interace buffer"
+//           {binding = @legacy_io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
+//         %arg2 = iree.placeholder for "interace buffer"
+//           {binding = @legacy_io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
+//         linalg.generic {
+//            indexing_maps = [#map0, #map0, #map0],
+//            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+//           ins(%arg0, %arg1 : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
+//          outs(%arg2 : memref<?x?x?x?xf32>) {
+//         ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
+//           %0 = addf %arg3, %arg4 : f32
+//           linalg.yield %0 : f32
+//         }
+//         return
+//       }
+//       func private @parallel_4D__num_workgroups__
+//         (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
+//          !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
+//       hal.interface @legacy_io attributes {sym_visibility = "private"} {
+//         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+//         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+//         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+//       }
+//     }
+//   }
+// }
+// // NOCHECK-LABEL: func @parallel_4D
+// //  NOCHECK-SAME:   local_size = dense<[32, 1, 1]>
+// //   NOCHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// //   NOCHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// //   NOCHECK-DAG:     %[[C2:.+]] = constant 2 : index
+// //   NOCHECK-DAG:     %[[C3:.+]] = constant 3 : index
+// //   NOCHECK-DAG:     %[[UB0:.+]] = dim %{{.+}}, %[[C0]]
+// //   NOCHECK-DAG:     %[[UB1:.+]] = dim %{{.+}}, %[[C1]]
+// //   NOCHECK-DAG:     %[[UB2:.+]] = dim %{{.+}}, %[[C2]]
+// //   NOCHECK-DAG:     %[[UB3:.+]] = dim %{{.+}}, %[[C3]]
+// //       NOCHECK:     %[[T4:.+]] = muli %[[UB3]], %[[UB2]]
+// //       NOCHECK:     %[[T5:.+]] = muli %[[T4]], %[[UB1]]
+// //       NOCHECK:     %[[UB:.+]] = muli %[[T5]], %[[UB0]]
+// //   NOCHECK-DAG:     %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
+// //   NOCHECK-DAG:     %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
+// //   NOCHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
+// //       NOCHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
+// //       NOCHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
+// //       NOCHECK:     %[[COND:.+]] = cmpi slt, %[[IV]], %[[UB]]
+// //       NOCHECK:     scf.if %[[COND]]
+// //       NOCHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
+// //       NOCHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
+// //       NOCHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[T4]]
+// //       NOCHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[T4]]
+// //       NOCHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[UB3]]
+// //       NOCHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[UB3]]
+// //       NOCHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+// //       NOCHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+// //       NOCHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 
 // -----
 
@@ -86,7 +87,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @parallel_4D_static attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
@@ -97,7 +98,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
         {max_compute_workgroup_invocations = 128 : i32,
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-      func @parallel_4D_static() attributes {hal.num_workgroups_fn = @parallel_4D_static__num_workgroups__} {
+      func @parallel_4D_static() {
         %arg0 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x5x6xf32>
         %arg1 = iree.placeholder for "interace buffer"
@@ -115,9 +116,6 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
         }
         return
       }
-      func private @parallel_4D_static__num_workgroups__
-        (!shapex.ranked_shape<[3,4,5,6]>, !shapex.ranked_shape<[3,4,5,6]>,
-         !shapex.ranked_shape<[3,4,5,6]>) -> (index, index, index)
       hal.interface @legacy_io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -126,8 +124,11 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
     }
   }
 }
-// CHECK-LABEL: func @parallel_4D_static()
-//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
+//       CHECK: hal.executable.entry_point @parallel_4D_static
+//   CHECK-DAG:   %[[C1:.+]] = constant 1
+//   CHECK-DAG:   %[[C12:.+]] = constant 12 : index
+//       CHECK:   hal.return %[[C12]], %[[C1]], %[[C1]]
+//       CHECK: func @parallel_4D_static()
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
 //   CHECK-DAG:     %[[C360:.+]] = constant 360 : index
 //   CHECK-DAG:     %[[C120:.+]] = constant 120 : index
@@ -150,11 +151,6 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
 //       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 //       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 
-//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[C12:.+]] = constant 12 : index
-//       CHECK:   return %[[C12]], %[[C1]], %[[C1]]
-
 // -----
 
 #map0 = affine_map<() -> ()>
@@ -170,11 +166,11 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @scalar_add attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.input<f32>, !flow.dispatch.input<f32>,
+        !flow.dispatch.output<f32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -197,9 +193,6 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
          }
          return
       }
-      func private @scalar_add__num_workgroups__
-        (!shapex.ranked_shape<[]>, !shapex.ranked_shape<[]>,
-         !shapex.ranked_shape<[]>) -> (index, index, index)
       hal.interface @legacy_io attributes {sym_visibility = "private"} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -208,54 +201,54 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
     }
   }
 }
+//       CHECK: hal.executable.entry_point @scalar_add
+//       CHECK:   %[[C1:.+]] = constant 1
+//       CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]]
 // CHECK-LABEL: func @scalar_add()
-//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //       CHECK:     load
 //  CHECK-NEXT:     load
 //  CHECK-NEXT:     addf
 //  CHECK-NEXT:     store
 //  CHECK-NEXT:     return
 
-//       CHECK: func private @[[NUM_WORKGROUPS_FN]]
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//       CHECK:   return %[[C1]], %[[C1]], %[[C1]]
-
 // -----
 
+// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @reduce_sum attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reduce_sum attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.input<40x50x75xf32>, !flow.dispatch.input<f32>,
+        !flow.dispatch.output<40xf32>) -> ()}
     module {
       func @reduce_sum() {
         %arg0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?x?xf32>
+          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<40x50x75xf32>
         %arg1 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
         %arg2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?xf32>
+          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<40xf32>
         linalg.indexed_generic {
-           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> ()>,
-                            affine_map<(d0, d1, d2) -> (d0)>],
-           iterator_types = ["parallel", "parallel", "reduction"]}
-          ins(%arg0, %arg1 : memref<?x?x?xf32>, memref<f32>)
-         outs(%arg2 : memref<?xf32>) {
+          indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                           affine_map<(d0, d1, d2) -> ()>,
+                           affine_map<(d0, d1, d2) -> (d0)>],
+          iterator_types = ["parallel", "reduction", "reduction"]}
+          ins(%arg0, %arg1 : memref<40x50x75xf32>, memref<f32>)
+          outs(%arg2 : memref<40xf32>) {
         ^bb0(%arg3: index, %arg4: index, %arg5: index,
-             %arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
+          %arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
           %c0 = constant 0 : index
-          %cst = constant true
           %0 = cmpi eq, %arg5, %c0 : index
-          %1 = and %cst, %0 : i1
-          %2 = select %1, %arg7, %arg8 : f32
-          %3 = addf %arg6, %2 : f32
-          linalg.yield %3 : f32
+          %1 = cmpi eq, %arg4, %c0 : index
+          %2 = and %0, %1 : i1
+          %3 = select %2, %arg7, %arg8 : f32
+          %4 = addf %arg6, %3 : f32
+          linalg.yield %4 : f32
         }
         return
       }
@@ -267,21 +260,22 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
     }
   }
 }
-// CHECK-LABEL: func @reduce_sum
+//       CHECK: hal.executable.entry_point @reduce_sum
+//   CHECK-DAG:   %[[C1:.+]] = constant 1
+//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//       CHECK:   hal.return %[[C2]], %[[C1]], %[[C1]]
+//       CHECK: func @reduce_sum
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
-//       CHECK:     %[[UB0:.+]] = dim %{{.+}}, %[[C0]]
-//       CHECK:     %[[UB1:.+]] = dim %{{.+}}, %[[C1]]
-//       CHECK:     %[[UB2:.+]] = dim %{{.+}}, %[[C2]]
-//       CHECK:     %[[UB:.+]] = muli %[[UB1]], %[[UB0]]
-//       CHECK:     %[[COND:.+]] = cmpi slt, %{{.+}}, %[[UB]]
+//   CHECK-DAG:     %[[C40:.+]] = constant 40 : index
+//   CHECK-DAG:     %[[C50:.+]] = constant 50 : index
+//   CHECK-DAG:     %[[C75:.+]] = constant 75 : index
+//       CHECK:     %[[COND:.+]] = cmpi slt, %{{.+}}, %[[C40]]
 //       CHECK:     scf.if %[[COND]]
-//       CHECK:       %[[IV0:.+]] = divi_signed %{{.+}}, %[[UB1]]
-//       CHECK:       %[[IV1:.+]] = remi_signed %{{.+}}, %[[UB1]]
-//       CHECK:       scf.for %[[IV:.+]] = %{{.+}} to %[[UB2]]
-//       CHECK:         %[[ISZERO:.+]] = cmpi eq, %[[IV]], %[[C0]]
+//       CHECK:       scf.for %[[IV0:.+]] = %{{.+}} to %[[C50]]
+//       CHECK:         scf.for %[[IV1:.+]] = %{{.+}} to %[[C75]]
+//   CHECK-DAG:           %[[ISZERO0:.+]] = cmpi eq, %[[IV0]], %[[C0]]
+//   CHECK-DAG:           %[[ISZERO1:.+]] = cmpi eq, %[[IV1]], %[[C0]]
 
 // -----
 
@@ -299,7 +293,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @matmul attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
@@ -381,7 +375,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @conv_no_padding attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
@@ -507,7 +501,7 @@ hal.executable @pooling_no_padding attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
+  hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @pooling_no_padding attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,

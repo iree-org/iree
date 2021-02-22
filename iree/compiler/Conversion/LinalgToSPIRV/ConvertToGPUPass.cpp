@@ -22,7 +22,6 @@
 #include <numeric>
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
@@ -635,6 +634,20 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   bool usingLinalgOnTensorsPath;
 };
 
+/// Given the workload return the workgroup count along X obtained by
+/// linearizing the workload and dividing by the workgroup size.
+static Value getWorkgroupCountX(OpBuilder &builder, Location loc,
+                                ArrayRef<Value> values,
+                                int64_t workgroupSizeX) {
+  AffineExpr expr = builder.getAffineConstantExpr(1);
+  for (auto val : enumerate(values)) {
+    expr = expr * builder.getAffineSymbolExpr(val.index());
+  }
+  expr = expr.ceilDiv(workgroupSizeX);
+  return linalg::applyMapToValues(
+      builder, loc, AffineMap::get(0, values.size(), expr), values)[0];
+}
+
 /// Map linalg operation to execute on GPU in parallel by mapping the parallel
 /// loops to "GlobalInvocationId".
 template <typename LinalgOpTy>
@@ -671,32 +684,49 @@ struct MapLinalgOpToGlobalInvocationId
         workgroupSize = {32, 1, 1};
       }
     }
-    if (!usingLinalgOnTensorsPath) {
-      if (failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
-          (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
-           failed(createNumWorkgroupsFromLinearizedResultShape(
-               rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()),
-               funcOp, getNumWorkgroupsFnAttrName(), workgroupSize[0])))) {
-        return failure();
-      }
-    } else {
+    if (usingLinalgOnTensorsPath) {
       WorkgroupCountRegionBuilder regionBuilder =
           [&workgroupSize](
               OpBuilder &b, Location loc,
               std::array<Value, 3> workload) -> std::array<Value, 3> {
         Value one = b.create<ConstantIndexOp>(loc, 1);
-        std::array<Value, 3> returnValues = {one, one, one};
-        AffineExpr expr = (b.getAffineSymbolExpr(0) * b.getAffineSymbolExpr(1) *
-                           b.getAffineSymbolExpr(2))
-                              .ceilDiv(workgroupSize[0]);
-        returnValues[0] = linalg::applyMapToValues(
-            b, loc, AffineMap::get(0, 3, expr), workload)[0];
-        return returnValues;
+        return {getWorkgroupCountX(b, loc, workload, workgroupSize[0]), one,
+                one};
       };
-      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder)) ||
-          failed(updateWorkGroupSize(funcOp, workgroupSize))) {
+      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
         return failure();
       }
+    } else {
+      // TODO (GH-4901): Only support static shapes on this path. This should be
+      // removed when moved to linalg on tensors.
+      Optional<SmallVector<int64_t, 4>> staticLoopRange =
+          linalg::getStaticLoopRanges(linalgOp);
+      if (!staticLoopRange ||
+          llvm::any_of(staticLoopRange.getValue(), [](int64_t d) {
+            return d == ShapedType::kDynamicSize;
+          })) {
+        return linalgOp.emitError("failed to find statlc loop bounds");
+      }
+      ArrayRef<int64_t> parallelLoopRange(staticLoopRange.getValue());
+      unsigned numOuterParallel = getNumOuterParallelLoops(linalgOp);
+      parallelLoopRange = parallelLoopRange.take_front(numOuterParallel);
+      WorkgroupCountRegionBuilder regionBuilder =
+          [&parallelLoopRange, &workgroupSize](
+              OpBuilder &b, Location loc,
+              std::array<Value, 3> workload) -> std::array<Value, 3> {
+        Value one = b.create<ConstantIndexOp>(loc, 1);
+        auto values = llvm::to_vector<4>(
+            llvm::map_range(parallelLoopRange, [&](int64_t dim) -> Value {
+              return b.create<ConstantIndexOp>(loc, dim);
+            }));
+        return {getWorkgroupCountX(b, loc, values, workgroupSize[0]), one, one};
+      };
+      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
+        return failure();
+      }
+    }
+    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) {
+      return failure();
     }
     rewriter.eraseOp(linalgOp);
     return success();

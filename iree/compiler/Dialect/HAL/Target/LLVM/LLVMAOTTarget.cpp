@@ -16,7 +16,6 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
@@ -109,92 +108,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     return linkExecutablesInto(
         moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
         [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder);
-  }
-
-  LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
-                               DeviceSwitchRewriter &switchRewriter) override {
-    // TODO(#4140): remove this legacy path when linalg-on-tensors is used.
-    // In the linalg-on-tensors world where we are performing the tiling logic
-    // in the flow dialect we don't even really need the ability to override
-    // dispatch recording at all - just a way to allow targets to map workgroup
-    // counts from the N-dimensional flow workgroup counts to the 3D hal counts.
-    if (dispatchState.workgroupCount.size() == 3) {
-      return TargetBackend::recordDispatch(loc, dispatchState, switchRewriter);
-    }
-
-    IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
-    ModuleOp llvmIRModuleOp;
-    for (auto executableTargetOp :
-         executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend_filter(),
-                       filter_pattern())) {
-        ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
-        llvmIRModuleOp = innerModuleOp;
-        break;
-      }
-    }
-    if (!llvmIRModuleOp)
-      return executableOp.emitError("unable to find executable llvmIR module");
-
-    SmallVector<LLVM::LLVMFuncOp, 2> entryPointFns;
-    for (LLVM::LLVMFuncOp funcOp : llvmIRModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-      if (funcOp.isPublic()) {
-        entryPointFns.push_back(funcOp);
-      }
-    }
-
-    auto *region = switchRewriter.addConditionRegion(
-        IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
-        {
-            dispatchState.workgroupCount[0],
-            dispatchState.commandBuffer,
-        });
-    auto &entryBlock = region->front();
-    ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToEnd(&entryBlock);
-
-    auto commandBuffer = entryBlock.getArgument(1);
-    for (auto it : llvm::enumerate(entryPointFns)) {
-      LLVM::LLVMFuncOp funcOp = it.value();
-      FlatSymbolRefAttr numWorkgroupsFnAttr =
-          funcOp->getAttrOfType<FlatSymbolRefAttr>(
-              getNumWorkgroupsFnAttrName());
-      if (!numWorkgroupsFnAttr) {
-        auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-        rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-            loc, commandBuffer, dispatchState.entryPointOp, constantOne,
-            constantOne, constantOne);
-        rewriter.create<IREE::HAL::ReturnOp>(loc);
-        return success();
-      }
-      std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
-      FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-          funcOp->getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
-      if (!numWorkgroupsFn) {
-        return funcOp.emitError("unable to find function ")
-               << numWorkgroupsFnAttr
-               << " that computes the number of workgroups to use";
-      }
-      workgroupCount =
-          iree_compiler::calculateWorkgroupCountFromNumWorkgroupsFn(
-              loc, numWorkgroupsFn, dispatchState.interfaceOp,
-              dispatchState.operands, dispatchState.results, rewriter);
-
-      if (llvm::any_of(workgroupCount,
-                       [](Value v) -> bool { return v == nullptr; })) {
-        auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-        rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-            loc, commandBuffer, dispatchState.entryPointOp, constantOne,
-            constantOne, constantOne);
-      } else {
-        rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-            loc, commandBuffer, dispatchState.entryPointOp, workgroupCount[0],
-            workgroupCount[1], workgroupCount[2]);
-      }
-    }
-    rewriter.create<IREE::HAL::ReturnOp>(loc);
-    return success();
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

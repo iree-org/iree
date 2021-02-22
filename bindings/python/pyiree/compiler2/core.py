@@ -53,7 +53,7 @@ class OutputFormat(Enum):
     """
     if isinstance(spec, OutputFormat):
       return spec
-    spec = spec.upper()
+    spec = spec.upper().replace("-", "_")
     if spec not in OutputFormat.__members__:
       raise ValueError(f"For output_format= argument, expected one of: "
                        f"{', '.join(OutputFormat.__members__.keys())}")

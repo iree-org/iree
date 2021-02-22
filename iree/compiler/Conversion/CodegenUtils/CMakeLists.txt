@@ -20,13 +20,11 @@ iree_cc_library(
   HDRS
     "ForOpCanonicalization.h"
     "FunctionUtils.h"
-    "GetNumWorkgroups.h"
     "MarkerUtils.h"
     "TransformUtils.h"
   SRCS
     "ForOpCanonicalization.cpp"
     "FunctionUtils.cpp"
-    "GetNumWorkgroups.cpp"
     "MarkerUtils.cpp"
     "TransformUtils.cpp"
   DEPS

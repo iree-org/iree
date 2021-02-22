@@ -1,101 +1,126 @@
-// RUN: iree-opt -split-input-file -iree-codegen-fold-gpu-procid-uses %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-fold-gpu-procid-uses))" %s | IreeFileCheck %s
 
-module {
-  // CHECK-LABEL: func @fold_block_id_x()
-  func @fold_block_id_x() -> index attributes {hal.num_workgroups_fn = @num_workgroups} {
-    // CHECK: %[[cst:.+]] = constant 3
-    // CHECK: return %[[cst]]
-    %0 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %1 = affine.min affine_map<()[s0] -> (3, s0 * -2 + 225)>()[%0]
-    return %1: index
+hal.executable @fold_block_id attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
   }
-
-  // CHECK-LABEL: func @fold_block_id_y()
-  func @fold_block_id_y() -> index attributes {hal.num_workgroups_fn = @num_workgroups} {
-    // CHECK: %[[cst:.+]] = constant 8
-    // CHECK: return %[[cst]]
-    %0 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %1 = affine.min affine_map<()[s0] -> (8, s0 * -1 + s0 * -1 + s0 * -1 + 131)>()[%0]
-    return %1: index
-  }
-
-  // CHECK-LABEL: func @fold_block_id_z()
-  func @fold_block_id_z() -> index attributes {hal.num_workgroups_fn = @num_workgroups} {
-    // CHECK: %[[cst:.+]] = constant 11
-    // CHECK: return %[[cst]]
-    %0 = "gpu.block_id"() {dimension = "z"} : () -> index
-    %1 = affine.min affine_map<()[s0] -> (11, s0 + 15)>()[%0]
-    return %1: index
-  }
-
-  func @num_workgroups() -> (index, index, index) {
-    %x = constant 112: index
-    %y = constant 42: index
-    %z = constant 1: index
-    return %x, %y, %z: index, index, index
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @fold_block_id attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()} {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 112: index
+      %y = constant 42: index
+      %z = constant 1: index
+      hal.return %x, %y, %z: index, index, index
+    }
+    module {
+      func @fold_block_id() -> (index, index, index) {
+        %0 = "gpu.block_id"() {dimension = "x"} : () -> index
+        %1 = "gpu.block_id"() {dimension = "y"} : () -> index
+        %2 = "gpu.block_id"() {dimension = "z"} : () -> index
+        %3 = affine.min affine_map<()[s0] -> (3, s0 * -2 + 225)>()[%0]
+        %4 = affine.min affine_map<()[s0] -> (8, s0 * -1 + s0 * -1 + s0 * -1 + 131)>()[%2]
+        %5 = affine.min affine_map<()[s0] -> (11, s0 + 15)>()[%3]
+        return %3, %4, %5: index, index, index
+      }
+    }
   }
 }
+// CHECK-LABEL: func @fold_block_id()
+//   CHECK-DAG:   %[[C3:.+]] = constant 3
+//   CHECK-DAG:   %[[C8:.+]] = constant 8
+//   CHECK-DAG:   %[[C11:.+]] = constant 11
+//   CHECK-DAG:   return %[[C3]], %[[C8]], %[[C11]]
 
 // -----
 
-// CHECK-LABEL: func @fold_thread_id_x()
-func @fold_thread_id_x() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: %[[cst:.+]] = constant 7
-  // CHECK: return %[[cst]]
-  %0 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (7, s0 * -1 + s0 * -1 + 21)>()[%0]
-  return %1: index
+hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @fold_thread_id attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()}
+    module {
+      func @fold_thread_id() -> (index, index, index)
+        attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+        %0 = "gpu.thread_id"() {dimension = "x"} : () -> index
+        %1 = "gpu.thread_id"() {dimension = "y"} : () -> index
+        %2 = "gpu.thread_id"() {dimension = "z"} : () -> index
+        %3 = affine.min affine_map<()[s0] -> (7, s0 * -1 + s0 * -1 + 21)>()[%0]
+        %4 = affine.min affine_map<()[s0] -> (11, s0 * -3 + 14)>()[%1]
+        %5 = affine.min affine_map<()[s0] -> (21, s0 + (s0 + 21))>()[%2]
+        return %3, %4, %5 : index, index, index
+      }
+    }
+  }
 }
-
-// CHECK-LABEL: func @fold_thread_id_y()
-func @fold_thread_id_y() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: %[[cst:.+]] = constant 11
-  // CHECK: return %[[cst]]
-  %0 = "gpu.thread_id"() {dimension = "y"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (11, s0 * -3 + 14)>()[%0]
-  return %1: index
-}
-
-// CHECK-LABEL: func @fold_thread_id_z()
-func @fold_thread_id_z() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: %[[cst:.+]] = constant 21
-  // CHECK: return %[[cst]]
-  %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (21, s0 + (s0 + 21))>()[%0]
-  return %1: index
-}
+// CHECK-LABEL: func @fold_thread_id()
+//   CHECK-DAG:   %[[C7:.+]] = constant 7
+//   CHECK-DAG:   %[[C11:.+]] = constant 11
+//   CHECK-DAG:   %[[C21:.+]] = constant 21
+//   CHECK-DAG:   return %[[C7]], %[[C11]], %[[C21]]
 
 // -----
 
+hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @does_not_fold_mod attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()}
+    module {
+      func @does_not_fold_mod() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+        %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
+        %1 = affine.min affine_map<()[s0] -> (21, s0 mod 5)>()[%0]
+        return %1: index
+      }
+    }
+  }
+}
 // CHECK-LABEL: func @does_not_fold_mod()
-func @does_not_fold_mod() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: affine.min
-  %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (21, s0 mod 5)>()[%0]
-  return %1: index
-}
+//       CHECK:   affine.min
 
+// -----
+
+hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @does_not_fold_div attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()}
+    module {
+      func @does_not_fold_div() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+        %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
+        %1 = affine.min affine_map<()[s0] -> (21, s0 ceildiv 5)>()[%0]
+        return %1: index
+      }
+    }
+  }
+}
 // CHECK-LABEL: func @does_not_fold_div()
-func @does_not_fold_div() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: affine.min
-  %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (21, s0 ceildiv 5)>()[%0]
-  return %1: index
-}
+//       CHECK:   affine.min
 
+// -----
+
+hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @does_not_fold_symbol_mul_symbol attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()}
+    module {
+      func @does_not_fold_symbol_mul_symbol() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+        // 5 is in %0's range of [0,7] so we cannot fold the following into 5 or 0.
+        %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
+        %1 = affine.min affine_map<()[s0] -> (21, s0 * s0)>()[%0]
+        return %1: index
+      }
+    }
+  }
+}
 // CHECK-LABEL: func @does_not_fold_symbol_mul_symbol()
-func @does_not_fold_symbol_mul_symbol() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: affine.min
-  %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
-  %1 = affine.min affine_map<()[s0] -> (21, s0 * s0)>()[%0]
-  return %1: index
-}
-
-// CHECK-LABEL: func @does_not_fold_if_cst_not_lower_bound()
-func @does_not_fold_if_cst_not_lower_bound() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
-  // CHECK: affine.min
-  %0 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  // 5 is in %0's range of [0,7] so we cannot fold the following into 5 or 0.
-  %1 = affine.min affine_map<()[s0] -> (5, s0)>()[%0]
-  return %1: index
-}
+//       CHECK:   affine.min

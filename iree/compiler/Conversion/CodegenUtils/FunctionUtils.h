@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 #define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -36,6 +37,9 @@ inline const char* getOperandResultNumAttrName() {
 
 /// Returns the number of outer parallel loops of a linalgOp.
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+
+/// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
+IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir
