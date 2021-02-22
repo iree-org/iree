@@ -648,30 +648,6 @@ hal.executable.target @llvm_aot, filter="dylib*" {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::DeclareNumWorkgroupsFnPass
-```
-module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
-    %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
-    return
-  }
-  func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    return %0 : tensor<32x64xf32>
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-}
-
-```
 ### IR Dump After Canonicalizer
 ```
 func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
@@ -682,24 +658,24 @@ func private @dot_ex_dispatch_0_impl(%arg0: tensor<32x1024xf32>, %arg1: tensor<1
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = call @dot_ex_dispatch_0_impl(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
@@ -707,13 +683,12 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After Inliner
 ```
 module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  func @dot_ex_dispatch_0() {
     %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
     %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
     return
   }
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -726,202 +701,146 @@ module  {
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::TieDynamicShapesPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::MaterializeShapeCalculationsPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::HoistShapeCalculations
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::Convert1x1ConvToDotPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::Convert1x1ConvToDotPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::DecomposeHLOClampPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnTensorsPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %cst = constant 0.000000e+00 : f32
   %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
   %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
   %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After LinalgFoldUnitExtentDims
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After LinalgFoldUnitExtentDims
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
   %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
   %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After Canonicalizer
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After Canonicalizer
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
   %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
   %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
   %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
   %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After CSE
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After CSE
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %c0 = constant 0 : index
   %cst = constant 0.000000e+00 : f32
-  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 {operand_result_index = 0 : i32} : tensor<32x1024xf32>
-  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 {operand_result_index = 1 : i32} : tensor<1024x64xf32>
+  %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
+  %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
   %2 = linalg.init_tensor [32, 64] : tensor<32x64xf32>
   %3 = linalg.fill(%2, %cst) : tensor<32x64xf32>, f32 -> tensor<32x64xf32> 
   %4 = linalg.matmul ins(%0, %1 : tensor<32x1024xf32>, tensor<1024x64xf32>) outs(%3 : tensor<32x64xf32>) -> tensor<32x64xf32>
-  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<32x64xf32>
+  hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[32,1024]>, !shapex.ranked_shape<[1024,64]>, !shapex.ranked_shape<[32,64]>) -> (index, index, index)
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::ConvertHLOToLinalgOnBuffersPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %c0 = constant 0 : index
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   linalg.fill(%0, %cst) : memref<32x64xf32>, f32 
   linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)
   return
@@ -931,44 +850,21 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After mlir::iree_compiler::{anonymous}::LinalgTileAndDistributePass
 ```
 hal.executable.target @llvm_aot, filter="dylib*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    %c1 = constant 1 : index
+    %c32 = constant 32 : index
+    %c1_0 = constant 1 : index
+    %c64 = constant 64 : index
+    %c1_1 = constant 1 : index
+    hal.return %c1_1, %c1_0, %c1 : index, index, index
+  }
   module  {
-    func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-      %c0 = constant 0 : index
-      %3 = dim %0, %c0 : memref<32x1024xf32>
-      %c1 = constant 1 : index
-      %4 = dim %0, %c1 : memref<32x1024xf32>
-      %c0_0 = constant 0 : index
-      %5 = dim %1, %c0_0 : memref<1024x64xf32>
-      %c1_1 = constant 1 : index
-      %6 = dim %1, %c1_1 : memref<1024x64xf32>
-      %c0_2 = constant 0 : index
-      %7 = dim %2, %c0_2 : memref<32x64xf32>
-      %c1_3 = constant 1 : index
-      %8 = dim %2, %c1_3 : memref<32x64xf32>
-      %c0_4 = constant 0 : index
-      %c1_5 = constant 1 : index
-      %c64 = constant 64 : index
-      %c1_6 = constant 1 : index
-      %9 = subi %c64, %c1_6 : index
-      %10 = addi %3, %9 : index
-      %11 = divi_signed %10, %c64 : index
-      %c64_7 = constant 64 : index
-      %c1_8 = constant 1 : index
-      %12 = subi %c64_7, %c1_8 : index
-      %13 = addi %6, %12 : index
-      %14 = divi_signed %13, %c64_7 : index
-      %c1_9 = constant 1 : index
-      return %14, %11, %c1_9 : index, index, index
-    }
-    func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+    func @dot_ex_dispatch_0() {
       %cst = constant 0.000000e+00 : f32
-      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+      %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+      %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+      %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_id_y = hal.interface.workgroup.id[1] : index
       %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -994,62 +890,18 @@ hal.executable.target @llvm_aot, filter="dylib*" {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::{anonymous}::LegalizeNumWorkgroupsFnPass
-```
-module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-    %c1 = constant 1 : index
-    return %c1, %c1, %c1 : index, index, index
-  }
-  func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
-    %cst = constant 0.000000e+00 : f32
-    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-    %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-    %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-    %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-    %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-    linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-}
-
-```
 ### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::TileAndVectorizeWorkgroups
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c64 = constant 64 : index
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c32 = constant 32 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1092,24 +944,16 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After mlir::iree_compiler::{anonymous}::PlanConvLoopOrderPass
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c64 = constant 64 : index
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c32 = constant 32 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1152,15 +996,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After LinalgLowerToLoops
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After LinalgLowerToLoops
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1168,9 +1004,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1228,15 +1064,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After Canonicalizer
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1244,9 +1072,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1304,15 +1132,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After CSE
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1320,9 +1140,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1374,15 +1194,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After SCFToStandard
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After SCFToStandard
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1390,9 +1202,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1510,15 +1322,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After Canonicalizer
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After Canonicalizer
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1526,9 +1330,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1630,15 +1434,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ```
 ### IR Dump After CSE
 ```
-func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-  %c1 = constant 1 : index
-  return %c1, %c1, %c1 : index, index, index
-}
-
-```
-### IR Dump After CSE
-```
-func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+func @dot_ex_dispatch_0() {
   %cst = constant 0.000000e+00 : f32
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
@@ -1646,9 +1442,9 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<32x64xf32>
-  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<32x1024xf32>
-  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1024x64xf32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
@@ -1751,11 +1547,7 @@ func @dot_ex_dispatch_0() attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0
 ### IR Dump After mlir::iree_compiler::{anonymous}::ConvertToLLVMPass
 ```
 module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-    %c1 = constant 1 : index
-    return %c1, %c1, %c1 : index, index, index
-  }
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2174,11 +1966,7 @@ module  {
 ### IR Dump After Canonicalizer
 ```
 module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-    %c1 = constant 1 : index
-    return %c1, %c1, %c1 : index, index, index
-  }
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2597,11 +2385,7 @@ module  {
 ### IR Dump After CSE
 ```
 module  {
-  func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-    %c1 = constant 1 : index
-    return %c1, %c1, %c1 : index, index, index
-  }
-  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+  llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
     %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
     %1 = llvm.mlir.constant(1024 : index) : i64
     %2 = llvm.mlir.constant(32 : index) : i64
@@ -2948,13 +2732,17 @@ module  {
 ### IR Dump After mlir::iree_compiler::IREE::HAL::TranslateExecutablesPass
 ```
 hal.executable.target @llvm_aot, filter="dylib*" {
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+  ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    %c1 = constant 1 : index
+    %c32 = constant 32 : index
+    %c1_0 = constant 1 : index
+    %c64 = constant 64 : index
+    %c1_1 = constant 1 : index
+    hal.return %c1_1, %c1_0, %c1 : index, index, index
+  }
   module  {
-    func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-      %c1 = constant 1 : index
-      return %c1, %c1, %c1 : index, index, index
-    }
-    llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+    llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
       %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
       %1 = llvm.mlir.constant(1024 : index) : i64
       %2 = llvm.mlir.constant(32 : index) : i64
@@ -3309,13 +3097,17 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        %c32 = constant 32 : index
+        %c1_0 = constant 1 : index
+        %c64 = constant 64 : index
+        %c1_1 = constant 1 : index
+        hal.return %c1_1, %c1_0, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -3693,15 +3485,13 @@ module  {
     %c0_15 = constant 0 : index
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0_15, bindings = [%c0_4 = (%arg0, %c0, %sz_3), %c1 = (%arg1, %c0, %sz_9), %c2 = (%buffer, %c0, %sz_14)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
-      %c32_16 = constant 32 : index
-      %c1024_17 = constant 1024 : index
-      %c1024_18 = constant 1024 : index
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
+      %c1_16 = constant 1 : index
+      %c32_17 = constant 32 : index
+      %c1_18 = constant 1 : index
       %c64_19 = constant 64 : index
-      %c32_20 = constant 32 : index
-      %c64_21 = constant 64 : index
-      %c1_22 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_22, %c1_22, %c1_22]
+      %c1_20 = constant 1 : index
+      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_20, %c1_18, %c1_16]
       hal.return
     }
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -3748,15 +3538,13 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %c0_15 = constant 0 : index
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0_15, bindings = [%c0_4 = (%arg0, %c0, %sz_3), %c1 = (%arg1, %c0, %sz_9), %c2 = (%buffer, %c0, %sz_14)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
-    %c32_16 = constant 32 : index
-    %c1024_17 = constant 1024 : index
-    %c1024_18 = constant 1024 : index
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
+    %c1_16 = constant 1 : index
+    %c32_17 = constant 32 : index
+    %c1_18 = constant 1 : index
     %c64_19 = constant 64 : index
-    %c32_20 = constant 32 : index
-    %c64_21 = constant 64 : index
-    %c1_22 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_22, %c1_22, %c1_22]
+    %c1_20 = constant 1 : index
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_20, %c1_18, %c1_16]
     hal.return
   }
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -3784,9 +3572,9 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
     hal.return
   }
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -3814,9 +3602,9 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
     hal.return
   }
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -3836,13 +3624,17 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        %c32 = constant 32 : index
+        %c1_0 = constant 1 : index
+        %c64 = constant 64 : index
+        %c1_1 = constant 1 : index
+        hal.return %c1_1, %c1_0, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -4202,9 +3994,9 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
       hal.return
     }
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -4248,13 +4040,17 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        %c32 = constant 32 : index
+        %c1_0 = constant 1 : index
+        %c64 = constant 64 : index
+        %c1_1 = constant 1 : index
+        hal.return %c1_1, %c1_0, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -4614,9 +4410,9 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch.symbol %arg2, @dot_ex_dispatch_0::@llvm_aot::@dot_ex_dispatch_0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
       hal.return
     }
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -4660,13 +4456,13 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -5026,11 +4822,11 @@ module  {
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      %0 = hal.command_buffer.device %arg3 : !hal.device
+      %0 = hal.command_buffer.device %arg2 : !hal.device
       %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-      hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
       hal.return
     }
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -5082,11 +4878,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %0 = hal.command_buffer.device %arg2 : !hal.device
     %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
     hal.return
   }
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -5114,11 +4910,11 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
     %c1_0 = constant 1 : index
-    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %0 = hal.command_buffer.device %arg2 : !hal.device
     %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
-    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+    hal.command_buffer.dispatch %arg2, %exe, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
     hal.return
   }
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -5228,13 +5024,13 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -5594,11 +5390,11 @@ module  {
     %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"dylib*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    #hal.device.match.id<"dylib*">(%arg2 = %cmd : !hal.command_buffer, %arg3 = %c2048 : index) {
       %c1_0 = constant 1 : index
-      %1 = hal.command_buffer.device %arg3 : !hal.device
+      %1 = hal.command_buffer.device %arg2 : !hal.device
       %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-      hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
+      hal.command_buffer.dispatch %arg2, %2, entry_point = 0, workgroup_xyz = [%c1_0, %c1_0, %c1_0]
       hal.return
     }
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
@@ -5783,13 +5579,13 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
@@ -6239,13 +6035,13 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_aot, filter="dylib*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>} {
+      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      }
       module  {
-        func private @dot_ex_dispatch_0__num_workgroups__(%arg0: !shapex.ranked_shape<[32,1024]>, %arg1: !shapex.ranked_shape<[1024,64]>, %arg2: !shapex.ranked_shape<[32,64]>) -> (index, index, index) {
-          %c1 = constant 1 : index
-          return %c1, %c1, %c1 : index, index, index
-        }
-        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) attributes {hal.num_workgroups_fn = @dot_ex_dispatch_0__num_workgroups__} {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>, %arg1: !llvm.ptr<array<3 x i32>>) {
           %0 = llvm.mlir.constant(0.000000e+00 : f32) : f32
           %1 = llvm.mlir.constant(1024 : index) : i64
           %2 = llvm.mlir.constant(32 : index) : i64
