@@ -32,10 +32,10 @@ namespace iree_compiler {
 
 namespace {
 
-/// Vectorizes linalg.conv for a single GPU invocation. Therefore, the
-/// linalg.conv op should have a very specific form; other patterns are
-/// expected to tile and distribute larger convolutions into this form for
-/// a single GPU invocation.
+/// Vectorizes linalg.conv_2d_input_nhwc_filter_hwcf for a single GPU
+/// invocation. Therefore, the linalg.conv op should have a very specific form;
+/// other patterns are expected to tile and distribute larger convolutions into
+/// this form for a single GPU invocation.
 ///
 /// The linalg.conv op should follow:
 /// - Filter: HfWfCiCo format
@@ -53,16 +53,17 @@ namespace {
 /// Output channel is requried to be a multiple of 4 so that we can process
 /// them with load4/store4, which is native to GPUs. Similarly for the input
 /// channel size requirement.
-struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
+struct VectorizeLinalgConv
+    : OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ConvOp convOp,
+  LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
                                 PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
     // This pattern does not handle convolutions with dilation.
     if (auto dilations = convOp.dilations()) {
-      auto values = dilations->getAsValueRange<IntegerAttr>();
+      auto values = dilations.getIntValues();
       if (llvm::any_of(values, [](const APInt &value) {
             return value.getSExtValue() != 1;
           })) {
@@ -70,9 +71,9 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
       }
     }
 
-    auto filterViewOp = convOp.filter().getDefiningOp<SubViewOp>();
-    auto inputViewOp = convOp.input().getDefiningOp<SubViewOp>();
-    auto outputViewOp = convOp.output().getDefiningOp<SubViewOp>();
+    auto inputViewOp = convOp.getInputBuffer(0).getDefiningOp<SubViewOp>();
+    auto filterViewOp = convOp.getInputBuffer(1).getDefiningOp<SubViewOp>();
+    auto outputViewOp = convOp.getOutputBuffer(0).getDefiningOp<SubViewOp>();
     if (!filterViewOp || !inputViewOp || !outputViewOp) return failure();
 
     // The filter/input/output view should have static sizes to vectorize.
@@ -99,8 +100,8 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::ConvOp> {
 
     int64_t numOutputHeights = outputViewOp.getStaticSize(1);
     int64_t numOutputWidths = outputViewOp.getStaticSize(2);
-    int64_t heightStride = convOp.getStride(0);
-    int64_t widthStride = convOp.getStride(1);
+    int64_t heightStride = convOp.strides().getValue<int64_t>({0});
+    int64_t widthStride = convOp.strides().getValue<int64_t>({1});
 
     // This invocation handles a batch of
     // (numOutputHeights * numOutputWidths * numOutputChannels).

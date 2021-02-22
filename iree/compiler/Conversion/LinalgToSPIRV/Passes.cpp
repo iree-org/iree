@@ -83,7 +83,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (!options.useLinalgOnTensors) {
+  if (!options.usingLinalgOnTensors) {
     pm.nest<ModuleOp>().addPass(createSplitDispatchFunctionPass());
   }
   pm.addPass(createLinalgTileAndFusePass(options));
@@ -101,7 +101,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     workgroups.
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
-  pm.nest<ModuleOp>().addPass(createConvertToGPUPass(options));
+  pm.addPass(createConvertToGPUPass(options));
   if (options.enableVectorization) {
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createVectorToGPUPass());
   }
@@ -109,7 +109,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
-  if (!options.useLinalgOnTensors) {
+  if (!options.usingLinalgOnTensors) {
     //===--------------------------------------------------------------------===//
     // Legalize the function that computes the number of workgroups to be
     // runnable on the host.
@@ -208,7 +208,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //     that returns the number of workgroups.
   //   - The entry point function gets an attribute `vkspv.num_workgroups_fn` to
   //     record which function in the module returns the number of workgroups.
-  if (!options.useLinalgOnTensors) {
+  if (!options.usingLinalgOnTensors) {
     pm.nest<ModuleOp>().addPass(createDeclareNumWorkgroupsFnPass());
   }
 
@@ -219,16 +219,14 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
-  if (options.useLinalgOnTensors) {
-    WorkgroupMemoryAllocationFn allocationFn = [](OpBuilder &builder,
-                                                  Location loc,
-                                                  ArrayRef<Value> dynamicSizes,
-                                                  MemRefType allocationType) {
-      MemRefType allocType = MemRefType::get(allocationType.getShape(),
-                                             allocationType.getElementType(),
-                                             {}, getWorkgroupMemorySpace());
-      return builder.create<AllocOp>(loc, allocType, dynamicSizes);
-    };
+  if (options.usingLinalgOnTensors) {
+    WorkgroupMemoryAllocationFn allocationFn =
+        [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+           Type elementType, ArrayRef<Value> dynamicSizes) {
+          MemRefType allocType = MemRefType::get(staticShape, elementType, {},
+                                                 getWorkgroupMemorySpace());
+          return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+        };
     addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
   } else {
     //===--------------------------------------------------------------------===//
@@ -260,9 +258,9 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //   - All XLA HLO ops are converted.
     //   - All Linalg ops are operating on buffers.
     //===--------------------------------------------------------------------===//
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createConvert1x1ConvToDotPass());
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
   }
 
   //===--------------------------------------------------------------------===//
@@ -274,7 +272,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   addLinalgToSPIRVPasses(pm, options);
 
-  if (!options.useLinalgOnTensors) {
+  if (!options.usingLinalgOnTensors) {
     // HACK: SplitDispatchFunctionPass inserts spv.EntryPoints but does not tell
     // the HAL about them. We need to find those new entry points and
     // materialize hal.executable.entry_point ops so that we have a consistent

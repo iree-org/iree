@@ -74,10 +74,8 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
-// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+
 // CHECK: func @depthwise_conv_multiplier_1()
 // CHECK: linalg.fill
-// CHECK: %[[FILTER:.+]] = linalg.reshape %{{.+}} [#[[MAP0]], #[[MAP1]], #[[MAP2]]] : memref<3x3x1x96xf32> into memref<3x3x96xf32>
+// CHECK: %[[FILTER:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x96xf32>
 // CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%{{.+}}, %[[FILTER]] : memref<1x113x113x96xf32>, memref<3x3x96xf32>) outs(%{{.+}} : memref<1x56x56x96xf32>)

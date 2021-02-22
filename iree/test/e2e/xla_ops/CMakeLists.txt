@@ -147,6 +147,7 @@ iree_check_single_backend_test_suite(
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
+    "dot_general.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"
@@ -158,6 +159,8 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
     "rsqrt.mlir"
     "select.mlir"
     "sine.mlir"
@@ -172,4 +175,50 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg_on_tensors_vulkan-spirv_vulkan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "constant.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "floor.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-spirv-experimental-linalg-on-tensors"
 )

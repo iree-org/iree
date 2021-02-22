@@ -59,7 +59,7 @@ SPIRVCodegenOptions getSPIRVCodegenOptionsFromClOptions() {
   options.enableVectorization = clEnableVectorization;
   options.useWorkgroupMemory = clUseWorkgroupMemory;
   options.vectorizeMemref = clVectorizeMemref;
-  options.useLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;
+  options.usingLinalgOnTensors = clEnableLinalgOnTensorsSPIRV;
   return options;
 }
 

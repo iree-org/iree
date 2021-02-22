@@ -25,10 +25,12 @@
 #include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
+#include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -47,19 +49,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-/// In some cases the iterations of the loops when partitioned to workgroups
-/// need to be distributed in a cyclic manner. The main use case here is when
-/// the number of workgroups is constrained such that the number of iterations
-/// is greater than or equal to number of processors (along any dimension). In
-/// those cases, distribute the iterations in a cyclic manner. This adds
-/// additional control flow, but isn't too detrimental to performance since they
-/// are convergent for the most part.
-static llvm::cl::opt<bool> isWorkgroupCountConstrained(
-    "iree-codegen-constrained-workgroup-count",
-    llvm::cl::desc("Specify whether the number of workgroups can be assumed to "
-                   "be large enough to cover the entire workload"),
-    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // Loop utilities
@@ -511,7 +500,8 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
 class ConvertToGPUPass
-    : public PassWrapper<ConvertToGPUPass, OperationPass<ModuleOp>> {
+    : public PassWrapper<ConvertToGPUPass,
+                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
   ConvertToGPUPass(const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
@@ -610,15 +600,16 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
 /// partitioning it to workitems.
 template <typename LinalgOpTy>
 struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
-  MapLinalgOpToLocalInvocationId(MLIRContext *context, bool optimizeControlFlow,
+  MapLinalgOpToLocalInvocationId(MLIRContext *context,
+                                 bool usingLinalgOnTensorsPath,
                                  PatternBenefit benefit = 1)
       : OpConversionPattern<LinalgOpTy>(context, benefit),
-        optimizeControlFlow(optimizeControlFlow) {}
+        usingLinalgOnTensorsPath(usingLinalgOnTensorsPath) {}
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (failed(mapLinalgOpToLocalInvocationIdImpl(linalgOp, operands, rewriter,
-                                                  optimizeControlFlow)))
+                                                  usingLinalgOnTensorsPath)))
       return failure();
 
     // If the `linalgOp` writes to workgroup memory insert barrier after the
@@ -637,10 +628,11 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   }
 
  private:
-  /// In cases where we know by construction that the iteration space is always
-  /// less than the number of local invocations within a workgroup, the
-  /// loop-control overhead can be reduced to just a single if-statement.
-  bool optimizeControlFlow;
+  /// Flag to signify if Linalg on tensors path is being used. The control flow
+  /// optimizations implemented on legacy path seems to be failing on this
+  /// path. Assuming this overhead is not too much, for now just generated the
+  /// extra loops.
+  bool usingLinalgOnTensorsPath;
 };
 
 /// Map linalg operation to execute on GPU in parallel by mapping the parallel
@@ -648,7 +640,12 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
 template <typename LinalgOpTy>
 struct MapLinalgOpToGlobalInvocationId
     : public OpConversionPattern<LinalgOpTy> {
-  using OpConversionPattern<LinalgOpTy>::OpConversionPattern;
+  MapLinalgOpToGlobalInvocationId(MLIRContext *context,
+                                  bool usingLinalgOnTensorsPath,
+                                  PatternBenefit benefit = 1)
+      : OpConversionPattern<LinalgOpTy>(context, benefit),
+        usingLinalgOnTensorsPath(usingLinalgOnTensorsPath) {}
+
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -674,16 +671,43 @@ struct MapLinalgOpToGlobalInvocationId
         workgroupSize = {32, 1, 1};
       }
     }
-    if (failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
-        (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
-         failed(createNumWorkgroupsFromLinearizedResultShape(
-             rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()), funcOp,
-             getNumWorkgroupsFnAttrName(), workgroupSize[0])))) {
-      return failure();
+    if (!usingLinalgOnTensorsPath) {
+      if (failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
+          (funcOp->getAttr(getNumWorkgroupsFnAttrName()) &&
+           failed(createNumWorkgroupsFromLinearizedResultShape(
+               rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()),
+               funcOp, getNumWorkgroupsFnAttrName(), workgroupSize[0])))) {
+        return failure();
+      }
+    } else {
+      WorkgroupCountRegionBuilder regionBuilder =
+          [&workgroupSize](
+              OpBuilder &b, Location loc,
+              std::array<Value, 3> workload) -> std::array<Value, 3> {
+        Value one = b.create<ConstantIndexOp>(loc, 1);
+        std::array<Value, 3> returnValues = {one, one, one};
+        AffineExpr expr = (b.getAffineSymbolExpr(0) * b.getAffineSymbolExpr(1) *
+                           b.getAffineSymbolExpr(2))
+                              .ceilDiv(workgroupSize[0]);
+        returnValues[0] = linalg::applyMapToValues(
+            b, loc, AffineMap::get(0, 3, expr), workload)[0];
+        return returnValues;
+      };
+      if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder)) ||
+          failed(updateWorkGroupSize(funcOp, workgroupSize))) {
+        return failure();
+      }
     }
     rewriter.eraseOp(linalgOp);
     return success();
   }
+
+ private:
+  /// Flag to signify if Linalg on tensors path is being used. This changes the
+  /// way the number of workgroups is computed. With the linalg on tensors path,
+  /// the hal.executable.entry_point will be updated to contain a region that
+  /// gives the number of workgroups to use.
+  bool usingLinalgOnTensorsPath;
 };
 
 /// Remove the linalg.range operation created when lowering to loops.
@@ -789,10 +813,10 @@ void ConvertToGPUPass::runOnOperation() {
       MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
       MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
       MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>, RemoveLinalgRange,
-      SerializeParallelLoopPattern>(context, options.useLinalgOnTensors);
+      SerializeParallelLoopPattern>(context, options.usingLinalgOnTensors);
   FrozenRewritePatternList frozenPatterns(std::move(patterns));
 
-  for (FuncOp funcOp : getOperation().getOps<FuncOp>()) {
+  for (FuncOp funcOp : getOperation().getInnerModule().getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
     Region &body = funcOp.getBody();
     if (!llvm::hasSingleElement(body)) {
@@ -804,8 +828,8 @@ void ConvertToGPUPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass(
-    const SPIRVCodegenOptions &options) {
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createConvertToGPUPass(const SPIRVCodegenOptions &options) {
   return std::make_unique<ConvertToGPUPass>(options);
 }
 

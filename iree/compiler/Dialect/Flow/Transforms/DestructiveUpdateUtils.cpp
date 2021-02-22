@@ -399,7 +399,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
 
   // No destructive update semantics, bail.
-  if (!sourceValue || !capture.rootDestructiveUpdate) return failure();
+  if (!sourceValue || !capture.rootDestructiveUpdate) return success();
 
   Operation *outermostProducingOp = (capture.loops.empty())
                                         ? capture.rootDestructiveUpdate
@@ -450,7 +450,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   // Bail on any control-flow for now.
   if (hasNonScfForControlFlow(dispatchOp)) {
-    return failure();
+    return success();
   }
 
   MLIRContext *context = dispatchOp->getContext();

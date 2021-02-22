@@ -620,7 +620,9 @@ hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"
         %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x225x225x16xf32>
         %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x16x32xf32>
         linalg.fill(%0, %cst) : memref<1x112x112x32xf32>, f32
-        linalg.conv(%2, %1, %0) {dilations = [1, 1], strides = [2, 2]} : memref<3x3x16x32xf32>, memref<1x225x225x16xf32>, memref<1x112x112x32xf32>
+        linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+           ins (%1, %2: memref<1x225x225x16xf32>, memref<3x3x16x32xf32>)
+          outs (%0: memref<1x112x112x32xf32>)
         return
       }
 
@@ -639,7 +641,7 @@ hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"
 // For linalg.fill
 // CHECK-COUNT-4: vector.transfer_write
 
-// For linalg.conv
+// For linalg.conv_2d_input_nhwc_filter_hwcf
 // CHECK-COUNT-4: vector.transfer_read
 
 // check tiling loop along filter height/width and input channel
@@ -654,7 +656,7 @@ hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"
 
 // CHECK-COUNT-3: scf.yield
 
-// For linalg.conv
+// For linalg.conv_2d_input_nhwc_filter_hwcf
 // CHECK-COUNT-4: vector.transfer_write
 
 // -----

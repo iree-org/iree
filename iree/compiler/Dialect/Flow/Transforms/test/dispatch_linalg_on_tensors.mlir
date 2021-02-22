@@ -143,15 +143,28 @@ func @tensor4(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   return %D: tensor<?x?xf32>
 }
 
-// CHECK-LABEL: func @tensor5
+//       CHECK: func @tensor5
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   -> (tensor<?x?xf32>, tensor<?x?xf32>) attributes {iree.module.export}
 {
   %f12 = constant 12.0 : f32
+  //  CHECK-DAG: %[[C0:.+]] = constant 0 : index
+  //  CHECK-DAG: %[[C1:.+]] = constant 1 : index
+  //  CHECK-DAG: %[[D0:.+]] = dim %[[ARG2]], %[[C0]]
+  //  CHECK-DAG: %[[D1:.+]] = dim %[[ARG2]], %[[C1]]
+  //      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]] (%[[ARG2]])
+  // CHECK-SAME:   %[[ARG3:.+]] : !flow.dispatch.input<?x?xf32>
+  // CHECK-SAME:   %[[ARG4:.+]] : !flow.dispatch.output<?x?xf32>
+  //      CHECK:   %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG3]]
+  //      CHECK:   %[[STOREVAL:.+]] = linalg.generic
+  // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
+  //      CHECK:   flow.dispatch.output.store %[[STOREVAL]], %[[ARG4]]
 
   // linalg.generic is fused inside the dispatch region and becomes a noop but
   // there is still a use.
-  // CHECK: %[[origCC:.*]] = linalg.generic
   %CC = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"] }
@@ -171,7 +184,6 @@ func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   %D = linalg.matmul ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
                     outs(%CC: tensor<?x?xf32>) -> tensor<?x?xf32>
 
-  // CHECK: %[[retD:.*]] = shapex.tie_shape %[[D]]
-  // CHECK: return %[[retD]], %[[origCC]]
+  // CHECK: return %[[D]], %[[origCC]]
   return %D, %CC: tensor<?x?xf32>, tensor<?x?xf32>
 }
