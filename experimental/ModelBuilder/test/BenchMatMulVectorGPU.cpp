@@ -285,7 +285,7 @@ static linalg::CodegenStrategy createPowerVRStrategy(int tileM, int tileN,
               .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({tileM, tileN, tileK})
               .setDistributionOptions(WGDistribute))
-      .setHoistInvariantCode(enableLICM);
+      .setEnableLICM(enableLICM);
   if (useWorkgroupMemory) {
     strategy.promote<linalg::MatmulOp>(
         linalg::LinalgPromotionOptions()
@@ -341,7 +341,7 @@ static linalg::CodegenStrategy createMaliStrategy(int tileM, int tileN,
               .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({tileM, tileN, tileK})
               .setDistributionOptions(WGDistribute))
-      .setHoistInvariantCode(enableLICM);
+      .setEnableLICM(enableLICM);
   strategy.tile<linalg::MatmulOp>(
       linalg::LinalgTilingOptions()
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
@@ -386,7 +386,7 @@ static linalg::CodegenStrategy createTuringStrategy(int tileM, int tileN,
               .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({tileM, tileN, tileK})
               .setDistributionOptions(WGDistribute))
-      .setHoistInvariantCode(enableLICM);
+      .setEnableLICM(enableLICM);
   if (useWorkgroupMemory) {
     strategy
         .promote<linalg::MatmulOp>(
