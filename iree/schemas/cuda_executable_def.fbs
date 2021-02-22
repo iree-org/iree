@@ -1,0 +1,45 @@
+// Copyright 2021 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+namespace iree;
+
+// 'CUDA Executable'.
+file_identifier "CUDA";
+file_extension "cuda";
+
+// A struct for the kernel block size along each dimensions.
+struct CUDABlockSizeDef {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+table CUDAExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader
+  // library.
+  entry_points:[string];
+
+  // Block sizes for each entry point.
+  //
+  // Currently the thread group size/block size is decided during code gen but
+  // in CUDA it is set by the runtime.
+  block_sizes:[CUDABlockSizeDef];
+
+  // PTX string of the module.
+  ptx_image:string;
+  
+  // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
+}
+
+root_type CUDAExecutableDef;
