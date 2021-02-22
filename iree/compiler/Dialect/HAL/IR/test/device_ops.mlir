@@ -1,27 +1,26 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @device_allocator
-func @device_allocator() -> !hal.allocator {
-  %0 = "test_hal.device"() : () -> !hal.device
-  // CHECK: %allocator = hal.device.allocator %0 : !hal.allocator
-  %allocator = hal.device.allocator %0 : !hal.allocator
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
+func @device_allocator(%device: !hal.device) -> !hal.allocator {
+  // CHECK: %allocator = hal.device.allocator<%[[DEVICE]] : !hal.device> : !hal.allocator
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   return %allocator : !hal.allocator
 }
 
 // -----
 
 // CHECK-LABEL: @device_switch
-func @device_switch() -> i32 {
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
+func @device_switch(%device: !hal.device) -> i32 {
   // CHECK-DAG: %[[C0:.+]] = constant 0
   %c0 = constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = constant 1
   %c1 = constant 1 : i32
   // CHECK-DAG: %[[C2:.+]] = constant 2
   %c2 = constant 2 : i32
-  // CHECK-DAG: %[[DEVICE:.+]] = "test_hal.device"
-  %device = "test_hal.device"() : () -> !hal.device
-  // CHECK: = hal.device.switch(%[[DEVICE]] : !hal.device) -> i32
-  %0 = hal.device.switch(%device : !hal.device) -> i32
+  // CHECK: = hal.device.switch<%[[DEVICE]] : !hal.device> -> i32
+  %0 = hal.device.switch<%device : !hal.device> -> i32
     // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*">(%[[C1A:.+]] = %[[C1]] : i32) {
     #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
       // CHECK-NEXT: hal.return %[[C1A]] : i32
@@ -46,9 +45,9 @@ func @device_switch() -> i32 {
 // -----
 
 // CHECK-LABEL: @device_matchers
-// CHECK-SAME: %[[DEVICE:.+]]: !hal.device
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
 func @device_matchers(%device : !hal.device) -> i1 {
-  // CHECK: = hal.device.match.id %[[DEVICE]], pattern = ["vulkan-*"] : (!hal.device) -> i1
-  %0 = hal.device.match.id %device, pattern = ["vulkan-*"] : (!hal.device) -> i1
+  // CHECK: = hal.device.match.id<%[[DEVICE]] : !hal.device> pattern("vulkan-*") : i1
+  %0 = hal.device.match.id<%device : !hal.device> pattern("vulkan-*") : i1
   return %0 : i1
 }

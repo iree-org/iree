@@ -14,9 +14,11 @@ func @expect_false() attributes { iree.module.export } {
 }
 
 func @expect_all_true() attributes {iree.module.export} {
-  %dev = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator %dev : !hal.allocator
-  %all_true = hal.buffer_view.const %allocator, "HostLocal|DeviceVisible", "All" : !hal.buffer_view = dense<1> : tensor<2x2xi32>
+  %device = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
+  %all_true = hal.allocator.constant<%allocator : !hal.allocator>
+         type("HostLocal|DeviceVisible") usage("All") : !hal.buffer_view =
+         dense<1> : tensor<2x2xi32>
   check.expect_all_true(%all_true) : !hal.buffer_view
   return
 }

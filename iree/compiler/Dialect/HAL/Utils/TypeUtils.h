@@ -47,8 +47,14 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
                                          OpBuilder &builder);
 
 // Returns an array of i32 values representing the shape of the |shapedValue|.
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(
-    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter);
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
+                                                   Value shapedValue,
+                                                   OpBuilder &builder);
+
+// Returns the size of |value| as an index type.
+// The returned value may either be produced at the current insertion site or
+// pulled from a dominating block/block argument.
+Value getValueSize(Location loc, Value value, OpBuilder &builder);
 
 // An adaptor used for tensor->buffer rewrites.
 // This abstracts the source and destination types to allow for implicit

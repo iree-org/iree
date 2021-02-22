@@ -109,9 +109,9 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   iree_vm_module_release(bytecode_module);
 
   // Lookup the entry point function.
-  // Note that we use the "raw" variant which operates on pure type/shape
+  // Note that we use the synchronous variant which operates on pure type/shape
   // erased buffers.
-  const char kMainFunctionName[] = "module.simple_mul$raw";
+  const char kMainFunctionName[] = "module.simple_mul";
   iree_vm_function_t main_function;
   IREE_ASSERT_OK(iree_vm_context_resolve_function(
       context, iree_make_cstring_view(kMainFunctionName), &main_function))
@@ -142,15 +142,30 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   IREE_ASSERT_OK(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
                                       &kFloat2, sizeof(float)));
 
+  // Wrap buffers in shaped buffer views.
+  iree_hal_dim_t shape[1] = {kElementCount};
+  iree_hal_buffer_view_t* arg0_buffer_view = nullptr;
+  iree_hal_buffer_view_t* arg1_buffer_view = nullptr;
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      arg0_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      &arg0_buffer_view));
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      arg1_buffer, IREE_HAL_ELEMENT_TYPE_FLOAT_32, shape, IREE_ARRAYSIZE(shape),
+      &arg1_buffer_view));
+  iree_hal_buffer_release(arg0_buffer);
+  iree_hal_buffer_release(arg1_buffer);
+
   // Setup call inputs with our buffers.
   // TODO(benvanik): make a macro/magic.
   vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
                                      iree_allocator_system(), &inputs));
-  auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
-  auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_ref));
-  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg1_buffer_ref));
+  auto arg0_buffer_view_ref = iree_hal_buffer_view_move_ref(arg0_buffer_view);
+  auto arg1_buffer_view_ref = iree_hal_buffer_view_move_ref(arg1_buffer_view);
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_view_ref));
+  IREE_ASSERT_OK(
+      iree_vm_list_push_ref_move(inputs.get(), &arg1_buffer_view_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
@@ -165,17 +180,17 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Get the result buffers from the invocation.
   IREE_LOG(INFO) << "Retrieving results...";
-  auto* ret_buffer =
-      reinterpret_cast<iree_hal_buffer_t*>(iree_vm_list_get_ref_deref(
-          outputs.get(), 0, iree_hal_buffer_get_descriptor()));
-  ASSERT_NE(nullptr, ret_buffer);
+  auto* ret_buffer_view =
+      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
+  ASSERT_NE(nullptr, ret_buffer_view);
 
   // Read back the results and ensure we got the right values.
   IREE_LOG(INFO) << "Reading back results...";
   iree_hal_buffer_mapping_t mapped_memory;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(ret_buffer,
-                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                           IREE_WHOLE_BUFFER, &mapped_memory));
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
+      0, IREE_WHOLE_BUFFER, &mapped_memory));
   ASSERT_THAT(absl::Span<const float>(
                   reinterpret_cast<const float*>(mapped_memory.contents.data),
                   mapped_memory.contents.data_length / sizeof(float)),

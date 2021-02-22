@@ -158,9 +158,9 @@ IREE::HAL::InterfaceBindingOp getBindingOp(Operation *op) {
 }
 
 /// Returns the (set, binding) pair for the given placeholder op.
-std::pair<uint32_t, uint32_t> getPlaceholderSetAndBinding(Operation *op) {
+std::pair<int32_t, int32_t> getPlaceholderSetAndBinding(Operation *op) {
   IREE::HAL::InterfaceBindingOp bindingOp = getBindingOp(op);
-  return {bindingOp.set(), bindingOp.binding()};
+  return {bindingOp.set().getSExtValue(), bindingOp.binding().getSExtValue()};
 }
 
 /// Returns the set of resources that should be marked as aliased in SPIR-V.
@@ -259,8 +259,8 @@ struct InterfaceOpConverter final : public OpConversionPattern<InterfaceOpTy> {
     // placeholder op's pointer address as the `id`.
     spirv::GlobalVariableOp varOp = insertResourceVariable(
         interfaceOp.getLoc(), convertedType,
-        reinterpret_cast<uint64_t>(interfaceOp.getOperation()), bindingOp.set(),
-        bindingOp.binding(),
+        reinterpret_cast<uint64_t>(interfaceOp.getOperation()),
+        bindingOp.set().getZExtValue(), bindingOp.binding().getZExtValue(),
         aliasedResources.contains(interfaceOp.getOperation()),
         *moduleOp.getBody(), rewriter);
 
@@ -484,8 +484,10 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
   auto halInterfaceOps =
       llvm::to_vector<1>(moduleOp.getOps<IREE::HAL::InterfaceOp>());
   assert(halInterfaceOps.size() == 1);
+  assert(halInterfaceOps.front().push_constants().hasValue());
 
-  unsigned elementCount = *halInterfaceOps.front().push_constants();
+  uint64_t elementCount =
+      (*halInterfaceOps.front().push_constants()).getZExtValue();
   unsigned offset = loadOp.offset().getZExtValue();
 
   // The following function generates SPIR-V ops with i32 types. So it does type

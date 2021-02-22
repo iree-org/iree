@@ -60,14 +60,14 @@ def HAL_MemoryModelAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryType_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_MemoryType_Transient : BitEnumAttrCase<"Transient", 0x0001>;
-def HAL_MemoryType_HostVisible : BitEnumAttrCase<"HostVisible", 0x0002>;
-def HAL_MemoryType_HostCoherent : BitEnumAttrCase<"HostCoherent", 0x0004>;
-def HAL_MemoryType_HostCached : BitEnumAttrCase<"HostCached", 0x0008>;
-def HAL_MemoryType_HostLocal : BitEnumAttrCase<"HostLocal", 0x0006>;
-def HAL_MemoryType_DeviceVisible : BitEnumAttrCase<"DeviceVisible", 0x0010>;
-def HAL_MemoryType_DeviceLocal : BitEnumAttrCase<"DeviceLocal", 0x0030>;
+def HAL_MemoryType_None           : BitEnumAttrCase<"None",           0x0000>;  // ?
+def HAL_MemoryType_Transient      : BitEnumAttrCase<"Transient",      0x0001>;  // T
+def HAL_MemoryType_HostVisible    : BitEnumAttrCase<"HostVisible",    0x0002>;  // h
+def HAL_MemoryType_HostCoherent   : BitEnumAttrCase<"HostCoherent",   0x0004>;  // c
+def HAL_MemoryType_HostCached     : BitEnumAttrCase<"HostCached",     0x0008>;  // C
+def HAL_MemoryType_HostLocal      : BitEnumAttrCase<"HostLocal",      0x0006>;  // H
+def HAL_MemoryType_DeviceVisible  : BitEnumAttrCase<"DeviceVisible",  0x0010>;  // d
+def HAL_MemoryType_DeviceLocal    : BitEnumAttrCase<"DeviceLocal",    0x0030>;  // D
 def HAL_MemoryTypeBitfieldAttr :
     BitEnumAttr<"MemoryTypeBitfield", "valid MemoryType", [
       HAL_MemoryType_None,
@@ -82,13 +82,13 @@ def HAL_MemoryTypeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryAccess_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_MemoryAccess_Read : BitEnumAttrCase<"Read", 0x0001>;
-def HAL_MemoryAccess_Write : BitEnumAttrCase<"Write", 0x0002>;
-def HAL_MemoryAccess_Discard : BitEnumAttrCase<"Discard", 0x0004>;
+def HAL_MemoryAccess_None         : BitEnumAttrCase<"None",         0x0000>;  // ?
+def HAL_MemoryAccess_Read         : BitEnumAttrCase<"Read",         0x0001>;  // R
+def HAL_MemoryAccess_Write        : BitEnumAttrCase<"Write",        0x0002>;  // W
+def HAL_MemoryAccess_Discard      : BitEnumAttrCase<"Discard",      0x0004>;  // D
 def HAL_MemoryAccess_DiscardWrite : BitEnumAttrCase<"DiscardWrite", 0x0006>;
-def HAL_MemoryAccess_MayAlias : BitEnumAttrCase<"MayAlias", 0x0008>;
-def HAL_MemoryAccess_All : BitEnumAttrCase<"All", 0x0007>;
+def HAL_MemoryAccess_MayAlias     : BitEnumAttrCase<"MayAlias",     0x0008>;  // A
+def HAL_MemoryAccess_All          : BitEnumAttrCase<"All",          0x0007>;
 def HAL_MemoryAccessBitfieldAttr :
     BitEnumAttr<"MemoryAccessBitfield", "valid MemoryAccess", [
       HAL_MemoryAccess_None,
@@ -102,12 +102,12 @@ def HAL_MemoryAccessBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_BufferUsage_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_BufferUsage_Constant : BitEnumAttrCase<"Constant", 0x0001>;
-def HAL_BufferUsage_Transfer : BitEnumAttrCase<"Transfer", 0x0002>;
-def HAL_BufferUsage_Mapping : BitEnumAttrCase<"Mapping", 0x0004>;
-def HAL_BufferUsage_Dispatch : BitEnumAttrCase<"Dispatch", 0x0008>;
-def HAL_BufferUsage_All : BitEnumAttrCase<"All", 0x000F>;
+def HAL_BufferUsage_None      : BitEnumAttrCase<"None",     0x0000>;  // ?
+def HAL_BufferUsage_Constant  : BitEnumAttrCase<"Constant", 0x0001>;  // C
+def HAL_BufferUsage_Transfer  : BitEnumAttrCase<"Transfer", 0x0002>;  // T
+def HAL_BufferUsage_Mapping   : BitEnumAttrCase<"Mapping",  0x0004>;  // M
+def HAL_BufferUsage_Dispatch  : BitEnumAttrCase<"Dispatch", 0x0008>;  // D
+def HAL_BufferUsage_All       : BitEnumAttrCase<"All",      0x000E>;
 def HAL_BufferUsageBitfieldAttr :
     BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
       HAL_BufferUsage_None,
@@ -413,8 +413,11 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Semaphore,
 ]>;
 
-def HAL_OrdinalAttr : SignlessIntegerAttrBase<
-  I32, "32-bit integer ordinal attribute">;
+def HAL_BufferType : AnyTypeOf<[
+  HAL_Buffer,
+]>;
+
+def HAL_OrdinalAttr : IREE_IndexAttrBase<"size_t">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
@@ -424,6 +427,7 @@ def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
 
 def HAL_DeviceSize : TypeAlias<Index>;
 def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"iree_device_size_t">;
+def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
 
 def HAL_HostSize : TypeAlias<Index>;
 def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
@@ -435,6 +439,12 @@ def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
+
+def HAL_IndexAttr : IREE_IndexAttrBase<"index">;
+def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,
+                                      "index array attribute"> {
+  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
+}
 
 def HAL_Dim : TypeAlias<Index>;
 def HAL_Dims : Variadic<HAL_Dim>;
@@ -503,31 +513,6 @@ def HAL_ByteRangeAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryBarrier : NamedTupleOf<[
-    NamedTupleElement<0, "source_scope", I32>,
-    NamedTupleElement<1, "target_scope", I32>
-  ], "MemoryBarrier"> {
-  let description = [{
-    MemoryBarrier struct that can be passed to the command buffer barrier
-    operations.
-  }];
-}
-def HAL_MemoryBarrierList : TupleOf<[HAL_MemoryBarrier]>;
-
-def HAL_BufferBarrier : NamedTupleOf<[
-    NamedTupleElement<0, "source_scope", I32>,
-    NamedTupleElement<1, "target_scope", I32>,
-    NamedTupleElement<2, "buffer", HAL_Buffer>,
-    NamedTupleElement<3, "offset", HAL_DeviceSize>,
-    NamedTupleElement<4, "length", HAL_DeviceSize>
-  ], "BufferBarrier"> {
-  let description = [{
-    BufferBarrier struct that can be passed to the command buffer barrier
-    operations.
-  }];
-}
-def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
-
 def HAL_DescriptorSetLayoutBindingAttr :
   IREE_StructAttr<"descriptor_set_layout_binding",
                   "DescriptorSetLayoutBindingAttr",
@@ -584,14 +569,8 @@ def HAL_DeviceMatchMemoryModelAttr : IREE_StructAttr<
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
 
-def HAL_OpInterface : OpInterface<"HALOp"> {
-  let description = [{
-    Interface for HAL ops.
-  }];
-}
-
 class HAL_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<HAL_Dialect, mnemonic, !listconcat(traits, [HAL_OpInterface])> {
+    Op<HAL_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, &result); }];
   let printer = [{ return print$cppClass(p, *this); }];
 }

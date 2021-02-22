@@ -110,11 +110,11 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
                                 loc, allocator, *shape, elementType.getValue())
                             .getResult();
 
-  auto buffer =
-      rewriter
-          .create<IREE::HAL::AllocatorAllocateOp>(loc, allocator, memoryTypes,
-                                                  bufferUsage, allocationSize)
-          .getResult();
+  auto buffer = rewriter
+                    .create<IREE::HAL::AllocatorAllocateOp>(
+                        loc, IREE::HAL::BufferType::get(rewriter.getContext()),
+                        allocator, memoryTypes, bufferUsage, allocationSize)
+                    .getResult();
 
   return buffer;
 }
@@ -183,11 +183,11 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
                                 loc, allocator, *shape, elementType.getValue())
                             .getResult();
 
-  auto buffer =
-      rewriter
-          .create<IREE::HAL::AllocatorAllocateOp>(loc, allocator, memoryTypes,
-                                                  bufferUsage, allocationSize)
-          .getResult();
+  auto buffer = rewriter
+                    .create<IREE::HAL::AllocatorAllocateOp>(
+                        loc, IREE::HAL::BufferType::get(rewriter.getContext()),
+                        allocator, memoryTypes, bufferUsage, allocationSize)
+                    .getResult();
 
   return buffer;
 }
@@ -331,14 +331,17 @@ static void recordPushConstants(Value device, Value commandBuffer,
     return;
   }
 
-  uint64_t maxPushConstants = interfaceOp.push_constants().getValueOr(0);
+  uint64_t maxPushConstants =
+      interfaceOp.push_constants().hasValue()
+          ? interfaceOp.push_constants().getValue().getZExtValue()
+          : 0;
   (void)maxPushConstants;
   assert(pushConstantValues.size() <= maxPushConstants &&
          "uniform buffer spilling not yet implemented");
 
   rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
       dispatchOp.getLoc(), commandBuffer, executableLayout,
-      rewriter.getI32IntegerAttr(0), pushConstantValues);
+      rewriter.getIndexAttr(0), pushConstantValues);
 }
 
 static LogicalResult recordPushBindings(Value device, Value commandBuffer,
@@ -353,7 +356,9 @@ static LogicalResult recordPushBindings(Value device, Value commandBuffer,
   SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
   auto zeroOffset =
       rewriter.createOrFold<mlir::ConstantIndexOp>(dispatchOp.getLoc(), 0);
-  auto pushBinding = [&](Value tensorValue) -> LogicalResult {
+  auto pushBinding =
+      [&](Value tensorValue,
+          IREE::HAL::MemoryAccessBitfield accessType) -> LogicalResult {
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
     assert(bufferRange.buffer && "buffer not preallocated");
     auto value = IREE::HAL::TensorRewriteAdaptor::getChecked(
@@ -374,7 +379,8 @@ static LogicalResult recordPushBindings(Value device, Value commandBuffer,
     LLVM_DEBUG(llvm::dbgs()
                << "  + OPERAND(" << it.index() << "): " << it.value() << "\n");
     if (it.value().getType().isa<TensorType>()) {
-      if (failed(pushBinding(it.value()))) {
+      if (failed(
+              pushBinding(it.value(), IREE::HAL::MemoryAccessBitfield::Read))) {
         return failure();
       }
     }
@@ -385,7 +391,8 @@ static LogicalResult recordPushBindings(Value device, Value commandBuffer,
     if (dispatchOp.getTiedResultOperandIndex(it.index())) {
       LLVM_DEBUG(llvm::dbgs() << "    TIED TO OPERAND; SKIP\n");
     } else {
-      if (failed(pushBinding(it.value()))) {
+      if (failed(pushBinding(it.value(),
+                             IREE::HAL::MemoryAccessBitfield::DiscardWrite))) {
         return failure();
       }
     }
@@ -449,8 +456,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   }
   // TODO(benvanik): support extended push constants.
   dispatchState.basePushConstantOffset = 0;
-  dispatchState.operands = operandAdaptors;
-  dispatchState.results = resultAdaptors;
 
   // Ask each target backend to record their dispatch logic.
   IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
@@ -473,8 +478,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
               dispatchOp.getLoc(),
               IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
-              interfaceOp.getExecutableSetLayoutsAttr(),
-              interfaceOp.push_constantsAttr());
+              interfaceOp.push_constantsAttr(),
+              interfaceOp.getExecutableSetLayoutsAttr());
 
       // Setup push constants for any dynamic values we need to pass across at
       // runtime.
@@ -719,7 +724,9 @@ class ExStreamFragmentOpConversion
     // information attached to the stream.
     auto commandBuffer =
         rewriter.createOrFold<IREE::HAL::CommandBufferCreateOp>(
-            streamOp.getLoc(), device, mode, category);
+            streamOp.getLoc(),
+            IREE::HAL::CommandBufferType::get(rewriter.getContext()), device,
+            mode, category);
     rewriter.create<IREE::HAL::CommandBufferBeginOp>(streamOp.getLoc(),
                                                      commandBuffer);
 

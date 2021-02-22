@@ -6,7 +6,7 @@ func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
   // CHECK-NOT: hal.allocator.compute_size
   %c1024 = constant 1024 : index
   %c32_i32 = constant 32 : i32
-  %0 = hal.allocator.compute_size %arg0, shape=[%c1024, %c1024], element_type=%c32_i32
+  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator> shape([%c1024, %c1024]) type(%c32_i32) : index
   return %0 : index
 }
 
@@ -15,8 +15,8 @@ func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
 // CHECK-LABEL: @allocatorAllocate
 func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   %c1024 = constant 1024 : index
-  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c15, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-  %0 = hal.allocator.allocate %arg0, "HostLocal", "All", %c1024 : !hal.buffer
+  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c14, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %0 = hal.allocator.allocate<%arg0 : !hal.allocator> type("HostLocal") usage("All") : !hal.buffer{%c1024}
   return %0 : !hal.buffer
 }
 
@@ -27,6 +27,6 @@ func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !iree.byte_buffer) 
   %offset = constant 128 : index
   %length = constant 256 : index
   // CHECK: = vm.call @hal.allocator.wrap.byte_buffer(%arg0, %c6, %c2, %arg1, %c128, %c256) : (!vm.ref<!hal.allocator>, i32, i32, !vm.ref<!iree.byte_buffer>, i32, i32) -> !vm.ref<!hal.buffer>
-  %buffer = hal.allocator.map %arg0, "HostVisible|HostCoherent", Transfer, %arg1[%offset, %length] : !iree.byte_buffer -> !hal.buffer
+  %buffer = hal.allocator.map<%arg0 : !hal.allocator> source(%arg1 : !iree.byte_buffer)[%offset, %length] type("HostVisible|HostCoherent") usage(Transfer) : !hal.buffer
   return %buffer : !hal.buffer
 }

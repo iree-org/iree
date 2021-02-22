@@ -1,18 +1,5 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize -cse %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: func @expand_buffer_view_const
-func @expand_buffer_view_const() -> !hal.buffer_view {
-  %0 = "test_hal.allocator"() : () -> !hal.allocator
-  //      CHECK: [[CONST:%.+]] = iree.byte_buffer.constant : !iree.byte_buffer = dense<[4, 1, 2]> : tensor<3xi32>
-  //      CHECK: [[BUFFER:%.+]] = hal.allocator.map {{.+}}, "HostVisible|HostCoherent", Transfer, [[CONST]][%c0, %c-1] : !iree.byte_buffer -> !hal.buffer
-  //      CHECK: [[VIEW:%.+]] = hal.buffer_view.create [[BUFFER]], element_type = %c16777248_i32, shape = [%c3] : !hal.buffer_view
-  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", Transfer : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
-  // CHECK-NEXT: return [[VIEW]]
-  return %view : !hal.buffer_view
-}
-
-// -----
-
 // CHECK-LABEL: func @expand_buffer_view_subview
 func @expand_buffer_view_subview(
   // CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view,
@@ -24,11 +11,11 @@ func @expand_buffer_view_subview(
   //      CHECK: %[[ELEMENT_TYPE:.+]] = hal.buffer_view.element_type %[[VIEW]] : i32
   // << A BUNCH OF MATH >>
   //      CHECK: %[[BUFFER:.+]] = hal.buffer_view.buffer %[[VIEW]] : !hal.buffer
-  // CHECK-NEXT: %[[SUBSPAN:.+]] = hal.buffer.subspan %[[BUFFER]], %{{.+}}, %{{.+}} : !hal.buffer
+  // CHECK-NEXT: %[[SUBSPAN:.+]] = hal.buffer.subspan<%[[BUFFER]] : !hal.buffer>[%{{.+}}, %{{.+}}] : !hal.buffer
   //      CHECK: %[[SUBVIEW:.+]] = hal.buffer_view.create
   // CHECK-SAME:     %[[SUBSPAN]],
   // CHECK-SAME:     element_type = %[[ELEMENT_TYPE]],
-  // CHECK-SAME:     shape = [%[[LENGTH0]], %[[LENGTH1]]] : !hal.buffer_view
+  // CHECK-SAME:     shape = [%[[LENGTH0]], %[[LENGTH1]]] : !hal.buffer -> !hal.buffer_view
   %subview = hal.buffer_view.subview %view,
                                      indices = [%index0, %index1],
                                      lengths = [%length0, %length1] : !hal.buffer_view
@@ -39,15 +26,15 @@ func @expand_buffer_view_subview(
 // -----
 
 // CHECK-LABEL: func @skip_buffer_view_buffer
-func @skip_buffer_view_buffer() -> !hal.buffer {
-  // CHECK: %[[BUFFER:.+]] = "test_hal.buffer"
-  %0 = "test_hal.buffer"() : () -> !hal.buffer
-  %1:2 = "test_hal.shape"() : () -> (index, index)
+// CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
+func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
+  %c10 = constant 10 : index
+  %c11 = constant 11 : index
   %c32 = constant 32 : i32
-  %2 = hal.buffer_view.create %0, element_type = %c32, shape = [%1#0, %1#1] : !hal.buffer_view
-  %3 = hal.buffer_view.buffer %2 : !hal.buffer
+  %view = hal.buffer_view.create %buffer, element_type = %c32, shape = [%c10, %c11] : !hal.buffer -> !hal.buffer_view
+  %view_buffer = hal.buffer_view.buffer %view : !hal.buffer
   // CHECK: return %[[BUFFER]]
-  return %3 : !hal.buffer
+  return %view_buffer : !hal.buffer
 }
 
 // -----
@@ -67,7 +54,7 @@ func @buffer_view_compute_offset(%arg0 : !hal.buffer_view) -> index {
   // CHECK: %[[T5:.+]] = subi %[[T4]], %c1 : index
   // CHECK: %[[T6:.+]] = divi_unsigned %[[T5]], %c8 : index
   // CHECK: %[[T7:.+]] = muli %[[T1]], %[[T6]] : index
-  %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
+  %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1] : index
   // CHECK: return %[[T7]]
   return %off : index
 }
@@ -86,7 +73,7 @@ func @buffer_view_compute_range(%arg0 : !hal.buffer_view) -> (index, index) {
   //      CHECK: = hal.buffer_view.dim %[[VIEW]], 1 : index
   //      CHECK: = hal.buffer_view.element_type %[[VIEW]] : i32
   // << A BUNCH OF MATH >>
-  %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
+  %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : index, index
   // CHECK: return
   return %off, %len : index, index
 }

@@ -25,6 +25,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "allocator_op_folding.mlir",
             "allocator_ops.mlir",
             "attributes.mlir",
             "buffer_folding.mlir",

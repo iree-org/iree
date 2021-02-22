@@ -97,7 +97,8 @@ class ConcatOpConversion
         newOperands[0]);
 
     auto bufferOp = rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
-        newConcatOp.getLoc(), newConcatOp);
+        newConcatOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
+        newConcatOp);
 
     rewriter.replaceOp(concatOp, bufferOp);
     return success();
@@ -128,7 +129,8 @@ class StackOpConversion
         allocator, newOperands[0], operand1);
 
     auto bufferOp = rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
-        stackOp.getLoc(), newStackOp);
+        stackOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
+        newStackOp);
 
     rewriter.replaceOp(stackOp, bufferOp);
     return success();

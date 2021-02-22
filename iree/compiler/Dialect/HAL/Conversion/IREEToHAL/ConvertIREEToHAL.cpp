@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -48,9 +49,27 @@ class DynamicShapeConstantOpConversion
         IREE::HAL::BufferUsageBitfield::All |
         IREE::HAL::BufferUsageBitfield::Constant;
 
-    auto view = rewriter.createOrFold<IREE::HAL::BufferViewConstOp>(
-        constantOp.getLoc(), allocator, memoryTypes, bufferUsage,
-        constantOp.value());
+    auto shapedType = constantOp.value().getType();
+    auto elementType =
+        IREE::HAL::getElementTypeValue(shapedType.getElementType());
+    if (!elementType.hasValue()) {
+      return rewriter.notifyMatchFailure(constantOp, "unhandled element type");
+    }
+
+    auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorConstantOp>(
+        constantOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
+        allocator, memoryTypes, bufferUsage, constantOp.value());
+
+    SmallVector<Value, 4> shape;
+    if (shapedType.getRank() >= 1) {
+      for (auto dim : shapedType.getShape()) {
+        shape.push_back(rewriter.createOrFold<mlir::ConstantIndexOp>(
+            constantOp.getLoc(), dim));
+      }
+    }
+
+    auto view = rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
+        constantOp.getLoc(), buffer, elementType.getValue(), shape);
 
     rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(constantOp, view);
     return success();

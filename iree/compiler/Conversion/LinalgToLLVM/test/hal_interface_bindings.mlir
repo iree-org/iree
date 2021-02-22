@@ -21,7 +21,7 @@ func @binding_ptrs() {
   "test.sink"(%memref) : (memref<?xf32>) -> ()
   return
 }
-hal.interface @io attributes {push_constants = 2 : i32, sym_visibility = "private"} {
+hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
 }
@@ -57,7 +57,7 @@ func @tie_shape() {
   "test.sink"(%tied_memref) : (memref<?x2xf32>) -> ()
   return
 }
-hal.interface @io attributes {push_constants = 2 : i32, sym_visibility = "private"} {
+hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
 }

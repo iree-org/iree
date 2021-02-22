@@ -65,7 +65,7 @@ class BackingBufferBufferViewDimPattern
     Optional<int64_t> index = dimOp.getConstantIndex();
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
 
-    auto dimIndex = rewriter.getI32IntegerAttr(index.getValue());
+    auto dimIndex = rewriter.getIndexAttr(index.getValue());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
         dimOp, dimOp.getResult().getType(), adaptor.getBufferView(), dimIndex);
     return success();
@@ -96,7 +96,7 @@ class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
 
 }  // namespace
 
-void populateHalBufferViewShapePatterns(MLIRContext *context,
+void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns,
                                         TypeConverter &converter) {
   patterns.insert<BackingBufferBufferViewDimPattern,

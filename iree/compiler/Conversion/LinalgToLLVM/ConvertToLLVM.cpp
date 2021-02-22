@@ -505,9 +505,9 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
         cast<IREE::HAL::InterfaceBindingSubspanOp>(op).queryBindingOp();
     IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(operands);
     MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
-    auto memRefDesc =
-        abi.loadBinding(op->getLoc(), interfaceBindingOp.binding(),
-                        newOperands.byte_offset(), memRefType, rewriter);
+    auto memRefDesc = abi.loadBinding(
+        op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
+        newOperands.byte_offset(), memRefType, rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }
@@ -532,9 +532,9 @@ class ConvertLegacyPlaceholderOp : public ConvertToLLVMPattern {
         SymbolTable::lookupNearestSymbolFrom(
             op, op->getAttrOfType<SymbolRefAttr>("binding")));
     MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
-    auto memRefDesc =
-        abi.loadBinding(op->getLoc(), interfaceBindingOp.binding(),
-                        /*baseOffset=*/{}, memRefType, rewriter);
+    auto memRefDesc = abi.loadBinding(
+        op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
+        /*baseOffset=*/{}, memRefType, rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }

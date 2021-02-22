@@ -54,7 +54,7 @@ func @resource_copy() {
   return
 }
 
-hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -80,7 +80,7 @@ func @resource_copy_f16() {
   return
 }
 
-hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -106,7 +106,7 @@ func @resource_copy_8xf16() {
   return
 }
 
-hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
+hal.interface @legacy_io attributes {push_constants = 5 : index, sym_visibility = "private"} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
