@@ -219,87 +219,17 @@ class ConvertVMToEmitCPass
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
     target.addLegalDialect<iree_compiler::IREEDialect>();
-    target.addLegalDialect<IREE::VM::VMDialect>();
+    target.addIllegalDialect<IREE::VM::VMDialect>();
 
-    // Constants
-    target.addIllegalOp<IREE::VM::ConstI32Op>();
+    // Structural ops
+    target.addLegalOp<IREE::VM::ModuleOp>();
+    target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
+    target.addLegalOp<IREE::VM::FuncOp>();
+    target.addLegalOp<IREE::VM::ExportOp>();
 
-    // Conditional assignment ops
-    target.addIllegalOp<IREE::VM::SelectI32Op>();
-
-    // Native integer arithmetic ops
-    target.addIllegalOp<IREE::VM::AddI32Op>();
-    target.addIllegalOp<IREE::VM::SubI32Op>();
-    target.addIllegalOp<IREE::VM::MulI32Op>();
-    target.addIllegalOp<IREE::VM::DivI32SOp>();
-    target.addIllegalOp<IREE::VM::DivI32UOp>();
-    target.addIllegalOp<IREE::VM::RemI32SOp>();
-    target.addIllegalOp<IREE::VM::RemI32UOp>();
-    target.addIllegalOp<IREE::VM::NotI32Op>();
-    target.addIllegalOp<IREE::VM::AndI32Op>();
-    target.addIllegalOp<IREE::VM::OrI32Op>();
-    target.addIllegalOp<IREE::VM::XorI32Op>();
-
-    // Casting and type conversion/emulation ops
-    target.addIllegalOp<IREE::VM::TruncI32I8Op>();
-    target.addIllegalOp<IREE::VM::TruncI32I16Op>();
-    target.addIllegalOp<IREE::VM::ExtI8I32SOp>();
-    target.addIllegalOp<IREE::VM::ExtI8I32UOp>();
-    target.addIllegalOp<IREE::VM::ExtI16I32SOp>();
-    target.addIllegalOp<IREE::VM::ExtI16I32UOp>();
-
-    // Native bitwise shift and rotate ops
-    target.addIllegalOp<IREE::VM::ShlI32Op>();
-    target.addIllegalOp<IREE::VM::ShrI32SOp>();
-    target.addIllegalOp<IREE::VM::ShrI32UOp>();
-
-    // Comparison ops
-    target.addIllegalOp<IREE::VM::CmpEQI32Op>();
-    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
-    target.addIllegalOp<IREE::VM::CmpLTI32SOp>();
-    target.addIllegalOp<IREE::VM::CmpLTI32UOp>();
-    target.addIllegalOp<IREE::VM::CmpNZI32Op>();
-
-    // Check ops
-    // TODO(simon-camp): These conversions to macro calls should be deleted once
-    // support for control flow ops has landed in the c module target
-    target.addIllegalOp<IREE::VM::CheckEQOp>();
-
-    // ExtI64: Constants
-    target.addIllegalOp<IREE::VM::ConstI64Op>();
-
-    // ExtI64: Conditional assignment ops
-    target.addIllegalOp<IREE::VM::SelectI64Op>();
-
-    // ExtI64: Native integer arithmetic ops
-    target.addIllegalOp<IREE::VM::AddI64Op>();
-    target.addIllegalOp<IREE::VM::SubI64Op>();
-    target.addIllegalOp<IREE::VM::MulI64Op>();
-    target.addIllegalOp<IREE::VM::DivI64SOp>();
-    target.addIllegalOp<IREE::VM::DivI64UOp>();
-    target.addIllegalOp<IREE::VM::RemI64SOp>();
-    target.addIllegalOp<IREE::VM::RemI64UOp>();
-    target.addIllegalOp<IREE::VM::NotI64Op>();
-    target.addIllegalOp<IREE::VM::AndI64Op>();
-    target.addIllegalOp<IREE::VM::OrI64Op>();
-    target.addIllegalOp<IREE::VM::XorI64Op>();
-
-    // ExtI64: Casting and type conversion/emulation ops
-    target.addIllegalOp<IREE::VM::TruncI64I32Op>();
-    target.addIllegalOp<IREE::VM::ExtI32I64SOp>();
-    target.addIllegalOp<IREE::VM::ExtI32I64UOp>();
-
-    // ExtI64: Native bitwise shift and rotate ops
-    target.addIllegalOp<IREE::VM::ShlI64Op>();
-    target.addIllegalOp<IREE::VM::ShrI64SOp>();
-    target.addIllegalOp<IREE::VM::ShrI64UOp>();
-
-    // ExtI64: Comparison ops
-    target.addIllegalOp<IREE::VM::CmpEQI64Op>();
-    target.addIllegalOp<IREE::VM::CmpNEI64Op>();
-    target.addIllegalOp<IREE::VM::CmpLTI64SOp>();
-    target.addIllegalOp<IREE::VM::CmpLTI64UOp>();
-    target.addIllegalOp<IREE::VM::CmpNZI64Op>();
+    // Control flow ops
+    target.addLegalOp<IREE::VM::CallOp>();
+    target.addLegalOp<IREE::VM::ReturnOp>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
