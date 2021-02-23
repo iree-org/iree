@@ -70,9 +70,8 @@ def parse_arguments():
       "-v",
       type=int,
       default=0,
-      help=
-      "Specify verbosity level where higher verbosity emits more logging. (Default 0)"
-  )
+      help="Specify verbosity level where higher verbosity emits more logging."
+      " (Default 0)")
 
   # Specify only one of these (defaults to --root_dir=iree).
   group = parser.add_mutually_exclusive_group()
@@ -146,7 +145,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
     raise FileNotFoundError(f"Cannot find directory '{directory_path}'")
 
   rel_dir_path = repo_relpath(directory_path)
-  if verbosity > 0:
+  if verbosity >= 1:
     log(f"Processing {rel_dir_path}")
 
   skip_file_path = os.path.join(directory_path, ".skip_bazel_to_cmake")
@@ -169,7 +168,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
         if line.startswith("# Copyright"):
           copyright_line = line.rstrip()
         if EDIT_BLOCKING_PATTERN.search(line):
-          if verbosity > 0:
+          if verbosity >= 1:
             log(f"Skipped. line {i + 1}: '{line.strip()}' prevents edits.",
                 indent=2)
           return Status.SKIPPED
@@ -200,7 +199,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
           f"Reason: `{type(e).__name__}: {e}`",
           indent=2)
       return Status.FAILED
-  if verbosity > 1:
+  if verbosity >= 2:
     log(
         f"Successfly generated {rel_cmakelists_file_path}"
         f" from {rel_build_file_path}",
