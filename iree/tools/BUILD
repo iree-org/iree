@@ -180,8 +180,10 @@ cc_library(
         "IREE_HAVE_VMLA_TARGET",
         "IREE_HAVE_VULKANSPIRV_TARGET",
         "IREE_HAVE_METALSPIRV_TARGET",
+        "IREE_HAVE_CUDA_TARGET",
     ],
     deps = [
+        "//iree/compiler/Dialect/HAL/Target/CUDA",
         "//iree/compiler/Dialect/HAL/Target/LLVM",
         "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
