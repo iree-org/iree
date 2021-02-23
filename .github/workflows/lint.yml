@@ -23,7 +23,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Running bazel_to_cmake
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
+        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
       - name: Checking Diff
         run: git diff --exit-code
 
