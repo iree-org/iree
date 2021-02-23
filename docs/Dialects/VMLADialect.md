@@ -761,7 +761,7 @@ Syntax:
 ```
 operation ::= `vmla.fft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
               $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
-              `out` $real_out `,` $imag_out attr-dict `:` $real_element_type `,` $imag_element_type
+              `out` $real_out `,` $imag_out attr-dict `:` $element_type
 ```
 
 
@@ -769,8 +769,7 @@ operation ::= `vmla.fft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`real_element_type` | ::mlir::TypeAttr | any type attribute
-`imag_element_type` | ::mlir::TypeAttr | any type attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -798,12 +797,11 @@ operation ::= `vmla.fft.pseudo` $real_in`,` $imag_in attr-dict `:` `(`type($real
 This is a tensor-level version of VMLA::FftOp, to facilitate
 the lowering process.
 
-The op that takes two tensors as input and returns two tensors as output.
-These represent the [real, imag] components of a complex number.
+The op takes two tensors, representing the real and imaginary components of
+a complex number and performs a Fast Fourier transform
+(https://en.wikipedia.org/wiki/Fast_Fourier_transform) on them. It returns
+two tensors as output, since the output of an FFT is also a complex number.
 
-This is a placeholder for the actual implementation of fft.
-In addition, only the base version of FFT is currently implemented.
-(TODO: natashaknk)
 
 #### Operands:
 
@@ -903,6 +901,71 @@ operation ::= `vmla.gather` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
+### `vmla.ifft` (::mlir::iree_compiler::IREE::VMLA::IfftOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.ifft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+              $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+              `out` $real_out `,` $imag_out attr-dict `:` $element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | buffer
+`real_in_shape` | Ranked shape type
+`imag_in` | buffer
+`imag_in_shape` | Ranked shape type
+`real_out` | buffer
+`imag_out` | buffer
+
+### `vmla.ifft.pseudo` (::mlir::iree_compiler::IREE::VMLA::IfftPseudoOp)
+
+pseudo-op of VMLA::IfftOp.
+
+
+Syntax:
+
+```
+operation ::= `vmla.ifft.pseudo` $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+              `->` `(`type($real_out)`,` type($imag_out)`)`
+```
+
+This is a tensor-level version of VMLA::IfftOp, to facilitate
+the lowering process.
+
+The op takes two tensors, representing the real and imaginary components of
+a complex number and performs an Inverse Fast Fourier transform
+(https://en.wikipedia.org/wiki/Fast_Fourier_transform) on them. It returns
+two tensors as output, since the output of an IFFT is also a complex number.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | tensor of any type values
+`imag_in` | tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`real_out` | tensor of any type values
+`imag_out` | tensor of any type values
+
 ### `vmla.interface.binding` (::mlir::iree_compiler::IREE::VMLA::InterfaceBindingOp)
 
 
@@ -987,6 +1050,70 @@ operation ::= `vmla.iota` `out` $dst attr-dict `:` $element_type
 | Operand | Description |
 | :-----: | ----------- |
 `dst` | buffer
+
+### `vmla.irfft` (::mlir::iree_compiler::IREE::VMLA::IrfftOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.irfft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+              $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+              `out` $real_out attr-dict `:` $element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | buffer
+`real_in_shape` | Ranked shape type
+`imag_in` | buffer
+`imag_in_shape` | Ranked shape type
+`real_out` | buffer
+
+### `vmla.irfft.pseudo` (::mlir::iree_compiler::IREE::VMLA::IrfftPseudoOp)
+
+pseudo-op of VMLA::IrfftOp.
+
+
+Syntax:
+
+```
+operation ::= `vmla.irfft.pseudo` $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+              `->` `(`type($real_out)`)`
+```
+
+This is a tensor-level version of VMLA::IrfftOp, to facilitate
+the lowering process.
+
+The op takes two tensors, representing the real and imaginary components of
+a complex number and performs an Inverse Real Fast Fourier transform
+(https://en.wikipedia.org/wiki/Fast_Fourier_transform) on them. It returns a
+single tensor as output, since the output of an IRFFT is a set of real
+numbers.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | tensor of any type values
+`imag_in` | tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`real_out` | tensor of any type values
 
 ### `vmla.log` (::mlir::iree_compiler::IREE::VMLA::LogOp)
 
@@ -1337,6 +1464,38 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
+### `vmla.reduce.and` (::mlir::iree_compiler::IREE::VMLA::ReduceAndOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.reduce.and` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`init` | buffer
+`init_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
 ### `vmla.reduce.max` (::mlir::iree_compiler::IREE::VMLA::ReduceMaxOp)
 
 
@@ -1378,6 +1537,38 @@ Syntax:
 
 ```
 operation ::= `vmla.reduce.min` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`init` | buffer
+`init_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
+### `vmla.reduce.or` (::mlir::iree_compiler::IREE::VMLA::ReduceOrOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.reduce.or` $src`(`$src_shape `:` type($src_shape)`)``,`
               $init`(`$init_shape `:` type($init_shape)`)``,`
               `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
 ```
@@ -1488,6 +1679,66 @@ operation ::= `vmla.reverse` $src`(`$src_shape `:` type($src_shape)`)``,`
 `src_shape` | Ranked shape type
 `dst` | buffer
 `dst_shape` | Ranked shape type
+
+### `vmla.rfft` (::mlir::iree_compiler::IREE::VMLA::RfftOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.rfft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+              `out` $real_out `,` $imag_out attr-dict `:` $element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | buffer
+`real_in_shape` | Ranked shape type
+`real_out` | buffer
+`imag_out` | buffer
+
+### `vmla.rfft.pseudo` (::mlir::iree_compiler::IREE::VMLA::RfftPseudoOp)
+
+pseudo-op of VMLA::RfftOp.
+
+
+Syntax:
+
+```
+operation ::= `vmla.rfft.pseudo` $real_in attr-dict `:` `(`type($real_in)`)`
+              `->` `(`type($real_out)`,` type($imag_out)`)`
+```
+
+This is a tensor-level version of VMLA::RfftOp, to facilitate
+the lowering process.
+
+The op takes a tensor and performs a Real Fast Fourier
+(https://en.wikipedia.org/wiki/Fast_Fourier_transform) on them. It returns
+two tensors as output, since the output of an RFFT is also a complex number.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`real_out` | tensor of any type values
+`imag_out` | tensor of any type values
 
 ### `vmla.round` (::mlir::iree_compiler::IREE::VMLA::RoundOp)
 

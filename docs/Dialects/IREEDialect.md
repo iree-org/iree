@@ -16,6 +16,9 @@ A dialect used for types common across IREE subdialects.
 
 ## Type constraint definition
 
+### list
+A resizable list of some type.
+
 ### ptr
 Pointer to a typed value.
 
@@ -108,6 +111,121 @@ information should be hidden from the compiler and resolved at runtime.
 | :----: | ----------- |
 `result` | tensor of any type values
 
+### `iree.list.get` (::mlir::iree_compiler::IREE::ListGetOp)
+
+element accessor
+
+
+Syntax:
+
+```
+operation ::= `iree.list.get` operands attr-dict `:` custom<ListType>(type($list), type($result))
+```
+
+Returns the value of the element at the given index. Note that the value
+may be null if the element is null or the type does not match.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`index` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | any type
+
+### `iree.list.resize` (::mlir::iree_compiler::IREE::ListResizeOp)
+
+resizes the list to a new count in elements
+
+
+Syntax:
+
+```
+operation ::= `iree.list.resize` operands attr-dict `:` type($list)
+```
+
+Resizes the list to contain `new_size` elements. This will either truncate
+the list if the existing size is greater than `new_size` or extend the list
+with the default list value of the element type.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`new_size` | index
+
+### `iree.list.set` (::mlir::iree_compiler::IREE::ListSetOp)
+
+element mutator
+
+
+Syntax:
+
+```
+operation ::= `iree.list.set` operands attr-dict `:` custom<ListType>(type($list), type($value))
+```
+
+Sets the element at the given index to the new value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`index` | index
+`value` | any type
+
+### `iree.list.size` (::mlir::iree_compiler::IREE::ListSizeOp)
+
+the size of the list in elements
+
+
+Syntax:
+
+```
+operation ::= `iree.list.size` operands attr-dict `:` type($list)
+```
+
+Returns the current size of the list in elements.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `iree.null` (::mlir::iree_compiler::IREE::NullOp)
+
+a null type value
+
+
+Syntax:
+
+```
+operation ::= `iree.null` attr-dict `:` type($result)
+```
+
+Defines an SSA value that is lowered into dialects supporting
+null/undefined/optional/etc values.
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | any type
+
 ### `iree.placeholder` (::mlir::iree_compiler::IREE::PlaceholderOp)
 
 A placeholder op to feed a value/buffer into computation
@@ -183,61 +301,3 @@ stripped during translation.
   ...
 
 ```
-
-### `iree.workgroup_id` (::mlir::iree_compiler::IREE::WorkgroupIdOp)
-
-Get grid index of an iree workgoup among a specific dimension.
-
-
-Syntax:
-
-```
-operation ::= `iree.workgroup_id` attr-dict `:` type($result)
-```
-
-IREE workgroups are logically distributed among a hypergrid, each point sampled 
-from the grid corresponds to a logical thread. For example in a 3d grid case 
-the op quries (x, y, z) dimensions:
-
-```mlir
- %0 = iree.workgroup_id {dimension = "x"} : index
- %1 = iree.workgroup_id {dimension = "y"} : index
- %2 = iree.workgroup_id {dimension = "z"} : index
-```
-
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`dimension` | ::mlir::StringAttr | string attribute
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-`result` | index
-
-### `iree.workgoup_size` (::mlir::iree_compiler::IREE::WorkgroupSizeOp)
-
-Get grid size of an iree thread among a specific dimension
-
-
-Syntax:
-
-```
-operation ::= `iree.workgoup_size` attr-dict `:` type($result)
-```
-
-Get grid size of an iree workgroups among a specific dimension
-
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`dimension` | ::mlir::StringAttr | string attribute
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-`result` | index

@@ -51,6 +51,18 @@ workload size, shapes of inputs and outputs, etc.
 1. TOC
 {:toc}
 
+## Type constraint definition
+
+### dispatch.input
+A placeholder for a dispatch region input operand. This can be used to query
+the metadata about the input (such as its shape) as well as load from the
+backing tensor representation.
+
+### dispatch.output
+A placeholder for a dispatch region output result. This can be used to
+query the metadata about the output (such as its shape) as well as store
+into the backing tensor representation.
+
 ## Operation definition
 
 ### `flow.dispatch.entry` (::mlir::iree_compiler::IREE::Flow::DispatchEntryOp)
@@ -66,13 +78,59 @@ exports can reference the same internal function.
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
 `function_ref` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`workload` | ::mlir::IntegerAttr | size_t
+`signature` | ::mlir::TypeAttr | any type attribute
+`workgroup_rank` | ::mlir::IntegerAttr | index attribute
+
+### `flow.dispatch.input.load` (::mlir::iree_compiler::IREE::Flow::DispatchInputLoadOp)
+
+loads a tensor from a dispatch input placeholder
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.input.load` $source
+              ( `,` `offsets` `=` `[` $offsets^ `]` )?
+              ( `,` `sizes` `=` `[` $sizes^ `]` )?
+              ( `,` `strides` `=` `[` $strides^ `]` )?
+              `:` type($source) `->` type($result) attr-dict-with-keyword
+```
+
+Loads an input tensor or subtensor from an input placeholder. As each
+workgroup executes concurrently all workgroups will receive identical loaded
+results of regions that may overlap.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`source` | dispatch.input
+`offsets` | index
+`sizes` | index
+`strides` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
 
 ### `flow.dispatch` (::mlir::iree_compiler::IREE::Flow::DispatchOp)
 
-a dispatch to an outlined dispatch region
+a dispatch of workgroups across an n-dimension grid
 
-Dispatches a workload to the specified executable function.
+
+Syntax:
+
+```
+operation ::= `flow.dispatch` $entry_point `[` $workgroup_count `]`
+              `(` $operands `)` attr-dict `:`
+              functional-type($operands, $results)
+```
+
+Dispatches workgroups across an n-dimensional grid defined by the specified
+workgroup count. The workgroup count may be dynamic and any dimension may be
+set to 0 to neuter the dispatch (no workgroup will execute).
 
 #### Attributes:
 
@@ -84,7 +142,7 @@ Dispatches a workload to the specified executable function.
 
 | Operand | Description |
 | :-----: | ----------- |
-`workload` | index
+`workgroup_count` | index
 `operands` | any type
 
 #### Results:
@@ -92,6 +150,35 @@ Dispatches a workload to the specified executable function.
 | Result | Description |
 | :----: | ----------- |
 `results` | any type
+
+### `flow.dispatch.output.store` (::mlir::iree_compiler::IREE::Flow::DispatchOutputStoreOp)
+
+stores a tensor into a dispatch output placeholder
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.output.store` $value `,` $target
+              ( `,` `offsets` `=` `[` $offsets^ `]` )?
+              ( `,` `sizes` `=` `[` $sizes^ `]` )?
+              ( `,` `strides` `=` `[` $strides^ `]` )?
+              `:` type($value) `->` type($target) attr-dict-with-keyword
+```
+
+Stores a tensor or subtensor into an output tensor placeholder. As each
+workgroup executes concurrently behavior is undefined if more than one
+workgroup stores into overlapping regions of the full output tensor.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | ranked tensor of any type values
+`target` | dispatch.output
+`offsets` | index
+`sizes` | index
+`strides` | index
 
 ### `flow.dispatch.region` (::mlir::iree_compiler::IREE::Flow::DispatchRegionOp)
 
@@ -116,6 +203,246 @@ side-effects.
 | :-----: | ----------- |
 `workload` | index
 `args` | any type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`results` | any type
+
+### `flow.dispatch.shape` (::mlir::iree_compiler::IREE::Flow::DispatchShapeOp)
+
+returns the shape of a dispatch region input/output tensor
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.shape` $source `:` type($source) `->` type($result) attr-dict
+```
+
+Queries the shape of an input or output tensor of a
+`flow.dispatch.workgroups` region. The shape may have dynamic dimensions
+that will be resolved to runtime values.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`source` | dispatch.input or dispatch.output
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | Ranked shape type
+
+### `flow.dispatch.tie_shape` (::mlir::iree_compiler::IREE::Flow::DispatchTieShapeOp)
+
+ties a runtime shape to a dispatch I/O argument
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.tie_shape` $operand `,` $shape attr-dict
+              `:` `(` type($operand) `,` type($shape) `)` `->` type($result)
+```
+
+Metadata op used to tie a runtime-computed shape with dynamic dimensions to
+a dispatch input/output argument. All uses of the argument should use the
+pass-through result of this op to allow for SSA-based shape resolution.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | dispatch.input or dispatch.output
+`shape` | Ranked shape type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | dispatch.input or dispatch.output
+
+### `flow.dispatch.workgroup.count` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupCountOp)
+
+returns the total workgroup count of the grid
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.workgroup.count` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The total number of workgroups along each dimension in the dispatch grid.
+
+Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+built-in variable, only in the flow dialect the number of dimensions is not
+restricted to 3 (XYZ).
+
+```mlir
+%x = flow.dispatch.workgroup.count[0] : index
+%y = flow.dispatch.workgroup.count[1] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `flow.dispatch.workgroup.id` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupIDOp)
+
+returns the index of the current workgroup in the grid
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.workgroup.id` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The global workgroup ID of the current workgroup in the range of
+`[0, flow.dispatch.workgroup.count)` along each dimension.
+
+Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+built-in variable, only in the flow dialect the number of dimensions is not
+restricted to 3 (XYZ).
+
+```mlir
+%x = flow.dispatch.workgroup.id[0] : index
+%y = flow.dispatch.workgroup.id[1] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `flow.dispatch.workgroup.rank` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupRankOp)
+
+returns the rank of the workgroup dimensions
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.workgroup.rank` attr-dict `:` type($result)
+```
+
+The number of workgroup dimensions used during dispatch, bounding the
+`flow.dispatch.workgroup.*` query functions.
+
+```mlir
+%rank = flow.dispatch.workgroup.rank : index
+```
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `flow.dispatch.workgroup.size` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupSizeOp)
+
+returns the size of each workgroup in invocations
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.workgroup.size` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The number of local invocations within the current workgroup along each
+dimension. Depending on backend this may map to the SIMT thread count or
+inner loop nest parameters.
+
+Workgroup sizes are not determined at the flow dialect level as they are
+dependent on the target backend determined when lowering into the HAL. It's
+still possible to use the symbolic workgroup size inside of dispatch
+executables as a placeholder for the resolved value once in the HAL.
+
+Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+built-in variable, only in the flow dialect the number of dimensions is not
+restricted to 3 (XYZ).
+
+```mlir
+%x = flow.dispatch.workgroup.size[0] : index
+%y = flow.dispatch.workgroup.size[1] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `flow.dispatch.workgroups` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupsOp)
+
+a dispatch of workgroups across an n-dimension grid
+
+Dispatches some number of workgroups across an n-dimensional grid. The
+body region will be invoked for each workgroup with a unique
+`flow.dispatch.workgroup.id` in the range of
+`[0, flow.dispatch.workgroup.count)` (along each dimension).
+
+From the outside the dispatch operation has value semantics: some tensors
+(and optionally other primitive types) are consumed and one or more new
+result tensors are produced. Inside each workgroup, however, the input and
+output tensors are available for arbitrary loads and stores. In many cases
+each workgroup will load some particular tile(s) from the input tensors and
+store some particular tile(s) to the output tensors unique to that
+workgroup. Though it's possible for multiple workgroups to load the same
+regions of the input tensors behavior is undefined if multiple workgroups
+store to the same regions of the output tensors.
+
+Though the representation is similar to the GPU-style grid dispatch model
+here we still have not yet allocated buffers, determined the target device
+for execution, or even completed fully resolving shapes/types/etc. Because
+of this it's important that the workgroup body use the
+`flow.dispatch.workgroup.*` ops to query the workgroup ID/count/size instead
+of hardcoding them to a particular set of values. Assume that any workgroup
+dispatch may end up being specialized for several different target devices
+and even several different variants for a particular target device
+(differing workgroup sizes, etc).
+
+Because of the general nature of the op in this dialect the workgroup count
+provided to the `flow.dispatch.workgroups` op is in an abstract untiled
+domain. Unlike when lowering to the HAL dialect the number of dimensions is
+unbounded and does not yet have the workgroup size factored into it. As the
+dispatch is lowered the workgroup count range will be converted into a 3D
+XYZ grid space and divided up by the workgroup size chosen for particular
+target devices.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`workgroup_count` | index
+`operands` | any type
 
 #### Results:
 
@@ -355,13 +682,16 @@ Syntax:
 operation ::= `flow.tensor.trace` attr-dict ($operands^ `:` type($operands))?
 ```
 
-Trace point for dispatchable functions.
+Traces out to a runtime trace sink (console, log file, etc) the given
+tensors and titles them with the given key. The key is informational only
+and useful for titling/marking specific sets of tensors for easier
+searching.
 
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`trace_info` | ::mlir::StringAttr | string attribute
+`key` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -447,7 +777,7 @@ Returns a copy of the variable value.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | ranked tensor of any type values
+`result` | any type
 
 ### `flow.variable.load` (::mlir::iree_compiler::IREE::Flow::VariableLoadOp)
 
@@ -472,7 +802,7 @@ Returns a copy of the variable value.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | ranked tensor of any type values
+`result` | any type
 
 ### `flow.variable` (::mlir::iree_compiler::IREE::Flow::VariableOp)
 
@@ -507,7 +837,7 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | ranked tensor of any type values
+`value` | any type
 `variable` | ranked tensor of any type values or index or signless integer or floating-point
 
 ### `flow.variable.store` (::mlir::iree_compiler::IREE::Flow::VariableStoreOp)
@@ -533,4 +863,4 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | ranked tensor of any type values
+`value` | any type

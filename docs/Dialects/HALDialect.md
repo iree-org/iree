@@ -68,14 +68,6 @@ across CommandBuffers from the same device or others.
 ### executable
 A prepared and ready-to-dispatch executable.
 
-### executable_cache
-A cache of prepared executables for a particular device.
-Caches may be shared across multiple devices from the same driver or
-specific to individual devices. Caches may persist prepared executables
-across process launches or reprepare them each run. Callers should assume
-that the cache is a no-op and the returned Executables only live for as long
-as the cache does.
-
 ### executable_layout
 An executable layout describing the descriptor sets and push constants used.
 
@@ -109,13 +101,13 @@ Returns a copy of the variable value.
 
 | Operand | Description |
 | :-----: | ----------- |
-`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
+`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore>
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
+`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore
 
 ### `hal.allocator.allocate.const` (::mlir::iree_compiler::IREE::HAL::AllocatorAllocateConstOp)
 
@@ -205,18 +197,13 @@ operation ::= `hal.allocator.compute_offset` $allocator `,` `shape` `=` `[` $sha
 Computes an element byte offset within a buffer produced by the allocator.
 This returns the same value as `hal.buffer_view.compute_offset`.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`element_type` | ::mlir::IntegerAttr | element type attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `allocator` | allocator
 `shape` | index
+`element_type` | 32-bit signless integer
 `indices` | index
 
 #### Results:
@@ -241,18 +228,13 @@ operation ::= `hal.allocator.compute_range` $allocator `,` `shape` `=` `[` $shap
 Computes a byte range within a buffer for one or more elements.
 This returns the same value as `hal.buffer_view.compute_range`.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`element_type` | ::mlir::IntegerAttr | element type attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `allocator` | allocator
 `shape` | index
+`element_type` | 32-bit signless integer
 `indices` | index
 `lengths` | index
 
@@ -278,18 +260,13 @@ operation ::= `hal.allocator.compute_size` $allocator `,` `shape` `=` `[` $shape
 Computes the byte size required for a buffer of the given shape and type.
 This returns the same value as `hal.buffer_view.byte_length`.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`element_type` | ::mlir::IntegerAttr | element type attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `allocator` | allocator
 `shape` | index
+`element_type` | 32-bit signless integer
 
 #### Results:
 
@@ -651,7 +628,7 @@ buffer view reference initializer
 Syntax:
 
 ```
-operation ::= `hal.buffer_view.create` $buffer `,` `shape` `=` `[` $shape `]` `,` `element_type` `=` $element_type
+operation ::= `hal.buffer_view.create` $buffer `,` `element_type` `=` $element_type `,` `shape` `=` `[` $shape `]`
               `:` type($result) attr-dict
 ```
 
@@ -660,17 +637,12 @@ The buffer is not copied and both the original and view references must be
 synchronized. This makes it easier to associate commonly-carried metadata
 along with the contents.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`element_type` | ::mlir::IntegerAttr | element type attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `buffer` | buffer
+`element_type` | 32-bit signless integer
 `shape` | index
 
 #### Results:
@@ -734,6 +706,31 @@ Returns each dimension value of the buffer view.
 | Result | Description |
 | :----: | ----------- |
 `result` | index
+
+### `hal.buffer_view.element_type` (::mlir::iree_compiler::IREE::HAL::BufferViewElementTypeOp)
+
+buffer view element type query
+
+
+Syntax:
+
+```
+operation ::= `hal.buffer_view.element_type` $buffer_view attr-dict `:` type($result)
+```
+
+Returns the element type of the buffer view.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`buffer_view` | buffer_view
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
 
 ### `hal.buffer_view.rank` (::mlir::iree_compiler::IREE::HAL::BufferViewRankOp)
 
@@ -800,13 +797,15 @@ Syntax:
 operation ::= `hal.buffer_view.trace` attr-dict ($operands^ `:` type($operands))?
 ```
 
-Trace point for dispatchable functions.
+Traces out to a runtime trace sink (console, log file, etc) the given buffer
+views and titles them with the given key. The key is informational only and
+useful for titling/marking specific sets of buffers for easier searching.
 
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`trace_info` | ::mlir::StringAttr | string attribute
+`key` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -907,18 +906,13 @@ operation ::= `hal.command_buffer.bind_descriptor_set` $command_buffer `,` $exec
 Binds a descriptor set to the given set number. The provided descriptor set
 must not be modified once bound to a command buffer.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 `executable_layout` | executable_layout
+`set` | index
 `descriptor_set` | descriptor_set
 `dynamic_offsets` | index
 
@@ -1175,8 +1169,9 @@ Ends recording into the command buffer.
 
 command buffer execution barrier recording operation
 
-Defines a memory dependency between commands recorded before and after the
-barrier.
+Defines an execution dependency between all commands recorded before the
+barrier and all commands recorded after the barrier. Only the stages
+provided will be affected.
 
 #### Attributes:
 
@@ -1184,14 +1179,13 @@ barrier.
 | :-------: | :-------: | ----------- |
 `source_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
 `target_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
+`flags` | ::mlir::IntegerAttr | valid ExecutionBarrierFlag
 
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `command_buffer` | command_buffer
-`memory_barriers` | MemoryBarrier
-`buffer_barriers` | BufferBarrier
 
 ### `hal.command_buffer.fill_buffer` (::mlir::iree_compiler::IREE::HAL::CommandBufferFillBufferOp)
 
@@ -1264,19 +1258,12 @@ command buffer descriptor set push binding operation
 Pushes an inline-defined descriptor set to the command buffer.
 
 ```mlir
-hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindings = [
-  0 = (%buffer_0, %buffer_offset_0, %buffer_length_0),
-  1 = (%buffer_1, %buffer_offset_1, %buffer_length_1),
-  2 = (%buffer_2, %buffer_offset_2, %buffer_length_2)
+hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = %c0, bindings = [
+  %c0 = (%buffer_0, %buffer_offset_0, %buffer_length_0),
+  %c1 = (%buffer_1, %buffer_offset_1, %buffer_length_1),
+  %c2 = (%buffer_2, %buffer_offset_2, %buffer_length_2)
 ]
 ```
-
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
-`bindings` | ::mlir::ArrayAttr | 32-bit integer array attribute
 
 #### Operands:
 
@@ -1284,6 +1271,8 @@ hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindin
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 `executable_layout` | executable_layout
+`set` | index
+`binding_ordinals` | index
 `binding_buffers` | buffer
 `binding_offsets` | index
 `binding_lengths` | index
@@ -1497,18 +1486,13 @@ allocates a descriptor set from the device pool
 
 Creates a DescriptorSet from the device pool.
 
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`bindings` | ::mlir::ArrayAttr | 32-bit integer array attribute
-
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `device` | device
 `set_layout` | descriptor_set_layout
+`binding_ordinals` | index
 `binding_buffers` | buffer
 `binding_offsets` | index
 `binding_lengths` | index
@@ -1838,145 +1822,55 @@ executable format in `iree/hal/executable_format.h`.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
 `format` | ::mlir::IntegerAttr | IREE HAL Executable format
 `data` | ::mlir::DenseIntElementsAttr | 8-bit signless integer elements attribute
 
-### `hal.executable_cache.create` (::mlir::iree_compiler::IREE::HAL::ExecutableCacheCreateOp)
+### `hal.executable.create` (::mlir::iree_compiler::IREE::HAL::ExecutableCreateOp)
 
-creates an executable cache
+creates an executable
 
 
 Syntax:
 
 ```
-operation ::= `hal.executable_cache.create` $device `,` `identifier` `=` $identifier
+operation ::= `hal.executable.create` $device `,` $executable_target `,`
+              `layouts` `=` `[` $layouts `]`
               attr-dict-with-keyword `:` type($result)
 ```
 
-Caches may be shared across multiple devices from the same driver or
-specific to individual devices. Caches may persist prepared executables
-across process launches or re-prepare them each run. Callers should assume
-that the cache is a no-op and the returned hal.executables only live for as
-long as the cache does.
+Creates a target-dependent executable cached on the provided device. Entry
+points contained within the executable can be dispatched using the resulting
+executable handle.
 
-The term 'cache' here is rather optimistic - it's perfectly acceptable for
-implementations to not cache at all and return new hal.executables for each
-preparation (even for the same executable). Callers should expect such
-behavior and try to retain the results of the preparation to reduce overhead
-from re-preparing executables.
-
-Currently caches are synchronous but the intent is to support asynchronous
-compilation of multiple executables with semaphores used to indicate when
-the executables are ready for use.
+Depending on the driver creation may take a non-trivial amount of time
+(such as when JITing/etc). As the cache is internally synchronized callers
+can issue preparation requests from multiple threads - even for the same
+executables - and calls will block until preparation completes.
 
 ```mlir
-%cache = hal.executable_cache.create %device, identifier = "some_guid" : !hal.executable_cache
+%exe = hal.executable.create %device, @executable::@target,
+                             layouts = [%exe_layout_0] : !hal.executable
 ```
 
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`identifier` | ::mlir::StringAttr | string attribute
+`executable_target` | ::mlir::SymbolRefAttr | symbol reference attribute
 
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `device` | device
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-`result` | executable_cache
-
-### `hal.executable_cache.prepare` (::mlir::iree_compiler::IREE::HAL::ExecutableCachePrepareOp)
-
-synchronously prepares an executable for use
-
-
-Syntax:
-
-```
-operation ::= `hal.executable_cache.prepare` $executable_cache `,` `layout` `=` $executable_layout `,`
-              `caching_mode` `=` $caching_mode `,` $executable
-              attr-dict-with-keyword `:` type($result)
-```
-
-The provided spec and data will be used to either lookup a previously
-prepared executable in the cache or prepare a new one.
-
-Depending on the driver preparation may take a non-trivial amount of time
-(such as when JITing/etc). As the cache is internally synchronized callers
-can issue preparation requests from multiple threads - even for the same
-executables - and calls will block until preparation completes.
-
-```mlir
-%exe = hal.executable_cache.prepare %executable_cache,
-                                    layout = %layout,
-                                    caching_mode = "AllowPersistentCaching|AllowOptimization",
-                                    @executable : !hal.executable
-```
-
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`caching_mode` | ::mlir::IntegerAttr | valid ExecutableCachingMode
-`executable` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`executable_cache` | executable_cache
-`executable_layout` | executable_layout
+`layouts` | executable_layout
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
 `result` | executable
-
-### `hal.executable_cache.select_format` (::mlir::iree_compiler::IREE::HAL::ExecutableCacheSelectFormatOp)
-
-selects the preferred format from the given list
-
-
-Syntax:
-
-```
-operation ::= `hal.executable_cache.select_format` $executable_cache `,` `available_formats` `=` $available_formats
-              attr-dict-with-keyword `:` type($result)
-```
-
-Returns the index of the preferred format of the cache from the given set or
--1 if none can be used. Preparation may still fail if the particular version
-or features required by the executable are not supported.
-
-```mlir
-// Returns indices 0 or 1 if either of the two inputs are usable or -1 otherwise.
-%index = hal.executable_cache.select_format %cache, available_formats = [1447906369 : i32, 123482395 : i32] : i32
-```
-
-#### Attributes:
-
-| Attribute | MLIR Type | Description |
-| :-------: | :-------: | ----------- |
-`available_formats` | ::mlir::ArrayAttr | HAL executable format array attribute
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`executable_cache` | executable_cache
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-`result` | 32-bit signless integer
 
 ### `hal.executable_end` (::mlir::iree_compiler::IREE::HAL::ExecutableEndOp)
 
@@ -1997,6 +1891,17 @@ executable entry point declaration
 An entry point exported by the executable with statically-available
 information describing the IO interface it uses and other dispatch metadata.
 
+The optional `workgroup_count_region` region represents the
+computation that returns the number of workgroups to use. The
+arguments to the region represents the workload along x, y and
+z. It returns the number of workgroups along x, y, and z.
+
+TODO(ravishankarm): In reality there is no need to define what the
+arguments represent. They could be any values that are needed to
+compute the number of workgroups. Its unclear what these are in
+general and how to plumb them through. So for now just accepting
+the workload along x, y, and z.
+
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
@@ -2005,6 +1910,7 @@ information describing the IO interface it uses and other dispatch metadata.
 `ordinal` | ::mlir::IntegerAttr | 32-bit integer ordinal attribute
 `interface` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 `signature` | ::mlir::TypeAttr | any type attribute
+`workgroup_size` | ::mlir::ArrayAttr | index array attribute
 
 ### `hal.executable_layout.create` (::mlir::iree_compiler::IREE::HAL::ExecutableLayoutCreateOp)
 
@@ -2014,8 +1920,9 @@ creates an executable layout
 Syntax:
 
 ```
-operation ::= `hal.executable_layout.create` $device `,` `set_layouts` `=` `[` $set_layouts `]` `,`
-              `push_constants` `=` $push_constants
+operation ::= `hal.executable_layout.create` $device `,`
+              `push_constants` `=` $push_constants `,`
+              `set_layouts` `=` `[` $set_layouts `]`
               attr-dict-with-keyword `:` type($result)
 ```
 
@@ -2031,8 +1938,8 @@ adjacent to it.
 %set0 = hal.descriptor_set_layout.create ...
 %set1 = hal.descriptor_set_layout.create ...
 %layout = hal.executable_layout.create %device,
-                                       set_layouts = [%set0, %set1],
-                                       push_constants = 3 : !hal.executable_layout
+                                       push_constants = 3,
+                                       set_layouts = [%set0, %set1] : !hal.executable_layout
 ```
 
 #### Attributes:
@@ -2197,6 +2104,39 @@ the scheduler.
 `type` | ::mlir::IntegerAttr | IREE HAL DescriptorType
 `access` | ::mlir::IntegerAttr | valid MemoryAccess
 
+### `hal.interface.binding.subspan` (::mlir::iree_compiler::IREE::HAL::InterfaceBindingSubspanOp)
+
+returns an alias to a subspan of interface binding data
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.binding.subspan` $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
+              attr-dict `:` type($result)
+```
+
+// TODO(benvanik): add description
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`binding` | ::mlir::SymbolRefAttr | symbol reference attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`byte_offset` | index
+`byte_length` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | any type
+
 ### `hal.interface_end` (::mlir::iree_compiler::IREE::HAL::InterfaceEndOp)
 
 terminator pseudo-op for the executable interface op
@@ -2280,6 +2220,74 @@ at least a 4 byte boundary.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
+### `hal.interface.load.tensor.tile` (::mlir::iree_compiler::IREE::HAL::InterfaceLoadTensorTileOp)
+
+loads a tensor tile from an executable IO binding
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.load.tensor.tile` $binding `,` `base_offset` `=` $base_offset `,` `offsets` `=`
+              custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+              `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+              `,` `strides` `=`
+              custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+              attr-dict `:` type($result)
+```
+
+Loads a tensor tile value from an executable IO binding at the given
+offset/size/stride. This is a pseudo op that can be used to tie SSA tensor
+values in the IR to the bindings that contain those tensors.
+
+Note that because there may not be a 1:1 mapping between original tensor
+arguments to the entry point function and the bindings in the interface the
+backend must use the offset provided on this op to properly compute the base
+address of the tensor data. The offset is in bytes relative to the base
+binding address, irrespective of the type of the tensor loaded by this
+operation.
+
+The base_offset provided, if non-zero, will have an alignment compatible
+with the tensor type represented. For example, a `tensor<16xf32>` will be
+aligned on at least a 4 byte boundary.
+
+The op follows the semantic of similar core MLIR strided subview / subtensor
+ops where offset-list, size-list and stride-list are SSA value or constants
+of type index.
+
+Example:
+```
+  `hal.interface.load.tensor.tile` $binding `,`
+    `base_offset` `=` base_offset `,`
+    `offsets` `=` `[` offset-list `]` `,`
+    `sizes` `=` `[` size-list `]` `,`
+    `strides` `=` `[` stride-list `]` attr-dict `:` type($result)
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`binding` | ::mlir::SymbolRefAttr | symbol reference attribute
+`static_offsets` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_sizes` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_strides` | ::mlir::ArrayAttr | 64-bit integer array attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`base_offset` | index
+`offsets` | index
+`sizes` | index
+`strides` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
+
 ### `hal.interface` (::mlir::iree_compiler::IREE::HAL::InterfaceOp)
 
 executable IO interface description
@@ -2348,6 +2356,176 @@ at least a 4 byte boundary.
 | :-----: | ----------- |
 `operand` | ranked tensor of any type values
 `offset` | index
+
+### `hal.interface.store.tensor.tile` (::mlir::iree_compiler::IREE::HAL::InterfaceStoreTensorTileOp)
+
+stores a tensor tile in an executable IO binding
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.store.tensor.tile` $operand `,` $binding `,` `base_offset` `=` $base_offset `,` `offsets` `=`
+              custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
+              `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
+              `,` `strides` `=`
+              custom<OperandsOrIntegersOffsetsOrStridesList>($strides, $static_strides)
+              attr-dict `:` type($operand)
+```
+
+Stores a tensor value into an executable IO binding. This is a pseudo op
+indicating that the value of the operand tensor should be stored into the
+specified binding at the given offset/size/stride.
+
+Note that because there may not be a 1:1 mapping between original tensor
+arguments to the entry point function and the bindings in the interface the
+backend must use the offset provided on this op to properly compute the base
+address of the tensor data. The offset is in bytes relative to the base
+binding address, irrespective of the type of the tensor loaded by this
+operation.
+
+The base_offset provided, if non-zero, will have an alignment compatible
+with the tensor type represented. For example, a `tensor<16xf32>` will be
+aligned on at least a 4 byte boundary.
+
+The op follows the semantic of similar core MLIR strided subview / subtensor
+ops where offset-list, size-list and stride-list are SSA value or constants
+of type index.
+
+Grammar:
+```
+  `hal.interface.store.tensor.tile` $operand `,` $binding `,`
+    `base_offset` `=` base_offset `,`
+    `offsets` `=` `[` offset-list `]` `,`
+    `sizes` `=` `[` size-list `]` `,`
+    `strides` `=` `[` stride-list `]` attr-dict `:` type($operand)
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`binding` | ::mlir::SymbolRefAttr | symbol reference attribute
+`static_offsets` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_sizes` | ::mlir::ArrayAttr | 64-bit integer array attribute
+`static_strides` | ::mlir::ArrayAttr | 64-bit integer array attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | ranked tensor of any type values
+`base_offset` | index
+`offsets` | index
+`sizes` | index
+`strides` | index
+
+### `hal.interface.workgroup.count` (::mlir::iree_compiler::IREE::HAL::InterfaceWorkgroupCountOp)
+
+returns the total workgroup count of the grid
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.workgroup.count` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The total number of workgroups along each dimension in the dispatch grid.
+Matches what was passed to the `hal.command_buffer.dispatch` command (or
+what was indirectly specified).
+
+Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+built-in variable.
+
+```mlir
+%x = hal.interface.workgroup.count[0] : index
+%y = hal.interface.workgroup.count[1] : index
+%z = hal.interface.workgroup.count[2] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `hal.interface.workgroup.id` (::mlir::iree_compiler::IREE::HAL::InterfaceWorkgroupIDOp)
+
+returns the index of the current workgroup in the grid
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.workgroup.id` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The global workgroup ID of the current tile in the range of
+`[0, hal.interface.workgroup.count)` along each XYZ dimension.
+
+Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+built-in variable.
+
+```mlir
+%x = hal.interface.workgroup.id[0] : index
+%y = hal.interface.workgroup.id[1] : index
+%z = hal.interface.workgroup.id[2] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
+
+### `hal.interface.workgroup.size` (::mlir::iree_compiler::IREE::HAL::InterfaceWorkgroupSizeOp)
+
+returns the size of each workgroup in invocations
+
+
+Syntax:
+
+```
+operation ::= `hal.interface.workgroup.size` `[` $dimension `]` attr-dict `:` type($result)
+```
+
+The number of local invocations within the current workgroup along each
+dimension. Depending on backend this may map to the SIMT thread count or
+inner loop nest parameters.
+
+Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+built-in variable.
+
+```mlir
+%x = hal.interface.workgroup.size[0] : index
+%y = hal.interface.workgroup.size[1] : index
+%z = hal.interface.workgroup.size[2] : index
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dimension` | ::mlir::IntegerAttr | index attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | index
 
 ### `hal.make_buffer_barrier` (::mlir::iree_compiler::IREE::HAL::MakeBufferBarrierOp)
 
@@ -2583,7 +2761,7 @@ variable load and store indirect ops.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
+`result` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore>
 
 ### `hal.variable.load` (::mlir::iree_compiler::IREE::HAL::VariableLoadOp)
 
@@ -2608,7 +2786,7 @@ Returns a copy of the variable value.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
+`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore
 
 ### `hal.variable` (::mlir::iree_compiler::IREE::HAL::VariableOp)
 
@@ -2645,8 +2823,8 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
-`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
+`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore
+`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore>
 
 ### `hal.variable.store` (::mlir::iree_compiler::IREE::HAL::VariableStoreOp)
 
@@ -2671,4 +2849,4 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
+`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_layout or ring_buffer or semaphore

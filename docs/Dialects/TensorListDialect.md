@@ -42,6 +42,7 @@ the non-leading axes.
 
 | Operand | Description |
 | :-----: | ----------- |
+`allocator` | allocator
 `list` | tensorlist.list
 
 #### Results:
@@ -49,6 +50,29 @@ the non-leading axes.
 | Result | Description |
 | :----: | ----------- |
 `tensor` | buffer_view
+
+### `tensorlist.Concat.Tensor` (::mlir::iree_compiler::IREE::TensorList::ConcatTensor)
+
+Creates a tensor by concatenate the tensors in the tensorlist
+
+Creates a new tensor `tensor` by concatenating the tensors in `list` along
+the leading dimension.
+
+Requires the list to be non-empty.
+Requires all tensors contained in `list` to have the same dimensions along
+the non-leading axes.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | tensorlist.list
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`tensor` | ranked tensor of any type values
 
 ### `tensorlist.FromTensor` (::mlir::iree_compiler::IREE::TensorList::FromTensor)
 
@@ -61,8 +85,7 @@ a tensorlist `list` of length equal to `tensor`'s leading dimension.
 
 | Operand | Description |
 | :-----: | ----------- |
-`tensor` | buffer_view
-`element_shape` | buffer_view
+`tensor` | buffer_view or ranked tensor of any type values
 
 #### Results:
 
@@ -81,14 +104,13 @@ Gets an item out of a tensorlist.
 | Operand | Description |
 | :-----: | ----------- |
 `list` | tensorlist.list
-`index` | buffer_view
-`element_shape` | buffer_view
+`index` | buffer_view or ranked tensor of any type values
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`item` | buffer_view
+`item` | buffer_view or ranked tensor of any type values
 
 ### `tensorlist.Reserve` (::mlir::iree_compiler::IREE::TensorList::Reserve)
 
@@ -96,12 +118,43 @@ Create a new tensorlist with a given capacity.
 
 Create a new tensorlist with a given capacity.
 
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::IntegerAttr | element type attribute
+
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `element_shape` | buffer_view
 `count` | buffer_view
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`list` | tensorlist.list
+
+### `tensorlist.Reserve.Tensor` (::mlir::iree_compiler::IREE::TensorList::ReserveTensor)
+
+Create a new tensorlist with a given capacity.
+
+Create a new tensorlist with a given capacity.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`element_shape` | ranked tensor of any type values
+`count` | ranked tensor of any type values
 
 #### Results:
 
@@ -121,8 +174,8 @@ reflecting the updated value. Does not mutate `list`.
 | Operand | Description |
 | :-----: | ----------- |
 `list` | tensorlist.list
-`index` | buffer_view
-`item` | buffer_view
+`index` | buffer_view or ranked tensor of any type values
+`item` | buffer_view or ranked tensor of any type values
 
 #### Results:
 
@@ -144,8 +197,8 @@ Requires all tensors contained in `list` to be the same shape.
 
 | Operand | Description |
 | :-----: | ----------- |
+`allocator` | allocator
 `list` | tensorlist.list
-`element_shape` | buffer_view
 `num_elements` | buffer_view
 
 #### Results:
@@ -153,3 +206,26 @@ Requires all tensors contained in `list` to be the same shape.
 | Result | Description |
 | :----: | ----------- |
 `tensor` | buffer_view
+
+### `tensorlist.Stack.Tensor` (::mlir::iree_compiler::IREE::TensorList::StackTensor)
+
+Creates a tensor by stacking the tensors in the tensorlist
+
+Creates a new tensor `tensor` by stacking the tensors in `list`.
+The resulting tensor has a leading dimension equal to the length of `list`.
+
+Requires the list to be non-empty.
+Requires all tensors contained in `list` to be the same shape.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | tensorlist.list
+`num_elements` | ranked tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`tensor` | ranked tensor of any type values

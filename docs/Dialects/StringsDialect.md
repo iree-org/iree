@@ -30,9 +30,7 @@ A tensor of string types.
 
 ### `strings.concat` (::mlir::iree_compiler::IREE::Strings::ConcatOp)
 
-
-  concatenates the strings in the tensor along the last dimension
-  
+Concatenates a tensor of strings along the last dimension
 
 Concatenates the strings in the tensor along the last dimension.
 
@@ -50,16 +48,16 @@ Concatenates the strings in the tensor along the last dimension.
 
 ### `strings.gather` (::mlir::iree_compiler::IREE::Strings::GatherOp)
 
-gathers all the strings from a Tensor by id
+Gathers all the strings from a Tensor by index.
 
-Gathers all the strings from a Tensor by ID.
+Gathers all the strings from a Tensor by index values along the final axis.
 
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `dict` | string_tensor
-`ids` | buffer_view
+`indices` | buffer_view or ranked tensor of any type values
 
 #### Results:
 
@@ -87,7 +85,7 @@ Converts an i32 to its string representation.
 
 ### `strings.print` (::mlir::iree_compiler::IREE::Strings::PrintOp)
 
-prints the contents of a string
+Prints the contents of a string.
 
 Prints the contents of a string.
 
@@ -125,7 +123,7 @@ Converts a hal buffer to a tensor of strings representation.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | buffer_view
+`value` | buffer_view or ranked tensor of any type values
 
 #### Results:
 

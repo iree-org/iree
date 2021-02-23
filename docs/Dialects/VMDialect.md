@@ -26,7 +26,7 @@ operations used for offset and shape calculations. This also enables simple
 flow control such as fixed-range loops.
 
 Besides integer values the only other storage type is a variant reference
-modeling an abstract iree::ref_ptr. This allows automated reference counting
+modeling an abstract iree_vm_ref_t. This allows automated reference counting
 to be relied upon by other dialects built on top of the VM dialect and
 avoids the need for more verbose manual reference counting logic (that may
 be difficult or impossible to manage given the coroutine-like nature of the
@@ -425,7 +425,7 @@ Compares two operands with the specified predicate.
 
 ### `vm.cmp.eq.ref` (::mlir::iree_compiler::IREE::VM::CmpEQRefOp)
 
-ref_ptr equality comparison operation
+ref<T> equality comparison operation
 
 
 Syntax:
@@ -919,7 +919,7 @@ Compares two operands with the specified predicate.
 
 ### `vm.cmp.ne.ref` (::mlir::iree_compiler::IREE::VM::CmpNERefOp)
 
-ref_ptr inequality comparison operation
+ref<T> inequality comparison operation
 
 
 Syntax:
@@ -995,7 +995,7 @@ Compares the given integer operand for a non-zero value.
 
 ### `vm.cmp.nz.ref` (::mlir::iree_compiler::IREE::VM::CmpNZRefOp)
 
-ref_ptr non-zero comparison operation
+ref<T> non-zero comparison operation
 
 
 Syntax:
@@ -1004,7 +1004,7 @@ Syntax:
 operation ::= `vm.cmp.nz.ref` $operand attr-dict `:` type($operand)
 ```
 
-Compares the given ref_ptr operand for a non-zero/null value.
+Compares the given ref operand for a non-zero/null value.
 
 #### Operands:
 
@@ -1135,7 +1135,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_443
+`value` | Attribute | 
 
 #### Results:
 
@@ -1172,7 +1172,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_447
+`value` | Attribute | 
 
 #### Results:
 
@@ -1226,7 +1226,7 @@ Returns a reference to a read-only buffer.
 
 ### `vm.const.ref.zero` (::mlir::iree_compiler::IREE::VM::ConstRefZeroOp)
 
-null ref_ptr constant operation
+null ref constant operation
 
 
 Syntax:
@@ -1235,7 +1235,7 @@ Syntax:
 operation ::= `vm.const.ref.zero` `:` type($result) attr-dict
 ```
 
-Defines a constant null ref_ptr that can be used in comparisons and
+Defines a constant null ref that can be used in comparisons and
 initialization.
 
 #### Results:
@@ -1693,7 +1693,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_446
+`initial_value` | Attribute | 
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.i64` (::mlir::iree_compiler::IREE::VM::GlobalI64Op)
@@ -1711,7 +1711,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_450
+`initial_value` | Attribute | 
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (::mlir::iree_compiler::IREE::VM::GlobalLoadI32Op)
@@ -1816,7 +1816,7 @@ Loads the value of a global containing a primitive value.
 
 ### `vm.global.load.indirect.ref` (::mlir::iree_compiler::IREE::VM::GlobalLoadIndirectRefOp)
 
-global ref_ptr<T> load operation
+global ref<T> load operation
 
 
 Syntax:
@@ -1825,7 +1825,7 @@ Syntax:
 operation ::= `vm.global.load.indirect.ref` $global attr-dict `:` type($global) `->` type($value)
 ```
 
-Loads the value of a global containing a ref_ptr of the given type.
+Loads the value of a global containing a ref of the given type.
 
 #### Operands:
 
@@ -1841,7 +1841,7 @@ Loads the value of a global containing a ref_ptr of the given type.
 
 ### `vm.global.load.ref` (::mlir::iree_compiler::IREE::VM::GlobalLoadRefOp)
 
-global ref_ptr<T> load operation
+global ref<T> load operation
 
 
 Syntax:
@@ -1850,7 +1850,7 @@ Syntax:
 operation ::= `vm.global.load.ref` $global attr-dict `:` type($value)
 ```
 
-Loads the value of a global containing a ref_ptr of the given type.
+Loads the value of a global containing a ref of the given type.
 
 #### Attributes:
 
@@ -1866,9 +1866,9 @@ Loads the value of a global containing a ref_ptr of the given type.
 
 ### `vm.global.ref` (::mlir::iree_compiler::IREE::VM::GlobalRefOp)
 
-ref_ptr<T> global declaration
+ref<T> global declaration
 
-Defines a global value that is a ref_ptr of a specific type. The global will
+Defines a global value that is a ref of a specific type. The global will
 retain the ref object for the lifetime of the context or until the value is
 replaced with a store or reset.
 
@@ -1975,7 +1975,7 @@ Stores a primitive value to a global.
 
 ### `vm.global.store.indirect.ref` (::mlir::iree_compiler::IREE::VM::GlobalStoreIndirectRefOp)
 
-global ref_ptr<T> stores operation
+global ref<T> stores operation
 
 
 Syntax:
@@ -1984,7 +1984,7 @@ Syntax:
 operation ::= `vm.global.store.indirect.ref` $value `,` $global attr-dict `:` type($value) `->` type($global)
 ```
 
-Stores a ref_ptr<T> to a global, retaining it until the global is reset.
+Stores a ref<T> to a global, retaining it until the global is reset.
 
 #### Operands:
 
@@ -1995,7 +1995,7 @@ Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 
 ### `vm.global.store.ref` (::mlir::iree_compiler::IREE::VM::GlobalStoreRefOp)
 
-global ref_ptr<T> stores operation
+global ref<T> stores operation
 
 
 Syntax:
@@ -2004,7 +2004,7 @@ Syntax:
 operation ::= `vm.global.store.ref` $value `,` $global attr-dict `:` type($value)
 ```
 
-Stores a ref_ptr<T> to a global, retaining it until the global is reset.
+Stores a ref<T> to a global, retaining it until the global is reset.
 
 #### Attributes:
 
@@ -2277,7 +2277,7 @@ Top-level container for VM functions.
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
-`ordinal_counts` | ::mlir::DictionaryAttr | dictionary of named attribute values
+`ordinal_counts` | OrdinalCountsAttr | structured attribute of OrdinalCountsAttr
 
 ### `vm.module_terminator` (::mlir::iree_compiler::IREE::VM::ModuleTerminatorOp)
 
@@ -2619,7 +2619,7 @@ vm.rodata that can be embedded inline in functions.
 read-only data definition operation
 
 Defines a blob of read-only constant data that can be represented as a
-ref_ptr. This can be used to store arbitrary data within modules such as
+ref. This can be used to store arbitrary data within modules such as
 large constant buffers and other file contents.
 
 Note that the data is reference counted as a way to track its usage once the
@@ -2709,7 +2709,7 @@ combining "select" with "cmpi" as follows:
 
 ### `vm.select.ref` (::mlir::iree_compiler::IREE::VM::SelectRefOp)
 
-ref_ptr select operation
+ref<T> select operation
 
 
 Syntax:
@@ -3042,7 +3042,7 @@ the index is out of bounds.
 
 ### `vm.switch.ref` (::mlir::iree_compiler::IREE::VM::SwitchRefOp)
 
-ref_ptr switch operation
+ref<T> switch operation
 
 Returns the value with the given `index` in `values` or `default_value` if
 the index is out of bounds.
