@@ -40,7 +40,7 @@ extern "C" {
                        __VA_ARGS__)
 
 // IREE_IGNORE_ERROR but implicitly converts the CUresult return value to a
-// ::util::Status and checks that it is OkStatus.
+// Status.
 //
 // Usage:
 //   CUDA_IGNORE_ERROR(cuDoThing(...));
