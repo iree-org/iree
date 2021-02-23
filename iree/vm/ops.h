@@ -18,6 +18,21 @@
 #include <stdint.h>
 
 //===------------------------------------------------------------------===//
+// Globals
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_global_load_i32(uint8_t* base, uint32_t byte_offset) {
+  const int32_t* global_ptr = (const int32_t*)(base + byte_offset);
+  return *global_ptr;
+}
+
+static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
+                                       int32_t value) {
+  int32_t* global_ptr = (int32_t*)(base + byte_offset);
+  *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
 // Constants
 //===------------------------------------------------------------------===//
 
@@ -120,11 +135,12 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
 //===------------------------------------------------------------------===//
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
-// supported in the c module target
+// supported in the c module target.
+// Note that this will fail if message contains a comma
 #define VM_CHECK_EQ(a, b, message)                                          \
   if (a != b) {                                                             \
     return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0, \
-                                iree_make_cstring_view("message"));         \
+                                iree_make_cstring_view(#message));          \
   }
 
 //===------------------------------------------------------------------===//

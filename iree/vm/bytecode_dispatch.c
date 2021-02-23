@@ -656,9 +656,9 @@ iree_status_t iree_vm_bytecode_dispatch(
             module_state->rwdata_storage.data_length);
       }
       int32_t* value = VM_DecResultRegI32("value");
-      const int32_t* global_ptr =
-          (const int32_t*)(module_state->rwdata_storage.data + byte_offset);
-      *value = *global_ptr;
+      const int32_t global_value =
+          vm_global_load_i32(module_state->rwdata_storage.data, byte_offset);
+      *value = global_value;
     });
 
     DISPATCH_OP(CORE, GlobalStoreI32, {
@@ -671,9 +671,8 @@ iree_status_t iree_vm_bytecode_dispatch(
             module_state->rwdata_storage.data_length);
       }
       int32_t value = VM_DecOperandRegI32("value");
-      int32_t* global_ptr =
-          (int32_t*)(module_state->rwdata_storage.data + byte_offset);
-      *global_ptr = value;
+      vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
+                          value);
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
@@ -686,9 +685,9 @@ iree_status_t iree_vm_bytecode_dispatch(
             module_state->rwdata_storage.data_length);
       }
       int32_t* value = VM_DecResultRegI32("value");
-      const int32_t* global_ptr =
-          (const int32_t*)(module_state->rwdata_storage.data + byte_offset);
-      *value = *global_ptr;
+      const int32_t global_value =
+          vm_global_load_i32(module_state->rwdata_storage.data, byte_offset);
+      *value = global_value;
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
@@ -701,9 +700,8 @@ iree_status_t iree_vm_bytecode_dispatch(
             module_state->rwdata_storage.data_length);
       }
       int32_t value = VM_DecOperandRegI32("value");
-      int32_t* global_ptr =
-          (int32_t*)(module_state->rwdata_storage.data + byte_offset);
-      *global_ptr = value;
+      vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
+                          value);
     });
 
     DISPATCH_OP(CORE, GlobalLoadRef, {
