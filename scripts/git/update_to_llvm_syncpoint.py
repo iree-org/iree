@@ -56,7 +56,7 @@ COMMIT_OPTIONS = {
         "Update to the most recent commit with a matching version of LLVM",
 }
 
-TF_WORKSPACE_FILEPATH = "tensorflow/workspace.bzl"
+TF_LLVM_WORKSPACE_FILEPATH = "third_party/llvm/workspace.bzl"
 TF_WORKSPACE_LLVM_COMMIT_REGEXP = re.compile(
     r"""\s*LLVM_COMMIT\s*=\s*"(.+)"\s*""", flags=re.MULTILINE)
 MLIR_HLO_LLVM_VERSION_FILEPATH = "build_tools/llvm_version.txt"
@@ -161,7 +161,7 @@ def main(args):
 
   # Update TensorFlow
   new_tf_commit = find_new_commit_from_version_file(args.tensorflow_path,
-                                                    TF_WORKSPACE_FILEPATH,
+                                                    TF_LLVM_WORKSPACE_FILEPATH,
                                                     current_llvm_commit,
                                                     args.tensorflow_rev)
   print("\n*** Updating TensorFlow to", new_tf_commit, "***")
@@ -328,7 +328,7 @@ def find_tensorflow_llvm_commit(tensorflow_path):
   # TensorFlow keeps its commit in workspace.bzl on a line like:
   # LLVM_COMMIT = "..."
   # Yeah. This is how we do it.
-  workspace_path = os.path.join(tensorflow_path, TF_WORKSPACE_FILEPATH)
+  workspace_path = os.path.join(tensorflow_path, TF_LLVM_WORKSPACE_FILEPATH)
 
   for line in open(workspace_path, "r", encoding="UTF-8"):
     m = re.match(TF_WORKSPACE_LLVM_COMMIT_REGEXP, line)
