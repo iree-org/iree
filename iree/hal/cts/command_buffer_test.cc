@@ -33,9 +33,6 @@ namespace cts {
 using ::testing::ContainerEq;
 
 class CommandBufferTest : public CtsTestBase {
- public:
-  CommandBufferTest() { declareUnimplementedDriver("cuda"); }
-
  protected:
   static constexpr iree_device_size_t kBufferSize = 4096;
 };
