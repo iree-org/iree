@@ -194,15 +194,16 @@ static bool isDispatchableOp(Operation *op) {
     return false;
   }
   // Only linalg ops are marked dispatchable.
-  if (op->getDialect() !=
-      op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) {
+  if ((op->getDialect() !=
+       op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
+      !isa<SubTensorOp>(op)) {
     return false;
   }
   return !isAlwaysClonedIntoDispatchOp(op);
 }
 
 static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
-  return isDispatchableOp(op) && isa<linalg::TensorReshapeOp>(op);
+  return isDispatchableOp(op) && isa<linalg::TensorReshapeOp, SubTensorOp>(op);
 }
 
 //===----------------------------------------------------------------------===//
