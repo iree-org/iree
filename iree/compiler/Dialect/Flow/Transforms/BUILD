@@ -52,17 +52,6 @@ cc_library(
         "DispatchConfig.h",
         "Passes.h",
     ],
-    copts = [
-        # FIXME: https://github.com/google/iree/issues/4919
-        # The O2 default release optimization level is causing an unknown
-        # issue on GCC 10.2.1 (and 9.x).
-        # It would be best to not set this globally but bazel to cmake goo is
-        # unfathomable. (Ideally, I would like to set a property on just the
-        # source file with the issue on the CMake side).
-        # Given that this is blocking releases, will just proceed with this
-        # for now.
-        "-O1",
-    ],
     deps = [
         "//iree/base:signature_mangle",
         "//iree/compiler/Conversion/HLOToHLO",
