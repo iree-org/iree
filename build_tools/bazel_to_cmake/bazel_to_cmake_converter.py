@@ -620,6 +620,7 @@ class Converter(object):
 
     return converted_content
 
+
 def GetDict(obj):
   ret = {}
   for k in dir(obj):
@@ -628,9 +629,7 @@ def GetDict(obj):
   return ret
 
 
-def convert_build_file(build_file_code,
-                       header,
-                       allow_partial_conversion=False):
+def convert_build_file(build_file_code, header, allow_partial_conversion=False):
   converter = Converter()
   exec(build_file_code, GetDict(BuildFileFunctions(converter)))
   converted_text = converter.convert(header)
