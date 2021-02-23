@@ -71,7 +71,10 @@ def parse_arguments():
       type=int,
       default=0,
       help="Specify verbosity level where higher verbosity emits more logging."
-      " (Default 0)")
+      " 0 (default): Only output errors and summary statistics."
+      " 1: Also output the name of each directory as it's being processed and"
+      " whether the directory is skipped."
+      " 2: Also output when conversion was successful.")
 
   # Specify only one of these (defaults to --root_dir=iree).
   group = parser.add_mutually_exclusive_group()
