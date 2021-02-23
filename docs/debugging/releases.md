@@ -63,7 +63,11 @@ Extended debugging in the manylinux container:
 ```shell
 cd /work/iree-build
 # If doing extended debugging in the container, these may make you happier.
-yum install ccache devtoolset-9-libasan-devel
+yum install ccache devtoolset-9-libasan-devel gdb
+
+# Get an LLVM symbolizer.
+yum install llvm9.0
+ln -s /usr/bin/llvm-symbolizer-9.0 /usr/bin/llvm-symbolizer
 
 # You can manipulate cmake flags. These may get you a better debug experience.
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_ENABLE_ASAN=ON -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=gold -DIREE_ENABLE_CCACHE=ON .

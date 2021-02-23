@@ -17,6 +17,8 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     Transforms
+  COPTS
+    "-O1"
   HDRS
     "DestructiveUpdateUtils.h"
     "DispatchConfig.h"

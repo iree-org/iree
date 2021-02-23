@@ -304,11 +304,13 @@ class BuildFileFunctions(object):
                  defines=None,
                  testonly=None,
                  linkopts=None,
+                 copts=None,
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
     textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
                                                     textual_hdrs,
                                                     sort=True)
@@ -320,6 +322,7 @@ class BuildFileFunctions(object):
 
     self.converter.body += (f"iree_cc_library(\n"
                             f"{name_block}"
+                            f"{copts_block}"
                             f"{hdrs_block}"
                             f"{textual_hdrs_block}"
                             f"{srcs_block}"
