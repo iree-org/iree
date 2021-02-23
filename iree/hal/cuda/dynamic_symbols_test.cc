@@ -29,9 +29,9 @@ namespace {
   }
 
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
-  DynamicSymbols symbols;
-  Status status = symbols.LoadSymbols();
-  if (!status.ok()) {
+  iree_hal_cuda_dynamic_symbols_t symbols;
+  iree_status_t status = load_symbols(&symbols);
+  if (!iree_status_is_ok(status)) {
     IREE_LOG(WARNING) << "Symbols cannot be loaded, skipping test.";
     GTEST_SKIP();
   }
@@ -43,6 +43,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
     CUdevice device;
     CUDE_CHECK_ERRORS(symbols.cuDeviceGet(&device, /*ordinal=*/0));
   }
+  unload_symbols(&symbols);
 }
 
 }  // namespace
