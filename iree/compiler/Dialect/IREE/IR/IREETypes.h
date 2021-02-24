@@ -69,13 +69,14 @@ class ListType
   /// This emits an error at the specified location and returns null if the
   /// element type isn't supported.
   static ListType getChecked(Type elementType, Location location);
+  static ListType getChecked(function_ref<InFlightDiagnostic()> emitError,
+                             Type elementType);
 
   /// Verifies construction of a type with the given object.
-  static LogicalResult verifyConstructionInvariants(Location loc,
-                                                    Type elementType) {
+  static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
+                              Type elementType) {
     if (!isCompatible(elementType)) {
-      return emitError(loc)
-             << "invalid element type for a list: " << elementType;
+      return emitError() << "invalid element type for a list: " << elementType;
     }
     return success();
   }
@@ -88,6 +89,8 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
  public:
   static PtrType get(Type targetType);
   static PtrType getChecked(Type targetType, Location location);
+  static PtrType getChecked(function_ref<InFlightDiagnostic()> emitError,
+                            Type targetType);
 
   using Base::Base;
 

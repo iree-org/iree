@@ -115,8 +115,8 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
                     : "detail::" + structAttr.getStructClassName());
 
   if (!structAttr.getAllFields().empty()) {
-    os << "  static LogicalResult verifyConstructionInvariants(\n";
-    os << "      Location loc,\n";
+    os << "  static LogicalResult verify(\n";
+    os << "      function_ref<InFlightDiagnostic()> emitError,\n";
     interleave(
         structAttr.getAllFields(), os,
         [&](StructFieldAttr field) {
@@ -278,9 +278,9 @@ static void emitStorageDef(const StructAttr &structAttr, raw_ostream &os) {
 
 static void emitVerifierDef(const StructAttr &structAttr, raw_ostream &os) {
   os << "// static\n";
-  os << formatv("LogicalResult {0}::verifyConstructionInvariants(\n",
+  os << formatv("LogicalResult {0}::verify(\n",
                 structAttr.getStructClassName());
-  os << "    Location loc,\n";
+  os << "    function_ref<InFlightDiagnostic()> emitError,\n";
   interleave(
       structAttr.getAllFields(), os,
       [&](StructFieldAttr field) {
@@ -295,7 +295,7 @@ static void emitVerifierDef(const StructAttr &structAttr, raw_ostream &os) {
     auto type = field.getType();
     os << formatv(R"(
   if (!{0}) {{
-    return emitError(loc) << "'{1}' must be {2} but got " << {1}.getType();
+    return emitError() << "'{1}' must be {2} but got " << {1}.getType();
   }
 )",
                   tgfmt(type.getConditionTemplate(),

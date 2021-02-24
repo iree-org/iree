@@ -240,7 +240,6 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
                                           vectorToSCFOptions);
     // Hosit hierarchical tiling indexing and other loop invariant transfer
     // ops computation.
-    linalg::hoistViewAllocOps(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
 
     // TODO(ataei): Move this to common vector dialect patterns.

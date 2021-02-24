@@ -70,14 +70,20 @@ RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims,
 
 RankedShapeType RankedShapeType::getChecked(ArrayRef<int64_t> dims,
                                             Location loc) {
-  return Base::getChecked(loc, dims);
+  return Base::getChecked(loc, loc.getContext(), dims);
 }
 
-LogicalResult RankedShapeType::verifyConstructionInvariants(
-    Location loc, ArrayRef<int64_t> dims) {
+RankedShapeType RankedShapeType::getChecked(
+    function_ref<InFlightDiagnostic()> emitError, MLIRContext *context,
+    ArrayRef<int64_t> dims) {
+  return Base::getChecked(emitError, context, dims);
+}
+
+LogicalResult RankedShapeType::verify(
+    function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> dims) {
   for (auto dim : dims) {
     if (dim < 0 && dim != -1) {
-      return emitError(loc, "dims must be -1 for dynamic");
+      return emitError() << "dims must be -1 for dynamic";
     }
   }
   return success();
