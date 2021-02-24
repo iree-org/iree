@@ -163,19 +163,9 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
   if not os.path.isfile(build_file_path):
     return Status.NO_BUILD_FILE
 
-  preserve_lines = []
   if os.path.isfile(cmakelists_file_path):
-    with open(cmakelists_file_path, "rt") as f:
-      found_preserve_marker = False
+    with open(cmakelists_file_path) as f:
       for i, line in enumerate(f):
-        # Accumulate all lines on and after the special preserve marker.
-        if (not found_preserve_marker and
-            re.match(r"^### CMAKE PRESERVE ###\s*$", line)):
-          found_preserve_marker = True
-        if found_preserve_marker:
-          preserve_lines.append(line)
-          continue
-
         if EDIT_BLOCKING_PATTERN.search(line):
           if verbosity >= 1:
             log(f"Skipped. line {i + 1}: '{line.strip()}' prevents edits.",
@@ -195,9 +185,6 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
       if write_files:
         with open(cmakelists_file_path, "wt") as cmakelists_file:
           cmakelists_file.write(converted_text)
-          if preserve_lines:
-            cmakelists_file.write("\n")
-            cmakelists_file.write("".join(preserve_lines))
       else:
         print(converted_text, end="")
     except (NameError, NotImplementedError) as e:

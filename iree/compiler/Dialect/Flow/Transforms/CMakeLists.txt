@@ -5,6 +5,8 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     Transforms
+  COPTS
+    "-O1"
   HDRS
     "DestructiveUpdateUtils.h"
     "DispatchConfig.h"
@@ -70,13 +72,3 @@ iree_cc_library(
     tensorflow::mlir_hlo
   PUBLIC
 )
-
-### CMAKE PRESERVE ###
-
-# FIXME: https://github.com/google/iree/issues/4919
-# The O2 default release optimization level is causing an unknown
-# issue on GCC 10.2.1 (and 9.x). This needs to be root-caused but just
-# carving out to unblock releases.
-set_source_files_properties(
-  DispatchLinalgOnTensors.cpp
-  PROPERTIES COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-O1>)
