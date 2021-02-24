@@ -23,9 +23,12 @@ iree_check_single_backend_test_suite(
     "vulkan"
 )
 
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_dylib-llvm-aot_dylib
+  SRCS
+    "${_GLOB_X_MLIR}"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER

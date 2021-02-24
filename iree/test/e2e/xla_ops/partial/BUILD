@@ -48,8 +48,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = [
-    ],
+    srcs = glob(["*.mlir"]),
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
