@@ -31,7 +31,7 @@ typedef struct {
 } iree_hal_cuda_driver_t;
 
 // Pick a fixed lenght size for device names.
-static const size_t IREE_MAX_CUDA_DEVICE_NAME_LENGTH = 100;
+#define IREE_MAX_CUDA_DEVICE_NAME_LENGTH 100
 
 extern const iree_hal_driver_vtable_t iree_hal_cuda_driver_vtable;
 
