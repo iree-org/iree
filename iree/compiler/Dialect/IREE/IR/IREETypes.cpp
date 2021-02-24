@@ -57,6 +57,11 @@ ListType ListType::getChecked(Type elementType, Location location) {
   return Base::getChecked(location, elementType);
 }
 
+ListType ListType::getChecked(function_ref<InFlightDiagnostic()> emitError,
+                              Type elementType) {
+  return Base::getChecked(emitError, elementType.getContext(), elementType);
+}
+
 Type ListType::getElementType() { return getImpl()->elementType; }
 
 //===----------------------------------------------------------------------===//
@@ -89,6 +94,11 @@ PtrType PtrType::get(Type targetType) {
 
 PtrType PtrType::getChecked(Type targetType, Location location) {
   return Base::getChecked(location, targetType);
+}
+
+PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
+                            Type targetType) {
+  return Base::getChecked(emitError, targetType.getContext(), targetType);
 }
 
 Type PtrType::getTargetType() { return getImpl()->targetType; }

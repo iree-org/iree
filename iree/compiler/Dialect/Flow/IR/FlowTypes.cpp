@@ -78,14 +78,15 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
   return hasStaticShape() && getShape() == shape;
 }
 
-LogicalResult DispatchTensorType::verifyConstructionInvariants(
-    Location loc, ArrayRef<int64_t> shape, Type elementType) {
+LogicalResult DispatchTensorType::verify(
+    function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> shape,
+    Type elementType) {
   if (!isValidElementType(elementType)) {
-    return emitError(loc, "dispatch tensor elements must be int or float type");
+    return emitError() << "dispatch tensor elements must be int or float type";
   }
   if (any_of(shape, [](int64_t i) { return i < -1; })) {
-    return emitError(loc,
-                     "dispatch tensor dimensions must be positive if defined");
+    return emitError()
+           << "dispatch tensor dimensions must be positive if defined";
   }
   return success();
 }

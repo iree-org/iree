@@ -47,11 +47,16 @@ SequenceType SequenceType::get(Type targetType) {
 }
 
 SequenceType SequenceType::getChecked(Type targetType, Location location) {
+  return Base::getChecked(location, targetType);
+}
+
+SequenceType SequenceType::getChecked(
+    function_ref<InFlightDiagnostic()> emitError, Type targetType) {
   if (!targetType) {
-    emitError(location) << "null target type: " << targetType;
+    emitError() << "null target type: " << targetType;
     return SequenceType();
   }
-  return Base::getChecked(location, targetType);
+  return Base::getChecked(emitError, targetType.getContext(), targetType);
 }
 
 Type SequenceType::getTargetType() { return getImpl()->targetType; }

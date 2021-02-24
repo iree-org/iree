@@ -34,6 +34,8 @@ class SequenceType
 
   static SequenceType get(Type targetType);
   static SequenceType getChecked(Type targetType, Location location);
+  static SequenceType getChecked(function_ref<InFlightDiagnostic()> emitError,
+                                 Type targetType);
 
   Type getTargetType();
 };

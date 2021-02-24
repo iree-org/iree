@@ -138,27 +138,26 @@ CapabilitiesAttr TargetEnvAttr::getCapabilitiesAttr() {
   return getImpl()->capabilities.cast<CapabilitiesAttr>();
 }
 
-LogicalResult TargetEnvAttr::verifyConstructionInvariants(
-    Location loc, IntegerAttr version, IntegerAttr revision,
-    ArrayAttr extensions, spirv::Vendor /*vendorID*/,
+LogicalResult TargetEnvAttr::verify(
+    function_ref<InFlightDiagnostic()> emitError, IntegerAttr version,
+    IntegerAttr revision, ArrayAttr extensions, spirv::Vendor /*vendorID*/,
     spirv::DeviceType /*deviceType*/, uint32_t /*deviceID*/,
     DictionaryAttr capabilities) {
   if (!version.getType().isInteger(32))
-    return emitError(loc) << "expected 32-bit integer for version";
+    return emitError() << "expected 32-bit integer for version";
 
   if (!revision.getType().isInteger(32))
-    return emitError(loc) << "expected 32-bit integer for revision";
+    return emitError() << "expected 32-bit integer for revision";
 
   if (!llvm::all_of(extensions.getValue(), [](Attribute attr) {
         if (auto strAttr = attr.dyn_cast<StringAttr>())
           if (symbolizeExtension(strAttr.getValue())) return true;
         return false;
       }))
-    return emitError(loc) << "unknown extension in extension list";
+    return emitError() << "unknown extension in extension list";
 
   if (!capabilities.isa<CapabilitiesAttr>()) {
-    return emitError(loc)
-           << "expected vulkan::CapabilitiesAttr for capabilities";
+    return emitError() << "expected vulkan::CapabilitiesAttr for capabilities";
   }
 
   return success();
