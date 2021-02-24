@@ -21,7 +21,7 @@ namespace iree_compiler {
 
 void addLinalgBufferizePasses(OpPassManager &passManager,
                               WorkgroupMemoryAllocationFn allocationFn) {
-  passManager.addPass(createLinalgBufferizePass(allocationFn));
+  passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());

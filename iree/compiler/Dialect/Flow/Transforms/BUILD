@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -92,4 +94,16 @@ cc_library(
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:unfuse_batch_norm",
     ],
+)
+
+# TODO(#4919): For an unknown reason, GCC's devirtualization optimization wreaks
+# havoc on this file. Needs to be further root caused. Seems to affect both 9.x
+# and 10.x.
+iree_cmake_extra_content(
+    content = """
+set_property(SOURCE
+  DispatchLinalgOnTensors.cpp
+  PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
+""",
+    inline = True,
 )

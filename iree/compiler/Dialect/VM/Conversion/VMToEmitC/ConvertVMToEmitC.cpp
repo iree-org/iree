@@ -33,6 +33,18 @@ SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
       }));
 }
 
+template <typename AccessOpTy, typename GlobalOpTy>
+GlobalOpTy lookupGlobalOp(AccessOpTy accessOp) {
+  FlatSymbolRefAttr globalAttr =
+      accessOp.getOperation()->template getAttrOfType<FlatSymbolRefAttr>(
+          "global");
+  GlobalOpTy globalOp =
+      accessOp.getOperation()
+          ->template getParentOfType<IREE::VM::ModuleOp>()
+          .template lookupSymbol<GlobalOpTy>(globalAttr.getValue());
+  return globalOp;
+}
+
 // Convert vm operations to emitc calls. The resultiong call has the ops
 // operands as arguments followed by an argument for every attribute.
 template <typename SrcOpTy>
@@ -78,10 +90,91 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+template <typename LoadOpTy, typename GlobalOpTy>
+class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
+  using OpConversionPattern<LoadOpTy>::OpConversionPattern;
+
+ public:
+  GlobalLoadOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<LoadOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      LoadOpTy loadOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    GlobalOpTy globalOp = lookupGlobalOp<LoadOpTy, GlobalOpTy>(loadOp);
+    if (!globalOp) return loadOp.emitError() << "Unable to find GlobalOp";
+
+    auto type = loadOp.getOperation()->getResultTypes();
+    StringAttr callee = rewriter.getStringAttr(funcName);
+
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
+    // buffer where globals live after code generation as well as the state
+    // struct argument name are hardcoded here.
+    ArrayAttr args = rewriter.getArrayAttr(
+        {rewriter.getStringAttr("state->rwdata"),
+         rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
+             globalOp.ordinal().getValue().getZExtValue()))});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(loadOp, type, callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+template <typename StoreOpTy, typename GlobalOpTy>
+class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
+  using OpConversionPattern<StoreOpTy>::OpConversionPattern;
+
+ public:
+  GlobalStoreOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<StoreOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      StoreOpTy storeOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    GlobalOpTy globalOp = lookupGlobalOp<StoreOpTy, GlobalOpTy>(storeOp);
+    if (!globalOp) return storeOp.emitError() << "Unable to find GlobalOp";
+
+    auto type = storeOp.getOperation()->getResultTypes();
+    StringAttr callee = rewriter.getStringAttr(funcName);
+
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
+    // buffer where globals live after code generation as well as the state
+    // struct argument name are hardcoded here.
+    ArrayAttr args = rewriter.getArrayAttr(
+        {rewriter.getStringAttr("state->rwdata"),
+         rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
+             globalOp.ordinal().getValue().getZExtValue())),
+         rewriter.getIndexAttr(0)});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(storeOp, type, callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
 }  // namespace
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
+  // Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadI32Op, IREE::VM::GlobalI32Op>>(
+      context, "vm_global_load_i32");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI32Op,
+                                          IREE::VM::GlobalI32Op>>(
+      context, "vm_global_store_i32");
+
   // Constants
   patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
                                                           "vm_const_i32");
@@ -225,6 +318,7 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
     target.addLegalOp<IREE::VM::FuncOp>();
+    target.addLegalOp<IREE::VM::GlobalI32Op>();
     target.addLegalOp<IREE::VM::ExportOp>();
 
     // Control flow ops

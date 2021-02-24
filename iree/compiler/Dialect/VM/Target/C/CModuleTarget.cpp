@@ -57,12 +57,20 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
 }
 
 static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
-                                            llvm::raw_ostream &output) {
-  // TODO(simon-camp): Support stateful modules
+                                            mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
   output << "struct " << moduleName << "_s;\n";
-  output << "struct " << moduleName << "_state_s;\n";
+  output << "struct " << moduleName << "_state_s {\n";
+
+  output << "iree_allocator_t allocator;\n";
+  output << "uint8_t rwdata["
+         << moduleOp.ordinal_counts().getValue().global_bytes() << "];\n";
+  output << "iree_vm_ref_t refs["
+         << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
+  output << "};\n";
+
   output << "typedef struct " << moduleName << "_s " << moduleName << "_t;\n";
   output << "typedef struct " << moduleName << "_state_s " << moduleName
          << "_state_t;\n";
@@ -112,6 +120,33 @@ static LogicalResult printFuncOpResults(
       });
 }
 
+static LogicalResult initializeGlobals(IREE::VM::ModuleOp moduleOp,
+                                       mlir::emitc::CppEmitter &emitter) {
+  llvm::raw_ostream &output = emitter.ostream();
+
+  for (auto globalOp : moduleOp.getOps<IREE::VM::GlobalI32Op>()) {
+    Optional<Attribute> initialValue = globalOp.initial_value();
+    Optional<StringRef> initializer = globalOp.initializer();
+    if (initialValue.hasValue()) {
+      // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so
+      // the struct argument name here must not be changed.
+      emitter.ostream() << "vm_global_store_i32(state->rwdata, "
+                        << globalOp.ordinal() << ", ";
+      if (failed(emitter.emitAttribute(initialValue.getValue()))) {
+        return globalOp.emitError() << "Unable to emit initial_value";
+      }
+      emitter.ostream() << ");\n";
+    } else if (initializer.hasValue()) {
+      return globalOp.emitError()
+             << "Initializers for globals not supported yet";
+    }
+  }
+
+  // TODO(simon-camp): Support vm.global.i64 and vm.global.ref
+
+  return success();
+}
+
 static LogicalResult translateCallOpToC(IREE::VM::CallOp callOp,
                                         mlir::emitc::CppEmitter &emitter) {
   return success();
@@ -151,6 +186,7 @@ static LogicalResult translateOpToC(Operation &op,
 static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
                                           IREE::VM::FuncOp &funcOp,
                                           mlir::emitc::CppEmitter &emitter) {
+  std::string moduleName = moduleOp.getName().str();
   emitc::CppEmitter::Scope scope(emitter);
   llvm::raw_ostream &output = emitter.ostream();
 
@@ -178,7 +214,13 @@ static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
     return failure();
   }
 
-  output << ") {\n";
+  if (funcOp.getNumArguments() + funcOp.getNumResults() > 0) {
+    output << ", ";
+  }
+
+  // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
+  // struct argument name here must not be changed.
+  output << moduleName << "_state_t* state) {\n";
 
   for (auto &op : funcOp.getOps()) {
     if (failed(translateOpToC(op, emitter, resultNames))) {
@@ -197,10 +239,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string moduleName = moduleOp.getName().str();
   llvm::raw_ostream &output = emitter.ostream();
 
-  if (failed(printStructDefinitions(moduleOp, output))) {
-    return failure();
-  }
-
   // function wrapper
   for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
     output << "static iree_status_t "
@@ -208,7 +246,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                 /*implSufffix=*/false)
            << "("
            << "iree_vm_stack_t* stack, " << moduleName << "_t* module, "
-           << moduleName << "_state_t* module_state";
+           << moduleName << "_state_t* state";
 
     if (funcOp.getNumArguments() > 0) {
       output << ", ";
@@ -218,7 +256,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       return failure();
     }
 
-    if (funcOp.getNumResults() > 0) {
+    if (funcOp.getNumArguments() > 0) {
       output << ", ";
     }
 
@@ -251,7 +289,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
     output << llvm::join(resultNames, ", ");
 
-    output << ");\n}\n";
+    if (funcOp.getNumArguments() + funcOp.getNumResults() > 0) {
+      output << ", ";
+    }
+    output << "state);\n}\n";
   }
 
   auto printCStringView = [](std::string s) -> std::string {
@@ -327,26 +368,55 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "NULL,\n"
          << "};\n";
 
-  // create
-  // TODO(simon-camp): look at iree/vm/bytecode_module.h for an example of a
-  // stateful module
-  output
-      << "static iree_status_t " << moduleName << "_create("
-      << "iree_allocator_t allocator, iree_vm_module_t** "
-         "out_module) {\n"
-      << "iree_vm_module_t interface;\n"
-      << "IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));\n"
-      << "return iree_vm_native_module_create(&interface, "
-         "&"
-      << descriptorName << ", allocator, out_module);\n"
-      << "}\n";
+  // destroy
+  // TODO(simon-camp):
 
-  // TODO(simon-camp): generate boilerplate code
-  //   * interface functions
-  //      * destroy
-  //      * alloc_state
-  //      * free_state
-  //      * resolve_import
+  // alloc_state
+  output << "static iree_status_t " << moduleName
+         << "_alloc_state(void* self, iree_allocator_t allocator, "
+            "iree_vm_module_state_t** out_module_state) {\n"
+         << moduleName << "_state_t* state = NULL;\n"
+         << "IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, "
+            "sizeof(*state), (void**)&state));\n "
+         << "memset(state, 0, sizeof(*state));\n"
+         << "state->allocator = allocator;\n";
+
+  // initialize globals
+  if (failed(initializeGlobals(moduleOp, emitter))) {
+    return moduleOp.emitError() << "Failed to emit global initialization";
+  }
+
+  output << "*out_module_state = (iree_vm_module_state_t*)state;\n"
+         << "return iree_ok_status();\n"
+         << "}\n";
+
+  // free_state
+  output << "static void " << moduleName
+         << "_free_state(void* self, iree_vm_module_state_t* "
+            "module_state) {\n"
+         << moduleName << "_state_t* state = (" << moduleName
+         << "_state_t*)module_state;\n"
+         << "iree_allocator_free(state->allocator, state);\n"
+         << "}\n";
+
+  // resolve_imports
+  // TODO(simon-camp):
+
+  // create
+  output << "static iree_status_t " << moduleName << "_create("
+         << "iree_allocator_t allocator, iree_vm_module_t** "
+            "out_module) {\n"
+         << "iree_vm_module_t interface;\n"
+         << "IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, "
+            "NULL));\n"
+         << "interface.destroy = NULL;\n"
+         << "interface.alloc_state = " << moduleName << "_alloc_state;\n"
+         << "interface.free_state = " << moduleName << "_free_state;\n"
+         << "interface.resolve_import = NULL;\n"
+         << "return iree_vm_native_module_create(&interface, "
+            "&"
+         << descriptorName << ", allocator, out_module);\n"
+         << "}\n";
 
   output << "\n";
   return success();
@@ -399,9 +469,6 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
     // modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  // C target specific passes
-  modulePasses.addPass(createConvertVMToEmitCPass());
-
   modulePasses.addPass(createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
@@ -410,6 +477,9 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   // We don't want any more modifications after this point as they could
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
+
+  // C target specific passes
+  modulePasses.addPass(createConvertVMToEmitCPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
@@ -439,6 +509,11 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   mlir::emitc::CppEmitter emitter(output);
   mlir::emitc::CppEmitter::Scope scope(emitter);
+
+  // build struct definitions
+  if (failed(printStructDefinitions(moduleOp, emitter))) {
+    return failure();
+  }
 
   // translate functions
   for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {

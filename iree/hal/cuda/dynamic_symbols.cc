@@ -17,15 +17,12 @@
 #include <cstddef>
 
 #include "absl/types/span.h"
+#include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-namespace iree {
-namespace hal {
-namespace cuda {
-
-static const char* kCudaLoaderSearchNames[] = {
+static const char* kCUDALoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "nvcuda.dll",
 #else
@@ -33,28 +30,31 @@ static const char* kCudaLoaderSearchNames[] = {
 #endif
 };
 
-Status DynamicSymbols::LoadSymbols() {
-  IREE_TRACE_SCOPE();
+extern "C" {
 
-  IREE_RETURN_IF_ERROR(DynamicLibrary::Load(
-      absl::MakeSpan(kCudaLoaderSearchNames), &loader_library_));
+iree_status_t load_symbols(iree_hal_cuda_dynamic_symbols_t* syms) {
+  std::unique_ptr<iree::DynamicLibrary> loader_library;
+  IREE_RETURN_IF_ERROR(iree::DynamicLibrary::Load(
+      absl::MakeSpan(kCUDALoaderSearchNames), &loader_library));
 
-#define CU_PFN_DECL(cudaSymbolName)                                         \
+#define CU_PFN_DECL(cudaSymbolName, ...)                                    \
   {                                                                         \
-    using FuncPtrT = std::add_pointer<decltype(::cudaSymbolName)>::type;    \
+    using FuncPtrT = decltype(syms->cudaSymbolName);                        \
     static const char* kName = #cudaSymbolName;                             \
-    cudaSymbolName = loader_library_->GetSymbol<FuncPtrT>(kName);           \
-    if (!cudaSymbolName) {                                                  \
+    syms->cudaSymbolName = loader_library->GetSymbol<FuncPtrT>(kName);      \
+    if (!syms->cudaSymbolName) {                                            \
       return iree_make_status(IREE_STATUS_UNAVAILABLE, "symbol not found"); \
     }                                                                       \
   }
 
 #include "dynamic_symbols_tables.h"
 #undef CU_PFN_DECL
-
-  return OkStatus();
+  syms->opaque_loader_library_ = (void*)loader_library.release();
+  return iree_ok_status();
 }
 
-}  // namespace cuda
-}  // namespace hal
-}  // namespace iree
+void unload_symbols(iree_hal_cuda_dynamic_symbols_t* syms) {
+  delete (iree::DynamicLibrary*)syms->opaque_loader_library_;
+}
+
+}  // extern "C"

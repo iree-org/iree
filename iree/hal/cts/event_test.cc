@@ -21,7 +21,10 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class EventTest : public CtsTestBase {};
+class EventTest : public CtsTestBase {
+ public:
+  EventTest() { declareUnimplementedDriver("cuda"); }
+};
 
 TEST_P(EventTest, Create) {
   iree_hal_event_t* event;

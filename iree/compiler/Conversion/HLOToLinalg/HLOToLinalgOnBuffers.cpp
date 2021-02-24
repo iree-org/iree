@@ -1277,19 +1277,26 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns.insert<ConvOpConversion, DepthwiseConvOpConversion,
-                  ConcatenateOpConversion, FillOpOnTensorConversion,
-                  InitTensorOpConversion,
-                  LinalgOpOnTensorConversion<linalg::GenericOp>,
-                  LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-                  NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
-                  NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
-                  NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
-                  NamedOpConversion<linalg::MatmulOp>,
-                  NamedOpConversion<linalg::BatchMatmulOp>,
-                  PadTensorOpConversion, ReduceWindowOpConversion,
-                  SubTensorOpConversion, TensorReshapeOpConversion>(
-      context, resultTensorToBufferMap);
+  patterns.insert<
+      // clang-format off
+      ConvOpConversion,
+      DepthwiseConvOpConversion,
+      ConcatenateOpConversion,
+      FillOpOnTensorConversion,
+      InitTensorOpConversion,
+      LinalgOpOnTensorConversion<linalg::GenericOp>,
+      LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+      NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
+      NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
+      NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      NamedOpConversion<linalg::MatmulOp>,
+      NamedOpConversion<linalg::BatchMatmulOp>,
+      PadTensorOpConversion,
+      ReduceWindowOpConversion,
+      SubTensorOpConversion,
+      TensorReshapeOpConversion
+      // clang-format on
+      >(context, resultTensorToBufferMap);
 
   // Prefer lowering to named Linalg dpethwise convolution when possible.
   patterns.insert<DepthwiseConvOpConversion>(context, resultTensorToBufferMap,

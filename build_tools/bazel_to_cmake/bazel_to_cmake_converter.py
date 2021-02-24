@@ -304,11 +304,13 @@ class BuildFileFunctions(object):
                  defines=None,
                  testonly=None,
                  linkopts=None,
+                 copts=None,
                  **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
     textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
                                                     textual_hdrs,
                                                     sort=True)
@@ -320,6 +322,7 @@ class BuildFileFunctions(object):
 
     self.converter.body += (f"iree_cc_library(\n"
                             f"{name_block}"
+                            f"{copts_block}"
                             f"{hdrs_block}"
                             f"{textual_hdrs_block}"
                             f"{srcs_block}"
@@ -607,9 +610,8 @@ class Converter(object):
 
     self.first_error = None
 
-  def convert(self, copyright_line):
-    converted_content = (f"{copyright_line}\n"
-                         f"{self.apache_license}\n\n"
+  def convert(self, header_line):
+    converted_content = (f"{header_line}\n"
                          f"{self.header}\n\n"
                          f"iree_add_all_subdirs()\n\n"
                          f"{self.body}")
@@ -621,20 +623,6 @@ class Converter(object):
 
     return converted_content
 
-  apache_license = textwrap.dedent("""\
-    #
-    # Licensed under the Apache License, Version 2.0 (the "License");
-    # you may not use this file except in compliance with the License.
-    # You may obtain a copy of the License at
-    #
-    #      https://www.apache.org/licenses/LICENSE-2.0
-    #
-    # Unless required by applicable law or agreed to in writing, software
-    # distributed under the License is distributed on an "AS IS" BASIS,
-    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    # See the License for the specific language governing permissions and
-    # limitations under the License.""")
-
 
 def GetDict(obj):
   ret = {}
@@ -644,12 +632,10 @@ def GetDict(obj):
   return ret
 
 
-def convert_build_file(build_file_code,
-                       copyright_line,
-                       allow_partial_conversion=False):
+def convert_build_file(build_file_code, header, allow_partial_conversion=False):
   converter = Converter()
   exec(build_file_code, GetDict(BuildFileFunctions(converter)))
-  converted_text = converter.convert(copyright_line)
+  converted_text = converter.convert(header)
   if not allow_partial_conversion and converter.first_error:
     raise converter.first_error  # pylint: disable=raising-bad-type
   return converted_text
