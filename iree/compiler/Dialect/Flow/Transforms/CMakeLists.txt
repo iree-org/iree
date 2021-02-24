@@ -74,8 +74,9 @@ iree_cc_library(
 ### CMAKE PRESERVE ###
 
 # FIXME: https://github.com/google/iree/issues/4919
-# For an unknown reason, GCC's devirtualization optimization wreaks havoc on
-# this file. Needs to be further root caused. Seems to affect both 9.x and 10.x.
+# The O2 default release optimization level is causing an unknown
+# issue on GCC 10.2.1 (and 9.x). This needs to be root-caused but just
+# carving out to unblock releases.
 set_source_files_properties(
   DispatchLinalgOnTensors.cpp
-  PROPERTIES COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
+  PROPERTIES COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-O1>)
