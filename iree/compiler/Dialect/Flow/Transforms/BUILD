@@ -52,17 +52,6 @@ cc_library(
         "DispatchConfig.h",
         "Passes.h",
     ],
-    copts = [
-        # FIXME: https://github.com/google/iree/issues/4919
-        # The O2 default release optimization level is causing an unknown
-        # issue on GCC 10.2.1 (and 9.x).
-        # It would be best to not set this globally but bazel to cmake goo is
-        # unfathomable. (Ideally, I would like to set a property on just the
-        # source file with the issue on the CMake side).
-        # Given that this is blocking releases, will just proceed with this
-        # for now.
-        "-O1",
-    ],
     deps = [
         "//iree/base:signature_mangle",
         "//iree/compiler/Conversion/HLOToHLO",
@@ -103,4 +92,16 @@ cc_library(
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:unfuse_batch_norm",
     ],
+)
+
+# TODO(#4919): For an unknown reason, GCC's devirtualization optimization wreaks
+# havoc on this file. Needs to be further root caused. Seems to affect both 9.x
+# and 10.x.
+iree_cmake_extra_content(
+    content = """
+set_property(SOURCE
+  DispatchLinalgOnTensors.cpp
+  PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize)
+""",
+    inline = True,
 )

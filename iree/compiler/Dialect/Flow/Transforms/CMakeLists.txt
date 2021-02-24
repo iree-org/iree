@@ -5,8 +5,6 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     Transforms
-  COPTS
-    "-O1"
   HDRS
     "DestructiveUpdateUtils.h"
     "DispatchConfig.h"
@@ -72,3 +70,7 @@ iree_cc_library(
     tensorflow::mlir_hlo
   PUBLIC
 )
+
+set_property(SOURCE
+  DispatchLinalgOnTensors.cpp
+  PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize)
