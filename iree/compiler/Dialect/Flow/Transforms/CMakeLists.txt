@@ -71,11 +71,6 @@ iree_cc_library(
   PUBLIC
 )
 
-### CMAKE PRESERVE ###
-
-# FIXME: https://github.com/google/iree/issues/4919
-# For an unknown reason, GCC's devirtualization optimization wreaks havoc on
-# this file. Needs to be further root caused. Seems to affect both 9.x and 10.x.
-set_source_files_properties(
+set_property(SOURCE
   DispatchLinalgOnTensors.cpp
-  PROPERTIES COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
+  PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
