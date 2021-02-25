@@ -60,11 +60,6 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // Utility functions.
 // -----------------------------------------------------------------------------
 
-/// Returns true if the given `attr` is a splat of the given `value`.
-static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
-
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
@@ -237,20 +232,10 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.convolution operation to linalg.conv or linalg.generic op.
+/// Converts mhlo.convolution operation to linalg.generic op.
 struct ConvOpConversion
     : public ConvertToLinalgBufferOp<ConvOpConversion, mhlo::ConvOp> {
   using ConvertToLinalgBufferOp<ConvOpConversion,
-                                mhlo::ConvOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-
-/// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
-struct DepthwiseConvOpConversion
-    : public ConvertToLinalgBufferOp<DepthwiseConvOpConversion, mhlo::ConvOp> {
-  using ConvertToLinalgBufferOp<DepthwiseConvOpConversion,
                                 mhlo::ConvOp>::ConvertToLinalgBufferOp;
   LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
@@ -436,89 +421,6 @@ LogicalResult ConvOpConversion::apply(
         Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
         nestedBuilder.create<linalg::YieldOp>(loc, add);
       });
-  return success();
-}
-
-LogicalResult DepthwiseConvOpConversion::apply(
-    mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  if (op.batch_group_count() != 1) return failure();
-
-  if (op.padding() && !isSplatValue(*op.padding(), 0)) {
-    return rewriter.notifyMatchFailure(op, "non-zero padding unsupported yet");
-  }
-
-  if ((op.lhs_dilation() && !isSplatValue(*op.lhs_dilation(), 1)) ||
-      (op.rhs_dilation() && !isSplatValue(*op.rhs_dilation(), 1))) {
-    return rewriter.notifyMatchFailure(op, "non-one dialation unsupported yet");
-  }
-
-  if (const mhlo::ConvDimensionNumbers &dimension_numbers =
-          op.dimension_numbers()) {
-    // Make sure that this is 2-D convolution.
-    const int spatialRank =
-        llvm::size(dimension_numbers.input_spatial_dimensions());
-    if (spatialRank != 2) {
-      return rewriter.notifyMatchFailure(op, "only support 2-D cases for now");
-    }
-
-    // Make sure that this is depthwise convolution.
-    int64_t inputFeatureDim =
-        dimension_numbers.input_feature_dimension().getInt();
-    int64_t inputFeatureCount =
-        op.lhs().getType().cast<ShapedType>().getDimSize(inputFeatureDim);
-    if (op.feature_group_count() != inputFeatureCount) {
-      return rewriter.notifyMatchFailure(op, "not depth-wise convolution");
-    }
-
-    // Make sure that this convolution has a canonical form.
-    if (!hasCanonicalDimensionNumbers(dimension_numbers)) {
-      return rewriter.notifyMatchFailure(op, "does not have canonical form");
-    }
-  }
-
-  DenseIntElementsAttr windowStrides;
-  if (op.window_strides()) {
-    windowStrides = op.window_strides().getValue();
-  } else {
-    windowStrides = rewriter.getI64VectorAttr({1, 1});
-  }
-
-  if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-  }
-
-  // Create a Linalg reshape op that converts the filter from 4 dimensions
-  // into 3 dimensions (by droping the unit dimension). This is needed because
-  // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
-
-  auto filterDims =
-      llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
-  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
-    return rewriter.notifyMatchFailure(
-        op, "non-one channel multiplier unsupported yet");
-  }
-  filterDims[2] = op.feature_group_count();
-  filterDims.pop_back();
-
-  MemRefType filterShape = MemRefType::get(
-      filterDims, op.getType().getElementType(), ArrayRef<AffineMap>(),
-      resultBuffers[0].getType().cast<MemRefType>().getMemorySpace());
-
-  auto getIndicesVector = [](int start, int end) {
-    return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
-  };
-
-  SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
-      getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
-
-  Value filterBuffer = rewriter.create<linalg::ReshapeOp>(
-      op.getLoc(), filterShape, inputBuffers[1], collapsedDimList);
-
-  rewriter.create<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
-      op.getLoc(), TypeRange(), ValueRange{inputBuffers[0], filterBuffer},
-      resultBuffers, windowStrides);
-
   return success();
 }
 
@@ -1280,7 +1182,6 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
   patterns.insert<
       // clang-format off
       ConvOpConversion,
-      DepthwiseConvOpConversion,
       ConcatenateOpConversion,
       FillOpOnTensorConversion,
       InitTensorOpConversion,
@@ -1289,6 +1190,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
       NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
       NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      NamedOpConversion<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
       NamedOpConversion<linalg::MatmulOp>,
       NamedOpConversion<linalg::MatmulI8I8I32Op>,
       NamedOpConversion<linalg::MatmulI16I16I32Op>,
@@ -1300,10 +1202,6 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       TensorReshapeOpConversion
       // clang-format on
       >(context, resultTensorToBufferMap);
-
-  // Prefer lowering to named Linalg dpethwise convolution when possible.
-  patterns.insert<DepthwiseConvOpConversion>(context, resultTensorToBufferMap,
-                                             /*benefit=*/2);
 }
 
 void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
