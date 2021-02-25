@@ -122,9 +122,9 @@ ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
 void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
   auto constOp = cast<IREE::UnfoldableConstantOp>(op);
   p << "iree.unfoldable_constant ";
-  p.printOptionalAttrDict(constOp.getAttrs(), /*elidedAttrs=*/{"value"});
+  p.printOptionalAttrDict(constOp->getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (constOp.getAttrs().size() > 1) p << ' ';
+  if (constOp->getAttrs().size() > 1) p << ' ';
   p << constOp.value();
 
   // If the value is a symbol reference, print a trailing type.

@@ -110,7 +110,7 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
     p << " : ";
     p.printType(op.type());
   }
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
                                          "sym_name",
                                          "type",
                                          "is_mutable",
@@ -495,7 +495,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
   }
 
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
-  p.printOptionalAttrDict(op.getAttrs(),
+  p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{});
 }
 
@@ -659,7 +659,7 @@ static void printDispatchWorkgroupsOp(::mlir::OpAsmPrinter &p,
   p << ' ' << ":";
   p << ' ';
   p.printFunctionalType(op.operands().getTypes(), op.results().getTypes());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
                                          "operand_segment_sizes",
                                      });
   p << ' ' << "=";
@@ -782,7 +782,7 @@ static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
@@ -832,7 +832,7 @@ static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
     p << " as(\"" << op.sym_name() << "\")";
   }
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(), /*elidedAttrs=*/{"function_ref", "sym_name"});
+      op->getAttrs(), /*elidedAttrs=*/{"function_ref", "sym_name"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -954,7 +954,7 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
   }
 
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
-  p.printOptionalAttrDict(op.getAttrs(),
+  p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{});
 }
 
