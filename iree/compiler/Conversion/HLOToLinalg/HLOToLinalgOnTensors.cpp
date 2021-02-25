@@ -155,11 +155,6 @@ struct TorchIndexSelectOpConversion
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Returns true if the given `attr` is a splat of the given `value`.
-static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
-
 /// Returns true if the given `dimensionNumbers` from a mhlo.convolution op
 /// follows a canonical form:
 ///
@@ -221,6 +216,11 @@ static bool hasCanonicalDimensionNumbers(
   }
 
   return true;
+}
+
+/// Returns true if the given `attr` is a splat of the given `value`.
+static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
+  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
 }
 
 /// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
