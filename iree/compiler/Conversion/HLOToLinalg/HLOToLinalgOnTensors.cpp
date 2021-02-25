@@ -470,11 +470,11 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
   SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
       getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
 
-  Value filterBuffer = rewriter.create<linalg::TensorReshapeOp>(
-      loc, filterShape, args[1], collapsedDimList);
+  Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+      loc, filterShape, filter, collapsedDimList);
 
   rewriter.replaceOpWithNewOp<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
-      op, resultType, ValueRange{args[0], filterBuffer}, ValueRange{zeroTensor},
+      op, resultType, ValueRange{input, reshapedFilter}, ValueRange{zeroTensor},
       windowStrides);
 
   return success();
