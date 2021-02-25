@@ -63,6 +63,10 @@ class CUDATargetBackend final : public TargetBackend {
   std::string name() const override { return "cuda"; }
   std::string filter_pattern() const override { return "cuda"; }
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    mlir::registerLLVMDialectTranslation(registry);
+  }
+
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildNVVMTransformPassPipeline(passManager);
   }
@@ -72,7 +76,6 @@ class CUDATargetBackend final : public TargetBackend {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
-    mlir::registerLLVMDialectTranslation(*targetOp.getContext());
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
