@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (EmitC is only buildable with CMake)
-
 iree_add_all_subdirs()
 
 if(IREE_ENABLE_EMITC)

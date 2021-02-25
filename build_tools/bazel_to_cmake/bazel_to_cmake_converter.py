@@ -610,9 +610,8 @@ class Converter(object):
 
     self.first_error = None
 
-  def convert(self, header_line):
-    converted_content = (f"{header_line}\n"
-                         f"{self.header}\n\n"
+  def convert(self):
+    converted_content = (f"{self.header}\n\n"
                          f"iree_add_all_subdirs()\n\n"
                          f"{self.body}")
 
@@ -632,10 +631,10 @@ def GetDict(obj):
   return ret
 
 
-def convert_build_file(build_file_code, header, allow_partial_conversion=False):
+def convert_build_file(build_file_code, allow_partial_conversion=False):
   converter = Converter()
   exec(build_file_code, GetDict(BuildFileFunctions(converter)))
-  converted_text = converter.convert(header)
+  converted_text = converter.convert()
   if not allow_partial_conversion and converter.first_error:
     raise converter.first_error  # pylint: disable=raising-bad-type
   return converted_text

@@ -14,7 +14,7 @@
 
 iree_add_all_subdirs()
 
-# bazel_to_cmake: DO NOT EDIT, IREE_HAL_DRIVER_VMLA filtering is custom logic
+# Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMLA filtering is custom logic
 if(${IREE_HAL_DRIVER_VMLA})
   iree_cc_test(
     NAME
