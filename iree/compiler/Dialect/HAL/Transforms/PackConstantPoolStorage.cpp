@@ -111,8 +111,7 @@ class PackConstantPoolStoragePass
         OpBuilder poolBuilder(poolOp.getContext());
         poolBuilder.setInsertionPointAfter(valueOp);
         auto spanOp = poolBuilder.create<ConstantPoolSpanOp>(
-            valueOp.getLoc(), valueOp.getName(),
-            TypeAttr::get(valueOp.value().getType()),
+            valueOp.getLoc(), valueOp.getName(), valueOp.value().getType(),
             poolBuilder.getSymbolRefAttr(storageBufferOp),
             ByteRangeAttr::get(APInt(64, constantSpan.offset),
                                APInt(64, constantSpan.length),

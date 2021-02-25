@@ -96,10 +96,9 @@ spirv::GlobalVariableOp getOrInsertPushConstantVariable(Location loc,
   if (auto varOp = getPushConstantVariable(block, elementCount)) return varOp;
 
   auto builder = OpBuilder::atBlockBegin(&block, b.getListener());
-  auto typeAttr =
-      TypeAttr::get(getPushConstantStorageType(elementCount, builder));
+  auto type = getPushConstantStorageType(elementCount, builder);
   StringRef name = "__push_constant_var__";
-  return builder.create<spirv::GlobalVariableOp>(loc, typeAttr, name,
+  return builder.create<spirv::GlobalVariableOp>(loc, type, name,
                                                  /*initializer=*/nullptr);
 }
 

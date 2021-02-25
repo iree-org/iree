@@ -1904,7 +1904,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   let builders = [
     OpBuilderDAG<
       (ins "::llvm::StringRef":$sym_name, "::llvm::APInt":$ordinal,
-        "::llvm::StringRef":$interface,"::mlir::TypeAttr":$signature,
+        "::llvm::StringRef":$interface,"::mlir::Type":$signature,
         "::mlir::ArrayAttr":$workgroup_size),
        [{build($_builder, $_state, sym_name, ordinal, interface, signature,
             workgroup_size, 0);}]>,
@@ -2436,7 +2436,7 @@ def HAL_InterfaceLoadTensorTileOp : HAL_PureOp<
     AnyRankedTensor:$result
   );
 
-   let assemblyFormat = [{
+  let assemblyFormat = [{
     $binding `,` `base_offset` `=` $base_offset `,` `offsets` `=`
     custom<OperandsOrIntegersOffsetsOrStridesList>($offsets, $static_offsets)
     `,` `sizes` `=` custom<OperandsOrIntegersSizesList>($sizes, $static_sizes)
