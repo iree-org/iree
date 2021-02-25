@@ -25,4 +25,5 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM::LinkerTool_hdrs
   PUBLIC
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

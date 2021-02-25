@@ -169,4 +169,5 @@ iree_bytecode_module(
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

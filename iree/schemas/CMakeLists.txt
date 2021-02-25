@@ -87,4 +87,5 @@ flatbuffer_c_library(
     "--json"
   PUBLIC
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

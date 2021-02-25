@@ -82,4 +82,5 @@ iree_cc_library(
 set_property(SOURCE
   DispatchLinalgOnTensors.cpp
   PROPERTY COMPILE_FLAGS $<$<CXX_COMPILER_ID:GNU>:-fno-devirtualize>)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

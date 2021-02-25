@@ -45,4 +45,5 @@ iree_cc_test(
     iree::vm::bytecode_module
     iree::vm::cc
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

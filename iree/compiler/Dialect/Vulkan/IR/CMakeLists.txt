@@ -54,4 +54,5 @@ iree_tablegen_library(
     -gen-enum-decls VulkanEnums.h.inc
     -gen-enum-defs VulkanEnums.cpp.inc
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

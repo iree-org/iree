@@ -36,4 +36,5 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vmla"
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

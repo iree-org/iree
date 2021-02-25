@@ -45,4 +45,5 @@ iree_cc_library(
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

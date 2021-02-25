@@ -47,4 +47,5 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

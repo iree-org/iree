@@ -23,4 +23,5 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

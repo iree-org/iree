@@ -176,7 +176,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
       ]
   ] + ["#" * 80])
 
-  preserved_footer = [PRESERVE_TAG + "\n"]
+  preserved_footer = ["\n" + PRESERVE_TAG + "\n"]
   if os.path.isfile(cmakelists_file_path):
     found_autogeneration_tag = False
     found_preserve_tag = False
