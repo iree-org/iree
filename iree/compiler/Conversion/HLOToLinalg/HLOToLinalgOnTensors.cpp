@@ -370,6 +370,7 @@ static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
 }
 
 /// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
+/// Note: this only supports channel multiplier == 1.
 struct DepthwiseConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
   using OpConversionPattern<mhlo::ConvOp>::OpConversionPattern;
 
