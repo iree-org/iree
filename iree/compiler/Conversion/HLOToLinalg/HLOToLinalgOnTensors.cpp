@@ -214,45 +214,6 @@ struct PadOpConversion : public OpConversionPattern<mhlo::PadOp> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// mhlo.slice conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts mhlo.slice operation to subtensor op.
-struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
-  using OpConversionPattern<mhlo::SliceOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      mhlo::SliceOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const override {
-    auto argType = args[0].getType().dyn_cast<RankedTensorType>();
-    if (!argType) {
-      return rewriter.notifyMatchFailure(op, "expected ranked tensor type");
-    }
-
-    SmallVector<int64_t, 4> staticOffsets, staticSizes, staticStrides;
-    for (int i = 0, e = argType.getRank(); i < e; ++i) {
-      int64_t offset = op.start_indices().getValue<int64_t>(i);
-      int64_t limit = op.limit_indices().getValue<int64_t>(i);
-      int64_t stride = op.strides().getValue<int64_t>(i);
-      staticOffsets.push_back(offset);
-      staticSizes.push_back((limit - offset) / stride);
-      staticStrides.push_back(stride);
-    }
-    rewriter.replaceOpWithNewOp<SubTensorOp>(
-        op, op.getType(), args[0],
-        /*offsets=*/ValueRange{},
-        /*sizes=*/ValueRange{},
-        /*strides=*/ValueRange{}, rewriter.getI64ArrayAttr(staticOffsets),
-        rewriter.getI64ArrayAttr(staticSizes),
-        rewriter.getI64ArrayAttr(staticStrides));
-
-    return success();
-  }
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // mhlo.conv conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -446,9 +407,8 @@ struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
-                  ConstOpConversion, PadOpConversion, NormalConvOpConversion>(
-      context);
+  patterns.insert<TorchIndexSelectOpConversion, ConstOpConversion,
+                  PadOpConversion, NormalConvOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
