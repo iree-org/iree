@@ -71,8 +71,16 @@ $ cmake -G Ninja -B ../iree-build-host/ -DCMAKE_INSTALL_PREFIX=../iree-build-hos
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then
+Debugging note: 
+  * If `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then
 the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
+  * If you experience the build error similar to issue [#4915](https://github.com/google/iree/issues/4915), update the cmake configuration CLI to
+```shell
+$ cmake -G Ninja -B ../iree-build-host/ \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_INSTALL_PREFIX=../iree-buile-host/install .
+```
 
 ### Target configuration
 
