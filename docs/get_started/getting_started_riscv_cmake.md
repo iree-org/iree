@@ -15,12 +15,6 @@ executables that can be run on the target platform.
 
 ## Prerequisites
 
-### Set up host development environment
-
-The host platform should have been set up for developing IREE. Right now only
-Linux is supported. Please make sure you have followed the steps for
-[Linux](./getting_started_linux_cmake.md).
-
 ### Install RISC-V Tools
 
 Execute the following script to download RISC-V toolchain and QEMU:
@@ -35,21 +29,37 @@ $ ./build_tools/riscv/riscv_bootstrap.sh
 
 ## Configure and build
 
-### Configure on Linux
+### Host configuration
+
+Build and install at least the compiler tools on your host machine, or install them from a binary distribution:
 
 ```shell
+$ mkdir build-host ; cd build-host ; mkdir install
+$ cmake -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX=./install ..
+$ cmake --build . --target install
+```
+
+Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting Android then the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
+
+### Target configuration
+
+```shell
+# Back to iree root folder.
 $ mkdir build-riscv ; cd build-riscv
 $ cmake -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="../build_tools/cmake/riscv.toolchain.cmake" \
+  -DIREE_HOST_BINARY_ROOT=$(realpath ../build-host/install) \
   -DRISCV_CPU=rv64 \
-  -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++` ..
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_ENABLE_MLIR=OFF \
+  ..
 ```
 
 *   The above configures IREE to cross-compile towards `rv64` cpu platform.
 *   If user specify different download path (default in `${HOME}/riscv`) in `riscv_bootscrap.sh`, please append `-DRISCV_TOOL_PATH="/path/to/the/downloaded/folder"` in cmake command.
 
-### Build all targets
+build target:
 
 ```shell
 $ cmake --build .
@@ -63,11 +73,11 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Still in "build-riscv" folder.
-$ ./host/iree/tools/iree-translate \
+$ ../build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
-  ../iree/tools/test/simple.mlir \
-  -o /tmp/simple-vmla.vmfb
+  ../iree/tools/test/iree-run-module.mlir \
+  -o /tmp/iree-run-module-vmla.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -77,7 +87,7 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=vmla \
-  -module_file=/tmp/simple-vmla.vmfb \
+  -module_file=/tmp/iree-run-module-vmla.vmfb \
   -entry_function=abs \
   -function_inputs="i32=-5"
 ```
@@ -104,14 +114,14 @@ $ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/toolchain/clang/linux/RISCV/bin/c
 Translate a source MLIR into an IREE module:
 
 ```shell
-$ ./host/iree/tools/iree-translate \
+$ ../build-host/install/bin/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=riscv64 \
   -iree-llvm-target-cpu=sifive-u74 \
   -iree-llvm-target-abi=lp64d \
-  ../iree/tools/test/simple.mlir \
-  -o /tmp/simple-llvm_aot.vmfb
+  ../iree/tools/test/iree-run-module.mlir \
+  -o /tmp/iree-run-module-llvm_aot.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -121,7 +131,7 @@ $ $HOME/riscv/qemu/linux/RISCV/bin/qemu-riscv64 \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L $HOME/riscv/toolchain/clang/linux/RISCV/sysroot/ \
   ./iree/tools/iree-run-module -driver=dylib \
-  -module_file=/tmp/simple-llvm_aot.vmfb \
+  -module_file=/tmp/iree-run-module-llvm_aot.vmfb \
   -entry_function=abs \
   -function_inputs="i32=-5"
 ```
