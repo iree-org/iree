@@ -214,45 +214,6 @@ struct PadOpConversion : public OpConversionPattern<mhlo::PadOp> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// mhlo.slice conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts mhlo.slice operation to subtensor op.
-struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
-  using OpConversionPattern<mhlo::SliceOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      mhlo::SliceOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const override {
-    auto argType = args[0].getType().dyn_cast<RankedTensorType>();
-    if (!argType) {
-      return rewriter.notifyMatchFailure(op, "expected ranked tensor type");
-    }
-
-    SmallVector<int64_t, 4> staticOffsets, staticSizes, staticStrides;
-    for (int i = 0, e = argType.getRank(); i < e; ++i) {
-      int64_t offset = op.start_indices().getValue<int64_t>(i);
-      int64_t limit = op.limit_indices().getValue<int64_t>(i);
-      int64_t stride = op.strides().getValue<int64_t>(i);
-      staticOffsets.push_back(offset);
-      staticSizes.push_back((limit - offset) / stride);
-      staticStrides.push_back(stride);
-    }
-    rewriter.replaceOpWithNewOp<SubTensorOp>(
-        op, op.getType(), args[0],
-        /*offsets=*/ValueRange{},
-        /*sizes=*/ValueRange{},
-        /*strides=*/ValueRange{}, rewriter.getI64ArrayAttr(staticOffsets),
-        rewriter.getI64ArrayAttr(staticSizes),
-        rewriter.getI64ArrayAttr(staticStrides));
-
-    return success();
-  }
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // mhlo.conv conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -402,6 +363,124 @@ struct NormalConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
 };
 }  // namespace
 
+namespace {
+/// Returns true if the given `attr` is a splat of the given `value`.
+static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
+  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
+}
+
+/// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
+/// Note: this only supports channel multiplier == 1.
+struct DepthwiseConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
+  using OpConversionPattern<mhlo::ConvOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ConvOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override;
+};
+
+LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
+    mhlo::ConvOp op, ArrayRef<Value> args,
+    ConversionPatternRewriter &rewriter) const {
+  if (op.batch_group_count() != 1) return failure();
+
+  if (op.padding() && !isSplatValue(*op.padding(), 0)) {
+    return rewriter.notifyMatchFailure(op, "non-zero padding unsupported yet");
+  }
+
+  if ((op.lhs_dilation() && !isSplatValue(*op.lhs_dilation(), 1)) ||
+      (op.rhs_dilation() && !isSplatValue(*op.rhs_dilation(), 1))) {
+    return rewriter.notifyMatchFailure(op, "non-one dialation unsupported yet");
+  }
+
+  if (const mhlo::ConvDimensionNumbers &dimension_numbers =
+          op.dimension_numbers()) {
+    // Make sure that this is 2-D convolution.
+    const int spatialRank =
+        llvm::size(dimension_numbers.input_spatial_dimensions());
+    if (spatialRank != 2) {
+      return rewriter.notifyMatchFailure(op, "only support 2-D cases for now");
+    }
+
+    // Make sure that this is depthwise convolution.
+    int64_t inputFeatureDim =
+        dimension_numbers.input_feature_dimension().getInt();
+    int64_t inputFeatureCount =
+        op.lhs().getType().cast<ShapedType>().getDimSize(inputFeatureDim);
+    if (op.feature_group_count() != inputFeatureCount) {
+      return rewriter.notifyMatchFailure(op, "not depth-wise convolution");
+    }
+
+    // Make sure that this convolution has a canonical form.
+    if (!hasCanonicalDimensionNumbers(dimension_numbers)) {
+      return rewriter.notifyMatchFailure(op, "does not have canonical form");
+    }
+  }
+
+  DenseIntElementsAttr windowStrides;
+  if (op.window_strides()) {
+    windowStrides = op.window_strides().getValue();
+  } else {
+    windowStrides = rewriter.getI64VectorAttr({1, 1});
+  }
+
+  mhlo::ConvOp::Adaptor adaptor(args);
+  Location loc = op.getLoc();
+  Value input = adaptor.lhs();
+  Value filter = adaptor.rhs();
+  auto resultType = op.getResult().getType().cast<RankedTensorType>();
+  int rank = resultType.getRank();
+
+  SmallVector<Value, 8> dynSizes;
+  for (int i = 0, e = rank; i < e; ++i) {
+    if (!resultType.isDynamicDim(i)) continue;
+    if (i != 0 && i != e - 1) {
+      return rewriter.notifyMatchFailure(
+          op, "expected output spatial dims to be static shapes");
+    }
+    dynSizes.push_back(rewriter.create<DimOp>(loc, input, i));
+  }
+  Value initTensor = rewriter.create<linalg::InitTensorOp>(
+      loc, dynSizes, resultType.getShape(), resultType.getElementType());
+  auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
+  Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+  Value zeroTensor =
+      rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+
+  // Create a Linalg reshape op that converts the filter from 4 dimensions
+  // into 3 dimensions (by droping the unit dimension). This is needed because
+  // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
+
+  auto filterDims =
+      llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
+  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
+    return rewriter.notifyMatchFailure(
+        op, "non-one channel multiplier unsupported yet");
+  }
+  filterDims[2] = op.feature_group_count();
+  filterDims.pop_back();
+
+  RankedTensorType filterShape =
+      RankedTensorType::get(filterDims, op.getType().getElementType());
+
+  auto getIndicesVector = [](int start, int end) {
+    return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
+  };
+
+  SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
+      getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
+
+  Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+      loc, filterShape, filter, collapsedDimList);
+
+  rewriter.replaceOpWithNewOp<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
+      op, resultType, ValueRange{input, reshapedFilter}, ValueRange{zeroTensor},
+      windowStrides);
+
+  return success();
+}
+}  // namespace
+
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -446,9 +525,9 @@ struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<TorchIndexSelectOpConversion, SliceOpConversion,
-                  ConstOpConversion, PadOpConversion, NormalConvOpConversion>(
-      context);
+  patterns
+      .insert<TorchIndexSelectOpConversion, ConstOpConversion, PadOpConversion,
+              NormalConvOpConversion, DepthwiseConvOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

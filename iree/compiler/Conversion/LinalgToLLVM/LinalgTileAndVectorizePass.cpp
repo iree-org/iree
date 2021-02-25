@@ -16,8 +16,11 @@
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -36,16 +39,18 @@ static llvm::cl::opt<bool> clEnablePromoteWorkgroupToFullTiles(
     llvm::cl::init(false));
 
 namespace {
-template <typename LinalgOpTy>
+// Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
+// that is always templated on an op.
 struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
-  TileWorkgroups(MLIRContext *context, linalg::LinalgTilingOptions options,
-                 linalg::LinalgTransformationFilter marker,
-                 PatternBenefit benefit = 1)
-      : Base(LinalgOpTy::getOperationName(), context, options, marker,
-             benefit) {}
+  TileWorkgroups(linalg::LinalgTilingOptions options,
+                 linalg::LinalgTransformationFilter marker)
+      : LinalgBaseTilingPattern(options, marker) {}
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
+    auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op);
+    if (!contractionOp) return failure();
+
     linalg::TiledLinalgOp tiledLinalgOp;
     if (failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp)) ||
         !tiledLinalgOp.tensorResults.empty()) {
@@ -127,7 +132,6 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 void TileAndVectorizeWorkgroups::runOnFunction() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
-  CPUKernelDispatch cpuKernelDispatch;
 
   // Promotes workgroups subviews to a full-tile allocated on the stack.
   if (clEnablePromoteWorkgroupToFullTiles) {
@@ -147,14 +151,12 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
   {
     // First level of tiling patterns. (workgroups memory)
     OwningRewritePatternList l1patterns;
-    l1patterns.insert<TileWorkgroups<linalg::MatmulOp>,
-                      TileWorkgroups<linalg::BatchMatmulOp>>(
-        context,
+    l1patterns.insert<TileWorkgroups>(
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [&cpuKernelDispatch](OpBuilder &builder, Operation *operation)
-                -> SmallVector<Value, 4> {
-              return TileSizeFn::get<TilingLevel::Level1Tiles>(
-                  cpuKernelDispatch, builder, operation);
+            [](OpBuilder &builder,
+               Operation *operation) -> SmallVector<Value, 4> {
+              return TileSizeFn::get<TilingLevel::Level1Tiles>(builder,
+                                                               operation);
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(clEnablePromoteWorkgroupToFullTiles
@@ -163,26 +165,28 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
                             context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+      return signalPassFailure();
+    }
   }
 
-  // Second level of tiling. (workgroups memroey -> vectors)
+  // Second level of tiling. (workgroups memory -> vectors)
   {
     OwningRewritePatternList l2patterns;
-    l2patterns.insert<TileWorkgroups<linalg::MatmulOp>,
-                      TileWorkgroups<linalg::BatchMatmulOp>>(
-        context,
+    l2patterns.insert<TileWorkgroups>(
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [&cpuKernelDispatch](OpBuilder &builder, Operation *operation)
-                -> SmallVector<Value, 4> {
-              return TileSizeFn::get<TilingLevel::Level2Tiles>(
-                  cpuKernelDispatch, builder, operation);
+            [](OpBuilder &builder,
+               Operation *operation) -> SmallVector<Value, 4> {
+              return TileSizeFn::get<TilingLevel::Level2Tiles>(builder,
+                                                               operation);
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // Apply canonicalization.
@@ -193,8 +197,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
                                                context);
     AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
     SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // Apply vectorization patterns.
@@ -205,8 +211,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         vectorizationPatterns, context, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(vectorizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorizationPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // TODO: This should be a folding of Add into Contract in core but while they
@@ -227,8 +235,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         .insert<ContractionOpToOuterProductOpLowering,
                 ContractionOpToMatmulOpLowering, ContractionOpLowering>(
             vectorTransformsOptions, context);
-    (void)applyPatternsAndFoldGreedily(
-        funcOp, std::move(vectorContractLoweringPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorContractLoweringPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // Programmatic controlled lowering of vector.transfer only.
@@ -245,8 +255,10 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     // TODO(ataei): Move this to common vector dialect patterns.
     populateStdLegalizationPatternsForSPIRVLowering(context,
                                                     vectorToLoopsPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(vectorToLoopsPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorToLoopsPatterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 

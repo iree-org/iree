@@ -151,15 +151,12 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
   if verbosity >= 1:
     log(f"Processing {rel_dir_path}")
 
-  skip_file_path = os.path.join(directory_path, ".skip_bazel_to_cmake")
   build_file_path = os.path.join(directory_path, "BUILD")
   cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
 
   rel_cmakelists_file_path = repo_relpath(cmakelists_file_path)
   rel_build_file_path = repo_relpath(build_file_path)
 
-  if os.path.isfile(skip_file_path):
-    return Status.SKIPPED
   if not os.path.isfile(build_file_path):
     return Status.NO_BUILD_FILE
 
