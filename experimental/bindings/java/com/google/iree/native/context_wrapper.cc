@@ -104,8 +104,9 @@ Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
     // Wrap the input buffers in buffer views.
     iree_hal_buffer_view_t* input_buffer_view = nullptr;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-        input_buffer, /*shape=*/&input_element_count,
-        /*shape_rank=*/1, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        input_buffer,      IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+ /*shape=*/&input_element_count,
+        /*shape_rank=*/1, 
         &input_buffer_view));
     iree_hal_buffer_release(input_buffer);
 
