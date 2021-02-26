@@ -58,6 +58,7 @@ DOC_TITLE_DICT = {
     'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
+    'getting_started_tensorflow.md': 'TensorFlow',
     'design_roadmap.md': 'Long-term Design Roadmap',
     'objectives.md': 'Short-term Objectives',
     'tensorflow_integrations.md': 'TensorFlow Integrations',
@@ -109,8 +110,9 @@ NAVI_ORDER_DICT = {
     'getting_started_macos_bazel.md': 8,
     'getting_started_android_cmake.md': 9,
     'getting_started_python.md': 10,
-    'generic_vulkan_env_setup.md': 11,
-    'cmake_options_and_variables.md': 12,
+    'getting_started_tensorflow.md': 11,
+    'generic_vulkan_env_setup.md': 12,
+    'cmake_options_and_variables.md': 13,
 
     # Within 'Developing IREE' use explicit ordering.
     'developer_overview.md': 1,
