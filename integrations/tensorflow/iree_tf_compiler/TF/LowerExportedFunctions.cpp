@@ -155,11 +155,11 @@ class LowerExportedFunctionsPass
       }
 
       // Remove its designation as a saved model export.
-      func.removeAttr("tf_saved_model.exported_names");
+      func->removeAttr("tf_saved_model.exported_names");
     }
 
     // We should have now removed anything requiring saved model semantics.
-    getOperation().removeAttr("tf_saved_model.semantics");
+    getOperation()->removeAttr("tf_saved_model.semantics");
     return success();
   }
 };

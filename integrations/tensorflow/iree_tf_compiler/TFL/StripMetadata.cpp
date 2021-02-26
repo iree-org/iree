@@ -40,7 +40,7 @@ class StripModuleMetadataPass
         moduleOp.getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      moduleOp.removeAttr(namedAttr.first);
+      moduleOp->removeAttr(namedAttr.first);
     }
   }
 };
@@ -54,7 +54,7 @@ class StripFunctionMetadataPass
         funcOp.getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      funcOp.removeAttr(namedAttr.first);
+      funcOp->removeAttr(namedAttr.first);
     }
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {

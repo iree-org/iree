@@ -115,7 +115,7 @@ class CreateBenchmarkFuncs
       BlockAndValueMapping mapping;
       clonedFuncOp.cloneInto(newFuncOp, mapping);
       newFuncOp->setAttr("iree.module.export", builder.getUnitAttr());
-      funcOp.removeAttr("iree.module.export");
+      funcOp->removeAttr("iree.module.export");
     }
   }
 
