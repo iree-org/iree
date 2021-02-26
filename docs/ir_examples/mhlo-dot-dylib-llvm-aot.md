@@ -6588,7 +6588,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
+  hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
   }
 }
 
@@ -6819,7 +6819,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -6917,7 +6917,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6888xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -7009,7 +7009,7 @@ module  {
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
     vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
     vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7165,7 +7165,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7320,7 +7320,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7721,7 +7721,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -7880,7 +7880,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8039,7 +8039,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8178,7 +8178,7 @@ vm.module @module {
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -8317,7 +8317,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6888xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
