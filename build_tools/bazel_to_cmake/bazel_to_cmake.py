@@ -47,10 +47,11 @@ PRESERVE_TAG = "### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###"
 
 
 class Status(Enum):
-  SUCCEEDED = 1
-  FAILED = 2
-  SKIPPED = 3
-  NO_BUILD_FILE = 4
+  UPDATED = 1
+  NOOP = 2
+  FAILED = 3
+  SKIPPED = 4
+  NO_BUILD_FILE = 5
 
 
 def parse_arguments():
@@ -123,6 +124,7 @@ def convert_directories(directories, write_files, allow_partial_conversion,
   failure_dirs = []
   skip_count = 0
   success_count = 0
+  noop_count = 0
   for directory in directories:
     status = convert_directory(
         directory,
@@ -133,10 +135,13 @@ def convert_directories(directories, write_files, allow_partial_conversion,
       failure_dirs.append(repo_relpath(directory))
     elif status == Status.SKIPPED:
       skip_count += 1
-    elif status == Status.SUCCEEDED:
+    elif status == Status.UPDATED:
       success_count += 1
+    elif status == Status.NOOP:
+      noop_count += 1
 
-  log(f"Updated {success_count} and skipped {skip_count} CMakeLists.txt files")
+  log(f"{success_count} CMakeLists.txt files were updated, {skip_count} were"
+      f" skipped, and {noop_count} required no change.")
   if failure_dirs:
     log(f"ERROR: Encountered unexpected errors converting {len(failure_dirs)}"
         " directories:")
@@ -176,55 +181,64 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
       ]
   ] + ["#" * 80])
 
-  preserved_footer = ["\n" + PRESERVE_TAG + "\n"]
+  old_lines = []
+  preserved_footer_lines = ["\n" + PRESERVE_TAG + "\n"]
   if os.path.isfile(cmakelists_file_path):
     found_autogeneration_tag = False
     found_preserve_tag = False
     with open(cmakelists_file_path) as f:
-      for line in f:
-        if not found_autogeneration_tag and autogeneration_tag in line:
-          found_autogeneration_tag = True
-        if not found_preserve_tag and PRESERVE_TAG in line:
-          found_preserve_tag = True
-        elif found_preserve_tag:
-          preserved_footer.append(line)
+      old_lines = f.readlines()
+
+    for line in old_lines:
+      if not found_autogeneration_tag and autogeneration_tag in line:
+        found_autogeneration_tag = True
+      if not found_preserve_tag and PRESERVE_TAG in line:
+        found_preserve_tag = True
+      elif found_preserve_tag:
+        preserved_footer_lines.append(line)
     if not found_autogeneration_tag:
       if verbosity >= 1:
         log(f"Skipped. Did not find autogeneration line.", indent=2)
       return Status.SKIPPED
+  preserved_footer = "".join(preserved_footer_lines)
 
   with open(build_file_path, "rt") as build_file:
     build_file_code = compile(build_file.read(), build_file_path, "exec")
-    try:
-      converted_text = bazel_to_cmake_converter.convert_build_file(
-          build_file_code, allow_partial_conversion=allow_partial_conversion)
-      if write_files:
-        with open(cmakelists_file_path, "wt") as cmakelists_file:
-          cmakelists_file.write(header)
-          cmakelists_file.write(converted_text)
-          cmakelists_file.writelines(preserved_footer)
-      else:
-        print(converted_text, end="")
-    except (NameError, NotImplementedError) as e:
-      log(
-          f"ERROR generating {rel_dir_path}.\n"
-          f"Missing a rule handler in bazel_to_cmake_converter.py?\n"
-          f"Reason: `{type(e).__name__}: {e}`",
-          indent=2)
-      return Status.FAILED
-    except KeyError as e:
-      log(
-          f"ERROR generating {rel_dir_path}.\n"
-          f"Missing a conversion in bazel_to_cmake_targets.py?\n"
-          f"Reason: `{type(e).__name__}: {e}`",
-          indent=2)
-      return Status.FAILED
+  try:
+    converted_build_file = bazel_to_cmake_converter.convert_build_file(
+        build_file_code, allow_partial_conversion=allow_partial_conversion)
+  except (NameError, NotImplementedError) as e:
+    log(
+        f"ERROR generating {rel_dir_path}.\n"
+        f"Missing a rule handler in bazel_to_cmake_converter.py?\n"
+        f"Reason: `{type(e).__name__}: {e}`",
+        indent=2)
+    return Status.FAILED
+  except KeyError as e:
+    log(
+        f"ERROR generating {rel_dir_path}.\n"
+        f"Missing a conversion in bazel_to_cmake_targets.py?\n"
+        f"Reason: `{type(e).__name__}: {e}`",
+        indent=2)
+    return Status.FAILED
+  converted_content = header + converted_build_file + preserved_footer
+  if write_files:
+    with open(cmakelists_file_path, "wt") as cmakelists_file:
+      cmakelists_file.write(converted_content)
+  else:
+    print(converted_content, end="")
+
+  if converted_content == "".join(old_lines):
+    if verbosity >= 2:
+      log(f"{rel_cmakelists_file_path} required no update", indent=2)
+    return Status.NOOP
+
   if verbosity >= 2:
     log(
         f"Successfly generated {rel_cmakelists_file_path}"
         f" from {rel_build_file_path}",
         indent=2)
-  return Status.SUCCEEDED
+  return Status.UPDATED
 
 
 def main(args):
