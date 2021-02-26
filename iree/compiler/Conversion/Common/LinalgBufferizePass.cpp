@@ -400,7 +400,6 @@ static Operation *getInsertionPointForReplacementStoreOp(
 LogicalResult preProcessConvertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchOutputStoreOp storeOp,
     BlockAndValueMapping &bvm) {
-  Operation *valueDefiningOp = storeOp.value().getDefiningOp();
   // Find the insertion point for the subview.
   SmallVector<Value, 4> operandsOfSubviewOp;
   operandsOfSubviewOp.push_back(bvm.lookup(storeOp.target()));
