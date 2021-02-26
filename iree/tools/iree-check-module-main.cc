@@ -60,7 +60,7 @@ class CheckModuleTest : public ::testing::Test {
                            iree_vm_function_t function)
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
-    IREE_ASSERT_OK(iree_vm_context_create_with_modules(
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, modules_.data(), modules_.size(), iree_allocator_system(),
         &context_));
   }
