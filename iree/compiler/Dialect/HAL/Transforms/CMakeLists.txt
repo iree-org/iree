@@ -34,6 +34,7 @@ iree_cc_library(
     "TranslateExecutables.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineToStandard
     MLIRIR
     MLIRPass
     MLIRStandard
