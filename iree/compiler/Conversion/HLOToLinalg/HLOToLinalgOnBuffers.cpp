@@ -499,6 +499,10 @@ struct SubTensorOpConversion
 };
 }  // namespace
 
+//===----------------------------------------------------------------------===//
+// subtensor_insert conversion patterns.
+//===----------------------------------------------------------------------===//
+
 namespace {
 /// Converts subtensor_insert operation to subview + linalg.copy
 struct SubTensorInsertOpConversion
@@ -515,9 +519,13 @@ struct SubTensorInsertOpConversion
         rewriter.create<SubViewOp>(loc, resultBuffers[0], op.getMixedOffsets(),
                                    op.getMixedSizes(), op.getMixedStrides());
     if (auto cstOp = inputBuffers[0].getDefiningOp<ConstantOp>()) {
-      auto inputConstAttr =
-          cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
-      Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
+      auto inputConstAttr = cstOp.valueAttr().cast<DenseElementsAttr>();
+      if (!inputConstAttr.isSplat()) {
+        return rewriter.notifyMatchFailure(
+            op, "non-splat constant is not supported");
+      }
+      Value cstVal =
+          rewriter.create<ConstantOp>(loc, inputConstAttr.getSplatValue());
       rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
     } else {
       rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
