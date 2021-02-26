@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (some scotttodd todos remain)
-
 # TODO(scotttodd): clean up bazel_to_cmake handling here
 #   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
 #   * the output file name is platform-specific, get it with $<TARGET_FILE:>
