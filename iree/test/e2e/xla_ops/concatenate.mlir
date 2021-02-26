@@ -16,3 +16,11 @@ func @xla_concatenate() attributes { iree.module.export } {
   check.expect_eq_const(%3, dense<[[1, 2], [3, 4], [11, 12], [13, 14]]> : tensor<4x2xi32>) : tensor<4x2xi32>
   return
 }
+
+func @concatenate_cst() attributes { iree.module.export } {
+  %c0 = iree.unfoldable_constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
+  %c1 = mhlo.constant dense<0> : tensor<2x3xi32>
+  %0 = "mhlo.concatenate"(%c0, %c1) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>) -> tensor<2x5xi32>
+  check.expect_eq_const(%0, dense<[[1, 2, 0, 0, 0], [3, 4, 0, 0, 0]]> : tensor<2x5xi32>) : tensor<2x5xi32>
+  return
+}

@@ -514,7 +514,14 @@ struct SubTensorInsertOpConversion
     auto subViewOp =
         rewriter.create<SubViewOp>(loc, resultBuffers[0], op.getMixedOffsets(),
                                    op.getMixedSizes(), op.getMixedStrides());
-    rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+    if (auto cstOp = inputBuffers[0].getDefiningOp<ConstantOp>()) {
+      auto inputConstAttr =
+          cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
+      Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
+      rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
+    } else {
+      rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+    }
     return success();
   }
 };

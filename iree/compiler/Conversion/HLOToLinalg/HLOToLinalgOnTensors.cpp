@@ -379,15 +379,9 @@ struct ConcatenateOpConversion
     Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       offsets[dim] = accBound;
-      if (auto cstOp = arg.getDefiningOp<ConstantOp>()) {
-        // TODO(hanchung): Support for concatenating with constant operands.
-        return rewriter.notifyMatchFailure(
-            op, "expected to concate non-constant value");
-      } else {
-        sizes[dim] = rewriter.create<DimOp>(loc, arg, dim);
-        result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
-                                                    sizes, strides);
-      }
+      sizes[dim] = rewriter.create<DimOp>(loc, arg, dim);
+      result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
+                                                  sizes, strides);
       accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
