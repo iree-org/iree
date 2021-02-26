@@ -167,7 +167,7 @@ struct PromoteConvSubviewsPattern
                              PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<ConvOpTy>(
             context,
-            options.setOperandsToPromote({1}).setUseFullTileBuffers(
+            options.setOperandsToPromote({0}).setUseFullTileBuffers(
                 {false, false}),
             marker, benefit) {}
 };
@@ -175,18 +175,18 @@ struct PromoteConvSubviewsPattern
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<
-      PromoteMatmulSubviewsPattern, PromoteConvSubviewsPattern<linalg::ConvOp>,
-      PromoteConvSubviewsPattern<linalg::ConvInputNWCFilterWCFOp>,
-      PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      PromoteConvSubviewsPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
-      context,
-      linalg::LinalgPromotionOptions()
-          .setAllocationDeallocationFns(allocateWorkgroupMemory,
-                                        deallocateWorkgroupMemory)
-          .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
-      getLinalgMatchAndReplaceMarker(getWorkgroupMarker(),
-                                     getWorkgroupMemoryMarker(), context));
+  patterns
+      .insert<PromoteMatmulSubviewsPattern,
+              PromoteConvSubviewsPattern<linalg::ConvInputNWCFilterWCFOp>,
+              PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>,
+              PromoteConvSubviewsPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
+          context,
+          linalg::LinalgPromotionOptions()
+              .setAllocationDeallocationFns(allocateWorkgroupMemory,
+                                            deallocateWorkgroupMemory)
+              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
+          getLinalgMatchAndReplaceMarker(getWorkgroupMarker(),
+                                         getWorkgroupMemoryMarker(), context));
 }
 
 //===----------------------------------------------------------------------===//
@@ -316,7 +316,6 @@ static void populateTilingToInvocationPatterns(
           getVectorizeMarker(), context));
 
   patterns.insert<
-      linalg::LinalgTilingPattern<linalg::ConvOp>,
       linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
       linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
       linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,

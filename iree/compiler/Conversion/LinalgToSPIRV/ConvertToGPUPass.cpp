@@ -830,7 +830,6 @@ void ConvertToGPUPass::runOnOperation() {
       MapLinalgOpToGlobalInvocationId<linalg::FillOp>,
       MapLinalgOpToGlobalInvocationId<linalg::GenericOp>,
       MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
-      MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
       MapLinalgOpToLocalInvocationId<linalg::ConvInputNWCFilterWCFOp>,
       MapLinalgOpToLocalInvocationId<linalg::ConvInputNHWCFilterHWCFOp>,
       MapLinalgOpToLocalInvocationId<linalg::ConvInputNDHWCFilterDHWCFOp>,
