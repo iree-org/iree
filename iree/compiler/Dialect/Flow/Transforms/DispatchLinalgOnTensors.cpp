@@ -26,6 +26,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -179,11 +181,11 @@ static bool isRootOp(Operation *op) {
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
-  if (isa<linalg::InitTensorOp>(op)) {
+  if (isa<linalg::InitTensorOp, tensor::ExtractOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
-    return constantOp.getResult().getType().isIntOrFloat();
+    return constantOp.getResult().getType().isIntOrIndexOrFloat();
   }
   return false;
 }
@@ -196,7 +198,7 @@ static bool isDispatchableOp(Operation *op) {
   // Only linalg ops are marked dispatchable.
   if ((op->getDialect() !=
        op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
-      !isa<SubTensorOp>(op)) {
+      !isa<SubTensorOp, SubTensorInsertOp>(op)) {
     return false;
   }
   return !isAlwaysClonedIntoDispatchOp(op);
@@ -406,7 +408,9 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   auto getUsesOfValueOutsideOfDispatchOp = [&](Value v) {
     SmallPtrSet<Operation *, 4> res;
     for (Operation *user : v.getUsers())
-      if (!dispatchOp->isAncestor(user)) res.insert(user);
+      if (isa<IREE::Flow::DispatchWorkgroupsOp>(user) ||
+          !dispatchOp->isAncestor(user))
+        res.insert(user);
     return res;
   };
   // Replace all uses of mapped values within the dispatch op to the new value.
@@ -548,6 +552,32 @@ struct TileAndDistributeOnTensorsPattern
   }
 };
 
+/// The workload is computed based on the problem size. For a given operation,
+/// return the problem size.
+static Optional<SmallVector<Value, 4>> getProblemSize(PatternRewriter &rewriter,
+                                                      Operation *op) {
+  Location loc = op->getLoc();
+  auto getShapeOfShapedTypeVal = [&](Value v) -> SmallVector<Value, 4> {
+    return llvm::to_vector<4>(llvm::map_range(
+        llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank()),
+        [&](int64_t dim) -> Value {
+          return rewriter.create<DimOp>(loc, v, dim);
+        }));
+  };
+  if (op->getNumResults() != 1) return llvm::None;
+
+  // TODO(ravishankarm): Since the workload depends on the output shape, set the
+  // insertion point to after the operation. After dim canonicalization, the
+  // original operation should become dead. This needs to be changed after the
+  // output shape interface lands upstream and can be used in IREE.
+  if (auto resultType = op->getResult(0).getType().dyn_cast<ShapedType>()) {
+    rewriter.setInsertionPointAfter(op);
+    return getShapeOfShapedTypeVal(op->getResult(0));
+  }
+
+  return llvm::None;
+}
+
 /// Puts ops that are not-tilable or arent tiled into a
 /// `flow.dispatch.workgroups` operation. For example tile and distribute of
 /// element-wise operations is not beneficial. These are handled appropriately
@@ -565,29 +595,22 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
         llvm::all_of(op->getUsers(), [](Operation *user) {
           return isDispatchableOp(user) ||
                  user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
-                 isa<IREE::Flow::DispatchWorkgroupsOp>(user);
+                 isa<IREE::Flow::DispatchWorkgroupsOp, DimOp>(user);
         })) {
       return failure();
     }
     // The workgroup count is based on the result shape.
     if (op->getNumResults() != 1) return failure();
-    SmallVector<Value, 4> count;
-    Location loc = op->getLoc();
-    // Since the workload depends on the output shape, set the insertion point
-    // to after the operation. After dim canonicalization, the original
-    // operation should become dead.
-    if (auto resultType = op->getResult(0).getType().dyn_cast<ShapedType>()) {
-      rewriter.setInsertionPointAfter(op);
-      count = llvm::to_vector<4>(llvm::map_range(
-          llvm::seq<int64_t>(0, resultType.getRank()), [&](int64_t d) -> Value {
-            return rewriter.create<DimOp>(loc, op->getResult(0), d);
-          }));
-    }
+    Optional<SmallVector<Value, 4>> countOpt = getProblemSize(rewriter, op);
+    if (!countOpt) return failure();
+    SmallVector<Value, 4> count = *countOpt;
+
     // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
     // workload count of 3, though it should be generalized. For now making sure
     // the flow has three elements of workload size (x, y, z) by linearizing the
     // workloads for all higher dimensions greater than or equal to
     // kNumMaxParallelDims.
+    Location loc = op->getLoc();
     if (count.size() > kNumMaxParallelDims) {
       unsigned numSymbols = 0;
       AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);

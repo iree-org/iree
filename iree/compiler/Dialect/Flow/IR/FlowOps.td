@@ -921,6 +921,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   }];
 
   // TODO(benvanik): canonicalize contiguous updates/across slices.
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 

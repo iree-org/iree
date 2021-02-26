@@ -193,7 +193,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     // will break VMLA backend.
     passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-    addHLOToLinalgOnTensorsPasses(passManager);
+    addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
     passManager.addPass(createCanonicalizerPass());
     passManager.addPass(createCSEPass());

@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -956,6 +957,38 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{});
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.update
+//===----------------------------------------------------------------------===//
+
+namespace {
+// When the target tensor is a result of a tensor.cast operation, the op needs
+// to be updated to use the source of the cast as the target tensor.
+struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
+  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
+                                PatternRewriter &rewriter) const override {
+    auto targetCastOp = updateOp.target().getDefiningOp<tensor::CastOp>();
+    auto updateCastOp = updateOp.update().getDefiningOp<tensor::CastOp>();
+    if (!targetCastOp && !updateCastOp) return failure();
+    auto target = (targetCastOp ? targetCastOp.source() : updateOp.target());
+    auto update = (updateCastOp ? updateCastOp.source() : updateOp.update());
+    auto newOp = rewriter.create<TensorUpdateOp>(
+        updateOp.getLoc(), target.getType(), update, target,
+        updateOp.start_indices());
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(
+        updateOp, updateOp.getResult().getType(), newOp.getResult());
+    return success();
+  }
+};
+}  // namespace
+
+void TensorUpdateOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldTensorUpdateOpWithCasts>(context);
 }
 
 }  // namespace Flow

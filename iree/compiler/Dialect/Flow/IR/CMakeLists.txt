@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransformUtils
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
