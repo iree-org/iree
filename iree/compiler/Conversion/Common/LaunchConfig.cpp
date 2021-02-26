@@ -61,7 +61,7 @@ static std::string getOrSetNewKey(Operation *op, int64_t suffix) {
 
 void LaunchConfig::finalize(FuncOp funcOp) {
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    linalgOp.removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
+    linalgOp->removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
   });
 }
 

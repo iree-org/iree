@@ -415,7 +415,7 @@ class PublicABIGenerationPass
         // Rename and remove reflection (it will go on the ABI entry point).
         funcOp->setAttr("iree.module.export",
                         StringAttr::get(ctx, (*exportName + "$raw").str()));
-        funcOp.removeAttr("iree.reflection");
+        funcOp->removeAttr("iree.reflection");
         funcOp->setAttr("noinline", UnitAttr::get(ctx));
 
         if (reflection) {

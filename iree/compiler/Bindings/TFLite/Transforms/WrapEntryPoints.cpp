@@ -66,7 +66,7 @@ class WrapEntryPointsPass
     // TODO(#3968): the story around what we export is pretty messy. We really
     // need to switch this to being an op (iree.entry_point or iree.export)
     // instead of being based on visibility or iree.module.export.
-    entryFuncOp.removeAttr("iree.module.export");
+    entryFuncOp->removeAttr("iree.module.export");
     entryFuncOp.setPrivate();
   }
 
