@@ -98,7 +98,7 @@ Set the AOT linker path environment variable:
 
 ```shell
 # Still in "build-riscv" folder
-$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/toolchain/clang/linux/RISCV/bin/clang++ -static-libstdc++ -O3"
+$ export IREE_LLVMAOT_LINKER_PATH="$HOME/riscv/toolchain/clang/linux/RISCV/bin/clang++"
 ```
 
 Translate a source MLIR into an IREE module:

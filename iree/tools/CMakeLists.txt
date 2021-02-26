@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
+# Doesn't use bazel_to_cmake because of various special logic throughout.
 
 add_subdirectory(android)
 add_subdirectory(test)

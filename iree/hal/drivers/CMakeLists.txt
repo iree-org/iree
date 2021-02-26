@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (custom configuration vars)
+# Doesn't use bazel_to_cmake because of custom configuration vars
 
 set(IREE_HAL_DRIVER_MODULES)
 if(${IREE_HAL_DRIVER_CUDA})

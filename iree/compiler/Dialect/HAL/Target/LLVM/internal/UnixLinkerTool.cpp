@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/target_platform.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Process.h"
 
 #define DEBUG_TYPE "llvmaot-linker"
 
@@ -31,70 +32,53 @@ class UnixLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
+    // Ideally a user specifies the linker so they can match whatever they are
+    // building with.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
-    if (targetTriple.isAndroid()) {
-      char *androidNDKPath = std::getenv("ANDROID_NDK");
-      if (!androidNDKPath) return toolPath;
+    // If no linker was specified, attempt to find one.
+    auto sysLinkers = {"ld", "ld.gold", "ld.lld"};
 
-      // Select prebuilt toolchain based on host architecture/platform:
-      // https://developer.android.com/ndk/guides/other_build_systems
-      std::string toolchains_binary_path;
-#if defined(IREE_PLATFORM_LINUX) && defined(IREE_ARCH_X86_64)
-      toolchains_binary_path = "/toolchains/llvm/prebuilt/linux-x86_64/bin/";
-#elif defined(IREE_PLATFORM_APPLE) && defined(IREE_ARCH_X86_64)
-      toolchains_binary_path = "/toolchains/llvm/prebuilt/darwin-x86_64/bin/";
-#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_32)
-      toolchains_binary_path = "/toolchains/llvm/prebuilt/windows/bin/";
-#elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_64)
-      toolchains_binary_path = "/toolchains/llvm/prebuilt/windows-x86_64/bin/";
-#else
-      llvm::errs() << "Unknown architecture/platform combination"
-                   << "\n";
-      return "";
-#endif  // IREE_PLATFORM_* && IREE_ARCH_*
-
-      // TODO(ataei): Set target architecture and ABI from targetTriple.
-      return llvm::Twine(androidNDKPath)
-          .concat(toolchains_binary_path)
-          .concat("aarch64-linux-android30-clang++")
-          .str();
-    }
-
-// TODO(ataei, benvanik): Windows cross-linking discovery support.
-#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
-#define UNIX_SYS_LINKER_PATH_LENGTH 255
-    auto sysLinkers = {"ld", "ld.gold", "lld.ld"};
-    for (auto syslinker : sysLinkers) {
-      FILE *pipe =
-          popen(llvm::Twine("which ").concat(syslinker).str().c_str(), "r");
-      char linkerPath[UNIX_SYS_LINKER_PATH_LENGTH];
-      if (fgets(linkerPath, sizeof(linkerPath), pipe) != NULL) {
-        return strtok(linkerPath, "\n");
+    // First search the current directory.
+    for (auto sysLinker : sysLinkers) {
+      if (llvm::sys::fs::exists(sysLinker)) {
+        llvm::SmallString<256> absolutePath(sysLinker);
+        llvm::sys::fs::make_absolute(absolutePath);
+        return std::string(absolutePath);
       }
     }
-    return toolPath;
-#undef UNIX_SYS_LINKER_PATH_LENGTH
-#else
-    return toolPath;
-#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_MACOS
+
+    // Next search the environment path.
+    for (auto sysLinker : sysLinkers) {
+      if (auto result = llvm::sys::Process::FindInEnvPath("PATH", sysLinker)) {
+        return *result;
+      }
+    }
+
+    llvm::errs() << "No Unix linker tool specified or discovered";
+    return "";
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,
                                 ArrayRef<StringRef> entryPointNames) override {
-    // Enable frame pointers to ensure that stack unwinding works, e.g. in
-    // Tracy. In principle this could also be achieved by enabling unwind
-    // tables, but we tried that and that didn't work in Tracy (which uses
-    // libbacktrace), while enabling frame pointers worked.
-    // https://github.com/google/iree/issues/3957
     for (auto &func : *llvmModule) {
-      auto attrs = func.getAttributes();
-      attrs = attrs.addAttribute(llvmModule->getContext(),
-                                 llvm::AttributeList::FunctionIndex,
-                                 "frame-pointer", "all");
-      func.setAttributes(attrs);
+      // Enable frame pointers to ensure that stack unwinding works.
+      func.addFnAttr("frame-pointer", "all");
+
+      // -ffreestanding-like behavior.
+      func.addFnAttr("no-builtins");
     }
+
+    // TODO(benvanik): switch to executable libraries w/ internal functions.
+    for (auto entryPointName : entryPointNames) {
+      auto *entryPointFn = llvmModule->getFunction(entryPointName);
+      entryPointFn->setLinkage(
+          llvm::GlobalValue::LinkageTypes::ExternalLinkage);
+      entryPointFn->setVisibility(
+          llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
+    }
+
     return success();
   }
 
@@ -113,19 +97,34 @@ class UnixLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-      getToolPath(),
-#if defined(IREE_PLATFORM_MACOS)
-      "-dylib",
-      "-undefined suppress",
-      "-flat_namespace",
-#else
-      "-shared",
-#endif
-      "-o " + artifacts.libraryFile.path,
+        getToolPath(),
+
+        // Avoids including any libc/startup files that initialize the CRT as
+        // we don't use any of that. Our shared libraries must be freestanding.
+        "-nostdlib",  // -nodefaultlibs + -nostartfiles
+
+        // Statically link all dependencies so we don't have any runtime deps.
+        // We cannot have any imports in the module we produce.
+        // "-static",
+
+        // HACK: we insert mallocs and libm calls. This is *not good*.
+        // We need hermetic binaries that pull in no imports; the MLIR LLVM
+        // lowering paths introduce a bunch, though, so this is what we are
+        // stuck with.
+        "-shared",
+        "-undefined suppress",
+
+        "-o " + artifacts.libraryFile.path,
     };
 
-    if (targetTriple.isAndroid()) {
-      flags.push_back("-static-libstdc++");
+    if (targetTriple.isOSDarwin() || targetTriple.isiOS()) {
+      flags.push_back("-dylib");
+      flags.push_back("-flat_namespace");
+    }
+
+    // Strip debug information (only, no relocations) when not requested.
+    if (!targetOptions.debugSymbols) {
+      flags.push_back("-Wl,--strip-debug");
     }
 
     // Link all input objects. Note that we are not linking whole-archive as

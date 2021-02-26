@@ -70,6 +70,17 @@ function(iree_check_test)
   set(_MODULE_NAME "${_RULE_NAME}_module")
 
   if(ANDROID)
+    # Android's CMake toolchain defines some variables that we can use to infer
+    # the appropriate target triple from the configured settings:
+    # https://developer.android.com/ndk/guides/cmake#android_platform
+    #
+    # In typical CMake fashion, the various strings are pretty fuzzy and can
+    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
+    #
+    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
+    # should pretty consistently be just a number we can use for target triple.
+    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+
     iree_bytecode_module(
       NAME
         "${_MODULE_NAME}"
@@ -78,8 +89,7 @@ function(iree_check_test)
       FLAGS
         "-iree-mlir-to-vm-bytecode-module"
         "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-        # TODO(ataei): Get target from arguments passed to build
-        "--iree-llvm-target-triple=aarch64-none-linux-android30"
+        "--iree-llvm-target-triple=${_TARGET_TRIPLE}"
         ${_RULE_COMPILER_FLAGS}
       TESTONLY
     )
