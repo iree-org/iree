@@ -47,12 +47,9 @@ a directory and:
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
   python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-xla-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-tflite-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py
-  py-tf-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
 
 
 That is not a perfect approximation but is close.
@@ -72,6 +69,7 @@ WORK_DIR = os.path.realpath(os.path.curdir)
 BUILD_DIR = os.path.join(WORK_DIR, "iree-build")
 INSTALL_DIR = os.path.join(WORK_DIR, "iree-install")
 IREESRC_DIR = os.path.join(WORK_DIR, "main_checkout")
+TF_INTEGRATIONS_DIR = os.path.join(IREESRC_DIR, "integrations/tensorflow")
 BINDIST_DIR = os.environ.get("BINDIST_DIR")
 if BINDIST_DIR is None:
   BINDIST_DIR = os.path.join(WORK_DIR, "bindist")
@@ -119,7 +117,7 @@ def build_main_dist():
 
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
@@ -128,17 +126,19 @@ def build_main_dist():
       f"-DIREE_BUILD_COMPILER=ON",
       f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
       f"-DIREE_BUILD_SAMPLES=OFF",
-  ])
+  ],
+                 check=True)
 
   print("*** Building ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       "--build",
       BUILD_DIR,
       "--target",
       INSTALL_TARGET,
-  ])
+  ],
+                 check=True)
 
   print("*** Packaging ***")
   dist_entries = [
@@ -169,7 +169,7 @@ def build_py_runtime_pkg():
 
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
@@ -179,17 +179,48 @@ def build_py_runtime_pkg():
       f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
       f"-DIREE_BUILD_SAMPLES=OFF",
       f"-DIREE_BUILD_TESTS=OFF",
-  ])
+  ],
+                 check=True)
 
   print("*** Building ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       "--build",
       BUILD_DIR,
       "--target",
       "install-IreePythonPackage-rt-stripped",
-  ])
+  ],
+                 check=True)
+
+
+def bazel_build_tf_binary(target):
+  """Builds a binary in the IREE-TF Workspace and returns the filepath."""
+
+  # Builds a runnable target and returns the path to the executable. Yes this is
+  # really the best Bazel gives us.
+  # See https://github.com/bazelbuild/bazel/issues/8739
+  cmd = [
+      "bazel",
+      "run",
+      "--run_under=echo",
+      "--config=release",
+      target,
+  ]
+  process = subprocess.run(cmd,
+                           cwd=TF_INTEGRATIONS_DIR,
+                           check=True,
+                           stdout=subprocess.PIPE,
+                           universal_newlines=True)
+
+  if len(process.stdout.splitlines()) != 1:
+    raise RuntimeError(
+        f"Unexpected output from `{' '.join(cmd)}`:\n{process.stdout}")
+  bin_path = process.stdout.strip()
+  if not os.path.isfile(bin_path):
+    raise RuntimeError("{bin_path} is not a file.")
+
+  return bin_path
 
 
 def build_py_xla_compiler_tools_pkg():
@@ -198,29 +229,35 @@ def build_py_xla_compiler_tools_pkg():
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
 
+  print("*** Building XLA import tool with Bazel ***")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-xla")
+
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_XLA_COMPILER=ON",
       f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
       f"-DIREE_BUILD_SAMPLES=OFF",
       f"-DIREE_BUILD_TESTS=OFF",
-  ])
+  ],
+                 check=True)
 
   print("*** Building ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       "--build",
       BUILD_DIR,
       "--target",
       "install-IreePythonPackage-tools-xla-stripped",
-  ])
+  ],
+                 check=True)
 
 
 def build_py_tflite_compiler_tools_pkg():
@@ -229,29 +266,35 @@ def build_py_tflite_compiler_tools_pkg():
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
 
+  print("*** Building TFLite import tool with Bazel ***")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tflite")
+
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TFLITE_COMPILER=ON",
       f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
       f"-DIREE_BUILD_SAMPLES=OFF",
       f"-DIREE_BUILD_TESTS=OFF",
-  ])
+  ],
+                 check=True)
 
   print("*** Building ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       "--build",
       BUILD_DIR,
       "--target",
       "install-IreePythonPackage-tools-tflite-stripped",
-  ])
+  ],
+                 check=True)
 
 
 def build_py_tf_compiler_tools_pkg():
@@ -260,12 +303,16 @@ def build_py_tf_compiler_tools_pkg():
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
 
+  print("*** Building TF import tool with Bazel ***")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
+
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TENSORFLOW_COMPILER=ON",
@@ -275,14 +322,15 @@ def build_py_tf_compiler_tools_pkg():
   ])
 
   print("*** Building ***")
-  subprocess.check_call([
+  subprocess.run([
       sys.executable,
       CMAKE_CI_SCRIPT,
       "--build",
       BUILD_DIR,
       "--target",
       "install-IreePythonPackage-tools-tf-stripped",
-  ])
+  ],
+                 check=True)
 
 
 command = sys.argv[1]

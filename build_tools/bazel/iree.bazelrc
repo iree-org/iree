@@ -155,6 +155,20 @@ build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variab
 build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-range-loop-analysis
 
 ###############################################################################
+# Additional options for release builds. These do *not* automatically pull in
+# the corresponding compiler config (e.g. generic_clang) because this is likely
+# to already be set in the user's configured.bazelrc and setting a config twice
+# causes flags to be passed twice.
+###############################################################################
+build:generic_clang_release --compilation_mode=opt
+build:generic_clang_release --linkopt=-Wl,--strip-all
+build:generic_gcc_release --compilation_mode=opt
+build:generic_gcc_release --linkopt=-Wl,--strip-all
+# MSVC doesn't store symbols in the binary (they're in separate .pdb files), so
+# nothing needs to be stripped.
+build:msvc_release --compilation_mode=opt
+
+###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################
@@ -302,6 +316,9 @@ build:rs --project_id=iree-oss
 ###############################################################################
 
 build:_msvc_base --define=iree_is_msvc=true
+
+# Bazel gets confused and sometimes loses track of Bash.
+build:_msvc_base --action_env BAZEL_SH='bash'
 
 # Disable warnings for dependencies. We don't control these.
 # absl forces /W3 in their copts, so we exclude them to avoid D9025

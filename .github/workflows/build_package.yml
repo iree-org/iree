@@ -142,6 +142,13 @@ jobs:
           EOF
           cat ./main_checkout/version_info.json
 
+      - name: Configure Bazel
+        if: matrix.needs_bazel
+        shell: bash
+        run: |
+          cd main_checkout
+          python ./configure_bazel.py
+
       # The main distribution builds the main binary package, tests and compiler
       # wheels (which are OS but not python version specific). The latter is
       # purely opportunistic: it adds incrementally to the former and would

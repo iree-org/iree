@@ -21,10 +21,11 @@ import sys
 def write_platform(bazelrc):
   platform_config = "generic_clang"
   if platform.system() == "Windows":
-    platform_config = "windows"
-  print("build --config={}".format(platform_config), file=bazelrc)
+    platform_config = "msvc"
+  print(f"build --config={platform_config}", file=bazelrc)
+  print(f"build:release --config={platform_config}_release", file=bazelrc)
   if not (platform.system() == "Darwin"):
-    print("common --config={}".format("non_darwin"), file=bazelrc)
+    print("common --config=non_darwin", file=bazelrc)
 
 
 if len(sys.argv) > 1:
