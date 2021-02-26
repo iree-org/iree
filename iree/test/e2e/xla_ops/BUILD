@@ -178,7 +178,7 @@ iree_check_single_backend_test_suite(
         "select.mlir",
         "sine.mlir",
         # https://github.com/google/iree/issues/4692
-        # "slice.mlir",
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "tanh.mlir",
@@ -239,7 +239,7 @@ iree_check_single_backend_test_suite(
         "select.mlir",
         "sine.mlir",
         # https://github.com/google/iree/issues/4692
-        # "slice.mlir",
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "tanh.mlir",
