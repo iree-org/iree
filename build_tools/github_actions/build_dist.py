@@ -195,30 +195,32 @@ def build_py_runtime_pkg():
 
 
 def bazel_build_tf_binary(target):
-  subprocess.run([
+  """Builds a binary in the IREE-TF Workspace and returns the filepath."""
+
+  # Builds a runnable target and returns the path to the executable. Yes this is
+  # really the best Bazel gives us.
+  # See https://github.com/bazelbuild/bazel/issues/8739
+  cmd = [
       "bazel",
-      "build",
+      "run",
+      "--run_under=echo",
       "--config=release",
       target,
-  ],
-                 cwd=TF_INTEGRATIONS_DIR,
-                 check=True,
-                 universal_newlines=True)
-
-  process = subprocess.run(["bazel", "info", "bazel-bin"],
+  ]
+  process = subprocess.run(cmd,
                            cwd=TF_INTEGRATIONS_DIR,
                            check=True,
-                           capture_output=True,
+                           stdout=subprocess.PIPE,
                            universal_newlines=True)
+
   if len(process.stdout.splitlines()) != 1:
     raise RuntimeError(
-        f"Unexpected output from `bazel info bazel-bin`:\n{process.stdout}")
-  bazel_bin_dir = process.stdout.strip()
-  if not os.path.isdir(bazel_bin_dir):
-    raise RuntimeError(
-        f"`bazel info bazel-bin` '{bazel_bin_dir}' is not a directory")
+        f"Unexpected output from `{' '.join(cmd)}`:\n{process.stdout}")
+  bin_path = process.stdout.strip()
+  if not os.path.isfile(bin_path):
+    raise RuntimeError("{bin_path} is not a file.")
 
-  return bazel_bin_dir
+  return bin_path
 
 
 def build_py_xla_compiler_tools_pkg():
@@ -228,7 +230,7 @@ def build_py_xla_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building XLA import tool with Bazel ***")
-  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-import-xla")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-xla")
 
   # CMake configure.
   print("*** Configuring ***")
@@ -236,7 +238,7 @@ def build_py_xla_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_XLA_COMPILER=ON",
@@ -265,7 +267,7 @@ def build_py_tflite_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TFLite import tool with Bazel ***")
-  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tflite")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tflite")
 
   # CMake configure.
   print("*** Configuring ***")
@@ -273,7 +275,7 @@ def build_py_tflite_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TFLITE_COMPILER=ON",
@@ -302,7 +304,7 @@ def build_py_tf_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TF import tool with Bazel ***")
-  bazel_bin_dir = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
+  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-tf-import")
 
   # CMake configure.
   print("*** Configuring ***")
@@ -310,7 +312,7 @@ def build_py_tf_compiler_tools_pkg():
       sys.executable,
       CMAKE_CI_SCRIPT,
       f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={bazel_bin_dir}/iree_tf_compiler/",
+      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_TENSORFLOW_COMPILER=ON",
