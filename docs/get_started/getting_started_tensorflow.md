@@ -70,7 +70,8 @@ comparison tests:
 
 ```shell
 $ cd ../iree-build-tf
-$ ctest -L integrations/tensorflow/e2e
+$ ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/' \
+  --output-on-failure
 
 # Or run individually as:
 $ export PYTHONPATH=$(pwd)/bindings/python
