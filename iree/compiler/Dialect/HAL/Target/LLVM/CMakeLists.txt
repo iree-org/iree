@@ -33,6 +33,8 @@ iree_cc_library(
     LLVMRISCVAsmParser
     LLVMRISCVCodeGen
     LLVMSupport
+    LLVMWebAssemblyAsmParser
+    LLVMWebAssemblyCodeGen
     LLVMX86AsmParser
     LLVMX86CodeGen
     MLIRLLVMIR

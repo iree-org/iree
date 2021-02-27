@@ -55,6 +55,8 @@ cc_library(
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:WebAssemblyAsmParser",
+        "@llvm-project//llvm:WebAssemblyCodeGen",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//mlir:LLVMDialect",
