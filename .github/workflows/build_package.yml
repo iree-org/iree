@@ -30,16 +30,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04]
-        build_package:
-          - main-dist
-          - py-runtime-pkg
-          - py-xla-compiler-tools-pkg
-          - py-tflite-compiler-tools-pkg
-          - py-tf-compiler-tools-pkg
-        experimental: [false]
-        needs_bazel: [false]  # Bazel comes in with the container.
         include:
+          # Ubuntu packages.
+          - os: ubuntu-18.04
+            build_package: main-dist
+            experimental: false
+            needs_bazel: false
+          - os: ubuntu-18.04
+            build_package: py-runtime-pkg
+            experimental: false
+            needs_bazel: false
+          - os: ubuntu-18.04
+            build_package: py-xla-compiler-tools-pkg
+            experimental: false
+            needs_bazel: true
+          - os: ubuntu-18.04
+            build_package: py-tflite-compiler-tools-pkg
+            experimental: false
+            needs_bazel: true
+          - os: ubuntu-18.04
+            build_package: py-tf-compiler-tools-pkg
+            experimental: false
+            needs_bazel: true
+
           # Windows packages.
           - os: windows-2019
             build_package: main-dist
@@ -61,6 +74,7 @@ jobs:
             build_package: py-tf-compiler-tools-pkg
             experimental: true
             needs_bazel: true
+
           # Macos packages.
           - os: macos-latest
             build_package: main-dist

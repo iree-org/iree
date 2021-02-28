@@ -134,16 +134,6 @@ def invoke_generate():
   report(f'Using REPO_DIR = {repo_root}')
 
   ##############################################################################
-  # Build deps.
-  ##############################################################################
-  requirements_file = os.path.join(repo_root, 'bindings', 'python',
-                                   'build_requirements.txt')
-
-  report('Installing python build requirements...')
-  subprocess.check_call(
-      [sys.executable, '-m', 'pip', 'install', '-r', requirements_file])
-
-  ##############################################################################
   # Load version_info.json
   ##############################################################################
 
