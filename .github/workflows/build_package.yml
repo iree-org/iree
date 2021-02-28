@@ -35,67 +35,52 @@ jobs:
           - os: ubuntu-18.04
             build_package: main-dist
             experimental: false
-            needs_bazel: false
           - os: ubuntu-18.04
             build_package: py-runtime-pkg
             experimental: false
-            needs_bazel: false
           - os: ubuntu-18.04
             build_package: py-xla-compiler-tools-pkg
             experimental: false
-            needs_bazel: true
           - os: ubuntu-18.04
             build_package: py-tflite-compiler-tools-pkg
             experimental: false
-            needs_bazel: true
           - os: ubuntu-18.04
             build_package: py-tf-compiler-tools-pkg
             experimental: false
-            needs_bazel: true
 
           # Windows packages.
           - os: windows-2019
             build_package: main-dist
             experimental: true
-            needs_bazel: false
           - os: windows-2019
             build_package: py-runtime-pkg
             experimental: true
-            needs_bazel: false
           - os: windows-2019
             build_package: py-xla-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
           - os: windows-2019
             build_package: py-tflite-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
           - os: windows-2019
             build_package: py-tf-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
 
           # Macos packages.
           - os: macos-latest
             build_package: main-dist
             experimental: true
-            needs_bazel: false
           - os: macos-latest
             build_package: py-runtime-pkg
             experimental: true
-            needs_bazel: false
           - os: macos-latest
             build_package: py-xla-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
           - os: macos-latest
             build_package: py-tflite-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
           - os: macos-latest
             build_package: py-tf-compiler-tools-pkg
             experimental: true
-            needs_bazel: true
     env:
       CIBW_BUILD_VERBOSITY: 1
       # Note that on Linux, we run under docker with an altered path.
@@ -155,13 +140,6 @@ jobs:
           }
           EOF
           cat ./main_checkout/version_info.json
-
-      - name: Configure Bazel
-        if: matrix.needs_bazel
-        shell: bash
-        run: |
-          cd main_checkout
-          python ./configure_bazel.py
 
       # The main distribution builds the main binary package, tests and compiler
       # wheels (which are OS but not python version specific). The latter is

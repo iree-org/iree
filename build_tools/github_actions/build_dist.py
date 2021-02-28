@@ -77,6 +77,7 @@ THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
 BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "bindings", "python",
                                       "build_requirements.txt")
+CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
 INSTALL_TARGET = ("install"
                   if platform.system() == "Windows" else "install/strip")
 
@@ -110,6 +111,11 @@ def install_python_requirements():
   print("Installing python requirements...")
   subprocess.check_call(
       [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT])
+
+
+def configure_bazel():
+  print("Generating configured.bazelrc...")
+  subprocess.check_call([sys.executable, CONFIGURE_BAZEL_PY])
 
 
 def build_main_dist():
@@ -208,6 +214,7 @@ def build_py_runtime_pkg():
 def bazel_build_tf_binary(target):
   """Builds a binary in the IREE-TF Workspace and returns the filepath."""
   install_python_requirements()
+  configure_bazel()
 
   # Builds a runnable target and returns the path to the executable. Yes this is
   # really the best Bazel gives us.
@@ -238,6 +245,7 @@ def bazel_build_tf_binary(target):
 def build_py_xla_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_xla package."""
   install_python_requirements()
+  configure_bazel()
 
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
@@ -277,6 +285,7 @@ def build_py_xla_compiler_tools_pkg():
 def build_py_tflite_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tflite package."""
   install_python_requirements()
+  configure_bazel()
 
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
@@ -316,6 +325,7 @@ def build_py_tflite_compiler_tools_pkg():
 def build_py_tf_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tf package."""
   install_python_requirements()
+  configure_bazel()
 
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
