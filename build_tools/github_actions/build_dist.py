@@ -108,8 +108,8 @@ def remove_cmake_cache():
 
 def install_python_requirements():
   print("Installing python requirements...")
-  subprocess.check_call(sys.executable, "-m", "pip", "install", "-r",
-                        BUILD_REQUIREMENTS_TXT)
+  subprocess.check_call(
+      [sys.executable, "-m", "pip", "install", "-r", BUILD_REQUIREMENTS_TXT])
 
 
 def build_main_dist():
