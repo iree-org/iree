@@ -224,6 +224,7 @@ def bazel_build_tf_binary(target):
       "run",
       "--run_under=echo",
       "--config=release",
+      "--keep_going",
       target,
   ]
   process = subprocess.run(cmd,
