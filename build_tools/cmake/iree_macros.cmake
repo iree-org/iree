@@ -125,26 +125,6 @@ function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
   endif()
 endfunction()
 
-# iree_get_target_path
-#
-# Gets the path to a target in a cross-compilation-aware way. This should be
-# used when accessing targets that are used as part of the build, such as for
-# generating files used for later build steps. Those targets should be defined
-# inside IREE itself.
-#
-# Paramters:
-# - OUTPUT_VAR: variable name for receiving the path to the built target.
-# - TARGET: the target to get its path.
-function(iree_get_target_path OUTPUT_VAR TARGET)
-  # If this is a host target for cross-compilation, it should have a
-  # `HOST_TARGET_FILE` property containing the artifact's path.
-  # Otherwise it must be a target defined in the current CMake invocation
-  # and we can just use `$<TARGET_FILE:${TARGET}>` on it.
-  set(${OUTPUT_VAR}
-      "$<IF:$<BOOL:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>>,$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>,$<TARGET_FILE:${TARGET}>>"
-      PARENT_SCOPE)
-endfunction()
-
 #-------------------------------------------------------------------------------
 # select()-like Evaluation
 #-------------------------------------------------------------------------------
