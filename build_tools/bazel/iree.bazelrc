@@ -97,7 +97,7 @@ build:generic_clang --copt=-Wall
 # ratio.
 build:generic_clang --copt=-Wno-ambiguous-member-template
 build:generic_clang --copt=-Wno-char-subscripts
-build:generic_clang --copt=-Wno-error=deprecated-declarations
+build:generic_clang --copt=-Wno-deprecated-declarations
 build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
 build:generic_clang --copt=-Wno-gnu-alignof-expression
 build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
@@ -161,8 +161,10 @@ build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-range-loop-an
 # causes flags to be passed twice.
 ###############################################################################
 build:generic_clang_release --compilation_mode=opt
+build:generic_clang_release --copt=-DNDEBUG
 build:generic_clang_release --linkopt=-Wl,--strip-all
 build:generic_gcc_release --compilation_mode=opt
+build:generic_gcc_release --copt=-DNDEBUG
 build:generic_gcc_release --linkopt=-Wl,--strip-all
 # MSVC doesn't store symbols in the binary (they're in separate .pdb files), so
 # nothing needs to be stripped.
