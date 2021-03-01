@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "llvmaot-linker"
@@ -25,8 +24,23 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Unix linker (ld-like); for ELF files.
-class UnixLinkerTool : public LinkerTool {
+// Wasm linker using wasm-ld for producing WebAssembly binaries.
+// wasm-ld behaves like traditional ELF linkers and uses similar flags.
+//
+// For details on the linking process and file formats, see:
+// * https://lld.llvm.org/WebAssembly.html
+// * https://github.com/WebAssembly/tool-conventions/blob/master/Linking.md
+//
+// For more background on WebAssembly, see:
+// * https://webassembly.org/
+// * https://developer.mozilla.org/en-US/docs/WebAssembly
+//
+// When working with WebAssembly files, these projects are useful:
+// * https://github.com/WebAssembly/wabt
+// * https://github.com/bytecodealliance/wasmtime
+//
+// Use -iree-llvm-target-triple=wasm32-unknown-unknown.
+class WasmLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
@@ -36,10 +50,10 @@ class UnixLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"ld", "ld.gold", "ld.lld"});
+    toolPath = findToolInEnvironment({"wasm-ld"});
     if (!toolPath.empty()) return toolPath;
 
-    llvm::errs() << "No Unix linker tool specified or discovered\n";
+    llvm::errs() << "No Wasm linker tool specified or discovered\n";
     return "";
   }
 
@@ -53,13 +67,10 @@ class UnixLinkerTool : public LinkerTool {
       func.addFnAttr("no-builtins");
     }
 
-    // TODO(benvanik): switch to executable libraries w/ internal functions.
+    // https://lld.llvm.org/WebAssembly.html#exports
     for (auto entryPointName : entryPointNames) {
       auto *entryPointFn = llvmModule->getFunction(entryPointName);
-      entryPointFn->setLinkage(
-          llvm::GlobalValue::LinkageTypes::ExternalLinkage);
-      entryPointFn->setVisibility(
-          llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
+      entryPointFn->addFnAttr("wasm-export-name", entryPointName);
     }
 
     return success();
@@ -69,45 +80,35 @@ class UnixLinkerTool : public LinkerTool {
       StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;
 
-    // Create the shared object name; if we only have a single input object we
-    // can just reuse that.
+    // Create the wasm binary file name; if we only have a single input object
+    // we can just reuse that.
     if (objectFiles.size() == 1) {
       artifacts.libraryFile =
-          Artifact::createVariant(objectFiles.front().path, "so");
+          Artifact::createVariant(objectFiles.front().path, "wasm");
     } else {
-      artifacts.libraryFile = Artifact::createTemporary(libraryName, "so");
+      artifacts.libraryFile = Artifact::createTemporary(libraryName, "wasm");
     }
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
         getToolPath(),
 
-        // Avoids including any libc/startup files that initialize the CRT as
-        // we don't use any of that. Our shared libraries must be freestanding.
-        "-nostdlib",  // -nodefaultlibs + -nostartfiles
+        // entry symbol not defined (pass --no-entry to suppress): _start
+        "--no-entry",
 
-        // Statically link all dependencies so we don't have any runtime deps.
-        // We cannot have any imports in the module we produce.
-        // "-static",
+        // Allow undefined symbols, provided by the runtime environment (?)
+        // TODO(scotttodd): figure out how to avoid this.
+        "--allow-undefined",
 
-        // HACK: we insert mallocs and libm calls. This is *not good*.
-        // We need hermetic binaries that pull in no imports; the MLIR LLVM
-        // lowering paths introduce a bunch, though, so this is what we are
-        // stuck with.
-        "-shared",
-        "-undefined suppress",
+        // Treat warnings as errors.
+        "--fatal-warnings",
 
         "-o " + artifacts.libraryFile.path,
     };
 
-    if (targetTriple.isOSDarwin() || targetTriple.isiOS()) {
-      flags.push_back("-dylib");
-      flags.push_back("-flat_namespace");
-    }
-
-    // Strip debug information (only, no relocations) when not requested.
+    // Strip debug information when not requested.
     if (!targetOptions.debugSymbols) {
-      flags.push_back("-Wl,--strip-debug");
+      flags.push_back("--strip-debug");
     }
 
     // Link all input objects. Note that we are not linking whole-archive as
@@ -122,9 +123,9 @@ class UnixLinkerTool : public LinkerTool {
   }
 };
 
-std::unique_ptr<LinkerTool> createUnixLinkerTool(
+std::unique_ptr<LinkerTool> createWasmLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
-  return std::make_unique<UnixLinkerTool>(targetTriple, targetOptions);
+  return std::make_unique<WasmLinkerTool>(targetTriple, targetOptions);
 }
 
 }  // namespace HAL

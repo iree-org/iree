@@ -82,7 +82,10 @@ class AndroidLinkerTool : public LinkerTool {
 
     // ANDROID_NDK must be set for us to infer the tool path.
     char *androidNDKPath = std::getenv("ANDROID_NDK");
-    if (!androidNDKPath) return toolPath;
+    if (!androidNDKPath) {
+      llvm::errs() << "ANDROID_NDK environment variable must be set\n";
+      return "";
+    }
 
     // Extract the Android version from the `android30` like triple piece.
     unsigned androidEnv[3];
