@@ -237,7 +237,7 @@ class ReorderConvOpInputDimensions : public OpRewritePattern<mhlo::ConvOp> {
 
     SmallVector<Value, 2> operands = {transposed, op.rhs()};
     auto newConv = rewriter.create<mhlo::ConvOp>(op.getLoc(), op.getType(),
-                                                 operands, op.getAttrs());
+                                                 operands, op->getAttrs());
     newConv.dimension_numbersAttr(newDimensionNumbers);
     rewriter.replaceOp(op, newConv.getResult());
 
@@ -303,7 +303,7 @@ struct ReorderConvOpKernelDimensions : public OpRewritePattern<mhlo::ConvOp> {
 
     SmallVector<Value, 2> operands = {op.lhs(), transposeKernel};
     mhlo::ConvOp newConv = rewriter.create<mhlo::ConvOp>(
-        op.getLoc(), op.getType(), operands, op.getAttrs());
+        op.getLoc(), op.getType(), operands, op->getAttrs());
     newConv.dimension_numbersAttr(newDimensionNumbers);
 
     rewriter.replaceOp(op, {newConv.getResult()});
@@ -376,7 +376,7 @@ class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
     auto newConv = rewriter.create<mhlo::ConvOp>(
         op.getLoc(),
         RankedTensorType::get(convShape, resultType.getElementType()), operands,
-        op.getAttrs());
+        op->getAttrs());
     newConv.dimension_numbersAttr(newDimensionNumbers);
 
     auto transposed = rewriter.create<mhlo::TransposeOp>(
@@ -465,7 +465,7 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
     auto resultType = op.getResult().getType();
     SmallVector<Value, 2> operands = {op.lhs(), reshapeOp.getResult()};
     auto newOp = rewriter.create<mhlo::ConvOp>(op.getLoc(), resultType,
-                                               operands, op.getAttrs());
+                                               operands, op->getAttrs());
     rewriter.replaceOp(op, newOp.getResult());
     return success();
   }

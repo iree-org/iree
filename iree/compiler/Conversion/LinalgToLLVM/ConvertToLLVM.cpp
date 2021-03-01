@@ -338,7 +338,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     // Copy all attributes onto the LLVM function except the ones handled by
     // MLIR implicitly.
     SmallVector<NamedAttribute, 4> funcAttrs;
-    for (auto attr : stdFuncOp.getAttrs()) {
+    for (auto attr : stdFuncOp->getAttrs()) {
       if (attr.first == SymbolTable::getSymbolAttrName() ||
           attr.first == mlir::impl::getTypeAttrName()) {
         continue;

@@ -45,7 +45,7 @@ class StripModuleMetadataPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-        moduleOp.getAttrs(),
+        moduleOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
       moduleOp->removeAttr(namedAttr.first);
@@ -59,7 +59,7 @@ class StripFunctionMetadataPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto stripAttrs = llvm::to_vector<4>(llvm::make_filter_range(
-        funcOp.getAttrs(),
+        funcOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
       funcOp->removeAttr(namedAttr.first);

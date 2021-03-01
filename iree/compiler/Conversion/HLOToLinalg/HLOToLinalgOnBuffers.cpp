@@ -1156,7 +1156,7 @@ class FoldReshapeIntoPlaceholder final
     if (!placeholderOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
         reshapeOp, reshapeOp.getResultType(), ValueRange(),
-        placeholderOp.getAttrs());
+        placeholderOp->getAttrs());
     return success();
   }
 };

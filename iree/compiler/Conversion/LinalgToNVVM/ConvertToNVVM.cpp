@@ -58,7 +58,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
 
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute, 4> funcAttrs;
-    for (auto attr : funcOp.getAttrs()) {
+    for (auto attr : funcOp->getAttrs()) {
       if (attr.first == SymbolTable::getSymbolAttrName() ||
           attr.first == mlir::impl::getTypeAttrName()) {
         continue;
