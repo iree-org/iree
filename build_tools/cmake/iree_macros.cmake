@@ -106,43 +106,30 @@ endfunction()
 #
 # Gets the path to an executable in a cross-compilation-aware way. This
 # should be used when accessing binaries that are used as part of the build,
-# such as for generating files used for later build steps. Those binaries
-# can come from third-party projects or another CMake invocation.
+# such as for generating files used for later build steps.
 #
 # Paramters:
 # - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
 # - EXECUTABLE: the executable to get its path.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if(CMAKE_CROSSCOMPILING)
-    # The target is defined in the CMake invocation for host. We don't have
-    # access to the target; relying on the path here.
-    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
-    set(${OUTPUT_PATH_VAR} "${_OUTPUT_PATH}" PARENT_SCOPE)
-  else()
-    # The target is defined in this CMake invocation. We can query the location
-    # directly from CMake.
+  if (NOT CMAKE_CROSSCOMPILING OR TARGET "${EXECUTABLE}")
+    # We can either expect the target to be defined as part of this CMake
+    # invocation (if not cross compiling) or the target is defined already.
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
+  else()
+    # The target won't be directly defined by this CMake invocation so check
+    # for an already built executable at IREE_HOST_BINARY_ROOT. If we find it,
+    # add it as an imported target so it gets picked up on later invocations.
+    set(_EXECUTABLE_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
+    if (EXISTS ${_EXECUTABLE_PATH})
+      add_executable("${EXECUTABLE}" IMPORTED GLOBAL)
+      set_property(TARGET "${EXECUTABLE}" PROPERTY IMPORTED_LOCATION "${_EXECUTABLE_PATH}")
+      set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
+    else()
+      message(FATAL_ERROR "Could not find '${EXECUTABLE}' at '${_EXECUTABLE_PATH}'. "
+              "Ensure that IREE_HOST_BINARY_ROOT points to installed binaries.")
+    endif()
   endif()
-endfunction()
-
-# iree_get_target_path
-#
-# Gets the path to a target in a cross-compilation-aware way. This should be
-# used when accessing targets that are used as part of the build, such as for
-# generating files used for later build steps. Those targets should be defined
-# inside IREE itself.
-#
-# Paramters:
-# - OUTPUT_VAR: variable name for receiving the path to the built target.
-# - TARGET: the target to get its path.
-function(iree_get_target_path OUTPUT_VAR TARGET)
-  # If this is a host target for cross-compilation, it should have a
-  # `HOST_TARGET_FILE` property containing the artifact's path.
-  # Otherwise it must be a target defined in the current CMake invocation
-  # and we can just use `$<TARGET_FILE:${TARGET}>` on it.
-  set(${OUTPUT_VAR}
-      "$<IF:$<BOOL:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>>,$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>,$<TARGET_FILE:${TARGET}>>"
-      PARENT_SCOPE)
 endfunction()
 
 #-------------------------------------------------------------------------------
