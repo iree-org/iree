@@ -2,7 +2,7 @@
 layout: default
 permalink: get-started/generic-vulkan-env-setup
 title: Generic Vulkan Setup
-nav_order: 11
+nav_order: 12
 parent: Getting Started
 ---
 
