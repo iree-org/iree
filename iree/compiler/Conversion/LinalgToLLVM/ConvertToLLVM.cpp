@@ -239,7 +239,8 @@ class HALDispatchABI {
     auto elementType = typeConverter->convertType(memRefType.getElementType());
     Value typedPtrValue = builder.createOrFold<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMPointerType::get(elementType, memRefType.getMemorySpace()),
+        LLVM::LLVMPointerType::get(elementType,
+                                   memRefType.getMemorySpaceAsInt()),
         basePtrValue);
 
     // Construct the MemRefDescriptor type based on the information we have.

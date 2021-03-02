@@ -51,7 +51,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
       auto memrefType = input.getType().cast<MemRefType>();
       Type elType = memrefType.getElementType();
       auto llvmType =
-          LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpace());
+          LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
       llvmInputTypes.push_back(llvmType);
     });
     signatureConverter.addInputs(llvmInputTypes);

@@ -253,10 +253,10 @@ static LogicalResult convertTensorReshapeOp(
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   // Create the reshape op.
   auto reshapeSrcType = getMemrefTypeForTensor(
-      srcTensorType, {}, inputBufferType.getMemorySpace());
+      srcTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value reshapeSrc = b.create<MemRefCastOp>(loc, inputBuffer, reshapeSrcType);
   auto reshapeResultType = getMemrefTypeForTensor(
-      resultTensorType, {}, inputBufferType.getMemorySpace());
+      resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value bufferReshape = b.create<linalg::ReshapeOp>(
       loc, reshapeResultType, reshapeSrc, op.reassociation());
   auto allocationDynamicSizes = linalg::getReshapeOutputShapeFromInputShape(

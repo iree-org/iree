@@ -329,7 +329,7 @@ Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   unsigned ratio = vecSizeInBits / type.getElementTypeBitWidth();
   if (newShape.back() % ratio != 0) return {};
   newShape.back() = newShape.back() / ratio;
-  return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
+  return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
 }
 
 class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
