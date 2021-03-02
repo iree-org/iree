@@ -6,15 +6,21 @@
 ## Prerequisites
 
 You should have already completed the
-[Python getting started guide](../get-started/getting-started-python)
+[Python getting started guide](../get-started/getting-started-python). Install
+the TensorFlow pip package:
+
+```shell
+$ python -m pip install tf-nightly
+```
 
 ## Obtaining IREE Integration Binaries
 
-IREE's integrations into parts of TensorFlow are mediated by standalone binaries
+IREE's compiler integrations into TensorFlow are mediated by standalone binaries
 that can be built individually or installed from a distribution. These binaries
 are: `iree-tf-import`, `iree-import-tflite`, and `iree-import-xla`. They are
 configured in the
-[iree_tf_compiler BUILD file](https://github.com/google/iree/blob/main/integrations/tensorflow/iree_tf_compiler/BUILD). You have a few options for how to obtain these binaries
+[iree_tf_compiler BUILD file](https://github.com/google/iree/blob/main/integrations/tensorflow/iree_tf_compiler/BUILD).
+You have a few options for how to obtain these binaries
 
 ### 1. Building with Bazel
 
