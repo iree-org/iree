@@ -38,7 +38,7 @@ For example to run TensorFlow-based tests, you can build `iree-import-tf`
 
 ```shell
 cd integrations/tensorflow
-bazel build //iree_tf_compiler:iree-import-tf
+bazel build //iree_tf_compiler:iree-tf-import
 ```
 
 ### 2. Install from a release
