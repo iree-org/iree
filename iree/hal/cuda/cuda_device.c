@@ -18,7 +18,11 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
 #include "iree/hal/cuda/cuda_allocator.h"
+#include "iree/hal/cuda/cuda_event.h"
+#include "iree/hal/cuda/descriptor_set_layout.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
+#include "iree/hal/cuda/event_semaphore.h"
+#include "iree/hal/cuda/graph_command_buffer.h"
 #include "iree/hal/cuda/status_util.h"
 
 //===----------------------------------------------------------------------===//
@@ -150,7 +154,9 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_command_buffer_t** out_command_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_graph_command_buffer_allocate(
+      &device->context_wrapper, mode, command_categories, out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda_device_create_descriptor_set(
@@ -169,12 +175,16 @@ static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_descriptor_set_layout_create(
+      &device->context_wrapper, usage_type, binding_count, bindings,
+      out_descriptor_set_layout);
 }
 
 static iree_status_t iree_hal_cuda_device_create_event(
     iree_hal_device_t* base_device, iree_hal_event_t** out_event) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_event_create(&device->context_wrapper, out_event);
 }
 
 static iree_status_t iree_hal_cuda_device_create_executable_cache(
@@ -194,14 +204,31 @@ static iree_status_t iree_hal_cuda_device_create_executable_layout(
 static iree_status_t iree_hal_cuda_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_semaphore_create(&device->context_wrapper, initial_value,
+                                        out_semaphore);
 }
 
 static iree_status_t iree_hal_cuda_device_queue_submit(
     iree_hal_device_t* base_device,
     iree_hal_command_category_t command_categories, uint64_t queue_affinity,
     iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  for (int i = 0; i < batch_count; i++) {
+    for (int j = 0; j < batches[i].command_buffer_count; j++) {
+      CUgraphExec exec = iree_hal_cuda_graph_command_buffer_exec(
+          batches[i].command_buffers[j]);
+      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           cuGraphLaunch(exec, device->stream),
+                           "cuGraphLaunch");
+    }
+  }
+  // TODO(thomasraoux): Conservatively syncronize after every submit until we
+  // support semaphores.
+  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                       cuStreamSynchronize(device->stream),
+                       "cuStreamSynchronize");
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_device_wait_semaphores_with_timeout(

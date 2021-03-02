@@ -50,12 +50,15 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFToStandard
     MLIRShape
     MLIRShapeOpsTransforms
     MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTosaToLinalg
+    MLIRTosaToSCF
+    MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
     iree::base::signature_mangle

@@ -82,8 +82,9 @@ hal.executable @conv_no_padding_tile attributes {sym_visibility = "private"} {
           {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<2x16x16x6xf32>
         %2 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x13x11x14xf32>
-        linalg.conv(%0, %1, %2) {dilations = [1, 1], strides = [1, 1]}
-          : memref<3x4x6x14xf32>, memref<2x16x16x6xf32>, memref<2x13x11x14xf32>
+        linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+           ins (%1, %0: memref<2x16x16x6xf32>, memref<3x4x6x14xf32>)
+          outs (%2: memref<2x13x11x14xf32>)
         return
       }
       hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -104,5 +105,7 @@ hal.executable @conv_no_padding_tile attributes {sym_visibility = "private"} {
 //       CHECK:   %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
 //       CHECK:   linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:      "copy_to_workgroup_memory"
-//       CHECK:   linalg.conv(%[[ARG0]], %[[SUBVIEW1]], %[[RET0SV]])
-//  CHECK-SAME:      "workgroup_memory"
+//       CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
+//  CHECK-SAME:     "workgroup_memory"
+//  CHECK-SAME:     ins(%[[SUBVIEW1]], %[[ARG0]]
+//  CHECK-SAME:    outs(%[[RET0SV]]

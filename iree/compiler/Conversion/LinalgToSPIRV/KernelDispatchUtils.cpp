@@ -448,7 +448,6 @@ LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
     return getConvOpLaunchConfig(op, targetEnv, options, tileSizes, config); \
   }
 
-GET_CONV_LAUNCH_CONFIG(linalg::ConvOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNWCFilterWCFOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNHWCFilterHWCFOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNDHWCFilterDHWCFOp)
@@ -614,7 +613,6 @@ Optional<LaunchConfig> initGPULaunchConfig(
   }
 
     DISPATCH(linalg::BatchMatmulOp)
-    DISPATCH(linalg::ConvOp)
     DISPATCH(linalg::DepthwiseConvInputNHWCFilterHWCOp)
     DISPATCH(linalg::ConvInputNWCFilterWCFOp)
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
