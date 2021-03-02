@@ -359,6 +359,55 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 // -----
 
+
+hal.executable @conv_1d attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+    hal.executable.entry_point @conv_1d attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<3x8x1xf32>, tensor<3x1x1xf32>) -> tensor<3x6x1xf32>}
+    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+      func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+        %cst = constant 0.000000e+00 : f32
+        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<3x6x1xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<3x8x1xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x1x1xf32>
+        %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+        %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+        %5 = "gpu.block_id"() {dimension = "z"} : () -> index
+        %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
+        %7 = affine.min affine_map<()[s0] -> (6, s0 * -4 + 8)>()[%4]
+        %8 = subview %1[%5, %6, 0] [1, %7, 1] [1, 1, 1] : memref<3x8x1xf32> to memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>
+        %9 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
+        %10 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
+        %11 = subview %2[0, 0, %9] [3, 1, %10] [1, 1, 1] : memref<3x1x1xf32> to memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>
+        %12 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
+        %13 = affine.min affine_map<()[s0] -> (4, s0 * -4 + 6)>()[%4]
+        %14 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
+        %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
+        %16 = subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
+        %17 = subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
+        linalg.conv_1d_input_nwc_filter_wcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
+        return
+      }
+      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+//       CHECK: func @conv_1d
+//       CHECK: scf.if
+//  CHECK-NEXT:   scf.for
+//   CHECK-NOT:     linalg.conv_1d_input_nwc_filter_wcf
+
+// -----
+
 #map0 = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0)[s0] -> (1, -d0 + s0)>
@@ -483,6 +532,58 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //       CHECK:               scf.for
 //       CHECK:                 scf.for
 //   CHECK-NOT:                   linalg.conv_2d_input_nhwc_filter_hwcf
+
+// -----
+
+hal.executable @conv_3d attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @vulkan_spirv, filter="vulkan*" {
+    hal.executable.entry_point @conv_3d attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<2x8x8x8x3xf32>, tensor<2x2x2x3x2xf32>) -> tensor<2x7x7x7x2xf32>}
+    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
+      func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+        %cst = constant 0.000000e+00 : f32
+        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x7x7x7x2xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x8x8x8x3xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x2x2x3x2xf32>
+        %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+        %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+        %5 = "gpu.block_id"() {dimension = "z"} : () -> index
+        %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
+        %7 = affine.min affine_map<()[s0] -> (5, s0 * -4 + 8)>()[%4]
+        %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
+        %9 = affine.min affine_map<()[s0] -> (33, s0 * -32 + 8)>()[%3]
+        %10 = subview %1[%5, %6, %8, 0, 0] [1, %7, %9, 8, 3] [1, 1, 1, 1, 1] : memref<2x8x8x8x3xf32> to memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>
+        %11 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
+        %12 = affine.min affine_map<()[s0] -> (4, s0 * -4 + 7)>()[%4]
+        %13 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
+        %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
+        %15 = subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
+        %16 = subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
+        linalg.conv_3d_input_ndhwc_filter_dhwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
+        return
+      }
+      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+//       CHECK: func @conv_3d
+//       CHECK: scf.if
+//  CHECK-NEXT:   scf.for
+//  CHECK-NEXT:     scf.for
+//  CHECK-NEXT:       scf.for
+//  CHECK-NEXT:         scf.for
+//  CHECK-NEXT:           scf.for
+//  CHECK-NEXT:             scf.for
+//   CHECK-NOT:               linalg.conv_3d_input_ndhwc_filter_dhwcf
 
 // -----
 
