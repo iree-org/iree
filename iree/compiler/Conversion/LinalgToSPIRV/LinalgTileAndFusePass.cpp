@@ -177,9 +177,7 @@ static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
   patterns
       .insert<PromoteMatmulSubviewsPattern,
-              PromoteConvSubviewsPattern<linalg::ConvInputNWCFilterWCFOp>,
-              PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-              PromoteConvSubviewsPattern<linalg::ConvInputNDHWCFilterDHWCFOp>>(
+              PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>>(
           context,
           linalg::LinalgPromotionOptions()
               .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -316,9 +314,7 @@ static void populateTilingToInvocationPatterns(
           getVectorizeMarker(), context));
 
   patterns.insert<
-      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
       linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
@@ -419,9 +415,7 @@ static void populateTilingConvFilterPatterns(
                            .setTileSizeComputationFunction(getTileSizeFn);
 
   patterns.insert<
-      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
       linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
       linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
       context, tilingOptions, marker);
 }
