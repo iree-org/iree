@@ -22,7 +22,7 @@ configured in the
 [iree_tf_compiler BUILD file](https://github.com/google/iree/blob/main/integrations/tensorflow/iree_tf_compiler/BUILD).
 You have a few options for how to obtain these binaries
 
-### 1. Building with Bazel
+### Option 1. Building with Bazel
 
 TensorFlow only supports the Bazel build system. If building any parts of
 TensorFlow yourself, you must have a working `bazel` command on your path. See
@@ -36,22 +36,38 @@ information.
 
 For example to run TensorFlow-based tests, you can build `iree-import-tf`
 
+TODO(4979): Rename iree-tf-import to iree-import-tf
+
 ```shell
 cd integrations/tensorflow
-bazel build //iree_tf_compiler:iree-tf-import
+bazel build \
+  //iree_tf_compiler:iree-tf-import \
+  //iree_tf_compiler:iree-import-tflite \
+  //iree_tf_compiler:iree-import-xla
+
 ```
 
-### 2. Install from a release
+The directory containing the binary will be printed (i.e.
+`bazel-bin/iree_tf_compiler/iree-tf-import`) and the parent directory must be
+passed to `-DIREE_TF_TOOLS_ROOT=` in a subsequent CMake invocation.
 
-TODO(laurenzo): Document how this works
+### Option 2. Install from a release
 
-The following CMake flags control
+TODO(#4980): Document how this works
 
-* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON`: build the TensorFlow integration.
-* `-DIREE_BUILD_TFLITE_COMPILER=ON`: build the TFLite integration.
-* `-DIREE_BUILD_XLA_COMPILER=ON`: build the XLA integration.
-* `-DIREE_TF_TOOLS_ROOT`: path to directory containing separately-built tools
-  for the enabled integrations.
+Roughly:
+
+```shell
+python -m pip install \
+  iree-tools-tf-snapshot \
+  iree-tools-tflite-snapshot \
+  iree-tools-xla-snapshot \
+  -f https://github.com/google/iree/releases
+```
+
+TODO: Need a more sophisticated mechanism than `IREE_TF_TOOLS_ROOT`, which
+only supports one directory. Also provide a tool to fetch and unpack
+release binaries.
 
 ## Building
 
@@ -61,6 +77,14 @@ your invocation. If you obtained the integration binaries by a method other than
 building them with Bazel, you will also need to pass the path to the directory
 in which they are located: `-DIREE_TF_TOOLS_ROOT=path/to/dir` (it defaults to
 the location where the Bazel build creates them). From the IREE root directory:
+
+The following CMake flags control:
+
+* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON`: build the TensorFlow integration.
+* `-DIREE_BUILD_TFLITE_COMPILER=ON`: build the TFLite integration.
+* `-DIREE_BUILD_XLA_COMPILER=ON`: build the XLA integration.
+* `-DIREE_TF_TOOLS_ROOT`: path to directory containing separately-built tools
+  for the enabled integrations.
 
 ```shell
 $ cmake -B ../iree-build-tf -G Ninja \
