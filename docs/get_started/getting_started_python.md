@@ -73,7 +73,6 @@ $ cd iree-build
 Then build like this:
 
 ```shell
-# Also include -DIREE_BUILD_TENSORFLOW_COMPILER=ON if you want the TF compiler.
 $ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
@@ -91,22 +90,6 @@ To run tests for core Python bindings built with CMake:
 ```shell
 $ ctest -L bindings/python
 ```
-
-To run tests for the TensorFlow integration, which include end-to-end backend
-comparison tests:
-
-```shell
-# TODO: Revisit once more patches land.
-$ ctest -L integrations/tensorflow/e2e
-
-# Or run individually as:
-$ export PYTHONPATH=$(pwd)/bindings/python
-# This is a Python 3 program. On some systems, such as Debian derivatives,
-# use 'python3' instead of 'python'.
-$ python ../iree/integrations/tensorflow/e2e/simple_arithmetic_test.py \
-    --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
-```
-
 ## Using Colab
 
 There are some sample colabs in the `colab` folder. If you have built the

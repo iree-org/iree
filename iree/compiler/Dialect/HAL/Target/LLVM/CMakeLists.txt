@@ -33,6 +33,8 @@ iree_cc_library(
     LLVMRISCVAsmParser
     LLVMRISCVCodeGen
     LLVMSupport
+    LLVMWebAssemblyAsmParser
+    LLVMWebAssemblyCodeGen
     LLVMX86AsmParser
     LLVMX86CodeGen
     MLIRLLVMIR
@@ -90,6 +92,7 @@ iree_cc_library(
   SRCS
     "LinkerTool.cpp"
   DEPS
+    LLVMSupport
     iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
   PUBLIC
 )

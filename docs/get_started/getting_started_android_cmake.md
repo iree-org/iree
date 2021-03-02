@@ -79,7 +79,7 @@ the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
 $ cmake -G Ninja -B ../iree-build-host/ \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_INSTALL_PREFIX=../iree-buile-host/install .
+  -DCMAKE_INSTALL_PREFIX=../iree-build-host/install .
 ```
 
 ### Target configuration

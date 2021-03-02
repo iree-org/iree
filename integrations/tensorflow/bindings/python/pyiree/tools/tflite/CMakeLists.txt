@@ -18,7 +18,7 @@ iree_py_library(
   SRCS
     "__init__.py"
   DEPS
-    integrations_iree_tensorflow_importers
+    iree_tf_compiler_iree-import-tflite
 )
 
 iree_symlink_tool(
@@ -32,7 +32,7 @@ iree_py_install_package(
   PACKAGE_NAME iree_tools_tflite
   MODULE_PATH pyiree/tools/tflite
   DEPS
-    integrations_iree_tensorflow_importers
+    iree_tf_compiler_iree-import-tflite
 )
 
 # Since imported, need to resolve the TARGET_FILE ourselves instead of

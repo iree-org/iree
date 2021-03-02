@@ -173,10 +173,9 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
 
 /// Generic conversion pattern that matches any linalg::LinalgOp. This avoids
 /// template instantiating one pattern for each linalg::LinalgOp.
-LogicalResult convertAnyLinalgOp(OpBuilder &b,
-                                 WorkgroupMemoryAllocationFn allocationFn,
-                                 linalg::LinalgOp op,
-                                 BlockAndValueMapping &bvm) {
+static LogicalResult convertAnyLinalgOp(
+    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn, linalg::LinalgOp op,
+    BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = op.getLoc();
@@ -401,11 +400,6 @@ static Operation *getInsertionPointForReplacementStoreOp(
 LogicalResult preProcessConvertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchOutputStoreOp storeOp,
     BlockAndValueMapping &bvm) {
-  Operation *valueDefiningOp = storeOp.value().getDefiningOp();
-  // TODO(ravishankarm): No real need to have this. Should be able to do this by
-  // default. Leaving it here for taking baby steps.
-  if (!isa<linalg::LinalgOp, linalg::TensorReshapeOp>(valueDefiningOp))
-    return success();
   // Find the insertion point for the subview.
   SmallVector<Value, 4> operandsOfSubviewOp;
   operandsOfSubviewOp.push_back(bvm.lookup(storeOp.target()));

@@ -17,6 +17,7 @@ iree_cc_library(
     "AndroidLinkerTool.cpp"
     "LinkerTools.cpp"
     "UnixLinkerTool.cpp"
+    "WasmLinkerTool.cpp"
     "WindowsLinkerTool.cpp"
   DEPS
     LLVMCore

@@ -106,7 +106,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # signal/noise ratio.
     "-Wno-ambiguous-member-template"
     "-Wno-char-subscripts"
-    "-Wno-error=deprecated-declarations"
+    "-Wno-deprecated-declarations"
     "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
     "-Wno-gnu-alignof-expression"
     "-Wno-gnu-variable-sized-type-not-at-end"

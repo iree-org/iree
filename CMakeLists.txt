@@ -371,16 +371,6 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
 endif()
 
 #-------------------------------------------------------------------------------
-# Bazel setup (conditional on whether features need it)
-# Depends on python configuration.
-#-------------------------------------------------------------------------------
-
-if(${IREE_ENABLE_TENSORFLOW})
-  include(configure_bazel)
-  iree_configure_bazel()
-endif()
-
-#-------------------------------------------------------------------------------
 # Other dependencies.
 #-------------------------------------------------------------------------------
 

@@ -519,3 +519,24 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
 //  CHECK-SAME:         outs(%[[RESULT_TILE]]
+
+// -----
+
+func @slice_whole_stride_dispatch_0() {
+  %c0 = constant 0 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<?x?xi32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<?x?xi32>
+  %2 = flow.dispatch.input.load %0 : !flow.dispatch.input<?x?xi32> -> tensor<?x?xi32>
+  %3 = subtensor %2[1, 0] [1, 4] [1, 1] : tensor<?x?xi32> to tensor<1x4xi32>
+  flow.dispatch.output.store %3, %1 : tensor<1x4xi32> -> !flow.dispatch.output<?x?xi32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @slice_whole_stride_dispatch_0()
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//       CHECK:   %[[SUBVIEW:.+]] = subview %[[INPUT]]
+//       CHECK:   linalg.copy(%[[SUBVIEW]], %[[OUTPUT]])
