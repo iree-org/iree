@@ -35,8 +35,8 @@ static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
 
 static llvm::cl::opt<bool> convImg2ColConversion(
     "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
-    llvm::cl::desc("Enable rewriting linalg.conv linalg.generic that does "
-                   "img2col buffer packing + "
+    llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
+                   "linalg.generic that does img2col buffer packing + "
                    "linag.matmul"),
     llvm::cl::init(false));
 
@@ -57,9 +57,9 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (convImg2ColConversion) {
-    // Linalg.ConvOp -> (Img2Col packing + matmul).  After convolution is tiled
-    // and distributed among workgroups its converted before vectorize workgroup
-    // workload.
+    // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
+    // After convolution is tiled and distributed among workgroups its converted
+    // before vectorize workgroup workload.
     nestedModulePM.addNestedPass<FuncOp>(
         createConvImg2ColMatmulConversionPass());
   }
