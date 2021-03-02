@@ -67,14 +67,15 @@ static void iree_hal_cuda_semaphore_destroy(
 
 static iree_status_t iree_hal_cuda_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
-  // TODO
+  // TODO: Support semaphores completely.
   *out_value = 0;
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
 }
 
 static iree_status_t iree_hal_cuda_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
-  // TODO
+  // TODO: Support semaphores completely. Return OK currently as everything is
+  // synchronized for each submit to allow things to run.
   return iree_ok_status();
 }
 
@@ -84,7 +85,8 @@ static void iree_hal_cuda_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 static iree_status_t iree_hal_cuda_semaphore_wait_with_deadline(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_time_t deadline_ns) {
-  // TODO
+  // TODO: Support semaphores completely. Return OK currently as everything is
+  // synchronized for each submit to allow things to run.
   return iree_ok_status();
 }
 

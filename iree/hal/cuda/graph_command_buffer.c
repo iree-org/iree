@@ -31,10 +31,12 @@ typedef struct {
   CUgraphExec exec;
   // Keep track of the last node added to the command buffer as we are currently
   // serializing all the nodes (each node depends on the previous one).
-  CUgraphNode lastNode;
+  CUgraphNode last_node;
   // Keep track of the current set of kernel arguments.
-  void** current_descriptor;
+  void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
+
+static const size_t max_binding_count = 64;
 
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
@@ -58,9 +60,11 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
   CUDA_RETURN_IF_ERROR(context->syms, cuGraphCreate(&graph, /*flags=*/0),
                        "cuGraphCreate");
   iree_hal_cuda_graph_command_buffer_t* command_buffer = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(context->host_allocator, sizeof(*command_buffer),
-                            (void**)&command_buffer);
+  size_t total_size = sizeof(*command_buffer) +
+                      max_binding_count * sizeof(void*) +
+                      max_binding_count * sizeof(CUdeviceptr);
+  iree_status_t status = iree_allocator_malloc(
+      context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda_graph_command_buffer_vtable,
                                  &command_buffer->resource);
@@ -69,8 +73,14 @@ iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
     command_buffer->allowed_categories = command_categories;
     command_buffer->graph = graph;
     command_buffer->exec = NULL;
-    command_buffer->current_descriptor = NULL;
-    command_buffer->lastNode = NULL;
+    command_buffer->last_node = NULL;
+
+    CUdeviceptr* device_ptrs =
+        (CUdeviceptr*)(command_buffer->current_descriptor + max_binding_count);
+    for (size_t i = 0; i < max_binding_count; i++) {
+      command_buffer->current_descriptor[i] = &device_ptrs[i];
+    }
+
     *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
   } else {
     context->syms->cuGraphDestroy(graph);
@@ -196,7 +206,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_discard_buffer(
 }
 
 // Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
-static uint32_t splat_pattern(const void* pattern, size_t pattern_length) {
+static uint32_t iree_hal_cuda_splat_pattern(const void* pattern,
+                                            size_t pattern_length) {
   switch (pattern_length) {
     case 1: {
       uint32_t pattern_value = *(const uint8_t*)(pattern);
@@ -227,19 +238,20 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  uint32_t dword_pattern = splat_pattern(pattern, pattern_length);
-  CUDA_MEMSET_NODE_PARAMS params = {};
-  params.dst = target_device_buffer + target_offset;
-  params.elementSize = pattern_length;
-  params.width = length;
-  params.height = 1;
-  params.value = dword_pattern;
+  uint32_t dword_pattern = iree_hal_cuda_splat_pattern(pattern, pattern_length);
+  CUDA_MEMSET_NODE_PARAMS params = {
+      .dst = target_device_buffer + target_offset,
+      .elementSize = pattern_length,
+      .width = length,
+      .height = 1,
+      .value = dword_pattern,
+  };
   // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->lastNode};
-  size_t numNode = command_buffer->lastNode ? 1 : 0;
+  CUgraphNode dep[] = {command_buffer->last_node};
+  size_t numNode = command_buffer->last_node ? 1 : 0;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuGraphAddMemsetNode(&command_buffer->lastNode, command_buffer->graph,
+      cuGraphAddMemsetNode(&command_buffer->last_node, command_buffer->graph,
                            dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemsetNode");
@@ -279,11 +291,11 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
   params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
   params.dstMemoryType = CU_MEMORYTYPE_DEVICE;
   // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->lastNode};
-  size_t numNode = command_buffer->lastNode ? 1 : 0;
+  CUgraphNode dep[] = {command_buffer->last_node};
+  size_t numNode = command_buffer->last_node ? 1 : 0;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuGraphAddMemcpyNode(&command_buffer->lastNode, command_buffer->graph,
+      cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->graph,
                            dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemcpyNode");
@@ -305,20 +317,16 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  void** arguments;
-
-  iree_status_t status = iree_allocator_malloc(
-      command_buffer->context->host_allocator,
-      binding_count * sizeof(void*) + binding_count * sizeof(CUdeviceptr),
-      (void**)&arguments);
-  CUdeviceptr* device_ptrs = (CUdeviceptr*)(arguments + binding_count);
   for (iree_host_size_t i = 0; i < binding_count; i++) {
-    uint32_t argIndex = bindings[i].binding;
-    device_ptrs[i] = iree_hal_cuda_buffer_device_pointer(bindings[i].buffer);
-    arguments[argIndex] = &device_ptrs[i];
+    uint32_t arg_index = bindings[i].binding;
+    assert(arg_index < max_binding_count &&
+           "binding index larger than the max expected.");
+    CUdeviceptr device_ptr =
+        iree_hal_cuda_buffer_device_pointer(bindings[i].buffer) +
+        iree_hal_buffer_byte_offset(bindings[i].buffer);
+    *((CUdeviceptr*)command_buffer->current_descriptor[arg_index]) = device_ptr;
   }
-  command_buffer->current_descriptor = arguments;
-  return status;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_bind_descriptor_set(
