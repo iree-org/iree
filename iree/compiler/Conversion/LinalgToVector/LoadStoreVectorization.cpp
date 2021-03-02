@@ -194,7 +194,7 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
       MemRefType vecMemRef = std::get<1>(it);
       auto arg = rewriter.create<IREE::PlaceholderOp>(placeholder.getLoc(),
                                                       vecMemRef, ValueRange{},
-                                                      placeholder.getAttrs());
+                                                      placeholder->getAttrs());
       rewriter.replaceOp(placeholder, arg.getResult());
       newArgs.push_back(arg.getResult());
     }

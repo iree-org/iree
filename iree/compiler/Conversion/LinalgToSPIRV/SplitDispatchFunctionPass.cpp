@@ -267,7 +267,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     });
 
     // Copy over all attributes except type and name.
-    for (const auto &namedAttr : oldFn.getAttrs()) {
+    for (const auto &namedAttr : oldFn->getAttrs()) {
       if (namedAttr.first != impl::getTypeAttrName() &&
           namedAttr.first != SymbolTable::getSymbolAttrName())
         newFn->setAttr(namedAttr.first, namedAttr.second);

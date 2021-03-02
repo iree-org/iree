@@ -190,7 +190,7 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
     p << " : ";
     p.printType(op.type());
   }
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
                                          "sym_name",
                                          "type",
                                          "is_mutable",
@@ -710,7 +710,7 @@ static void printCommandBufferExecutionBarrierOp(
   p << "\", \"";
   p << stringifyExecutionBarrierFlagBitfield(op.flags());
   p << "\"";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{
                                          "source_stage_mask",
                                          "target_stage_mask",
@@ -849,7 +849,7 @@ static void printCommandBufferPushDescriptorSetOp(
   p << ", bindings = [";
   printDescriptorSetBindings(p, op);
   p << "]";
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
                               "set",
                               "bindings",
                           });
@@ -941,7 +941,7 @@ static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
@@ -1031,7 +1031,7 @@ static void printDescriptorSetCreateOp(OpAsmPrinter &p,
   p << ", bindings = [";
   printDescriptorSetBindings(p, op);
   p << "]";
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
                               "bindings",
                           });
 }
@@ -1186,7 +1186,7 @@ static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
         p << ",\n";
         p.getStream().indent(4);
       });
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"conditions"});
 }
 
@@ -1268,7 +1268,7 @@ static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
@@ -1309,7 +1309,7 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
                                         ExecutableEntryPointOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
   if (op.workgroup_count_region().empty()) return;
   p.printRegion(op.workgroup_count_region().front());
@@ -1392,7 +1392,7 @@ static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
   p.printSymbolName(op.sym_name());
   p << ", filter=\"" << op.target_backend_filter() << "\"";
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(),
                        "target_backend_filter"});
   if (!op.body().empty()) {
@@ -1456,7 +1456,7 @@ static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   if (!op.body().empty()) {
     p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
@@ -1532,7 +1532,7 @@ static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
@@ -1611,7 +1611,7 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
   p << ", binding=" << op.binding();
   p << ", type=\"" << stringifyDescriptorType(op.type()) << "\"";
   p << ", access=\"" << stringifyMemoryAccessBitfield(op.access()) << "\"";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{
                                          mlir::SymbolTable::getSymbolAttrName(),
                                          "set",

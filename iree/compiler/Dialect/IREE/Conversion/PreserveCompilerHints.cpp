@@ -31,7 +31,7 @@ class PreserveDoNotOptimize
       IREE::DoNotOptimizeOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(op, operands,
-                                                       op.getAttrs());
+                                                       op->getAttrs());
     return success();
   }
 };
