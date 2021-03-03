@@ -1,18 +1,14 @@
 // RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -canonicalize %s | IreeFileCheck %s
 
 
-// CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:  %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:  %[[C2:.+]] = constant 2 : index
-// CHECK-DAG:  %[[C3:.+]] = constant 3 : index
 // CHECK-DAG:  %[[IN0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
 // CHECK-DAG:  %[[IN1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x3xi32>
 // CHECK:      %[[INIT:.+]] = linalg.init_tensor [2, 5] : tensor<2x5xi32>
 // CHECK:      %[[FILL:.+]] = linalg.fill(%[[INIT]], %{{.*}}) : tensor<2x5xi32>, i32 -> tensor<2x5xi32>
 // CHECK:      %[[OUT0:.+]] = subtensor_insert %[[IN0]] into
-// CHECK-SAME:   %[[FILL]][%[[C0]], %[[C0]]] [%[[C2]], %[[C2]]] [%[[C1]], %[[C1]]] : tensor<2x2xi32> into tensor<2x5xi32>
+// CHECK-SAME:   %[[FILL]][0, 0] [2, 2] [1, 1] : tensor<2x2xi32> into tensor<2x5xi32>
 // CHECK:      %[[OUT1:.+]] = subtensor_insert %[[IN1]] into
-// CHECK-SAME:   %[[OUT0]][%[[C0]], %[[C2]]] [%[[C2]], %[[C3]]] [%[[C1]], %[[C1]]] : tensor<2x3xi32> into tensor<2x5xi32>
+// CHECK-SAME:   %[[OUT0]][0, 2] [2, 3] [1, 1] : tensor<2x3xi32> into tensor<2x5xi32>
 module {
   func @concatenate() {
     %c0 = constant 0 : index
@@ -33,18 +29,14 @@ module {
 
 // -----
 
-// CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:  %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:  %[[C2:.+]] = constant 2 : index
-// CHECK-DAG:  %[[C3:.+]] = constant 3 : index
 // CHECK-DAG:  %[[CST:.+]] = constant dense<42> : tensor<3x2xi32>
 // CHECK-DAG:  %[[IN:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
 // CHECK:      %[[INIT:.+]] = linalg.init_tensor [5, 2] : tensor<5x2xi32>
 // CHECK:      %[[FILL:.+]] = linalg.fill(%[[INIT]], %{{.*}}) : tensor<5x2xi32>, i32 -> tensor<5x2xi32>
 // CHECK:      %[[OUT0:.+]] = subtensor_insert %[[IN]] into
-// CHECK-SAME:   %[[FILL]][%[[C0]], %[[C0]]] [%[[C2]], %[[C2]]] [%[[C1]], %[[C1]]] : tensor<2x2xi32> into tensor<5x2xi32>
+// CHECK-SAME:   %[[FILL]][0, 0] [2, 2] [1, 1] : tensor<2x2xi32> into tensor<5x2xi32>
 // CHECK:      %[[OUT1:.+]] = subtensor_insert %[[CST]] into
-// CHECK-SAME:   %[[OUT0]][%[[C2]], %[[C0]]] [%[[C3]], %[[C2]]] [%[[C1]], %[[C1]]] : tensor<3x2xi32> into tensor<5x2xi32>
+// CHECK-SAME:   %[[OUT0]][2, 0] [3, 2] [1, 1] : tensor<3x2xi32> into tensor<5x2xi32>
 module {
   func @concatenate() {
     %c0 = constant 0 : index
