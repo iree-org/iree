@@ -95,6 +95,7 @@ cc_binary(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_to_mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_parser",
         "@org_tensorflow//tensorflow/compiler/xla/service:hlo_proto_cc",
         "@org_tensorflow//tensorflow/core:lib",
     ],

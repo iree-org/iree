@@ -51,6 +51,7 @@ class ImportFormat(Enum):
   """Import type of the model."""
   BINARY_PROTO = "binary_proto"
   TEXT_PROTO = "text_proto"
+  HLO_TEXT = "hlo_text"
 
   @staticmethod
   def parse(spec: Union[str, "ImportFormat"]) -> "ImportFormat":
@@ -164,7 +165,9 @@ def compile_str(xla_content: Union[bytes, str], **kwargs):
   """
   options = ImportOptions(**kwargs)
   if isinstance(xla_content, str):
-    if options.import_format != ImportFormat.TEXT_PROTO:
+    if options.import_format not in [
+        ImportFormat.TEXT_PROTO, ImportFormat.HLO_TEXT
+    ]:
       raise ValueError("If passing a string, ImportFormat must be TEXT_PROTO")
     xla_content = xla_content.encode("utf-8")
 
