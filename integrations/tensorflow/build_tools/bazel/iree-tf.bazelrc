@@ -14,3 +14,7 @@
 
 # For now, just import the main IREE bazelrc
 try-import %workspace%/../../build_tools/bazel/iree.bazelrc
+
+# Ignore visibility issues in TensorFlow. They are inconsistently applied
+# to the OSS codebase.
+build --nocheck_visibility

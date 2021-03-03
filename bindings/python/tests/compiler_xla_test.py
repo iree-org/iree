@@ -90,6 +90,34 @@ class CompilerTest(unittest.TestCase):
     logging.info("Binary length = %d", len(binary))
     self.assertIn(b"main", binary)
 
+  def testImportHloTextFile(self):
+    path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
+    text = compile_file(path, import_only=True,
+                        import_format="hlo_text").decode("utf-8")
+    logging.info("%s", text)
+    self.assertIn("mhlo.constant", text)
+    self.assertIn("iree.module.export", text)
+
+  def testImportHloTextStr(self):
+    path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
+    with open(path, "rt") as f:
+      content = f.read()
+    text = compile_str(content, import_only=True,
+                       import_format="hlo_text").decode("utf-8")
+    logging.info("%s", text)
+    self.assertIn("mhlo.constant", text)
+    self.assertIn("iree.module.export", text)
+
+  def testImportHloTextBytes(self):
+    path = os.path.join(os.path.dirname(__file__), "testdata", "xla_sample.hlo")
+    with open(path, "rb") as f:
+      content = f.read()
+    text = compile_str(content, import_only=True,
+                       import_format="hlo_text").decode("utf-8")
+    logging.info("%s", text)
+    self.assertIn("mhlo.constant", text)
+    self.assertIn("iree.module.export", text)
+
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.DEBUG)

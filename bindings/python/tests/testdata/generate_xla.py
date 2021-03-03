@@ -32,3 +32,5 @@ xla_computation = builder.Build(result)
 this_dir = os.path.dirname(__file__)
 with open(os.path.join(this_dir, "xla_sample.pb"), "wb") as f:
   f.write(xla_computation.as_serialized_hlo_module_proto())
+with open(os.path.join(this_dir, "xla_sample.hlo"), "wt") as f:
+  f.write(xla_computation.as_hlo_text())
