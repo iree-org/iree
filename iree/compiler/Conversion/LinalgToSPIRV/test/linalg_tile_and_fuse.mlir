@@ -585,7 +585,6 @@ hal.executable @depthwise_conv2d_2452x2423_valid_stride_2 attributes {sym_visibi
   }
 }
 
-
 // CHECK-LABEL: func @depthwise_conv2d_2452x2423_valid_stride_2()
 // CHECK:         linalg.fill
 // CHECK:         linalg.generic
