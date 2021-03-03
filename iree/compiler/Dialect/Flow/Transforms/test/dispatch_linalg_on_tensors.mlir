@@ -18,11 +18,11 @@ func @tensor() -> tensor<2x4xf32> {
 
   // %[[C2]] will be handled by a later RematerializeDispatchConstants
   //      CHECK: flow.dispatch.workgroups[%[[C4wg]], %[[C2wg]], %[[C1wg]]](%[[outerA]], %[[outerB]], %[[outerC]]) :
-  // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> (tensor<2x4xf32>) =
-  // CHECK-NEXT:    (%[[A:[0-9a-z]*]]: !flow.dispatch.input<2x3xf32>,
-  // CHECK-SAME:     %[[B:[0-9a-z]*]]: !flow.dispatch.input<3x4xf32>,
-  // CHECK-SAME:     %[[C:[0-9a-z]*]]: !flow.dispatch.input<2x4xf32>,
-  // CHECK-SAME:     %[[OUT:[0-9a-z]*]]: !flow.dispatch.output<2x4xf32>) {
+  // CHECK-SAME:    (tensor<2x3xf32>, tensor<3x4xf32>, tensor<2x4xf32>) -> tensor<2x4xf32> =
+  // CHECK-NEXT:    (%[[A:[0-9a-z]*]]: !flow.dispatch.tensor<readonly:2x3xf32>,
+  // CHECK-SAME:     %[[B:[0-9a-z]*]]: !flow.dispatch.tensor<readonly:3x4xf32>,
+  // CHECK-SAME:     %[[C:[0-9a-z]*]]: !flow.dispatch.tensor<readonly:2x4xf32>,
+  // CHECK-SAME:     %[[OUT:[0-9a-z]*]]: !flow.dispatch.tensor<writeonly:2x4xf32>) {
   //  CHECK-DAG:   %[[C0:.*]] = constant 0 : index
   //  CHECK-DAG:   %[[C1:.*]] = constant 1 : index
   //  CHECK-DAG:   %[[C2:.*]] = constant 2 : index
@@ -38,23 +38,23 @@ func @tensor() -> tensor<2x4xf32> {
   // CHECK-NEXT:     scf.for %[[J:.*]] = %[[bix_scaled]] to %[[C4]] step %[[bdx_scaled]] {
   // Canonicalizations not yet powerful enough here.
   // CHECK-NEXT:       %[[MIN_I:.*]] = affine.min{{.*}}(%[[I]])
-  // CHECK-NEXT:       %[[AA:.*]] = flow.dispatch.input.load %[[A]],
+  // CHECK-NEXT:       %[[AA:.*]] = flow.dispatch.tensor.load %[[A]],
   // CHECK-SAME:         offsets = [%[[I]], %[[C0]]], sizes = [%[[MIN_I]], %[[C3]]], strides = [%[[C1]], %[[C1]]] :
-  // CHECK-SAME:           !flow.dispatch.input<2x3xf32> -> tensor<?x3xf32>
+  // CHECK-SAME:           !flow.dispatch.tensor<readonly:2x3xf32> -> tensor<?x3xf32>
   //
   // Canonicalizations not yet powerful enough here.
   // CHECK-NEXT:       %[[MIN_J:.*]] = affine.min{{.*}}(%[[J]])
-  // CHECK-NEXT:       %[[BB:.*]] = flow.dispatch.input.load %[[B]],
+  // CHECK-NEXT:       %[[BB:.*]] = flow.dispatch.tensor.load %[[B]],
   // CHECK-SAME:         offsets = [%[[C0]], %[[J]]], sizes = [%[[C3]], %[[MIN_J]]], strides = [%[[C1]], %[[C1]]] :
-  // CHECK-SAME:           !flow.dispatch.input<3x4xf32> -> tensor<3x?xf32>
-  // CHECK-NEXT:       %[[CC:.*]] = flow.dispatch.input.load %[[C]],
+  // CHECK-SAME:           !flow.dispatch.tensor<readonly:3x4xf32> -> tensor<3x?xf32>
+  // CHECK-NEXT:       %[[CC:.*]] = flow.dispatch.tensor.load %[[C]],
   // CHECK-SAME:         offsets = [%[[I]], %[[J]]], sizes = [%[[MIN_I]], %[[MIN_J]]], strides = [%[[C1]], %[[C1]]] :
-  // CHECK-SAME:           !flow.dispatch.input<2x4xf32> -> tensor<?x?xf32>
+  // CHECK-SAME:           !flow.dispatch.tensor<readonly:2x4xf32> -> tensor<?x?xf32>
   // CHECK-NEXT:       %[[RES:.*]] = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%[[AA]], %[[BB]] :
   // CHECK-SAME:         tensor<?x3xf32>, tensor<3x?xf32>) outs(%[[CC]] : tensor<?x?xf32>) -> tensor<?x?xf32>
-  // CHECK-NEXT:       flow.dispatch.output.store %[[RES]], %[[OUT]],
+  // CHECK-NEXT:       flow.dispatch.tensor.store %[[RES]], %[[OUT]],
   // CHECK-SAME:         offsets = [%[[I]], %[[J]]], sizes = [%[[MIN_I]], %[[MIN_J]]], strides = [%[[C1]], %[[C1]]] :
-  // CHECK-SAME:           tensor<?x?xf32> -> !flow.dispatch.output<2x4xf32>
+  // CHECK-SAME:           tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:2x4xf32>
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
   // CHECK-NEXT:   flow.return
@@ -163,12 +163,12 @@ func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   //  CHECK-DAG: %[[D0:.+]] = dim %[[ARG2]], %[[C0]]
   //  CHECK-DAG: %[[D1:.+]] = dim %[[ARG2]], %[[C1]]
   //      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]](%[[ARG2]])
-  // CHECK-NEXT:   %[[ARG3:.+]]: !flow.dispatch.input<?x?xf32>
-  // CHECK-SAME:   %[[ARG4:.+]]: !flow.dispatch.output<?x?xf32>
-  //      CHECK:   %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG3]]
+  // CHECK-NEXT:   %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+  // CHECK-SAME:   %[[ARG4:.+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+  //      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG3]]
   //      CHECK:   %[[STOREVAL:.+]] = linalg.generic
   // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
-  //      CHECK:   flow.dispatch.output.store %[[STOREVAL]], %[[ARG4]]
+  //      CHECK:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG4]]
 
   // linalg.generic is fused inside the dispatch region and becomes a noop but
   // there is still a use.

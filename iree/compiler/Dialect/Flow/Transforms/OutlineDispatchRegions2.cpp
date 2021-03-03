@@ -72,10 +72,12 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   }
 
   // Create the dispatch op to the executable function.
+  // Note that we copy the tied operand indices from the workgroups op - it
+  // lines up 1:1 with the dispatch once we've outlined things.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, regionOp.workgroup_count(),
       regionOp.getResultTypes(), resultDynamicDims, newOperands,
-      operandDynamicDims);
+      operandDynamicDims, regionOp.getTiedResultOperandIndices());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
@@ -102,13 +104,9 @@ static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
   SmallVector<Type, 4> operandTypes;
   int64_t totalDynamicDims = 0;
   for (auto &operand : region.getArguments()) {
-    if (auto inputType = operand.getType().dyn_cast<DispatchInputType>()) {
-      operandTypes.push_back(inputType);
-      totalDynamicDims += inputType.getNumDynamicDims();
-    } else if (auto outputType =
-                   operand.getType().dyn_cast<DispatchOutputType>()) {
-      operandTypes.push_back(outputType);
-      totalDynamicDims += outputType.getNumDynamicDims();
+    if (auto tensorType = operand.getType().dyn_cast<DispatchTensorType>()) {
+      operandTypes.push_back(tensorType);
+      totalDynamicDims += tensorType.getNumDynamicDims();
     } else {
       // Pass-through.
       operandTypes.push_back(operand.getType());

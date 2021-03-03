@@ -120,6 +120,7 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     SmallVector<Value, 8> fragmentResults;
     SmallVector<Value, 8> fragmentResultDims;
     SmallVector<Type, 8> fragmentResultTypes;
+    SmallVector<int64_t, 8> fragmentTiedOperands;
     for (auto *op : streamOps) {
       for (auto operand : op->getOperands()) {
         if (std::find(fragmentOperands.begin(), fragmentOperands.end(),
@@ -159,7 +160,7 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     // Create the fragment and clone in all of the ops.
     auto fragmentOp = blockBuilder.create<ExStreamFragmentOp>(
         fragmentLoc, fragmentResultTypes, fragmentResultDims, fragmentOperands,
-        fragmentOperandDims);
+        fragmentOperandDims, fragmentTiedOperands);
     auto *entryBlock = new Block();
     fragmentOp.body().getBlocks().push_back(entryBlock);
     entryBlock->addArguments(TypeRange(fragmentOp.operands()));

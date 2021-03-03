@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-split-dispatch-function))" -verify-diagnostics %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-split-dispatch-function))' -verify-diagnostics %s | IreeFileCheck %s
 
 hal.executable @kernel_fusable_fill_conv1d_ops attributes {sym_visiblity = "private"} {
   hal.interface @legacy_io {
@@ -9,8 +9,8 @@ hal.executable @kernel_fusable_fill_conv1d_ops attributes {sym_visiblity = "priv
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv1d_ops attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x512xf32>, !flow.dispatch.input<3x512x1xf32>,
-        !flow.dispatch.output<?x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x512xf32>, !flow.dispatch.tensor<readonly:3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x512xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_fill_conv1d_ops
       //     CHECK:   linalg.fill
@@ -55,8 +55,8 @@ hal.executable @kernel_fusable_fill_conv2d_ops attributes {sym_visiblity = "priv
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv2d_ops attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x3x512xf32>, !flow.dispatch.input<3x3x512x1xf32>,
-        !flow.dispatch.output<?x1x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_fill_conv2d_ops
       //     CHECK:   linalg.fill
@@ -102,8 +102,8 @@ hal.executable @kernel_fusable_fill_conv3d_ops attributes {sym_visiblity = "priv
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_conv3d_ops attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x3x3x512xf32>, !flow.dispatch.input<3x3x3x512x1xf32>,
-        !flow.dispatch.output<?x1x1x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x1x1x512xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_fill_conv3d_ops
       //     CHECK:   linalg.fill
@@ -149,8 +149,8 @@ hal.executable @kernel_fusable_fill_matmul_ops attributes {sym_visiblity = "priv
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_matmul_ops attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x512xf32>, !flow.dispatch.input<512x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x512xf32>, !flow.dispatch.tensor<readonly:512x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_fill_matmul_ops
       //     CHECK:   linalg.fill
@@ -196,8 +196,8 @@ hal.executable @kernel_fusable_pooling attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_pooling attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?x?x?xf32>,
-        !flow.dispatch.output<?x?x?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?x?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?x?x?xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_pooling()
       //     CHECK:   linalg.fill
@@ -236,8 +236,8 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x3x512xf32>, !flow.dispatch.input<3x3x512x1xf32>,
-        !flow.dispatch.output<?x1x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     // CHECK: hal.executable.entry_point @kernel_dispatch_0
     // CHECK: hal.executable.entry_point @kernel_dispatch_1
     // CHECK: module attributes {hal.entry_point_schedule = [@kernel_dispatch_0, @kernel_dispatch_1]}
@@ -303,8 +303,8 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x3x512xf32>, !flow.dispatch.input<3x3x512x1xf32>,
-        !flow.dispatch.output<?x1x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x1x512xf32>) -> ()}
     // CHECK: hal.executable.entry_point @kernel_dispatch_0
     // CHECK: hal.executable.entry_point @kernel_dispatch_1
     // CHECK: hal.executable.entry_point @kernel_dispatch_2
@@ -385,8 +385,8 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<1x3x3x512xf32>, !flow.dispatch.input<3x3x512x1xf32>,
-        !flow.dispatch.output<1x1x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:1x3x3x512xf32>, !flow.dispatch.tensor<readonly:3x3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:1x1x1x512xf32>) -> ()}
     // CHECK-NOT: hal.entry_point_schedule
     module {
       // CHECK-LABEL: @kernel()
@@ -427,8 +427,8 @@ hal.executable @kernel attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x3x512xf32>, !flow.dispatch.input<3x512x1xf32>,
-        !flow.dispatch.output<?x1x512xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x3x512xf32>, !flow.dispatch.tensor<readonly:3x512x1xf32>,
+        !flow.dispatch.tensor<writeonly:?x1x512xf32>) -> ()}
     module {
       // expected-error @+1 {{cannot separate Linalg/Parallel ops into multiple kernels}}
       func @kernel() {
@@ -465,7 +465,7 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @subview_interleaved attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<18x12xf32>, !flow.dispatch.output<12x4xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:18x12xf32>, !flow.dispatch.tensor<writeonly:12x4xf32>) -> ()}
     module {
       func @subview_interleaved() {
         %cst = constant 0.000000e+00 : f32
@@ -516,8 +516,8 @@ hal.executable @reshape_interleaved attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @reshape_interleaved attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<2x4xf32>, !flow.dispatch.output<1x2x4xf32>,
-        !flow.dispatch.output<2x4xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:2x4xf32>, !flow.dispatch.tensor<writeonly:1x2x4xf32>,
+        !flow.dispatch.tensor<writeonly:2x4xf32>) -> ()}
     module {
       func @reshape_interleaved() {
         %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
@@ -576,8 +576,8 @@ hal.executable @predict_ex_dispatch_0 attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @predict_ex_dispatch_0 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<1x512x1xf32>, !flow.dispatch.input<4x8x16xf32>,
-        !flow.dispatch.output<4x8x16xf32>, !flow.dispatch.output<4x8x16xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:1x512x1xf32>, !flow.dispatch.tensor<readonly:4x8x16xf32>,
+        !flow.dispatch.tensor<writeonly:4x8x16xf32>, !flow.dispatch.tensor<writeonly:4x8x16xf32>) -> ()}
     module {
       func @predict_ex_dispatch_0() {
         %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x512x1xf32>
@@ -637,8 +637,8 @@ hal.executable @kernel_fusable_fill_matmul_generic_ops attributes {sym_visiblity
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_fill_matmul_generic_ops attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x512xf32>, !flow.dispatch.input<512x?xf32>,
-        !flow.dispatch.input<?x?xf32>, !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x512xf32>, !flow.dispatch.tensor<readonly:512x?xf32>,
+        !flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_fill_matmul_generic_ops
       //     CHECK:   linalg.fill

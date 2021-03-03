@@ -70,29 +70,43 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
   // NOTE: we assume right now that all entry points have the same signature.
   // TODO(benvanik): replace when we have descriptor sets in the HAL IR.
   auto anyFuncOp = entryFuncOps.front();
-  int binding = 0;
+  int nextBindingOrdinal = 0;
   int pushConstantCount = 0;
-  int argOrdinal = 0;
-  int retOrdinal = 0;
   for (auto inputType : llvm::enumerate(anyFuncOp.getType().getInputs())) {
     if (inputType.value().isa<TensorType>()) {
+      int bindingOrdinal = nextBindingOrdinal++;
       auto bindingName = "arg" + std::to_string(inputType.index());
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
-    } else if (inputType.value().isa<IREE::Flow::DispatchInputType>()) {
-      auto bindingName = "arg" + std::to_string(argOrdinal++);
+    } else if (auto tensorType =
+                   inputType.value()
+                       .dyn_cast<IREE::Flow::DispatchTensorType>()) {
+      StringRef prefix;
+      IREE::HAL::MemoryAccessBitfield memoryAccess =
+          IREE::HAL::MemoryAccessBitfield::None;
+      switch (tensorType.getAccess()) {
+        case IREE::Flow::TensorAccess::ReadOnly:
+          prefix = "ro";
+          memoryAccess = IREE::HAL::MemoryAccessBitfield::Read;
+          break;
+        case IREE::Flow::TensorAccess::ReadWrite:
+          prefix = "rw";
+          memoryAccess = IREE::HAL::MemoryAccessBitfield::Read |
+                         IREE::HAL::MemoryAccessBitfield::Write;
+          break;
+        case IREE::Flow::TensorAccess::WriteOnly:
+          prefix = "wo";
+          memoryAccess = IREE::HAL::MemoryAccessBitfield::DiscardWrite;
+          break;
+      }
+      int bindingOrdinal = nextBindingOrdinal++;
+      std::string bindingName =
+          std::string(prefix) + std::to_string(bindingOrdinal);
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
-          IREE::HAL::DescriptorType::StorageBuffer,
-          IREE::HAL::MemoryAccessBitfield::Read);
-    } else if (inputType.value().isa<IREE::Flow::DispatchOutputType>()) {
-      auto bindingName = "ret" + std::to_string(retOrdinal++);
-      interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
-          IREE::HAL::DescriptorType::StorageBuffer,
-          IREE::HAL::MemoryAccessBitfield::DiscardWrite);
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
+          IREE::HAL::DescriptorType::StorageBuffer, memoryAccess);
     } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
       ++pushConstantCount;
     } else if (auto integerType = inputType.value().dyn_cast<IntegerType>()) {
@@ -113,10 +127,11 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     }
   }
   for (auto outputType : llvm::enumerate(anyFuncOp.getType().getResults())) {
+    int bindingOrdinal = nextBindingOrdinal++;
     auto bindingName = "ret" + std::to_string(outputType.index());
     if (outputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/bindingOrdinal,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::DiscardWrite);
     } else {

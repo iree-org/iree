@@ -29,6 +29,7 @@ filegroup(
     srcs = enforce_glob(
         [
             "IREEBase.td",
+            "IREEInterfaces.td",
             "IREEOps.td",
         ],
         include = ["*.td"],
@@ -39,18 +40,21 @@ cc_library(
     name = "IR",
     srcs = [
         "IREEDialect.cpp",
+        "IREEOpInterfaces.cpp.inc",
         "IREEOps.cpp",
         "IREEOps.cpp.inc",
         "IREETypes.cpp",
     ],
     hdrs = [
         "IREEDialect.h",
+        "IREEOpInterfaces.h.inc",
         "IREEOps.h",
         "IREEOps.h.inc",
         "IREETraits.h",
         "IREETypes.h",
     ],
     deps = [
+        ":IREEInterfacesGen",
         ":IREEOpsGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -58,6 +62,20 @@ cc_library(
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+gentbl(
+    name = "IREEInterfacesGen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "IREEOpInterfaces.h.inc"),
+        ("-gen-op-interface-defs", "IREEOpInterfaces.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEInterfaces.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 

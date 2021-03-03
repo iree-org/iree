@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -68,11 +69,57 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TiedResult>
+//===----------------------------------------------------------------------===//
+// type{%dim0, %dim1}
+// %arg0
+
+static ParseResult parseTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
+  if (failed(parser.parseType(resultType))) return failure();
+  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+    if (!shapedType.hasStaticShape()) {
+      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+      if (failed(parser.parseLBrace()) ||
+          failed(parser.parseOperandList(dynamicDims,
+                                         shapedType.getNumDynamicDims(),
+                                         OpAsmParser::Delimiter::None)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      resultDims.append(dynamicDims);
+    }
+  }
+  tiedOperands = parser.getBuilder().getIndexArrayAttr({0});
+  return success();
+}
+
+static void printTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                            ValueRange resultDims, ArrayAttr tiedOperands) {
+  p.printType(resultType);
+  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+    if (!shapedType.hasStaticShape()) {
+      if (resultDims.empty()) {
+        p << "{<<INVALID>>}";
+        return;
+      }
+      p << "{";
+      llvm::interleaveComma(
+          resultDims.take_front(shapedType.getNumDynamicDims()), p,
+          [&](Value value) { p.printOperand(value); });
+      p << "}";
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // custom<ShapedFunctionType>
 //===----------------------------------------------------------------------===//
-// (type, type{%dim0, %dim1}, type) -> type{%dim2}
+// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
 
-static ParseResult parseShapedTypeList(
+static ParseResult parseShapedOperandList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
     SmallVectorImpl<OpAsmParser::OperandType> &dims) {
   do {
@@ -80,12 +127,15 @@ static ParseResult parseShapedTypeList(
     if (failed(parser.parseType(type))) return failure();
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (!shapedType.hasStaticShape()) {
+        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
         if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dims, shapedType.getNumDynamicDims(),
+            failed(parser.parseOperandList(dynamicDims,
+                                           shapedType.getNumDynamicDims(),
                                            OpAsmParser::Delimiter::None)) ||
             failed(parser.parseRBrace())) {
           return failure();
         }
+        dims.append(dynamicDims);
       }
     }
     types.push_back(type);
@@ -93,60 +143,174 @@ static ParseResult parseShapedTypeList(
   return success();
 }
 
-static void printShapedTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
-                                OperandRange dims) {
-  llvm::interleaveComma(types, p, [&](Type type) {
-    p.printType(type);
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (dims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(dims.take_front(shapedType.getNumDynamicDims()),
-                              p, [&](Value value) { p.printOperand(value); });
-        p << "}";
-        dims = dims.drop_front(shapedType.getNumDynamicDims());
+// Ties the |tiedResult| parsed operand back to a previously parsed operand.
+// The type and any dynamic dimensions of the operand will be used for the
+// result values and the operand index will be appended to |tiedOperandIndices|.
+static ParseResult tieOperand(
+    OpAsmParser::OperandType tiedResult, OpAsmParser &parser,
+    ArrayRef<OpAsmParser::OperandType> operands, TypeRange operandTypes,
+    ArrayRef<OpAsmParser::OperandType> operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<int64_t> &tiedOperandIndices) {
+  int64_t operandIndex = TiedOpInterface::kUntiedIndex;
+  for (int64_t i = 0; i < operands.size(); ++i) {
+    if (operands[i].name == tiedResult.name) {
+      operandIndex = i;
+      break;
+    }
+  }
+  if (operandIndex == TiedOpInterface::kUntiedIndex) {
+    return parser.emitError(tiedResult.location,
+                            "tied operand not found for result reference ")
+           << tiedResult.name;
+  }
+
+  auto resultType = operandTypes[operandIndex];
+  resultTypes.push_back(resultType);
+  tiedOperandIndices.push_back(operandIndex);
+
+  auto shapedType = resultType.dyn_cast<ShapedType>();
+  if (shapedType) {
+    unsigned dimsIndex = 0;
+    for (unsigned i = 0; i < operandIndex; ++i) {
+      if (auto shapedType = operandTypes[i].dyn_cast<ShapedType>()) {
+        dimsIndex += shapedType.getNumDynamicDims();
       }
     }
-  });
+    resultDims.append(llvm::to_vector<4>(
+        operandDims.slice(dimsIndex, shapedType.getNumDynamicDims())));
+  }
+
+  return success();
+}
+
+static ParseResult parseShapedResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
+  SmallVector<int64_t, 4> tiedOperandIndices;
+  do {
+    OpAsmParser::OperandType tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    if (res.hasValue() && succeeded(res.getValue())) {
+      if (failed(tieOperand(tiedResult, parser, operands, operandTypes,
+                            operandDims, resultTypes, resultDims,
+                            tiedOperandIndices))) {
+        return failure();
+      }
+    } else {
+      Type type;
+      if (failed(parser.parseType(type))) return failure();
+      if (auto shapedType = type.dyn_cast<ShapedType>()) {
+        if (!shapedType.hasStaticShape()) {
+          SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+          if (failed(parser.parseLBrace()) ||
+              failed(parser.parseOperandList(dynamicDims,
+                                             shapedType.getNumDynamicDims(),
+                                             OpAsmParser::Delimiter::None)) ||
+              failed(parser.parseRBrace())) {
+            return failure();
+          }
+          resultDims.append(dynamicDims);
+        }
+      }
+      resultTypes.push_back(type);
+      tiedOperandIndices.push_back(TiedOpInterface::kUntiedIndex);
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
 }
 
 static ParseResult parseShapedFunctionType(
-    OpAsmParser &parser, SmallVectorImpl<Type> &operandTypes,
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    SmallVectorImpl<Type> &operandTypes,
     SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
   if (failed(parser.parseLParen())) return failure();
   if (failed(parser.parseOptionalRParen())) {
-    if (failed(parseShapedTypeList(parser, operandTypes, operandDims)) ||
+    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
   }
   if (failed(parser.parseArrow())) return failure();
   if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedTypeList(parser, resultTypes, resultDims)) ||
+    if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                     operandDims, resultTypes, resultDims,
+                                     tiedOperands)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
-  } else if (failed(parseShapedTypeList(parser, resultTypes, resultDims))) {
-    return failure();
+  } else {
+    if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                     operandDims, resultTypes, resultDims,
+                                     tiedOperands))) {
+      return failure();
+    }
   }
   return success();
 }
 
 static void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
-                                    TypeRange operandTypes,
+                                    ValueRange operands, TypeRange operandTypes,
                                     OperandRange operandDims,
                                     TypeRange resultTypes,
-                                    OperandRange resultDims) {
+                                    OperandRange resultDims,
+                                    ArrayAttr tiedOperands) {
   p << "(";
-  printShapedTypeList(p, op, operandTypes, operandDims);
-  p << ") -> (";
-  printShapedTypeList(p, op, resultTypes, resultDims);
-  p << ")";
+  llvm::interleaveComma(operandTypes, p, [&](Type type) {
+    p.printType(type);
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        if (operandDims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
+        }
+        p << "{";
+        llvm::interleaveComma(
+            operandDims.take_front(shapedType.getNumDynamicDims()), p,
+            [&](Value value) { p.printOperand(value); });
+        p << "}";
+        operandDims = operandDims.drop_front(shapedType.getNumDynamicDims());
+      }
+    }
+  });
+  p << ") -> ";
+  if (resultTypes.size() != 1) p << "(";
+  auto tiedOp = cast<TiedOpInterface>(op);
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto tiedOperand = tiedOp.getTiedResultOperandIndex(i);
+    if (tiedOperand.hasValue()) {
+      p.printOperand(op->getOperand(tiedOperand.getValue()));
+    } else {
+      auto type = resultTypes[i];
+      p.printType(type);
+      if (auto shapedType = type.dyn_cast<ShapedType>()) {
+        if (!shapedType.hasStaticShape()) {
+          if (resultDims.empty()) {
+            p << "{<<INVALID>>}";
+            return;
+          }
+          p << "{";
+          llvm::interleaveComma(
+              resultDims.take_front(shapedType.getNumDynamicDims()), p,
+              [&](Value value) { p.printOperand(value); });
+          p << "}";
+          resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
+        }
+      }
+    }
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
+  if (resultTypes.size() != 1) p << ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -674,6 +838,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                  ValueRange workgroupCount,
                                  TypeRange resultTypes, ValueRange resultDims,
                                  ValueRange operands, ValueRange operandDims,
+                                 ArrayRef<int64_t> tiedOperands,
                                  ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(workgroupCount);
@@ -681,6 +846,9 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
+  state.attributes.erase(TiedOpInterface::getStorageAttrName());
+  state.addAttribute(TiedOpInterface::getStorageAttrName(),
+                     builder.getIndexArrayAttr(tiedOperands));
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
@@ -696,17 +864,36 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     OpBuilder::InsertionGuard g(builder);
     builder.createBlock(body);  // createBlock implicitly moves IP, RAII away...
   }
-  for (auto operand : operands) {
-    Type type = operand.getType();
+
+  llvm::BitVector operandAliases(llvm::size(operands), false);
+  llvm::BitVector resultAliases(llvm::size(resultTypes), false);
+  for (unsigned resultIndex = 0; resultIndex < tiedOperands.size();
+       ++resultIndex) {
+    int64_t tiedOperandIndex = tiedOperands[resultIndex];
+    if (tiedOperandIndex != TiedOpInterface::kUntiedIndex) {
+      operandAliases[tiedOperandIndex] = true;
+      resultAliases[resultIndex] = true;
+    }
+  }
+
+  for (auto operand : llvm::enumerate(operands)) {
+    Type type = operand.value().getType();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
-      type = DispatchInputType::get(tensorType);
+      type = DispatchTensorType::get(operandAliases[operand.index()]
+                                         ? TensorAccess::ReadWrite
+                                         : TensorAccess::ReadOnly,
+                                     tensorType);
     }
     body->addArgument(type);
   }
-  for (auto resultType : resultTypes) {
-    Type type = resultType;
+  for (auto resultType : llvm::enumerate(resultTypes)) {
+    if (resultAliases[resultType.index()]) {
+      // Already handled by an aliased operand.
+      continue;
+    }
+    Type type = resultType.value();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
-      type = DispatchOutputType::get(tensorType);
+      type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
     body->addArgument(type);
   }
@@ -717,8 +904,6 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  auto loc = parser.getCurrentLocation();
-
   SmallVector<OpAsmParser::OperandType, 16> regionArgs;
   SmallVector<Type, 16> regionArgTypes;
   if (failed(parser.parseLParen())) {
@@ -737,12 +922,6 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
     if (failed(parser.parseRParen())) {
       return failure();
     }
-  }
-
-  if (regionArgs.size() != operandTypes.size() + resultTypes.size()) {
-    return parser.emitError(loc,
-                            "region operand list required required to match "
-                            "count of dispatch op operands + results");
   }
   return parser.parseRegion(body, regionArgs, regionArgTypes,
                             /*enableNameShadowing=*/true);
@@ -808,11 +987,15 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  auto newOp =
-      OpBuilder(getContext())
-          .create<DispatchWorkgroupsOp>(
-              getLoc(), workgroup_count(), newResultTypes, newResultDims,
-              newOperandsValues, newOperandDims, getOperation()->getAttrs());
+  SmallVector<int64_t, 4> newTiedOperandIndices =
+      llvm::to_vector<4>(getTiedResultOperandIndices());
+  excludeTiedOperandAndResultIndices(
+      excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  auto newOp = OpBuilder(getContext())
+                   .create<DispatchWorkgroupsOp>(
+                       getLoc(), workgroup_count(), newResultTypes,
+                       newResultDims, newOperandsValues, newOperandDims,
+                       newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   newBody.front().eraseArguments(excludedOperandIndices);
@@ -821,6 +1004,11 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       excludedResultIndices,
       [&](unsigned index) { return baseResultIndex + index; })));
   return newOp;
+}
+
+std::pair<unsigned, unsigned>
+DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -991,6 +1179,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                        DispatchEntryOp entryPoint, ValueRange workgroupCount,
                        TypeRange resultTypes, ValueRange resultDims,
                        ValueRange operands, ValueRange operandDims,
+                       ArrayRef<int64_t> tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
       entryPoint->getParentOp()
@@ -1007,6 +1196,9 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
+  state.attributes.erase(TiedOpInterface::getStorageAttrName());
+  state.addAttribute(TiedOpInterface::getStorageAttrName(),
+                     builder.getIndexArrayAttr(tiedOperands));
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
@@ -1043,6 +1235,10 @@ Value DispatchOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
 Value DispatchOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
   return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
                                                result_dims(), builder);
+}
+
+std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1121,7 +1317,7 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
   auto updateDims =
       Shape::buildOrFindDynamicDimsForValue(state.location, update, builder);
   build(builder, state, target.getType(), target, targetDims, startIndices,
-        update, updateDims);
+        update, updateDims, builder.getIndexArrayAttr({0}));
 }
 
 static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
@@ -1151,6 +1347,19 @@ Value TensorUpdateOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
                                          builder);
 }
 
+Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
+  return IREE::TiedOpInterface::findTiedBaseValue(target());
+}
+
+::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return 0;  // target
+}
+
+SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
 //===----------------------------------------------------------------------===//
 // flow.ex.stream.fragment
 //===----------------------------------------------------------------------===//
@@ -1158,12 +1367,16 @@ Value TensorUpdateOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
 void ExStreamFragmentOp::build(OpBuilder &builder, OperationState &state,
                                TypeRange resultTypes, ValueRange resultDims,
                                ValueRange operands, ValueRange operandDims,
+                               ArrayRef<int64_t> tiedOperands,
                                ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(operands);
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
+  state.attributes.erase(TiedOpInterface::getStorageAttrName());
+  state.addAttribute(TiedOpInterface::getStorageAttrName(),
+                     builder.getIndexArrayAttr(tiedOperands));
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
@@ -1185,6 +1398,7 @@ static LogicalResult verifyExStreamFragmentOp(ExStreamFragmentOp op) {
 static ParseResult parseStreamFragmentBody(OpAsmParser &parser,
                                            TypeRange operandTypes,
                                            TypeRange resultTypes,
+                                           ArrayAttr tiedOperands,
                                            Region &body) {
   auto loc = parser.getCurrentLocation();
 
@@ -1224,16 +1438,21 @@ static ParseResult parseStreamFragmentBody(OpAsmParser &parser,
 
 static void printStreamFragmentBody(OpAsmPrinter &p, Operation *op,
                                     TypeRange operandTypes,
-                                    TypeRange resultTypes, Region &body) {
+                                    TypeRange resultTypes,
+                                    ArrayAttr tiedOperands, Region &body) {
   p << "(";
   llvm::interleaveComma(body.getArguments(), p, [&](BlockArgument arg) {
     p << arg;
     p << ": ";
     p << arg.getType();
   });
-  p << ") -> (";
-  llvm::interleaveComma(resultTypes, p, [&](Type type) { p.printType(type); });
-  p << ")";
+  p << ") -> ";
+  if (resultTypes.size() != 1) p << "(";
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    p.printType(resultTypes[i]);
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
+  if (resultTypes.size() != 1) p << ")";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
@@ -1278,11 +1497,15 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  auto newOp =
-      OpBuilder(getContext())
-          .create<ExStreamFragmentOp>(getLoc(), newResultTypes, newResultDims,
-                                      newOperandsValues, newOperandDims,
-                                      getOperation()->getAttrs());
+  SmallVector<int64_t, 4> newTiedOperandIndices =
+      llvm::to_vector<4>(getTiedResultOperandIndices());
+  excludeTiedOperandAndResultIndices(
+      excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  auto newOp = OpBuilder(getContext())
+                   .create<ExStreamFragmentOp>(
+                       getLoc(), newResultTypes, newResultDims,
+                       newOperandsValues, newOperandDims, newTiedOperandIndices,
+                       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   eraseRegionResults(newBody, excludedResultIndices);
