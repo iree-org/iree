@@ -303,8 +303,7 @@ class ElementwiseLowering : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!op->hasTrait<OpTrait::ElementwiseMappable>() ||
-        op->getNumResults() != 1)
+    if (!OpTrait::hasElementwiseMappableTraits(op) || op->getNumResults() != 1)
       return failure();
     auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>();
     if (!vecType || vecType.getRank() == 1) return failure();

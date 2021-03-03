@@ -731,8 +731,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
 
 #undef DISPATCH
 
-  if (op->hasTrait<OpTrait::ElementwiseMappable>() &&
-      op->getNumResults() == 1) {
+  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       // Map elementwise ops to vec4.
       SmallVector<int64_t, 4> nativeSize(vecType.getRank() - 1, 1);
