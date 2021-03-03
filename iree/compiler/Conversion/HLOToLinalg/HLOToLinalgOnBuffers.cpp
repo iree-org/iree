@@ -504,7 +504,8 @@ struct SubTensorOpConversion
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts subtensor_insert operation to subview + linalg.copy
+/// Converts subtensor_insert operation to subview + linalg.copy.
+/// Note: this assumes dest and result are the same buffer.
 struct SubTensorInsertOpConversion
     : public ConvertToLinalgBufferOp<SubTensorInsertOpConversion,
                                      SubTensorInsertOp> {
