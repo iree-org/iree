@@ -470,10 +470,10 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 
   Value workgroupMemoryView;
   MemRefType workgroupMemoryType;
-  if (srcType.getMemorySpace() == getWorkgroupMemorySpace()) {
+  if (srcType.getMemorySpaceAsInt() == getWorkgroupMemorySpace()) {
     workgroupMemoryView = src;
     workgroupMemoryType = srcType;
-  } else if (dstType.getMemorySpace() == getWorkgroupMemorySpace()) {
+  } else if (dstType.getMemorySpaceAsInt() == getWorkgroupMemorySpace()) {
     workgroupMemoryView = dst;
     workgroupMemoryType = dstType;
   } else {
@@ -616,7 +616,7 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
           MemRefType outputType = output.getType().dyn_cast<MemRefType>();
           return outputType &&
-                 outputType.getMemorySpace() == getWorkgroupMemorySpace();
+                 outputType.getMemorySpaceAsInt() == getWorkgroupMemorySpace();
         })) {
       rewriter.create<spirv::ControlBarrierOp>(
           linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
@@ -792,7 +792,7 @@ struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
 
     // Insert a barrier if read or write shared memory.
     if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
-          return output.getType().cast<MemRefType>().getMemorySpace() ==
+          return output.getType().cast<MemRefType>().getMemorySpaceAsInt() ==
                  getWorkgroupMemorySpace();
         })) {
       rewriter.create<spirv::ControlBarrierOp>(

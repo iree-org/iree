@@ -54,7 +54,7 @@ static MemRefType getVectorizedMemRefType(OpBuilder &builder, MemRefType type) {
   if (newShape.empty()) return {};
   if (newShape.back() % vecSize != 0) return {};
   newShape.back() = newShape.back() / vecSize;
-  return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
+  return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
 }
 
 /// Returns a vectorized `val`, ie, the result type is a VectorType.
