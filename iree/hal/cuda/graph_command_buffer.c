@@ -281,16 +281,17 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
   CUdeviceptr source_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  CUDA_MEMCPY3D params = {};
-  params.Depth = 1;
-  params.Height = 1;
-  params.WidthInBytes = length;
-  params.dstDevice = target_device_buffer;
-  params.srcDevice = source_device_buffer;
-  params.srcXInBytes = source_offset;
-  params.dstXInBytes = target_offset;
-  params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-  params.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+  CUDA_MEMCPY3D params = {
+      .Depth = 1,
+      .Height = 1,
+      .WidthInBytes = length,
+      .dstDevice = target_device_buffer,
+      .srcDevice = source_device_buffer,
+      .srcXInBytes = source_offset,
+      .dstXInBytes = target_offset,
+      .srcMemoryType = CU_MEMORYTYPE_DEVICE,
+      .dstMemoryType = CU_MEMORYTYPE_DEVICE,
+  };
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};
   size_t numNode = command_buffer->last_node ? 1 : 0;
