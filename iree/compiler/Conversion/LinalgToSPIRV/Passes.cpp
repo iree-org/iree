@@ -166,6 +166,10 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (options.usingLinalgOnTensors) {
+    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
+    // them concrete now since we know the target and settings now.
+    pm.addPass(createConcretizeTileAmongWorkgroupsPass());
+
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
            Type elementType, ArrayRef<Value> dynamicSizes) {

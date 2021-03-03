@@ -34,6 +34,7 @@ cc_library(
 cc_library(
     name = "LinalgToSPIRV",
     srcs = [
+        "ConcretizeTileAmongWorkgroupsPass.cpp",
         "ConvertToGPUPass.cpp",
         "ConvertToSPIRVPass.cpp",
         "CooperativeMatrixAnalysis.cpp",

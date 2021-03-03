@@ -502,11 +502,21 @@ void LinalgTileAndFusePass::runOnOperation() {
       rootOperationTileSizes = rootOperationTileSizes.take_front(
           getNumOuterParallelLoops(rootOperation));
 
+      // XXX: Special treatment for convolution, which have more than 3 parallel
+      // dimensions. We want to ignore the batch dimension and tile along the
+      // next three.
+      if (isa<linalg::ConvInputNHWCFilterHWCFOp>(rootOperation)) {
+        rootOperationTileSizes = rootOperationTileSizes.drop_front();
+      }
+
       SmallVector<int64_t, 4> workloadPerWorkgroup =
           llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
-      if (failed(materializeStaticLaunchInformation(funcOp,
-                                                    workloadPerWorkgroup)) ||
-          failed(
+
+      // If we have all static workload size, a previous pass will materialize
+      // the number of workgroups with constant values.
+      (void)materializeStaticLaunchInformation(funcOp, workloadPerWorkgroup);
+
+      if (failed(
               updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
         funcOp.emitOpError("failed to materialize static launch information");
         return signalPassFailure();

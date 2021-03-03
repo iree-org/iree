@@ -32,6 +32,7 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "ConcretizeTileAmongWorkgroupsPass.cpp"
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"

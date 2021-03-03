@@ -20,6 +20,7 @@
 
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -89,28 +90,49 @@ int dimensionToIndex(StringRef dimension) {
   return StringSwitch<int>(dimension).Case("x", 0).Case("y", 1).Case("z", 2);
 }
 
-/// Gets the block processor ID's upper bound. This queries the workgroup count
-/// function.
-Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
-  auto funcOp = blockIDOp->getParentOfType<FuncOp>();
+IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
+  auto funcOp = op->getParentOfType<FuncOp>();
   auto targetOp =
       funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
+
+  IREE::HAL::ExecutableEntryPointOp entryPointOp;
   for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       entryPointOp = op;
       break;
     }
   }
-  if (!entryPointOp) return llvm::None;
+  if (!entryPointOp) return {};
 
   Operation *terminator = entryPointOp.getBlock()->getTerminator();
   auto retOp = dyn_cast<IREE::HAL::ReturnOp>(terminator);
-  if (!retOp || retOp.getNumOperands() != 3) return llvm::None;
+  if (!retOp || retOp.getNumOperands() != 3) return {};
+
   LLVM_DEBUG(llvm::dbgs() << "workgroup count function return op: " << retOp
                           << "\n");
+  return retOp;
+}
+
+/// Gets the block processor ID's upper bound. This queries the workgroup count
+/// function.
+Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
+  auto retOp = getEntryPointReturnOp(blockIDOp);
+  if (!retOp) return llvm::None;
 
   int index = dimensionToIndex(blockIDOp.dimension());
+  IntegerAttr attr;
+  if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
+    return llvm::None;
+
+  return attr.getInt();
+}
+
+Optional<int64_t> getProcessorIDUpperBound(
+    IREE::HAL::InterfaceWorkgroupIDOp blockIDOp) {
+  auto retOp = getEntryPointReturnOp(blockIDOp);
+  if (!retOp) return llvm::None;
+
+  int index = blockIDOp.dimensionAttr().getInt();
   IntegerAttr attr;
   if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
     return llvm::None;
@@ -130,6 +152,61 @@ Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
   auto valueIt = abiAttr.local_size().getIntValues().begin() + index;
   return (*valueIt).getZExtValue();
 }
+
+/// Folds `affin.min` ops over `std.muli` ops with constant operands into
+/// `affine.min` ops.
+///
+/// For example, the following pattern:
+///
+///   %id = hal.interface.workgroup.id[...]
+///   %mul = muli %id %c4
+///   %min = affine.min affine_map<()[s0] -> (9, s0 * -2 + 225)>()[%mul]
+///
+/// Can be folded into:
+///
+///   %min = affine.min affine_map<()[s0] -> (9, s0 * -8 + 225)>()[%id]
+struct FoldConstantMulIntoAffineMin : OpRewritePattern<AffineMinOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineMinOp minOp,
+                                PatternRewriter &rewriter) const override {
+    LLVM_DEBUG(llvm::dbgs() << "inspecting " << minOp << "\n");
+
+    auto dimensions = minOp.getDimOperands();
+    auto symbols = minOp.getSymbolOperands();
+
+    // We expect the affine.min op to only have one symbol operand.
+    if (!llvm::hasSingleElement(symbols) || !dimensions.empty()) {
+      return failure();
+    }
+
+    auto mulOp = symbols.front().getDefiningOp<MulIOp>();
+    if (!mulOp) return failure();
+
+    auto idOp = mulOp.lhs().getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
+    IntegerAttr multipler;
+    if (!idOp || !matchPattern(mulOp.rhs(), m_Constant(&multipler))) {
+      return failure();
+    }
+    LLVM_DEBUG(llvm::dbgs() << "std.muli op: " << mulOp << "\n");
+
+    MLIRContext *context = minOp.getContext();
+    auto symbol0 = getAffineSymbolExpr(0, context).cast<AffineSymbolExpr>();
+    auto replSymbol = symbol0 * multipler.getInt();
+
+    SmallVector<AffineExpr, 4> results;
+    for (auto result : minOp.getAffineMap().getResults()) {
+      results.push_back(
+          simplifyAffineExpr(result.replace(symbol0, replSymbol), 0, 1));
+    }
+
+    auto replMap = AffineMap::get(0, 1, results, context);
+    LLVM_DEBUG(llvm::dbgs() << "replacement map: " << replMap << "\n");
+
+    rewriter.replaceOpWithNewOp<AffineMinOp>(minOp, replMap, mulOp.lhs());
+    return success();
+  }
+};
 
 /// Folds `affine.min` ops which has only one symbol operand, which is a
 /// processor ID. For such cases we can use the processor ID's upper bound to
@@ -164,6 +241,9 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
 
     Optional<int64_t> ub;
     if (auto blockIDOp = dyn_cast<gpu::BlockIdOp>(symbolOp)) {
+      ub = getProcessorIDUpperBound(blockIDOp);
+    } else if (auto blockIDOp =
+                   dyn_cast<IREE::HAL::InterfaceWorkgroupIDOp>(symbolOp)) {
       ub = getProcessorIDUpperBound(blockIDOp);
     } else if (auto threadIDOp = dyn_cast<gpu::ThreadIdOp>(symbolOp)) {
       ub = getProcessorIDUpperBound(threadIDOp);
@@ -261,7 +341,8 @@ struct FoldGPUProcessIDUsesPass
 
 void populateFoldGPUProcessorIDUsesPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<FoldAffineMinOverProcessorID>(context);
+  patterns.insert<FoldConstantMulIntoAffineMin, FoldAffineMinOverProcessorID>(
+      context);
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 

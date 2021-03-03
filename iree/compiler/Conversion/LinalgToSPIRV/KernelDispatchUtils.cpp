@@ -354,14 +354,34 @@ template <typename ConvOpTy>
 static LogicalResult getMaliSpecificConfig(ConvOpTy op,
                                            TileSizesListType &tileSizes,
                                            LaunchConfigInfo &config) {
-  auto inputType = op.getInput(1).getType().template cast<MemRefType>();
-  auto outputType = op.getOutputBufferTypes()[0].template cast<MemRefType>();
+  Operation *operation = op.getOperation();
+  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(operation)) return failure();
+
+  ShapedType inputType, outputType;
+
+  // XXX: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto outputTypeAttr = operation->getAttrOfType<ArrayAttr>(
+          "iree.codegen.original_output_types")) {
+    auto inputTypeAttr = operation->getAttrOfType<ArrayAttr>(
+        "iree.codegen.original_input_types");
+    inputType = inputTypeAttr.getValue()[0]
+                    .template cast<TypeAttr>()
+                    .getValue()
+                    .template cast<ShapedType>();
+    outputType = outputTypeAttr.getValue()[0]
+                     .template cast<TypeAttr>()
+                     .getValue()
+                     .template cast<ShapedType>();
+    LLVM_DEBUG(llvm::dbgs() << "input types: " << inputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "output types: " << outputType << "\n");
+  } else {
+    inputType = op.getInput(0).getType().template cast<ShapedType>();
+    outputType = op.getOutputBufferTypes()[0].template cast<ShapedType>();
+  }
+
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
-  // Only support NHWC conv.
-  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(op.getOperation())) {
-    return failure();
-  }
 
   bool isInputTilable =
       inputType.getDimSize(3) % 4 == 0 || inputType.getDimSize(3) < 4;
