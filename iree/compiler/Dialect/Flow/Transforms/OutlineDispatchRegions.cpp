@@ -96,7 +96,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, ValueRange{regionOp.workload()},
       outlinedFuncOp.getType().getResults(), resultDynamicDims, newArgs,
-      operandDynamicDims);
+      operandDynamicDims, ArrayRef<int64_t>{});
 
   if (traceDispatchTensors) {
     std::string str = "Output for " + std::string(outlinedFuncOp.getName());

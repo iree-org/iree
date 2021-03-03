@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse))" -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse))' -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
@@ -10,8 +10,8 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<3x4x6x14xf32>, !flow.dispatch.input<2x16x16x6xf32>,
-        !flow.dispatch.output<2x13x11x14xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+        !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -77,8 +77,8 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -144,8 +144,8 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @pooling_nhwc_max attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<2x16x16x6xf32>, !flow.dispatch.input<1x3x4x2xf32>,
-        !flow.dispatch.output<2x14x13x5xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>,
+        !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -208,8 +208,8 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -277,8 +277,8 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<3x4x6x14xf32>, !flow.dispatch.input<2x16x16x6xf32>,
-        !flow.dispatch.output<2x13x11x14xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+        !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -347,8 +347,8 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @three_op_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,

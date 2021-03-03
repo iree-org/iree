@@ -55,12 +55,11 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %0 = flow.ex.stream.fragment(%arg0, %arg1, %c4, %c1) : (tensor<1x1x10xf32>, tensor<5x1x10xf32>, index, index) -> tensor<5x1x10xf32> =
       (%arg2: tensor<1x1x10xf32>, %arg3: tensor<5x1x10xf32>, %arg4: index, %arg5: index) -> tensor<5x1x10xf32> {
-    // TODO(laurenzo): Update these checks to be more precise. The regexes can
-    // match too much, masking issues.
     // CHECK-NEXT: hal.command_buffer.copy_buffer %[[CMD]], %[[TBUF]], %c0, %[[RET_BUF]], %c0, %c200
     // CHECK: hal.command_buffer.execution_barrier
+    %clone = flow.tensor.clone %arg3 : tensor<5x1x10xf32>
     // CHECK-NEXT: hal.command_buffer.copy_buffer %[[CMD]], %[[UBUF]], %c0, %[[RET_BUF]], %c204, %c40
-    %1 = flow.tensor.update %arg2, %arg3[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
+    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
     flow.return %1 : tensor<5x1x10xf32>
   }
   // CHECK: hal.command_buffer.end %[[CMD]]
@@ -118,7 +117,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.executable.entry_point @entry attributes {
       interface = @legacy_io,
       ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<7x4x24xf32>, !flow.dispatch.output<4x7x1024xf32>) -> ()
+      signature = (!flow.dispatch.tensor<readonly:7x4x24xf32>, !flow.dispatch.tensor<writeonly:4x7x1024xf32>) -> ()
     }
     module {}
   }
@@ -152,7 +151,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.executable.entry_point @entry attributes {
       interface = @legacy_io,
       ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<7x?x24x?xf32>, !flow.dispatch.output<?x?x1024xf32>, index, index, index, index) -> ()
+      signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
     }
     module {}
   }

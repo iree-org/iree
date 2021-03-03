@@ -221,7 +221,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
 static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
-  auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchInputLoadOp>();
+  auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
   if (!loadOp) {
     BlockArgument val = op.source().dyn_cast<BlockArgument>();
     while (val) {
@@ -230,7 +230,7 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
       if (!forOp) return failure();
       unsigned idx = val.getArgNumber() - 1;  // accounting for IV arg.
       Value iterOperand = *(forOp.getIterOperands().begin() + idx);
-      loadOp = iterOperand.getDefiningOp<IREE::Flow::DispatchInputLoadOp>();
+      loadOp = iterOperand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       val = iterOperand.dyn_cast<BlockArgument>();
     }
   }
@@ -243,7 +243,7 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b, SubTensorOp op) {
     sizes.push_back(r.size);
     strides.push_back(r.stride);
   }
-  Value loaded = b.create<IREE::Flow::DispatchInputLoadOp>(
+  Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
       op.getLoc(), op.getResult().getType(), loadOp.source(), offsets, sizes,
       strides);
   op.getResult().replaceAllUsesWith(loaded);
@@ -277,7 +277,7 @@ static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
     sizes.push_back(r.size);
     strides.push_back(r.stride);
   }
-  b.create<IREE::Flow::DispatchOutputStoreOp>(op.getLoc(), op.source(), target,
+  b.create<IREE::Flow::DispatchTensorStoreOp>(op.getLoc(), op.source(), target,
                                               offsets, sizes, strides);
   return success();
 }
@@ -418,7 +418,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
   // Reload the value produced inplace right after the inplace update.
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointAfter(outermostProducingOp);
-  Value newLoad = b.create<IREE::Flow::DispatchInputLoadOp>(
+  Value newLoad = b.create<IREE::Flow::DispatchTensorLoadOp>(
       outermostProducingOp->getLoc(), v.getType(), target);
   // TODO(nicolasvasilache): this brutally replaces all uses by the result of
   // this load. In practice we may want more recompute and we may have lost
@@ -435,8 +435,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
 // consecutive ops". Probably better to wait until core alias analysis is
 // upstreamed.
 // TODO(nicolasvasilache): interfaces.
-static bool hasInterleavedAliases(IREE::Flow::DispatchInputLoadOp loadOp,
-                                  IREE::Flow::DispatchOutputStoreOp storeOp) {
+static bool hasInterleavedAliases(IREE::Flow::DispatchTensorLoadOp loadOp,
+                                  IREE::Flow::DispatchTensorStoreOp storeOp) {
   Block *bLoad = loadOp.getOperation()->getBlock();
   Block *bStore = loadOp.getOperation()->getBlock();
   if (!isa<IREE::Flow::DispatchWorkgroupsOp>(bLoad->getParentOp()) ||
@@ -461,7 +461,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
   bool fail = dispatchOp
-                  .walk([&](IREE::Flow::DispatchOutputStoreOp op) {
+                  .walk([&](IREE::Flow::DispatchTensorStoreOp op) {
                     if (failed(rewriteDestructiveUpdateInPlace(b, op.value(),
                                                                op.target()))) {
                       return WalkResult::interrupt();
@@ -472,8 +472,8 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   if (fail) return failure();
 
   // For each tensor store op, redundant load/store optimization.
-  dispatchOp.walk([&](IREE::Flow::DispatchOutputStoreOp storeOp) {
-    auto loadOp = dyn_cast_or_null<IREE::Flow::DispatchInputLoadOp>(
+  dispatchOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+    auto loadOp = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
         storeOp.value().getDefiningOp());
     // Bail if there exists an interleaved aliasing.
     if (!loadOp || hasInterleavedAliases(loadOp, storeOp)) {

@@ -17,6 +17,7 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
+include "iree/compiler/Dialect/IREE/IR/IREEInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -241,6 +242,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     AttrSizedOperandSegments,
     SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
     DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+      "getTiedOperandsIndexAndLength",
+    ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
@@ -283,7 +287,8 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     Variadic<FLOW_Dim>:$workgroup_count,
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
-    FLOW_ShapeDynamicDims:$result_dims
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -294,8 +299,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   let assemblyFormat = [{
     `[` $workgroup_count `]` ``
     `(` $operands `)` `:`
-    custom<ShapedFunctionType>(type($operands), $operand_dims,
-                               type($results), $result_dims)
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
     attr-dict-with-keyword
     `=` `\n` ` ` ` ` ` `
     custom<DispatchWorkgroupBody>(ref(type($operands)),
@@ -309,6 +316,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
       "ValueRange":$workgroupCount,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -467,7 +475,7 @@ def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
   }];
 
   let arguments = (ins
-    FLOW_DispatchIO:$source
+    FLOW_DispatchTensor:$source
   );
   let results = (outs
     Shape_RankedShape:$result
@@ -487,11 +495,11 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
   }];
 
   let arguments = (ins
-    FLOW_DispatchIO:$operand,
+    FLOW_DispatchTensor:$operand,
     Shape_RankedShape:$shape
   );
   let results = (outs
-    FLOW_DispatchIO:$result
+    FLOW_DispatchTensor:$result
   );
 
   // TODO(benvanik): figure out a way to make this look like shapex.tie_shape.
@@ -503,7 +511,7 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
   let hasCanonicalizer = 1;
 }
 
-def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
+def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     SameVariadicOperandSize,
   ]> {
   let summary = [{loads a tensor from a dispatch input placeholder}];
@@ -514,7 +522,7 @@ def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
   }];
 
   let arguments = (ins
-    FLOW_DispatchInput:$source,
+    FLOW_ReadableDispatchTensor:$source,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides
@@ -534,7 +542,7 @@ def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
+def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     SameVariadicOperandSize,
   ]> {
   let summary = [{stores a tensor into a dispatch output placeholder}];
@@ -546,7 +554,7 @@ def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
 
   let arguments = (ins
     AnyRankedTensor:$value,
-    FLOW_DispatchOutput:$target,
+    FLOW_WritableDispatchTensor:$target,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides
@@ -655,6 +663,9 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     AttrSizedOperandSegments,
     FLOW_StreamableOp,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+      "getTiedOperandsIndexAndLength",
+    ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
@@ -669,7 +680,8 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     SymbolRefAttr:$entry_point,
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
-    FLOW_ShapeDynamicDims:$result_dims
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -681,6 +693,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
       "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -695,8 +708,10 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let assemblyFormat = [{
     $entry_point `[` $workgroup_count `]` ``
     `(` $operands `)` attr-dict `:`
-    custom<ShapedFunctionType>(type($operands), $operand_dims,
-                               type($results), $result_dims)
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
   }];
 
   let verifier = [{ return verifyDispatchOp(*this); }];
@@ -963,6 +978,11 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+        "getTiedResult",
+        "getTiedResultOperandIndex",
+        "getTiedResultOperandIndices",
+    ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
@@ -976,7 +996,8 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     FLOW_ShapeDynamicDims:$target_dims,
     Variadic<FLOW_Dim>:$start_indices,
     FLOW_Tensor:$update,
-    FLOW_ShapeDynamicDims:$update_dims
+    FLOW_ShapeDynamicDims:$update_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
@@ -985,7 +1006,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    type($result) (`{` $target_dims^ `}`)?
+    custom<TiedResult>(type($result), $target_dims, $tied_operands)
     attr-dict-with-keyword
   }];
 
@@ -1033,18 +1054,21 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
     IsolatedFromAbove,
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{experimental op for defining formed stream regions}];
   let description = [{
     Represents a region where all of the dispatches are meant to target the
-    same execution stream. This will be replaced with a segmented verison.
+    same execution stream. This will be replaced with a segmented version in the
+    future that stitches the stream segments together.
   }];
 
   let arguments = (ins
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
-    FLOW_ShapeDynamicDims:$result_dims
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -1054,12 +1078,15 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
 
   let assemblyFormat = [{
     `(` $operands `)` `:`
-    custom<ShapedFunctionType>(type($operands), $operand_dims,
-                               type($results), $result_dims)
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
     attr-dict-with-keyword
     `=` `\n` ` ` ` ` ` `
     custom<StreamFragmentBody>(ref(type($operands)),
                                ref(type($results)),
+                               ref($tied_operands),
                                $body)
   }];
 
@@ -1068,6 +1095,7 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
     OpBuilder<(ins
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 

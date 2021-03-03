@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "batch_matmul_vectorization.mlir"
+    "concretize_tile_among_workgroups.mlir"
     "convert_to_gpu.mlir"
     "convert_to_spirv.mlir"
     "dead_alloc.mlir"
@@ -30,6 +31,8 @@ iree_lit_test_suite(
     "pipeline_test.mlir"
     "pipeline_test_cooperative_mat.mlir"
     "split_dispatch_function.mlir"
+    "tile_and_vectorize_conv.mlir"
+    "tile_and_vectorize_matmul.mlir"
     "vector_to_gpu.mlir"
     "workgroup_memory_promotion.mlir"
   DATA

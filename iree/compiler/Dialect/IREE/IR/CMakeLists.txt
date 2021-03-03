@@ -15,12 +15,14 @@ iree_cc_library(
     IR
   HDRS
     "IREEDialect.h"
+    "IREEOpInterfaces.h.inc"
     "IREEOps.h"
     "IREEOps.h.inc"
     "IREETraits.h"
     "IREETypes.h"
   SRCS
     "IREEDialect.cpp"
+    "IREEOpInterfaces.cpp.inc"
     "IREEOps.cpp"
     "IREEOps.cpp.inc"
     "IREETypes.cpp"
@@ -32,6 +34,16 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    IREEInterfacesGen
+  TD_FILE
+    "IREEInterfaces.td"
+  OUTS
+    -gen-op-interface-decls IREEOpInterfaces.h.inc
+    -gen-op-interface-defs IREEOpInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

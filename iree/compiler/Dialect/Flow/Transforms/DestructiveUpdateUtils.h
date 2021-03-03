@@ -52,27 +52,30 @@ namespace Flow {
 //
 // The following destructive update patterns are rewritten.
 //
-// Coming from an `Flow::DispatchInputLoadOp`
+// Coming from an `Flow::DispatchTensorLoadOp`
 // ==========================================
 // ```
-//   %0 = flow.dispatch.input.load %a : !flow.dispatch.input<...> -> tensor<...>
+//   %0 = flow.dispatch.tensor.load %a : !flow.dispatch.tensor<readonly:...> ->
+//   tensor<...>
 //   ...
 //   %1 = destructive_update(%0)
 //   ...
-//   use_of(%1) // e.g. flow.dispatch.output.store %1, %b :
-//              //        tensor<...> -> !flow.dispatch.output<...>
+//   use_of(%1) // e.g. flow.dispatch.tensor.store %1, %b :
+//              //        tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 // is rewritten into:
 // ```
-//   %0 = flow.dispatch.input.load %a : !flow.dispatch.input<...> -> tensor<...>
+//   %0 = flow.dispatch.tensor.load %a : !flow.dispatch.tensor<readonly:...> ->
+//   tensor<...>
 //   ...
-//   inplace_update(%0, %out) //e.g. flow.dispatch.output.store %subtensor, %b,
+//   inplace_update(%0, %out) //e.g. flow.dispatch.tensor.store %subtensor, %b,
 //                            //     offsets = ..., sizes = ..., strides = ... :
-//                            //       tensor<...> -> !flow.dispatch.output<...>
+//                            //       tensor<...> ->
+//                            !flow.dispatch.tensor<writeonly:...>
 //   %2 = flow.dispatch.output.load %b
 //   ...
-//   use_of(%2) // e.g. flow.dispatch.output.store %2, %b :
-//              //        tensor<...> -> !flow.dispatch.output<...>
+//   use_of(%2) // e.g. flow.dispatch.tensor.store %2, %b :
+//              //        tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 //
 // This is a typical pattern that appears after tiling Linalg ops on tensors
@@ -84,8 +87,8 @@ namespace Flow {
 // ```
 //   %2 = flow.dispatch.output.load %b
 //   ...
-//   flow.dispatch.output.store %2, %b :
-//     tensor<...> -> !flow.dispatch.output<...>
+//   flow.dispatch.tensor.store %2, %b :
+//     tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 // is elided.
 LogicalResult rewriteLinalgDestructiveUpdates(

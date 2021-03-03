@@ -101,29 +101,58 @@ def FLOW_Workload : AnyTypeOf<[Index]> {
   }];
 }
 
-def FLOW_DispatchInput : DialectType<
+def FLOW_TensorAccessCanReadPred : CPred<[{
+  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+      IREE::Flow::TensorAccess::ReadOnly ||
+  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+      IREE::Flow::TensorAccess::ReadWrite
+}]>;
+
+def FLOW_TensorAccessCanWritePred : CPred<[{
+  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+      IREE::Flow::TensorAccess::WriteOnly ||
+  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+      IREE::Flow::TensorAccess::ReadWrite
+}]>;
+
+def FLOW_DispatchTensor : DialectType<
     FLOW_Dialect,
-    CPred<"$_self.isa<IREE::Flow::DispatchInputType>()">,
-    "dispatch.input"> {
+    CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+    "dispatch.tensor"> {
   let description = [{
-    A placeholder for a dispatch region input operand. This can be used to query
-    the metadata about the input (such as its shape) as well as load from the
-    backing tensor representation.
+    A placeholder for a dispatch region input/output operand. This can be used
+    to query the metadata about the tensor (such as its shape) as well as both
+    load and store from the backing tensor representation.
   }];
 }
 
-def FLOW_DispatchOutput : DialectType<
+def FLOW_ReadableDispatchTensor : DialectType<
     FLOW_Dialect,
-    CPred<"$_self.isa<IREE::Flow::DispatchOutputType>()">,
-    "dispatch.output"> {
+    And<[
+      CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+      FLOW_TensorAccessCanReadPred,
+    ]>,
+    "dispatch.tensor"> {
   let description = [{
-    A placeholder for a dispatch region output result. This can be used to
-    query the metadata about the output (such as its shape) as well as store
-    into the backing tensor representation.
+    A placeholder for a dispatch region input operand. This can be used
+    to query the metadata about the tensor (such as its shape) as well as load
+    from the backing tensor representation.
   }];
 }
 
-def FLOW_DispatchIO : AnyTypeOf<[FLOW_DispatchInput, FLOW_DispatchOutput]>;
+def FLOW_WritableDispatchTensor : DialectType<
+    FLOW_Dialect,
+    And<[
+      CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+      FLOW_TensorAccessCanWritePred,
+    ]>,
+    "dispatch.tensor"> {
+  let description = [{
+    A placeholder for a dispatch region output operand. This can be used
+    to query the metadata about the tensor (such as its shape) as well as store
+    to the backing tensor representation.
+  }];
+}
 
 // Use no padding and clamp the window to the valid area, possibly stopping
 // early prior to having covered all data.

@@ -8,12 +8,12 @@ func @constants() {
   // CHECK-DAG: constant 4 : index
   // CHECK-DAG: constant 5 : index
   // CHECK-DAG: constant 6 : index
-  // CHECK: flow.dispatch @dispatch0::@dispatch0[%[[W]]]() : () -> (tensor<f32>)
-  // CHECK: flow.dispatch @dispatch1::@dispatch1[%[[W]]]() : () -> (tensor<f32>)
-  // CHECK: flow.dispatch @dispatch2::@dispatch2[%[[W]]]() : () -> (tensor<f32>)
-  // CHECK: flow.dispatch @dispatch3::@dispatch3[%[[W]]]() : () -> (tensor<f32>)
-  // CHECK: flow.dispatch @dispatch4::@dispatch4[%[[W]]]() : () -> (tensor<f32>)
-  // CHECK: flow.dispatch @dispatch5::@dispatch5[%[[W]]]() : () -> (tensor<f32>)
+  // CHECK: flow.dispatch @dispatch0::@dispatch0[%[[W]]]() : () -> tensor<f32>
+  // CHECK: flow.dispatch @dispatch1::@dispatch1[%[[W]]]() : () -> tensor<f32>
+  // CHECK: flow.dispatch @dispatch2::@dispatch2[%[[W]]]() : () -> tensor<f32>
+  // CHECK: flow.dispatch @dispatch3::@dispatch3[%[[W]]]() : () -> tensor<f32>
+  // CHECK: flow.dispatch @dispatch4::@dispatch4[%[[W]]]() : () -> tensor<f32>
+  // CHECK: flow.dispatch @dispatch5::@dispatch5[%[[W]]]() : () -> tensor<f32>
   %w = constant 1 : index
   %d0 = flow.dispatch @dispatch0::@dispatch0[%w]() : () -> tensor<f32>
   %c2 = constant 2 : index

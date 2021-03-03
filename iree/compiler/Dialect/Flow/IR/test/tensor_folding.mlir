@@ -105,15 +105,6 @@ func @cloneConst() -> tensor<4xi32> {
 
 // -----
 
-// CHECK-LABEL: @cloneDynamic
-func @cloneDynamic(%arg0 : tensor<4xi32>) -> tensor<4xi32> {
-  %0 = flow.tensor.clone %arg0 : tensor<4xi32>
-  // CHECK-NEXT: return %arg0
-  return %0 : tensor<4xi32>
-}
-
-// -----
-
 // CHECK-LABEL: @sliceConst0D
 func @sliceConst0D() -> tensor<i32> {
   %0 = constant dense<0> : tensor<i32>

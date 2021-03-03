@@ -66,6 +66,20 @@ static bool isNoOp(Operation *op) { return isa<Shape::MakeRankedShapeOp>(op); }
 // identity.
 static bool isIdentityOp(Operation *op) { return isa<Shape::TieShapeOp>(op); }
 
+// HACK: until we are doing buffer allocation we need to pin tied buffers all
+// the way up the stream from the outputs.
+static void propagateTiedBuffer(BufferSet &bufferSet, Value streamValue,
+                                BufferRange bufferRange) {
+  Value baseValue = streamValue;
+  while (auto definingOp = dyn_cast_or_null<IREE::TiedOpInterface>(
+             baseValue.getDefiningOp())) {
+    auto tiedValue = definingOp.getTiedResultOperand(baseValue);
+    if (!tiedValue) break;
+    baseValue = tiedValue;
+    bufferSet.rangeMap[baseValue] = bufferRange;
+  }
+}
+
 // Allocates a buffer for the given stream output value.
 // |streamValue| is the Value used within the stream region and
 // |externalValue| is the returned value from the stream region in the parent
@@ -110,17 +124,36 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
 static void allocateOutputBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
                                   BufferSet &bufferSet,
                                   ConversionPatternRewriter &rewriter) {
+  auto tiedStreamOp = cast<IREE::TiedOpInterface>(streamOp.getOperation());
+  auto &entryBlock = streamOp.body().front();
+
   // Allocate output buffers and replace the original uses with the buffers.
   auto returnOp = cast<IREE::Flow::ReturnOp>(streamOp.body().front().back());
   for (auto result : llvm::enumerate(streamOp.getResults())) {
     auto streamValue = returnOp.getOperand(result.index());
     auto externalValue = result.value();
-    auto buffer = allocateOutputBuffer(streamValue, externalValue,
-                                       bufferSet.allocator, rewriter);
-    auto bufferRange = BufferRange{buffer};
+
+    // Tied results reuse their operand buffer.
+    BufferRange bufferRange;
+    auto tiedOperandIndex =
+        tiedStreamOp.getTiedResultOperandIndex(result.index());
+    if (tiedOperandIndex.hasValue()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    -- REUSING TIED OPERAND("
+                 << tiedOperandIndex.getValue() << ") BUFFER FOR STREAM RESULT("
+                 << result.index() << "): " << streamOp << "\n");
+      auto operand = entryBlock.getArgument(tiedOperandIndex.getValue());
+      bufferRange = bufferSet.rangeMap[operand];
+    } else {
+      auto buffer = allocateOutputBuffer(streamValue, externalValue,
+                                         bufferSet.allocator, rewriter);
+      bufferRange = BufferRange{buffer};
+    }
+    assert(bufferRange.buffer);
+    bufferSet.outputBuffers.push_back(bufferRange.buffer);
     bufferSet.rangeMap[externalValue] = bufferRange;
     bufferSet.rangeMap[streamValue] = bufferRange;
-    bufferSet.outputBuffers.push_back(buffer);
+    propagateTiedBuffer(bufferSet, streamValue, bufferRange);
   }
 }
 
@@ -221,20 +254,41 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   }
   for (auto &op : streamOp.body().front()) {
     if (isNoOp(&op) || isIdentityOp(&op)) continue;
+    auto tiedOp = dyn_cast<IREE::TiedOpInterface>(op);
     for (auto it : llvm::enumerate(op.getResults())) {
       auto result = it.value();
       if (!result.getType().isa<ShapedType>()) continue;
+
       // If the result is an output buffer we can just use that directly.
       if (bufferSet.rangeMap[result].buffer) {
         LLVM_DEBUG(llvm::dbgs() << "    -- SKIP ALREADY SET BUFFER RESULT("
                                 << it.index() << "): " << op << "\n");
         continue;
       }
+
+      // Tied results reuse their operand buffer.
+      if (tiedOp) {
+        auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(it.index());
+        if (tiedOperandIndex.hasValue()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    -- REUSING TIED OPERAND("
+                     << tiedOperandIndex.getValue() << ") BUFFER FOR RESULT("
+                     << it.index() << "): " << op << "\n");
+          auto operand = op.getOperand(tiedOperandIndex.getValue());
+          auto operandBufferRange = bufferSet.rangeMap[operand];
+          assert(operandBufferRange.buffer);
+          bufferSet.rangeMap[result] = operandBufferRange;
+          continue;
+        }
+      }
+
       LLVM_DEBUG(llvm::dbgs() << "    -- ALLOCATE BUFFER FOR RESULT("
                               << it.index() << "): " << op << "\n");
       auto buffer =
           allocateTransientBuffer(result, bufferSet.allocator, rewriter);
-      bufferSet.rangeMap[result] = BufferRange{buffer};
+      auto bufferRange = BufferRange{buffer};
+      bufferSet.rangeMap[result] = bufferRange;
+      propagateTiedBuffer(bufferSet, result, bufferRange);
     }
   }
   while (propagateIdentityBuffers()) {
@@ -450,13 +504,44 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   return success();
 }
 
+static LogicalResult recordTensorClone(Value device, Value commandBuffer,
+                                       IREE::Flow::TensorCloneOp &cloneOp,
+                                       BufferSet &bufferSet,
+                                       ConversionPatternRewriter &rewriter) {
+  auto &operandBuffer = bufferSet.rangeMap[cloneOp.operand()];
+  auto &resultBuffer = bufferSet.rangeMap[cloneOp.result()];
+
+  auto operand = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      cloneOp.getLoc(), cloneOp.operand(), operandBuffer.buffer, rewriter);
+  auto result = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      cloneOp.getLoc(), cloneOp.result(), resultBuffer.buffer, rewriter);
+  if (!operand.hasValue() || !result.hasValue()) {
+    return cloneOp.emitOpError()
+           << "cannot create adaptors for tensor clone operands/results";
+  }
+
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(cloneOp.getLoc(), 0);
+  auto byteLength = operand->getByteLength();
+  if (!byteLength) return failure();
+
+  rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
+      cloneOp.getLoc(), commandBuffer, operand->getBuffer(), zeroOffset,
+      result->getBuffer(), zeroOffset, byteLength);
+
+  // Full barriers for now as we aren't scheduling things.
+  // TODO(benvanik): don't add at the end of the command buffer (we could
+  // also do a canonicalization step that removed trailing barriers).
+  recordFullExecutionBarrier(commandBuffer, cloneOp.getLoc(), rewriter);
+  return success();
+}
+
 static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
                                         IREE::Flow::TensorUpdateOp &updateOp,
                                         BufferSet &bufferSet,
                                         ConversionPatternRewriter &rewriter) {
   auto &updateBuffer = bufferSet.rangeMap[updateOp.update()];
   auto &targetBuffer = bufferSet.rangeMap[updateOp.target()];
-  auto &resultBuffer = bufferSet.rangeMap[updateOp.result()];
 
   // TODO(benvanik): use something other than the BufferRange::buffer?
   // This may require us to subview the buffer first.
@@ -464,9 +549,7 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
       updateOp.getLoc(), updateOp.update(), updateBuffer.buffer, rewriter);
   auto target = IREE::HAL::TensorRewriteAdaptor::getChecked(
       updateOp.getLoc(), updateOp.target(), targetBuffer.buffer, rewriter);
-  auto result = IREE::HAL::TensorRewriteAdaptor::getChecked(
-      updateOp.getLoc(), updateOp.result(), resultBuffer.buffer, rewriter);
-  if (!update.hasValue() || !target.hasValue() || !result.hasValue()) {
+  if (!update.hasValue() || !target.hasValue()) {
     return updateOp.emitOpError()
            << "cannot create adaptors for tensor update operands/results";
   }
@@ -484,18 +567,10 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
       target->computeRange(startIndices, *update->getShapeDims());
   if (!targetRange) return failure();
 
-  // TODO(benvanik): actual buffer allocation so we aren't doing this copy.
-  auto targetByteLength = target->getByteLength();
-  if (!targetByteLength) return failure();
-
-  rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
-      updateOp.getLoc(), commandBuffer, target->getBuffer(), zeroOffset,
-      result->getBuffer(), zeroOffset, targetByteLength);
   // TODO(benvanik): slice left/mid/right, but really just don't do this.
-  recordFullExecutionBarrier(commandBuffer, updateOp.getLoc(), rewriter);
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
       updateOp.getLoc(), commandBuffer, update->getBuffer(), zeroOffset,
-      result->getBuffer(), targetRange->offset, targetRange->length);
+      target->getBuffer(), targetRange->offset, targetRange->length);
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could
@@ -512,6 +587,11 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
     if (auto dispatchOp = dyn_cast<IREE::Flow::DispatchOp>(op)) {
       if (failed(recordDispatch(device, commandBuffer, dispatchOp, bufferSet,
                                 rewriter))) {
+        return failure();
+      }
+    } else if (auto cloneOp = dyn_cast<IREE::Flow::TensorCloneOp>(op)) {
+      if (failed(recordTensorClone(device, commandBuffer, cloneOp, bufferSet,
+                                   rewriter))) {
         return failure();
       }
     } else if (auto updateOp = dyn_cast<IREE::Flow::TensorUpdateOp>(op)) {
