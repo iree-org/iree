@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -53,7 +54,7 @@ static MemRefType getVectorizedMemRefType(OpBuilder &builder, MemRefType type) {
   if (newShape.empty()) return {};
   if (newShape.back() % vecSize != 0) return {};
   newShape.back() = newShape.back() / vecSize;
-  return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
+  return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
 }
 
 /// Returns a vectorized `val`, ie, the result type is a VectorType.
@@ -193,7 +194,7 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
       MemRefType vecMemRef = std::get<1>(it);
       auto arg = rewriter.create<IREE::PlaceholderOp>(placeholder.getLoc(),
                                                       vecMemRef, ValueRange{},
-                                                      placeholder.getAttrs());
+                                                      placeholder->getAttrs());
       rewriter.replaceOp(placeholder, arg.getResult());
       newArgs.push_back(arg.getResult());
     }
@@ -243,29 +244,29 @@ struct LoadStoreVectorizationPass
         VectorizeElementwiseOp<AddFOp>,
         VectorizeElementwiseOp<AddIOp>,
         VectorizeElementwiseOp<CeilFOp>,
-        VectorizeElementwiseOp<CosOp>,
+        VectorizeElementwiseOp<math::CosOp>,
         VectorizeElementwiseOp<DivFOp>,
-        VectorizeElementwiseOp<ExpOp>,
+        VectorizeElementwiseOp<math::ExpOp>,
         VectorizeElementwiseOp<FPExtOp>,
         VectorizeElementwiseOp<FPToSIOp>,
         VectorizeElementwiseOp<FPTruncOp>,
         VectorizeElementwiseOp<FloorFOp>,
-        VectorizeElementwiseOp<LogOp>,
+        VectorizeElementwiseOp<math::LogOp>,
         VectorizeElementwiseOp<MulFOp>,
         VectorizeElementwiseOp<MulIOp>,
         VectorizeElementwiseOp<NegFOp>,
         VectorizeElementwiseOp<RemFOp>,
-        VectorizeElementwiseOp<RsqrtOp>,
+        VectorizeElementwiseOp<math::RsqrtOp>,
         VectorizeElementwiseOp<SIToFPOp>,
         VectorizeElementwiseOp<ShiftLeftOp>,
         VectorizeElementwiseOp<SignExtendIOp>,
         VectorizeElementwiseOp<SignedDivIOp>,
         VectorizeElementwiseOp<SignedShiftRightOp>,
-        VectorizeElementwiseOp<SinOp>,
-        VectorizeElementwiseOp<SqrtOp>,
+        VectorizeElementwiseOp<math::SinOp>,
+        VectorizeElementwiseOp<math::SqrtOp>,
         VectorizeElementwiseOp<SubFOp>,
         VectorizeElementwiseOp<SubIOp>,
-        VectorizeElementwiseOp<TanhOp>,
+        VectorizeElementwiseOp<math::TanhOp>,
         VectorizeElementwiseOp<TruncateIOp>,
         VectorizeElementwiseOp<UnsignedDivIOp>,
         VectorizeElementwiseOp<UnsignedRemIOp>,
@@ -292,7 +293,8 @@ struct LoadStoreVectorizationPass
     });
 
     // Mark all standard ops legal if they are operating on vector types.
-    target.addDynamicallyLegalDialect<mlir::StandardOpsDialect>(
+    target.addDynamicallyLegalDialect<mlir::StandardOpsDialect,
+                                      mlir::math::MathDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation *op) {
               auto isVectorType = [](Type t) { return t.isa<VectorType>(); };

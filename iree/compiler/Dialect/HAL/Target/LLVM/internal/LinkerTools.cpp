@@ -21,9 +21,12 @@ namespace HAL {
 
 // TODO(benvanik): add other platforms:
 // createMacLinkerTool using ld64.lld
-// createWasmLinkerTool wasm-ld
 
+std::unique_ptr<LinkerTool> createAndroidLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createUnixLinkerTool(
+    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
+std::unique_ptr<LinkerTool> createWasmLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createWindowsLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
@@ -31,8 +34,13 @@ std::unique_ptr<LinkerTool> createWindowsLinkerTool(
 // static
 std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions) {
-  if (targetTriple.isOSWindows() || targetTriple.isWindowsMSVCEnvironment()) {
+  if (targetTriple.isAndroid()) {
+    return createAndroidLinkerTool(targetTriple, targetOptions);
+  } else if (targetTriple.isOSWindows() ||
+             targetTriple.isWindowsMSVCEnvironment()) {
     return createWindowsLinkerTool(targetTriple, targetOptions);
+  } else if (targetTriple.isWasm()) {
+    return createWasmLinkerTool(targetTriple, targetOptions);
   }
   return createUnixLinkerTool(targetTriple, targetOptions);
 }

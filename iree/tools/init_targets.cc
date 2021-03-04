@@ -26,6 +26,9 @@
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 #endif
+#ifdef IREE_HAVE_CUDA_TARGET
+#include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
+#endif
 
 namespace mlir {
 namespace iree_compiler {
@@ -52,6 +55,10 @@ void registerHALTargetBackends() {
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
     IREE::HAL::registerVulkanSPIRVTargetBackends(
         []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
+#endif
+#ifdef IREE_HAVE_CUDA_TARGET
+    IREE::HAL::registerCUDATargetBackends(
+        []() { return IREE::HAL::getCUDATargetOptionsFromFlags(); });
 #endif
     return true;
   }();

@@ -106,7 +106,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # signal/noise ratio.
     "-Wno-ambiguous-member-template"
     "-Wno-char-subscripts"
-    "-Wno-error=deprecated-declarations"
+    "-Wno-deprecated-declarations"
     "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
     "-Wno-gnu-alignof-expression"
     "-Wno-gnu-variable-sized-type-not-at-end"
@@ -403,7 +403,8 @@ set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
 
 # TODO(ataei): Use optional build time targets selection for LLVMAOT.
-set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV" CACHE STRING "" FORCE)
+set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX"
+    CACHE STRING "" FORCE)
 
 set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)

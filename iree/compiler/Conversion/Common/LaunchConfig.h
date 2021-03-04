@@ -78,19 +78,12 @@ class LaunchConfig {
   /// Returns the number of subgroups to use.
   ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
 
-  /// First level of tiling (and fusion) happens in the Flow dialect, where the
-  /// workload is distributed amongst workgroups (the workload per workgroup is
-  /// same as tile size). The actual workload
-  /// per workgroup, i.e. tile size, is computed by the launchConfig (and is
-  /// currently static). Return this static value. The value is returned from
-  /// the slowest varying dimension to the fastest varying dimension. Also
-  /// accept a default to use in case no launch config is specified for ops in
-  /// the dispatch region.
-  // TODO(ravishankarm): The default is only needed to not interfere with the
-  // current codegen path. Needs to be cleaned up after we move to the new path.
-  Optional<SmallVector<int64_t, 4>> getWorkloadPerWorkgroup(
-      unsigned numWorkgroupDims,
-      ArrayRef<int64_t> defaultWorkloadPerWorkgroup) const;
+  /// Of the given operations return the operation that has been marked as the
+  /// root operation. Within a dispatch region a single root operation (like
+  /// matmul, conv, etc.) decides the launch configuration to be used. The rest
+  /// of the ops that are fused with it obey this configuration. Returns nullptr
+  /// if unable to find an operation that is set as root in the list.
+  Operation *getRootOperation(ArrayRef<Operation *> ops);
 
   /// Returns true if tile sizes have been computed for the operation. If tile
   /// sizes arent set, it implies operation is not to be tiled.
@@ -113,6 +106,11 @@ class LaunchConfig {
   /// Sets number of subgroups to use.
   void setNumSubgroups(ArrayRef<int64_t> vNumSubgroups);
 
+  /// Sets the root operation. Within a dispatch region a single root operation
+  /// (like matmul, conv, etc.) decides the launch configuration to be used. The
+  /// rest of the ops that are fused with it obey this configuration.
+  void setRootOperation(Operation *root);
+
   /// Sets the configuration of the `targetOp` to be same as the configuration
   /// of the `sourceOp`.
   void setSameConfig(Operation *sourceOp, Operation *targetOp);
@@ -128,6 +126,10 @@ class LaunchConfig {
   /// the tile sizes for the next level of tiling. The `finalize` method removes
   /// these attributes.
   llvm::StringMap<TileSizesListType> tileSizes;
+
+  /// Key used for tagging the root operation. The launch config does not track
+  /// the root operation itself, but rather the key used for the root operation.
+  StringRef rootOperationKey = "";
 
   /// Workgroup size to use.
   std::array<int64_t, 3> workgroupSize = {1, 1, 1};

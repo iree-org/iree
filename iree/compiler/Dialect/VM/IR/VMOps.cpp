@@ -62,7 +62,7 @@ static void printModuleOp(OpAsmPrinter &p, ModuleOp &op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
+      op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.getBodyRegion(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
@@ -169,7 +169,7 @@ static void printExportOp(OpAsmPrinter &p, ExportOp op) {
     p << " as(\"" << op.export_name() << "\")";
   }
   p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(), /*elidedAttrs=*/{"function_ref", "export_name"});
+      op->getAttrs(), /*elidedAttrs=*/{"function_ref", "export_name"});
 }
 
 void ExportOp::build(OpBuilder &builder, OperationState &result,
@@ -524,7 +524,7 @@ template <typename T>
 static void printConstIntegerOp(OpAsmPrinter &p, T &op) {
   p << op.getOperationName() << ' ';
   p.printAttribute(op.value());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 }
 
 template <int SZ>
@@ -768,7 +768,7 @@ static void printSwitchOp(OpAsmPrinter &p, T &op) {
   p << "]";
   p << " else ";
   p.printOperand(op.default_value());
-  p.printOptionalAttrDict(op.getAttrs());
+  p.printOptionalAttrDict(op->getAttrs());
   p << " : ";
   p.printType(op.default_value().getType());
 }
@@ -985,7 +985,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
         }
       });
   p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
                               "callee",
                               "segment_sizes",
                               "segment_types",
@@ -1072,7 +1072,7 @@ static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
   if (op.message().hasValue()) {
     p << ", \"" << op.message().getValue() << "\"";
   }
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"message"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"message"});
 }
 
 //===----------------------------------------------------------------------===//

@@ -208,7 +208,7 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   if (!compare_ranges(lhsModule.getOps<DispatchEntryOp>(),
                       rhsModule.getOps<DispatchEntryOp>(),
                       [](DispatchEntryOp lhs, DispatchEntryOp rhs) {
-                        return lhs.getAttrs() == rhs.getAttrs();
+                        return lhs->getAttrs() == rhs->getAttrs();
                       })) {
     return false;  // dispatch entry mismatch
   }
@@ -217,7 +217,7 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   if (!compare_ranges(lhsModule.getOps<FuncOp>(), rhsModule.getOps<FuncOp>(),
                       [](FuncOp lhs, FuncOp rhs) {
                         if (lhs.getType() != rhs.getType()) return false;
-                        if (lhs.getAttrs() != rhs.getAttrs()) return false;
+                        if (lhs->getAttrs() != rhs->getAttrs()) return false;
                         return isStructurallyEquivalentTo(lhs.getRegion(),
                                                           rhs.getRegion());
                       })) {

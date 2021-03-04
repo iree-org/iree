@@ -20,26 +20,19 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Alias for callback function that allocates workgroup level memory. The
-/// callback expects the type of the memref to be allocated (`allocationType`)
-/// and the SSA values that represent the size of dynamic dimensions in the
-/// `allocationType`. The callback is expected to return a MemRefType Value.
+/// callback expects the static shape and element-type of the result memref
+/// type. Also expects values for the dynamic dimension of the allocated memref,
+/// where each dynamic dimension corresponds to a `ShapedType::kDynamicSize`
+/// value in `staticShape`.
 using WorkgroupMemoryAllocationFn = std::function<Value(
-    OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
-    MemRefType allocationType)>;
+    OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+    Type elementType, ArrayRef<Value> dynamicSizes)>;
 
 /// Adds passes to convert tiled+distributed linalg on tensors code to linalg on
 /// buffers.
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
-
-/// Pass to initialize the function that computes the number of workgroups for
-/// each entry point function. The function is defined, but is populated later.
-std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
-
-/// Pass to legalize function that returns number of workgroups to use for
-/// launch to be runnable on the host.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 
 /// Pass to perform linalg on tensor bufferization. The function passed into the
 /// pass through the `allocationFn` argument is invoked whenever a new buffer is

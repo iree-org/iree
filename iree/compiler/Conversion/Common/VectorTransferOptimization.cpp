@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -58,7 +59,16 @@ namespace {
 struct VectorTransferOptimizationPass
     : public PassWrapper<VectorTransferOptimizationPass, FunctionPass> {
   void runOnFunction() override {
-    vector::transferOpflowOpt(getFunction());
+    FuncOp funcOp = getFunction();
+    // Generate vector.shape_cast for dropping leading one dimensions in vector
+    // ops. This increases the chance that we can forward more transfer writes
+    // to transfer reads.
+    OwningRewritePatternList patterns;
+    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
+        patterns, funcOp.getContext());
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+    vector::transferOpflowOpt(funcOp);
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     eraseDeadAllocAndStores(getFunction());

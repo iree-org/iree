@@ -86,11 +86,11 @@ class TargetEnvAttr
   /// bits.
   CapabilitiesAttr getCapabilitiesAttr();
 
-  static LogicalResult verifyConstructionInvariants(
-      Location loc, IntegerAttr version, IntegerAttr revision,
-      ArrayAttr extensions, spirv::Vendor vendorID,
-      spirv::DeviceType deviceType, uint32_t deviceID,
-      DictionaryAttr capabilities);
+  static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
+                              IntegerAttr version, IntegerAttr revision,
+                              ArrayAttr extensions, spirv::Vendor vendorID,
+                              spirv::DeviceType deviceType, uint32_t deviceID,
+                              DictionaryAttr capabilities);
 };
 
 }  // namespace Vulkan

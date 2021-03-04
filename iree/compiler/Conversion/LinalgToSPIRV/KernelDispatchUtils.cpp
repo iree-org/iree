@@ -359,17 +359,23 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
   // Only support NHWC conv.
-  if (!isa<linalg::ConvOp, linalg::ConvInputNHWCFilterHWCFOp>(
-          op.getOperation())) {
+  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(op.getOperation())) {
     return failure();
   }
 
-  bool isInputTilable = inputType.getDimSize(3) % 4 == 0;
+  bool isInputTilable =
+      inputType.getDimSize(3) % 4 == 0 || inputType.getDimSize(3) < 4;
   if (!isInputTilable) return failure();
 
+  // A list of preferred tile sizes and workgroup sizes. This is for Mali
+  // G77 now and it's fairly ad-hoc. We need to have a better story for
+  // incorporating such information.
   static const TileWorkgroupSizePair tileWorkgroupSizePairs[] = {
-      {{1, 8, 32}, {8, 2, 1}},
-  };
+      {{4, 4, 16}, {4, 4, 1}},
+      {{2, 2, 64}, {16, 1, 1}},
+      {{4, 8, 8}, {2, 4, 2}},
+      {{2, 2, 32}, {8, 2, 1}},
+      {{1, 1, 32}, {8, 1, 1}}};
 
   for (const auto &pair : tileWorkgroupSizePairs) {
     const std::array<int64_t, 3> &tileSize = pair.tileSize;
@@ -400,7 +406,7 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
     // Finally, for each invocation, we use tiling to generate loops to loop
     // over the filter's height (step 1), width (step 1), and input channel
     // (step 4) dimensions.
-    SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 4, 1, 1};
+    SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1, 4};
     tileSizes.emplace_back(fourthLevel);
 
     config.workgroupSize = workgroupSize;
@@ -442,7 +448,6 @@ LogicalResult getConvOpLaunchConfig(T op, const spirv::TargetEnv &targetEnv,
     return getConvOpLaunchConfig(op, targetEnv, options, tileSizes, config); \
   }
 
-GET_CONV_LAUNCH_CONFIG(linalg::ConvOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNWCFilterWCFOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNHWCFilterHWCFOp)
 GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNDHWCFilterDHWCFOp)
@@ -457,8 +462,13 @@ static LogicalResult getMaliSpecificConfig(
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 
+  // A list of preferred tile sizes and workgroup sizes. This is for Mali
+  // G77 now and it's fairly ad-hoc. We need to have a better story for
+  // incorporating such information.
   static const TileWorkgroupSizePair tileWorkgroupSizePairs[] = {
       {{2, 2, 32}, {8, 2, 2}},
+      {{1, 4, 16}, {4, 4, 1}},
+      {{1, 1, 64}, {16, 1, 1}},
   };
 
   for (const auto &pair : tileWorkgroupSizePairs) {
@@ -598,11 +608,11 @@ Optional<LaunchConfig> initGPULaunchConfig(
       return llvm::None;                                                     \
     }                                                                        \
     launchConfig.setTileSizes(op, tileSizesInfo);                            \
+    launchConfig.setRootOperation(op);                                       \
     continue;                                                                \
   }
 
     DISPATCH(linalg::BatchMatmulOp)
-    DISPATCH(linalg::ConvOp)
     DISPATCH(linalg::DepthwiseConvInputNHWCFilterHWCOp)
     DISPATCH(linalg::ConvInputNWCFilterWCFOp)
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
@@ -663,6 +673,14 @@ Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
 }
 
 template <>
+Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::FMAOp>(
+    vector::FMAOp op) {
+  SmallVector<int64_t, 4> size(op.getType().getRank(), 1);
+  size.back() = 4;
+  return size;
+}
+
+template <>
 Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
     vector::TransferReadOp op) {
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
@@ -707,13 +725,13 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
   }
 
   DISPATCH(vector::ContractionOp)
+  DISPATCH(vector::FMAOp)
   DISPATCH(vector::TransferReadOp)
   DISPATCH(vector::TransferWriteOp)
 
 #undef DISPATCH
 
-  if (op->hasTrait<OpTrait::ElementwiseMappable>() &&
-      op->getNumResults() == 1) {
+  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       // Map elementwise ops to vec4.
       SmallVector<int64_t, 4> nativeSize(vecType.getRank() - 1, 1);

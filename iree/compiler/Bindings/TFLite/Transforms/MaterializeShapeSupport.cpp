@@ -184,9 +184,9 @@ class MaterializeShapeSupportPass
     calcFuncOp.setName(namePrefix.str() + "_calculate_shapes");
     calcFuncOp.setPrivate();
     // TODO(benvanik): find a better way to strip these attributes.
-    calcFuncOp.removeAttr("iree.module.export");
-    calcFuncOp.removeAttr("iree.abi.stub");
-    calcFuncOp.removeAttr("iree.reflection");
+    calcFuncOp->removeAttr("iree.module.export");
+    calcFuncOp->removeAttr("iree.abi.stub");
+    calcFuncOp->removeAttr("iree.reflection");
     auto &entryBlock = calcFuncOp.front();
     auto entryBuilder = OpBuilder::atBlockBegin(&entryBlock);
 

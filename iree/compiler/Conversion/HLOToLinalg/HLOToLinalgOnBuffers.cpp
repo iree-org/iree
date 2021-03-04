@@ -47,6 +47,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-hlo-to-linalg-on-buffers"
 
@@ -58,11 +59,6 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // -----------------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------------------
-
-/// Returns true if the given `attr` is a splat of the given `value`.
-static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
@@ -236,20 +232,10 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts mhlo.convolution operation to linalg.conv or linalg.generic op.
+/// Converts mhlo.convolution operation to linalg.generic op.
 struct ConvOpConversion
     : public ConvertToLinalgBufferOp<ConvOpConversion, mhlo::ConvOp> {
   using ConvertToLinalgBufferOp<ConvOpConversion,
-                                mhlo::ConvOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-
-/// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
-struct DepthwiseConvOpConversion
-    : public ConvertToLinalgBufferOp<DepthwiseConvOpConversion, mhlo::ConvOp> {
-  using ConvertToLinalgBufferOp<DepthwiseConvOpConversion,
                                 mhlo::ConvOp>::ConvertToLinalgBufferOp;
   LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
@@ -438,145 +424,6 @@ LogicalResult ConvOpConversion::apply(
   return success();
 }
 
-LogicalResult DepthwiseConvOpConversion::apply(
-    mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  if (op.batch_group_count() != 1) return failure();
-
-  if (op.padding() && !isSplatValue(*op.padding(), 0)) {
-    return rewriter.notifyMatchFailure(op, "non-zero padding unsupported yet");
-  }
-
-  if ((op.lhs_dilation() && !isSplatValue(*op.lhs_dilation(), 1)) ||
-      (op.rhs_dilation() && !isSplatValue(*op.rhs_dilation(), 1))) {
-    return rewriter.notifyMatchFailure(op, "non-one dialation unsupported yet");
-  }
-
-  if (const mhlo::ConvDimensionNumbers &dimension_numbers =
-          op.dimension_numbers()) {
-    // Make sure that this is 2-D convolution.
-    const int spatialRank =
-        llvm::size(dimension_numbers.input_spatial_dimensions());
-    if (spatialRank != 2) {
-      return rewriter.notifyMatchFailure(op, "only support 2-D cases for now");
-    }
-
-    // Make sure that this is depthwise convolution.
-    int64_t inputFeatureDim =
-        dimension_numbers.input_feature_dimension().getInt();
-    int64_t inputFeatureCount =
-        op.lhs().getType().cast<ShapedType>().getDimSize(inputFeatureDim);
-    if (op.feature_group_count() != inputFeatureCount) {
-      return rewriter.notifyMatchFailure(op, "not depth-wise convolution");
-    }
-
-    // Make sure that this convolution has a canonical form.
-    if (!hasCanonicalDimensionNumbers(dimension_numbers)) {
-      return rewriter.notifyMatchFailure(op, "does not have canonical form");
-    }
-  }
-
-  DenseIntElementsAttr windowStrides;
-  if (op.window_strides()) {
-    windowStrides = op.window_strides().getValue();
-  } else {
-    windowStrides = rewriter.getI64VectorAttr({1, 1});
-  }
-
-  if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
-    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
-  }
-
-  // Create a Linalg reshape op that converts the filter from 4 dimensions
-  // into 3 dimensions (by droping the unit dimension). This is needed because
-  // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
-
-  auto filterDims =
-      llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
-  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
-    return rewriter.notifyMatchFailure(
-        op, "non-one channel multiplier unsupported yet");
-  }
-  filterDims[2] = op.feature_group_count();
-  filterDims.pop_back();
-
-  MemRefType filterShape = MemRefType::get(
-      filterDims, op.getType().getElementType(), ArrayRef<AffineMap>(),
-      resultBuffers[0].getType().cast<MemRefType>().getMemorySpace());
-
-  auto getIndicesVector = [](int start, int end) {
-    return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
-  };
-
-  SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
-      getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
-
-  Value filterBuffer = rewriter.create<linalg::ReshapeOp>(
-      op.getLoc(), filterShape, inputBuffers[1], collapsedDimList);
-
-  rewriter.create<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
-      op.getLoc(), TypeRange(), ValueRange{inputBuffers[0], filterBuffer},
-      resultBuffers, windowStrides);
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// mhlo.concatenate conversion patterns and utility functions.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts a mhlo.concatenate op to subview ops + linalg.copy/fill ops.
-class ConcatenateOpConversion
-    : public ConvertToLinalgBufferOp<ConcatenateOpConversion,
-                                     mhlo::ConcatenateOp> {
- public:
-  using ConvertToLinalgBufferOp<ConcatenateOpConversion,
-                                mhlo::ConcatenateOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-}  // namespace
-
-LogicalResult ConcatenateOpConversion::apply(
-    mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  Location loc = op.getLoc();
-  int dim = op.dimension();
-  int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
-  SmallVector<Value, 3> offsets, sizes, strides;
-  for (int i = 0; i < rank; ++i) {
-    offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
-    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], i);
-    sizes.push_back(size);
-    strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
-  }
-
-  Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
-  for (auto inBuf : inputBuffers) {
-    offsets[dim] = accBound;
-    if (auto cstOp = inBuf.getDefiningOp<ConstantOp>()) {
-      sizes[dim] = rewriter.create<ConstantIndexOp>(
-          loc, cstOp.getType().cast<ShapedType>().getShape()[dim]);
-      auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0],
-                                                  offsets, sizes, strides);
-      auto inputConstAttr =
-          cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
-      Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
-      rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
-    } else {
-      sizes[dim] = rewriter.create<DimOp>(loc, inBuf, dim);
-      auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0],
-                                                  offsets, sizes, strides);
-      rewriter.create<linalg::CopyOp>(loc, inBuf, subViewOp);
-    }
-    accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
-  }
-
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // linalg.pad_tensor conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
@@ -653,10 +500,57 @@ struct SubTensorOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// subtensor_insert conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts subtensor_insert operation to subview + linalg.copy.
+/// Note: this assumes dest and result are the same buffer.
+struct SubTensorInsertOpConversion
+    : public ConvertToLinalgBufferOp<SubTensorInsertOpConversion,
+                                     SubTensorInsertOp> {
+  using ConvertToLinalgBufferOp<SubTensorInsertOpConversion,
+                                SubTensorInsertOp>::ConvertToLinalgBufferOp;
+
+  LogicalResult apply(SubTensorInsertOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    auto loc = op.getLoc();
+    auto subViewOp =
+        rewriter.create<SubViewOp>(loc, resultBuffers[0], op.getMixedOffsets(),
+                                   op.getMixedSizes(), op.getMixedStrides());
+    if (auto cstOp = inputBuffers[0].getDefiningOp<ConstantOp>()) {
+      auto inputConstAttr = cstOp.valueAttr().cast<DenseElementsAttr>();
+      if (!inputConstAttr.isSplat()) {
+        return rewriter.notifyMatchFailure(
+            op, "non-splat constant is not supported");
+      }
+      Value cstVal =
+          rewriter.create<ConstantOp>(loc, inputConstAttr.getSplatValue());
+      rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
+    } else {
+      rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+    }
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
 // mhlo.reduce_window conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+/// Returns the constant value associated with the init value if the defining
+/// operation is a constant.
+static Attribute GetInitValueAsConst(Value init) {
+  DenseElementsAttr attr;
+  if (!matchPattern(init, m_Constant(&attr))) return {};
+  auto type = attr.getType().dyn_cast<ShapedType>();
+  if (!type || type.getRank() != 0) return {};
+  return attr.getValue({});
+}
 
 /// mhlo.reduce_window is mapped to a linalg.pooling operation. The type of
 /// the pooling is determined based on the body of the reduce window
@@ -729,9 +623,16 @@ LogicalResult ReduceWindowOpConversion::apply(
   linalg::LinalgOp poolingOp;
   PoolingType poolingType = getPoolingType(op.body());
 
-  if (failed(zeroFillBuffer(loc, resultBuffers[0], rewriter))) {
-    return rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
+  Value initValue = inputBuffers[1];
+  Attribute initConstVal = GetInitValueAsConst(initValue);
+  if (initConstVal) {
+    initValue = rewriter.create<ConstantOp>(initValue.getDefiningOp()->getLoc(),
+                                            initConstVal);
+  } else {
+    initValue = rewriter.create<LoadOp>(loc, initValue);
   }
+  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], initValue);
+
   switch (poolingType) {
     case PoolingType::kMin: {
       poolingOp = createOp(static_cast<linalg::PoolingMinOp *>(nullptr));
@@ -1163,6 +1064,11 @@ static LogicalResult propagateBufferUsedForResultTensor(
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }
+    if (auto subTensorInsertOp = tensor.getDefiningOp<SubTensorInsertOp>()) {
+      tensor = subTensorInsertOp.dest();
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
+      continue;
+    }
     break;
   }
   return success();
@@ -1221,6 +1127,27 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
 }
 
 //===----------------------------------------------------------------------===//
+// Canonicalization patterns.
+//===----------------------------------------------------------------------===//
+
+// Folds linalg.reshape op that directly reshaping an iree.placeholder op into
+// the iree.placeholder op itself.
+class FoldReshapeIntoPlaceholder final
+    : public OpRewritePattern<linalg::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::ReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto placeholderOp = reshapeOp.src().getDefiningOp<IREE::PlaceholderOp>();
+    if (!placeholderOp) return failure();
+    rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
+        reshapeOp, reshapeOp.getResultType(), ValueRange(),
+        placeholderOp->getAttrs());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass specification.
 //===----------------------------------------------------------------------===//
 
@@ -1238,23 +1165,29 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns.insert<ConvOpConversion, DepthwiseConvOpConversion,
-                  ConcatenateOpConversion, FillOpOnTensorConversion,
-                  InitTensorOpConversion,
-                  LinalgOpOnTensorConversion<linalg::GenericOp>,
-                  LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-                  NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
-                  NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
-                  NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
-                  NamedOpConversion<linalg::MatmulOp>,
-                  NamedOpConversion<linalg::BatchMatmulOp>,
-                  PadTensorOpConversion, ReduceWindowOpConversion,
-                  SubTensorOpConversion, TensorReshapeOpConversion>(
-      context, resultTensorToBufferMap);
-
-  // Prefer lowering to named Linalg dpethwise convolution when possible.
-  patterns.insert<DepthwiseConvOpConversion>(context, resultTensorToBufferMap,
-                                             /*benefit=*/2);
+  patterns.insert<
+      // clang-format off
+      ConvOpConversion,
+      FillOpOnTensorConversion,
+      InitTensorOpConversion,
+      LinalgOpOnTensorConversion<linalg::GenericOp>,
+      LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+      NamedOpConversion<linalg::ConvInputNWCFilterWCFOp>,
+      NamedOpConversion<linalg::ConvInputNHWCFilterHWCFOp>,
+      NamedOpConversion<linalg::ConvInputNDHWCFilterDHWCFOp>,
+      NamedOpConversion<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
+      NamedOpConversion<linalg::MatmulOp>,
+      NamedOpConversion<linalg::MatmulI8I8I32Op>,
+      NamedOpConversion<linalg::MatmulI16I16I32Op>,
+      NamedOpConversion<linalg::MatmulI32I32I32Op>,
+      NamedOpConversion<linalg::BatchMatmulOp>,
+      PadTensorOpConversion,
+      ReduceWindowOpConversion,
+      SubTensorOpConversion,
+      SubTensorInsertOpConversion,
+      TensorReshapeOpConversion
+      // clang-format on
+      >(context, resultTensorToBufferMap);
 }
 
 void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
@@ -1284,7 +1217,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
                       IREE::HAL::InterfaceStoreTensorOp, SubTensorOp,
-                      tensor::ExtractOp>();
+                      SubTensorInsertOp, tensor::ExtractOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();
@@ -1305,6 +1238,13 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
 
   if (failed(applyFullConversion(getFunction(), target, std::move(patterns)))) {
     return signalPassFailure();
+  }
+
+  // Perform additional canonicalizations.
+  {
+    OwningRewritePatternList foldingPatterns;
+    foldingPatterns.insert<FoldReshapeIntoPlaceholder>(context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(foldingPatterns));
   }
 }
 

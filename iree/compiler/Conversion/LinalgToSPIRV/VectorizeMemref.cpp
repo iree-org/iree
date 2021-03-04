@@ -18,11 +18,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 
 constexpr int kMaxVectorizationSizeInBits = 128;
 constexpr int kMaxVectorNumElements = 4;
@@ -326,7 +329,7 @@ Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   unsigned ratio = vecSizeInBits / type.getElementTypeBitWidth();
   if (newShape.back() % ratio != 0) return {};
   newShape.back() = newShape.back() / ratio;
-  return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
+  return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
 }
 
 class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
@@ -402,6 +405,7 @@ void VectorizeMemRefPass::runOnOperation() {
   // framework to implement the conversion.
   ModuleOp module = getOperation();
   MLIRContext *context = &getContext();
+
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
 
   OwningRewritePatternList patterns;

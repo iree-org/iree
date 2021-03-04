@@ -25,14 +25,12 @@ cc_library(
     srcs = [
         "ForOpCanonicalization.cpp",
         "FunctionUtils.cpp",
-        "GetNumWorkgroups.cpp",
         "MarkerUtils.cpp",
         "TransformUtils.cpp",
     ],
     hdrs = [
         "ForOpCanonicalization.h",
         "FunctionUtils.h",
-        "GetNumWorkgroups.h",
         "MarkerUtils.h",
         "TransformUtils.h",
     ],

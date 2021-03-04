@@ -31,6 +31,8 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -237,7 +239,8 @@ class HALDispatchABI {
     auto elementType = typeConverter->convertType(memRefType.getElementType());
     Value typedPtrValue = builder.createOrFold<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMPointerType::get(elementType, memRefType.getMemorySpace()),
+        LLVM::LLVMPointerType::get(elementType,
+                                   memRefType.getMemorySpaceAsInt()),
         basePtrValue);
 
     // Construct the MemRefDescriptor type based on the information we have.
@@ -336,7 +339,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     // Copy all attributes onto the LLVM function except the ones handled by
     // MLIR implicitly.
     SmallVector<NamedAttribute, 4> funcAttrs;
-    for (auto attr : stdFuncOp.getAttrs()) {
+    for (auto attr : stdFuncOp->getAttrs()) {
       if (attr.first == SymbolTable::getSymbolAttrName() ||
           attr.first == mlir::impl::getTypeAttrName()) {
         continue;
@@ -677,21 +680,22 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addLegalOp<ModuleOp, ModuleTerminatorOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
-                           IREE::HAL::HALDialect>();
+                           IREE::HAL::HALDialect, math::MathDialect>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
-                                    IREEDialect, IREE::HAL::HALDialect>(
-      [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
-        if (!funcParent) return false;
-        if (isEntryPoint(funcParent)) return false;
-        return true;
-      });
+  target
+      .addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
+                                  IREE::HAL::HALDialect, math::MathDialect>(
+          [&](Operation *op) {
+            auto funcParent = op->getParentOfType<FuncOp>();
+            if (!funcParent) return false;
+            if (isEntryPoint(funcParent)) return false;
+            return true;
+          });
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();

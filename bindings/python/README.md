@@ -20,9 +20,6 @@ First perform a normal CMake build/install with the following options:
 * `-DCMAKE_INSTALL_PREFIX=...path to install to...` : Sets up installation
   prefix.
 * `-DIREE_BUILD_PYTHON_BINDINGS=ON` : Enables Python Bindings
-* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON` (optional) : Enables building the
-  TensorFlow compilers (note: requires additional dependencies. see overall
-  build docs).
 
 Then from the install directory, run:
 

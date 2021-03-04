@@ -33,6 +33,18 @@ SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
       }));
 }
 
+template <typename AccessOpTy, typename GlobalOpTy>
+GlobalOpTy lookupGlobalOp(AccessOpTy accessOp) {
+  FlatSymbolRefAttr globalAttr =
+      accessOp.getOperation()->template getAttrOfType<FlatSymbolRefAttr>(
+          "global");
+  GlobalOpTy globalOp =
+      accessOp.getOperation()
+          ->template getParentOfType<IREE::VM::ModuleOp>()
+          .template lookupSymbol<GlobalOpTy>(globalAttr.getValue());
+  return globalOp;
+}
+
 // Convert vm operations to emitc calls. The resultiong call has the ops
 // operands as arguments followed by an argument for every attribute.
 template <typename SrcOpTy>
@@ -47,19 +59,102 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Attribute, 4> args_ =
-        indexSequence(operands.size(), op.getContext());
-
-    for (NamedAttribute attr : op.getAttrs()) {
-      args_.push_back(attr.second);
-    }
-
     auto type = op.getOperation()->getResultTypes();
     StringAttr callee = rewriter.getStringAttr(funcName);
-    ArrayAttr args = rewriter.getArrayAttr(args_);
+
+    // Default to an empty args attribute, which results in the operands being
+    // printed as the arguments to the function call.
+    ArrayAttr args;
     ArrayAttr templateArgs;
 
+    // If the operation has attributes, we need to explicitely build the args
+    // attribute of the emitc call op. This consists of index attributes for
+    // the operands, followed by the source op attributes themselves.
+    if (op.getAttrs().size() > 0) {
+      SmallVector<Attribute, 4> args_ =
+          indexSequence(operands.size(), op.getContext());
+
+      for (NamedAttribute attr : op.getAttrs()) {
+        args_.push_back(attr.second);
+      }
+
+      args = rewriter.getArrayAttr(args_);
+    }
+
     rewriter.replaceOpWithNewOp<emitc::CallOp>(op, type, callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+template <typename LoadOpTy, typename GlobalOpTy>
+class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
+  using OpConversionPattern<LoadOpTy>::OpConversionPattern;
+
+ public:
+  GlobalLoadOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<LoadOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      LoadOpTy loadOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    GlobalOpTy globalOp = lookupGlobalOp<LoadOpTy, GlobalOpTy>(loadOp);
+    if (!globalOp) return loadOp.emitError() << "Unable to find GlobalOp";
+
+    auto type = loadOp.getOperation()->getResultTypes();
+    StringAttr callee = rewriter.getStringAttr(funcName);
+
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
+    // buffer where globals live after code generation as well as the state
+    // struct argument name are hardcoded here.
+    ArrayAttr args = rewriter.getArrayAttr(
+        {rewriter.getStringAttr("state->rwdata"),
+         rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
+             globalOp.ordinal().getValue().getZExtValue()))});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(loadOp, type, callee, args,
+                                               templateArgs, operands);
+
+    return success();
+  }
+
+  StringRef funcName;
+};
+
+template <typename StoreOpTy, typename GlobalOpTy>
+class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
+  using OpConversionPattern<StoreOpTy>::OpConversionPattern;
+
+ public:
+  GlobalStoreOpConversion(MLIRContext *context, StringRef funcName)
+      : OpConversionPattern<StoreOpTy>(context), funcName(funcName) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      StoreOpTy storeOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    GlobalOpTy globalOp = lookupGlobalOp<StoreOpTy, GlobalOpTy>(storeOp);
+    if (!globalOp) return storeOp.emitError() << "Unable to find GlobalOp";
+
+    auto type = storeOp.getOperation()->getResultTypes();
+    StringAttr callee = rewriter.getStringAttr(funcName);
+
+    // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
+    // buffer where globals live after code generation as well as the state
+    // struct argument name are hardcoded here.
+    ArrayAttr args = rewriter.getArrayAttr(
+        {rewriter.getStringAttr("state->rwdata"),
+         rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
+             globalOp.ordinal().getValue().getZExtValue())),
+         rewriter.getIndexAttr(0)});
+    ArrayAttr templateArgs;
+
+    rewriter.replaceOpWithNewOp<emitc::CallOp>(storeOp, type, callee, args,
                                                templateArgs, operands);
 
     return success();
@@ -72,6 +167,14 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
+  // Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadI32Op, IREE::VM::GlobalI32Op>>(
+      context, "vm_global_load_i32");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI32Op,
+                                          IREE::VM::GlobalI32Op>>(
+      context, "vm_global_store_i32");
+
   // Constants
   patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
                                                           "vm_const_i32");
@@ -160,12 +263,32 @@ void populateVMToCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::OrI64Op>>(context, "vm_or_i64");
   patterns.insert<CallOpConversion<IREE::VM::XorI64Op>>(context, "vm_xor_i64");
 
+  // ExtI64: Casting and type conversion/emulation ops
+  patterns.insert<CallOpConversion<IREE::VM::TruncI64I32Op>>(context,
+                                                             "vm_trunc_i64i32");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI32I64SOp>>(context,
+                                                            "vm_ext_i32i64s");
+  patterns.insert<CallOpConversion<IREE::VM::ExtI32I64UOp>>(context,
+                                                            "vm_ext_i32i64u");
+
   // ExtI64: Native bitwise shift and rotate ops
   patterns.insert<CallOpConversion<IREE::VM::ShlI64Op>>(context, "vm_shl_i64");
   patterns.insert<CallOpConversion<IREE::VM::ShrI64SOp>>(context,
                                                          "vm_shr_i64s");
   patterns.insert<CallOpConversion<IREE::VM::ShrI64UOp>>(context,
                                                          "vm_shr_i64u");
+
+  // ExtI64: Comparison ops
+  patterns.insert<CallOpConversion<IREE::VM::CmpEQI64Op>>(context,
+                                                          "vm_cmp_eq_i64");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNEI64Op>>(context,
+                                                          "vm_cmp_ne_i64");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI64SOp>>(context,
+                                                           "vm_cmp_lt_i64s");
+  patterns.insert<CallOpConversion<IREE::VM::CmpLTI64UOp>>(context,
+                                                           "vm_cmp_lt_i64u");
+  patterns.insert<CallOpConversion<IREE::VM::CmpNZI64Op>>(context,
+                                                          "vm_cmp_nz_i64");
 }
 
 namespace IREE {
@@ -189,75 +312,18 @@ class ConvertVMToEmitCPass
 
     target.addLegalDialect<mlir::emitc::EmitCDialect>();
     target.addLegalDialect<iree_compiler::IREEDialect>();
-    target.addLegalDialect<IREE::VM::VMDialect>();
+    target.addIllegalDialect<IREE::VM::VMDialect>();
 
-    // Constants
-    target.addIllegalOp<IREE::VM::ConstI32Op>();
+    // Structural ops
+    target.addLegalOp<IREE::VM::ModuleOp>();
+    target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
+    target.addLegalOp<IREE::VM::FuncOp>();
+    target.addLegalOp<IREE::VM::GlobalI32Op>();
+    target.addLegalOp<IREE::VM::ExportOp>();
 
-    // Conditional assignment ops
-    target.addIllegalOp<IREE::VM::SelectI32Op>();
-
-    // Native integer arithmetic ops
-    target.addIllegalOp<IREE::VM::AddI32Op>();
-    target.addIllegalOp<IREE::VM::SubI32Op>();
-    target.addIllegalOp<IREE::VM::MulI32Op>();
-    target.addIllegalOp<IREE::VM::DivI32SOp>();
-    target.addIllegalOp<IREE::VM::DivI32UOp>();
-    target.addIllegalOp<IREE::VM::RemI32SOp>();
-    target.addIllegalOp<IREE::VM::RemI32UOp>();
-    target.addIllegalOp<IREE::VM::NotI32Op>();
-    target.addIllegalOp<IREE::VM::AndI32Op>();
-    target.addIllegalOp<IREE::VM::OrI32Op>();
-    target.addIllegalOp<IREE::VM::XorI32Op>();
-
-    // Casting and type conversion/emulation ops
-    target.addIllegalOp<IREE::VM::TruncI32I8Op>();
-    target.addIllegalOp<IREE::VM::TruncI32I16Op>();
-    target.addIllegalOp<IREE::VM::ExtI8I32SOp>();
-    target.addIllegalOp<IREE::VM::ExtI8I32UOp>();
-    target.addIllegalOp<IREE::VM::ExtI16I32SOp>();
-    target.addIllegalOp<IREE::VM::ExtI16I32UOp>();
-
-    // Native bitwise shift and rotate ops
-    target.addIllegalOp<IREE::VM::ShlI32Op>();
-    target.addIllegalOp<IREE::VM::ShrI32SOp>();
-    target.addIllegalOp<IREE::VM::ShrI32UOp>();
-
-    // Comparison ops
-    target.addIllegalOp<IREE::VM::CmpEQI32Op>();
-    target.addIllegalOp<IREE::VM::CmpNEI32Op>();
-    target.addIllegalOp<IREE::VM::CmpLTI32SOp>();
-    target.addIllegalOp<IREE::VM::CmpLTI32UOp>();
-    target.addIllegalOp<IREE::VM::CmpNZI32Op>();
-
-    // Check ops
-    // TODO(simon-camp): These conversions to macro calls should be deleted once
-    // support for control flow ops has landed in the c module target
-    target.addIllegalOp<IREE::VM::CheckEQOp>();
-
-    // ExtI64: Constants
-    target.addIllegalOp<IREE::VM::ConstI64Op>();
-
-    // ExtI64: Conditional assignment ops
-    target.addIllegalOp<IREE::VM::SelectI64Op>();
-
-    // ExtI64: Native integer arithmetic ops
-    target.addIllegalOp<IREE::VM::AddI64Op>();
-    target.addIllegalOp<IREE::VM::SubI64Op>();
-    target.addIllegalOp<IREE::VM::MulI64Op>();
-    target.addIllegalOp<IREE::VM::DivI64SOp>();
-    target.addIllegalOp<IREE::VM::DivI64UOp>();
-    target.addIllegalOp<IREE::VM::RemI64SOp>();
-    target.addIllegalOp<IREE::VM::RemI64UOp>();
-    target.addIllegalOp<IREE::VM::NotI64Op>();
-    target.addIllegalOp<IREE::VM::AndI64Op>();
-    target.addIllegalOp<IREE::VM::OrI64Op>();
-    target.addIllegalOp<IREE::VM::XorI64Op>();
-
-    // ExtI64: Native bitwise shift and rotate ops
-    target.addIllegalOp<IREE::VM::ShlI64Op>();
-    target.addIllegalOp<IREE::VM::ShrI64SOp>();
-    target.addIllegalOp<IREE::VM::ShrI64UOp>();
+    // Control flow ops
+    target.addLegalOp<IREE::VM::CallOp>();
+    target.addLegalOp<IREE::VM::ReturnOp>();
 
     if (failed(
             applyFullConversion(getOperation(), target, std::move(patterns)))) {

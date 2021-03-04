@@ -61,10 +61,6 @@ import jax.numpy as jnp
 import flax
 from flax import linen as nn
 
-import os
-# Configure the linker to target Android.
-os.environ["IREE_LLVMAOT_LINKER_PATH"] = "${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++"
-
 
 class MLP(nn.Module):
 
@@ -85,7 +81,6 @@ apply_args = [{"params": params}, image]
 options = dict(target_backends=["dylib-llvm-aot"],
                extra_args=["--iree-llvm-target-triple=aarch64-linux-android"])
 
-# This will throw a compilation error if IREE_LLVMAOT_LINKER_PATH is not set.
 compiled_binary = iree.jax.aot(MLP().apply, *apply_args, **options)
 
 with open("/tmp/mlp_apply.vmfb", "wb") as f:

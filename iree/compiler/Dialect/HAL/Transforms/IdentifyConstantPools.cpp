@@ -245,7 +245,7 @@ class IdentifyConstantPoolsPass
         variableOp.getLoc(), initializerName,
         moduleBuilder.getFunctionType({}, {variableOp.type()}));
     initializerFunc.setPrivate();
-    variableOp.removeAttr("initial_value");
+    variableOp->removeAttr("initial_value");
     variableOp->setAttr("initializer",
                         moduleBuilder.getSymbolRefAttr(initializerFunc));
 

@@ -43,7 +43,7 @@ struct FuseWithHALInterfaceLoadTensor
     if (!loadOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceLoadTensorOp>(
         reshapeOp, reshapeOp.getResultType(), loadOp.offset(),
-        loadOp.getAttrs());
+        loadOp->getAttrs());
     return success();
   }
 };
@@ -58,7 +58,7 @@ struct FuseWithHALInterfaceStoreTensor
     if (!reshapeOp) return failure();
     SmallVector<Value, 2> operands = {reshapeOp.src(), storeOp.offset()};
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceStoreTensorOp>(
-        storeOp, ArrayRef<Type>(), operands, storeOp.getAttrs());
+        storeOp, ArrayRef<Type>(), operands, storeOp->getAttrs());
     return success();
   }
 };

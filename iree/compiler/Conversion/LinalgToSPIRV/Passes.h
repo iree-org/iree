@@ -40,8 +40,8 @@ createLinalgTileAndFusePass(const SPIRVCodegenOptions &options);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass(
-    const SPIRVCodegenOptions &options);
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createConvertToGPUPass(const SPIRVCodegenOptions &options);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 /// This pass converts remaining interface ops into SPIR-V global variables,
@@ -56,7 +56,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 /// all workgroups to complete, then we need to split A and B into different
 /// kernels because there is no mechanism to perform cross-workgroup
 /// synchronization within a single kernel.
-std::unique_ptr<OperationPass<ModuleOp>> createSplitDispatchFunctionPass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createSplitDispatchFunctionPass();
 
 /// Pass to convert vector operations to GPU level operations. Instructions of
 /// vector size equal to subgroup size are distributed across the subgroup.
@@ -71,7 +72,8 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
 
 /// Creates a pass to fold processor ID uses where possible.
-std::unique_ptr<OperationPass<FuncOp>> createFoldProcessorIDUsesPass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createFoldProcessorIDUsesPass();
 
 /// Pass that materializes new hal.executable.entry_point ops for
 /// spv.EntryPoints that are added by other passes.

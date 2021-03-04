@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
+# Doesn't use bazel_to_cmake because of various special logic throughout.
 
 add_subdirectory(android)
 add_subdirectory(test)
@@ -36,6 +36,10 @@ endif()
 if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
+endif()
+if("${IREE_TARGET_BACKEND_CUDA}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::CUDA)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_CUDA_TARGET")
 endif()
 
 if(IREE_ENABLE_EMITC)
@@ -313,6 +317,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
+      MLIRTargetLLVMIR
       MLIRTranslation
       iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode
@@ -359,6 +364,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRParser
       MLIRPass
       MLIRSupport
+      MLIRTargetLLVMIR
       absl::flags
       absl::span
       absl::strings

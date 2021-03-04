@@ -30,8 +30,16 @@ class WindowsLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
+    // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getToolPath();
-    return toolPath.empty() ? "lld-link" : toolPath;
+    if (!toolPath.empty()) return toolPath;
+
+    // No explicit linker specified, search the environment for common tools.
+    toolPath = findToolInEnvironment({"lld-link"});
+    if (!toolPath.empty()) return toolPath;
+
+    llvm::errs() << "No Windows linker tool specified or discovered\n";
+    return "";
   }
 
   LogicalResult configureModule(llvm::Module *llvmModule,

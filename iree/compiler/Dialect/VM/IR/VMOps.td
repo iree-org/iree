@@ -309,9 +309,9 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     bool isMutable() { return is_mutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
     Optional<StringRef> getInitializerAttr() { return initializer(); }
-    void clearInitializer() { removeAttr("initializer"); }
+    void clearInitializer() { (*this)->removeAttr("initializer"); }
     Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
-    void clearInitialValue() { removeAttr("initial_value"); }
+    void clearInitialValue() { (*this)->removeAttr("initial_value"); }
     Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
   }];
 

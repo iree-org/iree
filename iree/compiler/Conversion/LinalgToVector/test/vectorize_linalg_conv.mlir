@@ -4,7 +4,9 @@ func @vectorize_conv(%filter: memref<1x1x3x4xf32>, %input: memref<1x2x2x3xf32>, 
   %0 = subview %filter[0, 0, 0, 0] [1, 1, 3, 4] [1, 1, 1, 1]  : memref<1x1x3x4xf32> to memref<1x1x3x4xf32>
   %1 = subview %input[0, 0, 0, 0] [1, 2, 2, 3] [1, 1, 1, 1]  : memref<1x2x2x3xf32> to memref<1x2x2x3xf32>
   %2 = subview %output[0, 0, 0, 0] [1, 2, 2, 4] [1, 1, 1, 1]  : memref<1x2x2x4xf32> to memref<1x2x2x4xf32>
-  linalg.conv(%0, %1, %2) {dilations = [1, 1], strides = [1, 1]} : memref<1x1x3x4xf32>, memref<1x2x2x3xf32>, memref<1x2x2x4xf32>
+  linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+     ins (%1, %0: memref<1x2x2x3xf32>, memref<1x1x3x4xf32>)
+    outs (%2: memref<1x2x2x4xf32>)
   return
 }
 
@@ -32,44 +34,44 @@ func @vectorize_conv(%filter: memref<1x1x3x4xf32>, %input: memref<1x2x2x3xf32>, 
 // CHECK: %[[INPUT_0:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x3xf32>, vector<1x3xf32>
 // CHECK: %[[OUTPUT_0:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x4xf32>, vector<1x4xf32>
 // CHECK: %[[INPUT_0_0:.+]] = vector.extract_strided_slice %[[INPUT_0]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_0_0]], %[[FILTER_0]], %[[OUTPUT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_0_0]], %[[FILTER_0]], %[[OUTPUT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_0_1:.+]] = vector.extract_strided_slice %[[INPUT_0]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_0_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_0_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_0_2:.+]] = vector.extract_strided_slice %[[INPUT_0]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_0_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_0_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: vector.transfer_write %[[DOT_2]], %[[OUTPUT]][%c0, %c0, %c0, %c0] {masked = [false, false]} : vector<1x4xf32>, memref<1x2x2x4xf32>
 
 // Handle batch #1
 // CHECK: %[[INPUT_1:.+]] = vector.transfer_read %[[INPUT]][%c0, %c0, %c1, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x3xf32>, vector<1x3xf32>
 // CHECK: %[[OUTPUT_1:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c0, %c1, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x4xf32>, vector<1x4xf32>
 // CHECK: %[[INPUT_1_0:.+]] = vector.extract_strided_slice %[[INPUT_1]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_1_0]], %[[FILTER_0]], %[[OUTPUT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_1_0]], %[[FILTER_0]], %[[OUTPUT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_1_1:.+]] = vector.extract_strided_slice %[[INPUT_1]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_1_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_1_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_1_2:.+]] = vector.extract_strided_slice %[[INPUT_1]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_1_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_1_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: vector.transfer_write %[[DOT_2]], %[[OUTPUT]][%c0, %c0, %c1, %c0] {masked = [false, false]} : vector<1x4xf32>, memref<1x2x2x4xf32>
 
 // Handle batch #2
 // CHECK: %[[INPUT_2:.+]] = vector.transfer_read %[[INPUT]][%c0, %c1, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x3xf32>, vector<1x3xf32>
 // CHECK: %[[OUTPUT_2:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c0, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x4xf32>, vector<1x4xf32>
 // CHECK: %[[INPUT_2_0:.+]] = vector.extract_strided_slice %[[INPUT_2]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_2_0]], %[[FILTER_0]], %[[OUTPUT_2]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_2_0]], %[[FILTER_0]], %[[OUTPUT_2]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_2_1:.+]] = vector.extract_strided_slice %[[INPUT_2]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_2_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_2_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_2_2:.+]] = vector.extract_strided_slice %[[INPUT_2]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_2_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_2_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: vector.transfer_write %[[DOT_2]], %[[OUTPUT]][%c0, %c1, %c0, %c0] {masked = [false, false]} : vector<1x4xf32>, memref<1x2x2x4xf32>
 
 // Handle batch #3
 // CHECK: %[[INPUT_3:.+]] = vector.transfer_read %[[INPUT]][%c0, %c1, %c1, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x3xf32>, vector<1x3xf32>
 // CHECK: %[[OUTPUT_3:.+]] = vector.transfer_read %[[OUTPUT]][%c0, %c1, %c1, %c0], %[[FLOAT_ZERO]] {masked = [false, false]} : memref<1x2x2x4xf32>, vector<1x4xf32>
 // CHECK: %[[INPUT_3_0:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_0]], %[[FILTER_0]], %[[OUTPUT_3]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_0:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_3_0]], %[[FILTER_0]], %[[OUTPUT_3]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_3_1:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_1:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_3_1]], %[[FILTER_1]], %[[DOT_0]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: %[[INPUT_3_2:.+]] = vector.extract_strided_slice %[[INPUT_3]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]} : vector<1x3xf32> to vector<1x1xf32>
-// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %[[INPUT_3_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
+// CHECK: %[[DOT_2:.+]] = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %[[INPUT_3_2]], %[[FILTER_2]], %[[DOT_1]] : vector<1x1xf32>, vector<1x4xf32> into vector<1x4xf32>
 // CHECK: vector.transfer_write %[[DOT_2]], %[[OUTPUT]][%c0, %c1, %c1, %c0] {masked = [false, false]} : vector<1x4xf32>, memref<1x2x2x4xf32>
 
 // -----
@@ -79,8 +81,10 @@ func @do_not_vectorize_conv_with_non_1_batch(%filter: memref<1x1x4x4xf32>, %inpu
   %0 = subview %filter[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
   %1 = subview %input[0, 0, 0, 0] [2, 1, 7, 4] [1, 1, 1, 1]  : memref<2x1x7x4xf32> to memref<2x1x7x4xf32>
   %2 = subview %output[0, 0, 0, 0] [2, 1, 4, 4] [1, 1, 1, 1]  : memref<2x1x4x4xf32> to memref<2x1x4x4xf32>
-  // CHECK: linalg.conv
-  linalg.conv(%0, %1, %2) {dilations = [1, 1], strides = [2, 2]} : memref<1x1x4x4xf32>, memref<2x1x7x4xf32>, memref<2x1x4x4xf32>
+  // CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+  linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+     ins (%1, %0: memref<2x1x7x4xf32>, memref<1x1x4x4xf32>)
+    outs (%2: memref<2x1x4x4xf32>)
   return
 }
 
@@ -91,8 +95,10 @@ func @do_not_vectorize_conv_with_non_1_filter_height(%filter: memref<2x1x4x4xf32
   %0 = subview %filter[0, 0, 0, 0] [2, 1, 4, 4] [1, 1, 1, 1]  : memref<2x1x4x4xf32> to memref<2x1x4x4xf32>
   %1 = subview %input[0, 0, 0, 0] [1, 2, 7, 4] [1, 1, 1, 1]  : memref<1x2x7x4xf32> to memref<1x2x7x4xf32>
   %2 = subview %output[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
-  // CHECK: linalg.conv
-  linalg.conv(%0, %1, %2) {dilations = [1, 1], strides = [2, 2]} : memref<2x1x4x4xf32>, memref<1x2x7x4xf32>, memref<1x1x4x4xf32>
+  // CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+  linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+     ins (%1, %0: memref<1x2x7x4xf32>, memref<2x1x4x4xf32>)
+    outs (%2: memref<1x1x4x4xf32>)
   return
 }
 
@@ -103,8 +109,10 @@ func @do_not_vectorize_conv_with_non_1_filter_width(%filter: memref<1x2x4x4xf32>
   %0 = subview %filter[0, 0, 0, 0] [1, 2, 4, 4] [1, 1, 1, 1]  : memref<1x2x4x4xf32> to memref<1x2x4x4xf32>
   %1 = subview %input[0, 0, 0, 0] [1, 1, 8, 4] [1, 1, 1, 1]  : memref<1x1x8x4xf32> to memref<1x1x8x4xf32>
   %2 = subview %output[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
-  // CHECK: linalg.conv
-  linalg.conv(%0, %1, %2) {dilations = [1, 1], strides = [2, 2]} : memref<1x2x4x4xf32>, memref<1x1x8x4xf32>, memref<1x1x4x4xf32>
+  // CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+  linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+     ins (%1, %0: memref<1x1x8x4xf32>, memref<1x2x4x4xf32>)
+    outs (%2: memref<1x1x4x4xf32>)
   return
 }
 
@@ -115,8 +123,10 @@ func @do_not_vectorize_conv_with_non_1_dilation(%filter: memref<1x1x4x4xf32>, %i
   %0 = subview %filter[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
   %1 = subview %input[0, 0, 0, 0] [1, 1, 7, 4] [1, 1, 1, 1]  : memref<1x1x7x4xf32> to memref<1x1x7x4xf32>
   %2 = subview %output[0, 0, 0, 0] [1, 1, 4, 4] [1, 1, 1, 1]  : memref<1x1x4x4xf32> to memref<1x1x4x4xf32>
-  // CHECK: linalg.conv
-  linalg.conv(%0, %1, %2) {dilations = [2, 1], strides = [2, 2]} : memref<1x1x4x4xf32>, memref<1x1x7x4xf32>, memref<1x1x4x4xf32>
+  // CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+  linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<[2, 1]> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+     ins (%1, %0: memref<1x1x7x4xf32>, memref<1x1x4x4xf32>)
+    outs (%2: memref<1x1x4x4xf32>)
   return
 }
 

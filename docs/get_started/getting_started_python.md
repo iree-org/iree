@@ -3,12 +3,14 @@
   NOTE: Iree's Python API is currently being reworked. Some of these
   instructions may be in a state of flux as they document the end state.
 
-IREE has two primary Python APIs:
-
-* Compiler API: `pyiree.compiler2`, `pyiree.compiler2.tf`
-* Runtime API: `pyiree.tf`
+The IREE compiler API is called `pyiree.compiler2` (naming is for historical
+reasons and will be changed to `iree.compiler` soon).
 
 There are additional ancillary modules that are not part of the public API.
+
+Note this guide does not cover IREE integrations with other frontends, such as
+TensorFlow. For those, see the relevant
+[getting started guides](../get-started).
 
 ## Prerequisites
 
@@ -21,12 +23,6 @@ You should already have IREE cloned and building on your machine. See the other
 Minimally, the following CMake flags must be specified:
 
 * `-DIREE_BUILD_PYTHON_BINDINGS=ON`
-* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON`: Optional. Also builds the TensorFlow
-  compiler integration.
-
-If building any parts of TensorFlow, you must have a working `bazel` command
-on your path. See the relevant "OS with Bazel" [getting started](../get-started)
-doc for more information.
 
 ## Python Setup
 
@@ -40,8 +36,7 @@ Install [Python 3](https://www.python.org/downloads/) `>= 3.6` and
   during interpreter installation.
 
 (Recommended) Setup a virtual environment with `venv` (or your preferred
-mechanism):
-
+mechanism):t
 ```shell
 # Note that venv is only available in python3 and is therefore a good check
 # that you are in fact running a python3 binary.
@@ -55,9 +50,6 @@ Install packages:
 ```shell
 $ python -m pip install --upgrade pip
 $ python -m pip install numpy absl-py
-
-# If using the TensorFlow integration
-$ python -m pip install tf-nightly
 ```
 
 ## Building
@@ -73,7 +65,6 @@ $ cd iree-build
 Then build like this:
 
 ```shell
-# Also include -DIREE_BUILD_TENSORFLOW_COMPILER=ON if you want the TF compiler.
 $ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
@@ -91,22 +82,6 @@ To run tests for core Python bindings built with CMake:
 ```shell
 $ ctest -L bindings/python
 ```
-
-To run tests for the TensorFlow integration, which include end-to-end backend
-comparison tests:
-
-```shell
-# TODO: Revisit once more patches land.
-$ ctest -L integrations/tensorflow/e2e
-
-# Or run individually as:
-$ export PYTHONPATH=$(pwd)/bindings/python
-# This is a Python 3 program. On some systems, such as Debian derivatives,
-# use 'python3' instead of 'python'.
-$ python ../iree/integrations/tensorflow/e2e/simple_arithmetic_test.py \
-    --target_backends=iree_vmla --artifacts_dir=/tmp/artifacts
-```
-
 ## Using Colab
 
 There are some sample colabs in the `colab` folder. If you have built the

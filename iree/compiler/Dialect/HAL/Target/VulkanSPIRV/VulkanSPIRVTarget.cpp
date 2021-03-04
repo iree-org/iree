@@ -147,7 +147,8 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
       // We have multiple entry points in this module. Make sure the order
       // specified in the schedule attribute is respected.
       for (Attribute entryPoint : scheduleAttr) {
-        entryPointNames.push_back(entryPoint.cast<StringAttr>().getValue());
+        entryPointNames.push_back(
+            entryPoint.cast<FlatSymbolRefAttr>().getValue());
       }
     } else {
       spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {

@@ -21,7 +21,10 @@
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
+#include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
+#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -59,6 +62,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
 
+  // Convert TOSA control flow / constant operations to standard operations.
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
+  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
+
   // Convert TOSA ops to Linalg-on-tensor ops.
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 
@@ -86,9 +94,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
   // handle region conversion properly (parent cloned before children). Revisit
   // when using ops with regions such as scf.for and linalg.generic.
-  if (!clEnableLinalgOnTensorsDispatch) {
-    passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
-  }
+  passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
 
   //----------------------------------------------------------------------------
   // Shape and reflection ABI materialization.
@@ -189,6 +195,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
   }
 
   // First perform module-level analysis that following passes will use to query

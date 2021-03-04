@@ -149,6 +149,7 @@ endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
+  CUDA
   DYLIB-LLVM-AOT
   Metal-SPIRV
   Vulkan-SPIRV
@@ -367,16 +368,6 @@ endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   # Note: Optional because python libs can be manually specified.
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-endif()
-
-#-------------------------------------------------------------------------------
-# Bazel setup (conditional on whether features need it)
-# Depends on python configuration.
-#-------------------------------------------------------------------------------
-
-if(${IREE_ENABLE_TENSORFLOW})
-  include(configure_bazel)
-  iree_configure_bazel()
 endif()
 
 #-------------------------------------------------------------------------------

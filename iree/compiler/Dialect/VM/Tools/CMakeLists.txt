@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Doesn't use bazel_to_cmake because of unhandled filegroup
+
 iree_add_all_subdirs()

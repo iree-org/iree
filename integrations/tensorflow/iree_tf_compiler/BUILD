@@ -66,14 +66,9 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir:init_mlir",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",
         "@org_tensorflow//tensorflow/core/platform:errors",
-    ] + select({
-        "@org_tensorflow//tensorflow:oss": [],
-        "//conditions:default": [
-            # TODO: Enable this for all builds once dependency bug is fixed.
-            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",  # Note: always_links in random foo that makes constant folding work
-        ],
-    }),
+    ],
 )
 
 cc_binary(
@@ -100,6 +95,7 @@ cc_binary(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_to_mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_parser",
         "@org_tensorflow//tensorflow/compiler/xla/service:hlo_proto_cc",
         "@org_tensorflow//tensorflow/core:lib",
     ],

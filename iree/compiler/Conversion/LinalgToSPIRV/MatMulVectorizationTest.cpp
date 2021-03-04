@@ -54,7 +54,7 @@ void MatMulTileAndVectorizeGPUPass::runOnFunction() {
               // canonicalize supports it.
               //.setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
               .setTileSizes({wgTileSize, wgTileSize, wgTileSize}))
-      .setHoistInvariantCode(enableLICM)
+      .setEnableLICM(enableLICM)
       .vectorize<linalg::MatmulOp>()
       // TODO upstream to the core CodegenStrategy
       // .unrollVector<vector::ContractionOp>(

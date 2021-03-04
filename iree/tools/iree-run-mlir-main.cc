@@ -75,6 +75,7 @@
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Target/LLVMIR.h"
 
 static llvm::cl::opt<std::string> input_file_flag{
     llvm::cl::Positional,
@@ -515,6 +516,7 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+  mlir::registerLLVMDialectTranslation(registry);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

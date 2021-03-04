@@ -21,12 +21,13 @@ package(
 cc_library(
     name = "LinkerTools_internal",
     srcs = [
+        "AndroidLinkerTool.cpp",
         "LinkerTools.cpp",
         "UnixLinkerTool.cpp",
+        "WasmLinkerTool.cpp",
         "WindowsLinkerTool.cpp",
     ],
     deps = [
-        "//iree/base:core_headers",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LinkerTool_hdrs",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",

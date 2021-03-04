@@ -31,6 +31,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/xla/hlo_to_mlir_hlo.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
+#include "tensorflow/compiler/xla/service/hlo_parser.h"
 #include "tensorflow/core/platform/protobuf.h"
 
 using namespace llvm;
@@ -41,6 +42,7 @@ namespace {
 enum XlaFormat {
   binary_proto,
   text_proto,
+  hlo_text,
 };
 
 // Error collector that prints errors.
@@ -71,6 +73,25 @@ class IStreamCopyingInputStream
   std::istream *input;
 };
 
+LogicalResult ReadHloTextFormatFromStream(std::istream *in,
+                                          xla::HloModuleProto *moduleProto) {
+  std::string contents(std::istreambuf_iterator<char>(*in), {});
+  if (in->fail()) {
+    llvm::errs() << "Error reading input stream\n";
+    return failure();
+  }
+  auto moduleOr = xla::ParseAndReturnUnverifiedModule(contents);
+  if (!moduleOr.ok()) {
+    llvm::errs() << "XLA failed to parse a text format HloModule:\n"
+                 << moduleOr.status().ToString() << "\n";
+    return failure();
+  }
+
+  auto module = std::move(*moduleOr);
+  *moduleProto = module->ToProto();
+  return success();
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -89,7 +110,9 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<XlaFormat> inputFormat(
       "xla-format", cl::desc("XLA Format"),
       cl::values(clEnumVal(binary_proto, "Parse a binary protocol buffer"),
-                 clEnumVal(text_proto, "Parse a text protocol buffer")));
+                 clEnumVal(text_proto, "Parse a text protocol buffer"),
+                 clEnumVal(hlo_text,
+                           "Parse an HLO module in its native text format")));
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -136,6 +159,13 @@ int main(int argc, char **argv) {
       }
       break;
     }
+    case hlo_text: {
+      if (failed(ReadHloTextFormatFromStream(inputStream,
+                                             hloProto.mutable_hlo_module()))) {
+        return 1;
+      }
+      break;
+    }
     default:
       llvm_unreachable("illegal XlaFormat");
   }
@@ -175,9 +205,7 @@ int main(int argc, char **argv) {
       return failure();
     }
     OpPrintingFlags printFlags;
-    // TODO: Re-enable debug info once fix is landed (#4539):
-    // https://reviews.llvm.org/D94847
-    // printFlags.enableDebugInfo();
+    printFlags.enableDebugInfo();
     printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";

@@ -18,6 +18,21 @@
 #include <stdint.h>
 
 //===------------------------------------------------------------------===//
+// Globals
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_global_load_i32(uint8_t* base, uint32_t byte_offset) {
+  const int32_t* global_ptr = (const int32_t*)(base + byte_offset);
+  return *global_ptr;
+}
+
+static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
+                                       int32_t value) {
+  int32_t* global_ptr = (int32_t*)(base + byte_offset);
+  *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
 // Constants
 //===------------------------------------------------------------------===//
 
@@ -120,11 +135,12 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
 //===------------------------------------------------------------------===//
 // Check ops
 // TODO(simon-camp): These macros should be removed once control flow ops are
-// supported in the c module target
+// supported in the c module target.
+// Note that this will fail if message contains a comma
 #define VM_CHECK_EQ(a, b, message)                                          \
   if (a != b) {                                                             \
     return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0, \
-                                iree_make_cstring_view("message"));         \
+                                iree_make_cstring_view(#message));          \
   }
 
 //===------------------------------------------------------------------===//
@@ -169,6 +185,20 @@ static inline int64_t vm_or_i64(int64_t lhs, int64_t rhs) { return lhs | rhs; }
 static inline int64_t vm_xor_i64(int64_t lhs, int64_t rhs) { return lhs ^ rhs; }
 
 //===------------------------------------------------------------------===//
+// ExtI64: Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_trunc_i64i32(int64_t operand) {
+  return (uint32_t)((uint64_t)operand);
+}
+static inline int64_t vm_ext_i32i64s(int32_t operand) {
+  return (int64_t)((int32_t)operand);
+}
+static inline int64_t vm_ext_i32i64u(int32_t operand) {
+  return (uint64_t)((uint32_t)operand);
+}
+
+//===------------------------------------------------------------------===//
 // ExtI64: Native bitwise shifts and rotates
 //===------------------------------------------------------------------===//
 
@@ -180,6 +210,26 @@ static inline int64_t vm_shr_i64s(int64_t operand, int8_t amount) {
 }
 static inline int64_t vm_shr_i64u(int64_t operand, int8_t amount) {
   return (int64_t)(((uint64_t)operand) >> amount);
+}
+
+//===------------------------------------------------------------------===//
+// ExtI64: Comparison ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_cmp_eq_i64(int64_t lhs, int64_t rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_i64(int64_t lhs, int64_t rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i64s(int64_t lhs, int64_t rhs) {
+  return (lhs < rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_i64u(int64_t lhs, int64_t rhs) {
+  return (((uint64_t)lhs) < ((uint64_t)rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nz_i64(int64_t operand) {
+  return (operand != 0) ? 1 : 0;
 }
 
 #endif  // IREE_VM_OPS_H_

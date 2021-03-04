@@ -15,38 +15,29 @@
 #ifndef IREE_HAL_CUDA_DYNAMIC_SYMBOLS_H_
 #define IREE_HAL_CUDA_DYNAMIC_SYMBOLS_H_
 
-#include <cstdint>
-#include <functional>
-#include <memory>
-
-#include "iree/base/dynamic_library.h"
-#include "iree/base/status.h"
+#include "iree/base/api.h"
 #include "iree/hal/cuda/cuda_headers.h"
 
-namespace iree {
-namespace hal {
-namespace cuda {
-
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 /// DyanmicSymbols allow loading dynamically a subset of CUDA driver API. It
 /// loads all the function declared in `dynamic_symbol_tables.def` and fail if
 /// any of the symbol is not available. The functions signatures are matching
 /// the declarations in `cuda.h`.
-struct DynamicSymbols {
-  Status LoadSymbols();
-
-#define CU_PFN_DECL(cudaSymbolName) \
-  std::add_pointer<decltype(::cudaSymbolName)>::type cudaSymbolName;
-
+typedef struct {
+#define CU_PFN_DECL(cudaSymbolName, ...) \
+  CUresult (*cudaSymbolName)(__VA_ARGS__);
 #include "dynamic_symbols_tables.h"
 #undef CU_PFN_DECL
+  void* opaque_loader_library_;
+} iree_hal_cuda_dynamic_symbols_t;
 
- private:
-  // Cuda Loader dynamic library.
-  std::unique_ptr<DynamicLibrary> loader_library_;
-};
+iree_status_t load_symbols(iree_hal_cuda_dynamic_symbols_t* syms);
+void unload_symbols(iree_hal_cuda_dynamic_symbols_t* syms);
 
-}  // namespace cuda
-}  // namespace hal
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_CUDA_DYNAMIC_SYMBOLS_H_

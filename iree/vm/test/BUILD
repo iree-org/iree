@@ -42,6 +42,7 @@ cc_embed_data(
         ":control_flow_ops.vmfb",
         ":conversion_ops.vmfb",
         ":conversion_ops_i64.vmfb",
+        ":global_ops.vmfb",
         ":list_ops.vmfb",
         ":shift_ops.vmfb",
         ":shift_ops_i64.vmfb",
@@ -97,6 +98,14 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "conversion_ops_i64",
     src = "conversion_ops_i64.mlir",
+    cc_namespace = "iree::vm::test",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+iree_bytecode_module(
+    name = "global_ops",
+    src = "global_ops.mlir",
+    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 

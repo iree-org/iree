@@ -26,6 +26,7 @@ cc_library(
     deps = [
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/LinalgToLLVM",
+        "//iree/compiler/Conversion/LinalgToNVVM",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Conversion/LinalgToVector",
     ],

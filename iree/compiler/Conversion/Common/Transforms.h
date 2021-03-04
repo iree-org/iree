@@ -53,9 +53,25 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
 /// `scf.for` operations in the function return the linalg operations in the
 /// body of the function if it has a single basic block. Return failure in all
 /// other cases.
+///
+/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
+/// within the loop. The marker is the way to tie into rest of the
+/// codegen. Refactor the downstream passes and get rid of the markers once and
+/// for all.
 LogicalResult getLinalgOps(FuncOp funcOp,
                            SmallVectorImpl<linalg::LinalgOp> &linalgOps,
                            SmallVectorImpl<Operation *> &tiledLoops);
+
+/// Specifies the number of workgroups to use for a particular entry point
+/// function, by updating the `worgroup_count` region in the
+/// `hal.executable.entry_point` op for this operation. The method takes a
+/// callback function, which computes the workgroup count (x,y,z) given the
+/// workload along (x,y,z).
+using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
+    OpBuilder &b, Location loc, std::array<Value, 3> workload)>;
+LogicalResult defineWorkgroupCountRegion(
+    OpBuilder &builder, FuncOp funcOp,
+    WorkgroupCountRegionBuilder regionBuilder);
 
 /// Using linalg on tensors for dispatch region creation does first-level of
 /// tile (fuse and distribute) during dispatch region formation. At that point

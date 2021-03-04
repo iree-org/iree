@@ -21,9 +21,7 @@ package(
 cc_library(
     name = "Common",
     srcs = [
-        "DeclareNumWorkgroupsFnPass.cpp",
         "LaunchConfig.cpp",
-        "LegalizeNumWorkgroupsFnPass.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",
         "Passes.cpp",
@@ -47,6 +45,7 @@ cc_library(
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",

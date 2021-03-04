@@ -84,7 +84,7 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
   }
   auto newRegionOp = builder.create<DispatchRegionOp>(
       fusedLoc, resultTypes, regionOp.workload(), operands,
-      regionOp.getAttrs());
+      regionOp->getAttrs());
   newRegionOp.body().takeBody(regionOp.body());
 
   // Replace uses of original values with the new values.
@@ -134,7 +134,7 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
   // Clone with new results.
   auto newRegionOp = builder.create<DispatchRegionOp>(
       regionOp.getLoc(), newReturnTypes, regionOp.workload(), regionOp.args(),
-      regionOp.getAttrs());
+      regionOp->getAttrs());
   newRegionOp.body().takeBody(regionOp.body());
 
   // Replace uses of original values with the new values.

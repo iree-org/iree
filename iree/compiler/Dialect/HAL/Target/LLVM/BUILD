@@ -55,10 +55,13 @@ cc_library(
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:WebAssemblyAsmParser",
+        "@llvm-project//llvm:WebAssemblyCodeGen",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:TargetLLVMIRModuleTranslation",
     ],
 )
 
@@ -102,7 +105,9 @@ cc_library(
     name = "LinkerTool",
     srcs = ["LinkerTool.cpp"],
     hdrs = ["LinkerTool.h"],
-    deps = platform_trampoline_deps("LinkerTools", "compiler/Dialect/HAL/Target/LLVM"),
+    deps = platform_trampoline_deps("LinkerTools", "compiler/Dialect/HAL/Target/LLVM") + [
+        "@llvm-project//llvm:Support",
+    ],
 )
 
 cc_library(

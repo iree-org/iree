@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
@@ -35,13 +34,15 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LinalgTileAndDistributePass
+class LinalgTileAndDistributePass
     : public PassWrapper<LinalgTileAndDistributePass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
+ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect, AffineDialect,
                     scf::SCFDialect>();
   }
+
   LinalgTileAndDistributePass() = default;
   LinalgTileAndDistributePass(const LinalgTileAndDistributePass &pass) {}
   void runOnOperation() override;
@@ -116,53 +117,55 @@ void LinalgTileAndDistributePass::runOnOperation() {
       }
     });
 
-    if (tiledLoops.empty()) {
-      linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-          [](OpBuilder &builder, Location loc,
-             ArrayRef<Range> parallelLoopRanges) {
-            auto numParallelDims = parallelLoopRanges.size();
-            SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-            for (size_t dim = 0,
-                        e = std::min(numParallelDims, static_cast<size_t>(3));
-                 dim < e; ++dim) {
-              procInfo[numParallelDims - dim - 1] = {
-                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
-                      loc, builder.getIndexType(), APInt(64, dim)),
-                  builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
-                      loc, builder.getIndexType(), APInt(64, dim)),
-              };
-            }
-            return procInfo;
-          },
-          {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-           linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-           linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-      TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
-                                               allocateThreadLocalMemory};
-      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
-                                            launchConfig,
-                                            tileAndFuseOptions))) {
-        return signalPassFailure();
-      }
-    } else {
-      SmallVector<int64_t, 4> defaultWorkloadPerWorkgroup(tiledLoops.size(), 1);
-      if (!defaultWorkloadPerWorkgroup.empty()) {
-        defaultWorkloadPerWorkgroup.back() = 4;
-      }
-      Optional<SmallVector<int64_t, 4>> workloadPerWorkgroup =
-          launchConfig.getWorkloadPerWorkgroup(tiledLoops.size(),
-                                               defaultWorkloadPerWorkgroup);
-      if (!workloadPerWorkgroup) {
-        funcOp.emitOpError("unable to find workload per workgroup");
-        return signalPassFailure();
-      }
-      if (failed(materializeStaticLaunchInformation(
-              funcOp, workloadPerWorkgroup.getValue()))) {
-        funcOp.emitOpError("failed to materialize static launch information");
+    linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
+        [](OpBuilder &builder, Location loc,
+           ArrayRef<Range> parallelLoopRanges) {
+          auto numParallelDims = parallelLoopRanges.size();
+          SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+          for (size_t dim = 0,
+                      e = std::min(numParallelDims, static_cast<size_t>(3));
+               dim < e; ++dim) {
+            procInfo[numParallelDims - dim - 1] = {
+                builder.createOrFold<IREE::HAL::InterfaceWorkgroupIDOp>(
+                    loc, builder.getIndexType(), APInt(64, dim)),
+                builder.createOrFold<IREE::HAL::InterfaceWorkgroupCountOp>(
+                    loc, builder.getIndexType(), APInt(64, dim)),
+            };
+          }
+          return procInfo;
+        },
+        {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+         linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+         linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+    TileAndFuseOptions tileAndFuseOptions = {workgroupDistributionOptions,
+                                             allocateThreadLocalMemory};
+    if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
+                                          launchConfig, tileAndFuseOptions))) {
+      return signalPassFailure();
+    }
+    // If the entry point op of the function isnt updated, set it to one since
+    // the op is going to be executed sequentially.
+    IREE::HAL::ExecutableEntryPointOp entryPoint = getEntryPoint(funcOp);
+    if (!entryPoint) {
+      funcOp.emitError("unable to find entry point for function");
+      return signalPassFailure();
+    }
+    if (entryPoint.workgroup_count_region().empty()) {
+      // Set the default number of workgroups to {1, 1, 1} since the op will be
+      // executed sequentially.
+      OpBuilder builder(funcOp.getContext());
+      if (failed(defineWorkgroupCountRegion(
+              builder, funcOp,
+              [](OpBuilder &b, Location loc,
+                 std::array<Value, 3> workload) -> std::array<Value, 3> {
+                Value one = b.create<ConstantIndexOp>(loc, 1);
+                return {one, one, one};
+              }))) {
+        funcOp.emitError(
+            "failed to set number of workgroups to {1, 1, 1} as fallback");
         return signalPassFailure();
       }
     }
-
     launchConfig.finalize(funcOp);
   }
 }

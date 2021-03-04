@@ -21,8 +21,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Converts linalg::ConvOp into packed img2col operation followed by
-/// linalg::MatmulOp.
+/// Converts linalg::ConvInputNHWCFilterHWCFOp into packed img2col operation
+/// followed by linalg::MatmulOp.
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 
 /// Converts linalg.conv into linalg.generic with a CPU-friendly iteration
@@ -39,23 +39,21 @@ std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createFastExpApproximationConversionPass();
 
-/// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
-/// followed by linalg::MatmulOp.
+/// Populates patterns to rewrite linalg::ConvInputNHWCFilterHWCFOp into packed
+/// img2col operation followed by linalg::MatmulOp.
 void populateConvImg2ColMatmulConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
-/// Performs the revamped final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVM2Pass();
 
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 
-/// Pass to perform tiling and distribution of Linalg ops with tensor semantics
-/// to sequentialized SPMD loops.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLinalgTileAndDistributeOnTensorsPass();
+/// Pass to materialize static launch information for a dispatch region when
+/// using the linalg on tensors path.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createMaterializeCPULaunchConfigurationPass();
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

@@ -96,7 +96,7 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
   // deallocation is for workgroup memory.
   MemRefType bufferType = buffer.getType().dyn_cast<MemRefType>();
   if (!bufferType) return failure();
-  return success(bufferType.getMemorySpace() == getWorkgroupMemorySpace());
+  return success(bufferType.getMemorySpaceAsInt() == getWorkgroupMemorySpace());
 }
 
 template <typename GPUIdOp, typename GPUCountOp>

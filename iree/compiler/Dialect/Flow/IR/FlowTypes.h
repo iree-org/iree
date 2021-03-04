@@ -106,9 +106,8 @@ class DispatchTensorType : public Type {
   }
 
   /// Verify the construction of a vector type.
-  static LogicalResult verifyConstructionInvariants(Location loc,
-                                                    ArrayRef<int64_t> shape,
-                                                    Type elementType);
+  static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
+                              ArrayRef<int64_t> shape, Type elementType);
 
   /// Returns true of the given type can be used as an element of a vector type.
   /// In particular, vectors can consist of integer or float primitives.
@@ -141,6 +140,12 @@ class DispatchInputType
   /// errors and return nullptr-wrapping type.
   static DispatchInputType getChecked(ArrayRef<int64_t> shape, Type elementType,
                                       Location location);
+  static DispatchInputType getChecked(
+      function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> shape,
+      Type elementType) {
+    return Base::getChecked(emitError, elementType.getContext(), shape,
+                            elementType);
+  }
 
   static DispatchInputType get(TensorType tensorType);
 
@@ -165,6 +170,12 @@ class DispatchOutputType
   /// errors and return nullptr-wrapping type.
   static DispatchOutputType getChecked(ArrayRef<int64_t> shape,
                                        Type elementType, Location location);
+  static DispatchOutputType getChecked(
+      function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> shape,
+      Type elementType) {
+    return Base::getChecked(emitError, elementType.getContext(), shape,
+                            elementType);
+  }
 
   static DispatchOutputType get(TensorType tensorType);
 

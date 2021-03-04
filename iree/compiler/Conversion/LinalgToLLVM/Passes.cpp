@@ -35,8 +35,8 @@ static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
 
 static llvm::cl::opt<bool> convImg2ColConversion(
     "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
-    llvm::cl::desc("Enable rewriting linalg.conv linalg.generic that does "
-                   "img2col buffer packing + "
+    llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
+                   "linalg.generic that does img2col buffer packing + "
                    "linag.matmul"),
     llvm::cl::init(false));
 
@@ -49,15 +49,17 @@ static llvm::cl::opt<bool> fastExpConversion(
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
-  passManager.addPass(createLinalgTileAndDistributePass());
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  if (!clEnableLLVMLinalgOnTensors) {
-    nestedModulePM.addPass(createLegalizeNumWorkgroupsFnPass());
+  if (clEnableLLVMLinalgOnTensors) {
+    passManager.addPass(createMaterializeCPULaunchConfigurationPass());
+  } else {
+    passManager.addPass(createLinalgTileAndDistributePass());
   }
-  // Linalg.ConvOp -> (Img2Col packing + matmul).
-  // After convolution is tiled and distributed among workgroups its converted
-  // before vectorize workgroup workload.
+
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (convImg2ColConversion) {
+    // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
+    // After convolution is tiled and distributed among workgroups its converted
+    // before vectorize workgroup workload.
     nestedModulePM.addNestedPass<FuncOp>(
         createConvImg2ColMatmulConversionPass());
   }
@@ -92,8 +94,6 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  if (!clEnableLLVMLinalgOnTensors)
-    nestedModulePM.addPass(createDeclareNumWorkgroupsFnPass());
 
   nestedModulePM.addPass(createInlinerPass());
 
@@ -102,10 +102,9 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addPass(createLinalgVectorizePass());
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
-        [](OpBuilder &builder, Location loc, ArrayRef<Value> dynamicSizes,
-           MemRefType allocationType) {
-          MemRefType allocType = MemRefType::get(
-              allocationType.getShape(), allocationType.getElementType());
+        [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
+           Type elementType, ArrayRef<Value> dynamicSizes) {
+          MemRefType allocType = MemRefType::get(staticShape, elementType);
           return builder.create<AllocaOp>(loc, allocType, dynamicSizes);
         };
     addLinalgBufferizePasses(nestedModulePM, allocationFn);
