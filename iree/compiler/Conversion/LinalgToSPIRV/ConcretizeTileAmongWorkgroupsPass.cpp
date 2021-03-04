@@ -73,7 +73,7 @@ static size_t getNumOuterParallelDims(linalg::LinalgOp op) {
 linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
   linalg::LinalgOp rootOp;
   funcOp.walk([&rootOp](linalg::LinalgOp op) {
-    if (op.getOperation()->hasAttr("iree.codegen.fushion.root_op")) {
+    if (op.getOperation()->hasAttr("iree.codegen.fusion.root_op")) {
       rootOp = op;
       return WalkResult::interrupt();
     }

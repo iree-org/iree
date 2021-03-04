@@ -51,7 +51,7 @@ func @tensor() -> tensor<2x4xf32> {
   // CHECK-SAME:         offsets = [%[[I]], %[[J]]], sizes = [%[[MIN_I]], %[[MIN_J]]], strides = [%[[C1]], %[[C1]]] :
   // CHECK-SAME:           !flow.dispatch.input<2x4xf32> -> tensor<?x?xf32>
   // CHECK-NEXT:       %[[RES:.*]] = linalg.matmul
-  // CHECK-SAME:       __internal_linalg_transform__ = "workgroup", iree.codegen.fushion.root_op
+  // CHECK-SAME:       __internal_linalg_transform__ = "workgroup", iree.codegen.fusion.root_op
   // CHECK-SAME:       ins(%[[AA]], %[[BB]] :
   // CHECK-SAME:         tensor<?x3xf32>, tensor<3x?xf32>) outs(%[[CC]] : tensor<?x?xf32>) -> tensor<?x?xf32>
   // CHECK-NEXT:       flow.dispatch.output.store %[[RES]], %[[OUT]],

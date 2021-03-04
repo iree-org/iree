@@ -52,7 +52,7 @@ hal.executable @conv2d attributes {sym_visibility = "private"} {
               %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg1)[%workgroup_size_y]
               %18 = linalg.init_tensor [1, %16, %17, %14] : tensor<1x?x?x?xf32>
               %19 = linalg.fill(%18, %cst) : tensor<1x?x?x?xf32>, f32 -> tensor<1x?x?x?xf32>
-              %20 = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fushion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%19 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+              %20 = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fusion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%19 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.output.store %20, %2, offsets = [%c0, %arg0, %arg1, %arg2], sizes = [%c1, %16, %17, %14], strides = [%c1, %c1, %c1, %c1] : tensor<1x?x?x?xf32> -> !flow.dispatch.output<1x112x112x32xf32>
             }
           }
@@ -94,5 +94,5 @@ hal.executable @conv2d attributes {sym_visibility = "private"} {
 // CHECK: %[[INPUT:.+]] = flow.dispatch.input.load %{{.+}}, offsets = [%c0, %[[Z_OFFSET]], %[[Y_OFFSET]], %c0], sizes = [%c1, %[[Z_SIZE]], %[[Y_SIZE]], %c16], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<1x225x225x16xf32> -> tensor<1x?x?x16xf32>
 // CHECK: %[[X_SIZE:.+]] = affine.min #[[MAP2]](%[[X_MUL_16]])[%c16]
 // CHECK: %[[FILTER:.+]] = flow.dispatch.input.load %{{.+}}, offsets = [%c0, %c0, %c0, %[[X_MUL_16]]], sizes = [%c3, %c3, %c16, %[[X_SIZE]]], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<3x3x16x32xf32> -> tensor<3x3x16x?xf32>
-// CHECK: %[[CONV:.+]] = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fushion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%[[INPUT]], %[[FILTER]] : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%16 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+// CHECK: %[[CONV:.+]] = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fusion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%[[INPUT]], %[[FILTER]] : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%16 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
 // CHECK: flow.dispatch.output.store %[[CONV]], %{{.+}}, offsets = [%c0, %[[Z_MUL_4]], %[[Y_MUL_4]], %[[X_MUL_16]]], sizes = [%c1, %13, %14, %[[X_SIZE]]], strides = [%c1, %c1, %c1, %c1] : tensor<1x?x?x?xf32> -> !flow.dispatch.output<1x112x112x32xf32>
