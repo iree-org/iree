@@ -48,6 +48,9 @@ declare -a test_env_args=(
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
 
+# CUDA CI testing disabled until we setup a target for it.
+default_test_tag_filters+=("-driver=cuda")
+
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
 fi

@@ -256,6 +256,32 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_cuda",
+    srcs = [
+        "add.mlir",
+        "broadcast.mlir",
+        "broadcast_add.mlir",
+        "broadcast_in_dim.mlir",
+        "clamp.mlir",
+        "compare.mlir",
+        "constant.mlir",
+        "divide.mlir",
+        "iota.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "multiply.mlir",
+        "negate.mlir",
+        "select.mlir",
+        "subtract.mlir",
+    ],
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+    ],
+    driver = "cuda",
+    target_backend = "cuda",
+)
+
 test_suite(
     name = "check",
     tests = [
