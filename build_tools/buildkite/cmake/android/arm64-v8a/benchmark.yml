@@ -59,7 +59,7 @@ steps:
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=exynos-990"
-      - "android-version=10"
+      - "android-version=11"
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
