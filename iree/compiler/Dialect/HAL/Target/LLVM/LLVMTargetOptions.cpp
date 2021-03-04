@@ -74,6 +74,20 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::desc("LLVM target machine CPU features; use 'host' for your "
                      "host native CPU"),
       llvm::cl::init(""));
+
+  static llvm::cl::opt<bool> llvmLoopInterleaving(
+      "iree-llvm-loop-interleaving", llvm::cl::init(false),
+      llvm::cl::desc("Enable LLVM loop interleaving opt"));
+  static llvm::cl::opt<bool> llvmLoopVectorization(
+      "iree-llvm-loop-vectorization", llvm::cl::init(true),
+      llvm::cl::desc("Enable LLVM loop vectorization opt"));
+  static llvm::cl::opt<bool> llvmLoopUnrolling(
+      "iree-llvm-loop-unrolling", llvm::cl::init(false),
+      llvm::cl::desc("Enable LLVM loop unrolling opt"));
+  static llvm::cl::opt<bool> llvmSLPVectorization(
+      "iree-llvm-slp-vectorization", llvm::cl::init(false),
+      llvm::cl::desc("Enable LLVM SLP Vectorization opt"));
+
   llvmTargetOptions.targetTriple = clTargetTriple;
   if (clTargetCPU != "host") {
     llvmTargetOptions.targetCPU = clTargetCPU;
@@ -81,6 +95,15 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   if (clTargetCPUFeatures != "host") {
     llvmTargetOptions.targetCPUFeatures = clTargetCPUFeatures;
   }
+
+  // LLVM opt options.
+  llvmTargetOptions.pipelineTuningOptions.LoopInterleaving =
+      llvmLoopInterleaving;
+  llvmTargetOptions.pipelineTuningOptions.LoopVectorization =
+      llvmLoopVectorization;
+  llvmTargetOptions.pipelineTuningOptions.LoopUnrolling = llvmLoopUnrolling;
+  llvmTargetOptions.pipelineTuningOptions.SLPVectorization =
+      llvmSLPVectorization;
 
   static llvm::cl::opt<SanitizerKind> clSanitizerKind(
       "iree-llvm-sanitize", llvm::cl::desc("Apply LLVM sanitize feature"),
