@@ -28,7 +28,7 @@ an Android app:
 
 ```mlir
 func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32>
-  attributes { iree.vmfb.export } {
+  attributes { iree.module.export } {
   %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
   return %0 : tensor<2x2xf32>
 }
@@ -38,7 +38,7 @@ func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32>
 # First translate into a VM bytecode module
 $ /path/to/iree/build/iree/tools/iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vulkan \
+  --iree-hal-target-backends=vulkan-spirv \
   /path/to/mhlo-dot.mlir \
   -o /tmp/mhlo-dot.vmfb
 

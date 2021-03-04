@@ -335,6 +335,61 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
 }
 }  // namespace
 
+//===----------------------------------------------------------------------===//
+// mhlo.concatenate conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts mhlo.concatenate operation to subtensor ops + subtensor_insert ops.
+struct ConcatenateOpConversion
+    : public OpConversionPattern<mhlo::ConcatenateOp> {
+  using OpConversionPattern<mhlo::ConcatenateOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ConcatenateOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
+    if (!resultType || !resultType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected static shape for output");
+    }
+
+    Location loc = op.getLoc();
+    int dim = op.dimension();
+    int rank = resultType.getRank();
+    SmallVector<Value, 3> offsets, sizes, strides;
+    for (int i = 0; i < rank; ++i) {
+      offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
+      sizes.push_back(rewriter.create<DimOp>(loc, args[0], i));
+      strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
+    }
+    Value resultDimSize = rewriter.create<ConstantIndexOp>(loc, 0);
+    for (auto arg : args) {
+      auto size = rewriter.create<DimOp>(loc, arg, dim);
+      resultDimSize = rewriter.create<AddIOp>(loc, resultDimSize, size);
+    }
+    sizes[dim] = resultDimSize;
+    auto initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, resultType.getShape(), resultType.getElementType());
+    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
+    Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    Value result =
+        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+
+    Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
+    for (auto arg : args) {
+      offsets[dim] = accBound;
+      sizes[dim] = rewriter.create<DimOp>(loc, arg, dim);
+      result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
+                                                  sizes, strides);
+      accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
+    }
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+}  // namespace
+
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -380,7 +435,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<TorchIndexSelectOpConversion, ConstOpConversion,
-                  DepthwiseConvOpConversion>(context);
+                  ConcatenateOpConversion, DepthwiseConvOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

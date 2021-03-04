@@ -22,7 +22,9 @@
 #include "iree/hal/cuda/descriptor_set_layout.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/event_semaphore.h"
+#include "iree/hal/cuda/executable_layout.h"
 #include "iree/hal/cuda/graph_command_buffer.h"
+#include "iree/hal/cuda/nop_executable_cache.h"
 #include "iree/hal/cuda/status_util.h"
 
 //===----------------------------------------------------------------------===//
@@ -190,7 +192,9 @@ static iree_status_t iree_hal_cuda_device_create_event(
 static iree_status_t iree_hal_cuda_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_nop_executable_cache_create(
+      &device->context_wrapper, identifier, out_executable_cache);
 }
 
 static iree_status_t iree_hal_cuda_device_create_executable_layout(
@@ -198,7 +202,10 @@ static iree_status_t iree_hal_cuda_device_create_executable_layout(
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t** set_layouts,
     iree_hal_executable_layout_t** out_executable_layout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_executable_layout_create(
+      &device->context_wrapper, set_layout_count, set_layouts, push_constants,
+      out_executable_layout);
 }
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(

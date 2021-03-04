@@ -17,6 +17,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
 #include "iree/hal/cuda/cuda_event.h"
+#include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 
 // Command buffer implementation that directly maps to cuda graph.
@@ -280,16 +281,17 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
   CUdeviceptr source_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  CUDA_MEMCPY3D params = {};
-  params.Depth = 1;
-  params.Height = 1;
-  params.WidthInBytes = length;
-  params.dstDevice = target_device_buffer;
-  params.srcDevice = source_device_buffer;
-  params.srcXInBytes = source_offset;
-  params.dstXInBytes = target_offset;
-  params.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-  params.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+  CUDA_MEMCPY3D params = {
+      .Depth = 1,
+      .Height = 1,
+      .WidthInBytes = length,
+      .dstDevice = target_device_buffer,
+      .srcDevice = source_device_buffer,
+      .srcXInBytes = source_offset,
+      .dstXInBytes = target_offset,
+      .srcMemoryType = CU_MEMORYTYPE_DEVICE,
+      .dstMemoryType = CU_MEMORYTYPE_DEVICE,
+  };
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};
   size_t numNode = command_buffer->last_node ? 1 : 0;
@@ -343,8 +345,33 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation");
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+
+  int32_t block_size_x, block_size_y, block_size_z;
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
+      executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
+  CUDA_KERNEL_NODE_PARAMS params = {
+      .func = iree_hal_cuda_native_executable_for_entry_point(executable,
+                                                              entry_point),
+      .blockDimX = block_size_x,
+      .blockDimY = block_size_y,
+      .blockDimZ = block_size_z,
+      .gridDimX = workgroup_x,
+      .gridDimY = workgroup_y,
+      .gridDimZ = workgroup_z,
+      .kernelParams = command_buffer->current_descriptor,
+  };
+  // Serialize all the nodes for now.
+  CUgraphNode dep[] = {command_buffer->last_node};
+  size_t numNodes = command_buffer->last_node ? 1 : 0;
+  CUDA_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      cuGraphAddKernelNode(&command_buffer->last_node, command_buffer->graph,
+                           dep, numNodes, &params),
+      "cuGraphAddKernelNode");
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(

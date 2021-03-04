@@ -21,10 +21,7 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class ExecutableLayoutTest : public CtsTestBase {
- public:
-  ExecutableLayoutTest() { declareUnimplementedDriver("cuda"); }
-};
+class ExecutableLayoutTest : public CtsTestBase {};
 
 TEST_P(ExecutableLayoutTest, CreateWithNoLayouts) {
   iree_hal_executable_layout_t* executable_layout;

@@ -1,14 +1,14 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -canonicalize %s | IreeFileCheck %s
 
-// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 5 + d1)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 * 5 + d1 + 2)>
-// CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x5xi32>
-// CHECK-DAG: %[[IN0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2xi32>
-// CHECK-DAG: %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x3xi32>
-//     CHECK: %[[SUB0:.+]] = subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<2x5xi32> to memref<2x2xi32, #[[MAP0]]>
-//     CHECK: linalg.copy(%[[IN0]], %[[SUB0]])
-//     CHECK: %[[SUB1:.+]] = subview %[[OUT]][0, 2] [2, 3] [1, 1]  : memref<2x5xi32> to memref<2x3xi32, #[[MAP1]]>
-//     CHECK: linalg.copy(%[[IN1]], %[[SUB1]])
+
+// CHECK-DAG:  %[[IN0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
+// CHECK-DAG:  %[[IN1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x3xi32>
+// CHECK:      %[[INIT:.+]] = linalg.init_tensor [2, 5] : tensor<2x5xi32>
+// CHECK:      %[[FILL:.+]] = linalg.fill(%[[INIT]], %{{.*}}) : tensor<2x5xi32>, i32 -> tensor<2x5xi32>
+// CHECK:      %[[OUT0:.+]] = subtensor_insert %[[IN0]] into
+// CHECK-SAME:   %[[FILL]][0, 0] [2, 2] [1, 1] : tensor<2x2xi32> into tensor<2x5xi32>
+// CHECK:      %[[OUT1:.+]] = subtensor_insert %[[IN1]] into
+// CHECK-SAME:   %[[OUT0]][0, 2] [2, 3] [1, 1] : tensor<2x3xi32> into tensor<2x5xi32>
 module {
   func @concatenate() {
     %c0 = constant 0 : index
@@ -29,16 +29,14 @@ module {
 
 // -----
 
-// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 * 2 + d1 + 4)>
-// CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5x2xi32>
-// CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2xi32>
-// CHECK-DAG: %[[CST:.+]] = constant 42 : i32
-//     CHECK: %[[SUB0:.+]] = subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<5x2xi32> to memref<2x2xi32, #[[MAP0]]>
-//     CHECK: linalg.copy(%[[IN]], %[[SUB0]])
-//     CHECK: %[[SUB1:.+]] = subview %[[OUT]][2, 0] [3, 2] [1, 1]  : memref<5x2xi32> to memref<3x2xi32, #[[MAP1]]>
-//     CHECK: linalg.fill(%[[SUB1]], %[[CST]])
-
+// CHECK-DAG:  %[[CST:.+]] = constant dense<42> : tensor<3x2xi32>
+// CHECK-DAG:  %[[IN:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
+// CHECK:      %[[INIT:.+]] = linalg.init_tensor [5, 2] : tensor<5x2xi32>
+// CHECK:      %[[FILL:.+]] = linalg.fill(%[[INIT]], %{{.*}}) : tensor<5x2xi32>, i32 -> tensor<5x2xi32>
+// CHECK:      %[[OUT0:.+]] = subtensor_insert %[[IN]] into
+// CHECK-SAME:   %[[FILL]][0, 0] [2, 2] [1, 1] : tensor<2x2xi32> into tensor<5x2xi32>
+// CHECK:      %[[OUT1:.+]] = subtensor_insert %[[CST]] into
+// CHECK-SAME:   %[[OUT0]][2, 0] [3, 2] [1, 1] : tensor<3x2xi32> into tensor<5x2xi32>
 module {
   func @concatenate() {
     %c0 = constant 0 : index
