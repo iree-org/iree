@@ -29,7 +29,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
-export IREE_CUDA_DISABLE=${IREE_VULKAN_DISABLE:-1}
+export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is
