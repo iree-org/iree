@@ -46,8 +46,14 @@ cc_library(
         "descriptor_set_layout.h",
         "event_semaphore.c",
         "event_semaphore.h",
+        "executable_layout.c",
+        "executable_layout.h",
         "graph_command_buffer.c",
         "graph_command_buffer.h",
+        "native_executable.c",
+        "native_executable.h",
+        "nop_executable_cache.c",
+        "nop_executable_cache.h",
         "status_util.c",
         "status_util.h",
     ],
@@ -66,6 +72,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/hal:api",
+        "//iree/schemas:cuda_executable_def_c_fbs",
     ],
 )
 
