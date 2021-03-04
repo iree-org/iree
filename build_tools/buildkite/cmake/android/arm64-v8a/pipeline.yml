@@ -34,7 +34,7 @@ steps:
       - "ctest --output-on-failure"
     agents:
       - "android-soc=exynos-990"
-      - "queue=benchmark-android"
+      - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
@@ -62,7 +62,7 @@ steps:
       - "ctest --output-on-failure"
     agents:
       - "android-soc=snapdragon-855"
-      - "queue=benchmark-android"
+      - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
