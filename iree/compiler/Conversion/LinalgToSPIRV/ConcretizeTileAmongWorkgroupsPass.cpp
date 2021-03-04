@@ -325,9 +325,17 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
 
 /// Concretizes hal.interface.workgroup.* ops with constants from the chosen
 /// tiling sheme when possible and perform loop canonicalization afterwards.
-struct ConcretizeTileAmongWorkgroupsPass
+class ConcretizeTileAmongWorkgroupsPass
     : public PassWrapper<ConcretizeTileAmongWorkgroupsPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
+ public:
+  ConcretizeTileAmongWorkgroupsPass() {}
+
+  ConcretizeTileAmongWorkgroupsPass(
+      const ConcretizeTileAmongWorkgroupsPass &that) {
+    clTileSizes = that.clTileSizes;
+  }
+
   void runOnOperation() override {
     IREE::HAL::ExecutableTargetOp targetOp = getOperation();
     ModuleOp module = targetOp.getInnerModule();
@@ -338,6 +346,7 @@ struct ConcretizeTileAmongWorkgroupsPass
     }
   }
 
+ private:
   LogicalResult runOnFunction(FuncOp funcOp) {
     MLIRContext &context = getContext();
 
@@ -376,7 +385,10 @@ struct ConcretizeTileAmongWorkgroupsPass
     });
 
     SmallVector<int64_t, 4> tileSize;
-    if (auto sizes = getTileSize(rootOp, inputTypes, outputTypes)) {
+    if (!clTileSizes.empty()) {
+      // Using tile sizes from the command-line for testing.
+      tileSize.assign(clTileSizes.begin(), clTileSizes.end());
+    } else if (auto sizes = getTileSize(rootOp, inputTypes, outputTypes)) {
       // The tile sizes are specified against the original dimension order of
       // the workload shape. But Flow/HAL processor id/size/count ops' are
       // created using the reverse order.
@@ -453,6 +465,11 @@ struct ConcretizeTileAmongWorkgroupsPass
 
     return success();
   }
+
+ private:
+  ListOption<int64_t> clTileSizes{
+      *this, "tile-sizes", llvm::cl::desc("Tile sizes for testing the pass"),
+      llvm::cl::CommaSeparated};
 };
 
 }  // namespace
