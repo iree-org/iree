@@ -135,74 +135,14 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 // -----
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
-hal.executable @pooling_sum_no_padding attributes {sym_visibility = "private"} {
+hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @pooling_sum_no_padding attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<24x28xf32>, !flow.dispatch.input<3x5xf32>,
-        !flow.dispatch.output<22x24xf32>) -> ()}
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-      func @pooling_sum_no_padding() {
-        %0 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<24x28xf32>
-        %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x5xf32>
-        %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<22x24xf32>
-        linalg.pooling_max(%0, %1, %2) {dilations = [1, 1], strides = [1, 1]} :
-          memref<24x28xf32>, memref<3x5xf32>, memref<22x24xf32>
-        return
-      }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
-    }
-  }
-}
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
-//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//       CHECK: hal.executable.entry_point @pooling_sum_no_padding
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C6:.+]] = constant 6
-//       CHECK:   hal.return %[[C1]], %[[C6]], %[[C1]]
-//       CHECK: func @pooling_sum_no_padding()
-//  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
-//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
-//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
-//   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][%[[LBY]], %[[LBX]]]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][%[[LBY]], %[[LBX]]]
-//       CHECK:   linalg.pooling_max
-//  CHECK-SAME:     %[[SV_ARG0]], %[[ARG1]], %[[SV_RET0]]
-//  CHECK-SAME:     "workgroup"
-
-// -----
-
-// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
-hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @pooling_max_4D attributes {
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @pooling_nhwc_max attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<2x16x16x6xf32>, !flow.dispatch.input<1x3x4x2xf32>,
         !flow.dispatch.output<2x14x13x5xf32>) -> ()}
@@ -212,15 +152,17 @@ hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
         {max_compute_workgroup_invocations = 128 : i32,
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-      func @pooling_max_4D() {
+      func @pooling_nhwc_max() {
         %0 = iree.placeholder for "interace buffer"
           {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<2x16x16x6xf32>
         %1 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<1x3x4x2xf32>
+          {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4xf32>
         %2 = iree.placeholder for "interace buffer"
-          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x5xf32>
-        linalg.pooling_max(%0, %1, %2) {dilations = [1, 1, 1, 1], strides = [1, 1, 1, 1]} :
-          memref<2x16x16x6xf32>, memref<1x3x4x2xf32>, memref<2x14x13x5xf32>
+          {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<2x14x13x6xf32>
+        linalg.pooling_nhwc_max
+          {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+          ins(%0, %1: memref<2x16x16x6xf32>, memref<3x4xf32>)
+          outs(%2: memref<2x14x13x6xf32>)
         return
       }
       hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -231,13 +173,14 @@ hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
     }
   }
 }
+
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//       CHECK: hal.executable.entry_point @pooling_max_4D
+//       CHECK: hal.executable.entry_point @pooling_nhwc_max
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
 //       CHECK:   hal.return %[[C1]], %[[C4]], %[[C1]]
-//       CHECK: func @pooling_max_4D()
+//       CHECK: func @pooling_nhwc_max()
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
@@ -248,9 +191,10 @@ hal.executable @pooling_max_4D attributes {sym_visibility = "private"} {
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
 //       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][0, %[[LBY]], %[[LBX]], 0]
 //       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][0, %[[LBY]], %[[LBX]], 0]
-//       CHECK:   linalg.pooling_max
-//  CHECK-SAME:     %[[SV_ARG0]], %[[ARG1]], %[[SV_RET0]]
+//       CHECK:   linalg.pooling_nhwc_max
 //  CHECK-SAME:     "workgroup"
+//  CHECK-SAME:     ins(%[[SV_ARG0]], %[[ARG1]]
+//  CHECK-SAME:    outs(%[[SV_RET0]]
 
 // -----
 

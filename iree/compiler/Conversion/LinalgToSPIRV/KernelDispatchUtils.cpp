@@ -563,7 +563,7 @@ static LogicalResult getPoolingOpLaunchConfig(
   // pooled dimension and which are not. Need to fix that, but for now just use
   // a working heuristic.
   SmallVector<int64_t, 4> ts(std::min<int64_t>(
-      op.output().getType().template cast<ShapedType>().getRank(), 3));
+      op.getOutput(0).getType().template cast<ShapedType>().getRank(), 3));
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
   ts[ts.size() - 2] = tileSizeY;
@@ -583,9 +583,9 @@ static LogicalResult getPoolingOpLaunchConfig(
                                     config);                            \
   }
 
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingMaxOp)
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingMinOp)
-DEFINE_POOLING_OP_CONFIG(linalg::PoolingSumOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMaxOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCMinOp)
+DEFINE_POOLING_OP_CONFIG(linalg::PoolingNHWCSumOp)
 
 #undef DEFINE_POOLINGOP_CONFIG
 
@@ -636,9 +636,9 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
     DISPATCH(linalg::MatmulOp)
-    DISPATCH(linalg::PoolingMaxOp)
-    DISPATCH(linalg::PoolingMinOp)
-    DISPATCH(linalg::PoolingSumOp)
+    DISPATCH(linalg::PoolingNHWCMaxOp)
+    DISPATCH(linalg::PoolingNHWCMinOp)
+    DISPATCH(linalg::PoolingNHWCSumOp)
 
 #undef DISPATCH
   }
