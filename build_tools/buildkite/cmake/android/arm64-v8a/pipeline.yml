@@ -48,7 +48,7 @@ steps:
       - "ctest --output-on-failure"
     agents:
       - "android-soc=exynos-9820"
-      - "test-android=true"
+      - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
