@@ -19,7 +19,7 @@ documented separately, as they require further setup.
 
 ### Install CMake
 
-Install CMake version >= 3.13 from the
+Install CMake version >= 3.13.4 from the
 [downloads page](https://cmake.org/download/).
 
 > Tip:<br>
