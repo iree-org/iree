@@ -21,8 +21,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Converts linalg::ConvOp into packed img2col operation followed by
-/// linalg::MatmulOp.
+/// Converts linalg::ConvInputNHWCFilterHWCFOp into packed img2col operation
+/// followed by linalg::MatmulOp.
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
 
 /// Converts linalg.conv into linalg.generic with a CPU-friendly iteration
@@ -39,8 +39,8 @@ std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createFastExpApproximationConversionPass();
 
-/// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
-/// followed by linalg::MatmulOp.
+/// Populates patterns to rewrite linalg::ConvInputNHWCFilterHWCFOp into packed
+/// img2col operation followed by linalg::MatmulOp.
 void populateConvImg2ColMatmulConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 

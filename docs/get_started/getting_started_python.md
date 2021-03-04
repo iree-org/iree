@@ -3,12 +3,14 @@
   NOTE: Iree's Python API is currently being reworked. Some of these
   instructions may be in a state of flux as they document the end state.
 
-IREE has two primary Python APIs:
-
-* Compiler API: `pyiree.compiler2`, `pyiree.compiler2.tf`
-* Runtime API: `pyiree.tf`
+The IREE compiler API is called `pyiree.compiler2` (naming is for historical
+reasons and will be changed to `iree.compiler` soon).
 
 There are additional ancillary modules that are not part of the public API.
+
+Note this guide does not cover IREE integrations with other frontends, such as
+TensorFlow. For those, see the relevant
+[getting started guides](../get-started).
 
 ## Prerequisites
 
@@ -21,12 +23,6 @@ You should already have IREE cloned and building on your machine. See the other
 Minimally, the following CMake flags must be specified:
 
 * `-DIREE_BUILD_PYTHON_BINDINGS=ON`
-* `-DIREE_BUILD_TENSORFLOW_COMPILER=ON`: Optional. Also builds the TensorFlow
-  compiler integration.
-
-If building any parts of TensorFlow, you must have a working `bazel` command
-on your path. See the relevant "OS with Bazel" [getting started](../get-started)
-doc for more information.
 
 ## Python Setup
 
@@ -40,8 +36,7 @@ Install [Python 3](https://www.python.org/downloads/) `>= 3.6` and
   during interpreter installation.
 
 (Recommended) Setup a virtual environment with `venv` (or your preferred
-mechanism):
-
+mechanism):t
 ```shell
 # Note that venv is only available in python3 and is therefore a good check
 # that you are in fact running a python3 binary.
@@ -55,9 +50,6 @@ Install packages:
 ```shell
 $ python -m pip install --upgrade pip
 $ python -m pip install numpy absl-py
-
-# If using the TensorFlow integration
-$ python -m pip install tf-nightly
 ```
 
 ## Building

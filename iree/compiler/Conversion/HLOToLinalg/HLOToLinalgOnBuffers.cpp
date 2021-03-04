@@ -425,62 +425,6 @@ LogicalResult ConvOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// mhlo.concatenate conversion patterns and utility functions.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts a mhlo.concatenate op to subview ops + linalg.copy/fill ops.
-class ConcatenateOpConversion
-    : public ConvertToLinalgBufferOp<ConcatenateOpConversion,
-                                     mhlo::ConcatenateOp> {
- public:
-  using ConvertToLinalgBufferOp<ConcatenateOpConversion,
-                                mhlo::ConcatenateOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-}  // namespace
-
-LogicalResult ConcatenateOpConversion::apply(
-    mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  Location loc = op.getLoc();
-  int dim = op.dimension();
-  int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
-  SmallVector<Value, 3> offsets, sizes, strides;
-  for (int i = 0; i < rank; ++i) {
-    offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
-    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], i);
-    sizes.push_back(size);
-    strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
-  }
-
-  Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
-  for (auto inBuf : inputBuffers) {
-    offsets[dim] = accBound;
-    if (auto cstOp = inBuf.getDefiningOp<ConstantOp>()) {
-      sizes[dim] = rewriter.create<ConstantIndexOp>(
-          loc, cstOp.getType().cast<ShapedType>().getShape()[dim]);
-      auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0],
-                                                  offsets, sizes, strides);
-      auto inputConstAttr =
-          cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
-      Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
-      rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
-    } else {
-      sizes[dim] = rewriter.create<DimOp>(loc, inBuf, dim);
-      auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0],
-                                                  offsets, sizes, strides);
-      rewriter.create<linalg::CopyOp>(loc, inBuf, subViewOp);
-    }
-    accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
-  }
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // linalg.pad_tensor conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
@@ -550,6 +494,43 @@ struct SubTensorOpConversion
         rewriter.create<SubViewOp>(loc, inputBuffers[0], op.getMixedOffsets(),
                                    op.getMixedSizes(), op.getMixedStrides());
     rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
+// subtensor_insert conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts subtensor_insert operation to subview + linalg.copy.
+/// Note: this assumes dest and result are the same buffer.
+struct SubTensorInsertOpConversion
+    : public ConvertToLinalgBufferOp<SubTensorInsertOpConversion,
+                                     SubTensorInsertOp> {
+  using ConvertToLinalgBufferOp<SubTensorInsertOpConversion,
+                                SubTensorInsertOp>::ConvertToLinalgBufferOp;
+
+  LogicalResult apply(SubTensorInsertOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    auto loc = op.getLoc();
+    auto subViewOp =
+        rewriter.create<SubViewOp>(loc, resultBuffers[0], op.getMixedOffsets(),
+                                   op.getMixedSizes(), op.getMixedStrides());
+    if (auto cstOp = inputBuffers[0].getDefiningOp<ConstantOp>()) {
+      auto inputConstAttr = cstOp.valueAttr().cast<DenseElementsAttr>();
+      if (!inputConstAttr.isSplat()) {
+        return rewriter.notifyMatchFailure(
+            op, "non-splat constant is not supported");
+      }
+      Value cstVal =
+          rewriter.create<ConstantOp>(loc, inputConstAttr.getSplatValue());
+      rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
+    } else {
+      rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+    }
     return success();
   }
 };
@@ -1083,6 +1064,11 @@ static LogicalResult propagateBufferUsedForResultTensor(
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }
+    if (auto subTensorInsertOp = tensor.getDefiningOp<SubTensorInsertOp>()) {
+      tensor = subTensorInsertOp.dest();
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
+      continue;
+    }
     break;
   }
   return success();
@@ -1182,7 +1168,6 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
   patterns.insert<
       // clang-format off
       ConvOpConversion,
-      ConcatenateOpConversion,
       FillOpOnTensorConversion,
       InitTensorOpConversion,
       LinalgOpOnTensorConversion<linalg::GenericOp>,
@@ -1199,6 +1184,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       PadTensorOpConversion,
       ReduceWindowOpConversion,
       SubTensorOpConversion,
+      SubTensorInsertOpConversion,
       TensorReshapeOpConversion
       // clang-format on
       >(context, resultTensorToBufferMap);
@@ -1231,7 +1217,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
                       IREE::HAL::InterfaceStoreTensorOp, SubTensorOp,
-                      tensor::ExtractOp>();
+                      SubTensorInsertOp, tensor::ExtractOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

@@ -109,7 +109,7 @@ def setup_environment():
 
 
 def repo_relpath(path):
-  return os.path.relpath(path, repo_root)
+  return os.path.relpath(path, repo_root).replace("\\", "/")
 
 
 def log(string, *args, indent=0, **kwargs):
