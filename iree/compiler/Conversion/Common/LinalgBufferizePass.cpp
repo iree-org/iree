@@ -158,7 +158,7 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
   op.clone(b, loc, /*resultTypes=*/TypeRange{}, newOperands);
 
   // Replace the results of the old op with the new output buffers.
-  for (auto result : enumerate(op.getOperation()->getResults())) {
+  for (auto result : llvm::enumerate(op.getOperation()->getResults())) {
     Value resultValue = result.value();
     Value resultBuffer = bvm.lookup(resultValue);
     if (resultBuffer != outputs[result.index()]) {

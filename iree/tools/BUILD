@@ -264,10 +264,11 @@ cc_binary(
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
     ],
 )
 
@@ -322,10 +323,11 @@ cc_library(
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:Translation",
     ],
 )

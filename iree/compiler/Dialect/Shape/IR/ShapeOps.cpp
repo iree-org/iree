@@ -334,8 +334,7 @@ LogicalResult FromExtentTensorOp::inferReturnTypes(
   return success();
 }
 
-bool FromExtentTensorOp::isCompatibleReturnTypes(ArrayRef<Type> lhs,
-                                                 ArrayRef<Type> rhs) {
+bool FromExtentTensorOp::isCompatibleReturnTypes(TypeRange lhs, TypeRange rhs) {
   auto lhsRs = lhs[0].cast<RankedShapeType>();
   auto rhsRs = rhs[0].cast<RankedShapeType>();
   return succeeded(

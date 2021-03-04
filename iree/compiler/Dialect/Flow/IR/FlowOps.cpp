@@ -348,7 +348,7 @@ ResultRange DispatchRegionOp::appendResults(DispatchRegionOp &self,
   builder.setInsertionPoint(self);
   auto newDrOp = llvm::cast<DispatchRegionOp>(
       builder.insert(cloneWithNewResultTypes(self, newTypes)));
-  self.replaceAllUsesWith(ResultRange(newDrOp, 0, origNumResults));
+  self.replaceAllUsesWith(newDrOp->getResults().take_front(origNumResults));
   self.erase();
   self = newDrOp;
 
@@ -358,7 +358,7 @@ ResultRange DispatchRegionOp::appendResults(DispatchRegionOp &self,
   returns.append(addlResults.begin(), addlResults.end());
   terminator->setOperands(returns);
 
-  return ResultRange(self, origNumResults, addlResults.size());
+  return self->getResults().slice(origNumResults, addlResults.size());
 }
 
 Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,

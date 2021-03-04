@@ -145,7 +145,8 @@ cc_binary(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:AllToLLVMIRTranslations",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorToLLVM",
         # mlir_runner_utils with iostream needed for printMemRef atm
