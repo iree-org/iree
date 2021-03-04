@@ -221,4 +221,31 @@ iree_check_single_backend_test_suite(
     "-iree-codegen-spirv-experimental-linalg-on-tensors"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg_on_tensors_cuda
+  SRCS
+    "add.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "constant.mlir"
+    "divide.mlir"
+    "iota.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "select.mlir"
+    "subtract.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
