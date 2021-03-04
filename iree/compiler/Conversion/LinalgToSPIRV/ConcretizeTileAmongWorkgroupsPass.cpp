@@ -429,7 +429,6 @@ struct ConcretizeTileAmongWorkgroupsPass
         OpBuilder builder(&context);
         WorkgroupCountRegionBuilder regionBuilder =
             [&](OpBuilder &builder, Location loc, std::array<Value, 3>) {
-              Value one = builder.create<ConstantIndexOp>(loc, 1);
               std::array<Value, 3> returnValues;
               for (unsigned i = 0; i < kWorkgroupDimCount; ++i) {
                 returnValues[i] =
