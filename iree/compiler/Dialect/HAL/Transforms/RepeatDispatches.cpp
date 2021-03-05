@@ -27,7 +27,7 @@ namespace {
 
 static llvm::cl::opt<int> repeatDispatchNum{
     "iree-hal-repeat-dispatch-num",
-    llvm::cl::desc("TBD"),
+    llvm::cl::desc("The number of times to repeat dispatches."),
     llvm::cl::init(1),
 };
 
@@ -65,9 +65,8 @@ std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass() {
   return std::make_unique<RepeatDispatchesPass>();  // NOLINT
 }
 
-static PassRegistration<RepeatDispatchesPass> pass(
-    "iree-hal-repeat-dispatches",
-    "Convert input flow/std/etc dialects to the IREE HAL dialect.");
+static PassRegistration<RepeatDispatchesPass> pass("iree-hal-repeat-dispatches",
+                                                   "Repeat all the dispatches");
 
 }  // namespace HAL
 }  // namespace IREE

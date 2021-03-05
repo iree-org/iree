@@ -55,8 +55,6 @@ void registerHALTransformPassPipeline();
 // Convert input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
-std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass();
-
 //===----------------------------------------------------------------------===//
 // Device management
 //===----------------------------------------------------------------------===//
@@ -131,6 +129,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 // Eliminates redundant 'load's of variables within functions with no 'store'.
 // TODO(#1124): replace with memory side effects once supported upstream.
 std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass();
+
+// Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
+// default.
+std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
