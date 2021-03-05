@@ -30,6 +30,7 @@ iree_cc_library(
     "PropagateConstantWorkgroupInfo.cpp"
     "PublicAbiGeneration.cpp"
     "ResolveEntryPointOrdinals.cpp"
+    "RepeatDispatches.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
   DEPS

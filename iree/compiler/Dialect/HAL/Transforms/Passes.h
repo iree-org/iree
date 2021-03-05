@@ -55,6 +55,8 @@ void registerHALTransformPassPipeline();
 // Convert input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
+std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass();
+
 //===----------------------------------------------------------------------===//
 // Device management
 //===----------------------------------------------------------------------===//
@@ -138,6 +140,7 @@ inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   auto executableOptions = getTargetOptionsFromFlags();
   createConvertToHALPass();
+  createRepeatDispatchesPass();
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
   createMaterializeInterfacesPass(executableOptions);

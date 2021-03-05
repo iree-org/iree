@@ -31,6 +31,8 @@ ABSL_FLAG(std::string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
+ABSL_FLAG(int, batch_size, 1, "batch_size");
+
 ABSL_FLAG(std::string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run. If this is not set, all the exported functions will be "
@@ -58,15 +60,16 @@ namespace iree {
 namespace {
 
 static void BenchmarkFunction(
-    const std::string& benchmark_name, iree_vm_context_t* context,
-    iree_vm_function_t function, iree_vm_list_t* inputs,
+    const std::string& benchmark_name, int batch_size,
+    iree_vm_context_t* context, iree_vm_function_t function,
+    iree_vm_list_t* inputs,
     const std::vector<RawSignatureParser::Description>& output_descs,
     benchmark::State& state) {
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
   IREE_TRACE_FRAME_MARK();
 
   // Benchmarking loop.
-  for (auto _ : state) {
+  while (state.KeepRunningBatch(batch_size)) {
     IREE_TRACE_SCOPE0("BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     vm::ref<iree_vm_list_t> outputs;
@@ -83,13 +86,14 @@ void RegisterModuleBenchmarks(
     iree_vm_function_t function, iree_vm_list_t* inputs,
     const std::vector<RawSignatureParser::Description>& output_descs) {
   auto benchmark_name = "BM_" + function_name;
-  benchmark::RegisterBenchmark(benchmark_name.c_str(),
-                               [benchmark_name, context, function, inputs,
-                                output_descs](benchmark::State& state) -> void {
-                                 BenchmarkFunction(benchmark_name, context,
-                                                   function, inputs,
-                                                   output_descs, state);
-                               })
+  int batch_size = absl::GetFlag(FLAGS_batch_size);
+  benchmark::RegisterBenchmark(
+      benchmark_name.c_str(),
+      [benchmark_name, batch_size, context, function, inputs,
+       output_descs](benchmark::State& state) -> void {
+        BenchmarkFunction(benchmark_name, batch_size, context, function, inputs,
+                          output_descs, state);
+      })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
