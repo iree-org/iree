@@ -139,7 +139,7 @@ iree_cc_binary(
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
     MLIRSupport
-    MLIRTargetLLVMIR
+    MLIRTargetLLVMIRExport
     MLIRTransformUtils
     MLIRVectorToLLVM
     experimental::ModelBuilder
