@@ -14,7 +14,7 @@
 #include <iterator>
 #include <memory>
 
-#include "iree/experimental/runners/Transforms.h"
+#include "Transforms.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"

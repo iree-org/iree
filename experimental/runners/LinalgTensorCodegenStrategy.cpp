@@ -14,7 +14,7 @@
 // Will get better once upstreamed to core and it replaces the existing codegen
 // strategy.
 
-#include "iree/experimental/runners/Transforms.h"
+#include "Transforms.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
