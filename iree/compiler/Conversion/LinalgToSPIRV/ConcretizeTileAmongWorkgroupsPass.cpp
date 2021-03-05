@@ -68,12 +68,18 @@ static size_t getNumOuterParallelDims(linalg::LinalgOp op) {
   return parallels.size();
 }
 
+/// Returns the op that can dictate tiling and distribution configuration.
+static bool isRootOp(Operation *op) {
+  return isa<linalg::ConvInputNHWCFilterHWCFOp, linalg::MatmulOp,
+             linalg::BatchMatmulOp>(op);
+}
+
 /// Returns the root Linalg op that is used as the anchor for dispatch region
 /// formation.
 linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
   linalg::LinalgOp rootOp;
   funcOp.walk([&rootOp](linalg::LinalgOp op) {
-    if (op.getOperation()->hasAttr("iree.codegen.fusion.root_op")) {
+    if (isRootOp(op)) {
       rootOp = op;
       return WalkResult::interrupt();
     }

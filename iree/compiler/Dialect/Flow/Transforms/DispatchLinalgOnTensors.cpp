@@ -47,7 +47,7 @@ static llvm::cl::opt<bool> clLinalgOnTensorsEnableForceFusion(
     llvm::cl::desc("Option to force fuse linalg operations on tensors"),
     llvm::cl::init(false));
 
-static const char kRootOpAttr[] = "iree.codegen.fusion.root_op";
+static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
 namespace mlir {
@@ -545,6 +545,8 @@ struct TileAndDistributeOnTensorsPattern
 
     pullInProducersInSameGroup(rewriter, dispatchOp, shapedOperands,
                                tiledLinalgOp, rootOpAttr.getInt());
+
+    tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
     rewriter.replaceOpWithIf(
         op, dispatchOp.getOperation()->getResults(),
