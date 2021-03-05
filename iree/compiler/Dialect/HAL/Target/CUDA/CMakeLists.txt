@@ -27,11 +27,11 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     MLIRLLVMIR
+    MLIRLLVMToLLVMIRTranslation
     MLIRNVVMIR
     MLIRPass
     MLIRSupport
-    MLIRTargetLLVMIR
-    MLIRTargetLLVMIRModuleTranslation
+    MLIRTargetLLVMIRExport
     iree::base::flatcc
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Dialect::HAL::Target

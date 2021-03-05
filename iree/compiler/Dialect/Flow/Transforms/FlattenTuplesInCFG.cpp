@@ -33,9 +33,8 @@ namespace Flow {
 namespace {
 
 // Given a set of types, unpack to a list of a types, removing all tuples.
-void untupleTypes(llvm::ArrayRef<Type> types,
-                  llvm::SmallVectorImpl<Type> *newTypes) {
-  for (auto &type : types) {
+void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> *newTypes) {
+  for (Type type : types) {
     if (type.isa<TupleType>()) {
       untupleTypes(type.dyn_cast<TupleType>().getTypes(), newTypes);
     } else {
