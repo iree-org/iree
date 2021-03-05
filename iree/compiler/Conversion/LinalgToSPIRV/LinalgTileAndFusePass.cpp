@@ -502,9 +502,9 @@ void LinalgTileAndFusePass::runOnOperation() {
       rootOperationTileSizes = rootOperationTileSizes.take_front(
           getNumOuterParallelLoops(rootOperation));
 
-      // XXX: Special treatment for convolution, which have more than 3 parallel
-      // dimensions. We want to ignore the batch dimension and tile along the
-      // next three.
+      // NOTE: Special treatment for convolution, which have more than 3
+      // parallel dimensions. We want to ignore the batch dimension and tile
+      // along the next three.
       if (isa<linalg::ConvInputNHWCFilterHWCFOp>(rootOperation)) {
         rootOperationTileSizes = rootOperationTileSizes.drop_front();
       }

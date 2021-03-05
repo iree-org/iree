@@ -504,7 +504,7 @@ struct TileAndDistributeOnTensorsPattern
     SmallVector<Value, 4> count = llvm::to_vector<4>(
         llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
                         [](Range r) { return r.size; }));
-    // XXX: Special treatment for convolution, which have more than 3 parallel
+    // NOTE: Special treatment for convolution, which have more than 3 parallel
     // dimensions. We want to ignore the batch dimension and tile along the
     // next three.
     if (isa<linalg::ConvInputNHWCFilterHWCFOp>(op)) {
@@ -715,7 +715,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         auto numParallelDims = parallelLoopRanges.size();
 
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        // XXX: Special treatment for convolution, which have more than 3
+        // NOTE: Special treatment for convolution, which have more than 3
         // parallel dimensions. We want to ignore the batch dimension and tile
         // along the next three. It means filling out the procInfo for the
         // positions > 0, so we need (dim < numParallelDims) here.
@@ -752,7 +752,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           }));
     }
 
-    // XXX: Special treatment for convolution, which have more than 3
+    // NOTE: Special treatment for convolution, which have more than 3
     // parallel dimensions. We want to ignore the batch dimension and tile
     // along the next three. That means setting the first position to zero.
     bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp>(op);

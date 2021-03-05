@@ -359,7 +359,7 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
 
   ShapedType inputType, outputType;
 
-  // XXX: Special treatment to let the flow.dispatch.workgroups path to be able
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
   // to query launch configurations.
   if (auto outputTypeAttr = operation->getAttrOfType<ArrayAttr>(
           "iree.codegen.original_output_types")) {
