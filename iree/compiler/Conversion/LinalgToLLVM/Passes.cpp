@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -71,9 +72,11 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
 
-  // (HAL, IREE, Linalg, STD) -> LLVM
+  // Handled tensor-type constants.
+  nestedModulePM.addPass(createTensorConstantBufferizePass());
+  nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
-  // OpPassManager& llvmPassManager = nestedModulePM.nest<ModuleOp>();
+  // (HAL, IREE, Linalg, STD) -> LLVM
   nestedModulePM.addPass(createConvertToLLVMPass());
 
   nestedModulePM.addPass(createCanonicalizerPass());

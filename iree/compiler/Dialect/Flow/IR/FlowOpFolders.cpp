@@ -400,6 +400,14 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
   results.insert<ConvertDimOfDispatchInputLoadToDispatchShape>(context);
 }
 
+OpFoldResult DispatchInputLoadOp::fold(ArrayRef<Attribute> operands) {
+  if (source().getType().isa<RankedTensorType>() && offsets().empty() &&
+      sizes().empty() && strides().empty()) {
+    return source();
+  }
+  return {};
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//

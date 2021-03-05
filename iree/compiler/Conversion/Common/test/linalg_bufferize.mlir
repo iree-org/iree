@@ -613,3 +613,18 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<3x4xi32>
 //       CHECK:   %[[IN:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<3x4xi32>
 //       CHECK:   linalg.copy(%[[IN]], %[[OUT]]) : memref<3x4xi32>, memref<3x4xi32>
+
+// -----
+
+func @constant() {
+  %c0 = constant 0 : index
+  %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
+  %0 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<2x2x3xi32>
+  flow.dispatch.output.store %cst, %0 : tensor<2x2x3xi32> -> !flow.dispatch.output<2x2x3xi32>
+  return
+}
+// CHECK-LABEL: func @constant()
+//       CHECK:   %[[CST:.+]] = constant {{.+}} : tensor<2x2x3xi32>
+//       CHECK:   %[[MEMREF:.+]] = tensor_to_memref %[[CST]] : memref<2x2x3xi32>
+//       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
