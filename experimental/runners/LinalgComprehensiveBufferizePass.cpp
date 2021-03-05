@@ -966,7 +966,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b, PadTensorOp padTensorOp,
   auto sourceMemRefType = sourceMemRef.getType().cast<MemRefType>();
   auto memRefType =
       getContiguousMemRefType(tensorType, sourceMemRefType.getAffineMaps(),
-                              sourceMemRefType.getMemorySpace());
+                              sourceMemRefType.getMemorySpaceAsInt());
   Value res =
       b.create<MemRefCastOp>(padTensorOp.getLoc(), memRefType, sourceMemRef);
   map(bvm, padTensorOp.result(), res);
@@ -1040,12 +1040,12 @@ static LogicalResult convertTensorCastOp(OpBuilder &b, tensor::CastOp castOp,
   Type memRefType;
   TensorType tensorType = castOp.getResult().getType().cast<TensorType>();
   if (tensorType.isa<UnrankedTensorType>()) {
-    memRefType = UnrankedMemRefType::get(tensorType.getElementType(),
-                                         sourceMemRefType.getMemorySpace());
+    memRefType = UnrankedMemRefType::get(
+        tensorType.getElementType(), sourceMemRefType.getMemorySpaceAsInt());
   } else {
     memRefType =
         getContiguousMemRefType(tensorType, sourceMemRefType.getAffineMaps(),
-                                sourceMemRefType.getMemorySpace());
+                                sourceMemRefType.getMemorySpaceAsInt());
   }
   Value res = b.create<MemRefCastOp>(castOp.getLoc(), memRefType,
                                      lookup(bvm, castOp.source()));
