@@ -76,44 +76,42 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //      CHECK:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP0]]()[%[[BIDX]]]
 //      CHECK:    %[[SUBVIEW_RESULT:.+]] = subview %[[RET0]]
 // CHECK-SAME:      [%[[BOFFSET_Y]], %[[BOFFSET_X]]] [64, 64]
-//      CHECK:  %[[SUBVIEW_RESULT_2:.+]] = subview %[[SUBVIEW_RESULT]]
-// CHECK-SAME:    [0, 0] [64, 64] [1, 1]
 
 //  CHECK-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C0]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C0]]]
 //  CHECK-DAG:  %[[READ_INIT_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C16]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C16]]]
 //  CHECK-DAG:  %[[READ_INIT_0_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C32]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C32]]]
 //  CHECK-DAG:  %[[READ_INIT_0_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C48]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C48]]]
 
 //  CHECK-DAG:  %[[READ_INIT_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C0]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C0]]]
 //  CHECK-DAG:  %[[READ_INIT_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C16]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C16]]]
 //  CHECK-DAG:  %[[READ_INIT_1_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C32]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C32]]]
 //  CHECK-DAG:  %[[READ_INIT_1_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C48]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C48]]]
 
 //  CHECK-DAG:  %[[READ_INIT_2_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C0]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C0]]]
 //  CHECK-DAG:  %[[READ_INIT_2_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C16]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C16]]]
 //  CHECK-DAG:  %[[READ_INIT_2_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C32]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C32]]]
 //  CHECK-DAG:  %[[READ_INIT_2_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C48]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C48]]]
 
 //  CHECK-DAG:  %[[READ_INIT_3_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C0]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C0]]]
 //  CHECK-DAG:  %[[READ_INIT_3_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C16]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C16]]]
 //  CHECK-DAG:  %[[READ_INIT_3_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C32]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C32]]]
 //  CHECK-DAG:  %[[READ_INIT_3_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C48]]]
+// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C48]]]
 
 //      CHECK:  %[[FOR_RES:.+]]:16 = scf.for %[[IV0:.+]] = {{.*}} to
 // CHECK-SAME:  iter_args(%[[ACC_0_0:.+]] = %[[READ_INIT_0_0]],
@@ -136,48 +134,44 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 // CHECK-SAME:      [%[[BOFFSET_Y]], %[[IV0]]] [64, 32]
 //      CHECK:    %[[SUBVIEW_RHS:.+]] = subview %[[ARG1]]
 // CHECK-SAME:      [%[[IV0]], %[[BOFFSET_X]]] [32, 64]
-//      CHECK:    %[[SUBVIEW_LHS_2:.+]] = subview %[[SUBVIEW_LHS]]
-// CHECK-SAME:      [0, 0] [64, 32] [1, 1]
-//      CHECK:    %[[SUBVIEW_RHS_2:.+]] = subview %[[SUBVIEW_RHS]]
-// CHECK-SAME:      [0, 0] [32, 64] [1, 1]
 
 //  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C0]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C0]], %[[C16]]]
 
 //  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C16]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C16]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C16]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C16]], %[[C16]]]
 
 //  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C32]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C32]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C32]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C32]], %[[C16]]]
 
 //  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C48]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C48]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_LHS_2]][%[[C48]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_LHS]][%[[C48]], %[[C16]]]
 
 //  CHECK-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C16]]]
 //  CHECK-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C32]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C32]]]
 //  CHECK-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C0]], %[[C48]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C0]], %[[C48]]]
 
 //  CHECK-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C16]], %[[C0]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C16]], %[[C16]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C16]]]
 //  CHECK-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C16]], %[[C32]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C32]]]
 //  CHECK-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read
-// CHECK-SAME:      %[[SUBVIEW_RHS_2]][%[[C16]], %[[C48]]]
+// CHECK-SAME:      %[[SUBVIEW_RHS]][%[[C16]], %[[C48]]]
 
 //      CHECK:    %[[CONTRACT_0_0_1:.+]] = vector.contract
 // CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_0]], %[[ACC_0_0]]
@@ -254,25 +248,25 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 // CHECK-SAME:      %[[CONTRACT_2_3]], %[[CONTRACT_3_0]], %[[CONTRACT_3_1]],
 // CHECK-SAME:      %[[CONTRACT_3_2]], %[[CONTRACT_3_3]]
 
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#0, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#1, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#2, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#3, %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C48]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#0, %[[SUBVIEW_RESULT]][%[[C0]], %[[C0]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#1, %[[SUBVIEW_RESULT]][%[[C0]], %[[C16]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#2, %[[SUBVIEW_RESULT]][%[[C0]], %[[C32]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#3, %[[SUBVIEW_RESULT]][%[[C0]], %[[C48]]]
 
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#4, %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#5, %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#6, %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#7, %[[SUBVIEW_RESULT_2]][%[[C16]], %[[C48]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#4, %[[SUBVIEW_RESULT]][%[[C16]], %[[C0]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#5, %[[SUBVIEW_RESULT]][%[[C16]], %[[C16]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#6, %[[SUBVIEW_RESULT]][%[[C16]], %[[C32]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#7, %[[SUBVIEW_RESULT]][%[[C16]], %[[C48]]]
 
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#8, %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#9, %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#10, %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#11, %[[SUBVIEW_RESULT_2]][%[[C32]], %[[C48]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#8, %[[SUBVIEW_RESULT]][%[[C32]], %[[C0]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#9, %[[SUBVIEW_RESULT]][%[[C32]], %[[C16]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#10, %[[SUBVIEW_RESULT]][%[[C32]], %[[C32]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#11, %[[SUBVIEW_RESULT]][%[[C32]], %[[C48]]]
 
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#12, %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#13, %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#14, %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SUBVIEW_RESULT_2]][%[[C48]], %[[C48]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#12, %[[SUBVIEW_RESULT]][%[[C48]], %[[C0]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#13, %[[SUBVIEW_RESULT]][%[[C48]], %[[C16]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#14, %[[SUBVIEW_RESULT]][%[[C48]], %[[C32]]]
+//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SUBVIEW_RESULT]][%[[C48]], %[[C48]]]
 
 
 //  PROMOTE-DAG: #[[MAP4:.+]] = affine_map<()[s0] -> (s0 * 64 - (s0 floordiv 2) * 128)>
