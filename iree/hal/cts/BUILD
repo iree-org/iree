@@ -120,7 +120,6 @@ cc_test(
 cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
-    tags = ["notap"],  # TODO(b/181878081) Disabled temporarily due to TAP failures
     deps = [
         ":cts_test_base",
         "//iree/hal/testing:driver_registry",
