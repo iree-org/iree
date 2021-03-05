@@ -45,6 +45,7 @@ inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
+  createHLOToLinalgOnTensorsPassExperimental();
   createDemoteF32ToF16Pass();
 }
 
