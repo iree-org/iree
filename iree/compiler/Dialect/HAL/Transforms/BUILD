@@ -34,6 +34,7 @@ cc_library(
         "Passes.cpp",
         "PropagateConstantWorkgroupInfo.cpp",
         "PublicAbiGeneration.cpp",
+        "RepeatDispatches.cpp",
         "ResolveEntryPointOrdinals.cpp",
         "SerializeExecutables.cpp",
         "TranslateExecutables.cpp",

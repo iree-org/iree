@@ -29,8 +29,8 @@ iree_cc_library(
     "Passes.cpp"
     "PropagateConstantWorkgroupInfo.cpp"
     "PublicAbiGeneration.cpp"
-    "ResolveEntryPointOrdinals.cpp"
     "RepeatDispatches.cpp"
+    "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
   DEPS
