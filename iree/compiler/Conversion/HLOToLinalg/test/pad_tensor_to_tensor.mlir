@@ -22,7 +22,6 @@ module  {
 //  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[C4:.+]] = constant 4
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //   CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
@@ -32,7 +31,6 @@ module  {
 //       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
 //       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, %[[ARG2]]] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   return %[[RESULT]]
-
 
 // -----
 
@@ -53,10 +51,8 @@ module  {
 // CHECK-LABEL: func @pad_tensor_static
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<12x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
-//   CHECK-DAG:   %[[C4:.+]] = constant 4
-//   CHECK-DAG:   %[[C5:.+]] = constant 5
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [18, 12]
 //       CHECK:   %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
-//       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, 5] [18, 12] [1, 1]
+//       CHECK:   %[[RESULT:.+]] = subtensor_insert %[[ARG0]] into %[[FILL]][4, 5] [12, 4] [1, 1]
 //       CHECK:   return %[[RESULT]]

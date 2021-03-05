@@ -322,8 +322,7 @@ func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tens
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %arg1 : f32
   } :  tensor<?x?xf32>
-  // CHECK: %[[UPDATED:.+]] = flow.tensor.update  %[[UPDATE]] %{{.+}}
-  // CHECK: %[[RESULT:.+]] = tensor.cast %[[UPDATED]] : tensor<21x42xf32> to tensor<?x?xf32>
+  // CHECK: %[[RESULT:.+]] = flow.tensor.update  %[[UPDATE]]
   %1 = flow.tensor.update %0, %arg0[%c2, %c4] : tensor<?x?xf32> -> tensor<?x?xf32>
   // CHECK: return %[[RESULT]]
   return %1 : tensor<?x?xf32>

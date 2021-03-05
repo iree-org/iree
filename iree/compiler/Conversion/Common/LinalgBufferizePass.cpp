@@ -310,8 +310,8 @@ static LogicalResult convertSubTensorOp(
 
 /// Converts a `subtensor_insert` operation to buffers by
 /// - Allocating a buffer for the result (if needed), and copying the
-///   destination value into this tensor.
-/// - Copying the source values into a subview of the result.
+///   destination value into this buffer.
+/// - Copying the source values into a subview of the result buffer.
 static LogicalResult convertSubTensorInsertOp(
     OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn,
     SubTensorInsertOp op, BlockAndValueMapping &bvm) {
