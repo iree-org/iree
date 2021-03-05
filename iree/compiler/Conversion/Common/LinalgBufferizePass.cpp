@@ -320,30 +320,24 @@ static LogicalResult convertSubTensorInsertOp(
   Location loc = op.getLoc();
   Value dest = op.dest();
   Value inputBuffer = bvm.lookup(dest);
-  auto allocationDynamicSizes = llvm::to_vector<4>(llvm::map_range(
-      llvm::seq<unsigned>(0,
-                          inputBuffer.getType().cast<ShapedType>().getRank()),
-      [&](int64_t dim) {
-        return b.createOrFold<DimOp>(loc, inputBuffer, dim);
-      }));
+  SmallVector<Value> allocationDynamicSizes;
+  int64_t rank = inputBuffer.getType().cast<ShapedType>().getRank();
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    allocationDynamicSizes.push_back(
+        b.createOrFold<DimOp>(loc, inputBuffer, dim));
+  }
   if (failed(createAliasingBufferOrAllocationForResult(
           b, loc, allocationFn, dest, inputBuffer, op.getResult(),
           allocationDynamicSizes, bvm))) {
-    return success();
+    return failure();
   }
 
   Value source = op.source();
   Value outputBuffer = bvm.lookup(op.result());
   Value sourceBuffer = bvm.lookup(source);
-  auto subViewResultType =
-      SubViewOp::inferResultType(outputBuffer.getType().cast<MemRefType>(),
-                                 extractFromI64ArrayAttr(op.static_offsets()),
-                                 extractFromI64ArrayAttr(op.static_sizes()),
-                                 extractFromI64ArrayAttr(op.static_strides()));
   auto subViewOp =
-      b.create<SubViewOp>(loc, subViewResultType, outputBuffer, op.offsets(),
-                          op.sizes(), op.strides(), op.static_offsets(),
-                          op.static_sizes(), op.static_strides());
+      b.create<SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
+                          op.getMixedSizes(), op.getMixedStrides());
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
   return success();
 }

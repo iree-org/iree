@@ -384,41 +384,48 @@ struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
 
     OpBuilder::InsertionGuard g(rewriter);
     Location loc = padTensorOp.getLoc();
-    auto lowPadVals = padTensorOp.getLowPadAsValues(rewriter, loc);
-    auto highPadVals = padTensorOp.getHighPadAsValues(rewriter, loc);
+    auto lowPad = padTensorOp.getMixedLowPad();
+    auto highPad = padTensorOp.getMixedHighPad();
     Value source = padOpAdaptor.source();
     RankedTensorType sourceType = padTensorOp.getSourceType();
     int64_t rank = sourceType.getRank();
 
     // TODO(ravishankarm): Use shape inference interface to get this.
-    auto sourceShape = llvm::to_vector<4>(
-        llvm::map_range(llvm::seq<int64_t>(0, rank), [&](int64_t dim) -> Value {
-          return rewriter.create<DimOp>(loc, source, dim);
-        }));
-    auto outputShape = llvm::to_vector<4>(
-        llvm::map_range(llvm::seq<int64_t>(0, rank), [&](int64_t dim) -> Value {
-          AffineExpr expr = rewriter.getAffineDimExpr(0) +
-                            rewriter.getAffineSymbolExpr(0) +
-                            rewriter.getAffineSymbolExpr(1);
-          return linalg::applyMapToValues(
-              rewriter, loc, AffineMap::get(1, 2, expr),
-              {sourceShape[dim], lowPadVals[dim], highPadVals[dim]})[0];
-        }));
+    SmallVector<OpFoldResult> sourceShape;
+    SmallVector<Value> outputShape;
+    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
+      SmallVector<Value> mapValues;
+      Value sourceDim = rewriter.createOrFold<DimOp>(loc, source, dim);
+      mapValues.push_back(sourceDim);
+      sourceShape.push_back(sourceDim);
+      AffineExpr expr = rewriter.getAffineDimExpr(0);
+      unsigned numSymbols = 0;
+      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
+        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+          e = e + attr.cast<IntegerAttr>().getInt();
+          return e;
+        }
+        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
+        mapValues.push_back(valueOrAttr.get<Value>());
+        return e;
+      };
+      expr = addValueOrAttr(expr, lowPad[dim]);
+      expr = addValueOrAttr(expr, highPad[dim]);
+      outputShape.push_back(linalg::applyMapToValues(
+          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0]);
+    }
     Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, outputShape, sourceType.getElementType());
-    Value fill = rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal)
-                     ->getResult(0);
-    SmallVector<OpFoldResult> offset = padTensorOp.getMixedLowPad();
-    SmallVector<OpFoldResult, 4> sizes = llvm::to_vector<4>(llvm::map_range(
-        sourceShape, [](Value v) -> OpFoldResult { return v; }));
-    SmallVector<OpFoldResult, 4> strides = llvm::to_vector<4>(llvm::map_range(
-        llvm::seq<int64_t>(0, rank), [&](int64_t dim) -> OpFoldResult {
-          return rewriter.getI64IntegerAttr(1);
-        }));
-    Value subTensorInsert = rewriter.create<SubTensorInsertOp>(
-        loc, source, fill, offset, sizes, strides);
-    rewriter.replaceOpWithNewOp<tensor::CastOp>(
-        padTensorOp, padTensorOp.getResultType(), subTensorInsert);
+    Value fill =
+        rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
+    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
+    Value replacement = rewriter.create<SubTensorInsertOp>(
+        loc, source, fill, lowPad, sourceShape, strides);
+    if (padTensorOp.getResultType() != replacement.getType()) {
+      replacement = rewriter.create<tensor::CastOp>(
+          loc, padTensorOp.getResultType(), replacement);
+    }
+    rewriter.replaceOp(padTensorOp, replacement);
     return success();
   }
 };
