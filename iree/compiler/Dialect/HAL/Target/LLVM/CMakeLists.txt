@@ -39,7 +39,7 @@ iree_cc_library(
     LLVMX86CodeGen
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
-    MLIRToLLVMIRTranslation
+    MLIRTargetLLVMIRExport
     iree::base::flatcc
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::Common

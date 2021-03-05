@@ -31,7 +31,7 @@ iree_cc_library(
     MLIRNVVMIR
     MLIRPass
     MLIRSupport
-    MLIRToLLVMIRTranslation
+    MLIRTargetLLVMIRExport
     iree::base::flatcc
     iree::compiler::Conversion::LinalgToNVVM
     iree::compiler::Dialect::HAL::Target
