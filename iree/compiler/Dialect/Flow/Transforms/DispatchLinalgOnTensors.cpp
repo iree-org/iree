@@ -715,10 +715,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         auto numParallelDims = parallelLoopRanges.size();
 
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        // NOTE: Special treatment for convolution, which have more than 3
-        // parallel dimensions. We want to ignore the batch dimension and tile
-        // along the next three. It means filling out the procInfo for the
-        // positions > 0, so we need (dim < numParallelDims) here.
         for (size_t dim = 0; dim < numParallelDims; ++dim) {
           procInfo[numParallelDims - dim - 1] = {
               buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupIDOp>(builder,
