@@ -153,61 +153,6 @@ Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
   return (*valueIt).getZExtValue();
 }
 
-/// Folds `affin.min` ops over `std.muli` ops with constant operands into
-/// `affine.min` ops.
-///
-/// For example, the following pattern:
-///
-///   %id = hal.interface.workgroup.id[...]
-///   %mul = muli %id %c4
-///   %min = affine.min affine_map<()[s0] -> (9, s0 * -2 + 225)>()[%mul]
-///
-/// Can be folded into:
-///
-///   %min = affine.min affine_map<()[s0] -> (9, s0 * -8 + 225)>()[%id]
-struct FoldConstantMulIntoAffineMin : OpRewritePattern<AffineMinOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineMinOp minOp,
-                                PatternRewriter &rewriter) const override {
-    LLVM_DEBUG(llvm::dbgs() << "inspecting " << minOp << "\n");
-
-    auto dimensions = minOp.getDimOperands();
-    auto symbols = minOp.getSymbolOperands();
-
-    // We expect the affine.min op to only have one symbol operand.
-    if (!llvm::hasSingleElement(symbols) || !dimensions.empty()) {
-      return failure();
-    }
-
-    auto mulOp = symbols.front().getDefiningOp<MulIOp>();
-    if (!mulOp) return failure();
-
-    auto idOp = mulOp.lhs().getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
-    IntegerAttr multipler;
-    if (!idOp || !matchPattern(mulOp.rhs(), m_Constant(&multipler))) {
-      return failure();
-    }
-    LLVM_DEBUG(llvm::dbgs() << "std.muli op: " << mulOp << "\n");
-
-    MLIRContext *context = minOp.getContext();
-    auto symbol0 = getAffineSymbolExpr(0, context).cast<AffineSymbolExpr>();
-    auto replSymbol = symbol0 * multipler.getInt();
-
-    SmallVector<AffineExpr, 4> results;
-    for (auto result : minOp.getAffineMap().getResults()) {
-      results.push_back(
-          simplifyAffineExpr(result.replace(symbol0, replSymbol), 0, 1));
-    }
-
-    auto replMap = AffineMap::get(0, 1, results, context);
-    LLVM_DEBUG(llvm::dbgs() << "replacement map: " << replMap << "\n");
-
-    rewriter.replaceOpWithNewOp<AffineMinOp>(minOp, replMap, mulOp.lhs());
-    return success();
-  }
-};
-
 /// Folds `affine.min` ops which has only one symbol operand, which is a
 /// processor ID. For such cases we can use the processor ID's upper bound to
 /// simplify the `affine.min`.
@@ -341,8 +286,7 @@ struct FoldGPUProcessIDUsesPass
 
 void populateFoldGPUProcessorIDUsesPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<FoldConstantMulIntoAffineMin, FoldAffineMinOverProcessorID>(
-      context);
+  patterns.insert<FoldAffineMinOverProcessorID>(context);
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 

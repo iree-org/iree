@@ -37,10 +37,13 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -283,12 +286,21 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
 
     // Now make sure the lower bound is smaller than upper bound. The lower
     // bound should be multiplying the workgroup ID with some constant.
-    auto mulOp = op.lowerBound().getDefiningOp<MulIOp>();
-    if (!mulOp) return failure();
 
-    auto idOp = mulOp.lhs().getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
+    auto mulOp = op.lowerBound().getDefiningOp<AffineApplyOp>();
+    if (!mulOp || mulOp.mapOperands().size() != 2) return failure();
+
+    AffineExpr lhs, rhs;
+    bindSymbols(op.getContext(), lhs, rhs);
+    auto mulMap = AffineMap::get(0, 2, lhs * rhs);
+    if (mulOp.getAffineMap() != mulMap) return failure();
+
+    auto mulLhs = mulOp.mapOperands().front();
+    auto mulRhs = mulOp.mapOperands().back();
+
+    auto idOp = mulLhs.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
     IntegerAttr multipler;
-    if (!idOp || !matchPattern(mulOp.rhs(), m_Constant(&multipler)))
+    if (!idOp || !matchPattern(mulRhs, m_Constant(&multipler)))
       return failure();
 
     // We just need to make sure the max value of the workgroup ID multipled by
