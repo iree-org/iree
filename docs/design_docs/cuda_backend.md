@@ -87,7 +87,7 @@ $ ../iree-build/iree/tools/iree-translate \
 # Run the module through CUDA HAL backend.
 $ ../iree-build/iree/tools/iree-run-module \
 -module_file=/tmp/mhlo-add.vmfb -driver=cuda -entry_function=add \
---function_inputs='4xf32=[1 2 3 4], 4xf32=[2 2 2 2]
+--function_inputs='4xf32=[1 2 3 4], 4xf32=[2 2 2 2]'
 
 EXEC @add
 4xf32=3 4 5 6
