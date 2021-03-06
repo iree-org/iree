@@ -32,6 +32,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -498,6 +500,8 @@ void LinalgTileAndFusePass::runOnOperation() {
         return;
       }
 
+      LLVM_DEBUG(llvm::dbgs() << "root operation: " << *rootOperation << "\n");
+
       // Only use the tile sizes for parallel loops of the root operation.
       rootOperationTileSizes = rootOperationTileSizes.take_front(
           getNumOuterParallelLoops(rootOperation));
@@ -505,12 +509,19 @@ void LinalgTileAndFusePass::runOnOperation() {
       // NOTE: Special treatment for convolution, which have more than 3
       // parallel dimensions. We want to ignore the batch dimension and tile
       // along the next three.
-      if (isa<linalg::ConvInputNHWCFilterHWCFOp>(rootOperation)) {
-        rootOperationTileSizes = rootOperationTileSizes.drop_front();
+      if (rootOperationTileSizes.size() > 3) {
+        // Ignore zeros, which means no tiling on the corresponding dimension.
+        rootOperationTileSizes = rootOperationTileSizes.drop_while(
+            [](int64_t dim) { return dim == 0; });
       }
 
       SmallVector<int64_t, 4> workloadPerWorkgroup =
           llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
+      LLVM_DEBUG({
+        llvm::dbgs() << "workload per workgroup: [";
+        llvm::interleaveComma(workloadPerWorkgroup, llvm::dbgs());
+        llvm::dbgs() << "]\n";
+      });
 
       // If we have all static workload size, a previous pass will materialize
       // the number of workgroups with constant values.
