@@ -16,6 +16,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/TransformUtils.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
+#include "iree/compiler/Conversion/VectorToLLVM/Passes.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
@@ -37,6 +38,12 @@ namespace iree_compiler {
 // TODO(ataei): Use pass options instead of global llvm flags.
 static llvm::cl::opt<bool> clEnablePromoteWorkgroupToFullTiles(
     "iree-codegen-llvm-promote-workgroup-to-full-tiles",
+    llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
+                   "on the stack."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableVectorContractAarch64AsmTo(
+    "iree-codegen-llvm-vector-contract-to-aarch64-asm",
     llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
                    "on the stack."),
     llvm::cl::init(false));
@@ -230,6 +237,16 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
       op->replaceAllUsesWith(contract);
   });
 
+  if (clEnableVectorContractAarch64AsmTo) {
+    OwningRewritePatternList vectorToAArch64AsmPatterns(context);
+    populateVectorContractToAArch64InlineAsm(vectorToAArch64AsmPatterns,
+                                             context);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorToAArch64AsmPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply vector specific operation lowering.
   {
     vector::VectorTransformsOptions vectorTransformsOptions =
@@ -245,6 +262,9 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
       return signalPassFailure();
     }
   }
+
+  // Hosit hierarchical tiling indexing and other loop invariant transfer
+  // ops computation.
 
   // Programmatic controlled lowering of vector.transfer only.
   {
