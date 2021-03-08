@@ -49,11 +49,11 @@ def FLOW_VariableOp : FLOW_Op<"variable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
       "FuncOp":$initializer, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
@@ -231,7 +231,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "ArrayRef<Type>":$resultTypes, "Value":$workload,
+    OpBuilder<(ins "ArrayRef<Type>":$resultTypes, "Value":$workload,
       "ValueRange":$args, CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -303,7 +303,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins
+    OpBuilder<(ins
       "ValueRange":$workgroupCount,
       "TypeRange":$resultTypes, "ValueRange":$operands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
@@ -372,7 +372,7 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   let results = (outs FLOW_Dim:$result);
 
   let builders = [
-    OpBuilderDAG<(ins "unsigned":$dim),
+    OpBuilder<(ins "unsigned":$dim),
     [{
       build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
     }]>,
@@ -403,7 +403,7 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   let results = (outs FLOW_Dim:$result);
 
   let builders = [
-    OpBuilderDAG<(ins "unsigned":$dim),
+    OpBuilder<(ins "unsigned":$dim),
     [{
       build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
     }]>,
@@ -441,7 +441,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
   let results = (outs FLOW_Dim:$result);
 
   let builders = [
-    OpBuilderDAG<(ins "unsigned":$dim),
+    OpBuilder<(ins "unsigned":$dim),
     [{
       build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
     }]>,
@@ -572,7 +572,7 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 
   let builders = [
-    OpBuilderDAG<(ins),
+    OpBuilder<(ins),
     [{
       build($_builder, $_state, llvm::None);
     }]>,
@@ -605,7 +605,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name)>,
+    OpBuilder<(ins "StringRef":$name)>,
   ];
 
   let extraClassDeclaration = [{
@@ -671,7 +671,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins
+    OpBuilder<(ins
       "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
       "TypeRange":$resultTypes, CArg<"ValueRange", "{}">:$operands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
@@ -966,7 +966,7 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "ArrayRef<Type>":$resultTypes, "ValueRange":$args,
+    OpBuilder<(ins "ArrayRef<Type>":$resultTypes, "ValueRange":$args,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 

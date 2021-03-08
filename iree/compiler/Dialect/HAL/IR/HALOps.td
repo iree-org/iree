@@ -43,7 +43,7 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins),
+    OpBuilder<(ins),
     [{
       $_state.addTypes({DeviceType::get($_builder.getContext())});
     }]>,
@@ -86,7 +86,7 @@ def HAL_MakeMemoryBarrierOp : HAL_MakeTupleOp<"make_memory_barrier", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "IREE::HAL::AccessScopeBitfield":$sourceScope,
+    OpBuilder<(ins "IREE::HAL::AccessScopeBitfield":$sourceScope,
       "IREE::HAL::AccessScopeBitfield":$targetScope)>,
   ];
 }
@@ -118,7 +118,7 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "IREE::HAL::AccessScopeBitfield":$sourceScope,
+    OpBuilder<(ins "IREE::HAL::AccessScopeBitfield":$sourceScope,
       "IREE::HAL::AccessScopeBitfield":$targetScope, "Value":$buffer,
       "Value":$offset, "Value":$length)>,
   ];
@@ -150,14 +150,14 @@ def HAL_VariableOp : HAL_Op<"variable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       "Optional<StringRef>":$initializer, "Optional<Attribute>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
       "mlir::FuncOp":$initializer, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
@@ -289,7 +289,7 @@ def HAL_CheckSuccessOp : HAL_Op<"check_success"> {
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
+    OpBuilder<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
     [{
       build(
         $_builder, $_state, status,
@@ -326,9 +326,9 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "int32_t":$elementType)>,
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "Value":$elementType)>,
   ];
 
@@ -362,9 +362,9 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "int32_t":$elementType, "ValueRange":$indices)>,
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "Value":$elementType, "ValueRange":$indices)>,
   ];
 
@@ -401,9 +401,9 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "int32_t":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
-    OpBuilderDAG<(ins "Value":$allocator, "ValueRange":$shape,
+    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
       "Value":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
   ];
 
@@ -437,7 +437,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator,
+    OpBuilder<(ins "Value":$allocator,
       "IREE::HAL::MemoryTypeBitfield":$memoryTypes,
       "IREE::HAL::BufferUsageBitfield":$bufferUsage, "Value":$allocationSize)>,
   ];
@@ -471,7 +471,7 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator,
+    OpBuilder<(ins "Value":$allocator,
       "IREE::HAL::MemoryTypeBitfield":$memoryTypes,
       "IREE::HAL::BufferUsageBitfield":$bufferUsage, "ElementsAttr":$value)>,
   ];
@@ -510,7 +510,7 @@ def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator,
+    OpBuilder<(ins "Value":$allocator,
       "IREE::HAL::MemoryTypeBitfield":$memoryTypes,
       "IREE::HAL::BufferUsageBitfield":$bufferUsage, "Value":$source,
       "Value":$offset, "Value":$length)>,
@@ -540,7 +540,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$buffer)>,
+    OpBuilder<(ins "Value":$buffer)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -700,7 +700,7 @@ def HAL_BufferViewConstOp : HAL_PureOp<"buffer_view.const", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$allocator,
+    OpBuilder<(ins "Value":$allocator,
       "IREE::HAL::MemoryTypeBitfield":$memoryTypes,
       "IREE::HAL::BufferUsageBitfield":$bufferUsage, "ElementsAttr":$value)>,
   ];
@@ -735,9 +735,9 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$buffer, "int32_t":$elementType,
+    OpBuilder<(ins "Value":$buffer, "int32_t":$elementType,
                   "ValueRange":$shape)>,
-    OpBuilderDAG<(ins "Value":$buffer, "Value":$elementType,
+    OpBuilder<(ins "Value":$buffer, "Value":$elementType,
                   "ValueRange":$shape)>,
   ];
 }
@@ -788,7 +788,7 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$bufferView)>,
+    OpBuilder<(ins "Value":$bufferView)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -813,7 +813,7 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$bufferView)>,
+    OpBuilder<(ins "Value":$bufferView)>,
   ];
 }
 
@@ -840,7 +840,7 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$bufferView, "ValueRange":$indices)>,
+    OpBuilder<(ins "Value":$bufferView, "ValueRange":$indices)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -873,7 +873,7 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$bufferView, "ValueRange":$indices,
+    OpBuilder<(ins "Value":$bufferView, "ValueRange":$indices,
       "ValueRange":$lengths)>,
   ];
 
@@ -991,7 +991,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$device,
+    OpBuilder<(ins "Value":$device,
       "IREE::HAL::CommandBufferModeBitfield":$modes,
       "IREE::HAL::CommandCategoryBitfield":$commandCategories)>,
   ];
@@ -1159,9 +1159,9 @@ def HAL_CommandBufferPushDescriptorSetOp :
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+    OpBuilder<(ins "Value":$commandBuffer, "Value":$executableLayout,
       "int64_t":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
-    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+    OpBuilder<(ins "Value":$commandBuffer, "Value":$executableLayout,
       "Value":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
   ];
 
@@ -1192,10 +1192,10 @@ def HAL_CommandBufferBindDescriptorSetOp :
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+    OpBuilder<(ins "Value":$commandBuffer, "Value":$executableLayout,
       "int64_t":$set, "Value":$descriptorSet,
       CArg<"ValueRange", "{}">:$dynamicOffsets)>,
-    OpBuilderDAG<(ins "Value":$commandBuffer, "Value":$executableLayout,
+    OpBuilder<(ins "Value":$commandBuffer, "Value":$executableLayout,
       "Value":$set, "Value":$descriptorSet,
       CArg<"ValueRange", "{}">:$dynamicOffsets)>,
   ];
@@ -1231,7 +1231,7 @@ def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol">
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$commandBuffer,
+    OpBuilder<(ins "Value":$commandBuffer,
       "IREE::HAL::ExecutableEntryPointOp":$entryPoint, "Value":$workgroupX,
       "Value":$workgroupY, "Value":$workgroupZ)>,
   ];
@@ -1349,7 +1349,7 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name,
+    OpBuilder<(ins "StringRef":$name,
       "BufferConstraintsAttr":$bufferConstraints)>,
   ];
 
@@ -1457,7 +1457,7 @@ def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Type":$resultType, "SymbolRefAttr":$constant),
+    OpBuilder<(ins "Type":$resultType, "SymbolRefAttr":$constant),
     [{
       $_state.addTypes({resultType});
       $_state.addAttribute("constant", constant);
@@ -1530,7 +1530,7 @@ def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Type":$resultType, "SymbolRefAttr":$runtimeBuffer,
+    OpBuilder<(ins "Type":$resultType, "SymbolRefAttr":$runtimeBuffer,
       "ByteRangeAttr":$runtimeRange),
     [{
       $_state.addTypes({resultType});
@@ -1567,7 +1567,7 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$device, "Value":$setLayout,
+    OpBuilder<(ins "Value":$device, "Value":$setLayout,
       "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
   ];
 }
@@ -1663,7 +1663,7 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$device),
+    OpBuilder<(ins "Value":$device),
     [{
       $_state.addOperands({device});
       $_state.addTypes({AllocatorType::get($_builder.getContext())});
@@ -1742,7 +1742,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "TypeRange":$resultTypes, "Value":$device,
+    OpBuilder<(ins "TypeRange":$resultTypes, "Value":$device,
       "ArrayRef<Attribute>":$conditions,
       "ArrayRef<SmallVector<Value, 4>>":$conditionArgs,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
@@ -1764,7 +1764,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 
   let builders = [
-    OpBuilderDAG<(ins),
+    OpBuilder<(ins),
     [{
       build($_builder, $_state, llvm::None);
     }]>,
@@ -1851,7 +1851,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name)>,
+    OpBuilder<(ins "StringRef":$name)>,
   ];
 
   let extraClassDeclaration = [{
@@ -1902,13 +1902,13 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
 
   let builders = [
-    OpBuilderDAG<
+    OpBuilder<
       (ins "::llvm::StringRef":$sym_name, "::llvm::APInt":$ordinal,
         "::llvm::StringRef":$interface,"::mlir::Type":$signature,
         "::mlir::ArrayAttr":$workgroup_size),
        [{build($_builder, $_state, sym_name, ordinal, interface, signature,
             workgroup_size, 0);}]>,
-    OpBuilderDAG<
+    OpBuilder<
       (ins "::mlir::StringAttr":$sym_name, "::mlir::IntegerAttr":$ordinal,
         "::mlir::FlatSymbolRefAttr":$interface, "::mlir::TypeAttr":$signature,
         "::mlir::ArrayAttr":$workgroup_size),
@@ -1956,7 +1956,7 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name, "StringRef":$targetBackendFilter)>,
+    OpBuilder<(ins "StringRef":$name, "StringRef":$targetBackendFilter)>,
   ];
 
   let extraClassDeclaration = [{
@@ -2004,8 +2004,8 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name, "uint32_t":$format, "std::vector<uint8_t>":$data)>,
-    OpBuilderDAG<(ins "StringRef":$name, "uint32_t":$format, "DenseIntElementsAttr":$data)>,
+    OpBuilder<(ins "StringRef":$name, "uint32_t":$format, "std::vector<uint8_t>":$data)>,
+    OpBuilder<(ins "StringRef":$name, "uint32_t":$format, "DenseIntElementsAttr":$data)>,
   ];
 
   let extraClassDeclaration = [{
@@ -2086,7 +2086,7 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$device, "StringRef":$executable),
+    OpBuilder<(ins "Value":$device, "StringRef":$executable),
     [{
       $_state.addOperands({device});
       $_state.addAttribute("executable", $_builder.getSymbolRefAttr(executable));
@@ -2137,7 +2137,7 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "StringRef":$name,
+    OpBuilder<(ins "StringRef":$name,
       CArg<"IntegerAttr", "{}">:$pushConstants)>,
   ];
 

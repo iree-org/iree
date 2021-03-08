@@ -79,7 +79,7 @@ iree_cc_library(
     MLIRSPIRV
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
-    MLIRTargetLLVMIR
+    MLIRTargetLLVMIRExport
     MLIRTransformUtils
     MLIRVector
     MLIRVectorToLLVM

@@ -317,7 +317,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
-      MLIRTargetLLVMIR
+      MLIRTargetLLVMIRExport
       MLIRTranslation
       iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode
@@ -364,7 +364,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRParser
       MLIRPass
       MLIRSupport
-      MLIRTargetLLVMIR
+      MLIRTargetLLVMIRExport
       absl::flags
       absl::span
       absl::strings

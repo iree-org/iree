@@ -326,9 +326,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
 //   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP]]]
 //       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0V]])
 
 // -----
@@ -365,9 +364,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
 //   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP1]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP1]]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0V]] : memref<3x4xi32, #[[MAP0]]>)
@@ -410,10 +408,9 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @legacy_io::@ret1[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0] [12] [1]
 //   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
 //   CHECK-DAG:   %[[RET1V:.+]] = subview %[[RET1]][0, 0] [3, 4] [1, 1]
-//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0V]] [#[[MAP1]]]
+//       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP1]]]
 //   CHECK-DAG:   linalg.copy(%[[RESHAPE]], %[[RET1V]])
 //   CHECK-DAG:   linalg.generic
 //  CHECK-SAME:     ins(%[[RET1V]] : memref<3x4xi32, #[[MAP0]]>)
@@ -455,13 +452,12 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0, 0] [3, 4] [1, 1]
-//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0] [12] [1]
 //       CHECK:   %[[ALLOC:.+]] = alloc() : memref<3x4xi32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0V]] : memref<3x4xi32, #[[MAP0]]>)
 //  CHECK-SAME:     outs(%[[ALLOC]] : memref<3x4xi32>)
 //       CHECK:   %[[RESULT:.+]] = linalg.reshape %[[ALLOC]] [#[[MAP1]]]
-//       CHECK:   linalg.copy(%[[RESULT]], %[[RET0V]])
+//       CHECK:   linalg.copy(%[[RESULT]], %[[RET0]])
 
 // -----
 
