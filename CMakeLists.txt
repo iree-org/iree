@@ -384,6 +384,7 @@ add_subdirectory(build_tools/third_party/half EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/pffft EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/wasm-micro-runtime EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
