@@ -83,9 +83,15 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (!options.usingLinalgOnTensors) {
+  if (options.usingLinalgOnTensors) {
+    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
+    // them concrete now since we know the target and settings now.
+    pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
+  } else {
     pm.addPass(createSplitDispatchFunctionPass());
+    pm.addPass(createTileAndDistributeAmongWorkgroupsPass(options));
   }
+
   pm.addPass(createLinalgTileAndFusePass(options));
   if (options.vectorizeMemref) {
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(
@@ -166,10 +172,6 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (options.usingLinalgOnTensors) {
-    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
-    // them concrete now since we know the target and settings now.
-    pm.addPass(createConcretizeTileAmongWorkgroupsPass());
-
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
            Type elementType, ArrayRef<Value> dynamicSizes) {

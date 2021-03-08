@@ -373,10 +373,10 @@ static LogicalResult getMaliSpecificConfig(ConvOpTy op,
                      .template cast<TypeAttr>()
                      .getValue()
                      .template cast<ShapedType>();
-    LLVM_DEBUG(llvm::dbgs() << "input types: " << inputType << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "output types: " << outputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "conv input types: " << inputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "conv output types: " << outputType << "\n");
   } else {
-    inputType = op.getInput(0).getType().template cast<ShapedType>();
+    inputType = op.getInputs().front().getType().template cast<ShapedType>();
     outputType = op.getOutputBufferTypes()[0].template cast<ShapedType>();
   }
 
@@ -477,8 +477,29 @@ GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNDHWCFilterDHWCFOp)
 static LogicalResult getMaliSpecificConfig(
     linalg::DepthwiseConvInputNHWCFilterHWCOp op, TileSizesListType &tileSizes,
     LaunchConfigInfo &config) {
-  auto inputType = op.getInput(0).getType().cast<MemRefType>();
-  auto outputType = op.getOutputBufferTypes()[0].cast<MemRefType>();
+  ShapedType inputType, outputType;
+
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto outputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_output_types")) {
+    auto inputTypeAttr =
+        op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types");
+    inputType = inputTypeAttr.getValue()[0]
+                    .template cast<TypeAttr>()
+                    .getValue()
+                    .template cast<ShapedType>();
+    outputType = outputTypeAttr.getValue()[0]
+                     .template cast<TypeAttr>()
+                     .getValue()
+                     .template cast<ShapedType>();
+    LLVM_DEBUG(llvm::dbgs() << "dwconv input types: " << inputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "dwconv output types: " << outputType << "\n");
+  } else {
+    inputType = op.getInput(0).getType().cast<ShapedType>();
+    outputType = op.getOutputBufferTypes()[0].cast<ShapedType>();
+  }
+
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 

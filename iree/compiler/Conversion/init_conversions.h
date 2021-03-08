@@ -61,6 +61,7 @@ inline void registerLinalgToSPIRVPasses() {
     // LinalgToSPIRV
     createConvertToGPUPass(SPIRVCodegenOptions());
     createFoldProcessorIDUsesPass();
+    createTileAndDistributeAmongWorkgroupsPass(SPIRVCodegenOptions());
     createLinalgTileAndFusePass(SPIRVCodegenOptions());
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();

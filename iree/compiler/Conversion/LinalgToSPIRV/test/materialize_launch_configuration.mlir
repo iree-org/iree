@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse))" -iree-codegen-spirv-experimental-linalg-on-tensors -cse -canonicalize -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -iree-codegen-spirv-experimental-linalg-on-tensors -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
 hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {

@@ -204,3 +204,16 @@ func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>) -
 // CHECK: scf.for
 // CHECK: scf.for
 // CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+
+func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96xf32>) -> tensor<1x56x56x96xf32> {
+  %cst = constant 0.000000e+00 : f32
+  %1 = linalg.init_tensor [1, 56, 56, 96] : tensor<1x56x56x96xf32>
+  %2 = linalg.fill(%1, %cst) : tensor<1x56x56x96xf32>, f32 -> tensor<1x56x56x96xf32>
+  %4 = linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
+  return %4 : tensor<1x56x56x96xf32>
+}
+
+// CHECK-LABEL: func @depthwise_conv2d
+// CHECK: scf.for
+// CHECK: scf.for
+// CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc

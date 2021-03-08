@@ -14,7 +14,8 @@
 
 //===- LinalgTileAndFusePass.cpp - Tile and fuse Linalg on Buffers --------===//
 //
-// Implements a pass to tile and fuse linalg operations on buffers.
+// This pass tiles and vectorizes Linalg ops on buffers within in a single
+// workgroup.
 //
 //===----------------------------------------------------------------------===//
 
@@ -72,33 +73,6 @@ static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
   }
   return linalg::LinalgTransformationFilter(
       markers, Identifier::get(replaceMarker, context));
-}
-
-/// Returns the distribution options for operations when targeting workgroups.
-static linalg::LinalgLoopDistributionOptions getWorkgroupDistributionOptions() {
-  linalg::LinalgLoopDistributionOptions options;
-
-  options.procInfo = [](OpBuilder &builder, Location loc,
-                        ArrayRef<Range> parallelLoopRanges) {
-    return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
-        builder, loc, parallelLoopRanges.size());
-  };
-  options.distributionMethod.assign(
-      3, linalg::DistributionMethod::CyclicNumProcsEqNumIters);
-
-  return options;
-}
-
-/// Applies canonicalization over index calculation inside the given `funcOp`.
-static void applyIndexCalculationCanonicalization(FuncOp funcOp) {
-  MLIRContext *context = funcOp.getContext();
-  OwningRewritePatternList canonicalizationPatterns;
-  DimOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  AddIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  SubIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  SignedDivIOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  (void)applyPatternsAndFoldGreedily(funcOp,
-                                     std::move(canonicalizationPatterns));
 }
 
 //===----------------------------------------------------------------------===//
@@ -431,8 +405,6 @@ void LinalgTileAndFusePass::runOnOperation() {
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
 
-  LLVM_DEBUG(
-      llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";);
   for (FuncOp funcOp : module.getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
 
@@ -454,6 +426,7 @@ void LinalgTileAndFusePass::runOnOperation() {
     LaunchConfig &launchConfig = *launchConfigOpt;
 
     LLVM_DEBUG({
+      llvm::dbgs() << "\n--- IREE Linalg tile and fuse configuration ---\n";
       llvm::dbgs() << "@func " << funcOp.getName() << ": # workgroup sizes: [";
       interleaveComma(launchConfig.getWorkgroupSize(), llvm::dbgs());
       llvm::dbgs() << "]\n";
@@ -470,74 +443,6 @@ void LinalgTileAndFusePass::runOnOperation() {
         }
         llvm::dbgs() << "}\n";
       }
-    });
-
-    if (!options.usingLinalgOnTensors) {
-      TileAndFuseOptions tileAndFuseOptions = {
-          getWorkgroupDistributionOptions(), allocateWorkgroupMemory};
-      if (failed(tileAndFuseLinalgBufferOps(funcOp, linalgOps, dependenceGraph,
-                                            launchConfig,
-                                            tileAndFuseOptions)) ||
-          failed(
-              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
-        return signalPassFailure();
-      }
-    } else {
-      // Find the root operation for the dispatch region and get the tile sizes.
-      Operation *rootOperation =
-          launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
-              linalgOps,
-              [](linalg::LinalgOp op) { return op.getOperation(); })));
-      if (!rootOperation) {
-        launchConfig.finalize(funcOp);
-        return;
-      }
-
-      ArrayRef<int64_t> rootOperationTileSizes =
-          launchConfig.getTileSizes(rootOperation, 0);
-      if (rootOperationTileSizes.empty()) {
-        launchConfig.finalize(funcOp);
-        return;
-      }
-
-      LLVM_DEBUG(llvm::dbgs() << "root operation: " << *rootOperation << "\n");
-
-      // Only use the tile sizes for parallel loops of the root operation.
-      rootOperationTileSizes = rootOperationTileSizes.take_front(
-          getNumOuterParallelLoops(rootOperation));
-
-      // NOTE: Special treatment for convolution, which have more than 3
-      // parallel dimensions. We want to ignore the batch dimension and tile
-      // along the next three.
-      if (rootOperationTileSizes.size() > 3) {
-        // Ignore zeros, which means no tiling on the corresponding dimension.
-        rootOperationTileSizes = rootOperationTileSizes.drop_while(
-            [](int64_t dim) { return dim == 0; });
-      }
-
-      SmallVector<int64_t, 4> workloadPerWorkgroup =
-          llvm::to_vector<4>(llvm::reverse(rootOperationTileSizes));
-      LLVM_DEBUG({
-        llvm::dbgs() << "workload per workgroup: [";
-        llvm::interleaveComma(workloadPerWorkgroup, llvm::dbgs());
-        llvm::dbgs() << "]\n";
-      });
-
-      // If we have all static workload size, a previous pass will materialize
-      // the number of workgroups with constant values.
-      (void)materializeStaticLaunchInformation(funcOp, workloadPerWorkgroup);
-
-      if (failed(
-              updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize()))) {
-        funcOp.emitOpError("failed to materialize static launch information");
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After first level of tiling and distribution ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
     });
 
     if (options.useWorkgroupMemory) {

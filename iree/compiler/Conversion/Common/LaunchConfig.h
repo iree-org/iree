@@ -127,10 +127,6 @@ class LaunchConfig {
   /// these attributes.
   llvm::StringMap<TileSizesListType> tileSizes;
 
-  /// Key used for tagging the root operation. The launch config does not track
-  /// the root operation itself, but rather the key used for the root operation.
-  StringRef rootOperationKey = "";
-
   /// Workgroup size to use.
   std::array<int64_t, 3> workgroupSize = {1, 1, 1};
 

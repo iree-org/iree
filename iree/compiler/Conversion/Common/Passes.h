@@ -58,10 +58,5 @@ std::unique_ptr<OperationPass<>> createRemoveDeadMemAllocsPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 
-/// Creates a pass to concretize hal.interface.workgroup.* ops with concrete
-/// tiling and distribution scheme.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConcretizeTileAmongWorkgroupsPass();
-
 }  // namespace iree_compiler
 }  // namespace mlir

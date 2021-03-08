@@ -14,8 +14,8 @@
 
 //===- ConcretizeTileAmongWorkgroupsPass.cpp ------------------------------===//
 //
-// This pass concretizes hal.interface.workgroup.* ops by replacing them with
-// chosen constant values.
+// This pass concretizes hal.interface.workgroup ops by replacing them with
+// constant values from the chosen tiling and distribution scheme.
 //
 // During dispatch region formation in IREE Flow transformations, ops are tiled
 // and distributed in an abstract way by using symbolic hal.interface.workgroup
@@ -26,12 +26,26 @@
 // concretize the tiling and distribution in order to inject static information
 // for further compilation.
 //
+// This pass performs the conretization in two modes:
+//
+// 1) Partically static: where have a concrete tiling and distirbution sheme
+//    *but not* a full static original problem size (e.g., due to dynamic
+//    shapes). Under such circumstances,  we can only replace ops like
+//    hal.interface.workgroup.size ops and still need to compute the number
+//    of workgroups using symbolic values.
+// 2) Fully static: where we have a concrete tiling and distribution scheme
+//    *and* the full static original problem size. Under such circumstances,
+//    we can fully deduce the number of workgroups to dispatch and replace
+//    hal.interface.workgroup.count ops with constant values too.
+//
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/Common/LaunchConfig.h"
 #include "iree/compiler/Conversion/Common/Transforms.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/CodeGenOptionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -39,6 +53,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -71,23 +86,30 @@ static size_t getNumOuterParallelDims(linalg::LinalgOp op) {
   return parallels.size();
 }
 
-/// Returns the op that can dictate tiling and distribution configuration.
-static bool isRootOp(Operation *op) {
-  return isa<linalg::ConvInputNHWCFilterHWCFOp, linalg::MatmulOp,
-             linalg::BatchMatmulOp>(op);
-}
-
-/// Returns the root Linalg op that is used as the anchor for dispatch region
-/// formation.
+/// Returns the root Linalg op that dictates tiling and distribution policy.
 linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
-  linalg::LinalgOp rootOp;
-  funcOp.walk([&rootOp](linalg::LinalgOp op) {
-    if (isRootOp(op)) {
-      rootOp = op;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
+  SmallVector<linalg::LinalgOp, 4> linalgOps;
+  SmallVector<Operation *, 4> tiledLoops;
+  if (failed(getLinalgOps(funcOp, linalgOps, tiledLoops))) return {};
+
+  SPIRVCodegenOptions options;
+  options.enableVectorization = true;
+  options.usingLinalgOnTensors = true;
+  linalg::Aliases aliases;
+  linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
+  Optional<LaunchConfig> launchConfigOpt = initGPULaunchConfig(
+      funcOp.getContext(), dependenceGraph, options, linalgOps);
+  if (!launchConfigOpt) return {};
+
+  LaunchConfig &launchConfig = *launchConfigOpt;
+  Operation *rootOp =
+      launchConfig.getRootOperation(llvm::to_vector<4>(llvm::map_range(
+          linalgOps, [](linalg::LinalgOp op) { return op.getOperation(); })));
+
+  // Clean up internal markers that are set during launch configuration
+  // preparation.
+  launchConfig.finalize(funcOp);
+
   return rootOp;
 }
 
@@ -103,52 +125,32 @@ linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
 // information down from the upper layer, which readily has it. Probably via
 // linalg.tile op.
 LogicalResult getInputOutputTypesForAllTiles(
-    Operation *rootOp, SmallVectorImpl<Type> &inputTypes,
+    linalg::LinalgOp rootOp, SmallVectorImpl<Type> &inputTypes,
     SmallVectorImpl<Type> &outputTypes) {
-  // There are operands providing shape for the results. Ignore them.
-  for (auto operand :
-       rootOp->getOperands().drop_back(rootOp->getNumResults())) {
-    Operation *op = operand.getDefiningOp();
-    if (auto subtensor = dyn_cast<SubTensorOp>(op)) {
-      op = subtensor.source().getDefiningOp();
-    }
-    if (auto loadOp = dyn_cast<IREE::Flow::DispatchInputLoadOp>(op)) {
-      auto type =
-          loadOp.source().getType().cast<IREE::Flow::DispatchInputType>();
-      inputTypes.push_back(
-          RankedTensorType::get(type.getShape(), type.getElementType()));
-    } else if (auto reshapeOp = dyn_cast<linalg::TensorReshapeOp>(op)) {
-      inputTypes.push_back(reshapeOp.getResultType());
-    } else {
-      return failure();
-    }
+  for (Value inputBuffer : rootOp.getInputBuffers()) {
+    auto subviewOp = inputBuffer.getDefiningOp<SubViewOp>();
+    if (!subviewOp) return failure();
+    inputTypes.push_back(subviewOp.getViewSource().getType());
   }
 
-  for (auto result : rootOp->getResults()) {
-    auto uses = result.getUses();
-    if (++uses.begin() != uses.end()) return failure();
-    auto storeOp =
-        dyn_cast<IREE::Flow::DispatchOutputStoreOp>(uses.begin()->getOwner());
-    if (!storeOp) return failure();
-
-    auto type =
-        storeOp.target().getType().dyn_cast<IREE::Flow::DispatchOutputType>();
-    if (!type) return failure();
-    outputTypes.push_back(
-        RankedTensorType::get(type.getShape(), type.getElementType()));
+  for (Value outputBuffer : rootOp.getOutputBuffers()) {
+    auto subviewOp = outputBuffer.getDefiningOp<SubViewOp>();
+    if (!subviewOp) return failure();
+    outputTypes.push_back(subviewOp.getViewSource().getType());
   }
 
   return success();
 }
 
 /// Assuming the given `rootOp` is the tiled root Linalg op, returns the
-/// tile sizes for distributing to workgroups.
+/// tile sizes for distributing to workgroups and the workgroups size for the
+/// generated kernel.
 ///
 /// TODO(antiagainst): This pass can be shared between CPU and GPU. But the
 /// following query scopes it to GPU for now.
-llvm::Optional<ArrayRef<int64_t>> getTileSize(Operation *rootOp,
-                                              ArrayRef<Type> inputTypes,
-                                              ArrayRef<Type> outputTypes) {
+llvm::Optional<std::pair<ArrayRef<int64_t>, ArrayRef<int64_t>>>
+getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
+                            ArrayRef<Type> outputTypes) {
   // Build necesary structures to query the tile sizes for distributing to
   // workgroups.
   linalg::Aliases aliases;
@@ -176,12 +178,13 @@ llvm::Optional<ArrayRef<int64_t>> getTileSize(Operation *rootOp,
   }
 
   ArrayRef<int64_t> tileSize = launchConfig->getTileSizes(rootOp, 0);
+  ArrayRef<int64_t> workgroupSize = launchConfig->getWorkgroupSize();
 
   // Clean up internal markers that are set during launch configuration
   // preparation.
   launchConfig->finalize(rootOp->getParentOfType<FuncOp>());
 
-  return tileSize;
+  return std::make_pair(tileSize, workgroupSize);
 }
 
 /// Replaces hal.interface.workgroup.size op with the constant value chosen
@@ -347,12 +350,11 @@ class ConcretizeTileAmongWorkgroupsPass
     : public PassWrapper<ConcretizeTileAmongWorkgroupsPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
-  ConcretizeTileAmongWorkgroupsPass() {}
-
+  ConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options)
+      : options(options) {}
   ConcretizeTileAmongWorkgroupsPass(
-      const ConcretizeTileAmongWorkgroupsPass &that) {
-    clTileSizes = that.clTileSizes;
-  }
+      const ConcretizeTileAmongWorkgroupsPass &that)
+      : options(that.options) {}
 
   void runOnOperation() override {
     IREE::HAL::ExecutableTargetOp targetOp = getOperation();
@@ -368,6 +370,9 @@ class ConcretizeTileAmongWorkgroupsPass
   LogicalResult runOnFunction(FuncOp funcOp) {
     MLIRContext &context = getContext();
 
+    // 1. Get the root op first. We need it to figure out the original problem
+    // size, which then affects the tiling and distribution policy.
+
     linalg::LinalgOp rootOp = getRootLinalgOp(funcOp);
     if (!rootOp) {
       LLVM_DEBUG(llvm::dbgs() << "unable to find root Linalg op\n");
@@ -375,10 +380,11 @@ class ConcretizeTileAmongWorkgroupsPass
       // region formation. So don't trigger pass failure.
       return success();
     }
-
     LLVM_DEBUG(llvm::dbgs() << "Root op: " << rootOp << "\n");
 
     size_t numTilableDims = getNumOuterParallelDims(rootOp);
+
+    // 2. Figure out the original problem size.
 
     SmallVector<Type, 4> inputTypes, outputTypes;
     if (failed(
@@ -402,18 +408,26 @@ class ConcretizeTileAmongWorkgroupsPass
       llvm::dbgs() << "\n";
     });
 
+    // 3. Query the scheme for tiling among workgroups.
+
     SmallVector<int64_t, 4> tileSize;
-    if (!clTileSizes.empty()) {
-      // Using tile sizes from the command-line for testing.
-      tileSize.assign(clTileSizes.begin(), clTileSizes.end());
-    } else if (auto sizes = getTileSize(rootOp, inputTypes, outputTypes)) {
-      // The tile sizes are specified against the original dimension order of
-      // the workload shape. But Flow/HAL processor id/size/count ops' are
-      // created using the reverse order.
-      tileSize =
-          llvm::to_vector<4>(llvm::reverse(sizes->take_front(numTilableDims)));
-    } else {
-      return funcOp.emitError("failed to query tile size");
+    SmallVector<int64_t, 4> workgroupSize;
+
+    tileSize.assign(options.tileSizes.begin(), options.tileSizes.end());
+    workgroupSize.assign(options.workgroupSize.begin(),
+                         options.workgroupSize.end());
+    if (tileSize.empty() || workgroupSize.empty()) {
+      auto sizes = getTileSizeAndWorkgroupSize(rootOp, inputTypes, outputTypes);
+      if (sizes) {
+        // The tile sizes are specified against the original dimension order of
+        // the workload shape. But Flow/HAL processor id/size/count ops' are
+        // created using the reverse order.
+        tileSize = llvm::to_vector<4>(
+            llvm::reverse(sizes->first.take_front(numTilableDims)));
+        workgroupSize = llvm::to_vector<4>(sizes->second);
+      } else {
+        return funcOp.emitError("failed to query tile size and workgroup size");
+      }
     }
 
     LLVM_DEBUG({
@@ -421,6 +435,8 @@ class ConcretizeTileAmongWorkgroupsPass
       llvm::interleaveComma(tileSize, llvm::dbgs());
       llvm::dbgs() << "\n";
     });
+
+    // 4. Replace hal.interface.workgroup symbolic ops with constant values.
 
     {
       OwningRewritePatternList patterns;
@@ -432,10 +448,14 @@ class ConcretizeTileAmongWorkgroupsPass
 
     LLVM_DEBUG({
       llvm::dbgs()
-          << "--- After concretizing hal.interface.workgroup.* ops ---\n";
+          << "--- After concretizing hal.interface.workgroup ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    // 5. Set the entry point region for computing the number of workgroups
+    // to dispatch. The region has symbolic arguments representing the workload.
+    // So two modes here (see comments at the begining of this file).
 
     {
       SmallVector<int64_t, 3> numWorkgroups;
@@ -452,7 +472,8 @@ class ConcretizeTileAmongWorkgroupsPass
       numWorkgroups.resize(kWorkgroupDimCount, 1);
 
       // If all dimensions are known constant, then we can set the number of
-      // workgroups directly.
+      // workgroups directly. Otherwise, we need to generate the IR for
+      // computing it using symbolic values.
       if (llvm::none_of(numWorkgroups, [](int64_t dim) {
             return dim == ShapedType::kDynamicSize;
           })) {
@@ -471,8 +492,19 @@ class ConcretizeTileAmongWorkgroupsPass
           return funcOp.emitError(
               "failed to set entry point region for number of workgroups");
         }
+      } else {
+        if (failed(materializeStaticLaunchInformation(funcOp, tileSize))) {
+          return funcOp.emitOpError(
+              "failed to materialize static launch information");
+        }
       }
     }
+
+    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) {
+      return funcOp.emitOpError("failed to set workgroup size on function");
+    }
+
+    // 6. Canonicalization and clean up.
 
     {
       OwningRewritePatternList patterns;
@@ -485,23 +517,24 @@ class ConcretizeTileAmongWorkgroupsPass
   }
 
  private:
-  ListOption<int64_t> clTileSizes{
-      *this, "tile-sizes", llvm::cl::desc("Tile sizes for testing the pass"),
-      llvm::cl::CommaSeparated};
+  SPIRVCodegenOptions options;
 };
 
 }  // namespace
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createConcretizeTileAmongWorkgroupsPass() {
-  return std::make_unique<ConcretizeTileAmongWorkgroupsPass>();
+createConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options) {
+  return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(options);
 }
 
 static PassRegistration<ConcretizeTileAmongWorkgroupsPass> pass(
     "iree-spirv-concretize-tile-among-workgroups",
     "Replace hal.interface.workgroup.* ops with constant values from chosen "
     "tiling and distribution scheme",
-    [] { return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(); });
+    [] {
+      SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
+      return std::make_unique<ConcretizeTileAmongWorkgroupsPass>(options);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir

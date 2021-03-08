@@ -40,6 +40,7 @@ cc_library(
         "CooperativeMatrixAnalysis.cpp",
         "FoldGPUProcessorIDUses.cpp",
         "KernelDispatchUtils.cpp",
+        "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndFusePass.cpp",
         "MatMulVectorizationTest.cpp",
         "Passes.cpp",

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups{tile-sizes=16,4,4,0}))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups))" -iree-spirv-tile-size=16,4,4 -iree-spirv-workgroup-size=4,4,1 %s | IreeFileCheck %s
 
 
 hal.executable @conv2d attributes {sym_visibility = "private"} {
@@ -16,13 +16,10 @@ hal.executable @conv2d attributes {sym_visibility = "private"} {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
         %c112 = constant 112 : index
-        %c3 = constant 3 : index
-        %c16 = constant 16 : index
         %c0 = constant 0 : index
-        %c1 = constant 1 : index
-        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<1x225x225x16xf32>
-        %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.input<3x3x16x32xf32>
-        %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<1x112x112x32xf32>
+        %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<1x225x225x16xf32>
+        %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<3x3x16x32xf32>
+        %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<1x112x112x32xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -45,15 +42,14 @@ hal.executable @conv2d attributes {sym_visibility = "private"} {
               %10 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 225)>(%arg0)[%workgroup_size_z]
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
               %12 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 225)>(%arg1)[%workgroup_size_y]
-              %13 = flow.dispatch.input.load %0, offsets = [%c0, %9, %11, %c0], sizes = [%c1, %10, %12, %c16], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<1x225x225x16xf32> -> tensor<1x?x?x16xf32>
+              %13 = subview %0[0, %9, %11, 0] [1, %10, %12, 16] [1, 1, 1, 1] : memref<1x225x225x16xf32> to memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>
               %14 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 32)>(%arg2)[%workgroup_size_x]
-              %15 = flow.dispatch.input.load %1, offsets = [%c0, %c0, %c0, %arg2], sizes = [%c3, %c3, %c16, %14], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<3x3x16x32xf32> -> tensor<3x3x16x?xf32>
+              %15 = subview %1[0, 0, 0, %arg2] [3, 3, 16, %14] [1, 1, 1, 1] : memref<3x3x16x32xf32> to memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>
               %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg0)[%workgroup_size_z]
               %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg1)[%workgroup_size_y]
-              %18 = linalg.init_tensor [1, %16, %17, %14] : tensor<1x?x?x?xf32>
-              %19 = linalg.fill(%18, %cst) : tensor<1x?x?x?xf32>, f32 -> tensor<1x?x?x?xf32>
-              %20 = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fusion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%19 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
-              flow.dispatch.output.store %20, %2, offsets = [%c0, %arg0, %arg1, %arg2], sizes = [%c1, %16, %17, %14], strides = [%c1, %c1, %c1, %c1] : tensor<1x?x?x?xf32> -> !flow.dispatch.output<1x112x112x32xf32>
+              %18 = subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
+              linalg.fill(%18, %cst) : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>, f32
+              linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }
           }
         }
@@ -85,15 +81,26 @@ hal.executable @conv2d attributes {sym_visibility = "private"} {
 // CHECK: %[[ID_X:.+]] = hal.interface.workgroup.id[0] : index
 // CHECK: %[[ID_Y:.+]] = hal.interface.workgroup.id[1] : index
 // CHECK: %[[ID_Z:.+]] = hal.interface.workgroup.id[2] : index
+
 // CHECK: %[[Z_MUL_4:.+]] = affine.apply #[[MULMAP]]()[%[[ID_Z]], %c4]
 // CHECK: %[[Y_MUL_4:.+]] = affine.apply #[[MULMAP]]()[%[[ID_Y]], %c4]
 // CHECK: %[[X_MUL_16:.+]] = affine.apply #[[MULMAP]]()[%[[ID_X]], %c16]
+
 // CHECK: %[[Z_OFFSET:.+]] = affine.apply #[[MAP0]](%[[Z_MUL_4]])
 // CHECK: %[[Z_SIZE:.+]] = affine.min #[[MAP1]](%[[Z_MUL_4]])[%c4]
 // CHECK: %[[Y_OFFSET:.+]] = affine.apply #[[MAP0]](%[[Y_MUL_4]])
 // CHECK: %[[Y_SIZE:.+]] = affine.min #[[MAP1]](%[[Y_MUL_4]])[%c4]
-// CHECK: %[[INPUT:.+]] = flow.dispatch.input.load %{{.+}}, offsets = [%c0, %[[Z_OFFSET]], %[[Y_OFFSET]], %c0], sizes = [%c1, %[[Z_SIZE]], %[[Y_SIZE]], %c16], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<1x225x225x16xf32> -> tensor<1x?x?x16xf32>
+
+// CHECK: %[[INPUT:.+]] = subview %{{.+}}[0, %[[Z_OFFSET]], %[[Y_OFFSET]], 0] [1, %[[Z_SIZE]], %[[Y_SIZE]], 16] [1, 1, 1, 1] : memref<1x225x225x16xf32> to memref<1x?x?x16xf32, {{.+}}>
+
 // CHECK: %[[X_SIZE:.+]] = affine.min #[[MAP2]](%[[X_MUL_16]])[%c16]
-// CHECK: %[[FILTER:.+]] = flow.dispatch.input.load %{{.+}}, offsets = [%c0, %c0, %c0, %[[X_MUL_16]]], sizes = [%c3, %c3, %c16, %[[X_SIZE]]], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.input<3x3x16x32xf32> -> tensor<3x3x16x?xf32>
-// CHECK: %[[CONV:.+]] = linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, iree.codegen.fusion.root_op = 0 : i64, strides = dense<2> : tensor<2xi64>} ins(%[[INPUT]], %[[FILTER]] : tensor<1x?x?x16xf32>, tensor<3x3x16x?xf32>) outs(%16 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
-// CHECK: flow.dispatch.output.store %[[CONV]], %{{.+}}, offsets = [%c0, %[[Z_MUL_4]], %[[Y_MUL_4]], %[[X_MUL_16]]], sizes = [%c1, %13, %14, %[[X_SIZE]]], strides = [%c1, %c1, %c1, %c1] : tensor<1x?x?x?xf32> -> !flow.dispatch.output<1x112x112x32xf32>
+
+// CHECK: %[[FILTER:.+]] = subview %{{.+}}[0, 0, 0, %[[X_MUL_16]]] [3, 3, 16, %[[X_SIZE]]] [1, 1, 1, 1] : memref<3x3x16x32xf32> to memref<3x3x16x?xf32, {{.+}}>
+
+// CHECK: %[[Z_SIZE:.+]] = affine.min #[[MAP3]](%[[Z_MUL_4]])[%c4]
+// CHECK: %[[Y_SIZE:.+]] = affine.min #[[MAP3]](%[[Y_MUL_4]])[%c4]
+// CHECK: %[[OUTPUT:.+]] = subview %{{.+}}[0, %[[Z_MUL_4]], %[[Y_MUL_4]], %[[X_MUL_16]]] [1, %[[Z_SIZE]], %[[Y_SIZE]], %[[X_SIZE]]] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, {{.+}}>
+
+// CHECK: linalg.fill(%[[OUTPUT]], %{{.+}})
+// CHECK: linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : tensor<2xi64>, is_root_op, strides = dense<2> : tensor<2xi64>} ins(%[[INPUT]], %[[FILTER]] : memref<1x?x?x16xf32, {{.+}}>, memref<3x3x16x?xf32, {{.+}}>) outs(%[[OUTPUT]] : memref<1x?x?x?xf32, {{.+}}>)
+

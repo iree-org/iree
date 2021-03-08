@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/Block.h"
@@ -175,7 +176,8 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
 ///   linalg.init_tensor operations.
 
 static bool isRootOp(Operation *op) {
-  return isa<linalg::ConvInputNHWCFilterHWCFOp, linalg::MatmulOp,
+  return isa<linalg::ConvInputNHWCFilterHWCFOp,
+             linalg::DepthwiseConvInputNHWCFilterHWCOp, linalg::MatmulOp,
              linalg::BatchMatmulOp>(op);
 }
 
@@ -507,7 +509,8 @@ struct TileAndDistributeOnTensorsPattern
     // NOTE: Special treatment for convolution, which have more than 3 parallel
     // dimensions. We want to ignore the batch dimension and tile along the
     // next three.
-    if (isa<linalg::ConvInputNHWCFilterHWCFOp>(op)) {
+    if (isa<linalg::ConvInputNHWCFilterHWCFOp,
+            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
       count.erase(count.begin());
     }
     count.resize(getNumTilableLoops(op));
@@ -751,7 +754,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // NOTE: Special treatment for convolution, which have more than 3
     // parallel dimensions. We want to ignore the batch dimension and tile
     // along the next three. That means setting the first position to zero.
-    bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp>(op);
+    bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp,
+                        linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
 
     for (size_t dim = 0; dim < numTiledLoops; ++dim) {
       useTileSizes[(isConvOp ? numParallelDims : numTiledLoops) - dim - 1] =
