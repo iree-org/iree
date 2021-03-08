@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "BenchmarkBatchDispatches.cpp"
     "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
     "IdentifyConstantPools.cpp"
@@ -29,7 +30,6 @@ iree_cc_library(
     "Passes.cpp"
     "PropagateConstantWorkgroupInfo.cpp"
     "PublicAbiGeneration.cpp"
-    "BenchmarkBatchDispatches.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
