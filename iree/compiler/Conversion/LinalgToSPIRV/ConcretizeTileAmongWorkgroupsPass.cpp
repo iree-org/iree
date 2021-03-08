@@ -359,7 +359,7 @@ class ConcretizeTileAmongWorkgroupsPass
     ModuleOp module = targetOp.getInnerModule();
 
     for (FuncOp funcOp : module.getOps<FuncOp>()) {
-      if (!funcOp.isPublic()) return;
+      if (!funcOp.isPublic()) continue;
       if (failed(runOnFunction(funcOp))) return signalPassFailure();
     }
   }
