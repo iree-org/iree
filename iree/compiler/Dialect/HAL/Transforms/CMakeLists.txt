@@ -29,7 +29,7 @@ iree_cc_library(
     "Passes.cpp"
     "PropagateConstantWorkgroupInfo.cpp"
     "PublicAbiGeneration.cpp"
-    "RepeatDispatches.cpp"
+    "BenchmarkBatchDispatches.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"

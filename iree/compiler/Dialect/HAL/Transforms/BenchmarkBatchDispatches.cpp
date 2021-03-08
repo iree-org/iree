@@ -25,48 +25,45 @@ namespace IREE {
 namespace HAL {
 namespace {
 
-static llvm::cl::opt<int> repeatDispatchNum{
-    "iree-hal-repeat-dispatch-num",
-    llvm::cl::desc("The number of times to repeat dispatches."),
-    llvm::cl::init(1),
-};
-
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
-class RepeatDispatchesPass
-    : public PassWrapper<RepeatDispatchesPass, OperationPass<FuncOp>> {
+class BenchmarkBatchDispatchesPass
+    : public PassWrapper<BenchmarkBatchDispatchesPass, OperationPass<FuncOp>> {
  public:
+  explicit BenchmarkBatchDispatchesPass(unsigned repeatCount)
+      : repeatCount_(repeatCount) {}
+
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<HALDialect, StandardOpsDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
-    if (repeatDispatchNum == 1) return;
     FuncOp f = getOperation();
-    f.walk([&](HAL::CommandBufferDispatchOp op) {
+    SmallVector<HAL::CommandBufferDispatchOp> ops;
+    f.walk([&](HAL::CommandBufferDispatchOp op) { ops.push_back(op); });
+
+    for (auto op : ops) {
       OpBuilder builder(op);
-      Location loc = op.getLoc();
-      Value zero = builder.create<ConstantIndexOp>(loc, 0);
-      Value one = builder.create<ConstantIndexOp>(loc, 1);
-      Value ub = builder.create<ConstantIndexOp>(loc, repeatDispatchNum);
-      auto forOp = builder.create<scf::ForOp>(
-          op.getLoc(), zero, ub, one, ValueRange{},
-          [&op](OpBuilder& b, Location l, Value v, ValueRange vr) {
-            b.clone(*(op.getOperation()));
-            b.create<scf::YieldOp>(l, ValueRange{});
-          });
+      for (unsigned i = 0; i < repeatCount_; ++i)
+        builder.clone(*op.getOperation());
       op.erase();
-    });
+    }
   }
+
+ private:
+  unsigned repeatCount_;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass() {
-  return std::make_unique<RepeatDispatchesPass>();  // NOLINT
+std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
+    unsigned repeatCount) {
+  return std::make_unique<BenchmarkBatchDispatchesPass>(repeatCount);
 }
 
-static PassRegistration<RepeatDispatchesPass> pass("iree-hal-repeat-dispatches",
-                                                   "Repeat all the dispatches");
+static PassRegistration<BenchmarkBatchDispatchesPass> pass(
+    "test-iree-hal-benchmark-batch-dispatches-2-times",
+    "Test pass used for benchmarking batch dispatches analysis",
+    [] { return std::make_unique<BenchmarkBatchDispatchesPass>(2); });
 
 }  // namespace HAL
 }  // namespace IREE

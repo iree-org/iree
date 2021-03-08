@@ -132,7 +132,8 @@ std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass();
 
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
-std::unique_ptr<OperationPass<FuncOp>> createRepeatDispatchesPass();
+std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
+    unsigned repeatCount);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -142,7 +143,7 @@ inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   auto executableOptions = getTargetOptionsFromFlags();
   createConvertToHALPass();
-  createRepeatDispatchesPass();
+  createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
   createMaterializeInterfacesPass(executableOptions);

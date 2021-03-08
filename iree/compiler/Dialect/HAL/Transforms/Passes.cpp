@@ -19,7 +19,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -41,6 +40,11 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Whether to link hal.executable ops together."),
       llvm::cl::init(true)};
 };
+
+static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
+    "iree-hal-benchmark-dispatch-repeat-count",
+    llvm::cl::desc("Whether to link hal.executable ops together."),
+    llvm::cl::init(1)};
 
 }  // namespace
 
@@ -111,8 +115,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
-  passManager.addNestedPass<FuncOp>(createRepeatDispatchesPass());
-  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  if (benchmarkDispatchRepeatCount != 1) {
+    passManager.addNestedPass<FuncOp>(
+        createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
+  }
   passManager.addPass(createLowerAffinePass());
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

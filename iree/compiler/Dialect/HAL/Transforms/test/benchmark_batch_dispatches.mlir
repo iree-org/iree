@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-repeat-dispatches -iree-hal-repeat-dispatch-num=32 -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -test-iree-hal-benchmark-batch-dispatches-2-times %s | IreeFileCheck %s
 
 hal.variable @_executable_0 : !hal.executable
 func @multiple_reads_no_writes() {
@@ -19,9 +19,9 @@ func @multiple_reads_no_writes() {
 // CHECK-DAG: %[[C0:.+]] = constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = constant 1 : index
 // CHECK-DAG: %[[C32:.+]] = constant 32 : index
-// CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] {
-// CHECK:       hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-// CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] {
-// CHECK:       hal.command_buffer.dispatch %cmd, %1, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
-// CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] {
-// CHECK:       hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %1, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %1, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK:     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
