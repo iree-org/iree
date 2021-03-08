@@ -28,7 +28,7 @@ steps:
 
   - wait
 
-  - label: "benchmark on snapdragon-855 (adreno-640) (Pixel 4)"
+  - label: "benchmark on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
       - "buildkite-agent artifact download --step build model-artifacts.tgz ./"
       - "tar xzvf model-artifacts.tgz"
@@ -47,7 +47,7 @@ steps:
     artifact_paths: "mako-*.log"
     timeout_in_minutes: "15"
 
-  - label: "benchmark on exynos-990 (S20)"
+  - label: "benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
       - "buildkite-agent artifact download --step build model-artifacts.tgz ./"
       - "tar xzvf model-artifacts.tgz"
@@ -59,7 +59,7 @@ steps:
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=exynos-990"
-      - "android-version=10"
+      - "android-version=11"
       - "queue=benchmark-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
