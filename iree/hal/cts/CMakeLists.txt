@@ -129,8 +129,6 @@ iree_cc_test(
     iree::hal::testing::driver_registry
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "notap"
 )
 
 iree_cc_test(
