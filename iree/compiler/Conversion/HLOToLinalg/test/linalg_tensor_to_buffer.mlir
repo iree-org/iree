@@ -589,3 +589,40 @@ module {
 //       CHECK:   linalg.batch_matmul
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] : memref<2x2x3xf32>, memref<2x3x4xf32>)
 //  CHECK-SAME:    outs(%[[RET]] : memref<2x2x4xf32>)
+
+// -----
+
+module {
+  func @reduce_window_sum_nhwc() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = linalg.init_tensor [3, 3] : tensor<3x3xf32>
+    %3 = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32>
+    %4 = tensor.extract %1[] : tensor<f32>
+    %5 = linalg.fill(%3, %4) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
+    %6 = linalg.pooling_nhwc_sum {
+        dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+      ins(%0, %2 : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+      outs(%5 : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+    hal.interface.store.tensor %6, @legacy_io::@ret0, offset = %c0 : tensor<1x8x8x64xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
+}
+// CHECK-LABEL: func @reduce_window_sum_nhwc
+// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
+// CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
+// CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
+// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
+// CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
+// CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
+// CHECK:         linalg.pooling_nhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
