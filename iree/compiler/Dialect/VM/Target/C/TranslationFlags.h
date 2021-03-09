@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,25 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_
+#define IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_
+
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#include "mlir/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-void registerToCTranslation() {
-  TranslateFromMLIRRegistration toCModule(
-      "iree-vm-ir-to-c-module",
-      [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
-        return translateModuleToC(moduleOp, getCTargetOptionsFromFlags(),
-                                  output);
-      });
-}
+// Returns a CTargetOptions struct initialized with the
+// --iree-vm-c-* flags.
+CTargetOptions getCTargetOptionsFromFlags();
 
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_

@@ -21,8 +21,10 @@ if(${IREE_ENABLE_EMITC})
       C
     HDRS
       "CModuleTarget.h"
+      "TranslationFlags.h"
     SRCS
       "CModuleTarget.cpp"
+      "TranslationFlags.cpp"
       "TranslationRegistration.cpp"
     DEPS
       LLVMSupport
