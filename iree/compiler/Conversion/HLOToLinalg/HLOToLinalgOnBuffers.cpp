@@ -394,33 +394,58 @@ LogicalResult ReduceWindowOpConversion::apply(
     mhlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
+  auto resultType = op.getResult().getType().cast<ShapedType>();
+  if (resultType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected NHWC pooling-based op");
+  }
 
   // Create a fake window dimension.
   SmallVector<int64_t, 4> shapes;
-  for (auto dim : op.window_dimensions().getValues<int64_t>()) {
-    shapes.push_back(dim);
-  }
-  Type type = rewriter.getIntegerType(32);
-  auto memrefType = MemRefType::get(shapes, type);
+  shapes.push_back(op.window_dimensions().getValue<int64_t>(1));
+  shapes.push_back(op.window_dimensions().getValue<int64_t>(2));
+  auto memrefType = MemRefType::get(shapes, rewriter.getF32Type());
   auto fakeWindowDims = rewriter.create<AllocOp>(loc, memrefType);
 
-  llvm::SmallVector<Attribute, 4> strides;
-  if (op.window_strides().hasValue()) {
-    strides.insert(strides.begin(),
-                   op.window_strides().getValue().getAttributeValues().begin(),
-                   op.window_strides().getValue().getAttributeValues().end());
+  if (op.window_strides() &&
+      (op.window_strides().getValue().getValue<int64_t>(0) != 1 ||
+       op.window_strides().getValue().getValue<int64_t>(3) != 1)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected window_strides to be [1,x,y,1]");
   }
-  auto stridesArg = ArrayAttr::get(op.getContext(), strides);
+  if (op.window_dimensions() &&
+      (op.window_dimensions().getValue<int64_t>(0) != 1 ||
+       op.window_dimensions().getValue<int64_t>(3) != 1)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected window_dimensions to be [1,x,y,1]");
+  }
 
-  // TODO(hanchung): Use template lambda after migrating to C++20.
+  if (!inputBuffers[0].getType().cast<ShapedType>().getElementType().isF32()) {
+    return rewriter.notifyMatchFailure(op, "expected element type to be f32");
+  }
+
+  Attribute strides;
+  if (op.window_stridesAttr()) {
+    strides = rewriter.getI64VectorAttr(
+        {op.window_strides().getValue().getValue<int64_t>(1),
+         op.window_strides().getValue().getValue<int64_t>(2)});
+  } else {
+    strides = rewriter.getI64VectorAttr({1, 1});
+  }
+  Attribute dilations;
+  if (op.window_dilations()) {
+    dilations = rewriter.getI64VectorAttr(
+        {op.window_dilations().getValue().getValue<int64_t>(1),
+         op.window_dilations().getValue().getValue<int64_t>(2)});
+  } else {
+    dilations = rewriter.getI64VectorAttr({1, 1});
+  }
   auto createOp = [&](auto *type_ptr) -> linalg::LinalgOp {
     return cast<linalg::LinalgOp>(
         rewriter
             .create<std::remove_pointer_t<decltype(type_ptr)>>(
-                loc, ArrayRef<Type>{}, inputBuffers[0],
-                fakeWindowDims.getResult(), resultBuffers[0], stridesArg,
-                /*dilations=*/nullptr,
-                /*padding=*/nullptr)
+                loc, ArrayRef<Type>{},
+                ValueRange{inputBuffers[0], fakeWindowDims.getResult()},
+                resultBuffers[0], dilations, strides)
             .getOperation());
   };
   linalg::LinalgOp poolingOp;
@@ -438,21 +463,19 @@ LogicalResult ReduceWindowOpConversion::apply(
 
   switch (poolingType) {
     case PoolingType::kMin: {
-      poolingOp = createOp(static_cast<linalg::PoolingMinOp *>(nullptr));
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCMinOp *>(nullptr));
       break;
     }
     case PoolingType::kMax: {
-      poolingOp = createOp(static_cast<linalg::PoolingMaxOp *>(nullptr));
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCMaxOp *>(nullptr));
       break;
     }
     case PoolingType::kAdd: {
-      poolingOp = createOp(static_cast<linalg::PoolingSumOp *>(nullptr));
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCSumOp *>(nullptr));
       break;
     }
   }
-
   rewriter.create<DeallocOp>(loc, fakeWindowDims);
-
   return success();
 }
 
