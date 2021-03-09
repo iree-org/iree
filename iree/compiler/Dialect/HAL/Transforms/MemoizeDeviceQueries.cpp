@@ -61,10 +61,9 @@ class MemoizeDeviceQueriesPass
       auto pattern = matchOps.front().pattern();
 
       // Merge all the locs as we are deduping the original query ops.
-      auto fusedLoc = FusedLoc::get(
-          llvm::to_vector<4>(llvm::map_range(
-              matchOps, [&](Operation *op) { return op->getLoc(); })),
-          moduleOp.getContext());
+      auto fusedLoc =
+          moduleBuilder.getFusedLoc(llvm::to_vector<4>(llvm::map_range(
+              matchOps, [&](Operation *op) { return op->getLoc(); })));
 
       // The initializer will perform the query once and store it in the
       // variable.
