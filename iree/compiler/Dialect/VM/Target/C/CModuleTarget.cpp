@@ -469,7 +469,12 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
     // modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  // In the the Bytecode module the order is:
+  // * `createDropCompilerHintsPass()`
+  // * `IREE::VM::createOrdinalAllocationPass()`
+  // Here, we have to reverse the order and run `createConvertVMToEmitCPass()`
+  // inbetween to test the EmitC pass. Otherwise, the constants get folded
+  // by the canonicalizer.
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
@@ -480,6 +485,8 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
 
   // C target specific passes
   modulePasses.addPass(createConvertVMToEmitCPass());
+
+  modulePasses.addPass(createDropCompilerHintsPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
