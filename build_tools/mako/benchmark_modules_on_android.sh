@@ -123,7 +123,7 @@ function run_and_log {
   test_out="${OUTPUT_DIR}/${model}_${phone}_${target}_output.txt"
   adb shell LD_LIBRARY_PATH=/data/local/tmp taskset 80 \
     "${DEVICE_ROOT}/iree-benchmark-module" \
-    "--flagfile=${DEVICE_ROOT}/flagfile" \
+    "--flagfile=${DEVICE_ROOT}/${model}_flagfile" \
     "--module_file=${DEVICE_ROOT}/${model}_${phone}_${target}.vmfb" \
     "--driver=${driver}" \
     "${extra_flags[@]}" \
