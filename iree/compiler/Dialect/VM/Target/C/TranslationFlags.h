@@ -22,9 +22,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-// Returns a CCodeTargetOptions struct initialized with the
+// Returns a CTargetOptions struct initialized with the
 // --iree-vm-c-* flags.
-CCodeTargetOptions getCCodeTargetOptionsFromFlags();
+CTargetOptions getCTargetOptionsFromFlags();
 
 }  // namespace VM
 }  // namespace IREE

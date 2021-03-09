@@ -26,7 +26,7 @@ namespace IREE {
 namespace VM {
 
 // Defines the output format of the c module.
-enum class CCodeOutputFormat {
+enum class COutputFormat {
   // C code.
   kCode,
   // MLIR text of the VM module mixed with emitc operations.
@@ -34,9 +34,9 @@ enum class CCodeOutputFormat {
 };
 
 // Options that can be provided to c code translation.
-struct CCodeTargetOptions {
+struct CTargetOptions {
   // Format of the module written to the output stream.
-  CCodeOutputFormat outputFormat = CCodeOutputFormat::kCode;
+  COutputFormat outputFormat = COutputFormat::kCode;
 
   // Run basic CSE/inlining/etc passes prior to serialization.
   bool optimize = true;
@@ -49,10 +49,10 @@ struct CCodeTargetOptions {
 //
 // Exposed via the --iree-vm-ir-to-c-module translation.
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
-                                 CCodeTargetOptions targetOptions,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output);
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
-                                 CCodeTargetOptions targetOptions,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output);
 
 }  // namespace VM

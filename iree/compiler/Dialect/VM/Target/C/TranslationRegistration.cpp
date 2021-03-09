@@ -25,7 +25,7 @@ void registerToCTranslation() {
   TranslateFromMLIRRegistration toCModule(
       "iree-vm-ir-to-c-module",
       [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
-        return translateModuleToC(moduleOp, getCCodeTargetOptionsFromFlags(),
+        return translateModuleToC(moduleOp, getCTargetOptionsFromFlags(),
                                   output);
       });
 }

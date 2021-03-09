@@ -424,7 +424,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
 // Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(
-    IREE::VM::ModuleOp moduleOp, IREE::VM::CCodeTargetOptions targetOptions) {
+    IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
   OwningRewritePatternList patterns;
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -495,14 +495,14 @@ static LogicalResult canonicalizeModule(
 }
 
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
-                                 CCodeTargetOptions targetOptions,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
   if (failed(canonicalizeModule(moduleOp, targetOptions))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
   }
 
-  if (targetOptions.outputFormat == CCodeOutputFormat::kMlirText) {
+  if (targetOptions.outputFormat == COutputFormat::kMlirText) {
     // Use the standard MLIR text printer.
     moduleOp.getOperation()->print(output);
     output << "\n";
@@ -552,7 +552,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
-                                 CCodeTargetOptions targetOptions,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {

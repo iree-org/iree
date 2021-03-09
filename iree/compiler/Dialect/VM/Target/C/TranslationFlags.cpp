@@ -21,13 +21,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-static llvm::cl::opt<CCodeOutputFormat> outputFormatFlag{
+static llvm::cl::opt<COutputFormat> outputFormatFlag{
     "iree-vm-c-module-output-format",
-    llvm::cl::desc("Output format the c module is written in"),
-    llvm::cl::init(CCodeOutputFormat::kCode),
+    llvm::cl::desc("Output format used to write the C module"),
+    llvm::cl::init(COutputFormat::kCode),
     llvm::cl::values(
-        clEnumValN(CCodeOutputFormat::kCode, "code", "C Code file"),
-        clEnumValN(CCodeOutputFormat::kMlirText, "mlir-text",
+        clEnumValN(COutputFormat::kCode, "code", "C Code file"),
+        clEnumValN(COutputFormat::kMlirText, "mlir-text",
                    "MLIR module file in the VM and EmitC dialects")),
 };
 
@@ -44,8 +44,8 @@ static llvm::cl::opt<bool> stripDebugOpsFlag{
     llvm::cl::init(false),
 };
 
-CCodeTargetOptions getCCodeTargetOptionsFromFlags() {
-  CCodeTargetOptions targetOptions;
+CTargetOptions getCTargetOptionsFromFlags() {
+  CTargetOptions targetOptions;
   targetOptions.outputFormat = outputFormatFlag;
   targetOptions.optimize = optimizeFlag;
   targetOptions.stripDebugOps = stripDebugOpsFlag;
