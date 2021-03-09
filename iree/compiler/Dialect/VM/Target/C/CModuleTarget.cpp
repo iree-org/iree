@@ -514,7 +514,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printModuleComment(moduleOp, output);
   output << "\n";
 
-  mlir::emitc::CppEmitter emitter(output);
+  mlir::emitc::CppEmitter emitter(output, true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
 
   // build struct definitions
