@@ -25,7 +25,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-// Defines the output format of the bytecode module.
+// Defines the output format of the c module.
 enum class CCodeOutputFormat {
   // C code.
   kCode,
