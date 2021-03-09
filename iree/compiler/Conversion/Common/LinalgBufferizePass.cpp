@@ -41,6 +41,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
@@ -461,6 +462,25 @@ LogicalResult convertInterfaceStoreTensorOp(
 }
 
 namespace {
+
+// Folds linalg.reshape op that directly reshaping an HAL interface binding
+// subspan op into the subspan op itself.
+class FoldReshapeIntoInterfaceBindingSubspan final
+    : public OpRewritePattern<linalg::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::ReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp =
+        reshapeOp.src().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) return failure();
+    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
+        reshapeOp, reshapeOp.getResultType(), subspanOp.binding(),
+        subspanOp.byte_offset(), subspanOp.byte_length());
+    return success();
+  }
+};
+
 class LinalgBufferizePass
     : public PassWrapper<LinalgBufferizePass, FunctionPass> {
  public:
@@ -571,6 +591,11 @@ void LinalgBufferizePass::runOnFunction() {
   if (funcOp.walk(conversionDispatch).wasInterrupted()) {
     return signalPassFailure();
   }
+
+  // Perform additional canonicalizations.
+  OwningRewritePatternList foldingPatterns;
+  foldingPatterns.insert<FoldReshapeIntoInterfaceBindingSubspan>(context);
+  (void)applyPatternsAndFoldGreedily(getFunction(), std::move(foldingPatterns));
 }
 
 static Value defaultAllocationFn(OpBuilder &builder, Location loc,
