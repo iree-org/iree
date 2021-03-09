@@ -92,7 +92,7 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
 
 template <typename ConstOpTy>
 class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
-public:
+ public:
   using OpRewritePattern<ConstOpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(ConstOpTy constOp,
