@@ -20,8 +20,8 @@ steps:
       - "tar -xzf iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz"
       - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec python3 build_tools/mako/compile_android_modules.py"
       - "cp tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile mobile-bert-flagfile"
-      - "tar -czvf model-Pixel4-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert-Pixel4*.vmfb"
-      - "tar -czvf model-S20-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert-S20*.vmfb"
+      - "tar -czvf model-Pixel4-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert_Pixel4*.vmfb"
+      - "tar -czvf model-S20-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert_S20*.vmfb"
     agents:
       - "build=true"
     env:
