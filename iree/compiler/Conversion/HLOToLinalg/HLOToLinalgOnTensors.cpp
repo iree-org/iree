@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/HLOToLinalg/HLOToLinalgOnTensorPasses.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -357,6 +358,78 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
 
   return success();
 }
+
+/// Pattern to convert a linalg.pad_tensor operation into a fill + subtensor
+/// insert. This is needed till pad_tensor op can be fused with its consumers.
+struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
+  using OpConversionPattern<linalg::PadTensorOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      linalg::PadTensorOp padTensorOp, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    linalg::PadTensorOpAdaptor padOpAdaptor(args,
+                                            padTensorOp->getAttrDictionary());
+    // Check that the region is just a yield operation which is returning a
+    // scalar that is not one of the arguments of the linalg operation.
+    Region &region = padTensorOp.region();
+    Block &block = region.front();
+    if (!llvm::hasSingleElement(block)) return failure();
+    auto yieldOp = cast<linalg::YieldOp>(block.getTerminator());
+    if (!llvm::hasSingleElement(yieldOp.values())) return failure();
+    Value yieldVal = yieldOp.values().front();
+    if (llvm::any_of(block.getArguments(),
+                     [&](Value v) { return v == yieldVal; })) {
+      return failure();
+    }
+
+    OpBuilder::InsertionGuard g(rewriter);
+    Location loc = padTensorOp.getLoc();
+    auto lowPad = padTensorOp.getMixedLowPad();
+    auto highPad = padTensorOp.getMixedHighPad();
+    Value source = padOpAdaptor.source();
+    RankedTensorType sourceType = padTensorOp.getSourceType();
+    int64_t rank = sourceType.getRank();
+
+    // TODO(ravishankarm): Use shape inference interface to get this.
+    SmallVector<OpFoldResult> sourceShape;
+    SmallVector<Value> outputShape;
+    for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
+      SmallVector<Value> mapValues;
+      Value sourceDim = rewriter.createOrFold<DimOp>(loc, source, dim);
+      mapValues.push_back(sourceDim);
+      sourceShape.push_back(sourceDim);
+      AffineExpr expr = rewriter.getAffineDimExpr(0);
+      unsigned numSymbols = 0;
+      auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
+        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+          e = e + attr.cast<IntegerAttr>().getInt();
+          return e;
+        }
+        e = e + rewriter.getAffineSymbolExpr(numSymbols++);
+        mapValues.push_back(valueOrAttr.get<Value>());
+        return e;
+      };
+      expr = addValueOrAttr(expr, lowPad[dim]);
+      expr = addValueOrAttr(expr, highPad[dim]);
+      outputShape.push_back(linalg::applyMapToValues(
+          rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0]);
+    }
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, outputShape, sourceType.getElementType());
+    Value fill =
+        rewriter.create<linalg::FillOp>(loc, initTensor, yieldVal).getResult(0);
+    SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
+    Value replacement = rewriter.create<SubTensorInsertOp>(
+        loc, source, fill, lowPad, sourceShape, strides);
+    if (padTensorOp.getResultType() != replacement.getType()) {
+      replacement = rewriter.create<tensor::CastOp>(
+          loc, padTensorOp.getResultType(), replacement);
+    }
+    rewriter.replaceOp(padTensorOp, replacement);
+    return success();
+  }
+};
+
 }  // namespace
 
 //===----------------------------------------------------------------------===//
@@ -416,14 +489,21 @@ struct ConcatenateOpConversion
 
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
+  ConvertHLOToLinalgOnTensorsPass(bool useLinalgOnTensorsPath = false)
+      : useLinalgOnTensorsPath(useLinalgOnTensorsPath){};
+
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect, ShapeDialect,
-                    math::MathDialect>();
+    registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                    mhlo::MhloDialect, ShapeDialect, math::MathDialect>();
   }
 
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);
+    MLIRContext *context = &getContext();
+    populateHLOToLinalgOnTensorsConversionPatterns(context, patterns);
+    if (useLinalgOnTensorsPath) {
+      patterns.insert<PadTensorOpConversion>(context);
+    }
 
     ConversionTarget target(getContext());
     // Don't convert the body of reduction ops.
@@ -435,12 +515,27 @@ struct ConvertHLOToLinalgOnTensorsPass
             }));
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    if (useLinalgOnTensorsPath) {
+      // Set linalg.pad_tensor illegal for now.
+      target.addIllegalOp<linalg::PadTensorOp>();
+    }
 
     if (failed(applyPartialConversion(getFunction(), target,
                                       std::move(patterns)))) {
       signalPassFailure();
     }
   }
+
+ private:
+  bool useLinalgOnTensorsPath;
+};
+
+/// This pass is just added for lit-testing when using the linalg on tensors
+/// path. Remove when the linalg on tensors path becomes default.
+struct ConvertHLOToLinalgOnTensorsPassExperimental
+    : public ConvertHLOToLinalgOnTensorsPass {
+  ConvertHLOToLinalgOnTensorsPassExperimental()
+      : ConvertHLOToLinalgOnTensorsPass(true){};
 };
 
 /// Convert mhlo.constant op into std.const.
@@ -462,13 +557,24 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
                   ConcatenateOpConversion, DepthwiseConvOpConversion>(context);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
-  return std::make_unique<ConvertHLOToLinalgOnTensorsPass>();
+static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
+    "iree-linalg-on-tensors-path",
+    llvm::cl::desc("Convert from MHLO to Linalg on tensors for linalg on "
+                   "tensor codegen path"),
+    llvm::cl::init(false));
+
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
+    bool useLinalgOnTensorsPath) {
+  return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
+      useLinalgOnTensorsPath);
 }
 
 static PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass(
     "iree-codegen-hlo-to-linalg-on-tensors",
-    "Convert from XLA-HLO ops to Linalg ops on tensors");
+    "Convert from XLA-HLO ops to Linalg ops on tensors", []() {
+      return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
+          clUseLinalgOnTensorsPath);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir
