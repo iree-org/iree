@@ -518,7 +518,7 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
     if (auto mulOp = dyn_cast_or_null<T>(op.lhs().getDefiningOp())) {
       if (matchPattern(mulOp.rhs(), m_Constant(&c2))) {
         auto c = rewriter.createOrFold<CONST_OP>(
-            FusedLoc::get({mulOp.getLoc(), op.getLoc()}, rewriter.getContext()),
+            rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
             constFoldBinaryOp<IntegerAttr>(
                 {c1, c2},
                 [](const APInt &a, const APInt &b) { return a * b; }));

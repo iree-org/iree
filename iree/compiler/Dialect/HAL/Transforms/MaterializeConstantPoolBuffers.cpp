@@ -168,11 +168,11 @@ class MaterializeConstantPoolBuffersPass
                                 SymbolTable &moduleSymbolTable,
                                 Block::iterator insertionPoint) {
     auto *context = poolOp.getContext();
-    auto variableLoc = FusedLoc::get(
-        llvm::to_vector<8>(llvm::map_range(
-            splatOps,
-            [](ConstantPoolSplatOp splatOp) { return splatOp.getLoc(); })),
-        context);
+    auto variableLoc =
+        FusedLoc::get(context, llvm::to_vector<8>(llvm::map_range(
+                                   splatOps, [](ConstantPoolSplatOp splatOp) {
+                                     return splatOp.getLoc();
+                                   })));
     auto variableName = (poolOp.getName() + "_splats").str();
     auto variableOp = OpBuilder(context).create<IREE::HAL::VariableOp>(
         variableLoc, variableName, /*isMutable=*/false,

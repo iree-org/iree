@@ -71,7 +71,7 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
 
   // Location is original region + new region location (both probably fused).
   SmallVector<Location, 2> fusedLocs = {regionOp.getLoc(), otherLoc};
-  auto fusedLoc = FusedLoc::get(fusedLocs, regionOp.getContext());
+  auto fusedLoc = FusedLoc::get(regionOp.getContext(), fusedLocs);
 
   // Clone with new results.
   SmallVector<Value, 8> operands;
