@@ -75,7 +75,7 @@ MODELS = [
 
 
 def main() -> None:
-  IREE_TRANSLATE_PATH = "build-tracy/iree/tools/iree-translate"
+  IREE_TRANSLATE_PATH = "build-host/iree/tools/iree-translate"
   for model in MODELS:
     for phone in PHONES:
       for target in phone.targets:
