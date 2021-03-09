@@ -281,6 +281,22 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd5105"  # allow: macro expansion producing 'defined' has undefined behavior
 )
 
+# On MSVC, CMake sets /GR by default (enabling RTTI), but we set /GR-
+# (disabling it) above. To avoid Command line warning D9025 which warns about
+# overriding the flag value, we remove /GR from global CMake flags.
+#
+# Note: this may have ripple effects on downstream projects using IREE. If this
+# is a problem for your project, please reach out to us and we'll figure out a
+# compatible solution.
+#
+# See also:
+#   https://github.com/google/iree/issues/4665.
+#   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
+#   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+  string(REPLACE "/GR" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+endif()
+
 if(NOT ANDROID)
   iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
     CLANG_OR_GCC
