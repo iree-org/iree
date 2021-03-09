@@ -28,4 +28,6 @@
 FROM gcr.io/iree-oss/cmake-python-vulkan@sha256:6722f69c6300749f6bd4b141fc653244990381a6b0111f9c361061adcd65c07c AS final
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-460=460.32.03-0ubuntu0.18.04.1
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       libnvidia-gl-460=460.39-0ubuntu0.18.04.1 \
+       libnvidia-compute-460=460.39-0ubuntu0.18.04.1
