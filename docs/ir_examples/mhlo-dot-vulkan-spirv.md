@@ -1505,21 +1505,21 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ```
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
   spv.module Logical GLSL450 {
-    spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-    spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-    spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
     spv.func @dot_ex_dispatch_0() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 8, 1]> : vector<3xi32>}} {
-      %0 = spv.constant 0.000000e+00 : f32
-      %1 = spv.constant 8 : i32
-      %2 = spv.constant 1024 : i32
-      %3 = spv.constant 16 : i32
-      %4 = spv.constant 0 : i32
-      %5 = spv.constant 1 : i32
-      %6 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-      %7 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      %8 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      %0 = spv.Constant 0.000000e+00 : f32
+      %1 = spv.Constant 8 : i32
+      %2 = spv.Constant 1024 : i32
+      %3 = spv.Constant 16 : i32
+      %4 = spv.Constant 0 : i32
+      %5 = spv.Constant 1 : i32
+      %6 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      %7 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      %8 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
       %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %10 = spv.Load "Input" %9 : vector<3xi32>
       %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
@@ -1537,17 +1537,17 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       %23 = spv.SLessThan %22, %1 : i32
       %24 = spv.SLessThan %19, %3 : i32
       %25 = spv.LogicalAnd %23, %24 : i1
-      spv.selection {
+      spv.mlir.selection {
         spv.BranchConditional %25, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
         %26 = spv.IAdd %15, %22 : i32
         %27 = spv.IAdd %16, %19 : i32
-        %28 = spv.constant 0 : i32
-        %29 = spv.constant 0 : i32
-        %30 = spv.constant 64 : i32
+        %28 = spv.Constant 0 : i32
+        %29 = spv.Constant 0 : i32
+        %30 = spv.Constant 64 : i32
         %31 = spv.IMul %30, %26 : i32
         %32 = spv.IAdd %29, %31 : i32
-        %33 = spv.constant 1 : i32
+        %33 = spv.Constant 1 : i32
         %34 = spv.IMul %33, %27 : i32
         %35 = spv.IAdd %32, %34 : i32
         %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
@@ -1556,55 +1556,55 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv.mlir.merge
       }
-      spv.selection {
+      spv.mlir.selection {
         spv.BranchConditional %25, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
-        spv.loop {
+        spv.mlir.loop {
           spv.Branch ^bb1(%4 : i32)
         ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
           %27 = spv.SLessThan %26, %2 : i32
           spv.BranchConditional %27, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
           %28 = spv.IAdd %15, %22 : i32
-          %29 = spv.constant 0 : i32
-          %30 = spv.constant 0 : i32
-          %31 = spv.constant 1024 : i32
+          %29 = spv.Constant 0 : i32
+          %30 = spv.Constant 0 : i32
+          %31 = spv.Constant 1024 : i32
           %32 = spv.IMul %31, %28 : i32
           %33 = spv.IAdd %30, %32 : i32
-          %34 = spv.constant 1 : i32
+          %34 = spv.Constant 1 : i32
           %35 = spv.IMul %34, %26 : i32
           %36 = spv.IAdd %33, %35 : i32
           %37 = spv.AccessChain %7[%29, %36] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
           %38 = spv.Load "StorageBuffer" %37 : f32
           %39 = spv.IAdd %16, %19 : i32
-          %40 = spv.constant 0 : i32
-          %41 = spv.constant 0 : i32
-          %42 = spv.constant 64 : i32
+          %40 = spv.Constant 0 : i32
+          %41 = spv.Constant 0 : i32
+          %42 = spv.Constant 64 : i32
           %43 = spv.IMul %42, %26 : i32
           %44 = spv.IAdd %41, %43 : i32
-          %45 = spv.constant 1 : i32
+          %45 = spv.Constant 1 : i32
           %46 = spv.IMul %45, %39 : i32
           %47 = spv.IAdd %44, %46 : i32
           %48 = spv.AccessChain %8[%40, %47] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
           %49 = spv.Load "StorageBuffer" %48 : f32
-          %50 = spv.constant 0 : i32
-          %51 = spv.constant 0 : i32
-          %52 = spv.constant 64 : i32
+          %50 = spv.Constant 0 : i32
+          %51 = spv.Constant 0 : i32
+          %52 = spv.Constant 64 : i32
           %53 = spv.IMul %52, %28 : i32
           %54 = spv.IAdd %51, %53 : i32
-          %55 = spv.constant 1 : i32
+          %55 = spv.Constant 1 : i32
           %56 = spv.IMul %55, %39 : i32
           %57 = spv.IAdd %54, %56 : i32
           %58 = spv.AccessChain %6[%50, %57] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
           %59 = spv.Load "StorageBuffer" %58 : f32
           %60 = spv.FMul %38, %49 : f32
           %61 = spv.FAdd %59, %60 : f32
-          %62 = spv.constant 0 : i32
-          %63 = spv.constant 0 : i32
-          %64 = spv.constant 64 : i32
+          %62 = spv.Constant 0 : i32
+          %63 = spv.Constant 0 : i32
+          %64 = spv.Constant 64 : i32
           %65 = spv.IMul %64, %28 : i32
           %66 = spv.IAdd %63, %65 : i32
-          %67 = spv.constant 1 : i32
+          %67 = spv.Constant 1 : i32
           %68 = spv.IMul %67, %39 : i32
           %69 = spv.IAdd %66, %68 : i32
           %70 = spv.AccessChain %6[%62, %69] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
@@ -1632,21 +1632,21 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
 ### IR Dump After SPIRVLowerABIAttributes
 ```
 spv.module Logical GLSL450 {
-  spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.constant 0.000000e+00 : f32
-    %1 = spv.constant 8 : i32
-    %2 = spv.constant 1024 : i32
-    %3 = spv.constant 16 : i32
-    %4 = spv.constant 0 : i32
-    %5 = spv.constant 1 : i32
-    %6 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %7 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %0 = spv.Constant 0.000000e+00 : f32
+    %1 = spv.Constant 8 : i32
+    %2 = spv.Constant 1024 : i32
+    %3 = spv.Constant 16 : i32
+    %4 = spv.Constant 0 : i32
+    %5 = spv.Constant 1 : i32
+    %6 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %7 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %9 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %10 = spv.Load "Input" %9 : vector<3xi32>
     %11 = spv.CompositeExtract %10[0 : i32] : vector<3xi32>
@@ -1664,17 +1664,17 @@ spv.module Logical GLSL450 {
     %23 = spv.SLessThan %22, %1 : i32
     %24 = spv.SLessThan %19, %3 : i32
     %25 = spv.LogicalAnd %23, %24 : i1
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %25, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %26 = spv.IAdd %15, %22 : i32
       %27 = spv.IAdd %16, %19 : i32
-      %28 = spv.constant 0 : i32
-      %29 = spv.constant 0 : i32
-      %30 = spv.constant 64 : i32
+      %28 = spv.Constant 0 : i32
+      %29 = spv.Constant 0 : i32
+      %30 = spv.Constant 64 : i32
       %31 = spv.IMul %30, %26 : i32
       %32 = spv.IAdd %29, %31 : i32
-      %33 = spv.constant 1 : i32
+      %33 = spv.Constant 1 : i32
       %34 = spv.IMul %33, %27 : i32
       %35 = spv.IAdd %32, %34 : i32
       %36 = spv.AccessChain %6[%28, %35] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
@@ -1683,55 +1683,55 @@ spv.module Logical GLSL450 {
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
     }
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %25, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      spv.loop {
+      spv.mlir.loop {
         spv.Branch ^bb1(%4 : i32)
       ^bb1(%26: i32):  // 2 preds: ^bb0, ^bb2
         %27 = spv.SLessThan %26, %2 : i32
         spv.BranchConditional %27, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
         %28 = spv.IAdd %15, %22 : i32
-        %29 = spv.constant 0 : i32
-        %30 = spv.constant 0 : i32
-        %31 = spv.constant 1024 : i32
+        %29 = spv.Constant 0 : i32
+        %30 = spv.Constant 0 : i32
+        %31 = spv.Constant 1024 : i32
         %32 = spv.IMul %31, %28 : i32
         %33 = spv.IAdd %30, %32 : i32
-        %34 = spv.constant 1 : i32
+        %34 = spv.Constant 1 : i32
         %35 = spv.IMul %34, %26 : i32
         %36 = spv.IAdd %33, %35 : i32
         %37 = spv.AccessChain %7[%29, %36] : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %38 = spv.Load "StorageBuffer" %37 : f32
         %39 = spv.IAdd %16, %19 : i32
-        %40 = spv.constant 0 : i32
-        %41 = spv.constant 0 : i32
-        %42 = spv.constant 64 : i32
+        %40 = spv.Constant 0 : i32
+        %41 = spv.Constant 0 : i32
+        %42 = spv.Constant 64 : i32
         %43 = spv.IMul %42, %26 : i32
         %44 = spv.IAdd %41, %43 : i32
-        %45 = spv.constant 1 : i32
+        %45 = spv.Constant 1 : i32
         %46 = spv.IMul %45, %39 : i32
         %47 = spv.IAdd %44, %46 : i32
         %48 = spv.AccessChain %8[%40, %47] : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %49 = spv.Load "StorageBuffer" %48 : f32
-        %50 = spv.constant 0 : i32
-        %51 = spv.constant 0 : i32
-        %52 = spv.constant 64 : i32
+        %50 = spv.Constant 0 : i32
+        %51 = spv.Constant 0 : i32
+        %52 = spv.Constant 64 : i32
         %53 = spv.IMul %52, %28 : i32
         %54 = spv.IAdd %51, %53 : i32
-        %55 = spv.constant 1 : i32
+        %55 = spv.Constant 1 : i32
         %56 = spv.IMul %55, %39 : i32
         %57 = spv.IAdd %54, %56 : i32
         %58 = spv.AccessChain %6[%50, %57] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
         %59 = spv.Load "StorageBuffer" %58 : f32
         %60 = spv.FMul %38, %49 : f32
         %61 = spv.FAdd %59, %60 : f32
-        %62 = spv.constant 0 : i32
-        %63 = spv.constant 0 : i32
-        %64 = spv.constant 64 : i32
+        %62 = spv.Constant 0 : i32
+        %63 = spv.Constant 0 : i32
+        %64 = spv.Constant 64 : i32
         %65 = spv.IMul %64, %28 : i32
         %66 = spv.IAdd %63, %65 : i32
-        %67 = spv.constant 1 : i32
+        %67 = spv.Constant 1 : i32
         %68 = spv.IMul %67, %39 : i32
         %69 = spv.IAdd %66, %68 : i32
         %70 = spv.AccessChain %6[%62, %69] : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>, i32, i32
@@ -1755,22 +1755,22 @@ spv.module Logical GLSL450 {
 ### IR Dump After Canonicalizer
 ```
 spv.module Logical GLSL450 {
-  spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.constant 0.000000e+00 : f32
-    %1 = spv.constant 8 : i32
-    %2 = spv.constant 16 : i32
-    %3 = spv.constant 1 : i32
-    %4 = spv.constant 1024 : i32
-    %5 = spv.constant 0 : i32
-    %6 = spv.constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %0 = spv.Constant 0.000000e+00 : f32
+    %1 = spv.Constant 8 : i32
+    %2 = spv.Constant 16 : i32
+    %3 = spv.Constant 1 : i32
+    %4 = spv.Constant 1024 : i32
+    %5 = spv.Constant 0 : i32
+    %6 = spv.Constant 64 : i32
+    %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -1788,7 +1788,7 @@ spv.module Logical GLSL450 {
     %24 = spv.SLessThan %23, %1 : i32
     %25 = spv.SLessThan %20, %2 : i32
     %26 = spv.LogicalAnd %24, %25 : i1
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %26, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %27 = spv.IAdd %16, %23 : i32
@@ -1801,10 +1801,10 @@ spv.module Logical GLSL450 {
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
     }
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %26, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      spv.loop {
+      spv.mlir.loop {
         spv.Branch ^bb1(%5 : i32)
       ^bb1(%27: i32):  // 2 preds: ^bb0, ^bb2
         %28 = spv.SLessThan %27, %4 : i32
@@ -1849,22 +1849,22 @@ spv.module Logical GLSL450 {
 ### IR Dump After CSE
 ```
 spv.module Logical GLSL450 {
-  spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.constant 0.000000e+00 : f32
-    %1 = spv.constant 8 : i32
-    %2 = spv.constant 16 : i32
-    %3 = spv.constant 1 : i32
-    %4 = spv.constant 1024 : i32
-    %5 = spv.constant 0 : i32
-    %6 = spv.constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %0 = spv.Constant 0.000000e+00 : f32
+    %1 = spv.Constant 8 : i32
+    %2 = spv.Constant 16 : i32
+    %3 = spv.Constant 1 : i32
+    %4 = spv.Constant 1024 : i32
+    %5 = spv.Constant 0 : i32
+    %6 = spv.Constant 64 : i32
+    %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -1880,7 +1880,7 @@ spv.module Logical GLSL450 {
     %22 = spv.SLessThan %21, %1 : i32
     %23 = spv.SLessThan %19, %2 : i32
     %24 = spv.LogicalAnd %22, %23 : i1
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %25 = spv.IAdd %15, %21 : i32
@@ -1893,10 +1893,10 @@ spv.module Logical GLSL450 {
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
     }
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      spv.loop {
+      spv.mlir.loop {
         spv.Branch ^bb1(%5 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
         %26 = spv.SLessThan %25, %4 : i32
@@ -1938,22 +1938,22 @@ spv.module Logical GLSL450 {
 ### IR Dump After SPIRVUpdateVCE
 ```
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-  spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-  spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-  spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+  spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+  spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
   spv.func @dot_ex_dispatch_0() "None" {
-    %0 = spv.constant 0.000000e+00 : f32
-    %1 = spv.constant 8 : i32
-    %2 = spv.constant 16 : i32
-    %3 = spv.constant 1 : i32
-    %4 = spv.constant 1024 : i32
-    %5 = spv.constant 0 : i32
-    %6 = spv.constant 64 : i32
-    %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-    %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-    %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+    %0 = spv.Constant 0.000000e+00 : f32
+    %1 = spv.Constant 8 : i32
+    %2 = spv.Constant 16 : i32
+    %3 = spv.Constant 1 : i32
+    %4 = spv.Constant 1024 : i32
+    %5 = spv.Constant 0 : i32
+    %6 = spv.Constant 64 : i32
+    %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+    %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+    %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
     %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
     %11 = spv.Load "Input" %10 : vector<3xi32>
     %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -1969,7 +1969,7 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
     %22 = spv.SLessThan %21, %1 : i32
     %23 = spv.SLessThan %19, %2 : i32
     %24 = spv.LogicalAnd %22, %23 : i1
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
       %25 = spv.IAdd %15, %21 : i32
@@ -1982,10 +1982,10 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
     ^bb2:  // 2 preds: ^bb0, ^bb1
       spv.mlir.merge
     }
-    spv.selection {
+    spv.mlir.selection {
       spv.BranchConditional %24, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      spv.loop {
+      spv.mlir.loop {
         spv.Branch ^bb1(%5 : i32)
       ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
         %26 = spv.SLessThan %25, %4 : i32
@@ -2038,22 +2038,22 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
   }
   module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
     spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-      spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-      spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-      spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-      spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-      spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+      spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+      spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+      spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
       spv.func @dot_ex_dispatch_0() "None" {
-        %0 = spv.constant 0.000000e+00 : f32
-        %1 = spv.constant 8 : i32
-        %2 = spv.constant 16 : i32
-        %3 = spv.constant 1 : i32
-        %4 = spv.constant 1024 : i32
-        %5 = spv.constant 0 : i32
-        %6 = spv.constant 64 : i32
-        %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-        %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-        %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+        %0 = spv.Constant 0.000000e+00 : f32
+        %1 = spv.Constant 8 : i32
+        %2 = spv.Constant 16 : i32
+        %3 = spv.Constant 1 : i32
+        %4 = spv.Constant 1024 : i32
+        %5 = spv.Constant 0 : i32
+        %6 = spv.Constant 64 : i32
+        %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+        %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+        %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
         %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
         %11 = spv.Load "Input" %10 : vector<3xi32>
         %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2069,7 +2069,7 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
         %22 = spv.SLessThan %21, %1 : i32
         %23 = spv.SLessThan %19, %2 : i32
         %24 = spv.LogicalAnd %22, %23 : i1
-        spv.selection {
+        spv.mlir.selection {
           spv.BranchConditional %24, ^bb1, ^bb2
         ^bb1:  // pred: ^bb0
           %25 = spv.IAdd %15, %21 : i32
@@ -2082,10 +2082,10 @@ hal.executable.target @vulkan_spirv, filter="vulkan*" {
         ^bb2:  // 2 preds: ^bb0, ^bb1
           spv.mlir.merge
         }
-        spv.selection {
+        spv.mlir.selection {
           spv.BranchConditional %24, ^bb1, ^bb2
         ^bb1:  // pred: ^bb0
-          spv.loop {
+          spv.mlir.loop {
             spv.Branch ^bb1(%5 : i32)
           ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
             %26 = spv.SLessThan %25, %4 : i32
@@ -2152,22 +2152,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2183,7 +2183,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -2196,10 +2196,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -2434,22 +2434,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2465,7 +2465,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -2478,10 +2478,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -2601,22 +2601,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2632,7 +2632,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -2645,10 +2645,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -2765,22 +2765,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -2796,7 +2796,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -2809,10 +2809,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -3083,22 +3083,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3114,7 +3114,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -3127,10 +3127,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -3388,22 +3388,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3419,7 +3419,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -3432,10 +3432,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
@@ -3594,22 +3594,22 @@ module  {
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
         spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-          spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-          spv.globalVariable @__resource_var_94182316402744__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316407256__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-          spv.globalVariable @__resource_var_94182316087016__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+          spv.GlobalVariable @__resource_var_94024588143936__ bind(0, 1) : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024588120976__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+          spv.GlobalVariable @__resource_var_94024587809424__ bind(0, 2) : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
           spv.func @dot_ex_dispatch_0() "None" {
-            %0 = spv.constant 0.000000e+00 : f32
-            %1 = spv.constant 8 : i32
-            %2 = spv.constant 16 : i32
-            %3 = spv.constant 1 : i32
-            %4 = spv.constant 1024 : i32
-            %5 = spv.constant 0 : i32
-            %6 = spv.constant 64 : i32
-            %7 = spv.mlir.addressof @__resource_var_94182316087016__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
-            %8 = spv.mlir.addressof @__resource_var_94182316407256__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
-            %9 = spv.mlir.addressof @__resource_var_94182316402744__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
+            %0 = spv.Constant 0.000000e+00 : f32
+            %1 = spv.Constant 8 : i32
+            %2 = spv.Constant 16 : i32
+            %3 = spv.Constant 1 : i32
+            %4 = spv.Constant 1024 : i32
+            %5 = spv.Constant 0 : i32
+            %6 = spv.Constant 64 : i32
+            %7 = spv.mlir.addressof @__resource_var_94024587809424__ : !spv.ptr<!spv.struct<(!spv.array<2048 x f32, stride=4> [0])>, StorageBuffer>
+            %8 = spv.mlir.addressof @__resource_var_94024588120976__ : !spv.ptr<!spv.struct<(!spv.array<32768 x f32, stride=4> [0])>, StorageBuffer>
+            %9 = spv.mlir.addressof @__resource_var_94024588143936__ : !spv.ptr<!spv.struct<(!spv.array<65536 x f32, stride=4> [0])>, StorageBuffer>
             %10 = spv.mlir.addressof @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
             %11 = spv.Load "Input" %10 : vector<3xi32>
             %12 = spv.CompositeExtract %11[0 : i32] : vector<3xi32>
@@ -3625,7 +3625,7 @@ module  {
             %22 = spv.SLessThan %21, %1 : i32
             %23 = spv.SLessThan %19, %2 : i32
             %24 = spv.LogicalAnd %22, %23 : i1
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               %25 = spv.IAdd %15, %21 : i32
@@ -3638,10 +3638,10 @@ module  {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv.mlir.merge
             }
-            spv.selection {
+            spv.mlir.selection {
               spv.BranchConditional %24, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
-              spv.loop {
+              spv.mlir.loop {
                 spv.Branch ^bb1(%5 : i32)
               ^bb1(%25: i32):  // 2 preds: ^bb0, ^bb2
                 %26 = spv.SLessThan %25, %4 : i32
