@@ -92,15 +92,17 @@ static bool isFusableWithCurrentOpsList(
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::DepthwiseConvInputNHWCFilterHWCOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::DepthwiseConvInputNHWCFilterHWCFOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::FillOp, linalg::BatchMatmulOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMaxOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCMinOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
-    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp,
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingNHWCSumOp,
                      linalg::LinalgDependenceGraph::DependenceType::WAW)
     ADD_FUSABLE_PAIR(linalg::MatmulOp, linalg::GenericOp,
                      linalg::LinalgDependenceGraph::DependenceType::RAW)

@@ -224,7 +224,6 @@ static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
 }
 
 /// Converts mhlo.convolution operation to linalg.depthwise_conv_nhwc op.
-/// Note: this only supports channel multiplier == 1.
 struct DepthwiseConvOpConversion : public OpConversionPattern<mhlo::ConvOp> {
   using OpConversionPattern<mhlo::ConvOp>::OpConversionPattern;
 
@@ -283,53 +282,78 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
   Value input = adaptor.lhs();
   Value filter = adaptor.rhs();
   auto resultType = op.getResult().getType().cast<RankedTensorType>();
-  int rank = resultType.getRank();
-
-  SmallVector<Value, 8> dynSizes;
-  for (int i = 0, e = rank; i < e; ++i) {
-    if (!resultType.isDynamicDim(i)) continue;
-    if (i != 0 && i != e - 1) {
-      return rewriter.notifyMatchFailure(
-          op, "expected output spatial dims to be static shapes");
-    }
-    dynSizes.push_back(rewriter.create<DimOp>(loc, input, i));
+  if (!resultType.hasStaticShape()) {
+    return rewriter.notifyMatchFailure(op, "expected output has static shapes");
   }
-  Value initTensor = rewriter.create<linalg::InitTensorOp>(
-      loc, dynSizes, resultType.getShape(), resultType.getElementType());
-  auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
-  Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
-  Value zeroTensor =
-      rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
-
-  // Create a Linalg reshape op that converts the filter from 4 dimensions
-  // into 3 dimensions (by droping the unit dimension). This is needed because
-  // linalg.depthwise_conv_2d_nhwc expects 3 dimensions for the filter.
 
   auto filterDims =
       llvm::to_vector<4>(op.rhs().getType().cast<ShapedType>().getShape());
-  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
-    return rewriter.notifyMatchFailure(
-        op, "non-one channel multiplier unsupported yet");
-  }
-  filterDims[2] = op.feature_group_count();
-  filterDims.pop_back();
-
-  RankedTensorType filterShape =
-      RankedTensorType::get(filterDims, op.getType().getElementType());
 
   auto getIndicesVector = [](int start, int end) {
     return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
   };
 
-  SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
-      getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
+  if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
+    // For cases where channel multiplier != 1
+    auto outputDims = resultType.getShape();
+    auto channelMultiplier = filterDims[3];
+    SmallVector<int64_t> reshapedOutputDims;
+    reshapedOutputDims.assign(outputDims.begin(), outputDims.end());
+    reshapedOutputDims.push_back(channelMultiplier);
+    reshapedOutputDims[3] /= channelMultiplier;
 
-  Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
-      loc, filterShape, filter, collapsedDimList);
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, reshapedOutputDims, resultType.getElementType());
+    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
+    Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    Value zeroTensor =
+        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
 
-  rewriter.replaceOpWithNewOp<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
-      op, resultType, ValueRange{input, reshapedFilter}, ValueRange{zeroTensor},
-      windowStrides);
+    auto reshapedOutputType =
+        RankedTensorType::get(reshapedOutputDims, resultType.getElementType());
+    auto conv = rewriter.create<linalg::DepthwiseConvInputNHWCFilterHWCFOp>(
+        op.getLoc(), reshapedOutputType, ValueRange{input, filter},
+        ValueRange{zeroTensor}, windowStrides);
+
+    // Create a Linalg reshape op that converts the output from 5 dimensions
+    // into 4 dimensions (by collapsing the last two dimensions). This is needed
+    // because linalg.depthwise_conv_2d_input_nhwc_filter_hwcf returns 5
+    // dimensions for the output.
+    SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
+        getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 3),
+        getIndicesVector(3, 5)};
+    rewriter.replaceOpWithNewOp<linalg::TensorReshapeOp>(
+        op, resultType, conv.getResult(0), collapsedDimList);
+  } else {
+    // For cases where channel multiplier == 1
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, resultType.getShape(), resultType.getElementType());
+    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
+    Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    Value zeroTensor =
+        rewriter.create<linalg::FillOp>(loc, initTensor, zero).getResult(0);
+
+    // Create a Linalg reshape op that converts the filter from 4 dimensions
+    // into 3 dimensions (by droping the unit dimension). This is needed because
+    // linalg.depthwise_conv_2d_input_nhwc_filter_hwc expects 3 dimensions for
+    // the filter.
+
+    filterDims[2] = op.feature_group_count();
+    filterDims.pop_back();
+
+    RankedTensorType filterShape =
+        RankedTensorType::get(filterDims, op.getType().getElementType());
+
+    SmallVector<linalg::ReassociationIndices, 4> collapsedDimList = {
+        getIndicesVector(0, 1), getIndicesVector(1, 2), getIndicesVector(2, 4)};
+
+    Value reshapedFilter = rewriter.create<linalg::TensorReshapeOp>(
+        loc, filterShape, filter, collapsedDimList);
+
+    rewriter.replaceOpWithNewOp<linalg::DepthwiseConvInputNHWCFilterHWCOp>(
+        op, resultType, ValueRange{input, reshapedFilter},
+        ValueRange{zeroTensor}, windowStrides);
+  }
 
   return success();
 }

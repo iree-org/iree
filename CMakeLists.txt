@@ -13,6 +13,11 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.13.4)
+# Do not set MSVC warning flags like /W3 by default (since 3.15):
+#   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
+if(POLICY CMP0092)
+  cmake_policy(SET CMP0092 NEW)
+endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(iree CXX C)

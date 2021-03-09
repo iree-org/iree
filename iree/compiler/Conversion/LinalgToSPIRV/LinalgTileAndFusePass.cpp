@@ -624,7 +624,8 @@ void LinalgTileAndFusePass::runOnOperation() {
           getLinalgMatchAndReplaceMarker({getWorkgroupMarker()},
                                          getWorkgroupMarker(), context);
       marker.addFilter([](Operation *op) -> LogicalResult {
-        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
+        return success(isa<linalg::DepthwiseConvInputNHWCFilterHWCFOp,
+                           linalg::DepthwiseConvInputNHWCFilterHWCOp>(op));
       });
 
       OwningRewritePatternList patterns;

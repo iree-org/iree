@@ -423,10 +423,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 }
 
 // Adapted from BytecodeModuleTarget and extended by C specific passes
-static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
-  bool optimize = true;
-  bool stripDebugOps = false;
-
+static LogicalResult canonicalizeModule(
+    IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
   OwningRewritePatternList patterns;
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
@@ -446,7 +444,8 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
 
     // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
-    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() && stripDebugOps) {
+    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
+        targetOptions.stripDebugOps) {
       target.setOpAction(OperationName(op->name, context),
                          ConversionTarget::LegalizationAction::Illegal);
     }
@@ -460,7 +459,7 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   mlir::applyPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
-  if (optimize) {
+  if (targetOptions.optimize) {
     // TODO(benvanik): does this run until it quiesces?
     // TODO(simon-camp): reenable pass once support for control flow ops has
     // landed
@@ -469,7 +468,12 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
     // modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  // In the the Bytecode module the order is:
+  // * `createDropCompilerHintsPass()`
+  // * `IREE::VM::createOrdinalAllocationPass()`
+  // Here, we have to reverse the order and run `createConvertVMToEmitCPass()`
+  // inbetween to test the EmitC pass. Otherwise, the constants get folded
+  // by the canonicalizer.
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
@@ -481,6 +485,8 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
   // C target specific passes
   modulePasses.addPass(createConvertVMToEmitCPass());
 
+  modulePasses.addPass(createDropCompilerHintsPass());
+
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
   }
@@ -489,10 +495,18 @@ static LogicalResult canonicalizeModule(IREE::VM::ModuleOp moduleOp) {
 }
 
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
-  if (failed(canonicalizeModule(moduleOp))) {
+  if (failed(canonicalizeModule(moduleOp, targetOptions))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
+  }
+
+  if (targetOptions.outputFormat == COutputFormat::kMlirText) {
+    // Use the standard MLIR text printer.
+    moduleOp.getOperation()->print(output);
+    output << "\n";
+    return success();
   }
 
   auto printInclude = [&output](std::string include) {
@@ -507,7 +521,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printModuleComment(moduleOp, output);
   output << "\n";
 
-  mlir::emitc::CppEmitter emitter(output);
+  mlir::emitc::CppEmitter emitter(output, true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
 
   // build struct definitions
@@ -538,13 +552,14 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
+                                 CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
     return outerModuleOp.emitError()
            << "outer module does not contain a vm.module op";
   }
-  return translateModuleToC(*moduleOps.begin(), output);
+  return translateModuleToC(*moduleOps.begin(), targetOptions, output);
 }
 
 }  // namespace VM

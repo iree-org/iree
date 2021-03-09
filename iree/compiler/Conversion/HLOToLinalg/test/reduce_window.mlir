@@ -24,11 +24,14 @@ module {
 // CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
 // CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<1x3x3x1xi32>
+// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
 // CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
 // CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_min(%[[ARG0]], %[[WINDOW]], %[[RES]])
-// CHECK-SAME:      strides = [1, 2, 2, 1]
+// CHECK:         linalg.pooling_nhwc_min
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
 
 // -----
 
@@ -56,11 +59,14 @@ module {
 // CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
 // CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<1x3x3x1xi32>
+// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
 // CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
 // CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_max(%[[ARG0]], %[[WINDOW]], %[[RES]])
-// CHECK-SAME:      strides = [1, 2, 2, 1]
+// CHECK:         linalg.pooling_nhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
 
 // -----
 
@@ -88,11 +94,14 @@ module {
 // CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
 // CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<1x3x3x1xi32>
+// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
 // CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
 // CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_sum(%[[ARG0]], %[[WINDOW]], %[[RES]])
-// CHECK-SAME:      strides = [1, 2, 2, 1]
+// CHECK:         linalg.pooling_nhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
 
 // -----
 
@@ -119,7 +128,10 @@ module {
 // CHECK-DAG:     %[[INIT:.+]] = constant 0xFF800000 : f32
 // CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<1x3x3x1xi32>
+// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
 // CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_max(%[[ARG0]], %[[WINDOW]], %[[RES]])
-// CHECK-SAME:      strides = [1, 2, 2, 1]
+// CHECK:         linalg.pooling_nhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
+// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
