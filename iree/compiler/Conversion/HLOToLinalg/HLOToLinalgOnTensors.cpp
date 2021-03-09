@@ -294,6 +294,7 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
   };
 
   if (filterDims[2] * filterDims[3] != op.feature_group_count()) {
+    // For cases where channel multiplier != 1
     auto outputDims = resultType.getShape();
     auto channelMultiplier = filterDims[3];
     SmallVector<int64_t> reshapedOutputDims;
@@ -324,6 +325,7 @@ LogicalResult DepthwiseConvOpConversion::matchAndRewrite(
     rewriter.replaceOpWithNewOp<linalg::TensorReshapeOp>(
         op, resultType, conv.getResult(0), collapsedDimList);
   } else {
+    // For cases where channel multiplier == 1
     Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, resultType.getShape(), resultType.getElementType());
     auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
