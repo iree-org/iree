@@ -239,29 +239,29 @@ class ref {
   typedef T* this_type::*unspecified_bool_type;
 
  public:
-  ABSL_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
     return ref_type_descriptor<T>::get()->type;
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref() noexcept
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept
       : ref_({
             0,
             ref_type_descriptor<T>::get()->offsetof_counter,
             ref_type_descriptor<T>::get()->type,
         }) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept  // NOLINT
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept  // NOLINT
       : ref_({
             0,
             ref_type_descriptor<T>::get()->offsetof_counter,
             ref_type_descriptor<T>::get()->type,
         }) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept  // NOLINT
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept  // NOLINT
       : ref_({
             p,
             ref_type_descriptor<T>::get()->offsetof_counter,
             ref_type_descriptor<T>::get()->type,
         }) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept { ref_type_release<T>(get()); }
+  IREE_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept { ref_type_release<T>(get()); }
 
   // Don't use implicit ref copying; use retain_ref instead to make things more
   // readable. We can't delete the ctor (or, I couldn't find a way not to)
@@ -308,7 +308,7 @@ class ref {
   // its reference count decremented and resets the ref to empty.
   // Returns nullptr if the ref holds no value.
   // To re-wrap in a ref use either ref<T>(value) or assign().
-  ABSL_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
     T* p = get();
     ref_.ptr = nullptr;
     return p;
@@ -317,7 +317,7 @@ class ref {
   // Assigns a pointer.
   // The pointer will be accepted by the ref and its reference count will
   // not be incremented.
-  ABSL_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
+  IREE_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
     reset();
     ref_.ptr = value;
   }

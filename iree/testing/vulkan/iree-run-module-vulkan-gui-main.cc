@@ -115,12 +115,10 @@ Status RunModuleAndUpdateImGuiWindow(
   IREE_LOG(INFO) << "EXEC @" << function_name;
   IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
                                       function_inputs.get(), outputs.get(),
-                                      iree_allocator_system()))
-      << "invoking function " << function_name;
+                                      iree_allocator_system()));
 
   std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss))
-      << "printing results";
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss));
 
   outputs.reset();
 
@@ -306,10 +304,7 @@ extern "C" int iree_main(int argc, char** argv) {
   // Load bytecode module from embedded data.
   IREE_LOG(INFO) << "Loading IREE byecode module...";
   std::string module_file;
-  Status status = iree::GetModuleContentsFromFlags(&module_file);
-  if (!status.ok()) {
-    IREE_LOG(FATAL) << "Error when reading module file" << status;
-  }
+  IREE_CHECK_OK(iree::GetModuleContentsFromFlags(&module_file));
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
@@ -404,8 +399,7 @@ extern "C" int iree_main(int argc, char** argv) {
     // Custom window.
     auto status = RunModuleAndUpdateImGuiWindow(
         iree_vk_device, iree_context, main_function, entry_function,
-        main_function_inputs.value(), main_function_output_descs.value(),
-        window_title);
+        main_function_inputs, main_function_output_descs, window_title);
     if (!status.ok()) {
       IREE_LOG(FATAL) << status;
       done = true;
@@ -422,7 +416,7 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
-  main_function_inputs.value().reset();
+  iree_vm_ref_release(main_function_inputs);
 
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
