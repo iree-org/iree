@@ -160,15 +160,19 @@ getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
   SPIRVCodegenOptions options;
 
-  // XXX: Launch configuration expects the original input/output type to decide
+  // NOTE: Launch configuration expects the original input/output type to decide
   // the configuration. But we have already tiled the Linalg ops here. Use an
   // attribute to send it over for now.
   const char inputTypeAttrName[] = "iree.codegen.original_input_types";
   const char outputTypeAttrName[] = "iree.codegen.original_output_types";
-  rootOp->setAttr(inputTypeAttrName,
-                  Builder(rootOp).getTypeArrayAttr(inputTypes));
-  rootOp->setAttr(outputTypeAttrName,
-                  Builder(rootOp).getTypeArrayAttr(outputTypes));
+  if (!inputTypes.empty()) {
+    rootOp->setAttr(inputTypeAttrName,
+                    Builder(rootOp).getTypeArrayAttr(inputTypes));
+  }
+  if (!outputTypes.empty()) {
+    rootOp->setAttr(outputTypeAttrName,
+                    Builder(rootOp).getTypeArrayAttr(outputTypes));
+  }
 
   Optional<LaunchConfig> launchConfig = initGPULaunchConfig(
       rootOp->getContext(), dependenceGraph, options, linalgOps);
@@ -204,7 +208,7 @@ class ConcretizeWorkgroupSizeOp final
                                 PatternRewriter &rewriter) const override {
     unsigned dimIndex = op.dimension().getZExtValue();
 
-    if (dimIndex < kWorkgroupDimCount) {
+    if (dimIndex < kWorkgroupDimCount && tileSize[dimIndex] != 0) {
       rewriter.replaceOpWithNewOp<ConstantOp>(
           op, rewriter.getIndexAttr(tileSize[dimIndex]));
       return success();
@@ -387,20 +391,28 @@ class ConcretizeTileAmongWorkgroupsPass
     // 2. Figure out the original problem size.
 
     SmallVector<Type, 4> inputTypes, outputTypes;
-    if (failed(
+    SmallVector<int64_t, 4> workloadSize;
+    if (succeeded(
             getInputOutputTypesForAllTiles(rootOp, inputTypes, outputTypes))) {
-      return rootOp.emitError("unable to find input/output type for all tiles");
-    }
+      if (outputTypes.size() != 1) {
+        return rootOp.emitError("only support ops with one result right now");
+      }
 
-    if (outputTypes.size() != 1) {
-      return rootOp.emitError("only support ops with one result right now");
-    }
+      // Flow/HAL processor id/size/count ops' indices follow the reverse order
+      // of the shape dimensions.
+      workloadSize = llvm::to_vector<4>(llvm::reverse(
+          outputTypes.front().cast<ShapedType>().getShape().take_front(
+              numTilableDims)));
+    } else {
+      // This can happen for dynamic shapes.
+      LLVM_DEBUG(llvm::dbgs()
+                 << "unable to find input/output type for all tiles");
 
-    // Flow/HAL processor id/size/count ops' indices follow the reverse order of
-    // the shape dimensions.
-    auto workloadSize = llvm::to_vector<4>(llvm::reverse(
-        outputTypes.front().cast<ShapedType>().getShape().take_front(
-            numTilableDims)));
+      inputTypes.clear();
+      outputTypes.clear();
+
+      workloadSize.assign(numTilableDims, ShapedType::kDynamicSize);
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "Queried workload size: ";
@@ -413,7 +425,9 @@ class ConcretizeTileAmongWorkgroupsPass
     SmallVector<int64_t, 4> tileSize;
     SmallVector<int64_t, 4> workgroupSize;
 
+    // Try to use configuration from the command-line first for testing.
     tileSize.assign(options.tileSizes.begin(), options.tileSizes.end());
+    tileSize.resize(numTilableDims, 0);
     workgroupSize.assign(options.workgroupSize.begin(),
                          options.workgroupSize.end());
     if (tileSize.empty() || workgroupSize.empty()) {
