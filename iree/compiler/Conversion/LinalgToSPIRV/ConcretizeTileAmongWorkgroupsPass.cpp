@@ -50,6 +50,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
@@ -358,7 +359,9 @@ class ConcretizeTileAmongWorkgroupsPass
       : options(options) {}
   ConcretizeTileAmongWorkgroupsPass(
       const ConcretizeTileAmongWorkgroupsPass &that)
-      : options(that.options) {}
+      : options(that.options) {
+    inlineTripOneLoops = that.inlineTripOneLoops;
+  }
 
   void runOnOperation() override {
     IREE::HAL::ExecutableTargetOp targetOp = getOperation();
@@ -520,7 +523,7 @@ class ConcretizeTileAmongWorkgroupsPass
 
     // 6. Canonicalization and clean up.
 
-    {
+    if (inlineTripOneLoops) {
       OwningRewritePatternList patterns;
       patterns.insert<RemoveTripOneLoop>(&context, workloadSize, tileSize);
 
@@ -532,6 +535,15 @@ class ConcretizeTileAmongWorkgroupsPass
 
  private:
   SPIRVCodegenOptions options;
+
+  // TODO(#5034): Investigate whether there is a better way to prove tileability
+  // and canonicalize affine.min ops, without matching against the specific
+  // pattern involving loops.
+  Option<bool> inlineTripOneLoops{
+      *this, "inline-trip-one-loops",
+      llvm::cl::desc(
+          "Inline a loop's body if it can be proven to just have one trip"),
+      llvm::cl::init(true)};
 };
 
 }  // namespace
