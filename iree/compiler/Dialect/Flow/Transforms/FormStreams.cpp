@@ -123,9 +123,8 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(&block);
     blockBuilder.setInsertionPointAfter(streamOps.back());
     auto fragmentLoc = FusedLoc::get(
-        llvm::to_vector<8>(llvm::map_range(
-            streamOps, [](Operation *op) { return op->getLoc(); })),
-        context);
+        context, llvm::to_vector<8>(llvm::map_range(
+                     streamOps, [](Operation *op) { return op->getLoc(); })));
 
     // Find all input operands and results that escape the fragment.
     llvm::SmallSetVector<Operation *, 8> streamOpSet{streamOps.begin(),
