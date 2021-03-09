@@ -506,12 +506,13 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @dot_general_lowering()
-//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%{{.+}}] : memref<1x2xf32>
+//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
+//   CHECK-DAG:   %[[RESHAPE_LHS:.+]] = linalg.reshape %[[LHS]]
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS_TILE:.+]] = subview %[[LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[LHS_TILE:.+]] = subview %[[RESHAPE_LHS]][%[[IV0]], 0]
 //   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]]
 //   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS]][0, %[[IV1]]]
 //       CHECK:       linalg.fill(%[[RESULT_TILE]], %{{.+}})
