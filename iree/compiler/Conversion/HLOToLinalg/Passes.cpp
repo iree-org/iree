@@ -30,7 +30,8 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
 
 void addHLOToLinalgOnTensorsPasses(OpPassManager &pm,
                                    bool useLinalgOnTensorsPath) {
-  pm.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass(useLinalgOnTensorsPath));
+  pm.addNestedPass<FuncOp>(
+      createHLOToLinalgOnTensorsPass(useLinalgOnTensorsPath));
   pm.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
