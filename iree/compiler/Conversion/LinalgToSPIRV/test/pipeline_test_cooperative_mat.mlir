@@ -62,7 +62,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 }
 //    CHECK-LABEL: spv.func @matmul_static_shape
 // CHECK-COUNT-16:   spv.CooperativeMatrixLoadNV
-//          CHECK:   spv.loop
+//          CHECK:   spv.mlir.loop
 // CHECK-COUNT-16:   spv.CooperativeMatrixLoadNV
 // CHECK-COUNT-32:   spv.CooperativeMatrixMulAddNV
 // CHECK-COUNT-16:   spv.CooperativeMatrixStoreNV

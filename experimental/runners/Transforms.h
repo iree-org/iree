@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef THIRD_PARTY_IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
-#define THIRD_PARTY_IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
+#ifndef IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
+#define IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
 
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -65,4 +65,4 @@ struct TileAndDistributePattern : public RewritePattern {
 }  // namespace linalg
 }  // namespace mlir
 
-#endif  // THIRD_PARTY_IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
+#endif  // IREE_EXPERIMENTAL_RUNNERS_TRANSFORMS_H_
