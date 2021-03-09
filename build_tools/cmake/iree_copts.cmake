@@ -172,6 +172,14 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
 
   MSVC_OR_CLANG_CL
+    # Default warning level (severe + significant + production quality).
+    # This does not include level 4, "informational", warnings or those that
+    # are off by default.
+    # https://docs.microsoft.com/en-us/cpp/build/reference/compiler-option-warning-level
+    # Note that we set CMake policy CMP0092 (if found), making this explicit:
+    # https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
+    "/W3"
+
     # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
     # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
     # NOTE: this is not really required anymore for build performance but does
