@@ -33,12 +33,6 @@ static inline void vm_global_store_i32(uint8_t* base, uint32_t byte_offset,
 }
 
 //===------------------------------------------------------------------===//
-// Constants
-//===------------------------------------------------------------------===//
-
-static inline int32_t vm_const_i32(int32_t a) { return a; }
-
-//===------------------------------------------------------------------===//
 // Conditional assignment
 //===------------------------------------------------------------------===//
 
@@ -142,12 +136,6 @@ static inline int32_t vm_cmp_nz_i32(int32_t operand) {
     return iree_status_allocate(IREE_STATUS_FAILED_PRECONDITION, "<vm>", 0, \
                                 iree_make_cstring_view(#message));          \
   }
-
-//===------------------------------------------------------------------===//
-// ExtI64: Constants
-//===------------------------------------------------------------------===//
-
-static inline int64_t vm_const_i64(int64_t a) { return a; }
 
 //===------------------------------------------------------------------===//
 // ExtI64: Conditional assignment
