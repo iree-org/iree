@@ -533,6 +533,23 @@ LogicalResult getOpLaunchConfig(linalg::DepthwiseConvInputNHWCFilterHWCOp op,
   return success();
 }
 
+template <>
+LogicalResult getOpLaunchConfig(linalg::DepthwiseConvInputNHWCFilterHWCFOp op,
+                                const spirv::TargetEnv &targetEnv,
+                                const SPIRVCodegenOptions &options,
+                                TileSizesListType &tileSizes,
+                                LaunchConfigInfo &config) {
+  unsigned maxWorkgroupSize = targetEnv.getResourceLimits()
+                                  .max_compute_workgroup_invocations()
+                                  .getInt();
+  const int64_t tileSizeX = 32;
+  int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
+  SmallVector<int64_t, 4> ts = {1, tileSizeY, tileSizeX};
+  tileSizes.emplace_back(std::move(ts));
+  config.workgroupSize = {tileSizeX, tileSizeY, 1};
+  return success();
+}
+
 template <typename PoolingOpTy>
 static LogicalResult getPoolingOpLaunchConfig(
     PoolingOpTy op, const spirv::TargetEnv &targetEnv,
@@ -614,6 +631,7 @@ Optional<LaunchConfig> initGPULaunchConfig(
 
     DISPATCH(linalg::BatchMatmulOp)
     DISPATCH(linalg::DepthwiseConvInputNHWCFilterHWCOp)
+    DISPATCH(linalg::DepthwiseConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNWCFilterWCFOp)
     DISPATCH(linalg::ConvInputNHWCFilterHWCFOp)
     DISPATCH(linalg::ConvInputNDHWCFilterDHWCFOp)
