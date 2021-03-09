@@ -395,8 +395,7 @@ LogicalResult ReduceWindowOpConversion::apply(
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
   auto resultType = op.getResult().getType().cast<ShapedType>();
-  int rank = resultType.getRank();
-  if (rank != 4) {
+  if (resultType.getRank() != 4) {
     return rewriter.notifyMatchFailure(op, "expected NHWC pooling-based op");
   }
 
@@ -424,7 +423,6 @@ LogicalResult ReduceWindowOpConversion::apply(
     return rewriter.notifyMatchFailure(op, "expected element type to be f32");
   }
 
-  // TODO(hanchung): Use template lambda after migrating to C++20.
   Attribute strides;
   if (op.window_stridesAttr()) {
     strides = rewriter.getI64VectorAttr(
