@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
 
 module {
   func @reduce_window_min_nhwc() {
@@ -21,17 +21,17 @@ module {
   }
 }
 // CHECK-LABEL: func @reduce_window_min_nhwc
-// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
-// CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-// CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
-// CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
-// CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_nhwc_min
+// CHECK-DAG:     %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+// CHECK-DAG:     %[[ARG1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+// CHECK:         %[[WINDOW:.+]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[INIT_VAL]]) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_min
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
 // CHECK-SAME:       strides = dense<2> : vector<2xi64>}
-// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
-// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
 
 // -----
 
@@ -56,22 +56,22 @@ module {
   }
 }
 // CHECK-LABEL: func @reduce_window_max_nhwc
-// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
-// CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-// CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
-// CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
-// CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_nhwc_max
+// CHECK-DAG:     %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+// CHECK-DAG:     %[[ARG1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+// CHECK:         %[[WINDOW:.+]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[INIT_VAL]]) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_max
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
 // CHECK-SAME:       strides = dense<2> : vector<2xi64>}
-// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
-// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
 
 // -----
 
 module {
-  func @reduce_window_add_nhwc() {
+  func @reduce_window_sum_nhwc() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
@@ -90,18 +90,18 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
-// CHECK-LABEL: func @reduce_window_add_nhwc
-// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
-// CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-// CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
-// CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
-// CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_nhwc_sum
+// CHECK-LABEL: func @reduce_window_sum_nhwc
+// CHECK-DAG:     %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+// CHECK-DAG:     %[[ARG1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+// CHECK:         %[[WINDOW:.+]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[INIT_VAL]]) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_sum
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
 // CHECK-SAME:       strides = dense<2> : vector<2xi64>}
-// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
-// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
 
 // -----
 
@@ -125,13 +125,14 @@ module {
   }
 }
 // CHECK-LABEL: func @reduce_window_max_nhwc
-// CHECK-DAG:     %[[INIT:.+]] = constant 0xFF800000 : f32
-// CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
-// CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
-// CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
-// CHECK:         linalg.pooling_nhwc_max
+// CHECK-DAG:     %[[CST:.+]] = constant dense<0xFF800000> : tensor<f32>
+// CHECK-DAG:     %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
+// CHECK:         %[[WINDOW:.+]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = linalg.init_tensor [1, 8, 8, 64] : tensor<1x8x8x64xf32
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[CST]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill(%[[INIT]], %[[INIT_VAL]]) : tensor<1x8x8x64xf32>, f32 -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_max
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
 // CHECK-SAME:       strides = dense<2> : vector<2xi64>}
-// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : memref<1x18x18x64xf32>, memref<3x3xf32>)
-// CHECK-SAME:      outs(%[[RES]] : memref<1x8x8x64xf32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x18x18x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>

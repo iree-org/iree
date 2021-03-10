@@ -152,6 +152,127 @@ struct TorchIndexSelectOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// mhlo.reduce_window conversion patterns.
+//===----------------------------------------------------------------------===//
+
+/// mhlo.reduce_window is mapped to a linalg.pooling operation. The type of
+/// the pooling is determined based on the body of the reduce window
+/// operation. This class enumerates the different variants.
+enum class PoolingType {
+  kMin,
+  kMax,
+  kAdd,
+};
+
+struct ReduceWindowOpConversion
+    : public OpConversionPattern<mhlo::ReduceWindowOp> {
+  using OpConversionPattern<mhlo::ReduceWindowOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ReduceWindowOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override;
+};
+
+static PoolingType getPoolingType(Region &region) {
+  assert(region.getBlocks().size() == 1 &&
+         "expected the region has exactlly one block");
+  Block &block = region.front();
+  assert(block.getOperations().size() == 2 &&
+         "expected the block has exactlly two operations");
+  auto op = block.begin();
+  if (isa<mhlo::MinOp>(op)) return PoolingType::kMin;
+  if (isa<mhlo::MaxOp>(op)) return PoolingType::kMax;
+  if (isa<mhlo::AddOp>(op)) return PoolingType::kAdd;
+
+  llvm_unreachable("unknown pooling type");
+}
+
+LogicalResult ReduceWindowOpConversion::matchAndRewrite(
+    mhlo::ReduceWindowOp op, ArrayRef<Value> args,
+    ConversionPatternRewriter &rewriter) const {
+  auto loc = op.getLoc();
+  auto resultType = op.getResult().getType().cast<ShapedType>();
+  if (resultType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected NHWC pooling-based op");
+  }
+
+  // Create a fake window dimension.
+  SmallVector<int64_t, 4> shapes;
+  shapes.push_back(op.window_dimensions().getValue<int64_t>(1));
+  shapes.push_back(op.window_dimensions().getValue<int64_t>(2));
+  auto fakeWindowDims = rewriter.create<linalg::InitTensorOp>(
+      loc, shapes, resultType.getElementType());
+
+  if (op.window_strides() &&
+      (op.window_strides().getValue().getValue<int64_t>(0) != 1 ||
+       op.window_strides().getValue().getValue<int64_t>(3) != 1)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected window_strides to be [1,x,y,1]");
+  }
+  if (op.window_dimensions() &&
+      (op.window_dimensions().getValue<int64_t>(0) != 1 ||
+       op.window_dimensions().getValue<int64_t>(3) != 1)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected window_dimensions to be [1,x,y,1]");
+  }
+
+  if (!args[0].getType().cast<ShapedType>().getElementType().isF32()) {
+    return rewriter.notifyMatchFailure(op, "expected element type to be f32");
+  }
+
+  Attribute strides;
+  if (op.window_stridesAttr()) {
+    strides = rewriter.getI64VectorAttr(
+        {op.window_strides().getValue().getValue<int64_t>(1),
+         op.window_strides().getValue().getValue<int64_t>(2)});
+  } else {
+    strides = rewriter.getI64VectorAttr({1, 1});
+  }
+  Attribute dilations;
+  if (op.window_dilations()) {
+    dilations = rewriter.getI64VectorAttr(
+        {op.window_dilations().getValue().getValue<int64_t>(1),
+         op.window_dilations().getValue().getValue<int64_t>(2)});
+  } else {
+    dilations = rewriter.getI64VectorAttr({1, 1});
+  }
+  linalg::LinalgOp poolingOp;
+  PoolingType poolingType = getPoolingType(op.body());
+
+  Value initTensor = rewriter.create<linalg::InitTensorOp>(
+      loc, resultType.getShape(), resultType.getElementType());
+  Value initValue = args[1];
+  initValue = rewriter.create<tensor::ExtractOp>(loc, initValue);
+  Value filledInitTensor =
+      rewriter.create<linalg::FillOp>(loc, initTensor, initValue).getResult(0);
+  auto createOp = [&](auto *type_ptr) -> linalg::LinalgOp {
+    return cast<linalg::LinalgOp>(
+        rewriter
+            .create<std::remove_pointer_t<decltype(type_ptr)>>(
+                loc, ArrayRef<Type>{resultType},
+                ValueRange{args[0], fakeWindowDims.getResult()},
+                filledInitTensor, dilations, strides)
+            .getOperation());
+  };
+  switch (poolingType) {
+    case PoolingType::kMin: {
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCMinOp *>(nullptr));
+      break;
+    }
+    case PoolingType::kMax: {
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCMaxOp *>(nullptr));
+      break;
+    }
+    case PoolingType::kAdd: {
+      poolingOp = createOp(static_cast<linalg::PoolingNHWCSumOp *>(nullptr));
+      break;
+    }
+  }
+  rewriter.replaceOp(op, poolingOp->getResult(0));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // mhlo.conv conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -506,13 +627,7 @@ struct ConvertHLOToLinalgOnTensorsPass
     }
 
     ConversionTarget target(getContext());
-    // Don't convert the body of reduction ops.
-    target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
-        Optional<ConversionTarget::DynamicLegalityCallbackFn>(
-            [](Operation *op) {
-              auto parentOp = op->getParentRegion()->getParentOp();
-              return isa<mhlo::ReduceWindowOp>(parentOp);
-            }));
+    target.addIllegalDialect<mhlo::MhloDialect>();
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     if (useLinalgOnTensorsPath) {
@@ -554,7 +669,8 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<TorchIndexSelectOpConversion, ConstOpConversion,
-                  ConcatenateOpConversion, DepthwiseConvOpConversion>(context);
+                  ReduceWindowOpConversion, ConcatenateOpConversion,
+                  DepthwiseConvOpConversion>(context);
 }
 
 static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
