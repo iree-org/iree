@@ -78,4 +78,28 @@ iree_cc_library(
 
 endif()
 
+if(${IREE_HAL_DRIVER_WASM})
+
+iree_cc_library(
+  NAME
+    wasm_module_loader
+  HDRS
+    "wasm_module_loader.h"
+  SRCS
+    "wasm_module_loader.c"
+  DEPS
+    iree::base::api
+    iree::base::flatcc
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::local
+    iree::schemas::dylib_executable_def_c_fbs
+    wasm_micro_runtime_vmlib
+  DEFINES
+    "IREE_HAL_HAVE_WASM_MODULE_LOADER=1"
+  PUBLIC
+)
+
+endif()
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

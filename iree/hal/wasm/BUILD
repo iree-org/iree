@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2021 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,21 +16,4 @@ package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-cc_library(
-    name = "drivers",
-    srcs = ["init.c"],
-    hdrs = ["init.h"],
-    deps = [
-        "//iree/base:api",
-        "//iree/base:tracing",
-    ] + [
-        # TODO(*): select() and only pull in based on build configuration.
-        "//iree/hal/dylib/registration",
-        "//iree/hal/vmla/registration",
-        "//iree/hal/vulkan/registration",
-        # TODO(scotttodd): add WASM when it builds with Bazel
-        # "//iree/hal/wasm/registration",
-    ],
 )

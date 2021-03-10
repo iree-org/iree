@@ -27,6 +27,9 @@ endif()
 if(${IREE_HAL_DRIVER_VULKAN})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::registration)
 endif()
+if(${IREE_HAL_DRIVER_WASM})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::wasm::registration)
+endif()
 
 # TODO: Move to either hal/metal/CMakeLists.txt or
 # hal/metal/registration/CMakeLists.txt if bazel-to-cmake issues can be
