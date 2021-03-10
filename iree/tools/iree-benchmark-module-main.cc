@@ -33,9 +33,10 @@ ABSL_FLAG(std::string, module_file, "-",
 
 // TODO(hanchung): Extract the batch size using
 // iree_vm_function_reflection_attr.
-ABSL_FLAG(int, batch_size, 1,
-          "The number of batch size, which is expected to match "
-          "iree-hal-repeat-dispatch-num when translating the module");
+ABSL_FLAG(
+    int, batch_size, 1,
+    "The number of batch size, which is expected to match "
+    "iree-hal-benchmark-dispatch-repeat-count when translating the module");
 
 ABSL_FLAG(std::string, entry_function, "",
           "Name of a function contained in the module specified by module_file "

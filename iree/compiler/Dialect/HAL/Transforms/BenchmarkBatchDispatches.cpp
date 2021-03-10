@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 
@@ -33,7 +32,7 @@ class BenchmarkBatchDispatchesPass
       : repeatCount_(repeatCount) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<HALDialect, StandardOpsDialect, scf::SCFDialect>();
+    registry.insert<HALDialect, StandardOpsDialect>();
   }
 
   void runOnOperation() override {
@@ -43,8 +42,9 @@ class BenchmarkBatchDispatchesPass
 
     for (auto op : ops) {
       OpBuilder builder(op);
-      for (unsigned i = 0; i < repeatCount_; ++i)
+      for (unsigned i = 0; i < repeatCount_; ++i) {
         builder.clone(*op.getOperation());
+      }
       op.erase();
     }
   }
