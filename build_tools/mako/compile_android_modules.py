@@ -76,8 +76,8 @@ PHONES = [
                 name="vulkan-spirv",
                 mako_tag="vlk",
                 extra_flags=[
-                    "-iree-spirv-enable-vectorization",
-                    "qualcomm-adreno640-unknown-android10"
+                    "--iree-spirv-enable-vectorization",
+                    "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
                 ])
         ]),
     PhoneInfo(
@@ -94,8 +94,8 @@ PHONES = [
                 name="vulkan-spirv",
                 mako_tag="vlk",
                 extra_flags=[
-                    "-iree-spirv-enable-vectorization",
-                    "-iree-vulkan-target-triple=valhall-g77-unknown-android10"
+                    "--iree-spirv-enable-vectorization",
+                    "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
                 ])
         ])
 ]
