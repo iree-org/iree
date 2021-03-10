@@ -14,12 +14,19 @@
 
 name: Lint
 
-on: [pull_request]
+on:
+  pull_request:
+    branches:
+    - main
 
 jobs:
   bazel_to_cmake:
     runs-on: ubuntu-18.04
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Running bazel_to_cmake
@@ -30,6 +37,10 @@ jobs:
   buildifier:
     runs-on: ubuntu-18.04
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Running Buildifier
@@ -46,6 +57,10 @@ jobs:
     env:
       BASE_REF: ${{ github.base_ref }}
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Setting up python
@@ -70,6 +85,10 @@ jobs:
     env:
       BASE_REF: ${{ github.base_ref }}
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Setting up python
@@ -90,6 +109,10 @@ jobs:
     env:
       BASE_REF: ${{ github.base_ref }}
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Installing dependencies
         run: |
           sudo apt-get update -qq
@@ -109,6 +132,10 @@ jobs:
   submodules:
     runs-on: ubuntu-18.04
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Checking submodules
@@ -119,6 +146,10 @@ jobs:
     env:
       BASE_REF: ${{ github.base_ref }}
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Fetching Base Branch
@@ -130,6 +161,10 @@ jobs:
   yamllint:
     runs-on: ubuntu-18.04
     steps:
+      - name: Cancel previous
+        uses: styfle/cancel-workflow-action@0.8.0
+        with:
+          access_token: ${{ github.token }}
       - uses: actions/checkout@v2
       - name: yaml-lint
         uses: ibiqlik/action-yamllint@v1
