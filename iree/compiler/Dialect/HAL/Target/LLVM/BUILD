@@ -22,7 +22,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}")
+if(NOT "${IREE_TARGET_BACKEND_LLVM-AOT}")
   return()
 endif()
 """,
