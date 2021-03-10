@@ -115,7 +115,7 @@ def main() -> None:
       for target in phone.targets:
         module_name = "{}_{}_{}_{}.vmfb".format(model.name, phone.name,
                                                 target.name, target.mako_tag)
-        if module_name.count("_") != 4:
+        if module_name.count("_") != 3:
           raise ValueError(
               "Expect model name, phone name and target name do not contain '_'"
           )
