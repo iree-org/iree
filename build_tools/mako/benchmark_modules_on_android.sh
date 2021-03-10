@@ -120,11 +120,11 @@ function run_and_log {
   esac
 
   driver="$(echo ${target} | cut -d '-' -f1)"
-  test_out="${OUTPUT_DIR}/${model}_${phone}_${target}_output.txt"
+  test_out="${OUTPUT_DIR}/${model}_${phone}_${target}_${TAG}_output.txt"
   adb shell LD_LIBRARY_PATH=/data/local/tmp taskset 80 \
     "${DEVICE_ROOT}/iree-benchmark-module" \
     "--flagfile=${DEVICE_ROOT}/${model}_flagfile" \
-    "--module_file=${DEVICE_ROOT}/${model}_${phone}_${target}.vmfb" \
+    "--module_file=${DEVICE_ROOT}/${model}_${phone}_${target}_${TAG}.vmfb" \
     "--driver=${driver}" \
     "${extra_flags[@]}" \
     --benchmark_repetitions=10 | tee "${test_out}"
