@@ -185,7 +185,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         # "torch_index_select.mlir",
         "transpose.mlir",
-        # "while.mlir",
+        "while.mlir",
     ],
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
@@ -246,7 +246,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         # "torch_index_select.mlir",
         "transpose.mlir",
-        # "while.mlir",
+        "while.mlir",
     ],
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
