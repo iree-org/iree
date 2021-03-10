@@ -509,6 +509,7 @@ struct TileAndDistributeOnTensorsPattern
     // NOTE: Special treatment for convolution, which have more than 3 parallel
     // dimensions. We want to ignore the batch dimension and tile along the
     // next three.
+    // TODO(#5048): figure out a better way to avoid this special case.
     if (isa<linalg::ConvInputNHWCFilterHWCFOp,
             linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
       count.erase(count.begin());
@@ -754,6 +755,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     // NOTE: Special treatment for convolution, which have more than 3
     // parallel dimensions. We want to ignore the batch dimension and tile
     // along the next three. That means setting the first position to zero.
+    // TODO(#5048): figure out a better way to avoid this special case.
     bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp,
                         linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
 
