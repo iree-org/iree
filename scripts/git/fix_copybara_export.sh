@@ -66,11 +66,6 @@ if git merge-base --is-ancestor HEAD main; then
   exit 1
 fi
 
-if [[ -n "$(git rev-list --merges HEAD^..HEAD)" ]]; then
-  echo -e "\n\nHEAD commit is already a merge commit. Aborting."
-  exit 1
-fi
-
 ################################################################################
 
 echo -e "\n\nTo revert the changes made by this script, run:"
@@ -88,6 +83,11 @@ if ! echo "${MESSAGE?}" | grep -q "${COPYBARA_TAG}"; then
   echo -e "\n\nHEAD commit does not contain Copybara tag '${COPYBARA_TAG?}'."
   git log -n 1 HEAD
   exit 0
+fi
+
+if [[ -n "$(git rev-list --merges HEAD^..HEAD)" ]]; then
+  echo -e "\n\nHEAD commit is already a merge commit. Aborting."
+  exit 1
 fi
 
 COPYBARA_LINE="$(echo "${MESSAGE?}" | grep "${COPYBARA_TAG?}")"
