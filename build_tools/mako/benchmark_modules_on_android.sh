@@ -31,6 +31,10 @@ while [[ $# -gt 0 ]]; do
       model="${1#*=}"
       shift
       ;;
+    --phone=*)
+      phone="${1#*=}"
+      shift
+      ;;
     --targets=*)
       targets="${1#*=}"
       shift
@@ -60,6 +64,11 @@ fi
 
 if [[ -z "${benchmark_key}" ]]; then
   echo "Must set --benchmark_key flag.";
+  exit 1
+fi
+
+if [[ -z "${phone}" ]]; then
+  echo "Must set --phone flag.";
   exit 1
 fi
 
@@ -111,11 +120,11 @@ function run_and_log {
   esac
 
   driver="$(echo ${target} | cut -d '-' -f1)"
-  test_out="${OUTPUT_DIR}/${model}-${target}_output.txt"
+  test_out="${OUTPUT_DIR}/${model}_${phone}_${target}_${TAG}_output.txt"
   adb shell LD_LIBRARY_PATH=/data/local/tmp taskset 80 \
     "${DEVICE_ROOT}/iree-benchmark-module" \
-    "--flagfile=${DEVICE_ROOT}/flagfile" \
-    "--module_file=${DEVICE_ROOT}/${model}-${target}.vmfb" \
+    "--flagfile=${DEVICE_ROOT}/${model}_flagfile" \
+    "--module_file=${DEVICE_ROOT}/${model}_${phone}_${target}_${TAG}.vmfb" \
     "--driver=${driver}" \
     "${extra_flags[@]}" \
     --benchmark_repetitions=10 | tee "${test_out}"
