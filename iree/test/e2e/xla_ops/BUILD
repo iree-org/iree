@@ -279,6 +279,8 @@ iree_check_single_backend_test_suite(
         "-iree-flow-dispatch-linalg-on-tensors",
     ],
     driver = "cuda",
+    # TODO: broken internally
+    tags = ["notap"],
     target_backend = "cuda",
 )
 

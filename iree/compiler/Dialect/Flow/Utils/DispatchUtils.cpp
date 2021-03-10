@@ -81,7 +81,7 @@ LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
   for (auto *op : ops) {
     opLocs.push_back(op->getLoc());
   }
-  auto regionLoc = FusedLoc::get(opLocs, workload.getContext());
+  auto regionLoc = FusedLoc::get(workload.getContext(), opLocs);
 
   // Get a list of values that we need to capture and values that escape the
   // region and need to be returned.
