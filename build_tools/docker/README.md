@@ -70,6 +70,29 @@ python3 build_tools/docker/manage_images.py --image all
 
 ## Adding or Updating an Image
 
+### Prerequisites
+
+## Instal GCloud
+
+To install gcloud run:
+
+```shell
+sudo apt install -y google-cloud-sdk
+```
+
+Follow the [`instructions in GCloud`][gcloud-help] or run:
+
+```shell
+gcloud auth login
+```
+
+By default Docker will require using `sudo`. If you are in this case make sure
+to authentify using:
+
+```shell
+sudo gcloud auth login
+```
+
 ### Part 1. Local Changes
 
 1. Update the `Dockerfile` for the image that you want to modify or add. If
@@ -110,3 +133,5 @@ modify the `docker` images.
     ```shell
     python3 build_tools/docker/manage_prod.py
     ```
+
+[gcloud-help]: https://cloud.google.com/container-registry/docs/advanced-authentication#gcloud-helper
