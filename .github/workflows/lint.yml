@@ -14,10 +14,7 @@
 
 name: Lint
 
-on:
-  pull_request:
-    branches:
-    - main
+on: [pull_request]
 
 jobs:
   bazel_to_cmake:
