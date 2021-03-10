@@ -41,6 +41,12 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::init(true)};
 };
 
+static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
+    "iree-hal-benchmark-dispatch-repeat-count",
+    llvm::cl::desc(
+        "The number of times to repeat each hal.command_buffer.dispatch op."),
+    llvm::cl::init(1)};
+
 }  // namespace
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
@@ -110,6 +116,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
+  if (benchmarkDispatchRepeatCount != 1) {
+    passManager.addNestedPass<FuncOp>(
+        createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
+  }
   passManager.addPass(createLowerAffinePass());
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
