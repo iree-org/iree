@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -838,6 +839,19 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           })
           .wasInterrupted()) {
     return signalPassFailure();
+  }
+
+  // Run necessary canonicalization patterns before destructive updates.
+  {
+    OwningRewritePatternList patterns;
+    // This is needed because tiling and distribution may create
+    // subtensor_insert ops whose source operands come from tensor.cast ops.
+    // Those tensor.cast ops cast tensors into a more dynamic shape, in order
+    // to guarantee type match during transformation. Later in destructive
+    // update subtensor_insert ops will be turned into flow dispatch output
+    // store ops.
+    SubTensorInsertOp::getCanonicalizationPatterns(patterns, context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
   // Rewrite destructive updates and ensure no remaining store remains to the
