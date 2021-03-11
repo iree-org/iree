@@ -90,21 +90,6 @@ static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
 }
 
 //===----------------------------------------------------------------------===//
-// Bufferization helper functions for scalar operations.
-//===----------------------------------------------------------------------===//
-
-/// Converts a `tensor.extract` operation into a `load`.
-static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
-                                            BlockAndValueMapping &bvm) {
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
-  Value inputBuffer = bvm.lookup(op.tensor());
-  Value load = b.createOrFold<LoadOp>(op.getLoc(), inputBuffer, op.indices());
-  bvm.map(op.result(), load);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // Bufferization helper functions using BlockAndValueMapping.
 //===----------------------------------------------------------------------===//
 
@@ -388,6 +373,17 @@ static LogicalResult convertSubTensorInsertOp(
       b.create<SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
                           op.getMixedSizes(), op.getMixedStrides());
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
+  return success();
+}
+
+/// Converts a `tensor.extract` operation into a `load`.
+static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
+                                            BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Value inputBuffer = bvm.lookup(op.tensor());
+  Value load = b.createOrFold<LoadOp>(op.getLoc(), inputBuffer, op.indices());
+  bvm.map(op.result(), load);
   return success();
 }
 
