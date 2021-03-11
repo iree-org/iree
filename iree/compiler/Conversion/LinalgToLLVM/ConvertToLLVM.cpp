@@ -642,6 +642,13 @@ void ConvertToLLVMPass::runOnOperation() {
                                        std::move(vectorToLoopsPatterns));
   }
 
+  // math dialect elementry functions -> polynomial form.
+  {
+    OwningRewritePatternList mathPatterns;
+    populateMathPolynomialApproximationPatterns(mathPatterns, &getContext());
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(mathPatterns));
+  }
+
   auto module = getOperation();
 
   LLVMTypeConverter converter(&getContext());
