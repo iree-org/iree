@@ -210,12 +210,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createFoldCompatibleDispatchRegionsPass());
 
-  // Note that as we are rematerializing things here it's critical we do not run
-  // the canonicalizer/CSE between now and when we outline - otherwise it'll
-  // undo all of our work!
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createRematerializeDispatchConstantsPass());
-
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from
   // dispatchees.
