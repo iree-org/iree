@@ -15,6 +15,7 @@
 # Tests for common transforms.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -24,7 +25,29 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "batch_matmul_vectorization.mlir",
+            "convert_to_gpu.mlir",
+            "convert_to_spirv.mlir",
+            "dead_alloc.mlir",
+            "fold-gpu-procid-uses.mlir",
+            "forop_canonicalization.mlir",
+            "linalg_tile_and_fuse.mlir",
+            "materialize_launch_configuration.mlir",
+            "materialize_launch_configuration2.mlir",
+            "matmul_fused_vectorization.mlir",
+            "matmul_vectorization.mlir",
+            "matmul_vectorization_licm.mlir",
+            "memref_vecrotization.mlir",
+            "pipeline_test.mlir",
+            "pipeline_test_cooperative_mat.mlir",
+            "split_dispatch_function.mlir",
+            "vector_to_gpu.mlir",
+            "workgroup_memory_promotion.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-opt",

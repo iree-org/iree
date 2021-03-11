@@ -18,6 +18,7 @@
 # written using the IREE Check framework and should always pass on the reference VMLA backend.
 # See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -26,9 +27,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ALL_SRCS = enforce_glob(
+    [
+        "add.mlir",
+        "matmul.mlir",
+    ],
+    include = ["*.mlir"],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_llvm-ir_llvm",
-    srcs = glob(["*.mlir"]),
+    srcs = ALL_SRCS,
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-llvm-experimental-linalg-on-tensors",
@@ -39,7 +48,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = glob(["*.mlir"]),
+    srcs = ALL_SRCS,
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
         "-iree-codegen-spirv-experimental-linalg-on-tensors",

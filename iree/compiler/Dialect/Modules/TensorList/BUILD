@@ -20,11 +20,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-filegroup(
-    name = "td_files",
-    srcs = glob(["*.td"]),
-)
-
 cc_embed_data(
     name = "tensorlist_imports",
     srcs = ["tensorlist.imports.mlir"],

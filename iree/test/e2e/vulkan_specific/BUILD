@@ -15,6 +15,7 @@
 # Tests for end-to-end IREE support specific to the vulkan-spirv lowering.
 # TODO(ravishankarm): Reorganize these tests.
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -25,8 +26,17 @@ package(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = glob(
-        ["*.mlir"],
+    srcs = enforce_glob(
+        [
+            "compare.mlir",
+            "conv.mlir",
+            "dot_general.mlir",
+            "log_plus_one.mlir",
+            "pw_add_multiwg.mlir",
+            "reduce.mlir",
+            "vectorized_conv.mlir",
+        ],
+        include = ["*.mlir"],
         exclude = [
             "gemm.mlir",
         ],
