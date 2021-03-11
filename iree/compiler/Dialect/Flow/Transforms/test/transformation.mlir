@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-transformation-pipeline %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-input-transformation-pipeline -iree-flow-transformation-pipeline %s | IreeFileCheck %s
 
 // CHECK-LABEL: @empty
 func @empty() {

@@ -28,8 +28,18 @@ namespace IREE {
 namespace Flow {
 
 //===----------------------------------------------------------------------===//
-// Helpers
+// Pipelines
 //===----------------------------------------------------------------------===//
+
+// Adds a set of passes to the given pass manager that perform input dialect
+// legalization required by the Flow dialect.
+//
+// NOTE: this will eventually be moved out to an associated import tool - it
+// currently relies on linking in all of the input dialects (mhlo, etc) and
+// instead those should be taken care of prior to coming into the compiler.
+void buildInputTransformPassPipeline(OpPassManager &passManager);
+
+void registerInputTransformPassPipeline();
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -39,7 +49,8 @@ namespace Flow {
 //
 // The expected usage is:
 //   <run conversion from TF/HLO/etc to flow>
-//   buildFlowTransformPassPipeline & run
+//   buildInputTransformPassPipeline
+//   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
 void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
@@ -182,6 +193,7 @@ createStripAndSplatConstantVariablesPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerFlowPasses() {
+  registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
   registerExportDispatchesTransformPassPipeline();
   createFlattenTuplesInCFGPass();
