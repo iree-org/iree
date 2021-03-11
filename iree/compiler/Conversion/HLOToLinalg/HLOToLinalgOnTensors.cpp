@@ -673,24 +673,23 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
                   DepthwiseConvOpConversion>(context);
 }
 
-static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
-    "iree-linalg-on-tensors-path",
-    llvm::cl::desc("Convert from MHLO to Linalg on tensors for linalg on "
-                   "tensor codegen path"),
-    llvm::cl::init(false));
-
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
     bool useLinalgOnTensorsPath) {
   return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
       useLinalgOnTensorsPath);
 }
 
-static PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass(
-    "iree-codegen-hlo-to-linalg-on-tensors",
-    "Convert from XLA-HLO ops to Linalg ops on tensors", []() {
-      return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(
-          clUseLinalgOnTensorsPath);
-    });
+void registerHLOToLinalgOnTensorsPasses() {
+  PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass(
+      "iree-codegen-hlo-to-linalg-on-tensors",
+      "Convert from XLA-HLO ops to Linalg ops on tensors",
+      []() { return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(); });
+
+  PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass_experimental(
+      "iree-codegen-hlo-to-linalg-on-tensors-experimental",
+      "Convert from XLA-HLO ops to Linalg ops on tensors",
+      []() { return std::make_unique<ConvertHLOToLinalgOnTensorsPass>(true); });
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir

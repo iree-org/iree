@@ -47,6 +47,7 @@ inline void registerHLOToLinalgPasses() {
     createHLOToLinalgOnBuffersPass();
     createHLOToLinalgOnTensorsPass();
     createDemoteF32ToF16Pass();
+    registerHLOToLinalgOnTensorsPasses();
     return true;
   }();
   (void)init_once;

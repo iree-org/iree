@@ -33,6 +33,7 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
     bool useLinalgOnTensorsPath = false);
+void registerHLOToLinalgOnTensorsPasses();
 
 /// Populates the patterns that convert from MHLO to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
