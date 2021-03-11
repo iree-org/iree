@@ -20,6 +20,7 @@
 
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -89,28 +90,49 @@ int dimensionToIndex(StringRef dimension) {
   return StringSwitch<int>(dimension).Case("x", 0).Case("y", 1).Case("z", 2);
 }
 
-/// Gets the block processor ID's upper bound. This queries the workgroup count
-/// function.
-Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
-  auto funcOp = blockIDOp->getParentOfType<FuncOp>();
+IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
+  auto funcOp = op->getParentOfType<FuncOp>();
   auto targetOp =
       funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableTargetOp>();
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = nullptr;
+
+  IREE::HAL::ExecutableEntryPointOp entryPointOp;
   for (auto op : targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       entryPointOp = op;
       break;
     }
   }
-  if (!entryPointOp) return llvm::None;
+  if (!entryPointOp) return {};
 
   Operation *terminator = entryPointOp.getBlock()->getTerminator();
   auto retOp = dyn_cast<IREE::HAL::ReturnOp>(terminator);
-  if (!retOp || retOp.getNumOperands() != 3) return llvm::None;
+  if (!retOp || retOp.getNumOperands() != 3) return {};
+
   LLVM_DEBUG(llvm::dbgs() << "workgroup count function return op: " << retOp
                           << "\n");
+  return retOp;
+}
+
+/// Gets the block processor ID's upper bound. This queries the workgroup count
+/// function.
+Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
+  auto retOp = getEntryPointReturnOp(blockIDOp);
+  if (!retOp) return llvm::None;
 
   int index = dimensionToIndex(blockIDOp.dimension());
+  IntegerAttr attr;
+  if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
+    return llvm::None;
+
+  return attr.getInt();
+}
+
+Optional<int64_t> getProcessorIDUpperBound(
+    IREE::HAL::InterfaceWorkgroupIDOp blockIDOp) {
+  auto retOp = getEntryPointReturnOp(blockIDOp);
+  if (!retOp) return llvm::None;
+
+  int index = blockIDOp.dimensionAttr().getInt();
   IntegerAttr attr;
   if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
     return llvm::None;
@@ -164,6 +186,9 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
 
     Optional<int64_t> ub;
     if (auto blockIDOp = dyn_cast<gpu::BlockIdOp>(symbolOp)) {
+      ub = getProcessorIDUpperBound(blockIDOp);
+    } else if (auto blockIDOp =
+                   dyn_cast<IREE::HAL::InterfaceWorkgroupIDOp>(symbolOp)) {
       ub = getProcessorIDUpperBound(blockIDOp);
     } else if (auto threadIDOp = dyn_cast<gpu::ThreadIdOp>(symbolOp)) {
       ub = getProcessorIDUpperBound(threadIDOp);
