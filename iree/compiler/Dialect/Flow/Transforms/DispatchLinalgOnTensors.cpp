@@ -180,9 +180,15 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
 ///   linalg.init_tensor operations.
 
 static bool isRootOp(Operation *op) {
+  if (auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
+    if (contractionOp.isRowMajorMatmul() ||
+        contractionOp.isColumnMajorMatmul() ||
+        contractionOp.isRowMajorBatchMatmul()) {
+      return true;
+    }
+  }
   return isa<linalg::ConvInputNHWCFilterHWCFOp,
-             linalg::DepthwiseConvInputNHWCFilterHWCOp, linalg::MatmulOp,
-             linalg::BatchMatmulOp>(op);
+             linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
