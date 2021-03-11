@@ -1,5 +1,7 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
 
+// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+
 func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -23,12 +25,12 @@ func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 //  CHECK-DAG:     %[[WGID_Y:.+]] = flow.dispatch.workgroup.id[1]
 //  CHECK-DAG:     %[[WGCOUNT_X:.+]] = flow.dispatch.workgroup.count[0]
 //  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = flow.dispatch.workgroup.count[1]
-//      CHECK:     %[[OFFSET_Y:.+]] = muli %[[WGSIZE_Y]], %[[WGID_Y]]
-//      CHECK:     %[[STEP_Y:.+]] = muli %[[WGSIZE_Y]], %[[WGCOUNT_Y]]
+//      CHECK:     %[[OFFSET_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     %[[STEP_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_Y]], %[[WGSIZE_Y]]]
 //      CHECK:     scf.for %[[ARG7:.+]] = %[[OFFSET_Y]]
 // CHECK-SAME:       to %{{.+}} step %[[STEP_Y]]
-//      CHECK:       %[[OFFSET_X:.+]] = muli %[[WGSIZE_X]], %[[WGID_X]]
-//      CHECK:       %[[STEP_X:.+]] = muli %[[WGSIZE_X]], %[[WGCOUNT_X]]
+//      CHECK:       %[[OFFSET_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_X]], %[[WGSIZE_X]]]
+//      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_X]], %[[WGSIZE_X]]]
 //      CHECK:       scf.for %[[ARG8:.+]] = %[[OFFSET_X]]
 // CHECK-SAME:         to %{{.+}} step %[[STEP_X]]
 //      CHECK:         %[[LHS:.+]] = flow.dispatch.input.load %[[ARG3]]

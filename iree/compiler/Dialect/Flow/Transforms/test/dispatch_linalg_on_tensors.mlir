@@ -1,8 +1,8 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -iree-flow-dispatch-linalg-on-tensors-tile-sizes="1,2" -iree-flow-dispatch-linalg-on-tensors-enable-fusion-always -canonicalize -cse %s | IreeFileCheck %s
 
-// CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0) -> (2, -d0 + 4)>
+// CHECK: #[[mul_map:.+]] = affine_map<()[s0] -> (s0 * 2)>
 
-// CHECK-LABEL: func @tensor
+// CHECK: func @tensor
 func @tensor() -> tensor<2x4xf32> {
   //  CHECK-DAG: %[[C1wg:.*]] = constant 1 : index
   //  CHECK-DAG: %[[C2wg:.*]] = constant 2 : index
@@ -33,8 +33,8 @@ func @tensor() -> tensor<2x4xf32> {
   //  CHECK-DAG:   %[[biy:.*]] = flow.dispatch.workgroup.id[1] : index
   //  CHECK-DAG:   %[[bdy:.*]] = flow.dispatch.workgroup.count[1] : index
   //      CHECK:   scf.for %[[I:.*]] = %[[biy]] to %[[C2]] step %[[bdy]] {
-  // CHECK-NEXT:     %[[bix_scaled:.*]] = muli %[[bix]], %[[C2]] : index
-  // CHECK-NEXT:     %[[bdx_scaled:.*]] = muli %[[bdx]], %[[C2]] : index
+  // CHECK-NEXT:     %[[bix_scaled:.*]] = affine.apply #[[mul_map]]()[%[[bix]]]
+  // CHECK-NEXT:     %[[bdx_scaled:.*]] = affine.apply #[[mul_map]]()[%[[bdx]]]
   // CHECK-NEXT:     scf.for %[[J:.*]] = %[[bix_scaled]] to %[[C4]] step %[[bdx_scaled]] {
   // Canonicalizations not yet powerful enough here.
   // CHECK-NEXT:       %[[MIN_I:.*]] = affine.min{{.*}}(%[[I]])
