@@ -1,17 +1,17 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-spirv-concretize-tile-among-workgroups,iree-codegen-linalg-tile-and-fuse))" -iree-spirv-enable-vectorization -iree-codegen-spirv-experimental-linalg-on-tensors -canonicalize -cse %s | IreeFileCheck %s
 
-hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
+hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @tile_and_vectorize_conv attributes {
+    hal.executable.entry_point @conv_static_shape_f32 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<1x225x225x16xf32>, !flow.dispatch.input<3x3x16x32xf32>, !flow.dispatch.output<1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
-      func @tile_and_vectorize_conv() {
+      func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
         %c112 = constant 112 : index
@@ -63,7 +63,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   }
 }
 
-// CHECK-LABEL: func @tile_and_vectorize_conv()
+// CHECK-LABEL: func @conv_static_shape_f32()
 
 // For linalg.fill
 // CHECK-COUNT-4: vector.transfer_write
@@ -88,18 +88,18 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
+hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @tile_and_vectorize_dwconv attributes {
+    hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
       signature = (!flow.dispatch.input<1x225x225x16xf32>, !flow.dispatch.input<3x3x16x32xf32>, !flow.dispatch.output<1x112x112x32xf32>) -> ()}
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
-      func @tile_and_vectorize_dwconv() {
+      func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c96 = constant 96 : index
         %c56 = constant 56 : index
@@ -153,7 +153,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   }
 }
 
-// CHECK-LABEL: func @tile_and_vectorize_dwconv()
+// CHECK-LABEL: func @depthwise_conv_static_shape_f32()
 
 // For linalg.fill
 // CHECK: vector.transfer_write

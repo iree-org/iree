@@ -121,8 +121,23 @@ static LogicalResult getMaliSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
-  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
-  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  ShapedType lhsType, rhsType;
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto inputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types")) {
+    lhsType = inputTypeAttr.getValue()[0]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+    rhsType = inputTypeAttr.getValue()[1]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+  } else {
+    lhsType = op.inputs()[0].getType().cast<MemRefType>();
+    rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  }
   assert(lhsType.getElementType() == rhsType.getElementType());
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return failure();
   // Get a vector of best tile size ordered from best to worst.
@@ -292,8 +307,21 @@ static LogicalResult getTargetSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
-  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
-  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  ShapedType lhsType, rhsType;
+  if (auto inputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types")) {
+    lhsType = inputTypeAttr.getValue()[0]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+    rhsType = inputTypeAttr.getValue()[1]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+  } else {
+    lhsType = op.inputs()[0].getType().cast<MemRefType>();
+    rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  }
   assert(lhsType.getElementType() == rhsType.getElementType());
   // If the shape size is unknonw fall back to none vectorized path.
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return failure();
