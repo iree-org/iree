@@ -172,6 +172,9 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (options.usingLinalgOnTensors) {
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createInterfaceLoadStoreCanonicalizationPass());
+
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
            Type elementType, ArrayRef<Value> dynamicSizes) {

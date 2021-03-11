@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "Common",
     srcs = [
+        "InterfaceLoadStoreCanonicalizationPass.cpp",
         "LaunchConfig.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",

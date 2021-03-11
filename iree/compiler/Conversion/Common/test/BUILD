@@ -27,6 +27,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "canonicalize_interface_load_store.mlir",
             "linalg_bufferize.mlir",
             "linalg_rewrite_destructive_updates.mlir",
             "remove_dead_allocs.mlir",

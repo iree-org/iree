@@ -57,5 +57,9 @@ std::unique_ptr<OperationPass<>> createRemoveDeadMemAllocsPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
 
+// Pass to perform canonicalizations related to HAL interface load/store
+// operations.
+std::unique_ptr<FunctionPass> createInterfaceLoadStoreCanonicalizationPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir

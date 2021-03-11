@@ -19,6 +19,7 @@ iree_cc_library(
     "Passes.h"
     "Transforms.h"
   SRCS
+    "InterfaceLoadStoreCanonicalizationPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
