@@ -28,6 +28,7 @@ cc_library(
         "HLOToLinalgOnTensorPasses.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/Shape/IR",

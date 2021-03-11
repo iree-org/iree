@@ -290,3 +290,40 @@ func @updateReplace(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi3
   // CHECK-NEXT: return %arg0
   return %0 : tensor<4xi32>
 }
+
+// CHECK-LABEL: @propogateStaticShapeOfTarget
+func @propogateStaticShapeOfTarget(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tensor<?x?xf32> {
+  %c21 = constant 21 : index
+  %c42 = constant 42 : index
+  %c2 = constant 2 : index
+  %c4 = constant 4 : index
+  // CHECK: %[[TARGET:.+]] = tensor.generate {
+  // CHECK: } : tensor<21x42xf32>
+  %0 = tensor.generate %c21, %c42 {
+  ^bb0(%arg2: index, %arg3: index):
+    tensor.yield %arg1 : f32
+  } :  tensor<?x?xf32>
+  // CHECK: %[[UPDATED:.+]] = flow.tensor.update %{{.+}}, %[[TARGET]]
+  // CHECK: %[[RESULT:.+]] = tensor.cast %[[UPDATED]] : tensor<21x42xf32> to tensor<?x?xf32>
+  %1 = flow.tensor.update %arg0, %0[%c2, %c4] : tensor<?x?xf32> -> tensor<?x?xf32>
+  // CHECK: return %[[RESULT]]
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: @propogateStaticShapeOfUpdate
+func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tensor<?x?xf32> {
+  %c21 = constant 21 : index
+  %c42 = constant 42 : index
+  %c2 = constant 2 : index
+  %c4 = constant 4 : index
+  // CHECK: %[[UPDATE:.+]] = tensor.generate {
+  // CHECK: } : tensor<21x42xf32>
+  %0 = tensor.generate %c21, %c42 {
+  ^bb0(%arg2: index, %arg3: index):
+    tensor.yield %arg1 : f32
+  } :  tensor<?x?xf32>
+  // CHECK: %[[RESULT:.+]] = flow.tensor.update  %[[UPDATE]]
+  %1 = flow.tensor.update %0, %arg0[%c2, %c4] : tensor<?x?xf32> -> tensor<?x?xf32>
+  // CHECK: return %[[RESULT]]
+  return %1 : tensor<?x?xf32>
+}

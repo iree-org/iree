@@ -120,7 +120,7 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
 //  CHECK-COUNT-16:   vector.transfer_write
 //  CHECK-COUNT-16:   vector.transfer_read
 //          CHECK:   %[[FOR_RES:.+]]:16 = scf.for
-// CHECK-COUNT-40:     vector.transfer_read
+// CHECK-COUNT-16:     vector.transfer_read
 // CHECK-COUNT-64:     vector.contract
 //      CHECK:         scf.yield
 //  CHECK-COUNT-16:    vector.transfer_write %[[FOR_RES]]

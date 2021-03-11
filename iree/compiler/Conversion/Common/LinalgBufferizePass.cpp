@@ -121,7 +121,8 @@ static LogicalResult allocateBuffersForResults(
         Value dimTensor = bvm.lookupOrNull(outTensor);
         if (!dimTensor) dimTensor = outTensor;
         if (dim.value() == TensorType::kDynamicSize) {
-          dynOperands.push_back(b.create<DimOp>(loc, dimTensor, dim.index()));
+          dynOperands.push_back(
+              b.createOrFold<DimOp>(loc, dimTensor, dim.index()));
         }
       }
       alloc = allocationFn(b, loc, tensorShape, tensorType.getElementType(),
@@ -152,10 +153,12 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
                                      BlockAndValueMapping &bvm) {
   SmallVector<Value, 8> newOperands = inputs;
   newOperands.append(outputs.begin(), outputs.end());
-  auto otherOperands = op.getAssumedNonShapedOperands();
+  auto otherOperands =
+      llvm::map_range(op.getAssumedNonShapedOperands(),
+                      [&bvm](Value v) { return bvm.lookupOrDefault(v); });
   newOperands.append(otherOperands.begin(), otherOperands.end());
   Location loc = op.getLoc();
-  op.clone(b, loc, /*resultTypes=*/TypeRange{}, newOperands);
+  op.cloneWithMapper(b, loc, /*resultTypes=*/TypeRange{}, newOperands, bvm);
 
   // Replace the results of the old op with the new output buffers.
   for (auto result : llvm::enumerate(op.getOperation()->getResults())) {
@@ -254,7 +257,8 @@ static LogicalResult convertTensorReshapeOp(
   // Create the reshape op.
   auto reshapeSrcType = getMemrefTypeForTensor(
       srcTensorType, {}, inputBufferType.getMemorySpaceAsInt());
-  Value reshapeSrc = b.create<MemRefCastOp>(loc, inputBuffer, reshapeSrcType);
+  Value reshapeSrc =
+      b.createOrFold<MemRefCastOp>(loc, inputBuffer, reshapeSrcType);
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value bufferReshape = b.create<linalg::ReshapeOp>(
@@ -265,6 +269,12 @@ static LogicalResult convertTensorReshapeOp(
   return createAliasingBufferOrAllocationForResult(
       b, loc, allocationFn, srcTensor, bufferReshape, resultTensor,
       allocationDynamicSizes, bvm);
+}
+
+static SmallVector<int64_t, 4> extractFromI64ArrayAttr(ArrayAttr attr) {
+  return llvm::to_vector<4>(llvm::map_range(attr, [](Attribute a) -> int64_t {
+    return a.cast<IntegerAttr>().getInt();
+  }));
 }
 
 /// Converts a `subtensor` operation to a `subview` operation.
@@ -279,11 +289,6 @@ static LogicalResult convertSubTensorOp(
   Value inputBuffer = bvm.lookup(srcTensor);
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
 
-  auto extractFromI64ArrayAttr = [](ArrayAttr attr) {
-    return llvm::to_vector<4>(llvm::map_range(attr, [](Attribute a) -> int64_t {
-      return a.cast<IntegerAttr>().getInt();
-    }));
-  };
   auto subViewResultType = SubViewOp::inferResultType(
       inputBufferType, extractFromI64ArrayAttr(op.static_offsets()),
       extractFromI64ArrayAttr(op.static_sizes()),
@@ -301,6 +306,52 @@ static LogicalResult convertSubTensorOp(
   return createAliasingBufferOrAllocationForResult(
       b, loc, allocationFn, srcTensor, subViewOp, resultTensor,
       allocationDynamicSizes, bvm);
+}
+
+/// Converts a `subtensor_insert` operation to buffers by
+/// - Allocating a buffer for the result (if needed), and copying the
+///   destination value into this buffer.
+/// - Copying the source values into a subview of the result buffer.
+static LogicalResult convertSubTensorInsertOp(
+    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn,
+    SubTensorInsertOp op, BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Location loc = op.getLoc();
+  Value dest = op.dest();
+  Value inputBuffer = bvm.lookup(dest);
+  SmallVector<Value> allocationDynamicSizes;
+  int64_t rank = inputBuffer.getType().cast<ShapedType>().getRank();
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    allocationDynamicSizes.push_back(
+        b.createOrFold<DimOp>(loc, inputBuffer, dim));
+  }
+  if (failed(createAliasingBufferOrAllocationForResult(
+          b, loc, allocationFn, dest, inputBuffer, op.getResult(),
+          allocationDynamicSizes, bvm))) {
+    return failure();
+  }
+
+  Value source = op.source();
+  Value outputBuffer = bvm.lookup(op.result());
+  Value sourceBuffer = bvm.lookup(source);
+  auto subViewOp =
+      b.create<SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
+                          op.getMixedSizes(), op.getMixedStrides());
+  b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
+  return success();
+}
+
+/// Converts a `tensor.extract` operation into a `load`.
+static LogicalResult convertTensorExtractOp(
+    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn,
+    tensor::ExtractOp op, BlockAndValueMapping &bvm) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Value inputBuffer = bvm.lookup(op.tensor());
+  Value load = b.createOrFold<LoadOp>(op.getLoc(), inputBuffer, op.indices());
+  bvm.map(op.result(), load);
+  return success();
 }
 
 static LogicalResult convertTransferOp(OpBuilder &b,
@@ -323,7 +374,7 @@ static LogicalResult convertTransferOp(OpBuilder &b,
       if (tensorType.isDynamicDim(idx)) {
         Value tensor = bvm.lookupOrNull(outputTensor);
         if (!tensor) tensor = outputTensor;
-        dynOperands.push_back(b.create<DimOp>(loc, tensor, idx));
+        dynOperands.push_back(b.createOrFold<DimOp>(loc, tensor, idx));
       }
     }
     auto alloc = allocationFn(b, loc, tensorShape, tensorType.getElementType(),
@@ -397,7 +448,7 @@ static Operation *getInsertionPointForReplacementStoreOp(
 /// For cases where the value operand of the `storeOp` is produced by a
 /// LinalgOp, create the subview operation that can be used by the op itself to
 /// store the result into directly. This avoids an extra allocation + copies.
-LogicalResult preProcessConvertInterfaceStoreTensorOp(
+LogicalResult preProcessInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchOutputStoreOp storeOp,
     BlockAndValueMapping &bvm) {
   // Find the insertion point for the subview.
@@ -520,7 +571,7 @@ void LinalgBufferizePass::runOnFunction() {
   });
   if (funcOp
           .walk([&](IREE::Flow::DispatchOutputStoreOp op) -> WalkResult {
-            return preProcessConvertInterfaceStoreTensorOp(b, op, bvm);
+            return preProcessInterfaceStoreTensorOp(b, op, bvm);
           })
           .wasInterrupted()) {
     return signalPassFailure();
@@ -556,11 +607,18 @@ void LinalgBufferizePass::runOnFunction() {
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return convertAnyLinalgOp(b, allocationFn, linalgOp, bvm);
         })
+        .Case<SubTensorInsertOp>([&](SubTensorInsertOp subTensorInsertOp) {
+          return convertSubTensorInsertOp(b, allocationFn, subTensorInsertOp,
+                                          bvm);
+        })
         .Case<SubTensorOp>([&](SubTensorOp subTensorOp) {
           return convertSubTensorOp(b, allocationFn, subTensorOp, bvm);
         })
         .Case<linalg::TensorReshapeOp>([&](linalg::TensorReshapeOp reshapeOp) {
           return convertTensorReshapeOp(b, allocationFn, reshapeOp, bvm);
+        })
+        .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
+          return convertTensorExtractOp(b, allocationFn, extractOp, bvm);
         })
         .Case<VectorTransferOpInterface>(
             [&](VectorTransferOpInterface vectorTransferOp) {

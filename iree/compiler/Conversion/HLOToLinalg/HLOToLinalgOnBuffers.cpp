@@ -340,146 +340,6 @@ struct SubTensorInsertOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// mhlo.reduce_window conversion patterns and utility functions.
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Returns the constant value associated with the init value if the defining
-/// operation is a constant.
-static Attribute GetInitValueAsConst(Value init) {
-  DenseElementsAttr attr;
-  if (!matchPattern(init, m_Constant(&attr))) return {};
-  auto type = attr.getType().dyn_cast<ShapedType>();
-  if (!type || type.getRank() != 0) return {};
-  return attr.getValue({});
-}
-
-/// mhlo.reduce_window is mapped to a linalg.pooling operation. The type of
-/// the pooling is determined based on the body of the reduce window
-/// operation. This class enumerates the different variants.
-enum class PoolingType {
-  kMin,
-  kMax,
-  kAdd,
-};
-
-struct ReduceWindowOpConversion
-    : public ConvertToLinalgBufferOp<ReduceWindowOpConversion,
-                                     mhlo::ReduceWindowOp> {
-  using ConvertToLinalgBufferOp<ReduceWindowOpConversion,
-                                mhlo::ReduceWindowOp>::ConvertToLinalgBufferOp;
-
-  LogicalResult apply(mhlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-}  // namespace
-
-static PoolingType getPoolingType(Region &region) {
-  assert(region.getBlocks().size() == 1 &&
-         "expected the region has exactlly one block");
-  Block &block = region.front();
-  assert(block.getOperations().size() == 2 &&
-         "expected the block has exactlly two operations");
-  auto op = block.begin();
-  if (isa<mhlo::MinOp>(op)) return PoolingType::kMin;
-  if (isa<mhlo::MaxOp>(op)) return PoolingType::kMax;
-  if (isa<mhlo::AddOp>(op)) return PoolingType::kAdd;
-
-  llvm_unreachable("unknown pooling type");
-}
-
-LogicalResult ReduceWindowOpConversion::apply(
-    mhlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  auto loc = op.getLoc();
-  auto resultType = op.getResult().getType().cast<ShapedType>();
-  if (resultType.getRank() != 4) {
-    return rewriter.notifyMatchFailure(op, "expected NHWC pooling-based op");
-  }
-
-  // Create a fake window dimension.
-  SmallVector<int64_t, 4> shapes;
-  shapes.push_back(op.window_dimensions().getValue<int64_t>(1));
-  shapes.push_back(op.window_dimensions().getValue<int64_t>(2));
-  auto memrefType = MemRefType::get(shapes, rewriter.getF32Type());
-  auto fakeWindowDims = rewriter.create<AllocOp>(loc, memrefType);
-
-  if (op.window_strides() &&
-      (op.window_strides().getValue().getValue<int64_t>(0) != 1 ||
-       op.window_strides().getValue().getValue<int64_t>(3) != 1)) {
-    return rewriter.notifyMatchFailure(
-        op, "expected window_strides to be [1,x,y,1]");
-  }
-  if (op.window_dimensions() &&
-      (op.window_dimensions().getValue<int64_t>(0) != 1 ||
-       op.window_dimensions().getValue<int64_t>(3) != 1)) {
-    return rewriter.notifyMatchFailure(
-        op, "expected window_dimensions to be [1,x,y,1]");
-  }
-
-  if (!inputBuffers[0].getType().cast<ShapedType>().getElementType().isF32()) {
-    return rewriter.notifyMatchFailure(op, "expected element type to be f32");
-  }
-
-  Attribute strides;
-  if (op.window_stridesAttr()) {
-    strides = rewriter.getI64VectorAttr(
-        {op.window_strides().getValue().getValue<int64_t>(1),
-         op.window_strides().getValue().getValue<int64_t>(2)});
-  } else {
-    strides = rewriter.getI64VectorAttr({1, 1});
-  }
-  Attribute dilations;
-  if (op.window_dilations()) {
-    dilations = rewriter.getI64VectorAttr(
-        {op.window_dilations().getValue().getValue<int64_t>(1),
-         op.window_dilations().getValue().getValue<int64_t>(2)});
-  } else {
-    dilations = rewriter.getI64VectorAttr({1, 1});
-  }
-  auto createOp = [&](auto *type_ptr) -> linalg::LinalgOp {
-    return cast<linalg::LinalgOp>(
-        rewriter
-            .create<std::remove_pointer_t<decltype(type_ptr)>>(
-                loc, ArrayRef<Type>{},
-                ValueRange{inputBuffers[0], fakeWindowDims.getResult()},
-                resultBuffers[0], dilations, strides)
-            .getOperation());
-  };
-  linalg::LinalgOp poolingOp;
-  PoolingType poolingType = getPoolingType(op.body());
-
-  Value initValue = inputBuffers[1];
-  Attribute initConstVal = GetInitValueAsConst(initValue);
-  if (initConstVal) {
-    initValue = rewriter.create<ConstantOp>(initValue.getDefiningOp()->getLoc(),
-                                            initConstVal);
-  } else {
-    initValue = rewriter.create<LoadOp>(loc, initValue);
-  }
-  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], initValue);
-
-  switch (poolingType) {
-    case PoolingType::kMin: {
-      poolingOp = createOp(static_cast<linalg::PoolingNHWCMinOp *>(nullptr));
-      break;
-    }
-    case PoolingType::kMax: {
-      poolingOp = createOp(static_cast<linalg::PoolingNHWCMaxOp *>(nullptr));
-      break;
-    }
-    case PoolingType::kAdd: {
-      poolingOp = createOp(static_cast<linalg::PoolingNHWCSumOp *>(nullptr));
-      break;
-    }
-  }
-  rewriter.create<DeallocOp>(loc, fakeWindowDims);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // Linalg op on tensors to linalg op on buffers conversion base class.
 //===----------------------------------------------------------------------===//
 
@@ -635,8 +495,15 @@ struct InitTensorOpConversion
       linalg::InitTensorOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     Value outputBuffer = resultTensorToBufferMap.lookup(op.result());
-    if (!outputBuffer) return failure();
-    rewriter.replaceOp(op, outputBuffer);
+    if (!outputBuffer) {
+      // If the outputBuffer does not exist, this is a shape-only operand.
+      // Allocate a temp buffer and it will get deleted after lowering to loops.
+      RankedTensorType type = op.getType();
+      auto memrefType = MemRefType::get(type.getShape(), type.getElementType());
+      rewriter.replaceOpWithNewOp<AllocOp>(op, memrefType);
+    } else {
+      rewriter.replaceOp(op, outputBuffer);
+    }
     return success();
   }
 
@@ -1007,8 +874,10 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       NamedOpConversion<linalg::MatmulI16I16I32Op>,
       NamedOpConversion<linalg::MatmulI32I32I32Op>,
       NamedOpConversion<linalg::BatchMatmulOp>,
+      NamedOpConversion<linalg::PoolingNHWCMaxOp>,
+      NamedOpConversion<linalg::PoolingNHWCMinOp>,
+      NamedOpConversion<linalg::PoolingNHWCSumOp>,
       PadTensorOpConversion,
-      ReduceWindowOpConversion,
       SubTensorOpConversion,
       SubTensorInsertOpConversion,
       TensorReshapeOpConversion
