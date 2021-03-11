@@ -10,20 +10,24 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS dynamic_linalg_matmul_on_tensors.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_MLIR})
-file(GLOB _GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_0_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS dynamic_linalg_matmul_on_tensors_fuse_0.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_0_MLIR})
-file(GLOB _GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_1_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS dynamic_linalg_matmul_on_tensors_fuse_1.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_1_MLIR})
-file(GLOB _GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_2_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS dynamic_linalg_matmul_on_tensors_fuse_2.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_DYNAMIC_LINALG_MATMUL_ON_TENSORS_FUSE_2_MLIR})
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_compare_and_select.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_dot_general.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "executable_benchmark.mlir"
+    "globals.mlir"
+    "scalar.mlir"
+    "trace_dispatch_tensors.mlir"
+    "unused_args.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module

@@ -10,12 +10,28 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "batch_matmul_vectorization.mlir"
+    "convert_to_gpu.mlir"
+    "convert_to_spirv.mlir"
+    "dead_alloc.mlir"
+    "fold-gpu-procid-uses.mlir"
+    "forop_canonicalization.mlir"
+    "linalg_tile_and_fuse.mlir"
+    "materialize_launch_configuration.mlir"
+    "materialize_launch_configuration2.mlir"
+    "matmul_fused_vectorization.mlir"
+    "matmul_vectorization.mlir"
+    "matmul_vectorization_licm.mlir"
+    "memref_vecrotization.mlir"
+    "pipeline_test.mlir"
+    "pipeline_test_cooperative_mat.mlir"
+    "split_dispatch_function.mlir"
+    "vector_to_gpu.mlir"
+    "workgroup_memory_promotion.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

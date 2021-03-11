@@ -10,12 +10,17 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "iree-benchmark-module.mlir"
+    "iree-run-mlir.mlir"
+    "iree-run-module.mlir"
+    "multiple_args.mlir"
+    "multiple_exported_functions.mlir"
+    "repeated_return.mlir"
+    "scalars.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module
