@@ -14,10 +14,10 @@ func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     (%[[ARG0]], %[[ARG1]], %[[ARG2]])
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]] : !flow.dispatch.output<?x?xf32>
+// CHECK-NEXT:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.output<?x?xf32>
 //  CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //  CHECK-DAG:     %[[WGSIZE_X:.+]] = flow.dispatch.workgroup.size[0]
 //  CHECK-DAG:     %[[WGSIZE_Y:.+]] = flow.dispatch.workgroup.size[1]
@@ -74,12 +74,12 @@ func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
 //  CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]] (%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?xf32>
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]] : index
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]] : index
-// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]] : !flow.dispatch.output<?x?xf32>
+// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
+// CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?xf32>
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.output<?x?xf32>
 //  CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.input.load %[[ARG2]] : !flow.dispatch.input<?x?xf32>
 //  CHECK-DAG:     %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
 //  CHECK-DAG:     %[[LOAD3:.+]] = flow.dispatch.input.load %[[ARG3]] : !flow.dispatch.input<?xf32>
@@ -111,11 +111,11 @@ func @fuse_fill_with_producer(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> ten
 //       CHECK:     %[[N:.+]] = dim %[[ARG1]], %[[C1]]
 //       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
 //  CHECK-SAME:       (%[[M]], %[[N]], %[[ARG0]], %[[ARG1]])
-//  CHECK-SAME:       (%[[ARG2:[a-zA-Z0-9_]+]] : index
-//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]] : index
-//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  CHECK-SAME:        %[[ARG6:[a-zA-Z0-9_]+]] : !flow.dispatch.output<?x?xf32>) {
+//  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  CHECK-SAME:        %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.output<?x?xf32>) {
 //       CHECK:        %[[ZERO:.+]] = constant 0.000000e+00 : f32
 //       CHECK:        scf.for
 //       CHECK:          scf.for
@@ -166,10 +166,10 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
 //   CHECK-DAG:     %[[K:.+]] = dim %[[ARG0]], %[[C1]]
 //       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[K]], %[[M]], %[[C1]]]
 //  CHECK-SAME:       (%[[ARG0]], %[[M]], %[[K]])
-//  CHECK-SAME:       (%[[ARG2:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]] : index
-//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]] : index
-//  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]] : !flow.dispatch.output<?x?xf32>) {
+//  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.output<?x?xf32>) {
 //       CHECK:          %[[ONE:.+]] = constant 1.0
 //   CHECK-DAG:          %[[INPUT:.+]] = flow.dispatch.input.load %[[ARG2]]
 //   CHECK-DAG:          %[[INIT:.+]] = linalg.init_tensor
@@ -190,12 +190,12 @@ func @two_dispatches(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tensor<?x?xf
 
 // The following CHECK* sems to hit a segfault with FileCheck. For now using a simpler check.
 //  NOCHECK-SAME:       (%[[M]], %[[N]], %[[ARG0]], %[[ARG1]], %[[RESULT1]])
-//  NOCHECK-SAME:       (%[[ARG2:[a-zA-Z0-9_]+]] : index
-//  NOCHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]] : index
-//  NOCHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  NOCHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  NOCHECK-SAME:        %[[ARG6:[a-zA-Z0-9_]+]] : !flow.dispatch.input<?x?xf32>
-//  NOCHECK-SAME:        %[[ARG7:[a-zA-Z0-9_]+]] : !flow.dispatch.output<?x?xf32>) {
+//  NOCHECK-SAME:       (%[[ARG2:[a-zA-Z0-9_]+]]: index
+//  NOCHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
+//  NOCHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  NOCHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  NOCHECK-SAME:        %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.input<?x?xf32>
+//  NOCHECK-SAME:        %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.output<?x?xf32>) {
 //       NOCHECK:          %[[ZERO:.+]] = constant 0.0
 //       NOCHECK:          scf.for
 //       NOCHECK:            scf.for
@@ -228,9 +228,9 @@ func @dot_general_lower() attributes {iree.module.export} {
 }
 // CHECK-LABEL: func @dot_general_lower
 //       CHECK:   flow.dispatch.workgroups[%{{.+}}, %{{.+}}, %{{.+}}]
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]] : !flow.dispatch.input<1x1x2xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]] : !flow.dispatch.input<2x3xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]] : !flow.dispatch.output<1x3xf32>
+//  CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: !flow.dispatch.input<1x1x2xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: !flow.dispatch.input<2x3xf32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.output<1x3xf32>
 //   CHECK-DAG:   %[[ZERO:.+]] = constant 0.0
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG0]]
 //       CHECK:   %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]]
@@ -262,9 +262,9 @@ func @reshapeop(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
 //  CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[WORKLOAD:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
 //      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:     [%[[WORKLOAD]], %[[C1]], %[[C1]]] (%[[ARG0]])
-// CHECK-SAME:     %[[ARG1:.+]] : !flow.dispatch.input<?x?xf32>
-// CHECK-SAME:     %[[ARG2:.+]] : !flow.dispatch.output<?xf32>
+// CHECK-SAME:     [%[[WORKLOAD]], %[[C1]], %[[C1]]](%[[ARG0]])
+// CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.input<?x?xf32>
+// CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.output<?xf32>
 //      CHECK:       %[[LOAD:.+]] = flow.dispatch.input.load %[[ARG1]]
 //      CHECK:       %[[RESHAPE:.+]] = linalg.tensor_reshape %[[LOAD]] [#[[MAP1]]]
 //      CHECK:       flow.dispatch.output.store %[[RESHAPE]], %[[ARG2]]
@@ -366,7 +366,7 @@ func @pad_test(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index,
   %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
   %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
   %6 = linalg.fill(%5, %0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
-  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32> -> tensor<?x?xf32>
+  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> tensor<?x?xf32>{%3, %4}
   return %7 : tensor<?x?xf32>
 }
 

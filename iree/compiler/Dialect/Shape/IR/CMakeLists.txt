@@ -18,6 +18,7 @@ iree_cc_library(
     "Builders.h"
     "ShapeDialect.h"
     "ShapeInterface.h"
+    "ShapeInterfaces.h.inc"
     "ShapeOps.h"
     "ShapeOps.h.inc"
     "ShapeTypes.h"
@@ -26,6 +27,7 @@ iree_cc_library(
     "Folders.cpp"
     "ShapeDialect.cpp"
     "ShapeInterface.cpp"
+    "ShapeInterfaces.cpp.inc"
     "ShapeOps.cpp"
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"
@@ -43,6 +45,16 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    ShapeInterfacesGen
+  TD_FILE
+    "ShapeInterfaces.td"
+  OUTS
+    -gen-op-interface-decls ShapeInterfaces.h.inc
+    -gen-op-interface-defs ShapeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

@@ -79,37 +79,6 @@ class FLOW_Op<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ return print$cppClass(p, *this); }];
 }
 
-def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
-  let description = [{
-    Interface for ops that can be used within a stream.
-
-    Some ops can exist both within a stream and outside of a stream. This allows
-    optimizations to place certain ops such that they are performed in a
-    synchronous (outside of a stream) or asynchronous (inside of a stream)
-    fashion.
-
-    The goal of the stream forming process is to move as many operations that
-    can be used within a stream into one and only using non-streamed ops as a
-    last resort. Ops that are isStreamOnly may force the creation of single-op
-    command buffers and synchronous dispatches.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      [{Returns true if the op is transfer operation (as defined by the HAL).}],
-      "bool", "isTransfer", (ins)
-    >,
-    InterfaceMethod<
-      [{Returns true if the op *can* be used within a stream.}],
-      "bool", "isUsableInStream", (ins)
-    >,
-    InterfaceMethod<
-      [{Returns true if the op *must* be used within a stream.}],
-      "bool", "isStreamOnly", (ins)
-    >,
-  ];
-}
-
 //===----------------------------------------------------------------------===//
 // Flow dialect types
 //===----------------------------------------------------------------------===//
@@ -117,6 +86,7 @@ def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
 def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 def FLOW_Dim : TypeAlias<Index>;
+def FLOW_ShapeDynamicDims : Variadic<FLOW_Dim>;
 
 def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 

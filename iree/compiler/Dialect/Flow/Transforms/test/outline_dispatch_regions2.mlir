@@ -24,9 +24,9 @@ func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %y = constant 50 : index
   // CHECK: %[[RET:.+]] = flow.dispatch @staticShapeDispatch_dispatch_0::@staticShapeDispatch_dispatch_0[
   // CHECK-SAME: %[[X]], %[[Y]]
-  // CHECK-SAME: ] (%[[ARG0]]) : (tensor<8x4xf32>) -> tensor<4x8xf32>
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
-    %arg : !flow.dispatch.input<8x4xf32>, %ret : !flow.dispatch.output<4x8xf32>
+  // CHECK-SAME: ](%[[ARG0]]) : (tensor<8x4xf32>) -> (tensor<4x8xf32>)
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> tensor<4x8xf32> = (
+    %arg: !flow.dispatch.input<8x4xf32>, %ret: !flow.dispatch.output<4x8xf32>
   ) {
     %arg_value = flow.dispatch.input.load %arg : !flow.dispatch.input<8x4xf32> -> tensor<8x4xf32>
     %arg_shape = flow.dispatch.shape %arg : !flow.dispatch.input<8x4xf32> -> !shapex.ranked_shape<[8,4]>
@@ -62,9 +62,9 @@ func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
   %y = constant 50 : index
   // CHECK: %[[RET0:.+]] = flow.dispatch @dispatchFnMuli_dispatch_0::@dispatchFnMuli_dispatch_0[
   // CHECK-SAME: %[[X]], %[[Y]]
-  // CHECK-SAME: ] (%[[ARG0]]) : (tensor<8x4xf32>) -> tensor<4x8xf32>
+  // CHECK-SAME: ](%[[ARG0]]) : (tensor<8x4xf32>) -> (tensor<4x8xf32>)
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
-    %arg : !flow.dispatch.input<8x4xf32>, %ret : !flow.dispatch.output<4x8xf32>
+    %arg: !flow.dispatch.input<8x4xf32>, %ret: !flow.dispatch.output<4x8xf32>
   ) {
     %arg_value = flow.dispatch.input.load %arg : !flow.dispatch.input<8x4xf32> -> tensor<8x4xf32>
     %arg_shape = flow.dispatch.shape %arg : !flow.dispatch.input<8x4xf32> -> !shapex.ranked_shape<[8,4]>
@@ -75,9 +75,9 @@ func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
   }
   // CHECK: %[[RET1:.+]] = flow.dispatch @dispatchFnMuli_dispatch_1::@dispatchFnMuli_dispatch_1[
   // CHECK-SAME: %[[Y]], %[[X]]
-  // CHECK-SAME: ] (%[[RET0]]) : (tensor<4x8xf32>) -> tensor<8x4xf32>
+  // CHECK-SAME: ](%[[RET0]]) : (tensor<4x8xf32>) -> (tensor<8x4xf32>)
   %1 = flow.dispatch.workgroups[%y, %x](%0) : (tensor<4x8xf32>) -> (tensor<8x4xf32>) = (
-    %arg : !flow.dispatch.input<4x8xf32>, %ret : !flow.dispatch.output<8x4xf32>
+    %arg: !flow.dispatch.input<4x8xf32>, %ret: !flow.dispatch.output<8x4xf32>
   ) {
     %arg_value = flow.dispatch.input.load %arg : !flow.dispatch.input<4x8xf32> -> tensor<8x4xf32>
     %arg_shape = flow.dispatch.shape %arg : !flow.dispatch.input<4x8xf32> -> !shapex.ranked_shape<[4,8]>
@@ -100,7 +100,7 @@ func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %y = constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
-    %arg : !flow.dispatch.input<8x4xf32>, %ret : !flow.dispatch.output<4x8xf32>
+    %arg: !flow.dispatch.input<8x4xf32>, %ret: !flow.dispatch.output<4x8xf32>
   ) {
     flow.return
   }
@@ -115,7 +115,7 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %y = constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
-    %arg : !flow.dispatch.input<8x4xf32>, %ret : !flow.dispatch.output<4x8xf32>
+    %arg: !flow.dispatch.input<8x4xf32>, %ret: !flow.dispatch.output<4x8xf32>
   ) {
     flow.return
   }
@@ -169,21 +169,17 @@ func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
   // CHECK-DAG: %[[Y:.+]] = constant 512
   %y = constant 512 : index
   // CHECK-NEXT: %[[ARG0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM1]], %[[ARG0_DIM3]]
-  %arg0_shape = shapex.make_ranked_shape %dim1, %dim3 : (index, index) -> !shapex.ranked_shape<[7,?,24,?]>
-  // CHECK-NEXT: %[[ARG0_SHAPED:.+]] = shapex.tie_shape %[[ARG0]], %[[ARG0_SHAPE]]
-  %arg0_shaped = shapex.tie_shape %arg0, %arg0_shape : tensor<7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>
-  // CHECK-NEXT: %[[RET0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM3]], %[[ARG0_DIM1]]
-  %ret0_shape = shapex.make_ranked_shape %dim3, %dim1 : (index, index) -> !shapex.ranked_shape<[?,?,1024]>
   //  CHECK-DAG: %[[IN_ARG0_DIM1:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][1]
   //  CHECK-DAG: %[[IN_ARG0_DIM3:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][3]
+  // CHECK-NEXT: %[[RET0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM3]], %[[ARG0_DIM1]]
   //  CHECK-DAG: %[[IN_RET0_DIM0:.+]] = shapex.ranked_dim %[[RET0_SHAPE]][0]
   //  CHECK-DAG: %[[IN_RET0_DIM1:.+]] = shapex.ranked_dim %[[RET0_SHAPE]][1]
   // CHECK-NEXT: %[[RET0:.+]] = flow.dispatch @dynamicShapeDispatch_dispatch_0::@dynamicShapeDispatch_dispatch_0[
   // CHECK-SAME:   %[[X]], %[[Y]]
-  // CHECK-SAME: ] (%[[ARG0_SHAPED]], %[[IN_ARG0_DIM1]], %[[IN_ARG0_DIM3]], %[[IN_RET0_DIM0]], %[[IN_RET0_DIM1]])
-  // CHECK-SAME: : (tensor<7x?x24x?xf32>, index, index, index, index) -> tensor<?x?x1024xf32>
-  %ret0 = flow.dispatch.workgroups[%x, %y](%arg0_shaped) : (tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> = (
-    %arg : !flow.dispatch.input<7x?x24x?xf32>, %ret : !flow.dispatch.output<?x?x1024xf32>
+  // CHECK-SAME: ](%arg0, %[[IN_ARG0_DIM1]], %[[IN_ARG0_DIM3]], %[[IN_RET0_DIM0]], %[[IN_RET0_DIM1]])
+  // CHECK-SAME: : (tensor<7x?x24x?xf32>{%[[IN_ARG0_DIM1]], %[[IN_ARG0_DIM3]]}, index, index, index, index) -> (tensor<?x?x1024xf32>{%[[IN_RET0_DIM0]], %[[IN_RET0_DIM1]]})
+  %ret0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim3, %dim1} = (
+    %arg: !flow.dispatch.input<7x?x24x?xf32>, %ret: !flow.dispatch.output<?x?x1024xf32>
   ) {
     %workgroup_rank = flow.dispatch.workgroup.rank : index
 
@@ -207,8 +203,6 @@ func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
 
     flow.return
   }
-  // CHECK-NEXT: %[[RET0_SHAPED:.+]] = shapex.tie_shape %[[RET0]], %[[RET0_SHAPE]]
-  %ret0_shaped = shapex.tie_shape %ret0, %ret0_shape : tensor<?x?x1024xf32>, !shapex.ranked_shape<[?,?,1024]>
-  // CHECK-NEXT: return %[[RET0_SHAPED]]
-  return %ret0_shaped : tensor<?x?x1024xf32>
+  // CHECK-NEXT: return %[[RET0]]
+  return %ret0 : tensor<?x?x1024xf32>
 }

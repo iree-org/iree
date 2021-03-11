@@ -4,7 +4,7 @@
 
 flow.executable @ex0 {
   module {
-    func @dispatch_fn(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
+    func @dispatch_fn(%cst : index, %arg0 : tensor<4xf32>) -> tensor<4xf32> {
       return %arg0 : tensor<4xf32>
     }
   }
@@ -15,7 +15,7 @@ flow.executable @ex0 {
 func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[CST:.+]] = constant
   %cst = constant 4 : index
-  // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @ex0::@dispatch_fn[%cst] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[CST]], %arg0) : (index, tensor<4xf32>) -> (tensor<4xf32>)
+  %0 = flow.dispatch @ex0::@dispatch_fn[%cst](%cst, %arg0) : (index, tensor<4xf32>) -> (tensor<4xf32>)
   return %0 : tensor<4xf32>
 }

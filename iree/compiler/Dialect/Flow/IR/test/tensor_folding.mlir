@@ -9,20 +9,13 @@ func @reshapeNoOp(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   return %0 : tensor<4x4xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @reshapeNoOpScalar
 func @reshapeNoOpScalar(%arg0 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: return %arg0 : tensor<f32>
   %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<f32>
   return %0 : tensor<f32>
-}
-
-// CHECK-LABEL: @reshapeTransitive
-func @reshapeTransitive(%arg0 : tensor<4x4xf32>) -> tensor<8x2xf32> {
-  %0 = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<2x8xf32>
-  // CHECK-NEXT: %[[T:.+]] = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<8x2xf32>
-  %1 = flow.tensor.reshape %0 : tensor<2x8xf32> -> tensor<8x2xf32>
-  // CHECK-NEXT: return %[[T]] : tensor<8x2xf32>
-  return %1 : tensor<8x2xf32>
 }
 
 // -----
@@ -37,6 +30,8 @@ func @loadConst() -> i32 {
   // CHECK-NEXT: return %[[C2]]
   return %2 : i32
 }
+
+// -----
 
 // CHECK-LABEL: @loadConstScalar
 func @loadConstScalar() -> i32 {
@@ -63,6 +58,8 @@ func @storeConst() -> tensor<2x2xi32> {
   return %1 : tensor<2x2xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @storeConstScalar
 func @storeConstScalar() -> tensor<i32> {
   %0 = constant dense<0> : tensor<i32>
@@ -84,6 +81,8 @@ func @splatConst() -> tensor<4xi32> {
   return %1 : tensor<4xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @splatConstScalar
 func @splatConstScalar() -> tensor<i32> {
   %0 = constant 4 : i32
@@ -104,6 +103,8 @@ func @cloneConst() -> tensor<4xi32> {
   return %1 : tensor<4xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @cloneDynamic
 func @cloneDynamic(%arg0 : tensor<4xi32>) -> tensor<4xi32> {
   %0 = flow.tensor.clone %arg0 : tensor<4xi32>
@@ -122,6 +123,8 @@ func @sliceConst0D() -> tensor<i32> {
   return %1 : tensor<i32>
 }
 
+// -----
+
 // CHECK-LABEL: @sliceConst1D
 func @sliceConst1D() -> tensor<1xi32> {
   %0 = constant dense<0> : tensor<1xi32>
@@ -133,6 +136,8 @@ func @sliceConst1D() -> tensor<1xi32> {
   return %1 : tensor<1xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @sliceConst1DZeroLength
 func @sliceConst1DZeroLength() -> tensor<0xi32> {
   %0 = constant dense<0> : tensor<1xi32>
@@ -142,6 +147,8 @@ func @sliceConst1DZeroLength() -> tensor<0xi32> {
   // CHECK-NEXT: return %[[C]]
   return %1 : tensor<0xi32>
 }
+
+// -----
 
 // CHECK-LABEL: @sliceConst2D
 func @sliceConst2D() -> tensor<1x2xi32> {
@@ -157,6 +164,8 @@ func @sliceConst2D() -> tensor<1x2xi32> {
   return %1 : tensor<1x2xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @sliceConst2DZeroLength1
 func @sliceConst2DZeroLength1() -> tensor<1x0xi32> {
   %0 = constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
@@ -168,6 +177,8 @@ func @sliceConst2DZeroLength1() -> tensor<1x0xi32> {
   return %1 : tensor<1x0xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @sliceConst2DZeroLength01
 func @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
   %0 = constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
@@ -177,6 +188,8 @@ func @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
   // CHECK-NEXT: return %[[C]]
   return %1 : tensor<0x0xi32>
 }
+
+// -----
 
 // CHECK-LABEL: @sliceConst3D
 func @sliceConst3D() -> tensor<1x2x3xi32> {
@@ -205,6 +218,8 @@ func @updateConst0D() -> tensor<i32> {
   return %2 : tensor<i32>
 }
 
+// -----
+
 // CHECK-LABEL: @updateConst1D
 func @updateConst1D() -> tensor<1xi32> {
   %0 = constant dense<0> : tensor<1xi32>
@@ -216,6 +231,8 @@ func @updateConst1D() -> tensor<1xi32> {
   return %2 : tensor<1xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @updateConst1DUpdateZeroSize
 func @updateConst1DUpdateZeroSize() -> tensor<1xi32> {
   %0 = constant dense<> : tensor<0xi32>
@@ -226,6 +243,8 @@ func @updateConst1DUpdateZeroSize() -> tensor<1xi32> {
   // CHECK-NEXT: return %[[C]]
   return %2 : tensor<1xi32>
 }
+
+// -----
 
 // CHECK-LABEL: @updateConst2DUpdate1x1
 func @updateConst2DUpdate1x1() -> tensor<3x4xi32> {
@@ -240,6 +259,8 @@ func @updateConst2DUpdate1x1() -> tensor<3x4xi32> {
   return %2 : tensor<3x4xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @updateConst2DUpdate2x2
 func @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
   %0 = constant dense<[[12, 13], [14, 15]]> : tensor<2x2xi32>
@@ -252,6 +273,8 @@ func @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
   // CHECK-NEXT: return %[[C]]
   return %2 : tensor<3x4xi32>
 }
+
+// -----
 
 // CHECK-LABEL: @updateConst3DUpdate1x2x3
 func @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
@@ -268,6 +291,8 @@ func @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
   return %2 : tensor<2x3x3xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @updateConst3DUpdate2x3x2
 func @updateConst3DUpdate2x3x2() -> tensor<2x3x3xi32> {
   %0 = constant dense<[[[18, 19], [20, 21], [22, 23]], [[24, 25], [26, 27], [28, 29]]]> : tensor<2x3x2xi32>
@@ -283,6 +308,8 @@ func @updateConst3DUpdate2x3x2() -> tensor<2x3x3xi32> {
   return %2 : tensor<2x3x3xi32>
 }
 
+// -----
+
 // CHECK-LABEL: @updateReplace
 func @updateReplace(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi32> {
   %c0 = constant 0 : index
@@ -290,6 +317,8 @@ func @updateReplace(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi3
   // CHECK-NEXT: return %arg0
   return %0 : tensor<4xi32>
 }
+
+// -----
 
 // CHECK-LABEL: @propogateStaticShapeOfTarget
 func @propogateStaticShapeOfTarget(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tensor<?x?xf32> {
@@ -305,10 +334,12 @@ func @propogateStaticShapeOfTarget(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tens
   } :  tensor<?x?xf32>
   // CHECK: %[[UPDATED:.+]] = flow.tensor.update %{{.+}}, %[[TARGET]]
   // CHECK: %[[RESULT:.+]] = tensor.cast %[[UPDATED]] : tensor<21x42xf32> to tensor<?x?xf32>
-  %1 = flow.tensor.update %arg0, %0[%c2, %c4] : tensor<?x?xf32> -> tensor<?x?xf32>
+  %1 = flow.tensor.update %arg0, %0[%c2, %c4] : tensor<?x?xf32>{%c21, %c42} -> tensor<?x?xf32>{%c21, %c42}
   // CHECK: return %[[RESULT]]
   return %1 : tensor<?x?xf32>
 }
+
+// -----
 
 // CHECK-LABEL: @propogateStaticShapeOfUpdate
 func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tensor<?x?xf32> {
@@ -323,7 +354,7 @@ func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tens
     tensor.yield %arg1 : f32
   } :  tensor<?x?xf32>
   // CHECK: %[[RESULT:.+]] = flow.tensor.update  %[[UPDATE]]
-  %1 = flow.tensor.update %0, %arg0[%c2, %c4] : tensor<?x?xf32> -> tensor<?x?xf32>
+  %1 = flow.tensor.update %0, %arg0[%c2, %c4] : tensor<?x?xf32>{%c21, %c42} -> tensor<?x?xf32>{%c21, %c42}
   // CHECK: return %[[RESULT]]
   return %1 : tensor<?x?xf32>
 }

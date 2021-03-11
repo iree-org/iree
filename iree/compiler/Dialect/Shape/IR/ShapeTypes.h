@@ -47,6 +47,9 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
       function_ref<InFlightDiagnostic()> emitError, MLIRContext *context,
       ArrayRef<int64_t> dims);
 
+  // Derives a RankedShapeType from a ShapedType.
+  static RankedShapeType get(ShapedType shapedType);
+
   // Verifies construction invariants and issues errors/warnings.
   static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
                               ArrayRef<int64_t> dims);

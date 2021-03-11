@@ -52,17 +52,17 @@ LogicalResult safeCastCompatibleShapePattern(
   return failure();
 }
 
-LogicalResult elideTiedGetRankedShapePattern(GetRankedShapeOp op,
-                                             GetRankedShapeOp::Adaptor operands,
-                                             PatternRewriter &rewriter) {
-  // If the immediate predecessor is a TieShapeOp, then this op can be
-  // erased in favor of the input to the tie op.
-  auto tieOp = dyn_cast_or_null<TieShapeOp>(operands.operand().getDefiningOp());
-  if (!tieOp) {
-    return rewriter.notifyMatchFailure(op, "no associated tie_shape op");
+LogicalResult elideShapeCarryingGetRankedShapePattern(
+    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
+    PatternRewriter &rewriter) {
+  auto carryingOp = dyn_cast_or_null<ShapeCarryingInterface>(
+      operands.operand().getDefiningOp());
+  if (!carryingOp) {
+    return rewriter.notifyMatchFailure(op,
+                                       "no associated dynamic-shape aware op");
   }
-
-  rewriter.replaceOp(op, tieOp.shape());
+  rewriter.replaceOp(
+      op, carryingOp.buildResultValueRankedShape(operands.operand(), rewriter));
   return success();
 }
 
@@ -225,6 +225,42 @@ LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
   return success();
 }
 
+// Removes tie_shape ops when the operand is produced by a shape-aware op.
+LogicalResult elideShapeCarryingOperandTieShapePattern(
+    TieShapeOp op, TieShapeOp::Adaptor operands, PatternRewriter &rewriter) {
+  auto definingOp = operands.operand().getDefiningOp();
+  if (!definingOp) return failure();
+  if (isa<TieShapeOp>(definingOp)) {
+    return failure();  // ignore tie-shape handled above
+  } else if (isa<ShapeCarryingInterface>(definingOp)) {
+    rewriter.replaceOp(op, operands.operand());
+    return success();
+  } else {
+    return failure();
+  }
+}
+
+// Reroutes uses of tie_shape ops by ops that are shape-aware or dim ops.
+LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
+                                        TieShapeOp::Adaptor operands,
+                                        PatternRewriter &rewriter) {
+  bool didAnything = false;
+  for (auto &use : llvm::make_early_inc_range(op.result().getUses())) {
+    if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(use.getOwner())) {
+      carryingOp->setOperand(use.getOperandNumber(), operands.operand());
+      didAnything = true;
+    } else if (auto dimOp = dyn_cast<DimOp>(use.getOwner())) {
+      auto index = dimOp.getConstantIndex();
+      if (index.hasValue()) {
+        rewriter.replaceOpWithNewOp<RankedDimOp>(dimOp, op.shape(),
+                                                 index.getValue());
+        didAnything = true;
+      }
+    }
+  }
+  return didAnything ? success() : failure();
+}
+
 //===----------------------------------------------------------------------===//
 // shapex.tie_shape
 //===----------------------------------------------------------------------===//
@@ -232,6 +268,9 @@ LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
 void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
                                              MLIRContext *context) {
   insertGreedyPattern(patterns, context, elideDuplicateTieShapePattern);
+  insertGreedyPattern(patterns, context,
+                      elideShapeCarryingOperandTieShapePattern);
+  insertGreedyPattern(patterns, context, elideTieShapeUsagePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -249,7 +288,8 @@ void CastCompatibleShapeOp::getCanonicalizationPatterns(
 
 void GetRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertGreedyPattern(patterns, context, elideTiedGetRankedShapePattern);
+  insertGreedyPattern(patterns, context,
+                      elideShapeCarryingGetRankedShapePattern);
   insertGreedyPattern(patterns, context, elideDuplicateGetRankedShapePattern);
   insertGreedyPattern(patterns, context, elideStaticGetRankedShapePattern);
 }
@@ -358,7 +398,11 @@ void populateFoldConversionPatterns(MLIRContext *context,
   insertConversionPattern(patterns, context,
                           elideDuplicateGetRankedShapePattern);
   insertConversionPattern(patterns, context, elideDuplicateTieShapePattern);
-  insertConversionPattern(patterns, context, elideTiedGetRankedShapePattern);
+  insertConversionPattern(patterns, context,
+                          elideShapeCarryingOperandTieShapePattern);
+  insertConversionPattern(patterns, context, elideTieShapeUsagePattern);
+  insertConversionPattern(patterns, context,
+                          elideShapeCarryingGetRankedShapePattern);
   insertConversionPattern(patterns, context, expandRankedShapeDimsPattern);
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
   insertConversionPattern(patterns, context, elideStaticGetRankedShapePattern);

@@ -16,6 +16,7 @@
 #define IREE_DIALECT_SHAPE_OPS
 
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
+include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -39,8 +40,9 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
+    Shape_ShapeCarryingOpInterface,
     AllTypesMatch<["operand", "result"]>,
-    DeclareOpInterfaceMethods<ViewLikeOpInterface>
+    DeclareOpInterfaceMethods<ViewLikeOpInterface>,
   ]> {
   let summary = "Ties a tensor and a shape together.";
   let description = [{
@@ -56,6 +58,12 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "operands attr-dict `:` type($operand) `,` type($shape)";
+
+  let extraClassDeclaration = [{
+    // ShapeCarryingInterface:
+    Value buildOperandRankedShape(unsigned, OpBuilder) { return shape(); }
+    Value buildResultRankedShape(unsigned, OpBuilder) { return shape(); }
+  }];
 
   let verifier = [{ return verify$cppClass(*this); }];
 
