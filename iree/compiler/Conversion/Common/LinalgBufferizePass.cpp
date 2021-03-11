@@ -497,8 +497,8 @@ LogicalResult convertInterfaceStoreTensorOp(
   b.setInsertionPoint(storeOp);
   Value storeTo = bvm.lookup(storeOp.target());
   // If the value already has a mapping, it should already have been updated in
-  // place by the converted producer.
-  if (storeTo) {
+  // place by the converted producer, as long as the producer is a Linalg op.
+  if (storeTo && storeOp.value().getDefiningOp<linalg::LinalgOp>()) {
     storeOp->erase();
     return success();
   }
@@ -551,13 +551,16 @@ void LinalgBufferizePass::runOnFunction() {
   OpBuilder b(context);
 
   BlockAndValueMapping bvm;
+
+  // First go over all hal.interface.binding.subspan ops and create counterparts
+  // working with memrefs.
   funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
     auto shapedType =
         op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
     if (!shapedType || !shapedType.hasRank()) return;
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(op);
-    // Just change the resulttype of InterfaceBindingSubspanOp to form
+    // Just change the result type of the InterfaceBindingSubspanOp to form
     // the base buffer.
     auto tensorType =
         op.result().getType().cast<IREE::Flow::DispatchTensorType>();
@@ -569,6 +572,7 @@ void LinalgBufferizePass::runOnFunction() {
     bvm.map(op, baseBuffer);
     transferShapeOpsToMemref(b, op.getResult(), baseBuffer.getResult(), bvm);
   });
+
   if (funcOp
           .walk([&](IREE::Flow::DispatchTensorStoreOp op) -> WalkResult {
             return preProcessInterfaceStoreTensorOp(b, op, bvm);

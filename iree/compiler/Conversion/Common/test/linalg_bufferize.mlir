@@ -592,3 +592,24 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   %[[LOAD:.+]] = load %[[ARG0]]
 //       CHECK:   linalg.fill(%[[RET0]], %[[LOAD]])
+
+// -----
+
+func @load_to_store() {
+  %c0 = constant 0 : index
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
+  %2 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:3x4xi32>
+  %3 = flow.dispatch.tensor.load %2 : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
+  flow.dispatch.tensor.store %3, %1 : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  return
+}
+
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+
+// CHECK-LABEL: func @load_to_store()
+//       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<3x4xi32>
+//       CHECK:   %[[IN:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<3x4xi32>
+//       CHECK:   linalg.copy(%[[IN]], %[[OUT]]) : memref<3x4xi32>, memref<3x4xi32>
