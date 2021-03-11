@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- LinalgTileAndFusePass.cpp - Tile and fuse Linalg on Buffers --------===//
+//===- TileAndVectorizeInOneWorkgroup.cpp ---------------------------------===//
 //
 // This pass tiles and vectorizes Linalg ops on buffers within in a single
 // workgroup.
@@ -81,13 +81,14 @@ static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
 
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
-class LinalgTileAndFusePass
-    : public PassWrapper<LinalgTileAndFusePass,
+class TileAndVectorizeInOneWorkgroupPass
+    : public PassWrapper<TileAndVectorizeInOneWorkgroupPass,
                          OperationPass<IREE::HAL::ExecutableTargetOp>> {
  public:
-  LinalgTileAndFusePass(const SPIRVCodegenOptions &passOptions)
+  TileAndVectorizeInOneWorkgroupPass(const SPIRVCodegenOptions &passOptions)
       : options(passOptions) {}
-  LinalgTileAndFusePass(const LinalgTileAndFusePass &pass)
+  TileAndVectorizeInOneWorkgroupPass(
+      const TileAndVectorizeInOneWorkgroupPass &pass)
       : options(pass.options) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -400,7 +401,7 @@ static void populateTilingConvFilterPatterns(
 // Main pass implementation
 //====---------------------------------------------------------------------===//
 
-void LinalgTileAndFusePass::runOnOperation() {
+void TileAndVectorizeInOneWorkgroupPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableTargetOp targetOp = getOperation();
   ModuleOp module = targetOp.getInnerModule();
@@ -576,15 +577,15 @@ void LinalgTileAndFusePass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
-createLinalgTileAndFusePass(const SPIRVCodegenOptions &options) {
-  return std::make_unique<LinalgTileAndFusePass>(options);
+createTileAndVectorizeInOneWorkgroupPass(const SPIRVCodegenOptions &options) {
+  return std::make_unique<TileAndVectorizeInOneWorkgroupPass>(options);
 }
 
-static PassRegistration<LinalgTileAndFusePass> pass(
-    "iree-codegen-linalg-tile-and-fuse",
-    "Tile and fuse Linalg operations on buffers", [] {
+static PassRegistration<TileAndVectorizeInOneWorkgroupPass> pass(
+    "iree-spirv-tile-and-vectorize-in-one-workgroup",
+    "Tile and vectorize Linalg operations on buffers in one workgroup", [] {
       SPIRVCodegenOptions options = getSPIRVCodegenOptionsFromClOptions();
-      return std::make_unique<LinalgTileAndFusePass>(options);
+      return std::make_unique<TileAndVectorizeInOneWorkgroupPass>(options);
     });
 
 }  // namespace iree_compiler
