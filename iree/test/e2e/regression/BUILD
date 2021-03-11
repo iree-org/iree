@@ -16,6 +16,7 @@
 # These should focus on support by IREE itself, not for issues with specific runner tools. Place
 # those tests in iree/tools/test/
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -26,8 +27,25 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(
-        ["*.mlir"],
+    srcs = enforce_glob(
+        [
+            "dynamic_abs.mlir",
+            "dynamic_add.mlir",
+            "dynamic_compare_and_select.mlir",
+            "dynamic_dot.mlir",
+            "dynamic_dot_general.mlir",
+            "dynamic_torch_index_select_high_rank.mlir",
+            "dynamic_torch_index_select_negative.mlir",
+            "dynamic_torch_index_select_scalar.mlir",
+            "dynamic_torch_index_select_vector.mlir",
+            "executable_benchmark.mlir",
+            "globals.mlir",
+            "scalar.mlir",
+            "trace_dispatch_tensors.mlir",
+            "unused_args.mlir",
+        ],
+        include =
+            ["*.mlir"],
         # Disabled temporarily. See GH Issue #4733
         exclude = [
             "dynamic_linalg_matmul_on_tensors.mlir",

@@ -251,6 +251,9 @@ class BuildFileFunctions(object):
   def sh_binary(self, name, **kwargs):
     self._convert_unimplemented_function("sh_binary", name)
 
+  def enforce_glob(self, files, **kwargs):
+    return files
+
   def glob(self, include, exclude=None, exclude_directories=1):
     if exclude_directories != 1:
       self._convert_unimplemented_function("glob", "with exclude_directories")

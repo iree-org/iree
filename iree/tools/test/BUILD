@@ -15,6 +15,7 @@
 # Smoke tests for the execution of tool binaries.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -24,7 +25,18 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "iree-benchmark-module.mlir",
+            "iree-run-mlir.mlir",
+            "iree-run-module.mlir",
+            "multiple_args.mlir",
+            "multiple_exported_functions.mlir",
+            "repeated_return.mlir",
+            "scalars.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",

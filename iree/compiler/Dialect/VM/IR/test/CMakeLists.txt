@@ -10,12 +10,30 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "arithmetic_folding.mlir"
+    "arithmetic_ops.mlir"
+    "assignment_folding.mlir"
+    "assignment_ops.mlir"
+    "comparison_folding.mlir"
+    "comparison_ops.mlir"
+    "const_folding.mlir"
+    "const_ops.mlir"
+    "control_flow_folding.mlir"
+    "control_flow_ops.mlir"
+    "conversion_folding.mlir"
+    "conversion_ops.mlir"
+    "debug_folding.mlir"
+    "debug_ops.mlir"
+    "global_folding.mlir"
+    "global_ops.mlir"
+    "list_op_verification.mlir"
+    "list_ops.mlir"
+    "shift_ops.mlir"
+    "structural_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

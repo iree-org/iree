@@ -43,6 +43,7 @@ def _deep_copy_recursion_depth_1(x):
 
 def deep_copy(x):
     """Returns a copy of the argument, making a deep copy if it is a container.
+
     Args:
       x: (object) value to copy. If it is a container with nested containers as
          elements, the maximum nesting depth is restricted to three (e.g.,

@@ -10,12 +10,22 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "benchmark_batch_dispatches.mlir"
+    "cse_variable_loads.mlir"
+    "identify_constant_pools.mlir"
+    "inline_device_switches.mlir"
+    "materialize_constant_pool_buffers.mlir"
+    "materialize_interfaces.mlir"
+    "materialize_resource_caches.mlir"
+    "memoize_device_queries.mlir"
+    "pack_constant_pool_storage.mlir"
+    "propagate_constant_workgroup_info.mlir"
+    "public_abi_generation.mlir"
+    "resolve_entry_point_ordinals.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

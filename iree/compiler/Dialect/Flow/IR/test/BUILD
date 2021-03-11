@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,7 +23,24 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "dispatch_ops.mlir",
+            "dispatch_region_folding.mlir",
+            "dispatch_regions.mlir",
+            "dispatch_workgroups.mlir",
+            "dispatch_workgroups_folding.mlir",
+            "executable_ops.mlir",
+            "stream_folding.mlir",
+            "stream_ops.mlir",
+            "tensor_folding.mlir",
+            "tensor_ops.mlir",
+            "types.mlir",
+            "variable_folding.mlir",
+            "variable_ops.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-opt",
