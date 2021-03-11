@@ -42,9 +42,18 @@ def enforce_glob(files, **kwargs):
         result_dict = {k: None for k in files}
         missing = [k for k in glob_result if k not in files]
         extra = [k for k in files if k not in glob_result]
+        expected_formatted = "\n".join(['"{}",'.format(file) for file in glob_result])
         fail(("Error in enforce_glob." +
               "\nExpected {}." +
               "\nGot {}." +
               "\nMissing {}." +
-              "\nExtra {}").format(glob_result, files, missing, extra))
+              "\nExtra {}" +
+              "\nPaste this into the first enforce_glob argument:" +
+              "\n{}").format(
+            glob_result,
+            files,
+            missing,
+            extra,
+            expected_formatted,
+        ))
     return files
