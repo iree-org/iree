@@ -166,6 +166,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -213,6 +214,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
