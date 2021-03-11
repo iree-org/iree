@@ -27,6 +27,7 @@ filegroup(
     srcs = enforce_glob(
         [
             "FlowBase.td",
+            "FlowInterfaces.td",
             "FlowOps.td",
         ],
         include = ["*.td"],

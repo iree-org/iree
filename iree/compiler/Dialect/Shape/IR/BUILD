@@ -29,6 +29,7 @@ filegroup(
     srcs = enforce_glob(
         [
             "ShapeBase.td",
+            "ShapeInterfaces.td",
             "ShapeOps.td",
         ],
         include = ["*.td"],
