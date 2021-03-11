@@ -28,8 +28,10 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createHLOToLinalgOnBuffersPass());
 }
 
-void addHLOToLinalgOnTensorsPasses(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass());
+void addHLOToLinalgOnTensorsPasses(OpPassManager &pm,
+                                   bool useLinalgOnTensorsPath) {
+  pm.addNestedPass<FuncOp>(
+      createHLOToLinalgOnTensorsPass(useLinalgOnTensorsPath));
   pm.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());

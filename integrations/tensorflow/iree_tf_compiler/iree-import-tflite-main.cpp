@@ -88,8 +88,8 @@ int main(int argc, char **argv) {
                                        inputArrayFlag.end());
   std::vector<std::string> outputArrays(outputArrayFlag.begin(),
                                         outputArrayFlag.end());
-  auto loc = mlir::FileLineColLoc::get(inputFile->getBufferIdentifier(), 0, 0,
-                                       &context);
+  auto loc = mlir::FileLineColLoc::get(&context,
+                                       inputFile->getBufferIdentifier(), 0, 0);
   OwningModuleRef module = tflite::FlatBufferToMlir(
       absl::string_view(inputFile->getBufferStart(),
                         inputFile->getBufferSize()),

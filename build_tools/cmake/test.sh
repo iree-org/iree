@@ -28,6 +28,8 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 # and turning on the llvmaot ones.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
+# CUDA is off by default.
+export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is
@@ -56,6 +58,9 @@ if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
 fi
 if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=dylib$")
+fi
+if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
+  label_exclude_args+=("^driver=cuda$")
 fi
 
 # Join on "|"

@@ -13,10 +13,10 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.13.4)
-# Allow target_link_libraries() from other directories (since 3.13):
-#   https://cmake.org/cmake/help/v3.13/policy/CMP0079.html
-if(POLICY CMP0079)
-  cmake_policy(SET CMP0079 NEW)
+# Do not set MSVC warning flags like /W3 by default (since 3.15):
+#   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
+if(POLICY CMP0092)
+  cmake_policy(SET CMP0092 NEW)
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

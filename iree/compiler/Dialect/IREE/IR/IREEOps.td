@@ -110,7 +110,7 @@ def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
   let results = (outs Variadic<AnyType>:$results);
   let verifier = [{ return verify$cppClass(*this); }];
   let builders = [
-    OpBuilderDAG<(ins "ValueRange":$operands,
+    OpBuilder<(ins "ValueRange":$operands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
   ];
 }
@@ -148,7 +148,7 @@ def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
   let results = (outs AnyType);
 
   let builders = [
-    OpBuilderDAG<(ins "Attribute":$value),
+    OpBuilder<(ins "Attribute":$value),
     [{ build($_builder, $_state, value.getType(), value); }]>];
 
   let hasCanonicalizer = 1;

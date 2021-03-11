@@ -41,7 +41,7 @@ def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
   );
 
   let builders = [
-    OpBuilderDAG<(ins "ElementsAttr":$value),
+    OpBuilder<(ins "ElementsAttr":$value),
     [{
       build($_builder, $_state, IREE::VMLA::BufferType::get($_builder.getContext()),
             value);

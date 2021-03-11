@@ -154,6 +154,7 @@ iree_check_single_backend_test_suite(
     "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
+    "pad.mlir"
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
@@ -165,6 +166,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -212,6 +214,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -219,6 +222,35 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
     "-iree-codegen-spirv-experimental-linalg-on-tensors"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg_on_tensors_cuda
+  SRCS
+    "add.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "constant.mlir"
+    "divide.mlir"
+    "iota.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "select.mlir"
+    "subtract.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+  LABELS
+    "notap"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

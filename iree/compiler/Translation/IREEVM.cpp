@@ -26,6 +26,7 @@
 
 #ifdef IREE_HAVE_EMITC_DIALECT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
+#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 namespace mlir {
@@ -194,7 +195,8 @@ static LogicalResult translateFromMLIRToBenchmarkVMBytecodeModuleWithFlags(
 static LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, BindingOptions bindingOptions,
     IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, llvm::raw_ostream &output) {
+    IREE::VM::TargetOptions targetOptions,
+    IREE::VM::CTargetOptions cTargetOptions, llvm::raw_ostream &output) {
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
                                       executableOptions, targetOptions,
                                       /*addExportDispatchesPipeline=*/false);
@@ -203,7 +205,8 @@ static LogicalResult translateFromMLIRToVMCModule(
   }
 
   // Serialize to c code.
-  return mlir::iree_compiler::IREE::VM::translateModuleToC(moduleOp, output);
+  return mlir::iree_compiler::IREE::VM::translateModuleToC(
+      moduleOp, cTargetOptions, output);
 }
 
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
@@ -212,8 +215,10 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
   auto bindingOptions = getBindingOptionsFromFlags();
   auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
-  return translateFromMLIRToVMCModule(
-      moduleOp, bindingOptions, halTargetOptions, vmTargetOptions, output);
+  auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
+  return translateFromMLIRToVMCModule(moduleOp, bindingOptions,
+                                      halTargetOptions, vmTargetOptions,
+                                      cTargetOptions, output);
 }
 #endif  // IREE_HAVE_EMITC_DIALECT
 

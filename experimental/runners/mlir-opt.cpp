@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/tools/init_dialects.h"
-#include "iree/tools/init_passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"

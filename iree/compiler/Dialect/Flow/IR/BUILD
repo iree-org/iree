@@ -60,6 +60,7 @@ cc_library(
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
     ],
 )

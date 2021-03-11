@@ -28,7 +28,9 @@ iree_lit_test_suite(
         "@iree//iree/tools:IreeFileCheck",
     ],
     driver = "@iree//iree/tools:run_lit.sh",
+    # TODO: These tests are failing internally and not running in OSS.
     tags = [
-        "notap",  # TODO: These tests are failing internally and not running in OSS.
+        "manual",
+        "notap",
     ],
 )

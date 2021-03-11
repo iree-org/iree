@@ -2,11 +2,11 @@
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.globalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
+  // CHECK: spv.GlobalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
   // CHECK: spv.func @push_constant()
   func @push_constant() {
-    // CHECK: %[[INDEX_0:.+]] = spv.constant 0 : i32
-    // CHECK: %[[INDEX_1:.+]] = spv.constant 2 : i32
+    // CHECK: %[[INDEX_0:.+]] = spv.Constant 0 : i32
+    // CHECK: %[[INDEX_1:.+]] = spv.Constant 2 : i32
     // CHECK: %[[ADDR:.+]] = spv.mlir.addressof @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
     // CHECK: %[[AC:.+]] = spv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
     // CHECK: spv.Load "PushConstant" %[[AC]] : i32
@@ -24,9 +24,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.globalVariable @[[RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @[[ARG0:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @[[ARG1:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[ARG0:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[ARG1:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.func @resource_bindings_in_same_entry_func()
   func @resource_bindings_in_same_entry_func() {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
@@ -45,10 +45,10 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.globalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @[[FUNC1_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC1_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
 
   // CHECK: spv.func @resource_bindings_in_entry_func1()
   func @resource_bindings_in_entry_func1() {
@@ -120,7 +120,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
     %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {masked = [false, false]} : memref<4096x4096xi32>, vector<16x16xi32>
     // CHECK: %[[ACC:.+]] = spv.Variable : !spv.ptr<!spv.coopmatrix<16x16xi32, Subgroup>, Function>
-    // CHECK: spv.loop {
+    // CHECK: spv.mlir.loop {
       // CHECK: spv.Branch ^[[BB:.+]](%{{.*}}, %[[C]] : i32, !spv.coopmatrix<16x16xi32, Subgroup>)
       // CHECK: ^[[BB]](%{{.*}}: i32, %[[C1:.+]]: !spv.coopmatrix<16x16xi32, Subgroup>)
     %5 = scf.for %arg3 = %c0 to %c4096 step %c32 iter_args(%arg4 = %4) -> (vector<16x16xi32>) {
@@ -158,7 +158,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
     %4 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<4096x1024xvector<4xi32>>, vector<16x16xi32>
     // CHECK: %[[ACC:.+]] = spv.Variable : !spv.ptr<!spv.coopmatrix<16x16xi32, Subgroup>, Function>
-    // CHECK: spv.loop {
+    // CHECK: spv.mlir.loop {
       // CHECK: spv.Branch ^[[BB:.+]](%{{.*}}, %[[C]] : i32, !spv.coopmatrix<16x16xi32, Subgroup>)
       // CHECK: ^[[BB]](%{{.*}}: i32, %[[C1:.+]]: !spv.coopmatrix<16x16xi32, Subgroup>)
     %5 = scf.for %arg3 = %c0 to %c4096 step %c32 iter_args(%arg4 = %4) -> (vector<16x16xi32>) {
@@ -196,9 +196,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   }
 }
 // CHECK-LABEL: spv.module
-//   CHECK-DAG:   spv.globalVariable @[[RET0:.+]] bind(0, 2)
-//   CHECK-DAG:   spv.globalVariable @[[ARG1:.+]] bind(0, 1)
-//   CHECK-DAG:   spv.globalVariable @[[ARG0:.+]] bind(0, 0)
+//   CHECK-DAG:   spv.GlobalVariable @[[RET0:.+]] bind(0, 2)
+//   CHECK-DAG:   spv.GlobalVariable @[[ARG1:.+]] bind(0, 1)
+//   CHECK-DAG:   spv.GlobalVariable @[[ARG0:.+]] bind(0, 0)
 //       CHECK:   spv.func
 //   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[RET0]]
 //   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[ARG0]]
@@ -219,7 +219,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   }
 }
 // CHECK-LABEL: spv.module
-//   CHECK-DAG:   spv.globalVariable @[[WGID:.+]] built_in("WorkgroupId")
+//   CHECK-DAG:   spv.GlobalVariable @[[WGID:.+]] built_in("WorkgroupId")
 //       CHECK:   spv.func
 //       CHECK:     %[[ADDR1:.+]] = spv.mlir.addressof @[[WGID]]
 //       CHECK:     %[[VAL1:.+]] = spv.Load "Input" %[[ADDR1]]
@@ -243,7 +243,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Grou
   }
 }
 // CHECK-LABEL: spv.module
-//   CHECK-DAG:   spv.globalVariable @[[WGCOUNT:.+]] built_in("NumWorkgroups")
+//   CHECK-DAG:   spv.GlobalVariable @[[WGCOUNT:.+]] built_in("NumWorkgroups")
 //       CHECK:   spv.func
 //       CHECK:     %[[ADDR1:.+]] = spv.mlir.addressof @[[WGCOUNT]]
 //       CHECK:     %[[VAL1:.+]] = spv.Load "Input" %[[ADDR1]]

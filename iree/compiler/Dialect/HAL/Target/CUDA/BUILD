@@ -47,10 +47,10 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:NVVMDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TargetLLVMIR",
-        "@llvm-project//mlir:TargetLLVMIRModuleTranslation",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
     ],
 )

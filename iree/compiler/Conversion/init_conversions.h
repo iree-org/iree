@@ -42,10 +42,14 @@ inline void registerCommonConversionPasses() {
 }
 
 inline void registerHLOToLinalgPasses() {
-  createDecomposeHLOClampPass();
-  createHLOToLinalgOnBuffersPass();
-  createHLOToLinalgOnTensorsPass();
-  createDemoteF32ToF16Pass();
+  static bool init_once = []() {
+    createDecomposeHLOClampPass();
+    createHLOToLinalgOnBuffersPass();
+    createHLOToLinalgOnTensorsPass();
+    createDemoteF32ToF16Pass();
+    return true;
+  }();
+  (void)init_once;
 }
 
 inline void registerLinalgToVectorPasses() {

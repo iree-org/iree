@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Edits the HEAD commit to use the submodule state specified in SUBMODULE_VERSIONS.txt
+# Edits the HEAD commit if it is tagged with the Copybara tag to use the
+# submodule state specified in SUBMODULE_VERSIONS.txt and merge from the
+# specified commit.
 # WARNING: rewrites history!
 
-name: Synchronize Submodules
+name: Fixup Copybara
 
 on:
   push:
@@ -23,8 +25,12 @@ on:
       # Do not add this to human branches like main. It rewrites history!
       - google
 
+env:
+  COPYBARA_TAG: "COPYBARA_INTEGRATE_REVIEW"
+  UPSTREAM_REMOTE: origin
+
 jobs:
-  synchronize:
+  fixup:
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
@@ -35,26 +41,39 @@ jobs:
           # all the branch history. This takes a whopping 2 seconds. I think
           # we'll live.
           fetch-depth: 0
-      - name: Importing submodules from SUBMODULE_VERSIONS.txt
-        run: ./scripts/git/submodule_versions.py import
-      - name: Checking submodule state
-        run: |
-          echo "has_diff=false" >> $GITHUB_ENV
-          git diff --cached --exit-code || echo "has_diff=true" >> $GITHUB_ENV
-      - name: Committing updates
-        if: env.has_diff == 'true'
+      - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
-          git config --local user.name "Submodule Synchronize Action"
-          git commit --amend -a --no-edit
+          git config --local user.name "Copybara Fixup Action"
+      - name: Running fixer script
+        run: |
+          ./scripts/git/fix_copybara_export.sh
+      - name: Checking for a change
+        run: |
+          echo "commit_amended=false" >> $GITHUB_ENV
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA?}" ]]; then
+            echo "commit_amended=true" >> $GITHUB_ENV
+          fi
       - name: Pushing changes
-        if: env.has_diff == 'true'
+        if: env.commit_amended == 'true'
         run: git push -f origin ${{ github.ref }}
 
-  check:
+  check_submodules:
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Checking submodules
         run: ./scripts/git/submodule_versions.py check
+
+  check_copybara_tag:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Checking for Copybara tag
+        run: |
+          if git log --format=%B -n 1 HEAD | grep -q "${COPYBARA_TAG}"; then
+            echo "Commit contains Copybara tag"
+            exit 1
+          fi

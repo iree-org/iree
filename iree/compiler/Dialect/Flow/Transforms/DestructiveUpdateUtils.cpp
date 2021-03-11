@@ -409,8 +409,11 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b, Value v,
 
   // Try to rewrite inplace.
   if (failed(rewriteSubTensorInsertInPlace(
-          b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target)))
-    return failure();
+          b, cast<SubTensorInsertOp>(capture.rootDestructiveUpdate), target))) {
+    // Nothing has changed yet, so return success. SubTensorInserts will be
+    // handled later.
+    return success();
+  }
 
   // Reload the value produced inplace right after the inplace update.
   OpBuilder::InsertionGuard g(b);

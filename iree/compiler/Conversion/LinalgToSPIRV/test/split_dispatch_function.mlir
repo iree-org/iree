@@ -196,22 +196,24 @@ hal.executable @kernel_fusable_pooling attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @kernel_fusable_pooling attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?x?x?xf32>,
+        !flow.dispatch.output<?x?x?x?xf32>) -> ()}
     module {
       //     CHECK: func @kernel_fusable_pooling()
       //     CHECK:   linalg.fill
       // CHECK-NOT:   return
-      //     CHECK:   linalg.pooling
+      //     CHECK:   linalg.pooling_nhwc_sum
       //     CHECK:   return
       func @kernel_fusable_pooling() {
         %cst = constant 0.000000e+00 : f32
         %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<?x?xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
-        linalg.fill(%2, %cst) : memref<?x?xf32>, f32
-        linalg.pooling_sum(%1, %0, %2) {dilations = [1, 1], strides = [1, 1]} :
-          memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<?x?x?x?xf32>
+        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x?x?x?xf32>
+        linalg.fill(%2, %cst) : memref<?x?x?x?xf32>, f32
+        linalg.pooling_nhwc_sum
+          {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+          ins(%1, %0: memref<?x?x?x?xf32>, memref<?x?xf32>)
+          outs(%2: memref<?x?x?x?xf32>)
         return
       }
       hal.interface @legacy_io attributes {sym_visibility = "private"} {

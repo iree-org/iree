@@ -31,7 +31,8 @@ namespace iree_compiler {
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
+    bool useLinalgOnTensorsPath = false);
 
 /// Populates the patterns that convert from MHLO to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
@@ -40,7 +41,8 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
 
 /// Populated passes to convert from MHLO to Linalg on tensors as well as fusion
 /// of the converted operations.
-void addHLOToLinalgOnTensorsPasses(OpPassManager &pm);
+void addHLOToLinalgOnTensorsPasses(OpPassManager &pm,
+                                   bool useLinalgOnTensorsPath = false);
 
 }  // namespace iree_compiler
 }  // namespace mlir

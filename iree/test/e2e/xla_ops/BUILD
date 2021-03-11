@@ -168,7 +168,7 @@ iree_check_single_backend_test_suite(
         "multiply.mlir",
         "negate.mlir",
         # https://github.com/google/iree/issues/4079
-        # "pad.mlir",
+        "pad.mlir",
         # "reduce.mlir",
         # "reduce_window.mlir",
         "remainder.mlir",
@@ -185,7 +185,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         # "torch_index_select.mlir",
         "transpose.mlir",
-        # "while.mlir",
+        "while.mlir",
     ],
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
@@ -246,7 +246,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         # "torch_index_select.mlir",
         "transpose.mlir",
-        # "while.mlir",
+        "while.mlir",
     ],
     compiler_flags = [
         "-iree-flow-dispatch-linalg-on-tensors",
@@ -254,6 +254,34 @@ iree_check_single_backend_test_suite(
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_cuda",
+    srcs = [
+        "add.mlir",
+        "broadcast.mlir",
+        "broadcast_add.mlir",
+        "broadcast_in_dim.mlir",
+        "clamp.mlir",
+        "compare.mlir",
+        "constant.mlir",
+        "divide.mlir",
+        "iota.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "multiply.mlir",
+        "negate.mlir",
+        "select.mlir",
+        "subtract.mlir",
+    ],
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+    ],
+    driver = "cuda",
+    # TODO: broken internally
+    tags = ["notap"],
+    target_backend = "cuda",
 )
 
 test_suite(

@@ -1,5 +1,7 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
 
+// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+
 func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -23,12 +25,12 @@ func @tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 //  CHECK-DAG:     %[[WGID_Y:.+]] = flow.dispatch.workgroup.id[1]
 //  CHECK-DAG:     %[[WGCOUNT_X:.+]] = flow.dispatch.workgroup.count[0]
 //  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = flow.dispatch.workgroup.count[1]
-//      CHECK:     %[[OFFSET_Y:.+]] = muli %[[WGSIZE_Y]], %[[WGID_Y]]
-//      CHECK:     %[[STEP_Y:.+]] = muli %[[WGSIZE_Y]], %[[WGCOUNT_Y]]
+//      CHECK:     %[[OFFSET_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     %[[STEP_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_Y]], %[[WGSIZE_Y]]]
 //      CHECK:     scf.for %[[ARG7:.+]] = %[[OFFSET_Y]]
 // CHECK-SAME:       to %{{.+}} step %[[STEP_Y]]
-//      CHECK:       %[[OFFSET_X:.+]] = muli %[[WGSIZE_X]], %[[WGID_X]]
-//      CHECK:       %[[STEP_X:.+]] = muli %[[WGSIZE_X]], %[[WGCOUNT_X]]
+//      CHECK:       %[[OFFSET_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_X]], %[[WGSIZE_X]]]
+//      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_X]], %[[WGSIZE_X]]]
 //      CHECK:       scf.for %[[ARG8:.+]] = %[[OFFSET_X]]
 // CHECK-SAME:         to %{{.+}} step %[[STEP_X]]
 //      CHECK:         %[[LHS:.+]] = flow.dispatch.input.load %[[ARG3]]
@@ -350,3 +352,44 @@ func @always_fuse_reshape
 //      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
 // CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[RHS2]])
 //      CHECK:   return %[[RESULT1]], %[[RESULT2]]
+
+// -----
+
+func @pad_test(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index,
+    %arg3 : index, %arg4 : index, %arg5 : index ) -> tensor<?x?xf32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = tensor.extract %arg1[] : tensor<f32>
+  %1 = dim %arg0, %c0 : tensor<?x?xf32>
+  %2 = dim %arg0, %c1 : tensor<?x?xf32>
+  %3 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%1)[%arg2, %arg4]
+  %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
+  %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
+  %6 = linalg.fill(%5, %0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32>
+  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32> -> tensor<?x?xf32>
+  return %7 : tensor<?x?xf32>
+}
+
+//       CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 + s2)>
+//       CHECK: func @pad_test
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[ARG4:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
+//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//  CHECK-SAME:    [%[[RD1]], %[[RD0]], %[[C1]]]
+//  CHECK-SAME:    (%[[ARG1]], %[[RD0]], %[[RD1]])
+//   CHECK-DAG:      %[[VAL:.+]] = tensor.extract
+//   CHECK-DAG:      %[[INIT:.+]] = linalg.init_tensor
+//       CHECK:      %[[RETURN:.+]] = linalg.fill(%[[INIT]], %[[VAL]])
+//       CHECK:      flow.dispatch.output.store %[[RETURN]]
+//  CHECK-NEXT:      flow.return
+//       CHECK:   flow.tensor.update %[[ARG0]], %[[RESULT]]

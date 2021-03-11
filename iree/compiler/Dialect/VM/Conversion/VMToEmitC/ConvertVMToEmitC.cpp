@@ -90,6 +90,19 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+template <typename ConstOpTy>
+class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
+ public:
+  using OpRewritePattern<ConstOpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ConstOpTy constOp,
+                                PatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constOp, constOp.getType(),
+                                                constOp.value());
+    return success();
+  }
+};
+
 template <typename LoadOpTy, typename GlobalOpTy>
 class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   using OpConversionPattern<LoadOpTy>::OpConversionPattern;
@@ -176,8 +189,7 @@ void populateVMToCPatterns(MLIRContext *context,
       context, "vm_global_store_i32");
 
   // Constants
-  patterns.insert<CallOpConversion<IREE::VM::ConstI32Op>>(context,
-                                                          "vm_const_i32");
+  patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context);
 
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
@@ -240,8 +252,7 @@ void populateVMToCPatterns(MLIRContext *context,
                                                          "VM_CHECK_EQ");
 
   // ExtI64: Constants
-  patterns.insert<CallOpConversion<IREE::VM::ConstI64Op>>(context,
-                                                          "vm_const_i64");
+  patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
 
   // ExtI64: Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI64Op>>(context,

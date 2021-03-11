@@ -24,9 +24,11 @@ cc_library(
     hdrs = ["ModelBuilder.h"],
     deps = [
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AllToLLVMIRTranslations",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:OpenMPDialect",
@@ -34,7 +36,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:VectorOps",
     ],
 )
@@ -69,6 +71,7 @@ cc_library(
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:AllToLLVMIRTranslations",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:GPUToSPIRV",
@@ -83,7 +86,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:StandardToSPIRV",
-        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",

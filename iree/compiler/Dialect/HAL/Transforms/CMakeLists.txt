@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "BenchmarkBatchDispatches.cpp"
     "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
     "IdentifyConstantPools.cpp"
