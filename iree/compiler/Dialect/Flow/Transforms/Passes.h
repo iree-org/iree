@@ -96,16 +96,7 @@ std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
 // Materializes reflection metadata on exported function arguments and results.
 // This runs as close to the input processing as possible as it needs to
 // annotate the ABI that the consumer is expecting to interop with.
-// Note that this does not combine the argument and result metadata into top
-// level function metadata. That happens late in transformation, as additional
-// synthetic arguments and results may still need to be added.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection();
-
-// Merges f_partial argument and result reflection metadata into a function
-// level signature. This should be run late once all synthetic arguments have
-// been added and no further exported function signature changes are
-// expected.
-std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection();
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
@@ -197,8 +188,7 @@ inline void registerFlowPasses() {
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createPostPartitioningConversionPass();
-  createMaterializeExportedReflection();
-  createMergeExportedReflection();
+  createMaterializeReflectionAttrs();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegions2Pass();

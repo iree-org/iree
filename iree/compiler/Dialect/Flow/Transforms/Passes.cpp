@@ -126,7 +126,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // This pass must come before any 1:N type expansion that will not be retained
   // in the public ABI (i.e. loose shape dims, etc).
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeExportedReflection());
+      IREE::Flow::createMaterializeReflectionAttrs());
 
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
@@ -144,13 +144,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // previous pass.
   passManager.addNestedPass<FuncOp>(
       Shape::createExpandFunctionDynamicDimsPass());
-
-  // Merge arg/result reflection metadata.
-  // NOTE(laurenzo): This will eventually not be the right place for this as
-  // it should happen after the HAL has further annotated the exported
-  // functions (such as with synthetic barrier arguments).
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMergeExportedReflection());
 
   //----------------------------------------------------------------------------
   // Shape materialization for buffer assignment and stream formation.
@@ -285,9 +278,7 @@ void registerFlowTransformPassPipeline() {
 void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createCreateBenchmarkFuncs());
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeExportedReflection());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMergeExportedReflection());
+      IREE::Flow::createMaterializeReflectionAttrs());
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
