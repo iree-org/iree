@@ -52,29 +52,6 @@ namespace {
 // mhlo.torch_index_select conversion patterns.
 //===----------------------------------------------------------------------===//
 
-static Value getOutputTensor(OpBuilder &builder, Location loc, Value opResult) {
-  ShapedType outputType = opResult.getType().cast<ShapedType>();
-  if (outputType.hasStaticShape()) {
-    return builder.create<linalg::InitTensorOp>(loc, outputType.getShape(),
-                                                outputType.getElementType());
-  }
-  // Check for tie-shape operations for the result to get the shape of the
-  // output.
-  SmallVector<Value, 4> dynamicSizes;
-  for (Operation *user : opResult.getUsers()) {
-    auto tieShapeOp = dyn_cast<Shape::TieShapeOp>(user);
-    if (!tieShapeOp) continue;
-    auto makeShapeOp =
-        tieShapeOp.shape().getDefiningOp<Shape::MakeRankedShapeOp>();
-    if (!makeShapeOp) continue;
-    dynamicSizes = llvm::to_vector<4>(makeShapeOp.dynamic_dimensions());
-    break;
-  }
-  if (outputType.getNumDynamicDims() != dynamicSizes.size()) return nullptr;
-  return builder.create<linalg::InitTensorOp>(
-      loc, dynamicSizes, outputType.getShape(), outputType.getElementType());
-}
-
 namespace {
 
 /// Converts xla-hlo.torch_index_select op to a linalg.indexed_generic op.
@@ -88,30 +65,49 @@ struct TorchIndexSelectOpConversion
     mhlo::TorchIndexSelectOp::Adaptor adaptor(args);
     int axis = op.dim();
     int batch = op.batch_dims();
-    auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
+    auto indexShapeType = adaptor.index().getType().cast<ShapedType>();
     int nIndices = indexShapeType.getRank();
-    auto inputShapeType = adaptor.input().getType().dyn_cast<ShapedType>();
+    auto inputShapeType = adaptor.input().getType().cast<ShapedType>();
     if (axis < 0) axis += inputShapeType.getRank();
     if (batch < 0) batch += nIndices;
 
     Location loc = op.getLoc();
-    Value output = op.getResult();
-    int rank = output.getType().cast<ShapedType>().getRank();
+    ShapedType resultType = op.getResult().getType().cast<ShapedType>();
+    int rank = resultType.getRank();
+
     SmallVector<AffineMap, 2> indexingMaps;
     SmallVector<AffineExpr, 4> exprs;
-    for (int i = 0; i < batch; ++i)
+    for (int i = 0; i < batch; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(i));
-    for (int i = 0, e = nIndices - batch; i < e; ++i)
+    }
+    for (int i = 0, e = nIndices - batch; i < e; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(axis + i));
+    }
     indexingMaps.emplace_back(
         AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
     indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
+
     SmallVector<StringRef, 3> loopTypes(rank, getParallelIteratorTypeName());
-    ShapedType outputType = op.getResult().getType().cast<ShapedType>();
-    Value initOp = getOutputTensor(rewriter, loc, op.getResult());
-    if (!initOp) return failure();
+
+    // The output shape is
+    //   `params[:axis] + indices[batch_dims:] + params[axis + 1:]`
+    SmallVector<Value, 4> dynSizes;
+    for (int i = 0; i < rank; ++i) {
+      if (!resultType.isDynamicDim(i)) continue;
+      if (i < axis) {
+        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), i));
+      } else if (i < (axis + nIndices - batch)) {
+        int idx = i - axis + batch;
+        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.index(), idx));
+      } else {
+        int idx = i - (axis + nIndices - batch) + axis + 1;
+        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), idx));
+      }
+    }
+    Value initOp = rewriter.create<linalg::InitTensorOp>(
+        loc, dynSizes, resultType.getShape(), resultType.getElementType());
     auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-        loc, /*resultTensors=*/ArrayRef<Type>{op.getResult().getType()},
+        loc, /*resultTensors=*/ArrayRef<Type>{resultType},
         /*inputs=*/adaptor.index(),
         /*outputBuffers=*/initOp, indexingMaps, loopTypes);
 
@@ -126,7 +122,7 @@ struct TorchIndexSelectOpConversion
           blockArgs.getType().cast<ShapedType>().getElementType());
     }
     block->addArguments(bodyArgTypes);
-    block->addArguments(outputType.getElementType());
+    block->addArguments(resultType.getElementType());
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToEnd(block);
 
