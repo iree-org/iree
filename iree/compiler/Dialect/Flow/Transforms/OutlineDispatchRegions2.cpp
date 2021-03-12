@@ -77,7 +77,7 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, regionOp.workgroup_count(),
       regionOp.getResultTypes(), resultDynamicDims, newOperands,
-      operandDynamicDims, regionOp.getTiedResultOperandIndices());
+      operandDynamicDims, regionOp.tied_operandsAttr());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
