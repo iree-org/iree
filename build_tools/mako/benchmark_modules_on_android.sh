@@ -133,8 +133,7 @@ function run_and_log {
   done < <(sed -En -e "${SED_EXPR}" "${test_out}")
 }
 
-phone_serial_number="$(adb get-serialno)"
-mako_log="mako-${phone_serial_number}-${git_hash}.log"
+mako_log="mako-${model}-${phone}-${git_hash}.log"
 : > "${mako_log}" # Empty the log file
 
 IFS=',' read -ra targets_array <<< "$targets"

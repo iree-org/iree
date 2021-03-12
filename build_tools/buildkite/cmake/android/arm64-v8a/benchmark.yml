@@ -17,11 +17,15 @@ steps:
     commands:
       - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
       - "gsutil cp gs://iree-model-artifacts/iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz ."
+      - "gsutil cp gs://iree-model-artifacts/mobilenet-v2.tar.gz ."
       - "tar -xzf iree-mobile-bert-artifacts-6fe4616e0ab9958eb18f368960a31276f1362029.tar.gz"
+      - "tar -xzf mobilenet-v2.tar.gz"
       - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:15d3266ae4865f7642a4ef4d76e5181f0dc3482a7cfba9021b6b55be524208ec python3 build_tools/mako/compile_android_modules.py"
       - "cp tmp/iree/modules/MobileBertSquad/iree_vmla/traces/serving_default/flagfile mobile-bert_flagfile"
-      - "tar -czvf model-Pixel4-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert_Pixel4*.vmfb"
-      - "tar -czvf model-S20-artifacts.tgz build-android/iree/tools/iree-benchmark-module mobile-bert_S20*.vmfb"
+      - "cp mobilenet-v2/flagfile mobilenet-v2_flagfile"
+      - "tar -czvf model-Pixel4-artifacts.tgz build-android/iree/tools/iree-benchmark-module *Pixel4*.vmfb"
+      - "tar -czvf model-S20-artifacts.tgz build-android/iree/tools/iree-benchmark-module *S20*.vmfb"
+      - "tar -czvf flagfiles.tgz *_flagfile"
     agents:
       - "build=true"
     env:
@@ -29,20 +33,22 @@ steps:
     artifact_paths:
       - "model-Pixel4-artifacts.tgz"
       - "model-S20-artifacts.tgz"
-      - "mobile-bert_flagfile"
+      - "flagfiles.tgz"
 
   - wait
 
   - label: "benchmark on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
       - "buildkite-agent artifact download --step build model-Pixel4-artifacts.tgz ./"
-      - "buildkite-agent artifact download --step build mobile-bert_flagfile ./"
+      - "buildkite-agent artifact download --step build flagfiles.tgz ./"
       - "tar xzvf model-Pixel4-artifacts.tgz"
+      - "tar xzvf flagfiles.tgz"
       - "adb shell mkdir -p /data/local/tmp/benchmark_tmpdir"
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
-      - "adb push mobile-bert_flagfile /data/local/tmp/benchmark_tmpdir"
+      - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
       - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=5538704950034432 --model=mobile-bert --git_hash=$(git rev-parse HEAD) --phone=Pixel4"
+      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=6338759231537152 --model=mobilenet-v2 --git_hash=$(git rev-parse HEAD) --phone=Pixel4"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=snapdragon-855"
@@ -56,13 +62,15 @@ steps:
   - label: "benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
       - "buildkite-agent artifact download --step build model-S20-artifacts.tgz ./"
-      - "buildkite-agent artifact download --step build mobile-bert_flagfile ./"
+      - "buildkite-agent artifact download --step build flagfiles.tgz ./"
       - "tar xzvf model-S20-artifacts.tgz"
+      - "tar xzvf flagfiles.tgz"
       - "adb shell mkdir -p /data/local/tmp/benchmark_tmpdir"
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
-      - "adb push mobile-bert_flagfile /data/local/tmp/benchmark_tmpdir"
+      - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
       - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=4699630718681088 --model=mobile-bert --git_hash=$(git rev-parse HEAD) --phone=S20"
+      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=5618403088793600 --model=mobilenet-v2 --git_hash=$(git rev-parse HEAD) --phone=S20"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=exynos-990"
