@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/base/status.h"
 #include "iree/hal/drivers/init.h"
 #include "pyiree/rt/binding.h"
 #include "pyiree/rt/function_abi.h"

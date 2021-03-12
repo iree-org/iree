@@ -35,7 +35,8 @@ iree_pyext_module(
     "${CMAKE_CURRENT_SOURCE_DIR}/../.."
   DEPS
     iree::base::api
-    iree::base::signature_mangle
+    iree::base::signature_parser
+    iree::base::status
     iree::hal::api
     iree::hal::drivers
     iree::modules::hal

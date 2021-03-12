@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Translation/IREEVM.h"
 
+#include "iree/compiler/Bindings/SIP/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -38,6 +39,9 @@ namespace iree_compiler {
 // match upstream better, and then our own iree-compile C API/binary will do the
 // whole end-to-end with options for bindings/targets/etc.
 struct BindingOptions {
+  // Whether to include runtime support functions and metadata required for
+  // SIP-compatible bindings (like pyiree).
+  bool sip = true;
   // Whether to include runtime support functions required for the IREE TFLite
   // API compatibility bindings.
   bool tflite = false;
@@ -47,6 +51,11 @@ static BindingOptions getBindingOptionsFromFlags() {
   static llvm::cl::OptionCategory bindingOptionsCategory(
       "IREE translation binding support options");
 
+  static llvm::cl::opt<bool> *bindingsSIPFlag = new llvm::cl::opt<bool>{
+      "iree-sip-bindings-support",
+      llvm::cl::desc("Include runtime support for SIP-compatible bindings"),
+      llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
+
   static llvm::cl::opt<bool> *bindingsTFLiteFlag = new llvm::cl::opt<bool>{
       "iree-tflite-bindings-support",
       llvm::cl::desc(
@@ -54,6 +63,7 @@ static BindingOptions getBindingOptionsFromFlags() {
       llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
 
   BindingOptions bindingOptions;
+  bindingOptions.sip = *bindingsSIPFlag;
   bindingOptions.tflite = *bindingsTFLiteFlag;
   return bindingOptions;
 }
@@ -105,18 +115,34 @@ static LogicalResult convertToVMModule(ModuleOp moduleOp,
   return success();
 }
 
+static void buildIREEVMTransformPassPipeline(
+    BindingOptions bindingOptions, IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::TargetOptions targetOptions, OpPassManager &passManager) {
+  if (bindingOptions.sip) {
+    IREE::SIP::buildTransformPassPipeline(passManager);
+  }
+  if (bindingOptions.tflite) {
+    IREE::TFLite::buildTransformPassPipeline(passManager);
+  }
+  IREE::Flow::buildInputTransformPassPipeline(passManager);
+  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
+  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+}
+
+void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
+  buildIREEVMTransformPassPipeline(
+      getBindingOptionsFromFlags(), IREE::HAL::getTargetOptionsFromFlags(),
+      IREE::VM::getTargetOptionsFromFlags(), passManager);
+}
+
 void registerIREEVMTransformPassPipeline() {
   PassPipelineRegistration<> transformPassPipeline(
       "iree-transformation-pipeline",
       "Runs the full IREE input to VM transformation pipeline",
       [](OpPassManager &passManager) {
-        IREE::Flow::buildInputTransformPassPipeline(passManager);
-        IREE::Flow::buildFlowTransformPassPipeline(passManager);
-        IREE::HAL::buildHALTransformPassPipeline(
-            passManager, IREE::HAL::getTargetOptionsFromFlags());
-        IREE::VM::buildVMTransformPassPipeline(
-            passManager, IREE::VM::getTargetOptionsFromFlags());
-        passManager.addPass(IREE::createDropCompilerHintsPass());
+        buildDefaultIREEVMTransformPassPipeline(passManager);
       });
 }
 
@@ -129,17 +155,8 @@ static LogicalResult translateFromMLIRToVM(
     IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
-
-  if (bindingOptions.tflite) {
-    IREE::TFLite::buildTransformPassPipeline(passManager);
-  }
-
-  IREE::Flow::buildInputTransformPassPipeline(passManager);
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
-  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
-
+  buildIREEVMTransformPassPipeline(bindingOptions, executableOptions,
+                                   targetOptions, passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }

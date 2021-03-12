@@ -65,7 +65,7 @@ namespace Flow {
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createHLOPreprocessingPass());
   if (clEnableLinalgOnTensorsDispatch) {
     // TODO(ataei): This should run as part of createHLOPreprocessingPass which
     // will break VMLA backend.
@@ -74,13 +74,13 @@ static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
-  passManager.addNestedPass<FuncOp>(createRemoveShapeConstraintsPass());
+  passManager.addNestedPass<FuncOp>(mlir::createRemoveShapeConstraintsPass());
 }
 
 // Prepare TOSA for use as an input to the Flow dialect.
 static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 }
@@ -106,12 +106,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten tuples (like tuple<tensor<...>, tensor<...>>) so we can do
   // fine-grained tensor tracking.
+  // NOTE: FlattenTuplesInCFGPass requires inlining to have run.
+  passManager.addPass(mlir::createInlinerPass());
   passManager.addPass(IREE::Flow::createFlattenTuplesInCFGPass());
 
-  // Perform inlining and cleanup after CFG manipulation.
-  passManager.addPass(createInlinerPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
+  // Perform cleanup after CFG manipulation.
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Legalize input types. We do this after flattening tuples so that we don't
   // have to deal with them.
@@ -121,39 +122,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
 
   //----------------------------------------------------------------------------
-  // Shape and reflection ABI materialization.
-  // Must happen after:
-  //   - Type conversion and sanitization of public function signatures
-  //   - Conversion to CFG
-  // Must happen before:
-  //   - Dependencies on shape metadata ops
-  //   - Dependencies on reflection attributes
-  //----------------------------------------------------------------------------
-
-  // Materialize default arg/result reflection metadata.
-  // This pass must come before any 1:N type expansion that will not be retained
-  // in the public ABI (i.e. loose shape dims, etc).
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeReflectionAttrs());
-
-  // Replaces variables with !shapex.ranked_shape types with individual
-  // variables for each dimension. This allows for constant dimensions to be
-  // DCE'd in following passes.
-  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
-
-  // Materialize dynamic shapes in the IR, also expanding function signatures
-  // such that:
-  //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
-  //     (tensor<?x?xf32>, ranked_shape<[?,?]>), and ultimately expands to
-  //     (tensor<?x?xf32>, i32, i32)
-  //   - Unranked tensors: TODO
-  // The generated ABI wrappers assume such an expansion and will generate code
-  // to produce it from the original reflection metadata captured in the
-  // previous pass.
-  passManager.addNestedPass<FuncOp>(
-      Shape::createExpandFunctionDynamicDimsPass());
-
-  //----------------------------------------------------------------------------
   // Shape materialization for buffer assignment and stream formation.
   //
   // Phase ordering constraints:
@@ -161,6 +129,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //     prior to this phase.
   //
   // Pre-conditions:
+  //   - Type conversion and sanitization of public function signatures.
   //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
   //     use which associates them to their shape.
   //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
@@ -173,6 +142,23 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //     dynamically).
   //   - Shape folding and canonicalization has been done.
   //----------------------------------------------------------------------------
+
+  // Replaces variables with !shapex.ranked_shape types with individual
+  // variables for each dimension. This allows for constant dimensions to be
+  // DCE'd in following passes.
+  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
+
+  // Materialize dynamic shapes in the IR, also expanding function signatures
+  // such that:
+  //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
+  //     (tensor<?x?xf32>, ranked_shape<[?,?]>), and ultimately expands to
+  //     (tensor<?x?xf32>, i32, i32)
+  //   - Unranked tensors: **unsupported**
+  // The generated ABI wrappers assume such an expansion and will generate code
+  // to produce it from the original reflection metadata captured in the
+  // previous pass.
+  passManager.addNestedPass<FuncOp>(
+      Shape::createExpandFunctionDynamicDimsPass());
 
   SmallVector<std::string> doNotRecurseOpNames = {"flow.dispatch.workgroups"};
   passManager.addNestedPass<FuncOp>(
@@ -204,10 +190,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       IREE::Flow::createPrePartitioningConversionPass());
 
   if (clEnableLinalgOnTensorsDispatch) {
-    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
-    passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
-    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(
+        IREE::Flow::createDispatchLinalgOnTensorsPass());
+    passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
     // Outline the dispatch regions into their own functions wrapped in
     // executables.
@@ -224,7 +211,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   }
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
@@ -242,11 +229,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<FuncOp>(createInjectDispatchTracingPass());
+    passManager.addNestedPass<FuncOp>(
+        IREE::Flow::createInjectDispatchTracingPass());
   }
 
   // Convert any leftover ops outside of dispatch regions to flow ops.
-  passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createPostPartitioningConversionPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.
@@ -256,29 +245,30 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Form streams.
   // Cleanup the IR before we try to form streams.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<FuncOp>(createHoistUnstreamableOpsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createHoistUnstreamableOpsPass());
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
-  passManager.addPass(createOutlineLargeConstantsPass());
+  passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
 
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
-  passManager.addPass(createSymbolDCEPass());
+  passManager.addPass(mlir::createSymbolDCEPass());
 }
 
 void registerFlowTransformPassPipeline() {

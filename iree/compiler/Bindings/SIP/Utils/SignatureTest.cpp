@@ -12,34 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/signature_mangle.h"
-
+#include "iree/compiler/Bindings/SIP/Utils/SignatureBuilder.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureParser.h"
 #include "iree/testing/gtest.h"
 
-namespace iree {
 namespace {
+
+using namespace mlir::iree_compiler::IREE::SIP;
 
 class SipSignatureTest : public ::testing::Test {
  protected:
-  std::string PrintInputSignature(const char* encoded) {
+  std::string PrintInputSignature(llvm::Optional<SignatureBuilder> signature) {
+    EXPECT_TRUE(signature);
+
     SipSignatureParser parser;
     SipSignatureParser::ToStringVisitor printer;
-    parser.VisitInputs(printer, encoded);
+    parser.VisitInputs(printer, signature->encoded());
     EXPECT_FALSE(parser.GetError()) << "Parse error: " << *parser.GetError();
     return std::move(printer.s());
   }
 
-  std::string PrintResultsSignature(const char* encoded) {
+  std::string PrintResultsSignature(
+      llvm::Optional<SignatureBuilder> signature) {
+    EXPECT_TRUE(signature);
+
     SipSignatureParser parser;
     SipSignatureParser::ToStringVisitor printer;
-    parser.VisitResults(printer, encoded);
+    parser.VisitResults(printer, signature->encoded());
     EXPECT_FALSE(parser.GetError()) << "Parse error: " << *parser.GetError();
     return std::move(printer.s());
   }
 };
 
 TEST(SignatureBuilderTest, TestInteger) {
-  SignatureParser sp1("_5a1z10x-5991");
+  SignatureBuilder sb1;
+  sb1.Integer(5).Integer(1, 'a').Integer(10, 'z').Integer(-5991, 'x');
+  EXPECT_EQ("_5a1z10x-5991", sb1.encoded());
+
+  SignatureParser sp1(sb1.encoded());
 
   // Expect 5.
   ASSERT_EQ(SignatureParser::Type::kInteger, sp1.type());
@@ -71,7 +81,11 @@ TEST(SignatureBuilderTest, TestInteger) {
 }
 
 TEST(SignatureBuilderTest, TestSpan) {
-  SignatureParser sp1("A7!foobarZ17!FOOBAR_23_FOOBAR");
+  SignatureBuilder sb1;
+  sb1.Span("foobar", 'A').Span("FOOBAR_23_FOOBAR", 'Z');
+  EXPECT_EQ("A7!foobarZ17!FOOBAR_23_FOOBAR", sb1.encoded());
+
+  SignatureParser sp1(sb1.encoded());
 
   // Expect "foobar".
   ASSERT_EQ(SignatureParser::Type::kSpan, sp1.type());
@@ -91,7 +105,11 @@ TEST(SignatureBuilderTest, TestSpan) {
 }
 
 TEST(SignatureBuilderTest, TestEscapedNumericSpan) {
-  SignatureParser sp1("A6!12345Z4!-23");
+  SignatureBuilder sb1;
+  sb1.Span("12345", 'A').Span("-23", 'Z');
+  EXPECT_EQ("A6!12345Z4!-23", sb1.encoded());
+
+  SignatureParser sp1(sb1.encoded());
 
   // Expect "foobar".
   ASSERT_EQ(SignatureParser::Type::kSpan, sp1.type());
@@ -111,7 +129,11 @@ TEST(SignatureBuilderTest, TestEscapedNumericSpan) {
 }
 
 TEST(SignatureBuilderTest, TestEscapedEscapeChar) {
-  SignatureParser sp1("A6!!2345Z4!-23");
+  SignatureBuilder sb1;
+  sb1.Span("!2345", 'A').Span("-23", 'Z');
+  EXPECT_EQ("A6!!2345Z4!-23", sb1.encoded());
+
+  SignatureParser sp1(sb1.encoded());
 
   // Expect "foobar".
   ASSERT_EQ(SignatureParser::Type::kSpan, sp1.type());
@@ -131,7 +153,12 @@ TEST(SignatureBuilderTest, TestEscapedEscapeChar) {
 }
 
 TEST(SignatureBuilderTest, TestNested) {
-  SignatureParser sp1("_5X3!_6");
+  SignatureBuilder sb1;
+  sb1.Integer(5);
+  SignatureBuilder().Integer(6).AppendTo(sb1, 'X');
+  EXPECT_EQ("_5X3!_6", sb1.encoded());
+
+  SignatureParser sp1(sb1.encoded());
   ASSERT_EQ(SignatureParser::Type::kInteger, sp1.type());
   EXPECT_EQ('_', sp1.tag());
   EXPECT_EQ(5, sp1.ival());
@@ -187,38 +214,112 @@ TEST(SignatureParserTest, ZeroLengthSpan) {
 // Raw signatures
 // -----------------------------------------------------------------------------
 
+TEST(RawSignatureManglerTest, DefaultBuffer) {
+  RawSignatureMangler sm;
+  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, {});
+  EXPECT_EQ("B1!", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, FullBuffer) {
+  RawSignatureMangler sm;
+  std::vector<int> dims = {-1, 128, 64};
+  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat64, dims);
+  EXPECT_EQ("B13!t2d-1d128d64", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, DefaultScalar) {
+  RawSignatureMangler sm;
+  sm.AddScalar(AbiConstants::ScalarType::kIeeeFloat32);
+  EXPECT_EQ("S1!", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, FullScalar) {
+  RawSignatureMangler sm;
+  sm.AddScalar(AbiConstants::ScalarType::kSint32);
+  EXPECT_EQ("S3!t6", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, AnyRef) {
+  RawSignatureMangler sm;
+  sm.AddAnyReference();
+  EXPECT_EQ("O1!", sm.builder().encoded());
+}
+
 TEST(RawSignatureParserTest, EmptySignature) {
+  RawSignatureMangler inputs;
+  RawSignatureMangler results;
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
   RawSignatureParser p;
-  auto s = p.FunctionSignatureToString("I1!R1!");
+  auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ("() -> ()", *s);
 }
 
 TEST(RawSignatureParserTest, StaticNdArrayBuffer) {
+  RawSignatureMangler inputs;
+  std::vector<int> dims = {10, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {32, 8, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32, dims2);
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I15!B11!d10d128d64R15!B11!t6d32d8d64", sig.encoded());
+
   RawSignatureParser p;
-  auto s = p.FunctionSignatureToString("I15!B11!d10d128d64R15!B11!t6d32d8d64");
+  auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ("(Buffer<float32[10x128x64]>) -> (Buffer<sint32[32x8x64]>)", *s);
 }
 
 TEST(RawSignatureParserTest, DynamicNdArrayBuffer) {
+  RawSignatureMangler inputs;
+  std::vector<int> dims = {-1, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {-1, 8, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32, dims2);
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I15!B11!d-1d128d64R15!B11!t6d-1d8d64", sig.encoded());
+
   RawSignatureParser p;
-  auto s = p.FunctionSignatureToString("I15!B11!d-1d128d64R15!B11!t6d-1d8d64");
+  auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ("(Buffer<float32[?x128x64]>) -> (Buffer<sint32[?x8x64]>)", *s);
 }
 
 TEST(RawSignatureParserTest, Scalar) {
+  RawSignatureMangler inputs;
+  inputs.AddScalar(AbiConstants::ScalarType::kSint32);
+  RawSignatureMangler results;
+  results.AddScalar(AbiConstants::ScalarType::kIeeeFloat64);
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I6!S3!t6R6!S3!t2", sig.encoded());
+
   RawSignatureParser p;
-  auto s = p.FunctionSignatureToString("I6!S3!t6R6!S3!t2");
+  auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ("(sint32) -> (float64)", *s);
 }
 
 TEST(RawSignatureParserTest, AllTypes) {
+  RawSignatureMangler inputs;
+  inputs.AddAnyReference();
+  std::vector<int> dims = {-1, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
+  inputs.AddScalar(AbiConstants::ScalarType::kSint32);
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {32, -1, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kUint64, dims2);
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I23!O1!B11!d-1d128d64S3!t6R17!B13!t11d32d-1d64", sig.encoded());
+
   RawSignatureParser p;
-  auto s = p.FunctionSignatureToString(
-      "I23!O1!B11!d-1d128d64S3!t6R17!B13!t11d32d-1d64");
+  auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ(
       "(RefObject<?>, Buffer<float32[?x128x64]>, sint32) -> "
@@ -231,19 +332,23 @@ TEST(RawSignatureParserTest, AllTypes) {
 // -----------------------------------------------------------------------------
 
 TEST_F(SipSignatureTest, NoInputsResults) {
-  const char kEncodedSignature[] = "I1!R1!";
   const char kExpectedInputs[] = R"()";
   const char kExpectedResults[] = R"()";
 
-  auto inputs_string = PrintInputSignature(kEncodedSignature);
+  SipSignatureMangler inputs;
+  SipSignatureMangler results;
+
+  auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I1!R1!", signature->encoded());
+
+  auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
-  auto results_string = PrintResultsSignature(kEncodedSignature);
+  auto results_string = PrintResultsSignature(signature);
   EXPECT_EQ(kExpectedResults, results_string) << results_string;
 }
 
 TEST_F(SipSignatureTest, SequentialInputSingleResult) {
-  const char kEncodedSignature[] = "I12!S9!k0_0k1_1R3!_0";
   const char kExpectedInputs[] = R"(:[
   0=raw(0),
   1=raw(1),
@@ -252,16 +357,22 @@ TEST_F(SipSignatureTest, SequentialInputSingleResult) {
   const char kExpectedResults[] = R"(=raw(0),
 )";
 
-  auto inputs_string = PrintInputSignature(kEncodedSignature);
+  SipSignatureMangler inputs;
+  inputs.SetRawSignatureIndex(0, {{0}});
+  inputs.SetRawSignatureIndex(1, {{1}});
+
+  SipSignatureMangler results;
+  results.SetRawSignatureIndex(0, {});
+
+  auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
+  auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
-  auto results_string = PrintResultsSignature(kEncodedSignature);
+  auto results_string = PrintResultsSignature(signature);
   EXPECT_EQ(kExpectedResults, results_string) << results_string;
 }
 
 TEST_F(SipSignatureTest, NestedInputMultiResult) {
-  const char kEncodedSignature[] =
-      "I31!S27!k0D17!K4!bar_1K4!foo_0k1_2R12!S9!k0_0k1_1";
   const char kExpectedInputs[] = R"(:[
   0:{
     bar=raw(1),
@@ -276,12 +387,21 @@ TEST_F(SipSignatureTest, NestedInputMultiResult) {
 ],
 )";
 
-  auto inputs_string = PrintInputSignature(kEncodedSignature);
+  SipSignatureMangler inputs;
+  inputs.SetRawSignatureIndex(0, {{0, "foo"}});
+  inputs.SetRawSignatureIndex(1, {{0, "bar"}});
+  inputs.SetRawSignatureIndex(2, {{1}});
+
+  SipSignatureMangler results;
+  results.SetRawSignatureIndex(0, {{0}});
+  results.SetRawSignatureIndex(1, {{1}});
+
+  auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
+  auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
-  auto results_string = PrintResultsSignature(kEncodedSignature);
+  auto results_string = PrintResultsSignature(signature);
   EXPECT_EQ(kExpectedResults, results_string) << results_string;
 }
 
 }  // namespace
-}  // namespace iree

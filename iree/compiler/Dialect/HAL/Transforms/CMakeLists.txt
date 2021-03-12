@@ -41,8 +41,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
-    absl::strings
-    iree::base::signature_mangle
+    iree::compiler::Bindings::SIP::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL

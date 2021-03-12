@@ -12,36 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/signature_mangle.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureParser.h"
 
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_cat.h"
-
-namespace iree {
-
-// -----------------------------------------------------------------------------
-// AbiConstants
-// -----------------------------------------------------------------------------
-
-const std::array<size_t, 12> AbiConstants::kScalarTypeSize = {
-    4,  // kIeeeFloat32 = 0,
-    2,  // kIeeeFloat16 = 1,
-    8,  // kIeeeFloat64 = 2,
-    2,  // kGoogleBfloat16 = 3,
-    1,  // kSint8 = 4,
-    2,  // kSint16 = 5,
-    4,  // kSint32 = 6,
-    8,  // kSint64 = 7,
-    1,  // kUint8 = 8,
-    2,  // kUint16 = 9,
-    4,  // kUint32 = 10,
-    8,  // kUint64 = 11,
-};
-
-const std::array<const char*, 12> AbiConstants::kScalarTypeNames = {
-    "float32", "float16", "float64", "bfloat16", "sint8",  "sint16",
-    "sint32",  "sint64",  "uint8",   "uint16",   "uint32", "uint64",
-};
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace SIP {
 
 // -----------------------------------------------------------------------------
 // SignatureParser
@@ -51,15 +27,15 @@ SignatureParser::Type SignatureParser::Next() {
   next_type_ = Type::kError;
   next_tag_ = 0;
   next_ival_ = 0;
-  next_sval_ = absl::string_view();
+  next_sval_ = StringRef();
   if (cursor_ == encoded_.end()) {
     next_type_ = Type::kEnd;
     return next_type_;
   }
 
   next_tag_ = *cursor_;
-  absl::string_view::const_iterator ival_begin = cursor_ + 1;
-  absl::string_view::const_iterator ival_end = ival_begin;
+  StringRef::const_iterator ival_begin = cursor_ + 1;
+  StringRef::const_iterator ival_end = ival_begin;
   while (ival_end != encoded_.end() &&
          ((*ival_end >= '0' && *ival_end <= '9') ||
           (*ival_end == '-' && ival_end == ival_begin))) {
@@ -72,9 +48,8 @@ SignatureParser::Type SignatureParser::Next() {
   }
 
   // Parse ival.
-  if (!absl::SimpleAtoi(
-          absl::string_view(&(*ival_begin), ival_end - ival_begin),
-          &next_ival_)) {
+  if (StringRef(&(*ival_begin), ival_end - ival_begin)
+          .consumeInteger(10, next_ival_)) {
     // Should not be possible.
     return next_type_;
   }
@@ -89,8 +64,8 @@ SignatureParser::Type SignatureParser::Next() {
   // For string components ('A'..'Z'), extract the string.
   if (next_tag_ >= 'A' && next_tag_ <= 'Z') {
     if (next_ival_ < 0) return next_type_;  // Negative size error.
-    absl::string_view::const_iterator sval_begin = ival_end;
-    absl::string_view::const_iterator sval_end = sval_begin + next_ival_;
+    StringRef::const_iterator sval_begin = ival_end;
+    StringRef::const_iterator sval_end = sval_begin + next_ival_;
     if (sval_end > encoded_.end()) return next_type_;  // Underrun.
 
     // Remove escape char if escaped.
@@ -101,7 +76,7 @@ SignatureParser::Type SignatureParser::Next() {
     next_ival_ -= 1;
     ++sval_begin;
 
-    next_sval_ = absl::string_view(&(*sval_begin), sval_end - sval_begin);
+    next_sval_ = StringRef(&(*sval_begin), sval_end - sval_begin);
     cursor_ = sval_end;
     next_type_ = Type::kSpan;
     return next_type_;
@@ -132,20 +107,22 @@ void RawSignatureParser::Description::ToString(std::string& s) const {
         scalar_type_name = AbiConstants::kScalarTypeNames[static_cast<unsigned>(
             scalar_type_u)];
       }
-      absl::StrAppend(&s, "Buffer<", scalar_type_name, "[");
+      s.append("Buffer<");
+      s.append(scalar_type_name);
+      s.append("[");
       for (size_t i = 0; i < dims.size(); ++i) {
         if (i > 0) s.push_back('x');
         if (dims[i] >= 0) {
-          absl::StrAppend(&s, dims[i]);
+          s.append(std::to_string(dims[i]));
         } else {
           s.push_back('?');
         }
       }
-      absl::StrAppend(&s, "]>");
+      s.append("]>");
       break;
     }
     case Type::kRefObject: {
-      absl::StrAppend(&s, "RefObject<?>");
+      s.append("RefObject<?>");
       break;
     }
     case Type::kScalar: {
@@ -155,16 +132,16 @@ void RawSignatureParser::Description::ToString(std::string& s) const {
         type_name =
             AbiConstants::kScalarTypeNames[static_cast<unsigned>(type_u)];
       }
-      absl::StrAppend(&s, type_name);
+      s.append(type_name);
       break;
     }
     default:
-      absl::StrAppend(&s, "!UNKNOWN!");
+      s.append("!UNKNOWN!");
   }
 }
 
-absl::optional<std::string> RawSignatureParser::FunctionSignatureToString(
-    absl::string_view signature) {
+llvm::Optional<std::string> RawSignatureParser::FunctionSignatureToString(
+    StringRef signature) {
   std::string s;
 
   bool print_sep = false;
@@ -185,7 +162,7 @@ absl::optional<std::string> RawSignatureParser::FunctionSignatureToString(
   if (!GetError()) {
     return s;
   } else {
-    return absl::nullopt;
+    return llvm::None;
   }
 }
 
@@ -195,46 +172,53 @@ absl::optional<std::string> RawSignatureParser::FunctionSignatureToString(
 
 void SipSignatureParser::ToStringVisitor::IntegerKey(SipSignatureParser& p,
                                                      int k) {
-  absl::StrAppend(&s_, indent_, k);
+  s_.append(indent_);
+  s_.append(std::to_string(k));
 }
 
 void SipSignatureParser::ToStringVisitor::StringKey(SipSignatureParser& p,
-                                                    absl::string_view k) {
-  absl::StrAppend(&s_, indent_, k);
+                                                    StringRef k) {
+  s_.append(indent_);
+  s_.append(k.data(), k.size());
 }
 
 void SipSignatureParser::ToStringVisitor::OpenStruct(SipSignatureParser& p,
                                                      StructType struct_type) {
-  absl::StrAppend(&indent_, "  ");
+  indent_.append("  ");
   switch (struct_type) {
     case StructType::kDict:
       close_char_.push_back('}');
-      absl::StrAppend(&s_, ":{");
+      s_.append(":{");
       break;
     case StructType::kSequence:
       close_char_.push_back(']');
-      absl::StrAppend(&s_, ":[");
+      s_.append(":[");
       break;
     default:
       close_char_.push_back('?');
-      absl::StrAppend(&s_, ":?");
+      s_.append(":?");
   }
-  absl::StrAppend(&s_, "\n");
+  s_.append("\n");
 }
 
 void SipSignatureParser::ToStringVisitor::CloseStruct(SipSignatureParser& p) {
   if (indent_.size() >= 2) {
     indent_.resize(indent_.size() - 2);
   }
-  absl::StrAppend(&s_, indent_);
+  s_.append(indent_);
   s_.push_back(close_char_.back());
   close_char_.pop_back();
-  absl::StrAppend(&s_, ",\n");
+  s_.append(",\n");
 }
 
 void SipSignatureParser::ToStringVisitor::MapToRawSignatureIndex(
     SipSignatureParser& p, int index) {
-  absl::StrAppend(&s_, "=raw(", index, "),\n");
+  s_.append("=raw(");
+  s_.append(std::to_string(index));
+  s_.append("),\n");
 }
 
-}  // namespace iree
+}  // namespace SIP
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir

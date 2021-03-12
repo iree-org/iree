@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "absl/strings/string_view.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureParser.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -26,15 +25,15 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Types.h"
 
-using iree::RawSignatureParser;
-using iree::AbiConstants::ScalarType;
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
 namespace {
+
+using mlir::iree_compiler::IREE::SIP::RawSignatureParser;
+using mlir::iree_compiler::IREE::SIP::AbiConstants::ScalarType;
 
 Type mapScalarType(MLIRContext *ctx, ScalarType scalarType) {
   switch (scalarType) {
@@ -280,7 +279,7 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   auto ctx = rawCalleeFuncOp.getContext();
   auto loc = rawCalleeFuncOp.getLoc();
 
-  absl::string_view signature(signatureSr.data(), signatureSr.size());
+  StringRef signature(signatureSr.data(), signatureSr.size());
   SmallVector<RawSignatureParser::Description, 4> inputDescs;
   SmallVector<RawSignatureParser::Description, 4> resultDescs;
 

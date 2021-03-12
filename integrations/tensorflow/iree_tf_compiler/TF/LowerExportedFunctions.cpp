@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/signature_mangle.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureBuilder.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree_tf_compiler/TF/Passes.h"
@@ -32,7 +32,7 @@ namespace mlir {
 namespace iree_integrations {
 namespace TF {
 
-using ::iree::SipSignatureMangler;
+using mlir::iree_compiler::IREE::SIP::SipSignatureMangler;
 
 static LogicalResult setRawSignatureIndex(FuncOp funcOp,
                                           SipSignatureMangler &mangler,
@@ -42,8 +42,7 @@ static LogicalResult setRawSignatureIndex(FuncOp funcOp,
   for (auto &indexAttr : indexPathAttr) {
     if (auto stringAttr = indexAttr.dyn_cast<StringAttr>()) {
       auto stringRef = stringAttr.getValue();
-      indexKeys.emplace_back(
-          absl::string_view(stringRef.data(), stringRef.size()));
+      indexKeys.emplace_back(StringRef(stringRef.data(), stringRef.size()));
     } else if (auto intAttr = indexAttr.dyn_cast<IntegerAttr>()) {
       indexKeys.emplace_back(intAttr.getInt());
     } else {
