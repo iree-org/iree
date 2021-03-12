@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -48,10 +49,16 @@ class CreateBenchmarkFuncs
 
         // Create a funcOp to invoke the dispatch function.
         std::string funcName = std::string(execFuncOp.getName()) + "_entry";
-        auto funcType =
-            builder.getFunctionType({}, execFuncOp.getType().getResults());
+        auto funcType = builder.getFunctionType({}, {});
         auto funcOp = builder.create<FuncOp>(loc, funcName, funcType);
-        funcOp->setAttr("iree.module.export", UnitAttr::get(&getContext()));
+        funcOp->setAttr("iree.module.export", builder.getUnitAttr());
+        funcOp->setAttr("iree.abi.stub", builder.getUnitAttr());
+        SmallVector<NamedAttribute> reflectionAttrs = {
+            builder.getNamedAttr("benchmark",
+                                 builder.getStringAttr("dispatch")),
+        };
+        funcOp->setAttr("iree.reflection",
+                        builder.getDictionaryAttr(reflectionAttrs));
         Block* block = funcOp.addEntryBlock();
 
         // Build the body of the FuncOp.
@@ -69,9 +76,16 @@ class CreateBenchmarkFuncs
         auto dummyWorkload = blockBuilder.create<ConstantIndexOp>(loc, 0);
         auto dispatchOp = blockBuilder.create<DispatchOp>(
             loc, dispatchEntryOp, ValueRange{dummyWorkload},
-            funcType.getResults(), ValueRange{}, args, ValueRange{},
+            execFuncOp.getType().getResults(), ValueRange{}, args, ValueRange{},
             ArrayRef<int64_t>{});
-        blockBuilder.create<mlir::ReturnOp>(loc, dispatchOp.getResults());
+
+        // Sink all results with do_not_optimize to ensure that DCE does not
+        // remove the dispatch.
+        for (auto result : dispatchOp.getResults()) {
+          blockBuilder.create<IREE::DoNotOptimizeOp>(loc, result);
+        }
+
+        blockBuilder.create<mlir::ReturnOp>(loc);
       }
     }
 

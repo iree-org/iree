@@ -277,8 +277,6 @@ void registerFlowTransformPassPipeline() {
 
 void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createCreateBenchmarkFuncs());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeReflectionAttrs());
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
