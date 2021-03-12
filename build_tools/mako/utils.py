@@ -35,7 +35,7 @@ class TargetInfo:
     self.compilation_flags = compilation_flags
     self.runtime_flags = runtime_flags
 
-  def get_driver():
+  def get_driver(self):
     return self.name.split("-")[0]
 
 
@@ -72,7 +72,7 @@ class ModelBenchmarkInfo:
     self.phones = phones
 
 
-def get_default_pixel4_target_list():
+def get_pixel4_default_target_list():
   return [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(
@@ -92,7 +92,7 @@ def get_default_pixel4_target_list():
   ]
 
 
-def get_default_s20_target_list():
+def get_s20_default_target_list():
   return [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(
@@ -120,11 +120,11 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(
                 name="Pixel4",
                 benchmark_key="5538704950034432",
-                targets=get_default_pixel4_target_list()),
+                targets=get_pixel4_default_target_list()),
             PhoneBenchmarkInfo(
                 name="S20",
                 benchmark_key="4699630718681088",
-                targets=get_default_s20_target_list()),
+                targets=get_s20_default_target_list()),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -133,11 +133,11 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(
                 name="Pixel4",
                 benchmark_key="6338759231537152",
-                targets=get_default_pixel4_target_list()),
+                targets=get_pixel4_default_target_list()),
             PhoneBenchmarkInfo(
                 name="S20",
                 benchmark_key="5618403088793600",
-                targets=get_default_s20_target_list()),
+                targets=get_s20_default_target_list()),
         ])
 ]
 
