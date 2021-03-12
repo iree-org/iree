@@ -46,7 +46,6 @@ cc_library(
         "OutlineLargeConstants.cpp",
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
-        "RematerializeDispatchConstants.cpp",
         "StripAndSplatConstantVariables.cpp",
     ],
     hdrs = [

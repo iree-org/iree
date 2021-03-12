@@ -14,6 +14,7 @@
 
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -28,8 +29,18 @@ CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
 iree_lit_test_suite(
     name = "lit",
     size = "medium",
-    srcs = glob(
-        ["*.mlir"],
+    srcs = enforce_glob(
+        [
+            "collatz.mlir",
+            "edge_detection.mlir",
+            "fragment_000.mlir",
+            "fullyconnected.mlir",
+            "mnist_fake_weights.mlir",
+            "resnet_fake_weights.mlir",
+            "unidirectional_lstm.mlir",
+        ],
+        include =
+            ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS,
     ),
     data = [

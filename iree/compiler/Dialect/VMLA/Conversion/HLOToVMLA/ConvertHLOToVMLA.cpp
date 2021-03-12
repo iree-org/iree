@@ -598,7 +598,9 @@ struct DynamicSliceOpConversion
 };
 
 struct CompareOpConversion : public OpConversionPattern<mhlo::CompareOp> {
-  using OpConversionPattern::OpConversionPattern;
+  CompareOpConversion(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern(typeConverter, context,
+                            /*benefit=*/9999) {}
 
   LogicalResult matchAndRewrite(
       mhlo::CompareOp srcOp, ArrayRef<Value> rawOperands,
@@ -874,11 +876,6 @@ struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
 void populateHLOToVMLAPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
-  // We rely on some additional HLO->std patterns and assume they
-  // have been run already. In case they haven't we provide them here (useful
-  // for standalone conversion testing).
-  mhlo::PopulateMhloToStdPatterns(&patterns, context);
-
   // mhlo.convolution.
   populateHLOConvToVMLAPatterns(context, patterns, typeConverter);
 
@@ -995,8 +992,11 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // runtime.
   patterns.insert<CanonicalizeBroadcastOp>(context);
 
-  // TODO(benvanik): add missing ops:
-  // - ConvOp
+  // We rely on some additional HLO->std patterns and assume they
+  // have been run already. In case they haven't we provide them here (useful
+  // for standalone conversion testing). We run them last so that other patterns
+  // have a chance to handle the HLO conversions first.
+  mhlo::PopulateMhloToStdPatterns(&patterns, context);
 }
 
 }  // namespace iree_compiler

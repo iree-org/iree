@@ -10,12 +10,12 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-ir_llvm
   SRCS
-    "${_GLOB_X_MLIR}"
+    "add.mlir"
+    "matmul.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -25,12 +25,12 @@ iree_check_single_backend_test_suite(
     "-iree-codegen-llvm-experimental-linalg-on-tensors"
 )
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
-    "${_GLOB_X_MLIR}"
+    "add.mlir"
+    "matmul.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER

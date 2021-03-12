@@ -124,10 +124,6 @@ std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass();
 std::unique_ptr<OperationPass<FuncOp>>
 createFoldCompatibleDispatchRegionsPass();
 
-// Rematerializes small previously-CSE'd constants into dispatch regions.
-std::unique_ptr<OperationPass<FuncOp>>
-createRematerializeDispatchConstantsPass();
-
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
@@ -200,7 +196,6 @@ inline void registerFlowPasses() {
   createIdentifyDispatchRegionsPass();
   createIdentifyDispatchRegions2Pass();
   createFoldCompatibleDispatchRegionsPass();
-  createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
   createCreateBenchmarkFuncs();
   createOutlineLargeConstantsPass();

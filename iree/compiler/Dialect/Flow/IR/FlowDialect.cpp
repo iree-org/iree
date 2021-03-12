@@ -30,7 +30,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.cpp.inc"
 
 namespace {
 
@@ -48,7 +48,7 @@ struct FlowFolderInterface : public DialectFoldInterface {
 FlowDialect::FlowDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
   addInterfaces<FlowFolderInterface>();
-  addTypes<DispatchInputType, DispatchOutputType>();
+  addTypes<DispatchTensorType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -70,10 +70,8 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
 
 Type FlowDialect::parseType(DialectAsmParser &parser) const {
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (succeeded(parser.parseOptionalKeyword("dispatch.input"))) {
-    return DispatchInputType::parse(parser);
-  } else if (succeeded(parser.parseOptionalKeyword("dispatch.output"))) {
-    return DispatchOutputType::parse(parser);
+  if (succeeded(parser.parseOptionalKeyword("dispatch.tensor"))) {
+    return DispatchTensorType::parse(parser);
   }
   parser.emitError(parser.getCurrentLocation())
       << "unknown Flow type: " << spec;
@@ -81,10 +79,8 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (auto inputType = type.dyn_cast<DispatchInputType>()) {
+  if (auto inputType = type.dyn_cast<DispatchTensorType>()) {
     IREE::Flow::printType(inputType, p);
-  } else if (auto outputType = type.dyn_cast<DispatchOutputType>()) {
-    IREE::Flow::printType(outputType, p);
   } else {
     llvm_unreachable("unknown Flow type");
   }

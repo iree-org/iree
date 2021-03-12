@@ -23,17 +23,4 @@ iree_check_single_backend_test_suite(
     "-iree-codegen-linalg-to-llvm-conv-img2col-conversion=true"
 )
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-aot-exponential_fast
-  SRCS
-    "exponential.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-fast-exp=true"
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

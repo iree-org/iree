@@ -28,6 +28,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
@@ -38,6 +39,7 @@ namespace iree_compiler {
 /// Name of the StrAttr that can be used to get the key to access the tile size
 /// information.
 static const char kLaunchInfoKey[] = "launch_info_key";
+static const char kRootOpKey[] = "is_root_op";
 
 static Optional<StringRef> getKey(Operation *op) {
   StringAttr attr = op->getAttrOfType<StringAttr>(kLaunchInfoKey);
@@ -82,8 +84,7 @@ ArrayRef<int64_t> LaunchConfig::getTileSizes(Operation *op,
 
 Operation *LaunchConfig::getRootOperation(ArrayRef<Operation *> ops) {
   for (auto op : ops) {
-    auto key = getKey(op);
-    if (key && key.getValue() == rootOperationKey) return op;
+    if (op->getAttrOfType<UnitAttr>(kRootOpKey)) return op;
   }
   return nullptr;
 }
@@ -114,8 +115,7 @@ void LaunchConfig::setNumSubgroups(ArrayRef<int64_t> vNumSubgroups) {
 }
 
 void LaunchConfig::setRootOperation(Operation *op) {
-  Optional<StringRef> key = getKey(op);
-  if (key) rootOperationKey = *key;
+  op->setAttr(kRootOpKey, UnitAttr::get(op->getContext()));
 }
 
 void LaunchConfig::setSameConfig(Operation *source, Operation *target) {

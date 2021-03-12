@@ -43,15 +43,36 @@ namespace detail {
 struct DispatchTensorTypeStorage;
 }  // namespace detail
 
+enum class TensorAccess : uint32_t {
+  ReadOnly,
+  ReadWrite,
+  WriteOnly,
+};
+
 // Blatantly ripped from ShapedType, because the closed type system means that
 // we can't extend it and reuse all of this.
-class DispatchTensorType : public Type {
+class DispatchTensorType
+    : public Type::TypeBase<DispatchTensorType, Type,
+                            detail::DispatchTensorTypeStorage> {
  public:
   using ImplType = detail::DispatchTensorTypeStorage;
 
   static constexpr int64_t kDynamicSize = -1;
 
-  using Type::Type;
+  using Base::Base;
+
+  /// Get or create a new DispatchTensorType of the provided shape and
+  /// element type. Assumes the arguments define a well-formed
+  /// DispatchTensorType.
+  static DispatchTensorType get(TensorAccess access, ArrayRef<int64_t> shape,
+                                Type elementType);
+
+  static DispatchTensorType get(TensorAccess access, TensorType tensorType);
+
+  static DispatchTensorType parse(DialectAsmParser &parser);
+
+  /// Returns the allowed operations the tensor.
+  TensorAccess getAccess() const;
 
   /// Return the element type.
   Type getElementType() const;
@@ -97,17 +118,15 @@ class DispatchTensorType : public Type {
   /// dimensions, given its `index` within the shape.
   unsigned getDynamicDimIndex(unsigned index) const;
 
-  /// Methods for support type inquiry through isa, cast, and dyn_cast.
-  static bool classof(Type type);
-
   /// Whether the given dimension size indicates a dynamic dimension.
   static constexpr bool isDynamic(int64_t dSize) {
     return dSize == kDynamicSize;
   }
 
-  /// Verify the construction of a vector type.
+  /// Verify the construction of a tensor type.
   static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
-                              ArrayRef<int64_t> shape, Type elementType);
+                              uint32_t access, ArrayRef<int64_t> shape,
+                              Type elementType);
 
   /// Returns true of the given type can be used as an element of a vector type.
   /// In particular, vectors can consist of integer or float primitives.
@@ -124,100 +143,41 @@ class DispatchTensorType : public Type {
   }
 };
 
-class DispatchInputType
-    : public Type::TypeBase<DispatchInputType, DispatchTensorType,
-                            detail::DispatchTensorTypeStorage> {
- public:
-  using Base::Base;
-
-  /// Get or create a new DispatchInputType of the provided shape and element
-  /// type. Assumes the arguments define a well-formed DispatchInputType.
-  static DispatchInputType get(ArrayRef<int64_t> shape, Type elementType);
-
-  /// Get or create a new DispatchInputType of the provided shape and element
-  /// type declared at the given, potentially unknown, location.  If the
-  /// DispatchInputType defined by the arguments would be ill-formed, emit
-  /// errors and return nullptr-wrapping type.
-  static DispatchInputType getChecked(ArrayRef<int64_t> shape, Type elementType,
-                                      Location location);
-  static DispatchInputType getChecked(
-      function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> shape,
-      Type elementType) {
-    return Base::getChecked(emitError, elementType.getContext(), shape,
-                            elementType);
-  }
-
-  static DispatchInputType get(TensorType tensorType);
-
-  static DispatchInputType parse(DialectAsmParser &parser);
-};
-
-void printType(DispatchInputType &type, DialectAsmPrinter &p);
-
-class DispatchOutputType
-    : public Type::TypeBase<DispatchOutputType, DispatchTensorType,
-                            detail::DispatchTensorTypeStorage> {
- public:
-  using Base::Base;
-
-  /// Get or create a new DispatchOutputType of the provided shape and element
-  /// type. Assumes the arguments define a well-formed DispatchOutputType.
-  static DispatchOutputType get(ArrayRef<int64_t> shape, Type elementType);
-
-  /// Get or create a new DispatchOutputType of the provided shape and element
-  /// type declared at the given, potentially unknown, location.  If the
-  /// DispatchOutputType defined by the arguments would be ill-formed, emit
-  /// errors and return nullptr-wrapping type.
-  static DispatchOutputType getChecked(ArrayRef<int64_t> shape,
-                                       Type elementType, Location location);
-  static DispatchOutputType getChecked(
-      function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> shape,
-      Type elementType) {
-    return Base::getChecked(emitError, elementType.getContext(), shape,
-                            elementType);
-  }
-
-  static DispatchOutputType get(TensorType tensorType);
-
-  static DispatchOutputType parse(DialectAsmParser &parser);
-};
-
-void printType(DispatchOutputType &type, DialectAsmPrinter &p);
-
-inline bool DispatchTensorType::classof(Type type) {
-  return type.isa<DispatchInputType, DispatchOutputType>();
-}
+void printType(DispatchTensorType &type, DialectAsmPrinter &p);
 
 namespace detail {
 
 struct DispatchTensorTypeStorage : public TypeStorage {
-  DispatchTensorTypeStorage(unsigned shapeSize, Type elementTy,
+  DispatchTensorTypeStorage(uint32_t access, unsigned shapeSize, Type elementTy,
                             const int64_t *shapeElements)
-      : shapeElements(shapeElements),
+      : access(access),
+        shapeElements(shapeElements),
         shapeSize(shapeSize),
         elementType(elementTy) {}
 
   /// The hash key used for uniquing.
-  using KeyTy = std::pair<ArrayRef<int64_t>, Type>;
+  using KeyTy = std::tuple<uint32_t, ArrayRef<int64_t>, Type>;
   bool operator==(const KeyTy &key) const {
-    return key == KeyTy(getShape(), elementType);
+    return key == KeyTy(access, getShape(), elementType);
   }
 
   /// Construction.
   static DispatchTensorTypeStorage *construct(TypeStorageAllocator &allocator,
                                               const KeyTy &key) {
     // Copy the shape into the bump pointer.
-    ArrayRef<int64_t> shape = allocator.copyInto(key.first);
+    ArrayRef<int64_t> shape = allocator.copyInto(std::get<1>(key));
 
     // Initialize the memory using placement new.
     return new (allocator.allocate<DispatchTensorTypeStorage>())
-        DispatchTensorTypeStorage(shape.size(), key.second, shape.data());
+        DispatchTensorTypeStorage(std::get<0>(key), shape.size(),
+                                  std::get<2>(key), shape.data());
   }
 
   ArrayRef<int64_t> getShape() const {
     return ArrayRef<int64_t>(shapeElements, shapeSize);
   }
 
+  uint32_t access;
   const int64_t *shapeElements;
   unsigned shapeSize;
   Type elementType;

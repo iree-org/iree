@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,7 +23,37 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "create_benchmark_funcs.mlir",
+            "deduplicate_executables.mlir",
+            "dispatch_linalg_on_tensors.mlir",
+            "dispatch_linalg_on_tensors_dynamic.mlir",
+            "expand_variable_dynamic_dims.mlir",
+            "fold_compatible_dispatch_regions.mlir",
+            "form_streams.mlir",
+            "hlo_to_hlo_preprocessing.mlir",
+            "hlo_to_hlo_preprocessing_canoncalize_dot_general.mlir",
+            "hlo_to_hlo_preprocessing_extract_pad_from_conv.mlir",
+            "hoist_unstreamable_ops.mlir",
+            "identify_dispatch_regions.mlir",
+            "identify_dispatch_regions2_enable_matmul_fusion.mlir",
+            "identify_dispatch_regions2_hlo.mlir",
+            "identify_dispatch_regions2_linalg.mlir",
+            "identify_dispatch_regions2_shapes.mlir",
+            "identify_dispatch_regions2_std_fusion.mlir",
+            "inject_dispatch_tracing.mlir",
+            "legalize_input_types.mlir",
+            "materialize_and_merge_exported_reflection.mlir",
+            "materialize_exported_reflection.mlir",
+            "merge_exported_reflection.mlir",
+            "outline_dispatch_regions2.mlir",
+            "outline_large_constants.mlir",
+            "strip_and_splat_constant_variables.mlir",
+            "transformation.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-opt",

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-dispatchability-analysis -iree-flow-identify-dispatch-regions2 -iree-enable-consumer-only-fusion %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-dispatchability-analysis -iree-flow-identify-dispatch-regions2 -iree-enable-consumer-only-fusion -canonicalize %s | IreeFileCheck %s
 
 func @simpleDotAddMul
   (%arg0 : tensor<16x32xf32>, %arg1 : tensor<32x48xf32>,

@@ -26,4 +26,6 @@
 FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:3656d9c3a08770f8371ad3a6f777b979c954656dae1cdbdfadfccdd7ab713f87 AS final
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y libnvidia-gl-460=460.32.03-0ubuntu0.18.04.1
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       libnvidia-gl-460=460.39-0ubuntu0.18.04.1 \
+       libnvidia-compute-460=460.39-0ubuntu0.18.04.1

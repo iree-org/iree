@@ -21,6 +21,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.h.inc"
+
 class ShapeDialect : public Dialect {
  public:
   explicit ShapeDialect(MLIRContext* context);

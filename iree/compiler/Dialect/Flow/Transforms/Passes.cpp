@@ -195,8 +195,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
-    passManager.addPass(createCanonicalizerPass());
-    passManager.addPass(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   }
 
   // First perform module-level analysis that following passes will use to query
@@ -210,12 +209,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createFoldCompatibleDispatchRegionsPass());
-
-  // Note that as we are rematerializing things here it's critical we do not run
-  // the canonicalizer/CSE between now and when we outline - otherwise it'll
-  // undo all of our work!
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createRematerializeDispatchConstantsPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables. This separates sequencer functions performing dispatches from
@@ -258,14 +251,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
   passManager.addPass(createOutlineLargeConstantsPass());
+
+  // Forming streams involves a fair amount of subgraph stitching, which can
+  // cause duplication. Run CSE to collapse.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.

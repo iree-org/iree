@@ -16,11 +16,14 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -177,7 +180,9 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
 ///   linalg.init_tensor operations.
 
 static bool isRootOp(Operation *op) {
-  return isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op);
+  return isa<linalg::ConvInputNHWCFilterHWCFOp,
+             linalg::DepthwiseConvInputNHWCFilterHWCOp, linalg::MatmulOp,
+             linalg::BatchMatmulOp>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
@@ -219,7 +224,10 @@ static std::pair<IREE::Flow::DispatchWorkgroupsOp, Operation *>
 buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                                         ArrayRef<Value> count, Operation *op) {
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, count, op->getResultTypes(), ValueRange{});
+      loc, count, op->getResultTypes(), /*result_dims=*/ValueRange{},
+      /*operands=*/ValueRange{},
+      /*operand_dims=*/ValueRange{},
+      /*tied_operands=*/ArrayRef<int64_t>{});
   Region &region = dispatchOp.body();
   Block *block = &region.front();
   Operation *clonedOp;
@@ -230,7 +238,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     for (auto it : llvm::zip(clonedOp->getResults(),
                              dispatchOp.body().getArguments().take_back(
                                  clonedOp->getNumResults()))) {
-      rewriter.create<IREE::Flow::DispatchOutputStoreOp>(
+      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
           loc, std::get<0>(it), std::get<1>(it), llvm::None, llvm::None,
           llvm::None);
     }
@@ -380,18 +388,18 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   // Replace valuesDefinedAbove by new BB args (including the op's operands).
   for (Value operand : valuesDefinedAbove) {
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
-      block.addArgument(IREE::Flow::DispatchInputType::get(
-          rt.getShape(), rt.getElementType()));
+      block.addArgument(IREE::Flow::DispatchTensorType::get(
+          TensorAccess::ReadOnly, rt.getShape(), rt.getElementType()));
     } else {
       block.addArgument(operand.getType());
     }
 
     Value bbArg = block.getArguments().back();
     Value repl = bbArg;
-    if (bbArg.getType().isa<IREE::Flow::DispatchInputType>()) {
-      repl = b.create<IREE::Flow::DispatchInputLoadOp>(loc, operand.getType(),
-                                                       bbArg);
-    } else if (bbArg.getType().isa<IREE::Flow::DispatchOutputType>()) {
+    if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
+      repl = b.create<IREE::Flow::DispatchTensorLoadOp>(loc, operand.getType(),
+                                                        bbArg);
+    } else if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
       // TODO(nicolasvasilache): do something useful.
       continue;
     }
@@ -401,7 +409,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   // The only existing arguments are for the outputs. Just need to add a new
   // argument for the outputs and remap the value to use the new argument.
   for (auto ba : block.getArguments().take_front(numOldBBArgs)) {
-    assert(ba.getType().isa<IREE::Flow::DispatchOutputType>());
+    assert(ba.getType().isa<IREE::Flow::DispatchTensorType>());
     map.map(ba, block.addArgument(ba.getType()));
   }
 
@@ -446,8 +454,22 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   block.eraseArguments(
       llvm::to_vector<4>(llvm::seq<unsigned>(0, numOldBBArgs)));
 
+  // Gather the dynamic dimensions for all operands.
+  SmallVector<Value, 4> operandDynamicDims;
+  OpBuilder builder(dispatchOp);
+  for (Value operand : valuesDefinedAbove) {
+    if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
+      for (unsigned i = 0; i < rt.getRank(); ++i) {
+        if (!rt.isDynamicDim(i)) continue;
+        auto dim = builder.createOrFold<DimOp>(dispatchOp.getLoc(), operand, i);
+        operandDynamicDims.push_back(dim);
+      }
+    }
+  }
+
   // Set the values captured from above as the new operands.
   dispatchOp.operandsMutable().assign(llvm::to_vector<4>(valuesDefinedAbove));
+  dispatchOp.operand_dimsMutable().assign(operandDynamicDims);
 
   return success();
 }
@@ -507,10 +529,25 @@ struct TileAndDistributeOnTensorsPattern
     SmallVector<Value, 4> count = llvm::to_vector<4>(
         llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
                         [](Range r) { return r.size; }));
+    // NOTE: Special treatment for convolution, which have more than 3 parallel
+    // dimensions. We want to ignore the batch dimension and tile along the
+    // next three.
+    // TODO(#5048): figure out a better way to avoid this special case.
+    if (isa<linalg::ConvInputNHWCFilterHWCFOp,
+            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
+      count.erase(count.begin());
+    }
     count.resize(getNumTilableLoops(op));
     auto workload = convertToWorkload(rewriter, loc, count);
 
-    // Note: DispatchOutputStoreOp generated by the
+    // Capture dynamic result dimensions.
+    SmallVector<Value, 4> resultDynamicDims;
+    for (auto result : linalgOp.outputs()) {
+      resultDynamicDims.append(Shape::buildOrFindDynamicDimsForValue(
+          linalgOp.getLoc(), result, rewriter));
+    }
+
+    // Note: DispatchTensorStoreOp generated by the
     // `buildOperandLessFlowDispatchWorkgroupOp` is an abstraction jump that
     // consumes the SSA value produced by `clonedOp` but it does not comply with
     // the semantics of DispatchWorkgroupsOp which explicitly states: "behavior
@@ -518,10 +555,11 @@ struct TileAndDistributeOnTensorsPattern
     // output tensors".  Similarly to sequentialized SPMD loops, the semantics
     // is valid assuming a sequential ordering of execution.  After destructive
     // update rewrites, the abstraction gap disappears.
-    auto en =
-        buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload, op);
-    linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
+    auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload,
+                                                      linalgOp);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
+    linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
+    dispatchOp.result_dimsMutable().assign(resultDynamicDims);
 
     // Scoped within DispatchWorkgroupOp.
     OpBuilder::InsertionGuard g(rewriter);
@@ -546,7 +584,7 @@ struct TileAndDistributeOnTensorsPattern
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
     rewriter.replaceOpWithIf(
-        op, dispatchOp.getOperation()->getResults(),
+        op, dispatchOp.getResults(),
         [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
     return success();
   }
@@ -554,7 +592,7 @@ struct TileAndDistributeOnTensorsPattern
 
 /// The workload is computed based on the problem size. For a given operation,
 /// return the problem size.
-static Optional<SmallVector<Value, 4>> getProblemSize(PatternRewriter &rewriter,
+static Optional<SmallVector<Value, 4>> getResultShape(PatternRewriter &rewriter,
                                                       Operation *op) {
   Location loc = op->getLoc();
   auto getShapeOfShapedTypeVal = [&](Value v) -> SmallVector<Value, 4> {
@@ -599,11 +637,13 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
         })) {
       return failure();
     }
+
     // The workgroup count is based on the result shape.
     if (op->getNumResults() != 1) return failure();
-    Optional<SmallVector<Value, 4>> countOpt = getProblemSize(rewriter, op);
-    if (!countOpt) return failure();
-    SmallVector<Value, 4> count = *countOpt;
+    Optional<SmallVector<Value, 4>> resultShapeOpt =
+        getResultShape(rewriter, op);
+    if (!resultShapeOpt) return failure();
+    SmallVector<Value, 4> resultShape = *resultShapeOpt;
 
     // TODO(ravishankarm): For now the Flow -> HAL conversion only handles
     // workload count of 3, though it should be generalized. For now making sure
@@ -611,6 +651,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // workloads for all higher dimensions greater than or equal to
     // kNumMaxParallelDims.
     Location loc = op->getLoc();
+    SmallVector<Value, 4> count = resultShape;
     if (count.size() > kNumMaxParallelDims) {
       unsigned numSymbols = 0;
       AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
@@ -625,9 +666,22 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
           ArrayRef<Value>(count).take_back(kNumMaxParallelDims));
     }
     auto workload = convertToWorkload(rewriter, loc, count);
+
+    // Capture dynamic result dimensions.
+    assert(op->getNumResults() == 1 && "currently assuming a single result");
+    auto resultType = op->getResult(0).getType().cast<ShapedType>();
+    SmallVector<Value, 4> resultDynamicDims;
+    for (unsigned i = 0; i < resultType.getRank(); ++i) {
+      if (resultType.isDynamicDim(i)) {
+        resultDynamicDims.push_back(resultShape[i]);
+      }
+    }
+
     auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, op->getLoc(),
                                                       workload, op);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
+    dispatchOp.result_dimsMutable().assign(resultDynamicDims);
+
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
                              [&](OpOperand &operand) {
                                Operation *user = operand.getOwner();
@@ -729,10 +783,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
         auto numParallelDims = parallelLoopRanges.size();
+
         SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        for (size_t dim = 0;
-             dim < std::min<size_t>(numParallelDims, kNumMaxParallelDims);
-             ++dim) {
+        for (size_t dim = 0; dim < numParallelDims; ++dim) {
           procInfo[numParallelDims - dim - 1] = {
               buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupIDOp>(builder,
                                                                     dim),
@@ -746,21 +799,34 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
+    auto numParallelDims = getNumOuterParallelLoops(cast<linalg::LinalgOp>(op));
     auto numTiledLoops = getNumTilableLoops(cast<linalg::LinalgOp>(op));
-    SmallVector<Value, 4> useTileSizes(numTiledLoops);
+
+    // Default to zero to skip tiling.
+    auto zero = builder.create<ConstantIndexOp>(op->getLoc(), 0);
+    SmallVector<Value, 4> useTileSizes(numParallelDims, zero);
+
     if (!clLinalgOnTensorsTileSizes.empty()) {
       SmallVector<int64_t, 2> tileSizes(clLinalgOnTensorsTileSizes.begin(),
                                         clLinalgOnTensorsTileSizes.end());
-      useTileSizes.resize(std::min<size_t>(tileSizes.size(), numTiledLoops));
+      useTileSizes.resize(std::min<size_t>(tileSizes.size(), numParallelDims));
       return llvm::to_vector<4>(llvm::map_range(
           ArrayRef<int64_t>(tileSizes).take_front(
-              std::min<size_t>(tileSizes.size(), numTiledLoops)),
+              std::min<size_t>(tileSizes.size(), numParallelDims)),
           [&](int64_t t) -> Value {
             return builder.create<ConstantIndexOp>(op->getLoc(), t);
           }));
     }
+
+    // NOTE: Special treatment for convolution, which have more than 3
+    // parallel dimensions. We want to ignore the batch dimension and tile
+    // along the next three. That means setting the first position to zero.
+    // TODO(#5048): figure out a better way to avoid this special case.
+    bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp,
+                        linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
+
     for (size_t dim = 0; dim < numTiledLoops; ++dim) {
-      useTileSizes[numTiledLoops - dim - 1] =
+      useTileSizes[(isConvOp ? numParallelDims : numTiledLoops) - dim - 1] =
           buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupSizeOp>(builder, dim);
     }
     return useTileSizes;
@@ -815,6 +881,19 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           })
           .wasInterrupted()) {
     return signalPassFailure();
+  }
+
+  // Run necessary canonicalization patterns before destructive updates.
+  {
+    OwningRewritePatternList patterns;
+    // This is needed because tiling and distribution may create
+    // subtensor_insert ops whose source operands come from tensor.cast ops.
+    // Those tensor.cast ops cast tensors into a more dynamic shape, in order
+    // to guarantee type match during transformation. Later in destructive
+    // update subtensor_insert ops will be turned into flow dispatch output
+    // store ops.
+    SubTensorInsertOp::getCanonicalizationPatterns(patterns, context);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
   // Rewrite destructive updates and ensure no remaining store remains to the

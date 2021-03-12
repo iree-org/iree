@@ -10,12 +10,13 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "constant_encoding.mlir"
+    "module_encoding_smoke.mlir"
+    "reflection_attrs.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-translate

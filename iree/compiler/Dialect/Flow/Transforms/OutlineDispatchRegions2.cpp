@@ -37,28 +37,6 @@ namespace IREE {
 namespace Flow {
 namespace {
 
-// Expands dynamic dimensions of a shaped type to their individual values.
-// Will walk the shape IR hierarchy to resolve the dimensions as possible.
-static void insertDynamicShapeDimOperands(DispatchWorkgroupsOp regionOp,
-                                          Value value,
-                                          SmallVectorImpl<Value> &newOperands,
-                                          OpBuilder &builder) {
-  auto shapedType = value.getType().cast<ShapedType>();
-  if (shapedType.hasStaticShape()) return;
-
-  // NOTE: this may insert new shape values at |builder|, which is prior to our
-  // dispatch operation. All new values that are built can only depend on SSA
-  // values that are defined prior to the region op.
-  auto shapeValue = Shape::buildOrFindRankedShapeForValue(
-      regionOp.getLoc(), value, builder.getIndexType(), builder);
-  for (int dim = 0, e = shapedType.getRank(); dim < e; ++dim) {
-    if (shapedType.isDynamicDim(dim)) {
-      newOperands.push_back(builder.create<Shape::RankedDimOp>(
-          regionOp.getLoc(), shapeValue, dim));
-    }
-  }
-}
-
 // Converts a dispatch region op into a dispatch op to the outlined region.
 static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
                                          ExecutableOp executableOp,
@@ -67,25 +45,39 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   OpBuilder builder(regionOp);
 
   // Perform shape to primitive type expansion.
+  // NOTE: this may insert new shape values at |builder|, which is prior to
+  // our dispatch operation. All new values that are built can only depend
+  // on SSA values that are defined prior to the region op.
   SmallVector<Value, 4> newOperands;
+  SmallVector<Value, 4> operandDynamicDims;
+  SmallVector<Value, 4> resultDynamicDims;
   for (auto operand : regionOp.operands()) {
     newOperands.push_back(operand);
   }
   for (auto operand : regionOp.operands()) {
-    if (operand.getType().isa<TensorType>()) {
-      insertDynamicShapeDimOperands(regionOp, operand, newOperands, builder);
+    if (operand.getType().isa<ShapedType>()) {
+      auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+          regionOp.getLoc(), operand, builder);
+      operandDynamicDims.append(dynamicDims);
+      newOperands.append(dynamicDims);
     }
   }
   for (auto result : regionOp.results()) {
-    if (result.getType().isa<TensorType>()) {
-      insertDynamicShapeDimOperands(regionOp, result, newOperands, builder);
+    if (result.getType().isa<ShapedType>()) {
+      auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+          regionOp.getLoc(), result, builder);
+      resultDynamicDims.append(dynamicDims);
+      newOperands.append(dynamicDims);
     }
   }
 
   // Create the dispatch op to the executable function.
+  // Note that we copy the tied operand indices from the workgroups op - it
+  // lines up 1:1 with the dispatch once we've outlined things.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), entryPointOp, regionOp.workgroup_count(),
-      regionOp.getResultTypes(), newOperands);
+      regionOp.getResultTypes(), resultDynamicDims, newOperands,
+      operandDynamicDims, regionOp.getTiedResultOperandIndices());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
@@ -112,13 +104,9 @@ static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
   SmallVector<Type, 4> operandTypes;
   int64_t totalDynamicDims = 0;
   for (auto &operand : region.getArguments()) {
-    if (auto inputType = operand.getType().dyn_cast<DispatchInputType>()) {
-      operandTypes.push_back(inputType);
-      totalDynamicDims += inputType.getNumDynamicDims();
-    } else if (auto outputType =
-                   operand.getType().dyn_cast<DispatchOutputType>()) {
-      operandTypes.push_back(outputType);
-      totalDynamicDims += outputType.getNumDynamicDims();
+    if (auto tensorType = operand.getType().dyn_cast<DispatchTensorType>()) {
+      operandTypes.push_back(tensorType);
+      totalDynamicDims += tensorType.getNumDynamicDims();
     } else {
       // Pass-through.
       operandTypes.push_back(operand.getType());

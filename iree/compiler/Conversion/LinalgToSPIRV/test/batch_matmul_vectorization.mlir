@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
 
 hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
@@ -9,8 +9,8 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -299,8 +299,8 @@ hal.executable @batch_matmul_fused_fillop attributes {sym_visibility = "private"
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @batch_matmul_fused_fillop attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,

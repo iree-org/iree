@@ -81,6 +81,16 @@ createFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createMaterializeEntryPointsPass();
 
+/// Creates a pass to concretize hal.interface.workgroup.* ops with concrete
+/// tiling and distribution scheme.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createConcretizeTileAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
+
+/// Tiles and distributes Linalg operations on buffers among multiple
+/// workgroups.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+createTileAndDistributeAmongWorkgroupsPass(const SPIRVCodegenOptions &options);
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//

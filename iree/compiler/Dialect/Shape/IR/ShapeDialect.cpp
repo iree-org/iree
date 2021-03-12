@@ -32,6 +32,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.cpp.inc"
+
 // Used to control inlining behavior.
 struct ShapeInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;

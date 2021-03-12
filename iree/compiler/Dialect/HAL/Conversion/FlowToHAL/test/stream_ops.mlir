@@ -24,16 +24,17 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK: %[[TMP_BUF:.+]] = hal.allocator.allocate {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch"
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
-  %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
+  %0 = flow.ex.stream.fragment(%cst, %arg0) : (index, tensor<128xf32>) -> tensor<128xf32> =
+      (%arg1: index, %arg2: tensor<128xf32>) -> tensor<128xf32> {
     //  CHECK-DAG: %[[EXE_LAYOUT:.+]] = hal.executable_layout.lookup
     //      CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %[[EXE_LAYOUT]], set = %c0, bindings = [%c0 = (%arg0, %c0, %c512), %c1 = (%[[TMP_BUF]], %c0, %c512)]
     //      CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex0::@vmla::@entry0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
-    %1 = flow.dispatch @ex0::@entry0[%arg1] (%arg2) : (tensor<128xf32>) -> tensor<128xf32>
+    %1 = flow.dispatch @ex0::@entry0[%arg1](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     //      CHECK: hal.command_buffer.push_descriptor_set
     //      CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex0::@vmla::@entry0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
-    %2 = flow.dispatch @ex0::@entry0[%arg1] (%1) : (tensor<128xf32>) -> tensor<128xf32>
+    %2 = flow.dispatch @ex0::@entry0[%arg1](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
   }
   // CHECK: hal.command_buffer.end %[[CMD]]
@@ -52,13 +53,13 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
   // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
-  %0 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<1x1x10xf32>, %arg3 = %arg1 : tensor<5x1x10xf32>, %arg4 = %c4 : index, %arg5 = %c1 : index) -> tensor<5x1x10xf32> {
-    // TODO(laurenzo): Update these checks to be more precise. The regexes can
-    // match too much, masking issues.
+  %0 = flow.ex.stream.fragment(%arg0, %arg1, %c4, %c1) : (tensor<1x1x10xf32>, tensor<5x1x10xf32>, index, index) -> tensor<5x1x10xf32> =
+      (%arg2: tensor<1x1x10xf32>, %arg3: tensor<5x1x10xf32>, %arg4: index, %arg5: index) -> tensor<5x1x10xf32> {
     // CHECK-NEXT: hal.command_buffer.copy_buffer %[[CMD]], %[[TBUF]], %c0, %[[RET_BUF]], %c0, %c200
     // CHECK: hal.command_buffer.execution_barrier
+    %clone = flow.tensor.clone %arg3 : tensor<5x1x10xf32>
     // CHECK-NEXT: hal.command_buffer.copy_buffer %[[CMD]], %[[UBUF]], %c0, %[[RET_BUF]], %c204, %c40
-    %1 = flow.tensor.update %arg2, %arg3[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
+    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
     flow.return %1 : tensor<5x1x10xf32>
   }
   // CHECK: hal.command_buffer.end %[[CMD]]
@@ -95,16 +96,12 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
   // CHECK: hal.command_buffer.push_constants %[[UNUSED0:.+]], %[[UNUSED1:.+]], offset = 0, values = [%[[CAST_BS]]] : i32
   // Note that multiple dispatches in the stream verifies that transient
   // allocation is covering all ops.
-  %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<?x128xf32>, %arg3 = %bs : index) -> tensor<?x128xf32> {
-    %1 = shapex.make_ranked_shape %arg3 : (index) -> !shapex.ranked_shape<[?,128]>
-    %2 = shapex.tie_shape %arg2, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
-    %3 = flow.dispatch @ex0::@entry0[%arg1] (%2, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
-    %4 = shapex.tie_shape %3, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
-    %5 = flow.dispatch @ex0::@entry0[%arg1] (%4, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
-    %6 = shapex.tie_shape %5, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
-    %7 = flow.dispatch @ex0::@entry0[%arg1] (%6, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
-    %8 = shapex.tie_shape %7, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
-    flow.return %8 : tensor<?x128xf32>
+  %0 = flow.ex.stream.fragment(%cst, %arg0, %bs) : (index, tensor<?x128xf32>{%cst}, index) -> tensor<?x128xf32>{%cst} =
+      (%arg1: index, %arg2: tensor<?x128xf32>, %arg3: index) -> tensor<?x128xf32> {
+    %3 = flow.dispatch @ex0::@entry0[%arg1](%arg2, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    %5 = flow.dispatch @ex0::@entry0[%arg1](%3, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    %7 = flow.dispatch @ex0::@entry0[%arg1](%5, %arg3) : (tensor<?x128xf32>{%arg3}, index) -> tensor<?x128xf32>{%arg3}
+    flow.return %7 : tensor<?x128xf32>
   }
   return %0 : tensor<?x128xf32>
 }
@@ -120,7 +117,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.executable.entry_point @entry attributes {
       interface = @legacy_io,
       ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<7x4x24xf32>, !flow.dispatch.output<4x7x1024xf32>) -> ()
+      signature = (!flow.dispatch.tensor<readonly:7x4x24xf32>, !flow.dispatch.tensor<writeonly:4x7x1024xf32>) -> ()
     }
     module {}
   }
@@ -132,14 +129,11 @@ func @static_tiled_dispatch(%arg0: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
   %c512 = constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
-  %1 = flow.ex.stream.fragment(
-      %arg3 = %arg0 : tensor<7x4x24xf32>,
-      %arg6 = %c1024 : index,
-      %arg7 = %c512 : index
-    ) -> tensor<4x7x1024xf32> {
+  %1 = flow.ex.stream.fragment(%arg0, %c1024, %c512) : (tensor<7x4x24xf32>, index, index) -> tensor<4x7x1024xf32> =
+      (%arg3: tensor<7x4x24xf32>, %arg6: index, %arg7: index) -> tensor<4x7x1024xf32> {
     // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %c2688), %c1 = (%buffer, %c0, %c114688)]
     // CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex::@tgt::@entry, workgroup_xyz
-    %0 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7] (%arg3) : (tensor<7x4x24xf32>) -> tensor<4x7x1024xf32>
+    %0 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3) : (tensor<7x4x24xf32>) -> tensor<4x7x1024xf32>
     flow.return %0 : tensor<4x7x1024xf32>
   }
   // CHECK: hal.command_buffer.end %[[CMD]]
@@ -157,7 +151,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.executable.entry_point @entry attributes {
       interface = @legacy_io,
       ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<7x?x24x?xf32>, !flow.dispatch.output<?x?x1024xf32>, index, index, index, index) -> ()
+      signature = (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !flow.dispatch.tensor<writeonly:?x?x1024xf32>, index, index, index, index) -> ()
     }
     module {}
   }
@@ -169,16 +163,8 @@ func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: i
   %c512 = constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, OneShot, "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
-  %2 = flow.ex.stream.fragment(
-      %arg3 = %arg0 : tensor<7x?x24x?xf32>,
-      %arg4 = %arg1 : index,
-      %arg5 = %arg2 : index,
-      %arg6 = %c1024 : index,
-      %arg7 = %c512 : index
-    ) -> tensor<?x?x1024xf32> {
-    %3 = shapex.make_ranked_shape %arg4, %arg5 : (index, index) -> !shapex.ranked_shape<[7,?,24,?]>
-    %4 = shapex.make_ranked_shape %arg5, %arg4 : (index, index) -> !shapex.ranked_shape<[?,?,1024]>
-    %5 = shapex.tie_shape %arg3, %3 : tensor<7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>
+  %2 = flow.ex.stream.fragment(%arg0, %arg1, %arg2, %c1024, %c512) : (tensor<7x?x24x?xf32>{%arg1, %arg2}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg2, %arg1} =
+      (%arg3: tensor<7x?x24x?xf32>, %arg4: index, %arg5: index, %arg6: index, %arg7: index) -> tensor<?x?x1024xf32> {
     // CHECK: hal.command_buffer.push_constants %[[CMD]], %executable_layout, offset = 0, values = [%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] : i32
     // CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %executable_layout, set = %c0, bindings = [%c0 = (%arg0, %c0, %9), %c1 = (%buffer, %c0, %12)]
 
@@ -199,9 +185,8 @@ func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: i
 
     // CHECK: hal.command_buffer.dispatch.symbol %[[CMD_INNER]], @ex::@tgt::@entry, workgroup_xyz =
     // CHECK-SAME: [%[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]]]
-    %6 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7] (%5, %arg4, %arg5, %arg5, %arg4) : (tensor<7x?x24x?xf32>, index, index, index, index) -> tensor<?x?x1024xf32>
-    %7 = shapex.tie_shape %6, %4 : tensor<?x?x1024xf32>, !shapex.ranked_shape<[?,?,1024]>
-    flow.return %7 : tensor<?x?x1024xf32>
+    %6 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3, %arg4, %arg5, %arg5, %arg4) : (tensor<7x?x24x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg5, %arg4}
+    flow.return %6 : tensor<?x?x1024xf32>
   }
   // CHECK: hal.command_buffer.end %[[CMD]]
   return %2 : tensor<?x?x1024xf32>

@@ -10,12 +10,14 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "buffer_ops.mlir"
+    "conv_reduction_ops.mlir"
+    "general_ops.mlir"
+    "shape_structure_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

@@ -13,7 +13,7 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
   // CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
@@ -29,7 +29,7 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
   // CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = addf %arg1, %arg1 : tensor<4xf32>
   %0 = addf %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   %2 = subf %1, %arg1 : tensor<4xf32>
@@ -49,7 +49,7 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
   // CHECK-NEXT: %0 = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   %2 = mhlo.subtract %1, %arg1 : tensor<4xf32>
@@ -73,21 +73,21 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK: %[[WORKLOAD2:.+]] = constant 16 : index
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
   // CHECK-NEXT:   %3 = mhlo.add %arg1, %arg1 : tensor<4x4xf32>
   %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT: flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD1]] : index]
-  // CHECK-SAME: (%arg1 = %[[R0]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-SAME: (%arg1 = %[[R0]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
   // CHECK-NEXT:   %3 = "mhlo.dot"(%arg1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   %1 = "mhlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK: %[[R2:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD2]] : index]
-  // CHECK-SAME: (%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-SAME: (%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> (tensor<4x4xf32>) {
   // CHECK-NEXT:   %3 = mhlo.multiply %arg1, %arg2 : tensor<4x4xf32>
   %2 = mhlo.multiply %1, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
@@ -103,7 +103,7 @@ func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK-NEXT: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   %2 = call @callee(%1) : (tensor<4xf32>) -> tensor<4xf32>
@@ -120,7 +120,7 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = mhlo.multiply %arg1, %arg1 : tensor<4xf32>
   %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
@@ -138,7 +138,7 @@ func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 4 : index
   // CHECK: %[[RESULT:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>, %arg2 = %[[INITIAL]] : tensor<f32>) -> tensor<4xf32>
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>, %arg2 = %[[INITIAL]] : tensor<f32>) -> (tensor<4xf32>)
   // CHECK-NEXT: = "mhlo.reduce"(%arg1, %arg2)
   %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):

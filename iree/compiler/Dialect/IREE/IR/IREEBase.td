@@ -53,6 +53,11 @@ class IREE_IndexAttrBase<string descr> :
 }
 def IREE_IndexAttr : IREE_IndexAttrBase<"size_t">;
 
+def IREE_TiedOpStorageAttr :
+    TypedArrayAttrBase<IREE_IndexAttr, "64-bit integer array attribute"> {
+  let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
+}
+
 //===----------------------------------------------------------------------===//
 // Status codes
 //===----------------------------------------------------------------------===//

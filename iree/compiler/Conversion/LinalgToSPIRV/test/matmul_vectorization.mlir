@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s -check-prefix=PROMOTE
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-enable-vectorization -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s -check-prefix=PROMOTE
 
 hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
@@ -10,8 +10,8 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_static_shape attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
@@ -483,4 +483,4 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#12, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C0]]]
 //  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#13, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C16]]]
 //  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#14, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C32]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C48]]] 
+//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C48]]]

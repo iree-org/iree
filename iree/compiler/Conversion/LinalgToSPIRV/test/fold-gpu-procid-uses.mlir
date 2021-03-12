@@ -34,6 +34,40 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
 
 // -----
 
+hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io {
+  }
+  hal.executable.target @vulkan, filter="vulkan*" {
+    hal.executable.entry_point @fold_interface_workgroup_id attributes {
+      interface = @legacy_io, ordinal = 0 : i32,
+      signature = () -> ()} {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 112: index
+      %y = constant 42: index
+      %z = constant 1: index
+      hal.return %x, %y, %z: index, index, index
+    }
+    module {
+      func @fold_interface_workgroup_id() -> (index, index, index) {
+        %0 = hal.interface.workgroup.id[0] : index
+        %1 = hal.interface.workgroup.id[1] : index
+        %2 = hal.interface.workgroup.id[2] : index
+        %3 = affine.min affine_map<()[s0] -> (3, s0 * -2 + 225)>()[%0]
+        %4 = affine.min affine_map<()[s0] -> (8, s0 * -1 + s0 * -1 + s0 * -1 + 131)>()[%2]
+        %5 = affine.min affine_map<()[s0] -> (11, s0 + 15)>()[%3]
+        return %3, %4, %5: index, index, index
+      }
+    }
+  }
+}
+// CHECK-LABEL: func @fold_interface_workgroup_id()
+//   CHECK-DAG:   %[[C3:.+]] = constant 3
+//   CHECK-DAG:   %[[C8:.+]] = constant 8
+//   CHECK-DAG:   %[[C11:.+]] = constant 11
+//   CHECK-DAG:   return %[[C3]], %[[C8]], %[[C11]]
+
+// -----
+
 hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
   hal.interface @legacy_io {
   }

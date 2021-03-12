@@ -34,15 +34,3 @@ iree_check_single_backend_test_suite(
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
-
-iree_check_single_backend_test_suite(
-    name = "check_llvm-aot-exponential_fast",
-    srcs = [
-        "exponential.mlir",
-    ],
-    compiler_flags = [
-        "-iree-codegen-linalg-to-llvm-fast-exp=true",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)

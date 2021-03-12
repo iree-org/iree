@@ -14,6 +14,7 @@
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,7 +24,14 @@ package(
 
 filegroup(
     name = "td_files",
-    srcs = glob(["*.td"]),
+    srcs = enforce_glob(
+        [
+            "FlowBase.td",
+            "FlowInterfaces.td",
+            "FlowOps.td",
+        ],
+        include = ["*.td"],
+    ),
 )
 
 cc_library(
@@ -31,8 +39,8 @@ cc_library(
     srcs = [
         "FlowDialect.cpp",
         "FlowEnums.cpp.inc",
+        "FlowInterfaces.cpp.inc",
         "FlowOpFolders.cpp",
-        "FlowOpInterface.cpp.inc",
         "FlowOpUtils.cpp",
         "FlowOps.cpp",
         "FlowOps.cpp.inc",
@@ -41,7 +49,7 @@ cc_library(
     hdrs = [
         "FlowDialect.h",
         "FlowEnums.h.inc",
-        "FlowOpInterface.h.inc",
+        "FlowInterfaces.h.inc",
         "FlowOpUtils.h",
         "FlowOps.h",
         "FlowOps.h.inc",
@@ -49,7 +57,7 @@ cc_library(
     ],
     deps = [
         ":FlowEnumsGen",
-        ":FlowOpInterfaceGen",
+        ":FlowInterfacesGen",
         ":FlowOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
@@ -84,13 +92,13 @@ gentbl(
 )
 
 gentbl(
-    name = "FlowOpInterfaceGen",
+    name = "FlowInterfacesGen",
     tbl_outs = [
-        ("-gen-op-interface-decls", "FlowOpInterface.h.inc"),
-        ("-gen-op-interface-defs", "FlowOpInterface.cpp.inc"),
+        ("-gen-op-interface-decls", "FlowInterfaces.h.inc"),
+        ("-gen-op-interface-defs", "FlowInterfaces.cpp.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "FlowBase.td",
+    td_file = "FlowInterfaces.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",

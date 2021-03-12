@@ -69,7 +69,8 @@ class CreateBenchmarkFuncs
         auto dummyWorkload = blockBuilder.create<ConstantIndexOp>(loc, 0);
         auto dispatchOp = blockBuilder.create<DispatchOp>(
             loc, dispatchEntryOp, ValueRange{dummyWorkload},
-            funcType.getResults(), args);
+            funcType.getResults(), ValueRange{}, args, ValueRange{},
+            ArrayRef<int64_t>{});
         blockBuilder.create<mlir::ReturnOp>(loc, dispatchOp.getResults());
       }
     }

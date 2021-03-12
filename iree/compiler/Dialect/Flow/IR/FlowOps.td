@@ -16,6 +16,9 @@
 #define IREE_DIALECT_FLOW_OPS
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
+include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
+include "iree/compiler/Dialect/IREE/IR/IREEInterfaces.td"
+include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -166,6 +169,7 @@ def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     IsolatedFromAbove,
+    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
   ]> {
   let summary = [{partitioned region representing a dispatched workload}];
   let description = [{
@@ -202,11 +206,6 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
         formFromAnchorOp(Value workload, Operation *anchorOp,
                          OpBuilder &builder);
 
-    /// Performs an in-place DCE optimization on unused operands and results.
-    /// Note that this may or may not re-allocate the op. If so, the reference
-    /// will be updated.
-    static void dceOperandsAndResults(DispatchRegionOp &op);
-
     // Appends results to the dispatch region. This will re-allocate the
     // DispatchRegionOp itself but preserve the contained body block.
     // Returns a ResultRange for the new dispatch region op's results
@@ -241,7 +240,12 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     IsolatedFromAbove,
     AttrSizedOperandSegments,
-    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">
+    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
+    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+      "getTiedOperandsIndexAndLength",
+    ]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
@@ -281,7 +285,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
   let arguments = (ins
     Variadic<FLOW_Dim>:$workgroup_count,
-    Variadic<AnyType>:$operands
+    Variadic<AnyType>:$operands,
+    FLOW_ShapeDynamicDims:$operand_dims,
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -289,23 +296,27 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
   let regions = (region AnyRegion:$body);
 
-  // TODO(benvanik): use after https://bugs.llvm.org/show_bug.cgi?id=48478
-  // let assemblyFormat = [{
-  //   `[` $workgroup_count `]`
-  //   `(` $operands `)` `:`
-  //   functional-type($operands, $results)
-  //   attr-dict-with-keyword
-  //   `=`
-  //   custom<DispatchWorkgroupBody>(type_ref($operands),
-  //                                 type_ref($results),
-  //                                 $body)
-  // }];
+  let assemblyFormat = [{
+    `[` $workgroup_count `]` ``
+    `(` $operands `)` `:`
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+    attr-dict-with-keyword
+    `=` `\n` ` ` ` ` ` `
+    custom<DispatchWorkgroupBody>(ref(type($operands)),
+                                  ref(type($results)),
+                                  $body)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "ValueRange":$workgroupCount,
-      "TypeRange":$resultTypes, "ValueRange":$operands,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -464,7 +475,7 @@ def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
   }];
 
   let arguments = (ins
-    FLOW_DispatchIO:$source
+    FLOW_DispatchTensor:$source
   );
   let results = (outs
     Shape_RankedShape:$result
@@ -484,11 +495,11 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
   }];
 
   let arguments = (ins
-    FLOW_DispatchIO:$operand,
+    FLOW_DispatchTensor:$operand,
     Shape_RankedShape:$shape
   );
   let results = (outs
-    FLOW_DispatchIO:$result
+    FLOW_DispatchTensor:$result
   );
 
   // TODO(benvanik): figure out a way to make this look like shapex.tie_shape.
@@ -500,7 +511,7 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
   let hasCanonicalizer = 1;
 }
 
-def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
+def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     SameVariadicOperandSize,
   ]> {
   let summary = [{loads a tensor from a dispatch input placeholder}];
@@ -511,7 +522,7 @@ def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
   }];
 
   let arguments = (ins
-    FLOW_DispatchInput:$source,
+    FLOW_ReadableDispatchTensor:$source,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides
@@ -531,7 +542,7 @@ def FLOW_DispatchInputLoadOp : FLOW_PureOp<"dispatch.input.load", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
+def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     SameVariadicOperandSize,
   ]> {
   let summary = [{stores a tensor into a dispatch output placeholder}];
@@ -543,7 +554,7 @@ def FLOW_DispatchOutputStoreOp : FLOW_Op<"dispatch.output.store", [
 
   let arguments = (ins
     AnyRankedTensor:$value,
-    FLOW_DispatchOutput:$target,
+    FLOW_WritableDispatchTensor:$target,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
     Variadic<Index>:$strides
@@ -652,6 +663,10 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     AttrSizedOperandSegments,
     FLOW_StreamableOp,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+      "getTiedOperandsIndexAndLength",
+    ]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
@@ -663,7 +678,10 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let arguments = (ins
     Variadic<FLOW_Dim>:$workgroup_count,
     SymbolRefAttr:$entry_point,
-    Variadic<AnyType>:$operands
+    Variadic<AnyType>:$operands,
+    FLOW_ShapeDynamicDims:$operand_dims,
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -673,7 +691,9 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let builders = [
     OpBuilder<(ins
       "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
-      "TypeRange":$resultTypes, CArg<"ValueRange", "{}">:$operands,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -683,14 +703,15 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
-    bool isUsableInStream() { return true; }
-    bool isStreamOnly() { return true; }
   }];
 
   let assemblyFormat = [{
-    $entry_point `[` $workgroup_count `]`
+    $entry_point `[` $workgroup_count `]` ``
     `(` $operands `)` attr-dict `:`
-    functional-type($operands, $results)
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
   }];
 
   let verifier = [{ return verifyDispatchOp(*this); }];
@@ -703,6 +724,8 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     FLOW_StreamableOp,
     AllElementTypesMatch<["source", "result"]>,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{reshapes a tensor}];
   let description = [{
@@ -710,21 +733,36 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   }];
 
   let arguments = (ins
-    FLOW_Tensor:$source
-    // TODO(benvanik): FLOW_Shape:$shape when supporting dynamic shapes.
+    FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
+    FLOW_ShapeDynamicDims:$result_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
-  let assemblyFormat = "$source `:` type($source) `->` type($result) attr-dict";
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, "ValueRange":$target_dims),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          Shape::buildOrFindDynamicDimsForValue($_state.location, source, $_builder),
+          target_dims);
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a shape manipulation.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize away if resulting ops don't care.
@@ -735,6 +773,8 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
     TypesMatchWith<"value type matches element type of target operand",
                    "source", "result",
                    "$_self.cast<ShapedType>().getElementType()">,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{loads a value from a tensor element}];
   let description = [{
@@ -743,6 +783,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
 
   let arguments = (ins
     FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
     Variadic<FLOW_Dim>:$indices
   );
   let results = (outs
@@ -750,8 +791,22 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
   );
 
   let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `:` type($source) attr-dict-with-keyword
+    $source (`[` $indices^ `]`)? `:`
+    type($source) (`{` $source_dims^ `}`)?
+    attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, CArg<"ValueRange", "{}">:$indices),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          Shape::buildOrFindDynamicDimsForValue($_state.location, source, $_builder),
+          indices);
+    }]>,
+  ];
 
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
@@ -762,6 +817,8 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
     TypesMatchWith<"value type matches element type of target operand",
                    "target", "value",
                    "$_self.cast<ShapedType>().getElementType()">,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{stores a value into a tensor element}];
   let description = [{
@@ -771,6 +828,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   let arguments = (ins
     AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$value,
     FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
     Variadic<FLOW_Dim>:$indices
   );
   let results = (outs
@@ -778,9 +836,23 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   );
 
   let assemblyFormat = [{
-    $value `,` $target (`[` $indices^ `]`)? `:` type($target)
+    $value `,` $target (`[` $indices^ `]`)? `:`
+    type($target) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value, "Value":$target, CArg<"ValueRange", "{}">:$indices),
+    [{
+      build($_builder, $_state,
+          target.getType(),
+          value,
+          target,
+          Shape::buildOrFindDynamicDimsForValue($_state.location, target, $_builder),
+          indices);
+    }]>,
+  ];
 
   let hasFolder = 1;
 }
@@ -790,6 +862,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     TypesMatchWith<"value type matches element type of result",
                    "result", "value",
                    "$_self.cast<ShapedType>().getElementType()">,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{splats a value into a shaped tensor}];
   let description = [{
@@ -797,21 +870,21 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   }];
 
   let arguments = (ins
-    FLOW_PrimitiveType:$value
-    // TODO(benvanik): FLOW_Shape:$shape when supporting dynamic shapes.
+    FLOW_PrimitiveType:$value,
+    FLOW_ShapeDynamicDims:$result_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
-  let assemblyFormat = "$value `:` type($result) attr-dict-with-keyword";
+  let assemblyFormat = [{
+    $value `:` type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.fill.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize splat+slice to smaller splat.
@@ -820,7 +893,8 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
 
 def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     FLOW_StreamableOp,
-    SameOperandsAndResultType,
+    AllTypesMatch<["operand", "result"]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{performs a full tensor clone operation}];
   let description = [{
@@ -828,20 +902,31 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   }];
 
   let arguments = (ins
-    FLOW_Tensor:$operand
+    FLOW_Tensor:$operand,
+    FLOW_ShapeDynamicDims:$operand_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
-  let assemblyFormat = "$operand `:` type($result) attr-dict";
+  let assemblyFormat = [{
+    $operand `:` type($result) (`{` $operand_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$operand),
+    [{
+      build($_builder, $_state,
+          operand.getType(),
+          operand,
+          Shape::buildOrFindDynamicDimsForValue($_state.location, operand, $_builder));
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize away entirely in most cases.
@@ -852,7 +937,8 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
     FLOW_StreamableOp,
     AllRanksMatch<["source", "result"]>,
     AllElementTypesMatch<["source", "result"]>,
-    SameVariadicOperandSize,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{slices out a subregion of a tensor}];
   let description = [{
@@ -861,25 +947,25 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
 
   let arguments = (ins
     FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
     Variadic<FLOW_Dim>:$start_indices,
-    Variadic<FLOW_Dim>:$lengths
-    // TODO(benvanik): strides.
+    Variadic<FLOW_Dim>:$lengths,
+    FLOW_ShapeDynamicDims:$result_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $source `[` $start_indices `for` $lengths `]` `:` type($source) `->`
-    type($result) attr-dict
+    $source `[` $start_indices `for` $lengths `]` `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
   }];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.slice.
-    bool isStreamOnly() { return true; }
   }];
 
   // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
@@ -891,6 +977,13 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     AllRanksMatch<["update", "target", "result"]>,
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+        "getTiedResult",
+        "getTiedResultOperandIndex",
+        "getTiedResultOperandIndices",
+    ]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
@@ -899,28 +992,38 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   }];
 
   let arguments = (ins
-    FLOW_Tensor:$update,
     FLOW_Tensor:$target,
-    Variadic<FLOW_Dim>:$start_indices
+    FLOW_ShapeDynamicDims:$target_dims,
+    Variadic<FLOW_Dim>:$start_indices,
+    FLOW_Tensor:$update,
+    FLOW_ShapeDynamicDims:$update_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $update `,` $target `[` $start_indices `]` `:` type($update) `->`
-    type($result) attr-dict
+    $update `,` $target `[` $start_indices `]` `:`
+    type($update) (`{` $update_dims^ `}`)? `->`
+    custom<TiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$target,
+      "ValueRange":$start_indices,
+      "Value":$update)>,
+  ];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
-    bool isUsableInStream() { return true; }
-    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
-    bool isStreamOnly() { return true; }
   }];
 
-  // TODO(benvanik): canonicalize contiguous updates/across slices.
+  let verifier = [{ return verifyTensorUpdateOp(*this); }];
+
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -949,15 +1052,23 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 // TODO(benvanik): replace with real segmented stream ops.
 def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
     IsolatedFromAbove,
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+    DeclareOpInterfaceMethods<IREE_TiedOpInterface>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{experimental op for defining formed stream regions}];
   let description = [{
     Represents a region where all of the dispatches are meant to target the
-    same execution stream. This will be replaced with a segmented verison.
+    same execution stream. This will be replaced with a segmented version in the
+    future that stitches the stream segments together.
   }];
 
   let arguments = (ins
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$operands,
+    FLOW_ShapeDynamicDims:$operand_dims,
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -965,11 +1076,30 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
 
   let regions = (region AnyRegion:$body);
 
+  let assemblyFormat = [{
+    `(` $operands `)` `:`
+    custom<ShapedFunctionType>(ref($operands),
+                               type($operands), $operand_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+    attr-dict-with-keyword
+    `=` `\n` ` ` ` ` ` `
+    custom<StreamFragmentBody>(ref(type($operands)),
+                               ref(type($results)),
+                               ref($tied_operands),
+                               $body)
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "ArrayRef<Type>":$resultTypes, "ValueRange":$args,
+    OpBuilder<(ins
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
+
+  let verifier = [{ return verifyExStreamFragmentOp(*this); }];
 
   let hasCanonicalizer = 1;
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse))" -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse))' -iree-spirv-enable-vectorization -canonicalize -cse %s | IreeFileCheck %s
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
@@ -10,8 +10,8 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<3x4x6x14xf32>, !flow.dispatch.input<2x16x16x6xf32>,
-        !flow.dispatch.output<2x13x11x14xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+        !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -77,8 +77,8 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -144,8 +144,8 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @pooling_nhwc_max attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<2x16x16x6xf32>, !flow.dispatch.input<1x3x4x2xf32>,
-        !flow.dispatch.output<2x14x13x5xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:2x16x16x6xf32>, !flow.dispatch.tensor<readonly:1x3x4x2xf32>,
+        !flow.dispatch.tensor<writeonly:2x14x13x5xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -208,8 +208,8 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -277,8 +277,8 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<3x4x6x14xf32>, !flow.dispatch.input<2x16x16x6xf32>,
-        !flow.dispatch.output<2x13x11x14xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+        !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -347,8 +347,8 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @three_op_fusion attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -439,148 +439,3 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 //  CHECK-SAME:       )
 //  CHECK-SAME:     outs(%[[SV_RET0]]
 //  CHECK-SAME:       )
-
-// -----
-
-// TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
-hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @conv_tiled_and_vectorized attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<1x225x225x16xf32>, !flow.dispatch.input<3x3x16x32xf32>,
-        !flow.dispatch.output<1x112x112x32xf32>) -> ()}
-    module attributes {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
-    }  {
-      func @conv_tiled_and_vectorized() {
-        %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x112x112x32xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x225x225x16xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x16x32xf32>
-        linalg.fill(%0, %cst) : memref<1x112x112x32xf32>, f32
-        linalg.conv_2d_input_nhwc_filter_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
-           ins (%1, %2: memref<1x225x225x16xf32>, memref<3x3x16x32xf32>)
-          outs (%0: memref<1x112x112x32xf32>)
-        return
-      }
-
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
-    }
-  }
-}
-// CHECK-LABEL: func @conv_tiled_and_vectorized()
-
-// For linalg.fill
-// CHECK-COUNT-4: vector.transfer_write
-
-// For linalg.conv_2d_input_nhwc_filter_hwcf
-// CHECK-COUNT-4: vector.transfer_read
-
-// check tiling loop along filter height/width and input channel
-//      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:     -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
-//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
-//      CHECK:     scf.for %{{.*}} = %c0 to %c16 step %c4
-// CHECK-SAME:         -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
-
-// CHECK-COUNT-16: vector.contract
-
-// CHECK-COUNT-3: scf.yield
-
-// For linalg.conv_2d_input_nhwc_filter_hwcf
-// CHECK-COUNT-4: vector.transfer_write
-
-// -----
-
-hal.executable @depthwise_conv2d_2452x2423_valid_stride_2 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan_spirv, filter="vulkan*" {
-    hal.executable.entry_point @depthwise_conv2d_2452x2423_valid_stride_2 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<2x4x5x2xf32>, tensor<2x4x2x3xf32>) -> tensor<2x2x1x6xf32>}
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-      func @depthwise_conv2d_2452x2423_valid_stride_2() {
-        %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x2x1x2x3xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4x5x2xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x4x2x3xf32>
-        linalg.fill(%0, %cst) : memref<2x2x1x2x3xf32>, f32
-        linalg.depthwise_conv_2d_input_nhwc_filter_hwcf {strides = dense<2> : tensor<2xi64>} ins(%1, %2 : memref<2x4x5x2xf32>, memref<2x4x2x3xf32>) outs(%0 : memref<2x2x1x2x3xf32>)
-        return
-      }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
-    }
-  }
-}
-
-// CHECK-LABEL: func @depthwise_conv2d_2452x2423_valid_stride_2()
-// CHECK:         linalg.fill
-// CHECK:         linalg.generic
-// CHECK-NOT:     linalg.depthwise_conv_2d_input_nhwc_filter_hwcf
-
-// -----
-
-hal.executable @conv_tiled_and_vectorized attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.target @vulkan, filter="dylib*" {
-    hal.executable.entry_point @depthwise_conv_tiled_and_vectorized attributes {
-      interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<1x113x113x96xf32>, !flow.dispatch.input<3x3x96xf32>,
-        !flow.dispatch.output<1x56x56x96xf32>) -> ()}
-    module attributes {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
-    }  {
-      func @depthwise_conv_tiled_and_vectorized() {
-        %cst = constant 0.000000e+00 : f32
-        %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x56x56x96xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x113x113x96xf32>
-        %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x96xf32>
-        linalg.fill(%0, %cst) : memref<1x56x56x96xf32>, f32
-        linalg.depthwise_conv_2d_input_nhwc_filter_hwc {strides = dense<2> : tensor<2xi64>} ins(%1, %2 : memref<1x113x113x96xf32>, memref<3x3x96xf32>) outs(%0 : memref<1x56x56x96xf32>)
-        return
-      }
-    }
-  }
-}
-
-// CHECK-LABEL: func @depthwise_conv_tiled_and_vectorized()
-
-// For linalg.fill
-// CHECK: vector.transfer_write
-
-// For linalg.depthwise_conv_2d_input_nhwc_filter_hwc
-// CHECK: vector.transfer_read
-
-// check tiling loop along filter height/width and input channel
-//      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<4xf32>)
-//      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<4xf32>)
-
-
-// CHECK: vector.fma
-
-// CHECK-COUNT-2: scf.yield
-
-// For linalg.depthwise_conv_2d_input_nhwc_filter_hwc
-// CHECK: vector.transfer_write

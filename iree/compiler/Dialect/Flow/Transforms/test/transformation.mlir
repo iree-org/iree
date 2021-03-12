@@ -8,31 +8,6 @@ func @empty() {
 
 // -----
 
-func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
-  return %0 : tensor<4xf32>
-}
-
-// CHECK-LABEL: flow.executable @simpleMath_ex_dispatch_0 attributes {sym_visibility = "private"} {
-// CHECK-NEXT:   flow.dispatch.entry @simpleMath_ex_dispatch_0
-// CHECK-NEXT:   module {
-// CHECK-NEXT:     func @simpleMath_ex_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       return %0 : tensor<4xf32>
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: func @simpleMath(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 4 : index
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD0]] : index, %arg2 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @simpleMath_ex_dispatch_0::@simpleMath_ex_dispatch_0[%arg1] (%arg2) : (tensor<4xf32>) -> tensor<4xf32>
-// CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-// CHECK-NEXT:   }
-// CHECK-NEXT:   return %0 : tensor<4xf32>
-// CHECK-NEXT: }
-
-// -----
-
 func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = addf %arg0, %arg0 : tensor<4xf32>
   %1 = subf %0, %arg0 : tensor<4xf32>
@@ -52,9 +27,10 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: func @stdElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 4 : index
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD0]] : index, %arg2 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @stdElementwiseOps_ex_dispatch_0::@stdElementwiseOps_ex_dispatch_0[%arg1] (%arg2) : (tensor<4xf32>) -> tensor<4xf32>
+// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4xf32>) -> tensor<4xf32> =
+// CHECK-NEXT:       (%arg1: tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-NEXT:     %[[WORKLOAD:.+]] = constant 4 : index
+// CHECK-NEXT:     %1 = flow.dispatch @stdElementwiseOps_ex_dispatch_0::@stdElementwiseOps_ex_dispatch_0[%[[WORKLOAD]]](%arg1) : (tensor<4xf32>) -> tensor<4xf32>
 // CHECK-NEXT:     flow.return %1 : tensor<4xf32>
 // CHECK-NEXT:   }
 // CHECK-NEXT:   return %0 : tensor<4xf32>
@@ -81,9 +57,10 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: func @hloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 4 : index
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD0]] : index, %arg2 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @hloElementwiseOps_ex_dispatch_0::@hloElementwiseOps_ex_dispatch_0[%arg1] (%arg2) : (tensor<4xf32>) -> tensor<4xf32>
+// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4xf32>) -> tensor<4xf32> =
+// CHECK-NEXT:       (%arg1: tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-NEXT:     %[[WORKLOAD:.+]] = constant 4 : index
+// CHECK-NEXT:     %1 = flow.dispatch @hloElementwiseOps_ex_dispatch_0::@hloElementwiseOps_ex_dispatch_0[%[[WORKLOAD]]](%arg1) : (tensor<4xf32>) -> tensor<4xf32>
 // CHECK-NEXT:     flow.return %1 : tensor<4xf32>
 // CHECK-NEXT:   }
 // CHECK-NEXT:   return %0 : tensor<4xf32>
@@ -126,11 +103,12 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 16 : index
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD0]] : index, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @interleavedDot_ex_dispatch_0::@interleavedDot_ex_dispatch_0[%arg1] (%arg2) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-// CHECK-NEXT:     %2 = flow.dispatch @interleavedDot_ex_dispatch_1::@interleavedDot_ex_dispatch_1[%arg1] (%1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-// CHECK-NEXT:     %3 = flow.dispatch @interleavedDot_ex_dispatch_2::@interleavedDot_ex_dispatch_2[%arg1] (%2, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x4xf32>) -> tensor<4x4xf32> =
+// CHECK-NEXT:        (%arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-NEXT:     %[[WORKLOAD:.+]] = constant 16 : index
+// CHECK-NEXT:     %1 = flow.dispatch @interleavedDot_ex_dispatch_0::@interleavedDot_ex_dispatch_0[%[[WORKLOAD]]](%arg1) : (tensor<4x4xf32>) -> tensor<4x4xf32>
+// CHECK-NEXT:     %2 = flow.dispatch @interleavedDot_ex_dispatch_1::@interleavedDot_ex_dispatch_1[%[[WORKLOAD]]](%1, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+// CHECK-NEXT:     %3 = flow.dispatch @interleavedDot_ex_dispatch_2::@interleavedDot_ex_dispatch_2[%[[WORKLOAD]]](%2, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 // CHECK-NEXT:     flow.return %3 : tensor<4x4xf32>
 // CHECK-NEXT:   }
 // CHECK-NEXT:   return %0 : tensor<4x4xf32>
@@ -163,9 +141,10 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:   }
 //  CHECK-NEXT: }
 //  CHECK-NEXT: func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
-//  CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 4 : index
-//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD0]] : index, %arg2 = %arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
-//  CHECK-NEXT:     %1 = flow.dispatch @reduction_ex_dispatch_0::@reduction_ex_dispatch_0[%arg1] (%arg2) : (tensor<4x8xf32>) -> tensor<4xf32>
+//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x8xf32>) -> tensor<4xf32> =
+//  CHECK-NEXT:       (%arg1: tensor<4x8xf32>) -> tensor<4xf32> {
+//  CHECK-NEXT:     %[[WORKLOAD:.+]] = constant 4 : index
+//  CHECK-NEXT:     %1 = flow.dispatch @reduction_ex_dispatch_0::@reduction_ex_dispatch_0[%[[WORKLOAD]]](%arg1) : (tensor<4x8xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:     flow.return %1 : tensor<4xf32>
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
@@ -189,15 +168,17 @@ func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, 
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: func @dynamicUpdateSlice(%arg0: tensor<2x4xi32>, %arg1: tensor<1x1xi32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<2x4xi32> {
-// CHECK-DAG:   %[[WORKLOAD0:.+]] = constant 8 : index
-// CHECK-DAG:   %[[ARG2_LOAD:.+]] = flow.tensor.load %arg2 : tensor<i32>
-// CHECK-DAG:   %[[ARG2_INDEX:.+]] = index_cast %[[ARG2_LOAD]] : i32 to index
-// CHECK-DAG:   %[[ARG3_LOAD:.+]] = flow.tensor.load %arg3 : tensor<i32>
-// CHECK-DAG:   %[[ARG3_INDEX:.+]] = index_cast %[[ARG3_LOAD]] : i32 to index
-// CHECK-NEXT:   %4 = flow.ex.stream.fragment(%arg4 = %arg1 : tensor<1x1xi32>, %arg5 = %arg0 : tensor<2x4xi32>, %arg6 = %[[ARG2_INDEX]] : index, %arg7 = %[[ARG3_INDEX]] : index, %arg8 = %[[WORKLOAD0]] : index) -> tensor<2x4xi32> {
-// CHECK-NEXT:     %5 = flow.tensor.update %arg4, %arg5[%arg6, %arg7] : tensor<1x1xi32> -> tensor<2x4xi32>
-// CHECK-NEXT:     %6 = flow.dispatch @dynamicUpdateSlice_ex_dispatch_0::@dynamicUpdateSlice_ex_dispatch_0[%arg8] (%arg5, %5) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
-// CHECK-NEXT:     flow.return %6 : tensor<2x4xi32>
+//  CHECK-DAG:   %[[ARG2_LOAD:.+]] = flow.tensor.load %arg2 : tensor<i32>
+//  CHECK-DAG:   %[[ARG2_INDEX:.+]] = index_cast %[[ARG2_LOAD]] : i32 to index
+//  CHECK-DAG:   %[[ARG3_LOAD:.+]] = flow.tensor.load %arg3 : tensor<i32>
+//  CHECK-DAG:   %[[ARG3_INDEX:.+]] = index_cast %[[ARG3_LOAD]] : i32 to index
+// CHECK-NEXT:   %[[RET:.+]] = flow.ex.stream.fragment(%arg0, %[[ARG2_INDEX]], %[[ARG3_INDEX]], %arg1) : (tensor<2x4xi32>, index, index, tensor<1x1xi32>) -> tensor<2x4xi32> =
+// CHECK-NEXT:        (%arg4: tensor<2x4xi32>, %arg5: index, %arg6: index, %arg7: tensor<1x1xi32>) -> tensor<2x4xi32> {
+// CHECK-NEXT:     %[[WORKLOAD:.+]] = constant 8 : index
+// CHECK-NEXT:     %[[ARG4_CLONE:.+]] = flow.tensor.clone %arg4 : tensor<2x4xi32>
+// CHECK-NEXT:     %[[T0:.+]] = flow.tensor.update %arg7, %arg4[%arg5, %arg6] : tensor<1x1xi32> -> tensor<2x4xi32>
+// CHECK-NEXT:     %[[T1:.+]] = flow.dispatch @dynamicUpdateSlice_ex_dispatch_0::@dynamicUpdateSlice_ex_dispatch_0[%[[WORKLOAD]]](%[[ARG4_CLONE]], %[[T0]]) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
+// CHECK-NEXT:     flow.return %[[T1]] : tensor<2x4xi32>
 // CHECK-NEXT:   }
-// CHECK-NEXT:   return %4 : tensor<2x4xi32>
+// CHECK-NEXT:   return %[[RET]] : tensor<2x4xi32>
 // CHECK-NEXT: }

@@ -90,7 +90,8 @@ class TensorLoadOpConversion
   LogicalResult matchAndRewrite(
       IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorLoadOp::Adaptor operands(newOperands);
+    IREE::Flow::TensorLoadOp::Adaptor operands(newOperands,
+                                               loadOp->getAttrDictionary());
     auto source = IREE::HAL::TensorRewriteAdaptor::getChecked(
         loadOp.getLoc(), loadOp.source(), operands.source(), rewriter);
     if (!source.hasValue()) {
@@ -117,7 +118,8 @@ class TensorStoreOpConversion
   LogicalResult matchAndRewrite(
       IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorStoreOp::Adaptor operands(newOperands);
+    IREE::Flow::TensorStoreOp::Adaptor operands(newOperands,
+                                                storeOp->getAttrDictionary());
     auto target = IREE::HAL::TensorRewriteAdaptor::getChecked(
         storeOp.getLoc(), storeOp.target(), operands.target(), rewriter);
 

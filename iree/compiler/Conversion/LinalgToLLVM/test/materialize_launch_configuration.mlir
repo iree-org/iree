@@ -9,8 +9,8 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_tensors attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module {
       func @matmul_tensors() {
         %c0 = constant 0 : index
@@ -97,8 +97,8 @@ hal.executable @add attributes {sym_visibility = "private"} {
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @add attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module  {
       func @add() {
         %c0 = constant 0 : index

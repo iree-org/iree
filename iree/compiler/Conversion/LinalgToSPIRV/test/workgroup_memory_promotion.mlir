@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.target(iree-codegen-spirv-linalg-tile-and-distribute,iree-codegen-linalg-tile-and-fuse,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
 hal.executable @matmul_tile attributes {sym_visibility = "private"} {
@@ -10,8 +10,8 @@ hal.executable @matmul_tile attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_tile attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<25x50xf32>, !flow.dispatch.input<50x75xf32>,
-        !flow.dispatch.output<25x75xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:25x50xf32>, !flow.dispatch.tensor<readonly:50x75xf32>,
+        !flow.dispatch.tensor<writeonly:25x75xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -68,8 +68,8 @@ hal.executable @conv_no_padding_tile attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @conv_no_padding_tile attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<3x4x6x14xf32>, !flow.dispatch.input<2x16x16x6xf32>,
-        !flow.dispatch.output<2x13x11x14xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:3x4x6x14xf32>, !flow.dispatch.tensor<readonly:2x16x16x6xf32>,
+        !flow.dispatch.tensor<writeonly:2x13x11x14xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,

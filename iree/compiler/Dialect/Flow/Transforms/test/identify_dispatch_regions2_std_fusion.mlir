@@ -13,7 +13,7 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
   // CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>) {
   // CHECK-NEXT:   %1 = addf %arg1, %arg1 : tensor<4xf32>
   %0 = addf %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>

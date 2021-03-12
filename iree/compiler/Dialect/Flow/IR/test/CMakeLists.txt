@@ -10,12 +10,23 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "dispatch_ops.mlir"
+    "dispatch_region_folding.mlir"
+    "dispatch_regions.mlir"
+    "dispatch_workgroups.mlir"
+    "dispatch_workgroups_folding.mlir"
+    "executable_ops.mlir"
+    "stream_folding.mlir"
+    "stream_ops.mlir"
+    "tensor_folding.mlir"
+    "tensor_ops.mlir"
+    "types.mlir"
+    "variable_folding.mlir"
+    "variable_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
