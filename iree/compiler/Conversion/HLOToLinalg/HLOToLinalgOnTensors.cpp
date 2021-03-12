@@ -151,6 +151,7 @@ struct TorchIndexSelectOpConversion
 // linalg.pad_tensor conversion patterns.
 //===----------------------------------------------------------------------===//
 
+namespace {
 /// Pattern to convert a linalg.pad_tensor operation into a fill + subtensor
 /// insert. This is needed till pad_tensor op can be fused with its consumers.
 struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
