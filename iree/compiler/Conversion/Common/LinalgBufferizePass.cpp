@@ -495,13 +495,19 @@ LogicalResult convertInterfaceStoreTensorOp(
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
-  Value storeTo = bvm.lookup(storeOp.target());
-  // If the value already has a mapping, it should already have been updated in
-  // place by the converted producer, as long as the producer is a Linalg op.
-  if (storeTo && storeOp.value().getDefiningOp<linalg::LinalgOp>()) {
+
+  // If we have both the source and target buffer pointing to the same binding,
+  // then it's an indication that we are performing in-place update. For such
+  // cases, we can just remove this store.
+  auto storeTo = bvm.lookup(storeOp.target())
+                     .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+  auto storeFrom = bvm.lookup(storeOp.value())
+                       .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+  if (storeTo && storeFrom && storeTo.binding() == storeFrom.binding()) {
     storeOp->erase();
     return success();
   }
+
   Value subview =
       createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
                       storeOp.offsets(), storeOp.sizes(), storeOp.strides());
