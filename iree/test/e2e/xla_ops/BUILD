@@ -279,8 +279,7 @@ iree_check_single_backend_test_suite(
         "minimum.mlir",
         "multiply.mlir",
         "negate.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "pad.mlir",
+        "pad.mlir",
         # "reduce.mlir",
         # "reduce_window.mlir",
         "remainder.mlir",
