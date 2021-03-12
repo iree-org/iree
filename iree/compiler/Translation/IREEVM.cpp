@@ -67,6 +67,7 @@ static BindingOptions getBindingOptionsFromFlags() {
 static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
+  IREE::Flow::buildInputTransformPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
@@ -109,6 +110,7 @@ void registerIREEVMTransformPassPipeline() {
       "iree-transformation-pipeline",
       "Runs the full IREE input to VM transformation pipeline",
       [](OpPassManager &passManager) {
+        IREE::Flow::buildInputTransformPassPipeline(passManager);
         IREE::Flow::buildFlowTransformPassPipeline(passManager);
         IREE::HAL::buildHALTransformPassPipeline(
             passManager, IREE::HAL::getTargetOptionsFromFlags());
@@ -134,6 +136,7 @@ static LogicalResult translateFromMLIRToVM(
     IREE::TFLite::buildTransformPassPipeline(passManager);
   }
 
+  IREE::Flow::buildInputTransformPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   if (addExportDispatchesPipeline) {
     IREE::Flow::buildExportDispatchesTransformPassPipeline(passManager);

@@ -44,5 +44,6 @@ echo "Initializing submodules"
 echo "Building with cmake"
 ./build_tools/cmake/clean_build.sh
 
+export IREE_CUDA_DISABLE=0
 echo "Testing with ctest"
 ./build_tools/cmake/test.sh

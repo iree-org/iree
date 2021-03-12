@@ -104,6 +104,10 @@ MODELS = [
     ModelInfo(
         name="mobile-bert",
         model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
+    ),
+    ModelInfo(
+        name="mobilenet-v2",
+        model_path="mobilenet-v2/iree_input.mlir",
     )
 ]
 

@@ -216,6 +216,8 @@ Status PrepareModule(std::string target_backend,
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
+  mlir::iree_compiler::IREE::Flow::buildInputTransformPassPipeline(
+      pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
       pass_manager, hal_target_options);

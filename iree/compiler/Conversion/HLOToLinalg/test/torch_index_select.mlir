@@ -110,48 +110,40 @@ module {
 
 // -----
 
-func @torch_index_select_dynamic() {
-  %c0 = constant 0 : index
-  %0 = hal.interface.load.constant offset = 9 : index
-  %1 = hal.interface.load.constant offset = 8 : index
-  %2 = shapex.make_ranked_shape %1, %0 : (index, index) -> !shapex.ranked_shape<[?,?]>
-  %3 = hal.interface.load.constant offset = 7 : index
-  %4 = hal.interface.load.constant offset = 6 : index
-  %5 = hal.interface.load.constant offset = 5 : index
-  %6 = shapex.make_ranked_shape %1, %5, %4, %3 : (index, index, index, index) -> !shapex.ranked_shape<[?,?,?,?]>
-  %7 = hal.interface.load.constant offset = 4 : index
-  %8 = shapex.make_ranked_shape %7, %5, %4, %3 : (index, index, index, index) -> !shapex.ranked_shape<[?,?,?,?]>
-  %9 = hal.interface.load.tensor @legacy_io::@arg4, offset = %c0 {operand_result_index = 0 : i32} : tensor<?x?x?x?xi32>
-  %10 = hal.interface.load.tensor @legacy_io::@arg9, offset = %c0 {operand_result_index = 1 : i32} : tensor<?x?xi32>
-  %11 = shapex.tie_shape %10, %2 : tensor<?x?xi32>, !shapex.ranked_shape<[?,?]>
-  %12 = shapex.tie_shape %9, %8 : tensor<?x?x?x?xi32>, !shapex.ranked_shape<[?,?,?,?]>
-  %13 = "mhlo.torch_index_select"(%11, %12) {batch_dims = 1 : i64, dim = 1 : i64} : (tensor<?x?xi32>, tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
-  %14 = shapex.tie_shape %13, %6 : tensor<?x?x?x?xi32>, !shapex.ranked_shape<[?,?,?,?]>
-  hal.interface.store.tensor %14, @legacy_io::@ret0, offset = %c0 {operand_result_index = 2 : i32} : tensor<?x?x?x?xi32>
-  return
+func @torch_index_select_dynamic(%input: tensor<?x?x?x?xf32>,
+                                 %index: tensor<?x?xi32>) -> tensor<?x?x?x?xf32>{
+  %0 = "mhlo.torch_index_select"(%input, %index) {
+    batch_dims = 1 : i64,
+    dim = 2 : i64
+  } : (tensor<?x?x?x?xf32>, tensor<?x?xi32>) -> tensor<?x?x?x?xf32>
+  return %0 : tensor<?x?x?x?xf32>
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//      CHECK: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+//      CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 //      CHECK: func @torch_index_select_dynamic
-//  CHECK-DAG:   %[[D0:.+]] = hal.interface.load.constant offset = 8
-//  CHECK-DAG:   %[[D1:.+]] = hal.interface.load.constant offset = 5
-//  CHECK-DAG:   %[[D2:.+]] = hal.interface.load.constant offset = 6
-//  CHECK-DAG:   %[[D3:.+]] = hal.interface.load.constant offset = 7
-//      CHECK:   %[[SHAPE:.+]] = shapex.make_ranked_shape %[[D0]], %[[D1]], %[[D2]], %[[D3]]
-//      CHECK:   %[[INPUT:.+]] = hal.interface.load.tensor @legacy_io::@arg9
-//      CHECK:   %[[INPUT_TIED:.+]] = shapex.tie_shape %[[INPUT]], %{{.+}}
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]*]]
+// CHECK-SAME:   %[[INDEX:[a-zA-Z0-9_]*]]
+//      CHECK:   %[[C0:.+]] = constant 0 : index
+//      CHECK:   %[[D0:.+]] = dim %[[INPUT]], %[[C0]]
+//      CHECK:   %[[C1:.+]] = constant 1 : index
+//      CHECK:   %[[D1:.+]] = dim %[[INPUT]], %[[C1]]
+//      CHECK:   %[[C1:.+]] = constant 1 : index
+//      CHECK:   %[[D2:.+]] = dim %[[INDEX]], %[[C1]]
+//      CHECK:   %[[C3:.+]] = constant 3 : index
+//      CHECK:   %[[D3:.+]] = dim %[[INPUT]], %[[C3]]
 //      CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]], %[[D2]], %[[D3]]]
 //      CHECK:   %[[RESULT:.+]] = linalg.indexed_generic
-// CHECK-SAME:     indexing_maps = [#[[MAP]], #[[MAP]]]
+// CHECK-SAME:     indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-// CHECK-SAME:     ins(%{{[a-zA-Z0-9_]+}} : tensor<?x?x?x?xi32>)
-// CHECK-SAME:     outs(%[[INIT]] : tensor<?x?x?x?xi32>)
+// CHECK-SAME:     ins(%[[INDEX]] : tensor<?x?xi32>)
+// CHECK-SAME:     outs(%[[INIT]] : tensor<?x?x?x?xf32>)
 //      CHECK:     ^{{.+}}(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: index,
-// CHECK-SAME:     %{{[a-zA-Z0-9_]+}}: index, %{{[a-zA-Z0-9_]+}}: index,
-// CHECK-SAME:     %{{[a-zA-Z0-9_]+}}: index, %[[ARG4:[a-zA-Z0-9_]+]]: i32
-// CHECK-SAME:     %{{[a-zA-Z0-9_]+}}: i32)
+// CHECK-SAME:       %[[ARG0:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:       %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:       %[[ARG3:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:       %[[ARG4:[a-zA-Z0-9_]+]]: i32, %{{[a-zA-Z0-9_]+}}: f32)
 //      CHECK:       %[[POS:.+]] = index_cast %[[ARG4]]
-//      CHECK:       %[[YIELD:.+]] = tensor.extract %[[INPUT_TIED]][%[[ARG0]], %[[POS]]]
+//      CHECK:       %[[YIELD:.+]] = tensor.extract %[[INPUT]][%[[ARG0]], %[[ARG1]], %[[POS]], %[[ARG3]]]
 //      CHECK:       linalg.yield %[[YIELD]]
-//      CHECK:  shapex.tie_shape %[[RESULT]], %[[SHAPE]]
