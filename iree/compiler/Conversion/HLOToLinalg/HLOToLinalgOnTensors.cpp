@@ -95,13 +95,16 @@ struct TorchIndexSelectOpConversion
     for (int i = 0; i < rank; ++i) {
       if (!resultType.isDynamicDim(i)) continue;
       if (i < axis) {
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), i));
+        dynSizes.push_back(
+            rewriter.createOrFold<DimOp>(loc, adaptor.input(), i));
       } else if (i < (axis + nIndices - batch)) {
         int idx = i - axis + batch;
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.index(), idx));
+        dynSizes.push_back(
+            rewriter.createOrFold<DimOp>(loc, adaptor.index(), idx));
       } else {
         int idx = i - (axis + nIndices - batch) + axis + 1;
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), idx));
+        dynSizes.push_back(
+            rewriter.createOrFold<DimOp>(loc, adaptor.input(), idx));
       }
     }
     Value initOp = rewriter.create<linalg::InitTensorOp>(
