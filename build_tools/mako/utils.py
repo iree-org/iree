@@ -35,7 +35,8 @@ class TargetInfo:
     self.compilation_flags = compilation_flags
     self.runtime_flags = runtime_flags
 
-  def get_driver(self):
+  def get_driver(self) -> str:
+    """ Returns a string indicates the driver of the target."""
     return self.name.split("-")[0]
 
 
@@ -46,6 +47,7 @@ class PhoneBenchmarkInfo:
     name: The name of the phone.
     targets: A list of TargetInfo which indicates the target config to benchmark
       on the phone.
+    benchmark_key: Mako benchmark key, which can be found in config/
   """
 
   def __init__(self, name, targets, benchmark_key):
@@ -62,6 +64,7 @@ class ModelBenchmarkInfo:
   Attributes:
     name: The name of the model.
     model_path: A path to MLIR input file. This can be a relative path.
+    phones: A list of PhoneBenchmarkInfo that the benchmarking targets on.
   """
 
   def __init__(self, name, model_path, phones):

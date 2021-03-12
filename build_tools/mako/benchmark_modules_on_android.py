@@ -38,7 +38,7 @@ def parse_arguments():
   return args
 
 
-def get_mako_sample(value, tag):
+def get_mako_sample(value, tag) -> str:
   return """
 samples: {{
   time: {}
@@ -46,7 +46,7 @@ samples: {{
 }}""".format(value, tag).strip()
 
 
-def get_mako_metadata(git_hash, timestamp, benchmark_key):
+def get_mako_metadata(git_hash, timestamp, benchmark_key) -> str:
   return """
 metadata: {{
   git_hash: "{}"
@@ -56,7 +56,7 @@ metadata: {{
 """.format(git_hash, timestamp, benchmark_key).strip()
 
 
-def benchmark(module_name, flagfile_name, target):
+def benchmark(module_name, flagfile_name, target) -> str:
   samples = []
   driver = target.get_driver()
   cmd = [
@@ -84,9 +84,9 @@ def main(args) -> None:
   timestamp = int(datetime.datetime.now().timestamp() * 1000)
   for model_benchmark in utils.MODEL_BENCHMARKS:
     for phone in model_benchmark.phones:
-      mako_log = []
       if phone.name != args.phone:
         continue
+      mako_log = []
       for target in phone.targets:
         module_name = utils.get_module_name(model_benchmark.name, phone.name,
                                             target.mako_tag)
