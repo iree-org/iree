@@ -56,7 +56,7 @@ metadata: {{
 """.format(git_hash, timestamp, benchmark_key).strip()
 
 
-def run(module_name, flagfile_name, target):
+def benchmark(module_name, flagfile_name, target):
   samples = []
   driver = target.get_driver()
   cmd = [
@@ -68,11 +68,11 @@ def run(module_name, flagfile_name, target):
   ] + target.runtime_flags
   print("Run cmd: {}".format(" ".join(cmd)))
   try:
-    output = subprocess.run(
-        cmd, check=True, capture_output=True).stdout.strip().decode()
+    output = subprocess.run(cmd, check=True,
+                            capture_output=True).stdout.strip().decode()
     for line in output.split("\n"):
       m = PATTERN.match(line)
-      if m != None:
+      if m is not None:
         samples.append(get_mako_sample(m.group("ms"), target.mako_tag))
     return "\n".join(samples)
   except subprocess.CalledProcessError as e:
@@ -91,13 +91,13 @@ def main(args) -> None:
         module_name = utils.get_module_name(model_benchmark.name, phone.name,
                                             target.mako_tag)
         flagfile_name = "{}_flagfile".format(model_benchmark.name)
-        mako_log.append(run(module_name, flagfile_name, target))
+        mako_log.append(benchmark(module_name, flagfile_name, target))
       mako_log.append(
           get_mako_metadata(args.git_hash, timestamp, phone.benchmark_key))
-      log = "\n".join(mako_log)
+      mako_log = "\n".join(mako_log)
       filename = "mako-{}-{}-{}.log".format(model_benchmark.name, phone.name,
                                             args.git_hash)
-      open(filename, "w").write("\n".join(log))
+      open(filename, "w").write(mako_log)
       print(log)
 
 

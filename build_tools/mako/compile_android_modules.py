@@ -34,14 +34,13 @@ def main() -> None:
         module_name = utils.get_module_name(model_benchmark.name, phone.name,
                                             target.mako_tag)
         print("Generating {} ...".format(module_name))
-        subprocess.run(
-            args=[
-                IREE_TRANSLATE_PATH, model_benchmark.model_path,
-                "--iree-mlir-to-vm-bytecode-module",
-                "--iree-hal-target-backends={}".format(
-                    target.name), "-o", module_name
-            ] + target.compilation_flags,
-            check=True)
+        subprocess.run(args=[
+            IREE_TRANSLATE_PATH, model_benchmark.model_path,
+            "--iree-mlir-to-vm-bytecode-module",
+            "--iree-hal-target-backends={}".format(
+                target.name), "-o", module_name
+        ] + target.compilation_flags,
+                       check=True)
 
 
 if __name__ == "__main__":
