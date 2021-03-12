@@ -30,7 +30,6 @@ iree_cc_library(
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
-    "IdentifyDispatchRegions.cpp"
     "IdentifyDispatchRegions2.cpp"
     "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"

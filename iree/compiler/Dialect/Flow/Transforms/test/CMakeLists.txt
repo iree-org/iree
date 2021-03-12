@@ -25,7 +25,6 @@ iree_lit_test_suite(
     "hlo_to_hlo_preprocessing_canoncalize_dot_general.mlir"
     "hlo_to_hlo_preprocessing_extract_pad_from_conv.mlir"
     "hoist_unstreamable_ops.mlir"
-    "identify_dispatch_regions.mlir"
     "identify_dispatch_regions2_enable_matmul_fusion.mlir"
     "identify_dispatch_regions2_hlo.mlir"
     "identify_dispatch_regions2_linalg.mlir"

@@ -124,10 +124,6 @@ std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
 
 // Identifies dispatchable regions of functions and wraps them in
-// flow.dispatch_regions.
-std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegionsPass();
-
-// Identifies dispatchable regions of functions and wraps them in
 // flow.dispatch_regions (version 2).
 std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass();
 
@@ -205,7 +201,6 @@ inline void registerFlowPasses() {
   createMergeExportedReflection();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
-  createIdentifyDispatchRegionsPass();
   createIdentifyDispatchRegions2Pass();
   createFoldCompatibleDispatchRegionsPass();
   createOutlineDispatchRegionsPass();
