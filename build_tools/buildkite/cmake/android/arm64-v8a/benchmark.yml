@@ -47,7 +47,7 @@ steps:
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
-      - "python3 build_tools/mako build_tools/mako/benchmark_modules_on_android.sh --git_hash=$(git rev-parse HEAD) Pixel4"
+      - "python3 build_tools/mako build_tools/mako/benchmark_modules_on_android.py --git_hash=$(git rev-parse HEAD) Pixel4"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=snapdragon-855"
@@ -68,7 +68,7 @@ steps:
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
-      - "python3 build_tools/mako build_tools/mako/benchmark_modules_on_android.sh --git_hash=$(git rev-parse HEAD) S20"
+      - "python3 build_tools/mako build_tools/mako/benchmark_modules_on_android.py --git_hash=$(git rev-parse HEAD) S20"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=exynos-990"
