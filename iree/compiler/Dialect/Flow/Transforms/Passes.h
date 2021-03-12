@@ -28,8 +28,18 @@ namespace IREE {
 namespace Flow {
 
 //===----------------------------------------------------------------------===//
-// Helpers
+// Pipelines
 //===----------------------------------------------------------------------===//
+
+// Adds a set of passes to the given pass manager that perform input dialect
+// legalization required by the Flow dialect.
+//
+// NOTE: this will eventually be moved out to an associated import tool - it
+// currently relies on linking in all of the input dialects (mhlo, etc) and
+// instead those should be taken care of prior to coming into the compiler.
+void buildInputTransformPassPipeline(OpPassManager &passManager);
+
+void registerInputTransformPassPipeline();
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -39,7 +49,8 @@ namespace Flow {
 //
 // The expected usage is:
 //   <run conversion from TF/HLO/etc to flow>
-//   buildFlowTransformPassPipeline & run
+//   buildInputTransformPassPipeline
+//   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
 void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
@@ -85,16 +96,7 @@ std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
 // Materializes reflection metadata on exported function arguments and results.
 // This runs as close to the input processing as possible as it needs to
 // annotate the ABI that the consumer is expecting to interop with.
-// Note that this does not combine the argument and result metadata into top
-// level function metadata. That happens late in transformation, as additional
-// synthetic arguments and results may still need to be added.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection();
-
-// Merges f_partial argument and result reflection metadata into a function
-// level signature. This should be run late once all synthetic arguments have
-// been added and no further exported function signature changes are
-// expected.
-std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection();
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
@@ -111,10 +113,6 @@ std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
 // This information is cached on the module and is used by other FuncOp-scoped
 // passes to quickly access the module-level dispatchability information.
 std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
-
-// Identifies dispatchable regions of functions and wraps them in
-// flow.dispatch_regions.
-std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegionsPass();
 
 // Identifies dispatchable regions of functions and wraps them in
 // flow.dispatch_regions (version 2).
@@ -182,6 +180,7 @@ createStripAndSplatConstantVariablesPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerFlowPasses() {
+  registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
   registerExportDispatchesTransformPassPipeline();
   createFlattenTuplesInCFGPass();
@@ -189,11 +188,9 @@ inline void registerFlowPasses() {
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createPostPartitioningConversionPass();
-  createMaterializeExportedReflection();
-  createMergeExportedReflection();
+  createMaterializeReflectionAttrs();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
-  createIdentifyDispatchRegionsPass();
   createIdentifyDispatchRegions2Pass();
   createFoldCompatibleDispatchRegionsPass();
   createOutlineDispatchRegionsPass();

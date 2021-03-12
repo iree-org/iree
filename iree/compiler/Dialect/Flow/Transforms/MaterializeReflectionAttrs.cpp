@@ -33,9 +33,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-namespace {
-
-llvm::Optional<ScalarType> mapScalarType(Type elementType) {
+static llvm::Optional<ScalarType> mapScalarType(Type elementType) {
   // Map ScalarType.
   if (elementType.isSignlessInteger()) {
     auto bits = elementType.getIntOrFloatBitWidth();
@@ -56,72 +54,58 @@ llvm::Optional<ScalarType> mapScalarType(Type elementType) {
         return llvm::None;
     }
   } else if (auto floatType = elementType.dyn_cast<FloatType>()) {
-    if (floatType.isF32())
+    if (floatType.isF32()) {
       return ScalarType::kIeeeFloat32;
-    else if (floatType.isF64())
+    } else if (floatType.isF64()) {
       return ScalarType::kIeeeFloat64;
-    else if (floatType.isF16())
+    } else if (floatType.isF16()) {
       return ScalarType::kIeeeFloat16;
-    else if (floatType.isBF16())
+    } else if (floatType.isBF16()) {
       return ScalarType::kGoogleBfloat16;
-    else
+    } else {
       return llvm::None;
+    }
   }
-
   return llvm::None;
 }
 
-llvm::Optional<RawSignatureMangler> mangleTensorType(TensorType t) {
+static LogicalResult mangleTensorType(TensorType t,
+                                      RawSignatureMangler &mangler) {
   auto scalarType = mapScalarType(t.getElementType());
-  if (!scalarType) return llvm::None;
+  if (!scalarType) return failure();
 
   llvm::SmallVector<int, 4> dims;
   for (auto typeDim : t.getShape()) {
-    if (typeDim < 0)
+    if (typeDim < 0) {
       dims.push_back(-1);
-    else if (typeDim > std::numeric_limits<int>::max())
-      return llvm::None;
-    else
+    } else if (typeDim > std::numeric_limits<int>::max()) {
+      return failure();
+    } else {
       dims.push_back(typeDim);
+    }
   }
 
-  RawSignatureMangler mangler;
   // Tensors map to buffers in the ABI.
   mangler.AddShapedNDBuffer(*scalarType, absl::MakeConstSpan(dims));
-  return mangler;
+  return success();
 }
 
-llvm::Optional<RawSignatureMangler> mangleScalarType(Type t) {
+static LogicalResult mangleScalarType(Type t, RawSignatureMangler &mangler) {
   auto mappedType = mapScalarType(t);
-  if (!mappedType) return llvm::None;
-  RawSignatureMangler mangler;
+  if (!mappedType) return failure();
   mangler.AddScalar(*mappedType);
-  return mangler;
+  return success();
 }
 
-StringAttr mangleType(Builder builder, Type type, char tag) {
-  SignatureBuilder fBuilder;
-  auto mangledType = mangleScalarType(type);
+static LogicalResult mangleType(Type type, RawSignatureMangler &mangler) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
-    mangledType = mangleTensorType(tensorType);
+    return mangleTensorType(tensorType, mangler);
   }
-  if (!mangledType) return nullptr;
-  mangledType->builder().AppendTo(fBuilder, tag);
-  return builder.getStringAttr(fBuilder.encoded());
+  return mangleScalarType(type, mangler);
 }
 
-StringAttr unrecognizedTypeAttr(Builder builder, char tag) {
-  SignatureBuilder fBuilder;
-  RawSignatureMangler mangler;
-  mangler.AddUnrecognized();
-  mangler.builder().AppendTo(fBuilder, tag);
-  return builder.getStringAttr(fBuilder.encoded());
-}
-
-}  // namespace
-
-class MaterializeExportedReflectionPass
-    : public PassWrapper<MaterializeExportedReflectionPass, FunctionPass> {
+class MaterializeReflectionAttrsPass
+    : public PassWrapper<MaterializeReflectionAttrsPass, FunctionPass> {
   void runOnFunction() override {
     auto func = getFunction();
     auto funcType = func.getType();
@@ -133,47 +117,48 @@ class MaterializeExportedReflectionPass
     if (func->getAttr("iree.abi.none")) return;
 
     // Arguments.
+    RawSignatureMangler inputsMangler;
     for (int i = 0, e = funcType.getNumInputs(); i < e; ++i) {
-      auto mangled = mangleType(builder, funcType.getInput(i), 'I');
-      if (!mangled) {
+      if (failed(mangleType(funcType.getInput(i), inputsMangler))) {
         func.emitWarning()
             << "Argument #" << i << " of function " << func.getName()
             << " is not a recognized public ABI type and the function"
             << " may not be invokable by standard tools";
-        mangled = unrecognizedTypeAttr(builder, 'I');
+        inputsMangler.AddUnrecognized();
       }
-      NamedAttrList l(
-          func.getArgAttrOfType<DictionaryAttr>(i, "iree.reflection"));
-      l.set(builder.getIdentifier("f_partial"), mangled);
-      func.setArgAttr(i, "iree.reflection",
-                      l.getDictionary(builder.getContext()));
     }
 
     // Results.
+    RawSignatureMangler resultsMangler;
     for (int i = 0, e = funcType.getNumResults(); i < e; ++i) {
-      auto mangled = mangleType(builder, funcType.getResult(i), 'R');
-      if (!mangled) {
+      if (failed(mangleType(funcType.getResult(i), resultsMangler))) {
         func.emitWarning()
             << "Result #" << i << " of function " << func.getName()
             << " is not a recognized public ABI type and the function"
             << " may not be invokable by standard tools";
-        mangled = unrecognizedTypeAttr(builder, 'R');
+        resultsMangler.AddUnrecognized();
       }
-      NamedAttrList l(
-          func.getResultAttrOfType<DictionaryAttr>(i, "iree.reflection"));
-      l.set(builder.getIdentifier("f_partial"), mangled);
-      func.setResultAttr(i, "iree.reflection",
-                         l.getDictionary(builder.getContext()));
     }
+
+    // Update the function level attribute.
+    auto reflectionIdent = builder.getIdentifier("iree.reflection");
+    auto fIdent = builder.getIdentifier("f");
+    auto fVersionIdent = builder.getIdentifier("fv");
+    SignatureBuilder functionSignature =
+        RawSignatureMangler::ToFunctionSignature(inputsMangler, resultsMangler);
+    NamedAttrList l(func->getAttrOfType<DictionaryAttr>(reflectionIdent));
+    l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
+    l.set(fVersionIdent, builder.getStringAttr("1"));
+    func->setAttr(reflectionIdent, l.getDictionary(&getContext()));
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection() {
-  return std::make_unique<MaterializeExportedReflectionPass>();
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs() {
+  return std::make_unique<MaterializeReflectionAttrsPass>();
 }
 
-static PassRegistration<MaterializeExportedReflectionPass> pass(
-    "iree-flow-materialize-exported-reflection",
+static PassRegistration<MaterializeReflectionAttrsPass> pass(
+    "iree-sip-materialize-reflection-attrs",
     "Materializes argument/result level reflection metadata for exported "
     "functions.");
 

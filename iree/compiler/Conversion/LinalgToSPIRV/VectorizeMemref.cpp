@@ -50,7 +50,6 @@ static bool getUsesIfAllTransferOp(Value v,
   return true;
 }
 
-
 /// Returns the bitwidth of a scalar or vector type.
 static Optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
@@ -370,7 +369,7 @@ class ProcessPlaceHolder final
     auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
     if (!vecMemRef) return failure();
     rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
-        placeholder, *vecMemRef, ValueRange(), placeholder.getAttrs());
+        placeholder, *vecMemRef, ValueRange(), placeholder->getAttrs());
     return success();
   }
 };

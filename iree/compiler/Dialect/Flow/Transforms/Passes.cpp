@@ -48,35 +48,51 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  //----------------------------------------------------------------------------
-  // Input dialect sanitization and type legalization.
-  // On completion:
-  //   - All ops remain at the input-dialect tensor-level.
-  //   - Loose shapex.get_ranked_shape ops can exist at points where dynamic
-  //     dims are required.
-  //----------------------------------------------------------------------------
-  passManager.addPass(createCanonicalizerPass());
-
-  // Flatten structured control flow to our CFG.
+// Prepare HLO for use as an input to the Flow dialect.
+//
+// HACK: this needs to be moved into the various tensorflow-specific import
+// tools so that none of this code pulls in HLO. Today we still have
+// dependencies on HLO for the legacy non-linalg-on-tensors path so it's fine
+// here, but soon we'll be shifting away from that and only accepting upstream
+// dialects like linalg.
+static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(createHLOPreprocessingPass());
-
-  // Convert TOSA control flow / constant operations to standard operations.
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
-
-  // Convert TOSA ops to Linalg-on-tensor ops.
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
+  if (clEnableLinalgOnTensorsDispatch) {
+    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
+    // will break VMLA backend.
+    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
+  }
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they
   // are not desired here.
-  //
-  // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
   passManager.addNestedPass<FuncOp>(createRemoveShapeConstraintsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+}
 
+// Prepare TOSA for use as an input to the Flow dialect.
+static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
+  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
+  passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
+}
+
+void buildInputTransformPassPipeline(OpPassManager &passManager) {
+  buildHLOInputTransformPassPipeline(passManager);
+  buildTOSAInputTransformPassPipeline(passManager);
+  passManager.addPass(createCanonicalizerPass());
+}
+
+void registerInputTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-input-transformation-pipeline",
+      "Runs the full IREE flow dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildInputTransformPassPipeline(passManager);
+      });
+}
+
+void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert `shape` dialect to `shapex` dialect.
   passManager.addPass(Shape::createConvertShapeToShapexPass());
 
@@ -105,11 +121,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //   - Dependencies on shape metadata ops
   //   - Dependencies on reflection attributes
   //----------------------------------------------------------------------------
+
   // Materialize default arg/result reflection metadata.
   // This pass must come before any 1:N type expansion that will not be retained
   // in the public ABI (i.e. loose shape dims, etc).
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeExportedReflection());
+      IREE::Flow::createMaterializeReflectionAttrs());
 
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
@@ -127,13 +144,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // previous pass.
   passManager.addNestedPass<FuncOp>(
       Shape::createExpandFunctionDynamicDimsPass());
-
-  // Merge arg/result reflection metadata.
-  // NOTE(laurenzo): This will eventually not be the right place for this as
-  // it should happen after the HAL has further annotated the exported
-  // functions (such as with synthetic barrier arguments).
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMergeExportedReflection());
 
   //----------------------------------------------------------------------------
   // Shape materialization for buffer assignment and stream formation.
@@ -154,10 +164,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //     concrete IR which materializes the shapes, either statically or
   //     dynamically).
   //   - Shape folding and canonicalization has been done.
-  // TODO(laurenzo): Investigate whether this can be done more incrementally
-  // during dispatch/stream formation versus having such a large phase
-  // ordering constraint.
   //----------------------------------------------------------------------------
+
   SmallVector<std::string> doNotRecurseOpNames = {"flow.dispatch.workgroups"};
   passManager.addNestedPass<FuncOp>(
       Shape::createTieDynamicShapesPass(doNotRecurseOpNames));
@@ -181,40 +189,31 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //     legal.
   //   - shapex.tie_shape ops exist at any dispatch operands/results that are
   //     dynamic, preserving the shape association.
-  //     TODO(laurenzo): determine if this is needed versus only preserving
-  //     for non-dispatchable ops.
   //----------------------------------------------------------------------------
+
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
 
   if (clEnableLinalgOnTensorsDispatch) {
-    // TODO(ataei): This should run as part of createHLOPreprocessingPass which
-    // will break VMLA backend.
-    passManager.addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
     passManager.addNestedPass<FuncOp>(createDispatchLinalgOnTensorsPass());
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+    // Outline the dispatch regions into their own functions wrapped in
+    // executables.
+    passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
+  } else {
+    // DEPRECATED: legacy HLO-based path.
+    passManager.addPass(IREE::Flow::createDispatchabilityAnalysisPass());
+    passManager.addNestedPass<FuncOp>(
+        IREE::Flow::createIdentifyDispatchRegions2Pass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        IREE::Flow::createFoldCompatibleDispatchRegionsPass());
+    passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
   }
-
-  // First perform module-level analysis that following passes will use to query
-  // per-function dispatchability information. We run this first so that it only
-  // needs to run once and will be cached for all of the following passes.
-  passManager.addPass(IREE::Flow::createDispatchabilityAnalysisPass());
-
-  // Create all of the dispatch regions, CSE their workloads, and fold.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createIdentifyDispatchRegions2Pass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createFoldCompatibleDispatchRegionsPass());
-
-  // Outline the dispatch regions into their own functions wrapped in
-  // executables. This separates sequencer functions performing dispatches from
-  // dispatchees.
-  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
-  passManager.addPass(IREE::Flow::createOutlineDispatchRegions2Pass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -239,6 +238,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Pre-conditions:
   //   - Full formation of dispatch regions
   //----------------------------------------------------------------------------
+
   // Form streams.
   // Cleanup the IR before we try to form streams.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -278,9 +278,7 @@ void registerFlowTransformPassPipeline() {
 void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createCreateBenchmarkFuncs());
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeExportedReflection());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMergeExportedReflection());
+      IREE::Flow::createMaterializeReflectionAttrs());
   passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
