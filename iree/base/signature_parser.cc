@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"

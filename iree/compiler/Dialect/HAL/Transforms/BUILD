@@ -59,7 +59,6 @@ cc_library(
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
-        "@com_google_absl//absl/strings",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:IR",
