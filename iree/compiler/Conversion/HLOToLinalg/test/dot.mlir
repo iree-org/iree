@@ -1,33 +1,5 @@
 // RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-pipeline -cse %s | IreeFileCheck %s
 
-module {
-  func @dot() {
-    %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x3xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<3x2xf32>
-    %result = "mhlo.dot"(%0, %1) : (tensor<2x3xf32>, tensor<3x2xf32>) -> tensor<2x2xf32>
-    hal.interface.store.tensor %result, @legacy_io::@ret0, offset = %c0 : tensor<2x2xf32>
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
-  }
-}
-
-// CHECK-LABEL: func @dot
-//   CHECK-DAG: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x3xf32>
-//   CHECK-DAG: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x2xf32>
-//   CHECK-DAG: %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x2xf32>
-//   CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
-//       CHECK: linalg.fill(%[[RES]], %[[CST]])
-//       CHECK: linalg.matmul
-//  CHECK-SAME:   ins(%[[ARG0]], %[[ARG1]] : memref<2x3xf32>, memref<3x2xf32>)
-//  CHECK-SAME:   outs(%[[RES]] : memref<2x2xf32>)
-
-// -----
-
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func @matmul_add() {
