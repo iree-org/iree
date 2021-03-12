@@ -248,7 +248,7 @@ module  {
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
+  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
     %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
@@ -260,7 +260,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
+  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
     %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
@@ -272,19 +272,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
-  }
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::RematerializeDispatchConstantsPass
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
+  %0 = flow.dispatch.region[%c2048 : index](%arg2 = %arg0 : tensor<32x1024xf32>, %arg3 = %arg1 : tensor<1024x64xf32>) -> (tensor<32x64xf32>) {
     %1 = "mhlo.dot"(%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
@@ -306,7 +294,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -326,7 +314,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -336,7 +324,7 @@ module  {
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -355,7 +343,7 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
 }
@@ -365,7 +353,7 @@ module  {
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -374,7 +362,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -383,7 +371,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -392,7 +380,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -401,7 +389,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048] (%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
 
@@ -410,32 +398,9 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %c2048 = constant 2048 : index
-  %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
-  }
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After Canonicalizer
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    flow.return %1 : tensor<32x64xf32>
-  }
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After CSE
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
-  %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  %0 = flow.ex.stream.fragment(%c2048, %arg0, %arg1) : (index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: index, %arg3: tensor<32x1024xf32>, %arg4: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     flow.return %1 : tensor<32x64xf32>
   }
   return %0 : tensor<32x64xf32>
@@ -456,12 +421,39 @@ module  {
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%c2048, %arg0, %arg1) : (index, tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: index, %arg3: tensor<32x1024xf32>, %arg4: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2](%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
   }
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+    %c2048 = constant 2048 : index
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    flow.return %1 : tensor<32x64xf32>
+  }
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After CSE
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+      (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+    %c2048 = constant 2048 : index
+    %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    flow.return %1 : tensor<32x64xf32>
+  }
+  return %0 : tensor<32x64xf32>
 }
 
 ```
@@ -478,9 +470,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -501,9 +494,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -524,9 +518,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -547,9 +542,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -570,9 +566,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -593,9 +590,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -636,9 +634,10 @@ module  {
     }
   }
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.ex.stream.fragment(%arg2 = %c2048 : index, %arg3 = %arg0 : tensor<32x1024xf32>, %arg4 = %arg1 : tensor<1024x64xf32>) -> tensor<32x64xf32> {
-      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%arg2] (%arg3, %arg4) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    %0 = flow.ex.stream.fragment(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32> =
+        (%arg2: tensor<32x1024xf32>, %arg3: tensor<1024x64xf32>) -> tensor<32x64xf32> {
+      %c2048 = constant 2048 : index
+      %1 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg2, %arg3) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
       flow.return %1 : tensor<32x64xf32>
     }
     return %0 : tensor<32x64xf32>
@@ -902,7 +901,7 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
-      linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%5, %7 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+      linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%5, %7 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
       return
     }
     hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -955,7 +954,7 @@ func @dot_ex_dispatch_0() {
               %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
               %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-              linalg.matmul {__internal_linalg_transform__ = "vectorize"} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+              linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
             }
           }
         }
@@ -1007,7 +1006,7 @@ func @dot_ex_dispatch_0() {
               %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
               %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-              linalg.matmul {__internal_linalg_transform__ = "vectorize"} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+              linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
             }
           }
         }
@@ -3476,7 +3475,6 @@ module  {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
     %dev = hal.ex.shared_device : !hal.device
     %allocator = hal.device.allocator %dev : !hal.allocator
     %c32 = constant 32 : index
@@ -3486,6 +3484,7 @@ module  {
     %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
     %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
+    %c2048 = constant 2048 : index
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     %c0 = constant 0 : index
     %c32_0 = constant 32 : index
@@ -3529,7 +3528,6 @@ module  {
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ExpandFunctionRankedShapeDimsPass
 ```
 func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %c2048 = constant 2048 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %c32 = constant 32 : index
@@ -3539,6 +3537,7 @@ func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {ire
   %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
   %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
+  %c2048 = constant 2048 : index
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   %c0 = constant 0 : index
   %c32_0 = constant 32 : index
@@ -6895,6 +6894,113 @@ module  {
     hal.check_success %1, "semaphore wait failed"
     return %0 : !hal.buffer_view
   }
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func private @_device_match_id_0_initializer() -> i1 {
+  %dev = hal.ex.shared_device : !hal.device
+  %0 = hal.device.match.id %dev, pattern = ["dylib*"] : (!hal.device) -> i1
+  return %0 : i1
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func private @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout {
+  %dev = hal.ex.shared_device : !hal.device
+  %descriptor_set_layout = hal.descriptor_set_layout.create %dev, PushOnly, bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">] : !hal.descriptor_set_layout
+  return %descriptor_set_layout : !hal.descriptor_set_layout
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func private @_executable_layout_0_initializer() -> !hal.executable_layout {
+  %0 = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
+  %dev = hal.ex.shared_device : !hal.device
+  %executable_layout = hal.executable_layout.create %dev, push_constants = 0, set_layouts = [%0] : !hal.executable_layout
+  return %executable_layout : !hal.executable_layout
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func private @_executable_dot_ex_dispatch_0_initializer() -> !hal.executable {
+  %dev = hal.ex.shared_device : !hal.device
+  %0 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %0, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  %exe = hal.executable.create %dev, @dot_ex_dispatch_0::@llvm_aot, layouts = [%1] : !hal.executable
+  br ^bb3(%exe : !hal.executable)
+^bb2:  // pred: ^bb0
+  %2 = iree.null : !hal.executable
+  br ^bb3(%2 : !hal.executable)
+^bb3(%3: !hal.executable):  // 2 preds: ^bb1, ^bb2
+  return %3 : !hal.executable
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
+  %c131072 = constant 131072 : index
+  %c262144 = constant 262144 : index
+  %c8192 = constant 8192 : index
+  %c2 = constant 2 : index
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %c8192 : !hal.buffer
+  %cmd = hal.command_buffer.create %dev, OneShot, "Transfer|Dispatch" : !hal.command_buffer
+  hal.command_buffer.begin %cmd
+  %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  hal.command_buffer.push_descriptor_set %cmd, %0, set = %c0, bindings = [%c0 = (%arg0, %c0, %c131072), %c1 = (%arg1, %c0, %c262144), %c2 = (%buffer, %c0, %c8192)]
+  %1 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %1, ^bb1, ^bb2
+^bb1:  // pred: ^bb0
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", "None"
+  hal.command_buffer.end %cmd
+  hal.ex.submit_and_wait %dev, %cmd
+  return %buffer : !hal.buffer
+^bb2:  // pred: ^bb0
+  iree.unreachable
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %c50331680_i32 = constant 50331680 : i32
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, element_type = %c50331680_i32, shape = [%c32, %c64] : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
+  return %view : !hal.buffer_view
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
 }
 
 ```

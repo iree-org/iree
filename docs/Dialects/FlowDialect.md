@@ -53,15 +53,20 @@ workload size, shapes of inputs and outputs, etc.
 
 ## Type constraint definition
 
-### dispatch.input
-A placeholder for a dispatch region input operand. This can be used to query
-the metadata about the input (such as its shape) as well as load from the
-backing tensor representation.
+### dispatch.tensor
+A placeholder for a dispatch region input/output operand. This can be used
+to query the metadata about the tensor (such as its shape) as well as both
+load and store from the backing tensor representation.
 
-### dispatch.output
-A placeholder for a dispatch region output result. This can be used to
-query the metadata about the output (such as its shape) as well as store
-into the backing tensor representation.
+### dispatch.tensor
+A placeholder for a dispatch region input operand. This can be used
+to query the metadata about the tensor (such as its shape) as well as load
+from the backing tensor representation.
+
+### dispatch.tensor
+A placeholder for a dispatch region output operand. This can be used
+to query the metadata about the tensor (such as its shape) as well as store
+to the backing tensor representation.
 
 ## Operation definition
 
@@ -81,40 +86,6 @@ exports can reference the same internal function.
 `signature` | ::mlir::TypeAttr | any type attribute
 `workgroup_rank` | ::mlir::IntegerAttr | index attribute
 
-### `flow.dispatch.input.load` (::mlir::iree_compiler::IREE::Flow::DispatchInputLoadOp)
-
-loads a tensor from a dispatch input placeholder
-
-
-Syntax:
-
-```
-operation ::= `flow.dispatch.input.load` $source
-              ( `,` `offsets` `=` `[` $offsets^ `]` )?
-              ( `,` `sizes` `=` `[` $sizes^ `]` )?
-              ( `,` `strides` `=` `[` $strides^ `]` )?
-              `:` type($source) `->` type($result) attr-dict-with-keyword
-```
-
-Loads an input tensor or subtensor from an input placeholder. As each
-workgroup executes concurrently all workgroups will receive identical loaded
-results of regions that may overlap.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`source` | dispatch.input
-`offsets` | index
-`sizes` | index
-`strides` | index
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-`result` | ranked tensor of any type values
-
 ### `flow.dispatch` (::mlir::iree_compiler::IREE::Flow::DispatchOp)
 
 a dispatch of workgroups across an n-dimension grid
@@ -123,9 +94,12 @@ a dispatch of workgroups across an n-dimension grid
 Syntax:
 
 ```
-operation ::= `flow.dispatch` $entry_point `[` $workgroup_count `]`
+operation ::= `flow.dispatch` $entry_point `[` $workgroup_count `]` ``
               `(` $operands `)` attr-dict `:`
-              functional-type($operands, $results)
+              custom<ShapedFunctionType>(ref($operands),
+              type($operands), $operand_dims,
+              type($results), $result_dims,
+              $tied_operands)
 ```
 
 Dispatches workgroups across an n-dimensional grid defined by the specified
@@ -137,6 +111,7 @@ set to 0 to neuter the dispatch (no workgroup will execute).
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `entry_point` | ::mlir::SymbolRefAttr | symbol reference attribute
+`tied_operands` | ::mlir::ArrayAttr | 64-bit integer array attribute
 
 #### Operands:
 
@@ -144,41 +119,14 @@ set to 0 to neuter the dispatch (no workgroup will execute).
 | :-----: | ----------- |
 `workgroup_count` | index
 `operands` | any type
+`operand_dims` | index
+`result_dims` | index
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
 `results` | any type
-
-### `flow.dispatch.output.store` (::mlir::iree_compiler::IREE::Flow::DispatchOutputStoreOp)
-
-stores a tensor into a dispatch output placeholder
-
-
-Syntax:
-
-```
-operation ::= `flow.dispatch.output.store` $value `,` $target
-              ( `,` `offsets` `=` `[` $offsets^ `]` )?
-              ( `,` `sizes` `=` `[` $sizes^ `]` )?
-              ( `,` `strides` `=` `[` $strides^ `]` )?
-              `:` type($value) `->` type($target) attr-dict-with-keyword
-```
-
-Stores a tensor or subtensor into an output tensor placeholder. As each
-workgroup executes concurrently behavior is undefined if more than one
-workgroup stores into overlapping regions of the full output tensor.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`value` | ranked tensor of any type values
-`target` | dispatch.output
-`offsets` | index
-`sizes` | index
-`strides` | index
 
 ### `flow.dispatch.region` (::mlir::iree_compiler::IREE::Flow::DispatchRegionOp)
 
@@ -229,13 +177,76 @@ that will be resolved to runtime values.
 
 | Operand | Description |
 | :-----: | ----------- |
-`source` | dispatch.input or dispatch.output
+`source` | dispatch.tensor
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
 `result` | Ranked shape type
+
+### `flow.dispatch.tensor.load` (::mlir::iree_compiler::IREE::Flow::DispatchTensorLoadOp)
+
+loads a tensor from a dispatch input placeholder
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.tensor.load` $source
+              ( `,` `offsets` `=` `[` $offsets^ `]` )?
+              ( `,` `sizes` `=` `[` $sizes^ `]` )?
+              ( `,` `strides` `=` `[` $strides^ `]` )?
+              `:` type($source) `->` type($result) attr-dict-with-keyword
+```
+
+Loads an input tensor or subtensor from an input placeholder. As each
+workgroup executes concurrently all workgroups will receive identical loaded
+results of regions that may overlap.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`source` | dispatch.tensor
+`offsets` | index
+`sizes` | index
+`strides` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
+
+### `flow.dispatch.tensor.store` (::mlir::iree_compiler::IREE::Flow::DispatchTensorStoreOp)
+
+stores a tensor into a dispatch output placeholder
+
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.tensor.store` $value `,` $target
+              ( `,` `offsets` `=` `[` $offsets^ `]` )?
+              ( `,` `sizes` `=` `[` $sizes^ `]` )?
+              ( `,` `strides` `=` `[` $strides^ `]` )?
+              `:` type($value) `->` type($target) attr-dict-with-keyword
+```
+
+Stores a tensor or subtensor into an output tensor placeholder. As each
+workgroup executes concurrently behavior is undefined if more than one
+workgroup stores into overlapping regions of the full output tensor.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | ranked tensor of any type values
+`target` | dispatch.tensor
+`offsets` | index
+`sizes` | index
+`strides` | index
 
 ### `flow.dispatch.tie_shape` (::mlir::iree_compiler::IREE::Flow::DispatchTieShapeOp)
 
@@ -257,14 +268,14 @@ pass-through result of this op to allow for SSA-based shape resolution.
 
 | Operand | Description |
 | :-----: | ----------- |
-`operand` | dispatch.input or dispatch.output
+`operand` | dispatch.tensor
 `shape` | Ranked shape type
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`result` | dispatch.input or dispatch.output
+`result` | dispatch.tensor
 
 ### `flow.dispatch.workgroup.count` (::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupCountOp)
 
@@ -404,6 +415,23 @@ restricted to 3 (XYZ).
 
 a dispatch of workgroups across an n-dimension grid
 
+
+Syntax:
+
+```
+operation ::= `flow.dispatch.workgroups` `[` $workgroup_count `]` ``
+              `(` $operands `)` `:`
+              custom<ShapedFunctionType>(ref($operands),
+              type($operands), $operand_dims,
+              type($results), $result_dims,
+              $tied_operands)
+              attr-dict-with-keyword
+              `=` `\n` ` ` ` ` ` `
+              custom<DispatchWorkgroupBody>(ref(type($operands)),
+              ref(type($results)),
+              $body)
+```
+
 Dispatches some number of workgroups across an n-dimensional grid. The
 body region will be invoked for each workgroup with a unique
 `flow.dispatch.workgroup.id` in the range of
@@ -437,12 +465,20 @@ dispatch is lowered the workgroup count range will be converted into a 3D
 XYZ grid space and divided up by the workgroup size chosen for particular
 target devices.
 
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`tied_operands` | ::mlir::ArrayAttr | 64-bit integer array attribute
+
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
 `workgroup_count` | index
 `operands` | any type
+`operand_dims` | index
+`result_dims` | index
 
 #### Results:
 
@@ -454,14 +490,40 @@ target devices.
 
 experimental op for defining formed stream regions
 
+
+Syntax:
+
+```
+operation ::= `flow.ex.stream.fragment` `(` $operands `)` `:`
+              custom<ShapedFunctionType>(ref($operands),
+              type($operands), $operand_dims,
+              type($results), $result_dims,
+              $tied_operands)
+              attr-dict-with-keyword
+              `=` `\n` ` ` ` ` ` `
+              custom<StreamFragmentBody>(ref(type($operands)),
+              ref(type($results)),
+              ref($tied_operands),
+              $body)
+```
+
 Represents a region where all of the dispatches are meant to target the
-same execution stream. This will be replaced with a segmented verison.
+same execution stream. This will be replaced with a segmented version in the
+future that stitches the stream segments together.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`tied_operands` | ::mlir::ArrayAttr | 64-bit integer array attribute
 
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
-`args` | any type
+`operands` | any type
+`operand_dims` | index
+`result_dims` | index
 
 #### Results:
 
@@ -522,7 +584,8 @@ performs a full tensor clone operation
 Syntax:
 
 ```
-operation ::= `flow.tensor.clone` $operand `:` type($result) attr-dict
+operation ::= `flow.tensor.clone` $operand `:` type($result) (`{` $operand_dims^ `}`)?
+              attr-dict-with-keyword
 ```
 
 Clones the input tensor into an identical output tensor.
@@ -532,6 +595,7 @@ Clones the input tensor into an identical output tensor.
 | Operand | Description |
 | :-----: | ----------- |
 `operand` | ranked tensor of any type values
+`operand_dims` | index
 
 #### Results:
 
@@ -547,7 +611,9 @@ loads a value from a tensor element
 Syntax:
 
 ```
-operation ::= `flow.tensor.load` $source (`[` $indices^ `]`)? `:` type($source) attr-dict-with-keyword
+operation ::= `flow.tensor.load` $source (`[` $indices^ `]`)? `:`
+              type($source) (`{` $source_dims^ `}`)?
+              attr-dict-with-keyword
 ```
 
 Returns the element at the given location from within the tensor.
@@ -557,6 +623,7 @@ Returns the element at the given location from within the tensor.
 | Operand | Description |
 | :-----: | ----------- |
 `source` | ranked tensor of any type values
+`source_dims` | index
 `indices` | index
 
 #### Results:
@@ -573,7 +640,10 @@ reshapes a tensor
 Syntax:
 
 ```
-operation ::= `flow.tensor.reshape` $source `:` type($source) `->` type($result) attr-dict
+operation ::= `flow.tensor.reshape` $source `:`
+              type($source) (`{` $source_dims^ `}`)? `->`
+              type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
 ```
 
 Reshapes a tensor to a new shape without modifying the contents.
@@ -583,6 +653,8 @@ Reshapes a tensor to a new shape without modifying the contents.
 | Operand | Description |
 | :-----: | ----------- |
 `source` | ranked tensor of any type values
+`source_dims` | index
+`result_dims` | index
 
 #### Results:
 
@@ -598,8 +670,10 @@ slices out a subregion of a tensor
 Syntax:
 
 ```
-operation ::= `flow.tensor.slice` $source `[` $start_indices `for` $lengths `]` `:` type($source) `->`
-              type($result) attr-dict
+operation ::= `flow.tensor.slice` $source `[` $start_indices `for` $lengths `]` `:`
+              type($source) (`{` $source_dims^ `}`)? `->`
+              type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
 ```
 
 Clones a subregion of a tensor.
@@ -609,8 +683,10 @@ Clones a subregion of a tensor.
 | Operand | Description |
 | :-----: | ----------- |
 `source` | ranked tensor of any type values
+`source_dims` | index
 `start_indices` | index
 `lengths` | index
+`result_dims` | index
 
 #### Results:
 
@@ -626,7 +702,8 @@ splats a value into a shaped tensor
 Syntax:
 
 ```
-operation ::= `flow.tensor.splat` $value `:` type($result) attr-dict-with-keyword
+operation ::= `flow.tensor.splat` $value `:` type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
 ```
 
 Returns a tensor initialized to the given primitive value.
@@ -636,6 +713,7 @@ Returns a tensor initialized to the given primitive value.
 | Operand | Description |
 | :-----: | ----------- |
 `value` | index or signless integer or floating-point
+`result_dims` | index
 
 #### Results:
 
@@ -651,7 +729,8 @@ stores a value into a tensor element
 Syntax:
 
 ```
-operation ::= `flow.tensor.store` $value `,` $target (`[` $indices^ `]`)? `:` type($target)
+operation ::= `flow.tensor.store` $value `,` $target (`[` $indices^ `]`)? `:`
+              type($target) (`{` $target_dims^ `}`)?
               attr-dict-with-keyword
 ```
 
@@ -663,6 +742,7 @@ Returns a tensor with the element at the given index set to the given value.
 | :-----: | ----------- |
 `value` | index or signless integer or floating-point or vector of any type values
 `target` | ranked tensor of any type values
+`target_dims` | index
 `indices` | index
 
 #### Results:
@@ -707,20 +787,30 @@ updates a tensor with the contents of another tensor
 Syntax:
 
 ```
-operation ::= `flow.tensor.update` $update `,` $target `[` $start_indices `]` `:` type($update) `->`
-              type($result) attr-dict
+operation ::= `flow.tensor.update` $update `,` $target `[` $start_indices `]` `:`
+              type($update) (`{` $update_dims^ `}`)? `->`
+              custom<TiedResult>(type($result), $target_dims, $tied_operands)
+              attr-dict-with-keyword
 ```
 
 Updates the target tensor with the contents of the update tensor at the
 given offset indices.
 
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`tied_operands` | ::mlir::ArrayAttr | 64-bit integer array attribute
+
 #### Operands:
 
 | Operand | Description |
 | :-----: | ----------- |
-`update` | ranked tensor of any type values
 `target` | ranked tensor of any type values
+`target_dims` | index
 `start_indices` | index
+`update` | ranked tensor of any type values
+`update_dims` | index
 
 #### Results:
 
