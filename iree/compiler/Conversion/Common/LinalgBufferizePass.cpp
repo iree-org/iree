@@ -495,13 +495,19 @@ LogicalResult convertInterfaceStoreTensorOp(
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
-  Value storeTo = bvm.lookup(storeOp.target());
-  // If the value already has a mapping, it should already have been updated in
-  // place by the converted producer.
-  if (storeTo) {
+
+  // If we have both the source and target buffer pointing to the same binding,
+  // then it's an indication that we are performing in-place update. For such
+  // cases, we can just remove this store.
+  auto storeTo = bvm.lookup(storeOp.target())
+                     .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+  auto storeFrom = bvm.lookup(storeOp.value())
+                       .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+  if (storeTo && storeFrom && storeTo.binding() == storeFrom.binding()) {
     storeOp->erase();
     return success();
   }
+
   Value subview =
       createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
                       storeOp.offsets(), storeOp.sizes(), storeOp.strides());
@@ -551,13 +557,16 @@ void LinalgBufferizePass::runOnFunction() {
   OpBuilder b(context);
 
   BlockAndValueMapping bvm;
+
+  // First go over all hal.interface.binding.subspan ops and create counterparts
+  // working with memrefs.
   funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
     auto shapedType =
         op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
     if (!shapedType || !shapedType.hasRank()) return;
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(op);
-    // Just change the resulttype of InterfaceBindingSubspanOp to form
+    // Just change the result type of the InterfaceBindingSubspanOp to form
     // the base buffer.
     auto tensorType =
         op.result().getType().cast<IREE::Flow::DispatchTensorType>();
@@ -569,6 +578,7 @@ void LinalgBufferizePass::runOnFunction() {
     bvm.map(op, baseBuffer);
     transferShapeOpsToMemref(b, op.getResult(), baseBuffer.getResult(), bvm);
   });
+
   if (funcOp
           .walk([&](IREE::Flow::DispatchTensorStoreOp op) -> WalkResult {
             return preProcessInterfaceStoreTensorOp(b, op, bvm);
