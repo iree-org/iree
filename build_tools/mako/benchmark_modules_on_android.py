@@ -98,7 +98,7 @@ def main(args) -> None:
       filename = "mako-{}-{}-{}.log".format(model_benchmark.name, phone.name,
                                             args.git_hash)
       open(filename, "w").write(mako_log)
-      print(log)
+      print(mako_log)
 
 
 if __name__ == "__main__":
