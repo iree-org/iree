@@ -693,8 +693,20 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
       "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
-      "ArrayRef<int64_t>":$tiedOperands,
+      "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ArrayRef<int64_t>":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        build($_builder, $_state, entryPoint, workgroupCount,
+              resultTypes, resultDims, operands, operandDims,
+              $_builder.getIndexArrayAttr(tiedOperands),
+              attributes);
+      }]>
   ];
 
   let extraClassDeclaration = [{

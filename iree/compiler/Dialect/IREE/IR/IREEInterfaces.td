@@ -49,6 +49,10 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     The default implementations use an attribute on the op to store the
     relationship:
       `OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands`
+
+    Note that `$tied_operands` are indices inside the operand range returned
+    by `getTiedOperandsIndexAndLength`, which may *not* be the full operand
+    range of the op.
   }];
 
   let methods = [
@@ -109,6 +113,9 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     InterfaceMethod<
       /*desc=*/[{
         Returns the operand index tied to the given result index, if any.
+
+        Note that the index returned is into the full range of all operands of
+        the current op.
       }],
       /*retTy=*/"::llvm::Optional<unsigned>",
       /*methodName=*/"getTiedResultOperandIndex",
@@ -121,6 +128,9 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     InterfaceMethod<
       /*desc=*/[{
         Sets the operand index tied to the given result index, if any.
+
+        Note that the index should be into the operand range returned by
+        `getTiedOperandsIndexAndLength`.
       }],
       /*retTy=*/"void",
       /*methodName=*/"setTiedResultOperandIndex",
@@ -135,6 +145,9 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*desc=*/[{
         Returns an array containing the tied result operand indices with -1
         indicating that a result is not tied.
+
+        Note that the index returned is into the full range of all operands of
+        the current op.
       }],
       /*retTy=*/"SmallVector<int64_t, 4>",
       /*methodName=*/"getTiedResultOperandIndices",

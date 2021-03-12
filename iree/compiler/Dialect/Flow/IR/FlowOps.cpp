@@ -1179,7 +1179,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                        DispatchEntryOp entryPoint, ValueRange workgroupCount,
                        TypeRange resultTypes, ValueRange resultDims,
                        ValueRange operands, ValueRange operandDims,
-                       ArrayRef<int64_t> tiedOperands,
+                       ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
       entryPoint->getParentOp()
@@ -1197,8 +1197,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(resultDims);
   state.addAttributes(attributes);
   state.attributes.erase(TiedOpInterface::getStorageAttrName());
-  state.addAttribute(TiedOpInterface::getStorageAttrName(),
-                     builder.getIndexArrayAttr(tiedOperands));
+  state.addAttribute(TiedOpInterface::getStorageAttrName(), tiedOperands);
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
