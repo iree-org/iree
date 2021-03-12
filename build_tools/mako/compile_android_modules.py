@@ -24,7 +24,7 @@ import subprocess
 
 import utils
 
-IREE_TRANSLATE_PATH = "build-tracy/iree/tools/iree-translate"
+IREE_TRANSLATE_PATH = "build-host/iree/tools/iree-translate"
 
 
 def main() -> None:
