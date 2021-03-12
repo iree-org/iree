@@ -100,6 +100,11 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
 
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 
+  let builders = [
+    OpBuilder<(ins "IREE::Flow::VariableOp":$variableOp,
+                   CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
   let verifier = [{ return verifyVariableLoadOp(*this); }];
 
   let hasFolder = 1;

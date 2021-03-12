@@ -126,9 +126,7 @@ void registerIREEVMTransformPassPipeline() {
 static LogicalResult translateFromMLIRToVM(
     ModuleOp moduleOp, BindingOptions bindingOptions,
     IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions,
-    // TODO(*): clean this up - please don't add more things like this.
-    bool addExportDispatchesPipeline) {
+    IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
 
@@ -138,9 +136,6 @@ static LogicalResult translateFromMLIRToVM(
 
   IREE::Flow::buildInputTransformPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
-  if (addExportDispatchesPipeline) {
-    IREE::Flow::buildExportDispatchesTransformPassPipeline(passManager);
-  }
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
@@ -166,24 +161,7 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
   auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
-                                      halTargetOptions, vmTargetOptions,
-                                      /*addExportDispatchesPipeline=*/false);
-  if (failed(result)) {
-    return result;
-  }
-  return translateModuleToBytecode(moduleOp, bytecodeTargetOptions, output);
-}
-
-static LogicalResult translateFromMLIRToBenchmarkVMBytecodeModuleWithFlags(
-    ModuleOp moduleOp, llvm::raw_ostream &output) {
-  mlir::registerPassManagerCLOptions();
-  auto bindingOptions = getBindingOptionsFromFlags();
-  auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
-  auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
-                                      halTargetOptions, vmTargetOptions,
-                                      /*addExportDispatchesPipeline=*/true);
+                                      halTargetOptions, vmTargetOptions);
   if (failed(result)) {
     return result;
   }
@@ -201,8 +179,7 @@ static LogicalResult translateFromMLIRToVMCModule(
     IREE::VM::TargetOptions targetOptions,
     IREE::VM::CTargetOptions cTargetOptions, llvm::raw_ostream &output) {
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions,
-                                      executableOptions, targetOptions,
-                                      /*addExportDispatchesPipeline=*/false);
+                                      executableOptions, targetOptions);
   if (failed(result)) {
     return result;
   }
@@ -231,10 +208,6 @@ void registerIREEVMTranslation() {
   TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
       "iree-mlir-to-vm-bytecode-module",
       translateFromMLIRToVMBytecodeModuleWithFlags);
-
-  TranslateFromMLIRRegistration toBenchmarkVMBytecodeModuleWithFlags(
-      "iree-mlir-to-executable-benchmark-vm-module",
-      translateFromMLIRToBenchmarkVMBytecodeModuleWithFlags);
 
 #ifdef IREE_HAVE_EMITC_DIALECT
   TranslateFromMLIRRegistration toVMCModuleWithFlags(
