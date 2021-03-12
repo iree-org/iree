@@ -148,7 +148,8 @@ LogicalResult getInputOutputTypesForAllTiles(
 ///
 /// TODO(antiagainst): This pass can be shared between CPU and GPU. But the
 /// following query scopes it to GPU for now.
-llvm::Optional<std::pair<ArrayRef<int64_t>, ArrayRef<int64_t>>>
+llvm::Optional<
+    std::pair<llvm::SmallVector<int64_t, 4>, llvm::SmallVector<int64_t, 4>>>
 getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
                             ArrayRef<Type> outputTypes) {
   // Build necesary structures to query the tile sizes for distributing to
@@ -188,7 +189,8 @@ getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
   // preparation.
   launchConfig->finalize(rootOp->getParentOfType<FuncOp>());
 
-  return std::make_pair(tileSize, workgroupSize);
+  return std::make_pair(llvm::to_vector<4>(tileSize),
+                        llvm::to_vector<4>(workgroupSize));
 }
 
 /// Replaces hal.interface.workgroup.size op with the constant value chosen
@@ -438,9 +440,10 @@ class ConcretizeTileAmongWorkgroupsPass
         // The tile sizes are specified against the original dimension order of
         // the workload shape. But Flow/HAL processor id/size/count ops' are
         // created using the reverse order.
-        tileSize = llvm::to_vector<4>(
-            llvm::reverse(sizes->first.take_front(numTilableDims)));
-        workgroupSize = llvm::to_vector<4>(sizes->second);
+        tileSize = sizes->first;
+        tileSize.resize(numTilableDims);
+        tileSize = llvm::to_vector<4>(llvm::reverse(tileSize));
+        workgroupSize = sizes->second;
       } else {
         return funcOp.emitError("failed to query tile size and workgroup size");
       }
