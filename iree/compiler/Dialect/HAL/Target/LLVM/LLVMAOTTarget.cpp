@@ -71,7 +71,14 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   // NOTE: we could vary these based on the options, such as by arch/etc.
   std::string name() const override { return "llvm_aot"; }
-  std::string filter_pattern() const override { return "dylib*"; }
+  std::string filter_pattern() const override {
+    llvm::Triple targetTriple(options_.targetTriple);
+    if (targetTriple.isWasm()) {
+      return "wasm*";
+    } else {
+      return "dylib*";
+    }
+  }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildLLVMTransformPassPipeline(passManager);
@@ -269,10 +276,14 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         builder, static_cast<unsigned char>(options_.sanitizerKind));
     iree_DyLibExecutableDef_end_as_root(builder);
 
+    uint32_t executableFormat =
+        targetTriple.isWasm()
+            ? static_cast<uint32_t>(IREE::HAL::ExecutableFormat::WASM)
+            : static_cast<uint32_t>(IREE::HAL::ExecutableFormat::DyLib);
+
     // Add the binary data to the target executable.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
-        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::DyLib),
+        targetOp.getLoc(), targetOp.sym_name(), executableFormat,
         builder.getBufferAttr(executableBuilder.getContext()));
     return success();
   }
@@ -284,20 +295,27 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
-  static TargetBackendRegistration registration("dylib-llvm-aot", [=]() {
+
 #define INIT_LLVM_TARGET(TargetName)        \
   LLVMInitialize##TargetName##Target();     \
   LLVMInitialize##TargetName##TargetMC();   \
   LLVMInitialize##TargetName##TargetInfo(); \
   LLVMInitialize##TargetName##AsmPrinter(); \
   LLVMInitialize##TargetName##AsmParser();
+
+  static TargetBackendRegistration dylibRegistration("dylib-llvm-aot", [=]() {
     INIT_LLVM_TARGET(X86)
     INIT_LLVM_TARGET(ARM)
     INIT_LLVM_TARGET(AArch64)
     INIT_LLVM_TARGET(RISCV)
+    return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
+  });
+  static TargetBackendRegistration wasmRegistration("wasm-llvm-aot", [=]() {
     INIT_LLVM_TARGET(WebAssembly)
     return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
   });
+
+#undef INIT_LLVM_TARGET
 }
 
 }  // namespace HAL
