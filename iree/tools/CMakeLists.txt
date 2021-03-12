@@ -314,6 +314,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_xla_dialects
       LLVMSupport
       MLIRIR
+      MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
