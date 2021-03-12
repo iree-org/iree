@@ -64,7 +64,7 @@ def benchmark(module_name, flagfile_name, target) -> str:
       "{}/iree-benchmark-module".format(DEVICE_ROOT), "--flagfile={}/{}".format(
           DEVICE_ROOT, flagfile_name), "--module_file={}/{}".format(
               DEVICE_ROOT, module_name), "--driver={}".format(driver),
-      "--benchmark_repetitions=3"
+      "--benchmark_repetitions=10"
   ] + target.runtime_flags
   print("Run cmd: {}".format(" ".join(cmd)))
   try:
