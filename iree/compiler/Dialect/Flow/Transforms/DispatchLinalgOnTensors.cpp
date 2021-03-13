@@ -370,7 +370,8 @@ static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
   return insertAfter->getNextNode();
 }
 
-/// Modifies `dispatchOp` to attach operand-result tie information when possible.
+/// Modifies `dispatchOp` to attach operand-result tie information when
+/// possible.
 static void tryToTieOperandsAndResults(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Block *block = dispatchOp.getBody(0);
