@@ -67,5 +67,7 @@ echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
 
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
+
 echo "Testing with CTest"
 ctest --output-on-failure -L 'integrations/tensorflow' --label-exclude "^nokokoro$"
