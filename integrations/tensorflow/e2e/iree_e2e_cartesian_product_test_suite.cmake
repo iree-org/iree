@@ -1,45 +1,16 @@
-
-# iree_py_test()
+# Copyright 2021 Google LLC
 #
-# Creates a test that executes a specified Python source file. The IREE Python
-# bindings are added to PYTHONPATH.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# Parameters:
-#   NAME: Name of the target
-#   SRC: Python source file to be executed.
-#   ARGS: Command line arguments to the Python source file.
-#   LABELS: Additional labels to apply to the test. The package path is added
-#       automatically.
-function(iree_py_test)
-  cmake_parse_arguments(
-    PARSE_ARGV 0
-    _RULE
-    ""
-    "NAME;SRC"
-    "ARGS;LABELS"
-  )
-
-  iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
-
-  add_test(
-    NAME ${_TEST_NAME}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMAND
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "${Python3_EXECUTABLE}" -B
-      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
-      ${_RULE_ARGS}
-  )
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(
-    TEST ${_TEST_NAME}
-    PROPERTY ENVIRONMENT
-    "TEST_TMPDIR=${_RULE_NAME}_test_tmpdir"
-    "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python")
-endfunction()
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # iree_e2e_cartesian_product_test_suite()
 #
@@ -264,7 +235,7 @@ function(iree_e2e_cartesian_product_test_suite)
       iree_py_test(
         NAME
           ${_TEST_NAME}
-        SRC
+        SRCS
           "${_TEST_SRC}"
         ARGS
           ${_TEST_ARGS}
