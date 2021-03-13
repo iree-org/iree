@@ -68,5 +68,4 @@ cd "${CMAKE_BUILD_DIR?}"
 ninja
 
 echo "Testing with CTest"
-ctest -R 'tensorflow_e2e|bindings/python|integrations/tensorflow/' \
-  --output-on-failure
+ctest --output-on-failure -L 'integrations/tensorflow' --label-exclude "^nokokoro$"
