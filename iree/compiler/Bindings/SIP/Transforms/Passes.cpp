@@ -27,14 +27,6 @@ namespace IREE {
 namespace SIP {
 
 void buildTransformPassPipeline(OpPassManager &passManager) {
-  // Run inlining to avoid issues with flatten tuples in cfg and tf.while & co.
-  // This should not be required if we are going to linalg in the importer.
-  passManager.addPass(createInlinerPass());
-
-  // Currently SIP can't handle tuples; we probably want to make it handle them
-  // if we expect them to be in the inputs.
-  passManager.addPass(IREE::Flow::createFlattenTuplesInCFGPass());
-
   // Materialize default arg/result reflection metadata.
   // This pass must come before any 1:N type expansion that will not be retained
   // in the public ABI (i.e. loose shape dims, etc).

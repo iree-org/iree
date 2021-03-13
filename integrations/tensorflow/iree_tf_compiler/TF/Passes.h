@@ -42,6 +42,9 @@ void registerTFImportPassPipeline();
 // Converts the TF dialect to the XLA MHLO dialect.
 std::unique_ptr<FunctionPass> createConvertToMHLOPass();
 
+// Flattens tuple values in function signatures and blocks.
+std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
+
 // In a module tagged with `tf_saved_model.semantics`, lowers
 // `tf_saved_model.global_variable`'s to `flow.variable`'s.
 //
@@ -74,6 +77,7 @@ inline void registerAllPasses() {
   registerTFImportPassPipeline();
 
   createConvertToMHLOPass();
+  createFlattenTuplesInCFGPass();
   createLowerGlobalTensorsPass();
   createLowerExportedFunctionsPass();
   createPropagateResourceCastsPass();

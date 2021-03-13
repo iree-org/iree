@@ -37,7 +37,7 @@ struct ExtractElementOpLowering : public OpRewritePattern<tensor::ExtractOp> {
     }
     // tensor<i1> is not valid to load, it needs to be converted to i8 or
     // something else instead.
-    if (tensorType.getElementTypeBitWidth() == 1) {
+    if (tensorType.getElementType().isInteger(1)) {
       return rewriter.notifyMatchFailure(op, "expected non-i1 type");
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(

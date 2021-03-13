@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
 #include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
+#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -125,6 +126,20 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createStripModuleMetadataPass());
   pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
+
+  //----------------------------------------------------------------------------
+  // Convert control flow and flatten tuples (like tuple<tensor<...>, ...>)
+  //----------------------------------------------------------------------------
+  // NOTE: FlattenTuplesInCFGPass requires inlining to have run and has some
+  // sensitivity to structured control flow ops.
+  // SCF would be ideal as a target (as that matches our other IREE inputs) but
+  // the current HLO to SCF pass is extremely basic and doesn't handle anything
+  // but tf.while for less-than comparisons from 0. Since those are common we
+  // still try to pull those out here but then fall back on the full conversion
+  // to CFG form.
+  pm.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
+  pm.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
+  pm.addPass(createFlattenTuplesInCFGPass());
 
   ////////////////////////////////////////////////////////////////////////////
   // Temporary: Does some special case fixups of HLO ops with dynamic
