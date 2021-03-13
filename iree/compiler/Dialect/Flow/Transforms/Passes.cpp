@@ -64,7 +64,6 @@ namespace Flow {
 // here, but soon we'll be shifting away from that and only accepting upstream
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(IREE::Flow::createHLOPreprocessingPass());
   if (clEnableLinalgOnTensorsDispatch) {
     // TODO(ataei): This should run as part of createHLOPreprocessingPass which
@@ -80,7 +79,6 @@ static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
 // Prepare TOSA for use as an input to the Flow dialect.
 static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 }
@@ -101,16 +99,23 @@ void registerInputTransformPassPipeline() {
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  //----------------------------------------------------------------------------
+  // Entry dialect cleanup
+  //----------------------------------------------------------------------------
+
+  // Currently we don't handle SCF ops well and have to convert them all to CFG.
+  // In the future it would be nice if we could have all of flow be both scf
+  // and cfg compatible.
+  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+
+  // We also don't handle calls well on the old codepath; until we remove the
+  // use of the CFG we can continue inlining.
+  passManager.addPass(mlir::createInlinerPass());
+
   // Convert `shape` dialect to `shapex` dialect.
   passManager.addPass(Shape::createConvertShapeToShapexPass());
 
-  // Flatten tuples (like tuple<tensor<...>, tensor<...>>) so we can do
-  // fine-grained tensor tracking.
-  // NOTE: FlattenTuplesInCFGPass requires inlining to have run.
-  passManager.addPass(mlir::createInlinerPass());
-  passManager.addPass(IREE::Flow::createFlattenTuplesInCFGPass());
-
-  // Perform cleanup after CFG manipulation.
+  // Perform initial cleanup.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 

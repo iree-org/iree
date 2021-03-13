@@ -98,7 +98,11 @@ namespace {
 static bool hasUsersInStreamAfterUpdate(Value value, Operation *updateOp) {
   for (auto user : value.getUsers()) {
     if (user == updateOp) continue;
-    if (user->isBeforeInBlock(updateOp)) continue;
+    if (user->getBlock() != updateOp->getBlock() ||
+        user->isBeforeInBlock(updateOp)) {
+      // From a dominating block or earlier in the block, cannot be a consumer.
+      continue;
+    }
     return true;
   }
   return false;
