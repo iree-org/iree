@@ -656,7 +656,7 @@ class BuildFileFunctions(object):
             str(failing_configuration.get(key, "")) for key in matrix_keys)
         failing_configuration_strings.append(failing_config_string)
         failing_configurations_block = _convert_string_list_block(
-          "FAILING_CONFIGURATIONS", failing_configuration_strings)
+            "FAILING_CONFIGURATIONS", failing_configuration_strings)
 
     self.converter.body += (f"iree_e2e_cartesian_product_test_suite(\n"
                             f"{name_block}"
