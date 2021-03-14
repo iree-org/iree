@@ -405,10 +405,10 @@ struct ConvertDimOfDispatchInputLoadToDispatchShape
 //
 // subtensor %v[..] [..] [..]
 struct ConvertDispatchInputLoadOfTensorToSubTensor
-    : public OpRewritePattern<DispatchInputLoadOp> {
+    : public OpRewritePattern<DispatchTensorLoadOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(DispatchInputLoadOp loadOp,
+  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!loadOp.source().getType().isa<RankedTensorType>()) {
       return failure();
@@ -436,7 +436,7 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // `flow.dispatch.input.load` having a `tensor` type as input. This fails
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
-OpFoldResult DispatchInputLoadOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
   if (source().getType().isa<RankedTensorType>() && offsets().empty() &&
       sizes().empty() && strides().empty()) {
     return source();

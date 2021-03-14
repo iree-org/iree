@@ -619,8 +619,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 func @constant() {
   %c0 = constant 0 : index
   %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
-  %0 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<2x2x3xi32>
-  flow.dispatch.output.store %cst, %0 : tensor<2x2x3xi32> -> !flow.dispatch.output<2x2x3xi32>
+  %0 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:2x2x3xi32>
+  flow.dispatch.tensor.store %cst, %0 : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
   return
 }
 // CHECK-LABEL: func @constant()
@@ -637,9 +637,9 @@ func @rhs_non_splat_constant() {
   %cst_0 = constant 0.000000e+00 : f32
   %c5 = constant 5 : index
   %c1 = constant 1 : index
-  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<1x5x3x1xf32>
-  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<5x5xf32>
-  %2 = flow.dispatch.input.load %0 : !flow.dispatch.input<1x5x3x1xf32> -> tensor<1x5x3x1xf32>
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:5x5xf32>
+  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
   %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -660,7 +660,7 @@ func @rhs_non_splat_constant() {
       %12 = linalg.init_tensor [%8, %10] : tensor<?x?xf32>
       %13 = linalg.fill(%12, %cst_0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
       %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%9, %11 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      flow.dispatch.output.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.output<5x5xf32>
+      flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
     }
   }
   return
