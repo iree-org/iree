@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/Builders.h"
@@ -162,6 +163,8 @@ LogicalResult TargetEnvAttr::verify(
 
   return success();
 }
+
+void VulkanDialect::registerAttributes() { addAttributes<TargetEnvAttr>(); }
 
 }  // namespace Vulkan
 }  // namespace IREE

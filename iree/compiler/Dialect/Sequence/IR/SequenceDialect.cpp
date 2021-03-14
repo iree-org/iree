@@ -30,7 +30,7 @@ namespace Sequence {
 
 SequenceDialect::SequenceDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<SequenceDialect>()) {
-  addTypes<SequenceType>();
+  registerTypes();
 
 #define GET_OP_LIST
   addOperations<

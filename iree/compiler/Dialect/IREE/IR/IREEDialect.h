@@ -31,6 +31,10 @@ class IREEDialect : public Dialect {
 
   /// Prints a type registered to this dialect.
   void printType(Type type, DialectAsmPrinter& os) const override;
+
+ private:
+  /// Register the types of this dialect.
+  void registerTypes();
 };
 
 }  // namespace iree_compiler

@@ -36,6 +36,10 @@ class SequenceDialect : public Dialect {
 
   Type parseType(DialectAsmParser& parser) const override;
   void printType(Type type, DialectAsmPrinter& os) const override;
+
+ private:
+  /// Register the types of this dialect.
+  void registerTypes();
 };
 
 }  // namespace Sequence

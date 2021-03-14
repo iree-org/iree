@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
@@ -223,5 +224,15 @@ void excludeTiedOperandAndResultIndices(
 #include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.cpp.inc"
 
 }  // namespace IREE
+
+//===----------------------------------------------------------------------===//
+// IREEDialect
+//===----------------------------------------------------------------------===//
+
+void IREEDialect::registerTypes() {
+  addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
+           IREE::PtrType>();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -192,8 +192,8 @@ struct VMFolderInterface : public DialectFoldInterface {
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()) {
-  addAttributes<IREE::VM::OrdinalCountsAttr>();
-  addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
+  registerAttributes();
+  registerTypes();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
 #define GET_OP_LIST

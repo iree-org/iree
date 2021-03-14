@@ -43,6 +43,7 @@ cc_library(
         "HALTypes.cpp",
     ],
     hdrs = [
+        "HALDialect.h",
         "HALOps.h",
         "HALTypes.h",
     ],

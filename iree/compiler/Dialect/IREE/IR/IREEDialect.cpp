@@ -29,8 +29,7 @@ namespace iree_compiler {
 
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<IREEDialect>()) {
-  addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
-           IREE::PtrType>();
+  registerTypes();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
