@@ -319,6 +319,13 @@ static LogicalResult convertSubTensorOp(
       b.create<SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
                           op.sizes(), op.strides(), op.static_offsets(),
                           op.static_sizes(), op.static_strides());
+  // For now special case the constant source case (where sub-tensor can
+  // directly be replaced by a subview). All this needs to be cleaned up soon.
+  // TODO(GH-5013): This should fall out naturally when doing buffer planning.
+  if (srcTensor.getDefiningOp<ConstantOp>()) {
+    bvm.map(resultTensor, subViewOp);
+    return success();
+  }
   auto allocationDynamicSizes = llvm::to_vector<4>(
       llvm::map_range(subViewOp.getOrCreateRanges(b, loc), [](Range range) {
         assert(matchPattern(range.stride, m_One()) &&
@@ -512,6 +519,14 @@ LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
   return success();
 }
 
+// Check if the buffer being copied from and being stored to are the same. If so
+// this copy is unnecessary since the output has been updated in place.
+bool isRedundantCopy(Value storeTo, Value storeFrom) {
+  if (storeTo == storeFrom) return true;
+  auto storeFromOp = storeFrom.getDefiningOp<SubViewOp>();
+  return storeFromOp && storeFromOp.source() == storeTo;
+}
+
 LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp,
     BlockAndValueMapping &bvm) {
@@ -521,7 +536,7 @@ LogicalResult convertInterfaceStoreTensorOp(
   Value storeFrom = bvm.lookup(storeOp.value());
   // If the value already has a mapping, it should already have been updated in
   // place by the converted producer.
-  if (storeTo == storeFrom) {
+  if (isRedundantCopy(storeTo, storeFrom)) {
     storeOp->erase();
     return success();
   }
