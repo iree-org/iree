@@ -29,7 +29,7 @@ gentbl(
             "FoldTensorExtractOp.cpp.inc",
         ),
     ],
-    tblgen = "@llvm-project/mlir:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FoldTensorExtractOp.td",
     td_srcs = [
         "//iree/compiler/Conversion/ConvertToLLVM/FoldTensorExtractOp.td",
