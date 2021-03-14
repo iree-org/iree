@@ -33,7 +33,7 @@ gentbl(
     td_file = "FoldTensorExtractOp.td",
     td_srcs = [
         "//iree/compiler/Conversion/ConvertToLLVM/FoldTensorExtractOp.td",
-        "@llvm-project//mlir:OpBasedTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
     ],
@@ -86,7 +86,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:StandardToSPIRV",
-        "@llvm-project//mlir:Tensor",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",
