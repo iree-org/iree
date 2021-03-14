@@ -663,6 +663,10 @@ func @rhs_non_splat_constant() {
       flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
     }
   }
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @rhs_non_splat_constant
@@ -686,11 +690,11 @@ func @rhs_non_splat_constant() {
 func @gather() {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.input<?x?xf32>
-  %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.input<?xi32>
-  %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.output<?x?xf32>
-  %4 = flow.dispatch.input.load %0 : !flow.dispatch.input<?x?xf32> -> tensor<?x?xf32>
-  %5 = flow.dispatch.input.load %1 : !flow.dispatch.input<?xi32> -> tensor<?xi32>
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?xi32>
+  %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+  %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %5 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
   %d0 = dim %5, %c0 : tensor<?xi32>
   %d1 = dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
@@ -700,7 +704,7 @@ func @gather() {
     %9 = tensor.extract %4[%8, %arg1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
-  flow.dispatch.output.store %7, %2 : tensor<?x?xf32> -> !flow.dispatch.output<?x?xf32>
+  flow.dispatch.tensor.store %7, %2 : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {
