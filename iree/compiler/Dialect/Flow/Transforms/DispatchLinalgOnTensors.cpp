@@ -381,7 +381,7 @@ static void tryToTieOperandsAndResults(
 
   // Returns the tied operand for the given `resultArg`. Returns nullptr
   // if error or not found.
-  auto getTiledOperandBlockArgument =
+  auto getTiedOperandBlockArgument =
       [](BlockArgument resultArg) -> BlockArgument {
     // Each output block argument should just have one use.
     if (!llvm::hasSingleElement(resultArg.getUses())) return nullptr;
@@ -393,7 +393,7 @@ static void tryToTieOperandsAndResults(
 
     Operation *tieOp = storeOp.value().getDefiningOp();
 
-    // TODO(antiagainst): use TileOpInterface here instead of hardcoding ops
+    // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
     // when it's available in MLIR core in some form.
     if (auto insertOp = dyn_cast_or_null<SubTensorInsertOp>(tieOp)) {
       auto loadOp =
@@ -410,7 +410,7 @@ static void tryToTieOperandsAndResults(
 
   // Collect all result argument's tied operand arguments.
   for (BlockArgument &arg : outputs) {
-    tiedOperands.push_back(getTiledOperandBlockArgument(arg));
+    tiedOperands.push_back(getTiedOperandBlockArgument(arg));
   }
 
   // Go over each result to tie operand when possible, by:
