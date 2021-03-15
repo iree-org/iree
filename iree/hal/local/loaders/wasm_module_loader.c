@@ -25,6 +25,7 @@
 #include "iree/schemas/dylib_executable_def_reader.h"
 #include "iree/schemas/dylib_executable_def_verifier.h"
 
+// TODO(#5084): enforce no imports, remove `--allow-undefined` linker flag
 float fmaf_impl(wasm_exec_env_t exec_env, float x, float y, float z) {
   return fmaf(x, y, z);
 }
@@ -132,7 +133,7 @@ static iree_status_t iree_hal_wasm_executable_load(
   init_args.native_module_name = "env";
 
   // `fmaf` is still used by some models
-  // TODO(scotttodd): enforce no imports, remove `--allow-undefined` linker flag
+  // TODO(#5084): enforce no imports, remove `--allow-undefined` linker flag
   static NativeSymbol native_symbols[] = {
       {.symbol = "fmaf",
        .func_ptr = fmaf_impl,
