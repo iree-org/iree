@@ -63,7 +63,7 @@ def benchmark(module_name, flagfile_name, target) -> str:
       "adb", "shell", "LD_LIBRARY_PATH=/data/local/tmp", "taskset", "80",
       f"{DEVICE_ROOT}/iree-benchmark-module",
       f"--flagfile={DEVICE_ROOT}/{flagfile_name}",
-      f"--module_file={DEVICE_ROOT}/{modle_name}", f"--driver={driver}",
+      f"--module_file={DEVICE_ROOT}/{module_name}", f"--driver={driver}",
       "--benchmark_repetitions=10"
   ] + target.runtime_flags
   print(f"Running cmd: {' '.join(cmd)}")
