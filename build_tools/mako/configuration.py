@@ -137,7 +137,7 @@ def get_s20_default_target_list(batch_config=None):
   return targets
 
 
-# The batch numbers are roughly computed to let it benchmark more then 3
+# The batch numbers are roughly computed to let it benchmark more than 3
 # seconds.
 # Do not set batch size on Pixel 4 for GPU targets, because it will get killed
 # after 2 seconds. See https://github.com/google/iree/issues/5052
