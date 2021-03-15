@@ -159,17 +159,17 @@ static iree_status_t iree_hal_wasm_executable_load(
   }
 
   // TODO(scotttodd): make this configurable
-  uint32_t stack_size = 1073741824;  // 1 GB
-  uint32_t heap_size = 1073741824;   // 1 GB
+  uint32_t heap_size = 1073741824;  // 1 GB
   executable->wasm_module_inst =
-      wasm_runtime_instantiate(executable->wasm_module, stack_size, heap_size,
-                               error_buffer, sizeof(error_buffer));
+      wasm_runtime_instantiate(executable->wasm_module, /*stack_size=*/0,
+                               heap_size, error_buffer, sizeof(error_buffer));
   if (!executable->wasm_module_inst) {
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "wasm_runtime_instantiate failed: %s",
                             error_buffer);
   }
 
+  uint32_t stack_size = 4096;
   executable->wasm_exec_env =
       wasm_runtime_create_exec_env(executable->wasm_module_inst, stack_size);
   if (!executable->wasm_exec_env) {
