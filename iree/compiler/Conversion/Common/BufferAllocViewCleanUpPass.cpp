@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- InterfaceLoadStoreCanonicalizationPass.cpp -------------------------===//
+//===- BufferAllocViewCleanUpPass.cpp -------------------------------------===//
 //
-// This pass performs canonicalizations related to HAL interface load/store
-// operations. This is a specific pass because patterns here involve multiple
-// dialects.
+// This pass performs canonicalizations/cleanups related to HAL interface/buffer
+// allocations and views. We need a dedicated pass because patterns here involve
+// multiple dialects.
 //
 //===----------------------------------------------------------------------===//
 
@@ -85,26 +85,44 @@ struct FoldReshapeIntoInterfaceTensorLoad
   }
 };
 
+// Removes operations with Allocate MemoryEffects but no uses.
+struct RemoveDeadMemAllocs : RewritePattern {
+  RemoveDeadMemAllocs(PatternBenefit benefit = 1)
+      : RewritePattern(benefit, MatchAnyOpTypeTag()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
+    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
+      return failure();
+    }
+    if (!op->use_empty()) return failure();
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 /// Runs canonicalization patterns on interface load/store ops.
-struct InterfaceLoadStoreCanonicalizationPass
-    : public PassWrapper<InterfaceLoadStoreCanonicalizationPass, FunctionPass> {
+struct BufferAllocViewCleanUpPass
+    : public PassWrapper<BufferAllocViewCleanUpPass, FunctionPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<FoldReshapeIntoInterfaceTensorLoad>(&getContext());
+    patterns.insert<RemoveDeadMemAllocs>();
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
 }  // namespace
 
-std::unique_ptr<FunctionPass> createInterfaceLoadStoreCanonicalizationPass() {
-  return std::make_unique<InterfaceLoadStoreCanonicalizationPass>();
+std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass() {
+  return std::make_unique<BufferAllocViewCleanUpPass>();
 }
 
-static PassRegistration<InterfaceLoadStoreCanonicalizationPass> pass(
-    "iree-codegen-canonicalize-hal-interface-load-store",
-    "Canonicalize HAL interface load/store operations",
-    [] { return std::make_unique<InterfaceLoadStoreCanonicalizationPass>(); });
+static PassRegistration<BufferAllocViewCleanUpPass> pass(
+    "iree-codegen-cleanup-buffer-alloc-view",
+    "Performs cleanups over HAL interface/buffer allocation/view operations",
+    [] { return std::make_unique<BufferAllocViewCleanUpPass>(); });
 
 }  // namespace iree_compiler
 }  // namespace mlir

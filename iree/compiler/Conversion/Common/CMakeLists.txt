@@ -19,12 +19,11 @@ iree_cc_library(
     "Passes.h"
     "Transforms.h"
   SRCS
-    "InterfaceLoadStoreCanonicalizationPass.cpp"
+    "BufferAllocViewCleanUpPass.cpp"
     "LaunchConfig.cpp"
     "LinalgBufferizePass.cpp"
     "LinalgRewriteDestructiveUpdatesPass.cpp"
     "Passes.cpp"
-    "RemoveDeadMemAllocsPass.cpp"
     "Transforms.cpp"
     "VectorTransferOptimization.cpp"
   DEPS

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-codegen-remove-dead-mem-allocs -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s -iree-codegen-cleanup-buffer-alloc-view -split-input-file | IreeFileCheck %s
 
 func @alloc_remove(%arg0: index, %arg1: index) {
   %0 = alloc(%arg0, %arg1) : memref<?x?xf32>

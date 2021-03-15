@@ -24,7 +24,7 @@ void addLinalgBufferizePasses(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
+  passManager.addNestedPass<FuncOp>(createBufferAllocViewCleanUpPass());
   passManager.addPass(createCopyRemovalPass());
   // passManager.addPass(createBufferHoistingPass());
   // TODO(nicolasvasilache): bug in buffer loop hoisting with

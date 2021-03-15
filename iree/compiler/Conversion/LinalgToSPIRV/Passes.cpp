@@ -173,7 +173,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
 
   if (options.usingLinalgOnTensors) {
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-        createInterfaceLoadStoreCanonicalizationPass());
+        createBufferAllocViewCleanUpPass());
 
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
@@ -215,7 +215,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //===--------------------------------------------------------------------===//
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createBufferAllocViewCleanUpPass());
   }
 
   //===--------------------------------------------------------------------===//
