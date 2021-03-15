@@ -71,3 +71,20 @@ func @tensor_4D() attributes { iree.module.export } {
   check.expect_almost_eq_const(%result, dense<42.0> : tensor<10x20x30x40xf32>) : tensor<10x20x30x40xf32>
   return
 }
+
+func @cst_plus_tensor() attributes { iree.module.export } {
+   %c2 = constant 2 : i32
+   %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
+   %0 = linalg.init_tensor [2, 2, 3] : tensor<2x2x3xi32>
+   %1 = linalg.generic
+     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+     ins(%cst : tensor<2x2x3xi32>) outs(%0 : tensor<2x2x3xi32>) {
+     ^bb0(%arg0 : i32, %arg1 : i32):
+       %2 = muli %arg0, %c2 : i32
+       linalg.yield %2 : i32
+     } -> tensor<2x2x3xi32>
+   check.expect_eq_const(%1, dense<
+     [[[2, 4, 6], [8, 10, 12]], [[14, 16, 18], [20, 22, 24]]]> : tensor<2x2x3xi32>) : tensor<2x2x3xi32>
+   return
+}

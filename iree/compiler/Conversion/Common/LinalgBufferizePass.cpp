@@ -204,6 +204,28 @@ static LogicalResult convertAnyLinalgOp(
   return success();
 }
 
+/// Constants that return tensor types can be handled natively by the
+/// backends. Here just provide a cast to memref to bridge the gap from tensors
+/// to memrefs.
+static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
+                                       BlockAndValueMapping &bvm) {
+  Value result = constantOp.getResult();
+  RankedTensorType tensorType = result.getType().dyn_cast<RankedTensorType>();
+  if (!tensorType) return success();
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPointAfter(constantOp);
+  auto memrefType = getMemrefTypeForTensor(tensorType);
+  Value memref =
+      b.create<TensorToMemrefOp>(constantOp.getLoc(), memrefType, result);
+  if (Value resultBuffer = bvm.lookupOrNull(result)) {
+    // Since this is already remapped to a buffer, copy the data.
+    b.create<linalg::CopyOp>(constantOp.getLoc(), memref, resultBuffer);
+  } else {
+    bvm.map(result, memref);
+  }
+  return success();
+}
+
 /// Avoids creating an allocation if the result tensor can just be aliased to
 /// use the same buffer (`inputBuffer`) that `srcTensor` is mapped to. This can
 /// be done if `srcTensor` has a single use, which is the operation which is
@@ -297,6 +319,13 @@ static LogicalResult convertSubTensorOp(
       b.create<SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
                           op.sizes(), op.strides(), op.static_offsets(),
                           op.static_sizes(), op.static_strides());
+  // For now special case the constant source case (where sub-tensor can
+  // directly be replaced by a subview). All this needs to be cleaned up soon.
+  // TODO(GH-5013): This should fall out naturally when doing buffer planning.
+  if (srcTensor.getDefiningOp<ConstantOp>()) {
+    bvm.map(resultTensor, subViewOp);
+    return success();
+  }
   auto allocationDynamicSizes = llvm::to_vector<4>(
       llvm::map_range(subViewOp.getOrCreateRanges(b, loc), [](Range range) {
         assert(matchPattern(range.stride, m_One()) &&
@@ -490,29 +519,32 @@ LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
   return success();
 }
 
+// Check if the buffer being copied from and being stored to are the same. If so
+// this copy is unnecessary since the output has been updated in place.
+bool isRedundantCopy(Value storeTo, Value storeFrom) {
+  if (storeTo == storeFrom) return true;
+  auto storeFromOp = storeFrom.getDefiningOp<SubViewOp>();
+  return storeFromOp && storeFromOp.source() == storeTo;
+}
+
 LogicalResult convertInterfaceStoreTensorOp(
     OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp,
     BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(storeOp);
-
-  // If we have both the source and target buffer pointing to the same binding,
-  // then it's an indication that we are performing in-place update. For such
-  // cases, we can just remove this store.
-  auto storeTo = bvm.lookup(storeOp.target())
-                     .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-  auto storeFrom = bvm.lookup(storeOp.value())
-                       .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-  if (storeTo && storeFrom && storeTo.binding() == storeFrom.binding()) {
+  Value storeTo = bvm.lookup(storeOp.target());
+  Value storeFrom = bvm.lookup(storeOp.value());
+  // If the value already has a mapping, it should already have been updated in
+  // place by the converted producer.
+  if (isRedundantCopy(storeTo, storeFrom)) {
     storeOp->erase();
     return success();
   }
 
   Value subview =
-      createSubviewOp(b, storeOp.getLoc(), bvm.lookup(storeOp.target()),
-                      storeOp.offsets(), storeOp.sizes(), storeOp.strides());
-  b.create<linalg::CopyOp>(storeOp->getLoc(), bvm.lookup(storeOp.value()),
-                           subview);
+      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.offsets(),
+                      storeOp.sizes(), storeOp.strides());
+  b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
   storeOp->erase();
   return success();
 }
@@ -606,6 +638,9 @@ void LinalgBufferizePass::runOnFunction() {
 
   auto conversionDispatch = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<ConstantOp>([&](ConstantOp constantOp) {
+          return convertConstantOp(b, constantOp, bvm);
+        })
         .Case<IREE::Flow::DispatchTensorLoadOp>(
             [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
               return convertInterfaceLoadTensorOp(b, loadOp, bvm);

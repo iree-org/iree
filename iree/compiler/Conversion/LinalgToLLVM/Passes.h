@@ -55,6 +55,11 @@ std::unique_ptr<FunctionPass> createLinalgVectorizePass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
 createMaterializeCPULaunchConfigurationPass();
 
+/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
+/// introduced for use only in tensor_extract. These can be folded to use a load
+/// of the created memref object that holds the constant values.
+std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
+
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.

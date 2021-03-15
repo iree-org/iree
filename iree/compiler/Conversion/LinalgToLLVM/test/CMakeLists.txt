@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "conv_img2col.mlir"
+    "fold_tensor_extract_op.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"

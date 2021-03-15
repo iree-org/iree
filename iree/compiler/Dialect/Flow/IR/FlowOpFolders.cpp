@@ -393,11 +393,55 @@ struct ConvertDimOfDispatchInputLoadToDispatchShape
   }
 };
 
+// Inlining producers of an input to the dispatch region results in the
+// `flow.dispatch.input.load` having a `tensor` type as input. This fails
+// verification. Since inlining happens during canonicalization, add a pattern
+// to convert
+//
+// flow.dispatch.input.load %v, offsets .., sizes .., strides..
+//   : tensor<...> -> tensor<..>
+//
+// to
+//
+// subtensor %v[..] [..] [..]
+struct ConvertDispatchInputLoadOfTensorToSubTensor
+    : public OpRewritePattern<DispatchTensorLoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp.source().getType().isa<RankedTensorType>()) {
+      return failure();
+    }
+    // If the offsets are empty rely on folding to take care of it.
+    if (loadOp.offsets().empty() && loadOp.sizes().empty() &&
+        loadOp.strides().empty()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<SubTensorOp>(loadOp, loadOp.source(),
+                                             loadOp.offsets(), loadOp.sizes(),
+                                             loadOp.strides());
+    return success();
+  }
+};
 }  // namespace
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ConvertDimOfDispatchInputLoadToDispatchShape>(context);
+  results.insert<ConvertDimOfDispatchInputLoadToDispatchShape,
+                 ConvertDispatchInputLoadOfTensorToSubTensor>(context);
+}
+
+// Inlining producers of an input to the dispatch region results in the
+// `flow.dispatch.input.load` having a `tensor` type as input. This fails
+// verification. Fold such uses of the offsets, size and strides are emtpy.
+// i.e, flow.dispatch.input.load %v -> %v
+OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
+  if (source().getType().isa<RankedTensorType>() && offsets().empty() &&
+      sizes().empty() && strides().empty()) {
+    return source();
+  }
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

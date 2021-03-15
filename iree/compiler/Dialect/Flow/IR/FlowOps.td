@@ -545,6 +545,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
   }];
 
   let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [

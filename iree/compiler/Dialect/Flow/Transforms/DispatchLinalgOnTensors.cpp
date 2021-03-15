@@ -206,7 +206,7 @@ static bool isDispatchableOp(Operation *op) {
   if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
     return false;
   }
-  // Only linalg ops are marked dispatchable.
+  // Linalg ops are marked dispatchable.
   if ((op->getDialect() !=
        op->getContext()->getLoadedDialect<linalg::LinalgDialect>()) &&
       !isa<SubTensorOp, SubTensorInsertOp>(op)) {
