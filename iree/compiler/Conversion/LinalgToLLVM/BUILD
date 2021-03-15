@@ -32,7 +32,6 @@ gentbl(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FoldTensorExtractOp.td",
     td_srcs = [
-        "//iree/compiler/Conversion/ConvertToLLVM/FoldTensorExtractOp.td",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
