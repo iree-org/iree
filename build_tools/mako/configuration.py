@@ -88,7 +88,9 @@ class ModelBenchmarkInfo:
     self.phones = phones
 
 
-def get_pixel4_default_target_list(batch_config={}):
+def get_pixel4_default_target_list(batch_config=None):
+  if batch_config is None:
+    batch_config = []
   targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
@@ -111,7 +113,9 @@ def get_pixel4_default_target_list(batch_config={}):
   return targets
 
 
-def get_s20_default_target_list(batch_config={}):
+def get_s20_default_target_list(batch_config=None):
+  if batch_config is None:
+    batch_config = []
   targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
