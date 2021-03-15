@@ -370,6 +370,70 @@ static Operation *getInsertionPoint(Block &block, ArrayRef<Value> usedValues) {
   return insertAfter->getNextNode();
 }
 
+/// Modifies `dispatchOp` to attach operand-result tie information when
+/// possible.
+static void tryToTieOperandsAndResults(
+    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+  Block *block = dispatchOp.getBody(0);
+  unsigned numResults = dispatchOp.getNumResults();
+  auto inputs = block->getArguments().drop_back(numResults);
+  auto outputs = block->getArguments().take_back(numResults);
+
+  // Returns the tied operand for the given `resultArg`. Returns nullptr
+  // if error or not found.
+  auto getTiedOperandBlockArgument =
+      [](BlockArgument resultArg) -> BlockArgument {
+    // Each output block argument should just have one use.
+    if (!llvm::hasSingleElement(resultArg.getUses())) return nullptr;
+
+    // And that's a flow.dispatch.output.store op.
+    auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(
+        (*resultArg.getUses().begin()).getOwner());
+    if (!storeOp) return nullptr;
+
+    Operation *tieOp = storeOp.value().getDefiningOp();
+
+    // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
+    // when it's available in MLIR core in some form.
+    if (auto insertOp = dyn_cast_or_null<SubTensorInsertOp>(tieOp)) {
+      auto loadOp =
+          insertOp.dest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+      if (!loadOp) return nullptr;
+      return loadOp.source().cast<BlockArgument>();
+    }
+
+    return nullptr;
+  };
+
+  SmallVector<BlockArgument, 4> tiedOperands;
+  tiedOperands.reserve(numResults);
+
+  // Collect all result argument's tied operand arguments.
+  for (BlockArgument &arg : outputs) {
+    tiedOperands.push_back(getTiedOperandBlockArgument(arg));
+  }
+
+  // Go over each result to tie operand when possible, by:
+  // 1. Update the tied operand argument to take readwrite tensors.
+  // 2. Erase the result argument.
+  // 3. Attach the tie information to the DispatchWorkgroupsOp.
+  for (int i = outputs.size() - 1; i >= 0; --i) {
+    BlockArgument inputArg = tiedOperands[i];
+    if (!inputArg) continue;
+
+    auto oldType = inputArg.getType().cast<IREE::Flow::DispatchTensorType>();
+    inputArg.setType(IREE::Flow::DispatchTensorType::get(
+        IREE::Flow::TensorAccess::ReadWrite, oldType.getShape(),
+        oldType.getElementType()));
+
+    BlockArgument outputArg = block->getArgument(inputs.size() + i);
+    outputArg.replaceAllUsesWith(inputArg);
+    block->eraseArgument(inputs.size() + i);
+
+    dispatchOp.setTiedResultOperandIndex(i, inputArg.getArgNumber());
+  }
+}
+
 // After outlining in dispatch region we can rewrite the dispatch ops with
 // proper captures.
 // A later RematerializeDispatchConstants should be called to avoid passing
@@ -476,6 +540,12 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   // Set the values captured from above as the new operands.
   dispatchOp.operandsMutable().assign(llvm::to_vector<4>(valuesDefinedAbove));
   dispatchOp.operand_dimsMutable().assign(operandDynamicDims);
+
+  // Now try to see if we can tie certain results to operands in order to
+  // indicate sharing storage. This need to happen here because it needs to
+  // access region block arguments for input/output tensors, which aren't
+  // available until now.
+  tryToTieOperandsAndResults(dispatchOp);
 
   return success();
 }
