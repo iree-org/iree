@@ -1020,10 +1020,25 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  SmallVector<int64_t, 4> newTiedOperandIndices =
+
+  auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  // TODO(benvanik): all this offset stuff is confusing and should be reworked.
+  // We should probably have absolute indices and relative indices, or just one
+  // or the other, and not be crossing the streams. The way things are offset
+  // is the same as variadic ODS operands for consistency, but just like ODS
+  // operands half of the code assumes its within a particular ODS operand and
+  // half the code assumes it's within the flattened set of all Operation
+  // operands.
+  unsigned tiedOperandOffset = getTiedOperandsIndexAndLength().first;
+  for (unsigned i = 0; i < newTiedOperandIndices.size(); ++i) {
+    if (newTiedOperandIndices[i] != TiedOpInterface::kUntiedIndex) {
+      newTiedOperandIndices[i] -= tiedOperandOffset;
+    }
+  }
+
   auto newOp = OpBuilder(getContext())
                    .create<DispatchWorkgroupsOp>(
                        getLoc(), workgroup_count(), newResultTypes,
@@ -1529,10 +1544,14 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  SmallVector<int64_t, 4> newTiedOperandIndices =
+
+  auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  assert(getTiedOperandsIndexAndLength().first == 0 &&
+         "operands must be the first ODS group");
+
   auto newOp = OpBuilder(getContext())
                    .create<ExStreamFragmentOp>(
                        getLoc(), newResultTypes, newResultDims,
