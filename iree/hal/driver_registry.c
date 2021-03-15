@@ -60,6 +60,41 @@ iree_hal_driver_registry_default() {
   return &iree_hal_driver_registry_default_;
 }
 
+// Creates and initializes an empty device driver registry
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_create(
+    iree_allocator_t allocator,
+    iree_hal_driver_registry_t** out_registry) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+    allocator, sizeof(struct iree_hal_driver_registry_s), (void**)out_registry));
+  iree_slim_mutex_initialize(&((*out_registry)->mutex));
+  
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_unregister_and_free(
+    iree_hal_driver_registry_t* registry,
+    iree_allocator_t allocator) {
+  IREE_ASSERT_ARGUMENT(registry);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // unregister each factory
+  for (iree_host_size_t i = 0; i < registry->factory_count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_driver_registry_unregister_factory(
+      registry, registry->factories[i]));
+  }
+
+  iree_slim_mutex_deinitialize(&registry->mutex);
+  iree_allocator_free(allocator, registry);
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_driver_registry_register_factory(
     iree_hal_driver_registry_t* registry,
