@@ -42,20 +42,6 @@ int32_t getRoundedElementByteWidth(Type type);
 // the HAL ABI. For example, `tensor<4x8xi1>` is converted to `tensor<4x8xi8>`.
 TensorType convertTensorTypeToABIType(TensorType sourceType);
 
-// Converts a value to/from one supported by the ABI from/to an arbitrary tensor
-// type.
-//
-// Ideally we'd use some type-aware conversion to handle signed/unsigned
-// saturation vs. truncation. As an example, we'd want to zero-extend an
-// unsigned i4 to a signed i8. We also don't want to use HLO ops here, but the
-// standard ops (trunci, zexti, etc) are not supported by subsequent lowerings
-// and just cause pain.
-//
-// Example: `tensor<4xi8>` -> `tensor<4xi1>`
-//      or  `tensor<4xi1>` -> `tensor<4xi8>`
-Value convertABITensorType(Location loc, Value sourceValue,
-                           TensorType targetType, OpBuilder &builder);
-
 // Returns an array of i32 values representing the shape of the |shapedType|.
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
                                          OpBuilder &builder);

@@ -36,6 +36,5 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@mlir-hlo//:hlo",
     ],
 )
