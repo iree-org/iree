@@ -684,3 +684,38 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]]
 //  CHECK-SAME:         outs(%[[RESULT_SUBVIEW]]
+
+// -----
+
+func @gather() {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?xi32>
+  %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+  %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %5 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
+  %d0 = dim %5, %c0 : tensor<?xi32>
+  %d1 = dim %4, %c1 : tensor<?x?xf32>
+  %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %7 = linalg.indexed_generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
+  ^bb0(%arg0: index, %arg1: index, %arg2: i32, %arg3: f32):  // no predecessors
+    %8 = index_cast %arg2 : i32 to index
+    %9 = tensor.extract %4[%8, %arg1] : tensor<?x?xf32>
+    linalg.yield %9 : f32
+  } -> tensor<?x?xf32>
+  flow.dispatch.tensor.store %7, %2 : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @gather()
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//       CHECK:   linalg.indexed_generic
+//       CHECK:     %[[VAL:.+]] = load %[[ARG0]]
+//       CHECK:     linalg.yield %[[VAL]]
