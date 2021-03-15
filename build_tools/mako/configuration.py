@@ -47,6 +47,11 @@ class TargetInfo:
     """ Returns a string indicates the driver of the target."""
     return self.name.split("-")[0]
 
+  def add_batch_flag(self, size):
+    self.compilation_flags.append(
+        f"--iree-hal-benchmark-dispatch-repeat-count={size}")
+    self.runtime_flags.append(f"--batch_size={size}")
+
 
 class PhoneBenchmarkInfo:
   """Information of a phone.
@@ -83,8 +88,8 @@ class ModelBenchmarkInfo:
     self.phones = phones
 
 
-def get_pixel4_default_target_list():
-  return [
+def get_pixel4_default_target_list(batch_config={}):
+  targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
                  mako_tag="cpu",
@@ -100,10 +105,14 @@ def get_pixel4_default_target_list():
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
           ])
   ]
+  for target in targets:
+    if target.mako_tag in batch_config:
+      target.add_batch_flag(batch_config[target.mako_tag])
+  return targets
 
 
-def get_s20_default_target_list():
-  return [
+def get_s20_default_target_list(batch_config={}):
+  targets = [
       TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
                  mako_tag="cpu",
@@ -118,6 +127,10 @@ def get_s20_default_target_list():
                      "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
                  ])
   ]
+  for target in targets:
+    if target.mako_tag in batch_config:
+      target.add_batch_flag(batch_config[target.mako_tag])
+  return targets
 
 
 MODEL_BENCHMARKS = [
@@ -127,10 +140,14 @@ MODEL_BENCHMARKS = [
         phones=[
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="5538704950034432",
-                               targets=get_pixel4_default_target_list()),
+                               targets=get_pixel4_default_target_list(
+                                   {'cpu': 16})),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="4699630718681088",
-                               targets=get_s20_default_target_list()),
+                               targets=get_s20_default_target_list({
+                                   'cpu': 16,
+                                   'vlk': 16
+                               })),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
@@ -138,10 +155,14 @@ MODEL_BENCHMARKS = [
         phones=[
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="6338759231537152",
-                               targets=get_pixel4_default_target_list()),
+                               targets=get_pixel4_default_target_list(
+                                   {'cpu': 8})),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="5618403088793600",
-                               targets=get_s20_default_target_list()),
+                               targets=get_s20_default_target_list({
+                                   'cpu': 16,
+                                   'vlk': 32
+                               })),
         ])
 ]
 
