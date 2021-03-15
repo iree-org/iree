@@ -87,9 +87,9 @@ static iree_status_t iree_hal_wasm_driver_factory_try_create(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_wasm_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
-      /*self=*/NULL,
-      iree_hal_wasm_driver_factory_enumerate,
-      iree_hal_wasm_driver_factory_try_create,
+      .self = NULL,
+      .enumerate = iree_hal_wasm_driver_factory_enumerate,
+      .try_create = iree_hal_wasm_driver_factory_try_create,
   };
   return iree_hal_driver_registry_register_factory(registry, &factory);
 }

@@ -134,10 +134,10 @@ static iree_status_t iree_hal_wasm_executable_load(
   // `fmaf` is still used by some models
   // TODO(scotttodd): enforce no imports, remove `--allow-undefined` linker flag
   static NativeSymbol native_symbols[] = {
-      {/*symbol=*/"fmaf",
-       /*func_ptr=*/fmaf_impl,
-       /*signature=*/"(fff)f",
-       /*attachment=*/NULL},
+      {.symbol = "fmaf",
+       .func_ptr = fmaf_impl,
+       .signature = "(fff)f",
+       .attachment = NULL},
   };
   init_args.native_symbols = native_symbols;
   init_args.n_native_symbols = IREE_ARRAYSIZE(native_symbols);
