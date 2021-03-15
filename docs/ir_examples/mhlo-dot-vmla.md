@@ -30,16 +30,6 @@ func @dot(%lhs: tensor<32x1024xf32>, %rhs: tensor<1024x64xf32>) -> tensor<32x64x
   return %0 : tensor<32x64xf32>
 }
 ```
-### IR Dump After Canonicalizer
-```
-module  {
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    return %0 : tensor<32x64xf32>
-  }
-}
-
-```
 ### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
@@ -49,6 +39,14 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After RemoveShapeConstraints
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -88,19 +86,13 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 }
 
 ```
-### IR Dump After RemoveShapeConstraints
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
 ### IR Dump After Canonicalizer
 ```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
+module  {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
 }
 
 ```
@@ -168,9 +160,9 @@ module  {
 }
 
 ```
-### IR Dump After mlir::iree_compiler::IREE::Flow::MaterializeExportedReflectionPass
+### IR Dump After mlir::iree_compiler::IREE::Flow::MaterializeReflectionAttrsPass
 ```
-func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {f_partial = "I12!B9!d32d1024"}}, %arg1: tensor<1024x64xf32> {iree.reflection = {f_partial = "I12!B9!d1024d64"}}) -> (tensor<32x64xf32> {iree.reflection = {f_partial = "R10!B7!d32d64"}}) attributes {iree.module.export} {
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
@@ -179,7 +171,7 @@ func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {f_partial = "I12!B9!d32
 ### IR Dump After mlir::iree_compiler::IREE::Flow::ExpandVariableDynamicDimsPass
 ```
 module  {
-  func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {f_partial = "I12!B9!d32d1024"}}, %arg1: tensor<1024x64xf32> {iree.reflection = {f_partial = "I12!B9!d1024d64"}}) -> (tensor<32x64xf32> {iree.reflection = {f_partial = "R10!B7!d32d64"}}) attributes {iree.module.export} {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
@@ -187,14 +179,6 @@ module  {
 
 ```
 ### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ExpandFunctionDynamicDimsPass
-```
-func @dot(%arg0: tensor<32x1024xf32> {iree.reflection = {f_partial = "I12!B9!d32d1024"}}, %arg1: tensor<1024x64xf32> {iree.reflection = {f_partial = "I12!B9!d1024d64"}}) -> (tensor<32x64xf32> {iree.reflection = {f_partial = "R10!B7!d32d64"}}) attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::MergeExportedReflectionPass
 ```
 func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
@@ -281,26 +265,6 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 
 ```
 ### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegionsPass
-```
-module  {
-  flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    flow.dispatch.entry @dot_ex_dispatch_0 attributes {signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
-    module  {
-      func @dot_ex_dispatch_0(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> {
-        %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-        return %0 : tensor<32x64xf32>
-      }
-    }
-  }
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %c2048 = constant 2048 : index
-    %0 = flow.dispatch @dot_ex_dispatch_0::@dot_ex_dispatch_0[%c2048](%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    return %0 : tensor<32x64xf32>
-  }
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::OutlineDispatchRegions2Pass
 ```
 module  {
   flow.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
