@@ -23,13 +23,13 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
-        "CreateBenchmarkFuncs.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
         "DispatchConfig.cpp",
         "DispatchLinalgOnTensors.cpp",
         "DispatchabilityAnalysis.cpp",
         "ExpandVariableDynamicDims.cpp",
+        "ExportBenchmarkFuncs.cpp",
         "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
         "FormStreams.cpp",

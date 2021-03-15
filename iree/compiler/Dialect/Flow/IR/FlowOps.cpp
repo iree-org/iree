@@ -464,6 +464,14 @@ void VariableOp::build(OpBuilder &builder, OperationState &result,
 // flow.variable.load
 //===----------------------------------------------------------------------===//
 
+void VariableLoadOp::build(OpBuilder &builder, OperationState &state,
+                           VariableOp variableOp,
+                           ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({variableOp.type()});
+  state.addAttribute("variable", builder.getSymbolRefAttr(variableOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
 void VariableLoadOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying

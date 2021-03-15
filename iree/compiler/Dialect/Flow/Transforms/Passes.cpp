@@ -33,14 +33,22 @@
 static llvm::cl::opt<bool> clEnableLinalgOnTensorsDispatch(
     "iree-flow-dispatch-linalg-on-tensors",
     llvm::cl::desc(
-        "Enable use of Linalg on tensors for dispatch region creation"),
+        "Enable use of Linalg on tensors for dispatch region creation."),
+    llvm::cl::init(false));
+
+// TODO(benvanik): change to a pipeline option.
+static llvm::cl::opt<bool> clExportBenchmarkFuncs(
+    "iree-flow-export-benchmark-funcs",
+    llvm::cl::desc(
+        "Exports one function per original module entry point and "
+        "unique flow.executable that dispatches with dummy arguments."),
     llvm::cl::init(false));
 
 // TODO(benvanik): change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
     "iree-flow-trace-dispatch-tensors2",
     llvm::cl::desc(
-        "Trace runtime input/output tensors for each dispatch function"),
+        "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
 
 namespace mlir {
@@ -224,6 +232,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
+  // Create one function per remaining flow.executable that can be used with
+  // iree-benchmark-module to benchmark each dispatch individually, as well as
+  // exporting all original model entry points.
+  if (clExportBenchmarkFuncs) {
+    passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
+  }
+
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
@@ -272,25 +287,6 @@ void registerFlowTransformPassPipeline() {
       "Runs the full IREE flow dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildFlowTransformPassPipeline(passManager);
-      });
-}
-
-void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addPass(IREE::Flow::createCreateBenchmarkFuncs());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createMaterializeReflectionAttrs());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addPass(createSymbolDCEPass());
-}
-
-void registerExportDispatchesTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
-      "iree-flow-export-dispatches",
-      "Runs the pipeline to export dispatch functions",
-      [](OpPassManager &passManager) {
-        buildExportDispatchesTransformPassPipeline(passManager);
       });
 }
 
