@@ -30,7 +30,6 @@ iree_cc_library(
     MLIRTransforms
     iree::base::flatcc
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 
