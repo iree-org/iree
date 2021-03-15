@@ -25,6 +25,7 @@
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -193,13 +194,23 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   if (clEnableLinalgOnTensorsDispatch) {
-    passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-    addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
+    // TODO(benvanik): move up to input; requires pre-partitioning conversion
+    // to be reworked first.
+    passManager.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass(true));
+
+    passManager.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
     passManager.addNestedPass<FuncOp>(createConvertToFlowTensorOpsPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+
     passManager.addNestedPass<FuncOp>(
         IREE::Flow::createDispatchLinalgOnTensorsPass());
+    // NOTE: required because the current dispatch-linalg-on-tensors pass
+    // creates a lot of dead IR that needs to be cleaned up.
     passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
     // Outline the dispatch regions into their own functions wrapped in
