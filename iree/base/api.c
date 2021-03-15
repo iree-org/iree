@@ -953,7 +953,9 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
                                         /*buffer=*/NULL, &buffer_length))) {
     return false;
   }
-  char* buffer = (char*)malloc(buffer_length + 1);
+  // add space for NULL and pass this information on to iree_status_format
+  buffer_length += 1;
+  char* buffer = (char*)malloc(buffer_length);
   if (IREE_UNLIKELY(!buffer)) return false;
   bool ret =
       iree_status_format(status, buffer_length, buffer, out_buffer_length);

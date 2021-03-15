@@ -729,12 +729,17 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for
 // presenting errors to users and not sent to a logs aggregation service.
+//
+// If |buffer_capacity| is insufficient, then |out_buffer_length| is the
+// number of characters that would have been written if |buffer_capacity| 
+// had been sufficiently large, not counting the terminating null character. 
 IREE_API_EXPORT bool IREE_API_CALL
 iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
                    char* buffer, iree_host_size_t* out_buffer_length);
 
 // Converts the status to an allocated string value.
 // The caller must free the buffer with the system allocator.
+// |out_buffer_length| does not count the terminating null character.
 IREE_API_EXPORT bool IREE_API_CALL
 iree_status_to_string(iree_status_t status, char** out_buffer,
                       iree_host_size_t* out_buffer_length);
