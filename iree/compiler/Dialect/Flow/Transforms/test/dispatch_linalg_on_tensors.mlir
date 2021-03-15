@@ -225,6 +225,8 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
 // CHECK: scf.for
 // CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc
 
+// -----
+
 func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32> {
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
