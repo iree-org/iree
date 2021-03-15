@@ -38,7 +38,6 @@ cc_library(
         "IdentifyDispatchRegions2.cpp",
         "InjectDispatchTracing.cpp",
         "LegalizeInputTypes.cpp",
-        "MaterializeReflectionAttrs.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineDispatchRegions2.cpp",
         "OutlineLargeConstants.cpp",
@@ -52,7 +51,6 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/base:signature_mangle",
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Conversion/HLOToLinalg:HLOToLinalgOnTensors",

@@ -42,7 +42,7 @@ cc_library(
         "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_tensorlist_to_tensorlist",
         "//iree_tf_compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
         "//iree_tf_compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
-        "@iree//iree/base:signature_mangle",
+        "@iree//iree/compiler/Bindings/SIP/Utils",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/IREE/IR",
         "@iree//iree/compiler/Dialect/Shape/Conversion",

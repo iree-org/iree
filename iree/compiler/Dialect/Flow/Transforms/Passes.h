@@ -84,11 +84,6 @@ std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 // to dispatch regions.
 std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
 
-// Materializes reflection metadata on exported function arguments and results.
-// This runs as close to the input processing as possible as it needs to
-// annotate the ABI that the consumer is expecting to interop with.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs();
-
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
 
@@ -178,7 +173,6 @@ inline void registerFlowPasses() {
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createPostPartitioningConversionPass();
-  createMaterializeReflectionAttrs();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegions2Pass();

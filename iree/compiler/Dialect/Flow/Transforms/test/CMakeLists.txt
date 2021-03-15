@@ -32,7 +32,6 @@ iree_lit_test_suite(
     "identify_dispatch_regions2_std_fusion.mlir"
     "inject_dispatch_tracing.mlir"
     "legalize_input_types.mlir"
-    "materialize_reflection_attrs.mlir"
     "outline_dispatch_regions2.mlir"
     "outline_large_constants.mlir"
     "strip_and_splat_constant_variables.mlir"

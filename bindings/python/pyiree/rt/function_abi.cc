@@ -18,7 +18,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"

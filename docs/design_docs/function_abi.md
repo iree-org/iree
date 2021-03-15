@@ -19,7 +19,7 @@ implemented without additional dependencies (i.e. just string manipulation).
 
 The suggested format is manipulated via the C++ reference implementations
 `SignatureBuilder` and `SignatureParser` classes (see
-`iree/base/signature_mangle.h`). See documentation and code for those classes
+`iree/base/signature_parser.h`). See documentation and code for those classes
 for more details.
 
 ## ABIs
