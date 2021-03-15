@@ -258,7 +258,7 @@ iree_check_single_backend_test_suite(
         "clamp.mlir",
         "compare.mlir",
         # https://github.com/google/iree/issues/4079
-        # "concatenate.mlir",
+        "concatenate.mlir",
         "constant.mlir",
         # https://github.com/google/iree/issues/4079
         # "convolution.mlir",

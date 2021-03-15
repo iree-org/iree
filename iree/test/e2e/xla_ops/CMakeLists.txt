@@ -235,6 +235,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
     "cosine.mlir"
     "divide.mlir"
