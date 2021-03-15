@@ -34,34 +34,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-namespace {
-/// tensor::ExtractOp will be lowered to IREE::Flow::TensorLoadOp. If the type
-/// is i1, it's not valid to load. In this case, we need to cast it to i8 before
-/// the load, and truncate the value after the load.
-struct ExtractElementOpPromotion
-    : public OpConversionPattern<tensor::ExtractOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      tensor::ExtractOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const override {
-    auto tensorType = op.tensor().getType().dyn_cast<TensorType>();
-    if (!tensorType) {
-      return rewriter.notifyMatchFailure(op, "expected tensor types");
-    }
-    if (!tensorType.getElementType().isInteger(1)) {
-      return rewriter.notifyMatchFailure(op, "expected i1 type");
-    }
-    Location loc = op.getLoc();
-    auto i8Type = rewriter.getIntegerType(8);
-    auto i8Operand = rewriter.create<mhlo::ConvertOp>(loc, args[0], i8Type);
-    auto loadOp = rewriter.create<tensor::ExtractOp>(loc, i8Type, i8Operand,
-                                                     op.indices());
-    auto i1Type = rewriter.getI1Type();
-    rewriter.replaceOpWithNewOp<TruncateIOp>(op, i1Type, loadOp.getResult());
-    return success();
-  }
-};
-}  // namespace
 
 class PrePartitioningConversionPass
     : public PassWrapper<PrePartitioningConversionPass, FunctionPass> {
@@ -101,7 +73,6 @@ class PrePartitioningConversionPass
     setupDirectHLOToFlowLegality(context, conversionTarget);
     populateHLOToFlowPatterns(context, conversionPatterns);
     setupDirectStandardToFlowLegality(context, conversionTarget);
-    conversionPatterns.insert<ExtractElementOpPromotion>(context);
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,

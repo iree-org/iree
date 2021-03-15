@@ -27,6 +27,7 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
   // HACK: this is only for the old linalg-on-buffers path. It should be
   // deleted.
   pm.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass(false));
+  pm.addNestedPass<FuncOp>(createConvertElementwiseToLinalgPass());
   pm.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
