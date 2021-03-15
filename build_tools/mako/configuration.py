@@ -78,12 +78,13 @@ class ModelBenchmarkInfo:
 def get_pixel4_default_target_list():
   return [
       TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(name="dylib-llvm-aot",
-                 mako_tag="cpu",
-                 compilation_flags=[
-                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-                 ],
-                 runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(
+          name="dylib-llvm-aot",
+          mako_tag="cpu",
+          compilation_flags=[
+              "--iree-llvm-target-triple=aarch64-none-linux-android29"
+          ],
+          runtime_flags=["--dylib_worker_count=1"]),
       TargetInfo(
           name="vulkan-spirv",
           mako_tag="vlk",
@@ -97,18 +98,20 @@ def get_pixel4_default_target_list():
 def get_s20_default_target_list():
   return [
       TargetInfo(name="vmla", mako_tag="vmla"),
-      TargetInfo(name="dylib-llvm-aot",
-                 mako_tag="cpu",
-                 compilation_flags=[
-                     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-                 ],
-                 runtime_flags=["--dylib_worker_count=1"]),
-      TargetInfo(name="vulkan-spirv",
-                 mako_tag="vlk",
-                 compilation_flags=[
-                     "--iree-spirv-enable-vectorization",
-                     "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
-                 ])
+      TargetInfo(
+          name="dylib-llvm-aot",
+          mako_tag="cpu",
+          compilation_flags=[
+              "--iree-llvm-target-triple=aarch64-none-linux-android29"
+          ],
+          runtime_flags=["--dylib_worker_count=1"]),
+      TargetInfo(
+          name="vulkan-spirv",
+          mako_tag="vlk",
+          compilation_flags=[
+              "--iree-spirv-enable-vectorization",
+              "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
+          ])
   ]
 
 
@@ -117,26 +120,30 @@ MODEL_BENCHMARKS = [
         name="mobile-bert",
         model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
         phones=[
-            PhoneBenchmarkInfo(name="Pixel4",
-                               benchmark_key="5538704950034432",
-                               targets=get_pixel4_default_target_list()),
-            PhoneBenchmarkInfo(name="S20",
-                               benchmark_key="4699630718681088",
-                               targets=get_s20_default_target_list()),
+            PhoneBenchmarkInfo(
+                name="Pixel4",
+                benchmark_key="5538704950034432",
+                targets=get_pixel4_default_target_list()),
+            PhoneBenchmarkInfo(
+                name="S20",
+                benchmark_key="4699630718681088",
+                targets=get_s20_default_target_list()),
         ]),
     ModelBenchmarkInfo(
         name="mobilenet-v2",
         model_path="mobilenet-v2/iree_input.mlir",
         phones=[
-            PhoneBenchmarkInfo(name="Pixel4",
-                               benchmark_key="6338759231537152",
-                               targets=get_pixel4_default_target_list()),
-            PhoneBenchmarkInfo(name="S20",
-                               benchmark_key="5618403088793600",
-                               targets=get_s20_default_target_list()),
+            PhoneBenchmarkInfo(
+                name="Pixel4",
+                benchmark_key="6338759231537152",
+                targets=get_pixel4_default_target_list()),
+            PhoneBenchmarkInfo(
+                name="S20",
+                benchmark_key="5618403088793600",
+                targets=get_s20_default_target_list()),
         ])
 ]
 
 
 def get_module_name(model_name, phone_name, mako_tag):
-  return "{}_{}_{}.vmfb".format(model_name, phone_name, mako_tag)
+  return f"{model_name}_{phone_name}_{mako_tag}.vmfb"

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Compiles the given model (which is configured in utils.py) to modules.
+# Compiles the given model (which is configured in configuration.py) to modules.
 #
 # The scripts is used for benchmarking automation, and it assumes:
 #   1) ANDROID_NDK env is set.
@@ -22,25 +22,25 @@
 
 import subprocess
 
-import utils
+import configuration
 
 IREE_TRANSLATE_PATH = "build-host/iree/tools/iree-translate"
 
 
 def main() -> None:
-  for model_benchmark in utils.MODEL_BENCHMARKS:
+  for model_benchmark in configuration.MODEL_BENCHMARKS:
     for phone in model_benchmark.phones:
       for target in phone.targets:
-        module_name = utils.get_module_name(model_benchmark.name, phone.name,
-                                            target.mako_tag)
-        print("Generating {} ...".format(module_name))
-        subprocess.run(args=[
-            IREE_TRANSLATE_PATH, model_benchmark.model_path,
-            "--iree-mlir-to-vm-bytecode-module",
-            "--iree-hal-target-backends={}".format(
-                target.name), "-o", module_name
-        ] + target.compilation_flags,
-                       check=True)
+        module_name = configuration.get_module_name(model_benchmark.name,
+                                                    phone.name, target.mako_tag)
+        print(f"Generating {module_name} ...")
+        subprocess.run(
+            args=[
+                IREE_TRANSLATE_PATH, model_benchmark.model_path,
+                "--iree-mlir-to-vm-bytecode-module",
+                f"--iree-hal-target-backends={target.name}", "-o", module_name
+            ] + target.compilation_flags,
+            check=True)
 
 
 if __name__ == "__main__":
