@@ -27,9 +27,17 @@ class TargetInfo:
       E.g., CPU can run with single thread or multi thread.
   """
 
-  def __init__(self, name, mako_tag, compilation_flags, runtime_flags):
+  def __init__(self,
+               name,
+               mako_tag,
+               compilation_flags=None,
+               runtime_flags=None):
     if "_" in name:
       raise ValueError("The target name contains invalid char '_'")
+    if compilation_flags is None:
+      compilation_flags = []
+    if runtime_flags is None:
+      runtime_flags = []
     self.name = name
     self.mako_tag = mako_tag
     self.compilation_flags = compilation_flags
@@ -77,10 +85,7 @@ class ModelBenchmarkInfo:
 
 def get_pixel4_default_target_list():
   return [
-      TargetInfo(name="vmla",
-                 mako_tag="vmla",
-                 compilation_flags=[],
-                 runtime_flags=[]),
+      TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
                  mako_tag="cpu",
                  compilation_flags=[
@@ -93,17 +98,13 @@ def get_pixel4_default_target_list():
           compilation_flags=[
               "--iree-spirv-enable-vectorization",
               "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
-          ],
-          runtime_flags=[])
+          ])
   ]
 
 
 def get_s20_default_target_list():
   return [
-      TargetInfo(name="vmla",
-                 mako_tag="vmla",
-                 compilation_flags=[],
-                 runtime_flags=[]),
+      TargetInfo(name="vmla", mako_tag="vmla"),
       TargetInfo(name="dylib-llvm-aot",
                  mako_tag="cpu",
                  compilation_flags=[
@@ -115,8 +116,7 @@ def get_s20_default_target_list():
                  compilation_flags=[
                      "--iree-spirv-enable-vectorization",
                      "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
-                 ],
-                 runtime_flags=[])
+                 ])
   ]
 
 
