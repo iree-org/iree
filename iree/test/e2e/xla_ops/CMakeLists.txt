@@ -247,6 +247,7 @@ iree_check_single_backend_test_suite(
     "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
+    "pad.mlir"
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"

@@ -382,8 +382,12 @@ static LogicalResult recordPushBindings(Value device, Value commandBuffer,
   for (auto it : llvm::enumerate(dispatchOp.results())) {
     LLVM_DEBUG(llvm::dbgs()
                << "  + RESULT(" << it.index() << "): " << it.value() << "\n");
-    if (failed(pushBinding(it.value()))) {
-      return failure();
+    if (dispatchOp.getTiedResultOperandIndex(it.index())) {
+      LLVM_DEBUG(llvm::dbgs() << "    TIED TO OPERAND; SKIP\n");
+    } else {
+      if (failed(pushBinding(it.value()))) {
+        return failure();
+      }
     }
   }
   rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(

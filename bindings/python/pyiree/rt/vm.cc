@@ -18,6 +18,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
 #include "iree/base/api.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"

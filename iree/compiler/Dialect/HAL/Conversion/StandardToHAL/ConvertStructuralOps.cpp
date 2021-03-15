@@ -71,6 +71,25 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   }
 };
 
+class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::CallOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    mlir::CallOpAdaptor adaptor(operands);
+    SmallVector<Type, 4> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
+                                                resultTypes))) {
+      return rewriter.notifyMatchFailure(op, "unable to convert result types");
+    }
+    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.callee(),
+                                              adaptor.operands());
+    return success();
+  }
+};
+
 class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
@@ -118,9 +137,9 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
                                              OwningRewritePatternList &patterns,
                                              TypeConverter &converter) {
-  patterns.insert<FuncOpSignatureConversion, BranchOpConversion,
-                  CondBranchOpConversion, ReturnOpConversion>(converter,
-                                                              context);
+  patterns
+      .insert<FuncOpSignatureConversion, CallOpConversion, BranchOpConversion,
+              CondBranchOpConversion, ReturnOpConversion>(converter, context);
 }
 
 }  // namespace iree_compiler

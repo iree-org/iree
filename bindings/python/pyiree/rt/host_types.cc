@@ -16,7 +16,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 #include "pybind11/numpy.h"
 #include "pyiree/rt/hal.h"
 #include "pyiree/rt/status_utils.h"

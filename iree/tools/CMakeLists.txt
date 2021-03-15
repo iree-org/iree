@@ -373,12 +373,8 @@ if(${IREE_BUILD_COMPILER})
       iree::base::internal::flags
       iree::base::status
       iree::base::tracing
-      iree::compiler::Dialect::Flow::Transforms
-      iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::IREEVM
       iree::hal::api
       iree::hal::drivers

@@ -191,3 +191,55 @@ func @dynamic_tiled_dispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: i
   // CHECK: hal.command_buffer.end %[[CMD]]
   return %2 : tensor<?x?x1024xf32>
 }
+
+// -----
+
+hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
+  hal.interface @interface_io {
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+    hal.executable.entry_point @pad_dispatch_0 attributes {
+      interface = @interface_io,
+      ordinal = 0 : i32,
+      signature = (!flow.dispatch.tensor<readonly:i32>, !flow.dispatch.tensor<writeonly:3x9xi32>) -> ()
+    }
+    module {}
+  }
+}
+
+hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
+  hal.interface @interface_io {
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @rw1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+    hal.executable.entry_point @pad_dispatch_1 attributes {
+      interface = @interface_io,
+      ordinal = 0 : i32,
+      signature = (!flow.dispatch.tensor<readonly:2x3xi32>, !flow.dispatch.tensor<readwrite:3x9xi32>) -> ()
+    }
+    module {}
+  }
+}
+
+// CHECK-LABEL: func @dispatch_tied_buffer
+// CHECK-SAME: (%[[FILL:.+]]: !hal.buffer, %[[INPUT:.+]]: !hal.buffer)
+func @dispatch_tied_buffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<3x9xi32> {
+  // CHECK: %[[OUTPUT:.+]] = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
+  %0 = flow.ex.stream.fragment(%fill, %input) : (tensor<i32>, tensor<2x3xi32>) -> tensor<3x9xi32> =
+      (%arg0: tensor<i32>, %arg1: tensor<2x3xi32>) -> tensor<3x9xi32> {
+    %c9 = constant 9 : index
+    %c3 = constant 3 : index
+    %c1 = constant 1 : index
+    // CHECK: %[[LAYOUT0:.+]] = hal.executable_layout.lookup %{{.+}}, set_layouts = {{\[\[}}#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write|Discard">]]
+    // CHECK: hal.command_buffer.push_descriptor_set %{{.+}}, %[[LAYOUT0]], set = %{{.+}}, bindings = [%c0 = (%[[FILL]], %c0, %c4), %c1 = (%[[OUTPUT]], %c0, %c108)]
+    %3 = flow.dispatch @pad_dispatch_0::@pad_dispatch_0[%c9, %c3, %c1](%arg0) : (tensor<i32>) -> tensor<3x9xi32>
+    // CHECK: %[[LAYOUT1:.+]] = hal.executable_layout.lookup %{{.+}}, set_layouts = {{\[\[}}#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read|Write">]]
+    // CHECK: hal.command_buffer.push_descriptor_set %{{.+}}, %[[LAYOUT1]], set = %{{.+}}, bindings = [%c0 = (%[[INPUT]], %c0, %c24), %c1 = (%[[OUTPUT]], %c0, %c108)]
+    %4 = flow.dispatch @pad_dispatch_1::@pad_dispatch_1[%c9, %c3, %c1](%arg1, %3) : (tensor<2x3xi32>, tensor<3x9xi32>) -> %3
+    flow.return %4 : tensor<3x9xi32>
+  }
+  return %0 : tensor<3x9xi32>
+}

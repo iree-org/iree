@@ -22,7 +22,7 @@
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
@@ -31,6 +31,15 @@
 namespace iree {
 
 Status ValidateFunctionAbi(const iree_vm_function_t& function) {
+  // Benchmark functions are always allowed through as they are () -> ().
+  // That we are requiring SIP for everything in this util file is bad, and this
+  // workaround at least allows us to benchmark non-SIP functions.
+  if (iree_vm_function_reflection_attr(&function,
+                                       iree_make_cstring_view("benchmark"))
+          .size != 0) {
+    return OkStatus();
+  }
+
   iree_string_view_t sig_fv =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
@@ -49,6 +58,7 @@ Status ParseInputSignature(
   out_input_descs->clear();
   iree_string_view_t sig_f =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
+  if (sig_f.size == 0) return OkStatus();
   RawSignatureParser sig_parser;
   sig_parser.VisitInputs(absl::string_view{sig_f.data, sig_f.size},
                          [&](const RawSignatureParser::Description& desc) {
@@ -69,6 +79,7 @@ Status ParseOutputSignature(
   out_output_descs->clear();
   iree_string_view_t sig_f =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
+  if (sig_f.size == 0) return OkStatus();
   RawSignatureParser sig_parser;
   sig_parser.VisitResults(absl::string_view{sig_f.data, sig_f.size},
                           [&](const RawSignatureParser::Description& desc) {

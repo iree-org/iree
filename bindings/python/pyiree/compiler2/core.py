@@ -144,8 +144,7 @@ def build_compile_command_line(input_file: str,
     cl.append(f"-o={options.output_file}")
 
   # Translation to perform.
-  cl.append("--iree-mlir-to-vm-bytecode-module" if not options.enable_benchmark
-            else "--iree-mlir-to-executable-benchmark-vm-module")
+  cl.append("--iree-mlir-to-vm-bytecode-module")
 
   # Other options to set if specified.
   if options.strip_debug_ops:
@@ -159,6 +158,8 @@ def build_compile_command_line(input_file: str,
         f"--pass-pipeline-crash-reproducer={options.crash_reproducer_path}")
   if options.enable_tflite_bindings:
     cl.append("--iree-tflite-bindings-support")
+  if options.enable_benchmark:
+    cl.append("--iree-flow-export-benchmark-funcs")
 
   cl.extend(options.extra_args)
   return cl

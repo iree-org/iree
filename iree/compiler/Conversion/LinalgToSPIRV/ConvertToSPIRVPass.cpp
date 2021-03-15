@@ -271,16 +271,14 @@ struct InterfaceOpConverter final : public OpConversionPattern<InterfaceOpTy> {
   const llvm::DenseSet<Operation *> &aliasedResources;
 };
 
-/// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
-/// in SPIR-V lowering, linalg.reshape becomes a no-op.
-// TODO(ravishankarm): Move this into MLIR Core.
-struct LinalgReshapeConverter final
-    : public OpConversionPattern<linalg::ReshapeOp> {
-  using OpConversionPattern<linalg::ReshapeOp>::OpConversionPattern;
+/// Pattern to lower operations that become a no-ops at this level.
+template <typename OpTy>
+struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      linalg::ReshapeOp reshapeOp, ArrayRef<Value> operands,
+      OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(reshapeOp, operands);
+    rewriter.replaceOp(op, operands);
     return success();
   }
 };
@@ -548,6 +546,15 @@ void ConvertToSPIRVPass::runOnOperation() {
                              patterns);
   // Pull in standard patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+  // Pull in standard patterns to convert tensor operations to SPIR-V. These are
+  // primarily used to handle tensor-type constants and contain a
+  // threshold. Only those constants that are below the threshold are converted
+  // to SPIR-V. In IREE we want to control this threshold at Flow level. So set
+  // this value arbitrarily high to make sure that everything within a dispatch
+  // region is converted.
+  mlir::populateTensorToSPIRVPatterns(context, typeConverter,
+                                      std::numeric_limits<int64_t>::max() / 8,
+                                      patterns);
   // Pull in vector patterns to convert vector ops.
   mlir::populateVectorToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
@@ -566,7 +573,13 @@ void ConvertToSPIRVPass::runOnOperation() {
   patterns.insert<InterfaceOpConverter<IREE::PlaceholderOp>,
                   InterfaceOpConverter<IREE::HAL::InterfaceBindingSubspanOp>>(
       typeConverter, context, aliasedResources);
-  patterns.insert<LinalgReshapeConverter>(typeConverter, context);
+  /// Fold operations as no-ops
+  /// - linalg.reshape becomes a no-op since all memrefs are linearized in
+  ///   SPIR-V
+  /// - tensor_to_memref can become a no-op since tensors are lowered to
+  ///   !spv.array
+  patterns.insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<TensorToMemrefOp>>(
+      typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);

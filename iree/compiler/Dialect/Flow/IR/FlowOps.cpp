@@ -464,6 +464,14 @@ void VariableOp::build(OpBuilder &builder, OperationState &result,
 // flow.variable.load
 //===----------------------------------------------------------------------===//
 
+void VariableLoadOp::build(OpBuilder &builder, OperationState &state,
+                           VariableOp variableOp,
+                           ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({variableOp.type()});
+  state.addAttribute("variable", builder.getSymbolRefAttr(variableOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
 void VariableLoadOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying
@@ -807,6 +815,31 @@ static bool canDispatchRegionContainOpIssue4897(Operation *op) {
   return false;
 }
 
+// Inline operations that the dispatch region can handle natively.
+static bool canDispatchRegionContainOp(Operation *op) {
+  // Inline constant operations that are splat or small constants.
+  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+    auto constantValueAttr = constantOp.getValue();
+    auto constantType = constantOp.getType();
+    if (constantValueAttr.isa<SplatElementsAttr>()) {
+      return true;
+    } else if (auto denseAttr =
+                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLLVM
+      // side. Uncomment after that is fixed.
+      // auto shapedType = constantOp.getType().cast<ShapedType>();
+      // uint64_t estimatedByteLength =
+      //     (shapedType.getNumElements() * shapedType.getElementTypeBitWidth())
+      //     / 8;
+      return denseAttr
+          .isSplat();  // || estimatedByteLength <= 256;  // or whatever
+    } else if (constantType.isIntOrIndexOrFloat()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool DispatchRegionOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOpIssue4897(op);
 }
@@ -973,7 +1006,7 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 }
 
 bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
-  return canDispatchRegionContainOpIssue4897(op);
+  return canDispatchRegionContainOp(op);
 }
 
 ClosureOpInterface

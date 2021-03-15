@@ -25,11 +25,11 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "create_benchmark_funcs.mlir",
             "deduplicate_executables.mlir",
             "dispatch_linalg_on_tensors.mlir",
             "dispatch_linalg_on_tensors_dynamic.mlir",
             "expand_variable_dynamic_dims.mlir",
+            "export_benchmark_funcs.mlir",
             "fold_compatible_dispatch_regions.mlir",
             "form_streams.mlir",
             "hlo_to_hlo_preprocessing.mlir",
@@ -43,7 +43,6 @@ iree_lit_test_suite(
             "identify_dispatch_regions2_std_fusion.mlir",
             "inject_dispatch_tracing.mlir",
             "legalize_input_types.mlir",
-            "materialize_reflection_attrs.mlir",
             "outline_dispatch_regions2.mlir",
             "outline_large_constants.mlir",
             "strip_and_splat_constant_variables.mlir",

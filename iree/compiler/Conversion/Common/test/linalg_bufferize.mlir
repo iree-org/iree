@@ -613,3 +613,74 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<3x4xi32>
 //       CHECK:   %[[IN:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<3x4xi32>
 //       CHECK:   linalg.copy(%[[IN]], %[[OUT]]) : memref<3x4xi32>, memref<3x4xi32>
+
+// -----
+
+func @constant() {
+  %c0 = constant 0 : index
+  %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
+  %0 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:2x2x3xi32>
+  flow.dispatch.tensor.store %cst, %0 : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
+  return
+}
+// CHECK-LABEL: func @constant()
+//       CHECK:   %[[CST:.+]] = constant {{.+}} : tensor<2x2x3xi32>
+//       CHECK:   %[[MEMREF:.+]] = tensor_to_memref %[[CST]] : memref<2x2x3xi32>
+//       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
+//       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
+
+// -----
+
+func @rhs_non_splat_constant() {
+  %c0 = constant 0 : index
+  %cst = constant dense<[[0.706495285, -0.567672312, 0.483717591, 0.522725761, 0.7563259], [-0.0899272263, -0.283501834, -0.350822538, -0.351515919, -0.337136656], [-0.451804549, 0.372324884, -0.620518147, 0.235451385, 0.851095855]]> : tensor<3x5xf32>
+  %cst_0 = constant 0.000000e+00 : f32
+  %c5 = constant 5 : index
+  %c1 = constant 1 : index
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:5x5xf32>
+  %2 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
+  %3 = linalg.tensor_reshape %2 [affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+  %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+  scf.for %arg0 = %4 to %c5 step %5 {
+    %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+    %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+    scf.for %arg1 = %6 to %c5 step %7 {
+      %8 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 5)>(%arg0)[%workgroup_size_y]
+      %9 = subtensor %3[%arg0, 0] [%8, 3] [1, 1] : tensor<5x3xf32> to tensor<?x3xf32>
+      %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 5)>(%arg1)[%workgroup_size_x]
+      %11 = subtensor %cst[0, %arg1] [3, %10] [1, 1] : tensor<3x5xf32> to tensor<3x?xf32>
+      %12 = linalg.init_tensor [%8, %10] : tensor<?x?xf32>
+      %13 = linalg.fill(%12, %cst_0) : tensor<?x?xf32>, f32 -> tensor<?x?xf32> 
+      %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%9, %11 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
+    }
+  }
+  return
+}
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @rhs_non_splat_constant
+//   CHECK-DAG:   %[[CONSTANT:.+]] = constant {{.+}} : tensor<3x5xf32>
+//   CHECK-DAG:   %[[RHS:.+]] = tensor_to_memref %[[CONSTANT]]
+//   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%{{.+}}] : memref<1x5x3x1xf32>
+//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%{{.+}}] : memref<5x5xf32>
+//       CHECK:   %[[LHS:.+]] = linalg.reshape %[[LHS_INPUT]]
+//       CHECK:   scf.for %[[IV0:.+]] =
+//       CHECK:     scf.for %[[IV1:.+]] =
+//   CHECK-DAG:       %[[LHS_SUBVIEW:.+]] = subview %[[LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[RHS_SUBVIEW:.+]] = subview %[[RHS]][0, %[[IV1]]]
+//   CHECK-DAG:       %[[RESULT_SUBVIEW:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]]
+//       CHECK:       linalg.fill(%[[RESULT_SUBVIEW]], %{{.+}})
+//       CHECK:       linalg.matmul
+//  CHECK-SAME:         ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]]
+//  CHECK-SAME:         outs(%[[RESULT_SUBVIEW]]

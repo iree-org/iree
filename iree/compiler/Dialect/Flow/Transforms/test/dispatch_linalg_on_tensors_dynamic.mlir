@@ -393,3 +393,10 @@ func @pad_test(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index,
 //       CHECK:      flow.dispatch.tensor.store %[[RETURN]]
 //  CHECK-NEXT:      flow.return
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[RESULT]]
+
+// -----
+
+func @constant() -> tensor<2x2x3xi32> {
+  %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
+  return %cst : tensor<2x2x3xi32>
+}
