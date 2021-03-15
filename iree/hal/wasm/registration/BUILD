@@ -20,29 +20,27 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# TODO(scotttodd): add to Bazel when the WASM driver builds with it
 iree_cmake_extra_content(
     content = """
 if(${IREE_HAL_DRIVER_WASM})
-""",
-    inline = True,
+
+iree_cc_library(
+  NAME
+    registration
+  HDRS
+    "driver_module.h"
+  SRCS
+    "driver_module.c"
+  DEPS
+    iree::hal::api
+    iree::hal::local::loaders::wasm_module_loader
+    iree::hal::local::task_driver
+  DEFINES
+    "IREE_HAL_HAVE_WASM_DRIVER_MODULE=1"
+  PUBLIC
 )
 
-cc_library(
-    name = "registration",
-    srcs = ["driver_module.c"],
-    hdrs = ["driver_module.h"],
-    defines = [
-        "IREE_HAL_HAVE_WASM_DRIVER_MODULE=1",
-    ],
-    deps = [
-        "//iree/hal:api",
-        "//iree/hal/local:task_driver",
-        "//iree/hal/local/loaders:wasm_module_loader",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
 endif()
 """,
     inline = True,
