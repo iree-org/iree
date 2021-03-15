@@ -112,51 +112,13 @@ class PrePartitioningConversionPass
   }
 };
 
-class PostPartitioningConversionPass
-    : public PassWrapper<PostPartitioningConversionPass, FunctionPass> {
- public:
-  void runOnFunction() override {
-    auto *context = &getContext();
-    ConversionTarget conversionTarget(getContext());
-    OwningRewritePatternList conversionPatterns;
-
-    // We have completed all flow op creation at this point.
-    conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
-
-    // Standard ops always pass through as import code may have produced some
-    // and control flow should have been legalized from HLO to std.
-    // The flow dialect uses std.module and std.func for its structure and they
-    // must be allowed.
-    conversionTarget.addLegalDialect<StandardOpsDialect>();
-    conversionTarget.addLegalOp<ModuleOp, ModuleTerminatorOp, FuncOp>();
-
-    // Pick up any remaining HLO ops that were not partitioned.
-    populateHLOToFlowPatterns(context, conversionPatterns);
-    populateStandardToFlowPatterns(context, conversionPatterns);
-
-    if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      std::move(conversionPatterns)))) {
-      getFunction().emitError() << "module is not in a compatible input format";
-      return signalPassFailure();
-    }
-  }
-};
-
 std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass() {
   return std::make_unique<PrePartitioningConversionPass>();
-}
-
-std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass() {
-  return std::make_unique<PostPartitioningConversionPass>();
 }
 
 static PassRegistration<PrePartitioningConversionPass> prePass(
     "iree-flow-pre-partitioning-conversion",
     "Dialect conversion prior to partitioning");
-
-static PassRegistration<PostPartitioningConversionPass> postPass(
-    "iree-flow-post-partitioning-conversion",
-    "Dialect conversion after partitioning");
 
 }  // namespace Flow
 }  // namespace IREE

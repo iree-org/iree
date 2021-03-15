@@ -250,10 +250,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
         IREE::Flow::createInjectDispatchTracingPass());
   }
 
-  // Convert any leftover ops outside of dispatch regions to flow ops.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createPostPartitioningConversionPass());
-
   //----------------------------------------------------------------------------
   // Stream formation.
   // Pre-conditions:
