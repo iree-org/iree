@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
+#include "llvm/ADT/BitVector.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
@@ -204,14 +205,36 @@ void excludeTiedOperandAndResultIndices(
     SmallVector<int64_t, 4> &tiedOperandIndices) {
   SmallVector<int64_t, 4> oldTiedOperandIndices = tiedOperandIndices;
   tiedOperandIndices.clear();
+
+  // To adjust operand indices we need to know the how many operands to offset
+  // the indices by - if 2 operands before operand N were removed then we know
+  // it needs to be -2. This is nasty but that's why we have this helper
+  // function.
+  llvm::BitVector excludedOperands(
+      *std::max_element(excludedOperandIndices.begin(),
+                        excludedOperandIndices.end()) +
+          1,
+      false);
+  for (unsigned i = 0; i < excludedOperandIndices.size(); ++i) {
+    excludedOperands[excludedOperandIndices[i]] = true;
+  }
+
   for (auto it : llvm::enumerate(oldTiedOperandIndices)) {
     unsigned resultIndex = it.index();
-    if (!llvm::count(excludedResultIndices, resultIndex)) {
+    if (llvm::count(excludedResultIndices, resultIndex)) {
       continue;  // result removed
     }
+
     int64_t tiedOperandIndex = it.value();
     if (tiedOperandIndex != TiedOpInterface::kUntiedIndex) {
-      if (!llvm::count(excludedOperandIndices, tiedOperandIndex)) {
+      // Count up the number of removed operands prior to this one.
+      unsigned offset = 0;
+      for (unsigned i = 0; i < tiedOperandIndex; ++i) {
+        if (i < excludedOperands.size() && excludedOperands[i]) ++offset;
+      }
+      tiedOperandIndex -= offset;
+
+      if (llvm::count(excludedOperandIndices, tiedOperandIndex)) {
         tiedOperandIndex = TiedOpInterface::kUntiedIndex;  // operand removed
       }
     }
