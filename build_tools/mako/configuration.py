@@ -133,6 +133,10 @@ def get_s20_default_target_list(batch_config={}):
   return targets
 
 
+# The batch numbers are roughly computed to let it benchmark more then 3
+# seconds.
+# Do not set batch size on Pixel 4 for GPU targets, because it will get killed
+# after 2 seconds. See https://github.com/google/iree/issues/5052
 MODEL_BENCHMARKS = [
     ModelBenchmarkInfo(
         name="mobile-bert",
@@ -141,11 +145,11 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="5538704950034432",
                                targets=get_pixel4_default_target_list(
-                                   {'cpu': 16})),
+                                   {'cpu': 8})),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="4699630718681088",
                                targets=get_s20_default_target_list({
-                                   'cpu': 16,
+                                   'cpu': 8,
                                    'vlk': 16
                                })),
         ]),
@@ -156,12 +160,12 @@ MODEL_BENCHMARKS = [
             PhoneBenchmarkInfo(name="Pixel4",
                                benchmark_key="6338759231537152",
                                targets=get_pixel4_default_target_list(
-                                   {'cpu': 8})),
+                                   {'cpu': 16})),
             PhoneBenchmarkInfo(name="S20",
                                benchmark_key="5618403088793600",
                                targets=get_s20_default_target_list({
                                    'cpu': 16,
-                                   'vlk': 32
+                                   'vlk': 64
                                })),
         ])
 ]
