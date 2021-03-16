@@ -47,6 +47,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Utility functions.
+//===----------------------------------------------------------------------===//
+
 static MemRefType getMemrefTypeForTensor(RankedTensorType tensorType,
                                          ArrayRef<AffineMap> layout = {},
                                          unsigned memorySpace = 0) {
@@ -84,6 +88,10 @@ static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
   if (offsets.empty()) return src;
   return b.create<SubViewOp>(loc, src, offsets, sizes, strides);
 }
+
+//===----------------------------------------------------------------------===//
+// Bufferization helper functions using BlockAndValueMapping.
+//===----------------------------------------------------------------------===//
 
 // Non-conversion equivalent of the core MLIR Linalg bufferization patterns.
 // Allocate the output buffers for the bufferized Linalg op to write into.
@@ -148,9 +156,10 @@ static LogicalResult allocateBuffersForResults(
 }
 
 // Non-conversion equivalent of the core MLIR Linalg bufferization patterns.
-static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
-                                     ValueRange inputs, ValueRange outputs,
-                                     BlockAndValueMapping &bvm) {
+static LogicalResult finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
+                                              ValueRange inputs,
+                                              ValueRange outputs,
+                                              BlockAndValueMapping &bvm) {
   SmallVector<Value, 8> newOperands = inputs;
   newOperands.append(outputs.begin(), outputs.end());
   auto otherOperands =
@@ -158,7 +167,7 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
                       [&bvm](Value v) { return bvm.lookupOrDefault(v); });
   newOperands.append(otherOperands.begin(), otherOperands.end());
   Location loc = op.getLoc();
-  op.cloneWithMapper(b, loc, /*resultTypes=*/TypeRange{}, newOperands, bvm);
+  op.clone(b, loc, {}, newOperands);
 
   // Replace the results of the old op with the new output buffers.
   for (auto result : llvm::enumerate(op.getOperation()->getResults())) {
@@ -168,11 +177,8 @@ static void finalizeBufferAllocation(OpBuilder &b, linalg::LinalgOp op,
       b.create<linalg::CopyOp>(loc, outputs[result.index()], resultBuffer);
     }
   }
+  return success();
 }
-
-//===----------------------------------------------------------------------===//
-// Bufferization helper functions using BlockAndValueMapping.
-//===----------------------------------------------------------------------===//
 
 /// Generic conversion pattern that matches any linalg::LinalgOp. This avoids
 /// template instantiating one pattern for each linalg::LinalgOp.
@@ -195,13 +201,12 @@ static LogicalResult convertAnyLinalgOp(
 
   // Delegate to the linalg generic pattern.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation())) {
-    finalizeBufferAllocation(b, genericOp, newInputBuffers, newOutputBuffers,
-                             bvm);
-    return success();
+    return finalizeBufferAllocation(b, genericOp, newInputBuffers,
+                                    newOutputBuffers, bvm);
   }
 
-  finalizeBufferAllocation(b, op, newInputBuffers, newOutputBuffers, bvm);
-  return success();
+  return finalizeBufferAllocation(b, op, newInputBuffers, newOutputBuffers,
+                                  bvm);
 }
 
 /// Constants that return tensor types can be handled natively by the
@@ -372,9 +377,8 @@ static LogicalResult convertSubTensorInsertOp(
 }
 
 /// Converts a `tensor.extract` operation into a `load`.
-static LogicalResult convertTensorExtractOp(
-    OpBuilder &b, WorkgroupMemoryAllocationFn allocationFn,
-    tensor::ExtractOp op, BlockAndValueMapping &bvm) {
+static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
+                                            BlockAndValueMapping &bvm) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Value inputBuffer = bvm.lookup(op.tensor());
@@ -663,13 +667,25 @@ void LinalgBufferizePass::runOnFunction() {
           return convertTensorReshapeOp(b, allocationFn, reshapeOp, bvm);
         })
         .Case<tensor::ExtractOp>([&](tensor::ExtractOp extractOp) {
-          return convertTensorExtractOp(b, allocationFn, extractOp, bvm);
+          return convertTensorExtractOp(b, extractOp, bvm);
         })
         .Case<VectorTransferOpInterface>(
             [&](VectorTransferOpInterface vectorTransferOp) {
               return convertTransferOp(b, allocationFn, vectorTransferOp, bvm);
             })
-        .Default([](Operation *) { return success(); });
+        .Default([&](Operation *op) {
+          // Replace any scalar remapped operands to the new values.
+          // TODO(GH-5013): This is really hacky solution, but gets us past for
+          // the time being. This all should be replaced by a pattern.
+          for (unsigned i : llvm::seq<unsigned>(0, op->getNumOperands())) {
+            Value operand = op->getOperand(i);
+            if (operand.getType().isIntOrIndexOrFloat()) {
+              Value remappedVal = bvm.lookupOrNull(operand);
+              if (remappedVal) op->setOperand(i, remappedVal);
+            }
+          }
+          return success();
+        });
   };
   if (funcOp.walk(conversionDispatch).wasInterrupted()) {
     return signalPassFailure();

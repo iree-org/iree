@@ -16,6 +16,7 @@
 #define IREE_COMPILER_BINDINGS_SIP_UTILS_SIGNATURE_H_
 
 #include <array>
+#include <cstddef>
 
 namespace mlir {
 namespace iree_compiler {
