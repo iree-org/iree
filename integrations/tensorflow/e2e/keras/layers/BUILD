@@ -44,10 +44,7 @@ package(
             "//util/debuginfo:signalsafe_addr2line_installer",
         ],
     )
-    for src in glob(
-        ["*_test.py"],
-        exclude = ["keyword_spotting_streaming_test.py"],
-    )
+    for src in glob(["*_test.py"])
 ]
 
 # These layers were selected by:
