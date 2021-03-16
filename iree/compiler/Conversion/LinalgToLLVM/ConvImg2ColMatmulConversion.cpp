@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -100,7 +101,7 @@ class ConvImg2ColMatmulConversion
     auto ColBufferMemrefType =
         MemRefType::get(colBufferShape, filterShapeType.getElementType());
 
-    Value result = rewriter.create<AllocaOp>(loc, ColBufferMemrefType);
+    Value result = rewriter.create<memref::AllocaOp>(loc, ColBufferMemrefType);
 
     // (n, d1, d2, d3, ..., dn, k1, k2, k3, ...kn, ci) ->
     // (n, d_1 * stride_1 + k_1, d_2 * stride_2 + k_2, ...d_n * stride_n + k_n,
@@ -185,7 +186,7 @@ class ConvImg2ColMatmulConversion
 struct ConvImg2ColMatmulConversionPass
     : PassWrapper<ConvImg2ColMatmulConversionPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
+    registry.insert<linalg::LinalgDialect, memref::MemRefDialect>();
   }
   void runOnFunction() override;
 };

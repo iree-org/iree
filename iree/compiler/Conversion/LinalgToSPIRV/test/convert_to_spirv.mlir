@@ -269,7 +269,7 @@ module attributes {
     // CHECK: %{{.+}} = spv.CompositeConstruct %[[LD0]], %[[LD1]], %[[LD2]] : vector<3xf32>
     %2 = vector.transfer_read %0[%c0], %f0 : memref<3xf32>, vector<3xf32>
     %3 = vector.extract %2[0]: vector<3xf32>
-    store %3, %1[] : memref<f32>
+    memref.store %3, %1[] : memref<f32>
     return
   }
 

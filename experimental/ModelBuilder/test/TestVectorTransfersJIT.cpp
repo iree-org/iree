@@ -66,8 +66,8 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
   Value flt_1 = mb.constant_f32(1.0f);
   Value flt_42 = mb.constant_f32(42.0f);
 
-  Value A = std_alloc(mb.getMemRefType(szA, mb.f32));
-  Value B = std_alloc(mb.getMemRefType(szB, mb.f32));
+  Value A = memref_alloc(mb.getMemRefType(szA, mb.f32));
+  Value B = memref_alloc(mb.getMemRefType(szB, mb.f32));
   linalg_fill(A, flt_0);
   linalg_fill(B, flt_1);
 
@@ -110,8 +110,8 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
   (vector_print(vFullB));
   (vector_print(vB));
 
-  (std_dealloc(A));
-  (std_dealloc(B));
+  (memref_dealloc(A));
+  (memref_dealloc(B));
   std_ret();
   // clang-format on
 

@@ -38,10 +38,10 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT:.+]] = subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
@@ -93,14 +93,14 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[LHS:.+]] = subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//       CHECK:       %[[ALLOC:.+]] = alloc() : memref<1x3xf32>
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[LHS]] :
 //  CHECK-SAME:         outs(%[[ALLOC]]
-//   CHECK-DAG:       %[[INIT:.+]] = subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
@@ -151,10 +151,10 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[RESULT:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[LHS:.+]] = subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT:.+]] = subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[INIT]] :
 //  CHECK-SAME:         outs(%[[RESULT]]
@@ -246,13 +246,13 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
 //       CHECK:       %[[TILE_M:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[DIM0]], %[[WGSIZE_Y]]]
-//       CHECK:       %[[LHS_TILE:.+]] = subview %[[LHS_SHAPED]][%[[IV0]], 0] [%[[TILE_M]], %[[DIM1]]]
+//       CHECK:       %[[LHS_TILE:.+]] = memref.subview %[[LHS_SHAPED]][%[[IV0]], 0] [%[[TILE_M]], %[[DIM1]]]
 //       CHECK:       %[[TILE_N:.+]] = affine.min #[[MAP0]](%[[IV1]])[%[[DIM3]], %[[WGSIZE_X]]]
-//   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS_SHAPED]][0, %[[IV1]]] [%[[DIM2]], %[[TILE_N]]]
+//   CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS_SHAPED]][0, %[[IV1]]] [%[[DIM2]], %[[TILE_N]]]
 //       CHECK:       %[[TILE_M_2:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[WGSIZE_Y]], %[[DIM4]]]
 //       CHECK:       %[[TILE_N_2:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[WGSIZE_X]], %[[DIM5]]]
-//   CHECK-DAG:       %[[INIT_TILE:.+]] = subview %[[INIT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
-//   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RESULT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
+//   CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
+//   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT_SHAPED]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
 //       CHECK:       linalg.copy(%[[INIT_TILE]], %[[RESULT_TILE]])
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
@@ -326,7 +326,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET0V:.+]] = memref.subview %[[RET0]][0, 0] [3, 4] [1, 1]
 //       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP]]]
 //       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0V]])
 
@@ -364,7 +364,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET0V:.+]] = memref.subview %[[RET0]][0, 0] [3, 4] [1, 1]
 //       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP1]]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
@@ -408,8 +408,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @legacy_io::@ret1[%[[C0]]] : memref<3x4xi32>
-//   CHECK-DAG:   %[[RET0V:.+]] = subview %[[RET0]][0, 0] [3, 4] [1, 1]
-//   CHECK-DAG:   %[[RET1V:.+]] = subview %[[RET1]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET0V:.+]] = memref.subview %[[RET0]][0, 0] [3, 4] [1, 1]
+//   CHECK-DAG:   %[[RET1V:.+]] = memref.subview %[[RET1]][0, 0] [3, 4] [1, 1]
 //       CHECK:   %[[RESHAPE:.+]] = linalg.reshape %[[ARG0]] [#[[MAP1]]]
 //   CHECK-DAG:   linalg.copy(%[[RESHAPE]], %[[RET1V]])
 //   CHECK-DAG:   linalg.generic
@@ -451,8 +451,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //       CHECK:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%[[C0]]] : memref<12xi32>
-//   CHECK-DAG:   %[[ARG0V:.+]] = subview %[[ARG0]][0, 0] [3, 4] [1, 1]
-//       CHECK:   %[[ALLOC:.+]] = alloc() : memref<3x4xi32>
+//   CHECK-DAG:   %[[ARG0V:.+]] = memref.subview %[[ARG0]][0, 0] [3, 4] [1, 1]
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<3x4xi32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[ARG0V]] : memref<3x4xi32, #[[MAP0]]>)
 //  CHECK-SAME:     outs(%[[ALLOC]] : memref<3x4xi32>)
@@ -508,9 +508,9 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
 //       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS_TILE:.+]] = subview %[[RESHAPE_LHS]][%[[IV0]], 0]
-//   CHECK-DAG:       %[[RESULT_TILE:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]]
-//   CHECK-DAG:       %[[RHS_TILE:.+]] = subview %[[RHS]][0, %[[IV1]]]
+//   CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[RESHAPE_LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]]
 //       CHECK:       linalg.fill(%[[RESULT_TILE]], %{{.+}})
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
@@ -534,7 +534,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 // CHECK-LABEL: func @slice_whole_stride_dispatch_0()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
-//       CHECK:   %[[SUBVIEW:.+]] = subview %[[INPUT]]
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[INPUT]]
 //       CHECK:   linalg.copy(%[[SUBVIEW]], %[[OUTPUT]])
 
 // -----
@@ -547,8 +547,8 @@ func @subtensor_insert() {
   %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
   %3 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %4 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
-  %5 = dim %3, %c0 : tensor<?x?xi32>
-  %6 = dim %3, %c1 : tensor<?x?xi32>
+  %5 = memref.dim %3, %c0 : tensor<?x?xi32>
+  %6 = memref.dim %3, %c1 : tensor<?x?xi32>
   %7 = subtensor_insert %3 into %4[3, 4] [%5, %6] [1, 1] : tensor<?x?xi32> into tensor<?x?xi32>
   flow.dispatch.tensor.store %7, %2 : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
@@ -564,10 +564,10 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
-//   CHECK-DAG:   %[[D0:.+]] = dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //       CHECK:   linalg.copy(%[[ARG1]], %[[RET0]])
-//       CHECK:   %[[SUBVIEW:.+]] = subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   linalg.copy(%[[ARG0]], %[[SUBVIEW]])
 
 // -----
@@ -590,7 +590,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 // CHECK-LABEL: func @tensor_extract()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
-//       CHECK:   %[[LOAD:.+]] = load %[[ARG0]]
+//       CHECK:   %[[LOAD:.+]] = memref.load %[[ARG0]]
 //       CHECK:   linalg.fill(%[[RET0]], %[[LOAD]])
 
 // -----
@@ -625,7 +625,7 @@ func @constant() {
 }
 // CHECK-LABEL: func @constant()
 //       CHECK:   %[[CST:.+]] = constant {{.+}} : tensor<2x2x3xi32>
-//       CHECK:   %[[MEMREF:.+]] = tensor_to_memref %[[CST]] : memref<2x2x3xi32>
+//       CHECK:   %[[MEMREF:.+]] = memref.buffer_cast %[[CST]] : memref<2x2x3xi32>
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
 
@@ -671,15 +671,15 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 }
 // CHECK-LABEL: func @rhs_non_splat_constant
 //   CHECK-DAG:   %[[CONSTANT:.+]] = constant {{.+}} : tensor<3x5xf32>
-//   CHECK-DAG:   %[[RHS:.+]] = tensor_to_memref %[[CONSTANT]]
+//   CHECK-DAG:   %[[RHS:.+]] = memref.buffer_cast %[[CONSTANT]]
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@arg0[%{{.+}}] : memref<1x5x3x1xf32>
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @legacy_io::@ret0[%{{.+}}] : memref<5x5xf32>
 //       CHECK:   %[[LHS:.+]] = linalg.reshape %[[LHS_INPUT]]
 //       CHECK:   scf.for %[[IV0:.+]] =
 //       CHECK:     scf.for %[[IV1:.+]] =
-//   CHECK-DAG:       %[[LHS_SUBVIEW:.+]] = subview %[[LHS]][%[[IV0]], 0]
-//   CHECK-DAG:       %[[RHS_SUBVIEW:.+]] = subview %[[RHS]][0, %[[IV1]]]
-//   CHECK-DAG:       %[[RESULT_SUBVIEW:.+]] = subview %[[RETURN]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:       %[[LHS_SUBVIEW:.+]] = memref.subview %[[LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[RHS_SUBVIEW:.+]] = memref.subview %[[RHS]][0, %[[IV1]]]
+//   CHECK-DAG:       %[[RESULT_SUBVIEW:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]]
 //       CHECK:       linalg.fill(%[[RESULT_SUBVIEW]], %{{.+}})
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]]

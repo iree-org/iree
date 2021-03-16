@@ -25,6 +25,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Identifier.h"
@@ -60,7 +61,7 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   return success();
 }
 
-Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
+Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
                                         OperationFolder *folder) {
   // Allocate the memory into the entry block of the parent FuncOp. This better
@@ -84,7 +85,7 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
   MemRefType allocType = MemRefType::get(
       shape, subview.getType().getElementType(), {}, getWorkgroupMemorySpace());
-  Value buffer = b.create<AllocOp>(subview.getLoc(), allocType);
+  Value buffer = b.create<memref::AllocOp>(subview.getLoc(), allocType);
   return buffer;
 }
 

@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "pad_tensor.mlir",
             "pad_tensor_to_tensor.mlir",
             "pipeline_test.mlir",
+            "reduce.mlir",
             "subtensor.mlir",
             "subtensor_insert.mlir",
             "torch_index_select.mlir",

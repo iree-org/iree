@@ -25,6 +25,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Dominance.h"
@@ -74,7 +75,7 @@ static bool hasDestructiveUpdateSubTensorUses(
       writes.push_back(subTensorInsertOp);
       continue;
     }
-    if (auto dimOp = dyn_cast<DimOp>(u.getOwner())) {
+    if (auto dimOp = dyn_cast<memref::DimOp>(u.getOwner())) {
       continue;
     }
     LLVM_DEBUG(llvm::dbgs() << "found non-destructive update pattern use: "

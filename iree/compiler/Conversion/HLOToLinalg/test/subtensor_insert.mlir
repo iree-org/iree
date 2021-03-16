@@ -5,9 +5,9 @@
 // CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x5xi32>
 // CHECK-DAG: %[[IN0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2xi32>
 // CHECK-DAG: %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x3xi32>
-//     CHECK: %[[SUB0:.+]] = subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<2x5xi32> to memref<2x2xi32, #[[MAP0]]>
+//     CHECK: %[[SUB0:.+]] = memref.subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<2x5xi32> to memref<2x2xi32, #[[MAP0]]>
 //     CHECK: linalg.copy(%[[IN0]], %[[SUB0]])
-//     CHECK: %[[SUB1:.+]] = subview %[[OUT]][0, 2] [2, 3] [1, 1]  : memref<2x5xi32> to memref<2x3xi32, #[[MAP1]]>
+//     CHECK: %[[SUB1:.+]] = memref.subview %[[OUT]][0, 2] [2, 3] [1, 1]  : memref<2x5xi32> to memref<2x3xi32, #[[MAP1]]>
 //     CHECK: linalg.copy(%[[IN1]], %[[SUB1]])
 module  {
   func @concatenate() {
@@ -39,9 +39,9 @@ module  {
 // CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5x2xi32>
 // CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2xi32>
 // CHECK-DAG: %[[CST:.+]] = constant 42 : i32
-//     CHECK: %[[SUB0:.+]] = subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<5x2xi32> to memref<2x2xi32, #[[MAP0]]>
+//     CHECK: %[[SUB0:.+]] = memref.subview %[[OUT]][0, 0] [2, 2] [1, 1]  : memref<5x2xi32> to memref<2x2xi32, #[[MAP0]]>
 //     CHECK: linalg.copy(%[[IN]], %[[SUB0]])
-//     CHECK: %[[SUB1:.+]] = subview %[[OUT]][2, 0] [3, 2] [1, 1]  : memref<5x2xi32> to memref<3x2xi32, #[[MAP1]]>
+//     CHECK: %[[SUB1:.+]] = memref.subview %[[OUT]][2, 0] [3, 2] [1, 1]  : memref<5x2xi32> to memref<3x2xi32, #[[MAP1]]>
 //     CHECK: linalg.fill(%[[SUB1]], %[[CST]])
 module  {
   func @concatenate() {

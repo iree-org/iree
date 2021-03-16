@@ -125,13 +125,13 @@ func @torch_index_select_dynamic(%input: tensor<?x?x?x?xf32>,
 // CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]*]]
 // CHECK-SAME:   %[[INDEX:[a-zA-Z0-9_]*]]
 //      CHECK:   %[[C0:.+]] = constant 0 : index
-//      CHECK:   %[[D0:.+]] = dim %[[INPUT]], %[[C0]]
+//      CHECK:   %[[D0:.+]] = memref.dim %[[INPUT]], %[[C0]]
 //      CHECK:   %[[C1:.+]] = constant 1 : index
-//      CHECK:   %[[D1:.+]] = dim %[[INPUT]], %[[C1]]
+//      CHECK:   %[[D1:.+]] = memref.dim %[[INPUT]], %[[C1]]
 //      CHECK:   %[[C1:.+]] = constant 1 : index
-//      CHECK:   %[[D2:.+]] = dim %[[INDEX]], %[[C1]]
+//      CHECK:   %[[D2:.+]] = memref.dim %[[INDEX]], %[[C1]]
 //      CHECK:   %[[C3:.+]] = constant 3 : index
-//      CHECK:   %[[D3:.+]] = dim %[[INPUT]], %[[C3]]
+//      CHECK:   %[[D3:.+]] = memref.dim %[[INPUT]], %[[C3]]
 //      CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]], %[[D2]], %[[D3]]]
 //      CHECK:   %[[RESULT:.+]] = linalg.indexed_generic
 // CHECK-SAME:     indexing_maps = [#[[MAP0]], #[[MAP1]]]

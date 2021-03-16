@@ -14,6 +14,7 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -78,7 +79,7 @@ CooperativeMatrixAnalysis::CooperativeMatrixAnalysis(mlir::Operation* op) {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (contract == nullptr) return;
     auto hasVectorDest = [](Operation* op) {
-      if (isa<ConstantOp, AllocOp>(op)) return false;
+      if (isa<ConstantOp, memref::AllocOp>(op)) return false;
       for (auto resultType : op->getResultTypes()) {
         if (resultType.isa<VectorType>()) return true;
       }

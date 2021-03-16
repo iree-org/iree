@@ -35,7 +35,7 @@ namespace iree_compiler {
 static constexpr int kNumGPUDims = 3;
 
 /// Allocation callback for allocation workgroup local memory.
-Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
+Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
                                         OperationFolder *folder);
 

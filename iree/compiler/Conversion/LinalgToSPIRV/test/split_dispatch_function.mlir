@@ -472,7 +472,7 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
         %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
         %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
         linalg.fill(%0, %cst) : memref<18x12xf32>, f32
-        %2 = subview %0[4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #map0>
+        %2 = memref.subview %0[4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #map0>
         linalg.copy(%1, %2) : memref<12x4xf32>, memref<18x12xf32, #map0>
         return
       }
@@ -492,7 +492,7 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
 //      CHECK: func @subview_interleaved_dispatch_1()
 //  CHECK-DAG:   %[[DST:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
 //  CHECK-DAG:   %[[SRC:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
-//      CHECK:   %[[SUB:.+]] = subview %[[DST]][4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #[[MAP0]]>
+//      CHECK:   %[[SUB:.+]] = memref.subview %[[DST]][4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #[[MAP0]]>
 //      CHECK:   linalg.copy(%[[SRC]], %[[SUB]]) : memref<12x4xf32>, memref<18x12xf32, #[[MAP0]]>
 //      CHECK:   return
 //      CHECK: func @subview_interleaved_dispatch_0()
@@ -663,7 +663,7 @@ hal.executable @kernel_fusable_fill_matmul_generic_ops attributes {sym_visiblity
         %ts2 = shapex.tie_shape %2, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?, ?]>
         %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
         %ts3 = shapex.tie_shape %3, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?,?]>
-        %4 = alloc(%dimM, %dimN) : memref<?x?xf32>
+        %4 = memref.alloc(%dimM, %dimN) : memref<?x?xf32>
         %ts4 = shapex.tie_shape %4, %shape3 : memref<?x?xf32>, !shapex.ranked_shape<[?,?]>
         linalg.fill(%ts4, %cst) : memref<?x?xf32>, f32
         linalg.matmul ins(%ts0, %ts1 : memref<?x512xf32>, memref<512x?xf32>)

@@ -87,7 +87,7 @@ func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
 func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<?x4xf32>
   %c0 = constant 0 : index
-  %1 = dim %0, %c0 : tensor<?x4xf32>
+  %1 = memref.dim %0, %c0 : tensor<?x4xf32>
   // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   // CHECK: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
   // CHECK: %{{.*}} = vm.const.i32.zero

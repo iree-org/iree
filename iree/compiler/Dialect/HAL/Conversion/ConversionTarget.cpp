@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -46,7 +47,7 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
 
   // There are a variety of patterns which convert std.dim and std.rank ops
   // to corresponding HAL ops. All should be eliminated.
-  addIllegalOp<DimOp>();
+  addIllegalOp<memref::DimOp>();
   addIllegalOp<RankOp>();
 
   // Metadata ops are dynamically legal if their types are legal.

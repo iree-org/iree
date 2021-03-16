@@ -421,7 +421,7 @@ static MemRefType getDynamicMemRefType(RankedTensorType tensorType,
 // Transfer all `dim` ops on `tensor` to `memref`.
 static void transferDimOpsToMemref(Value tensor, Value memref) {
   for (OpOperand &opOperand : llvm::make_early_inc_range(tensor.getUses())) {
-    if (isa<DimOp>(opOperand.getOwner())) {
+    if (isa<memref::DimOp>(opOperand.getOwner())) {
       opOperand.set(memref);
     }
   }
@@ -503,7 +503,8 @@ static Value createNewAllocDeallocPairForShapedValue(
   if (dynOperands.empty()) {
     for (auto dim : llvm::enumerate(memRefType.getShape()))
       if (dim.value() == ShapedType::kDynamicSize)
-        dynOperands.push_back(b.create<DimOp>(loc, shapedValue, dim.index()));
+        dynOperands.push_back(
+            b.create<memref::DimOp>(loc, shapedValue, dim.index()));
   }
   Value allocated = b.create<AllocOp>(loc, memRefType, dynOperands);
   b.setInsertionPoint(allocated.getParentBlock()->getTerminator());

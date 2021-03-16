@@ -548,7 +548,7 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0}
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1}
 //   CHECK-DAG:   %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2}
-//   CHECK-DAG:   %[[TEMP:.+]] = alloc()
+//   CHECK-DAG:   %[[TEMP:.+]] = memref.alloc()
 //       CHECK:   linalg.fill(%[[TEMP]], %{{.+}})
 //       CHECK:   linalg.matmul ins(%[[ARG0]], %[[ARG1]]
 //  CHECK-SAME:     ) outs(%[[TEMP]]
@@ -618,8 +618,8 @@ module {
 // CHECK-DAG:     %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x18x18x64xf32>
 // CHECK-DAG:     %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
 // CHECK-DAG:     %[[RES:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x8x8x64xf32>
-// CHECK:         %[[WINDOW:.+]] = alloc() : memref<3x3xf32>
-// CHECK:         %[[INIT:.+]] = load %[[ARG1]][] : memref<f32>
+// CHECK:         %[[WINDOW:.+]] = memref.alloc() : memref<3x3xf32>
+// CHECK:         %[[INIT:.+]] = memref.load %[[ARG1]][] : memref<f32>
 // CHECK:         linalg.fill(%[[RES]], %[[INIT]]) : memref<1x8x8x64xf32>, f32
 // CHECK:         linalg.pooling_nhwc_sum
 // CHECK-SAME:      {dilations = dense<1> : vector<2xi64>

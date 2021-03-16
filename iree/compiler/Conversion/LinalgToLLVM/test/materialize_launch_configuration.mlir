@@ -19,9 +19,9 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
         %2 = hal.interface.binding.subspan @legacy_io::@arg1[%c0] : memref<?x?xf32>
         %4 = hal.interface.binding.subspan @legacy_io::@arg2[%c0] : memref<?x?xf32>
         %6 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<?x?xf32>
-        %M = dim %0, %c0 : memref<?x?xf32>
-        %N = dim %2, %c1 : memref<?x?xf32>
-        %K = dim %0, %c1 : memref<?x?xf32>
+        %M = memref.dim %0, %c0 : memref<?x?xf32>
+        %N = memref.dim %2, %c1 : memref<?x?xf32>
+        %K = memref.dim %0, %c1 : memref<?x?xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -35,14 +35,14 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
           %11 = muli %workgroup_size_x, %workgroup_count_x : index
           scf.for %arg1 = %10 to %N step %11 {
             %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %N]
-            %13 = subview %0[%arg0, 0] [%12, %K] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %13 = memref.subview %0[%arg0, 0] [%12, %K] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
             %14 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %M]
-            %15 = subview %2[0, %arg1] [%K, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            %16 = subview %4[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            %17 = alloc(%12, %14) : memref<?x?xf32>
+            %15 = memref.subview %2[0, %arg1] [%K, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %16 = memref.subview %4[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %17 = memref.alloc(%12, %14) : memref<?x?xf32>
             linalg.copy(%16, %17) : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xf32>
             linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%13, %15 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) outs(%17 : memref<?x?xf32>)
-            %18 = subview %6[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %18 = memref.subview %6[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
             linalg.copy(%17, %18) : memref<?x?xf32>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
           }
         }
@@ -72,9 +72,9 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@arg2
 //   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
-//   CHECK-DAG:   %[[M:.+]] = dim %[[LHS]], %[[C0]]
-//   CHECK-DAG:   %[[N:.+]] = dim %[[RHS]], %[[C1]]
-//   CHECK-DAG:   %[[K:.+]] = dim %[[LHS]], %[[C1]]
+//   CHECK-DAG:   %[[M:.+]] = memref.dim %[[LHS]], %[[C0]]
+//   CHECK-DAG:   %[[N:.+]] = memref.dim %[[RHS]], %[[C1]]
+//   CHECK-DAG:   %[[K:.+]] = memref.dim %[[LHS]], %[[C1]]
 //   CHECK-DAG:   %[[WGID_X:.+]] = hal.interface.workgroup.id[0]
 //   CHECK-DAG:   %[[WGID_Y:.+]] = hal.interface.workgroup.id[1]
 //   CHECK-DAG:   %[[WGCOUNT_X:.+]] = hal.interface.workgroup.count[0]
