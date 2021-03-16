@@ -30,73 +30,15 @@ func @dot(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> attri
   return %0 : tensor<?x?xf32>
 }
 ```
-### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After RemoveShapeConstraints
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After TosaToSCF
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After SCFToStandard
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After TosaToStandard
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
-### IR Dump After TosaToLinalgOnTensors
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-
-```
 ### IR Dump After Canonicalizer
 ```
-module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-    return %0 : tensor<?x?xf32>
-  }
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
 }
 
 ```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+### IR Dump After Inliner
 ```
 module  {
   func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
@@ -116,9 +58,119 @@ module  {
 }
 
 ```
+### IR Dump After mlir::iree_compiler::IREE::SIP::MaterializeReflectionAttrsPass
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
 ### IR Dump After Canonicalizer
 ```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After CSE
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After SymbolDCE
+```
+module  {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+    return %0 : tensor<?x?xf32>
+  }
+}
+
+```
+### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After RemoveShapeConstraints
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After TosaToSCF
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After SCFToStandard
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After TosaToStandard
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After TosaToLinalgOnTensors
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+module  {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+    return %0 : tensor<?x?xf32>
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+```
+module  {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+    return %0 : tensor<?x?xf32>
+  }
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -127,7 +179,17 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 ### IR Dump After Inliner
 ```
 module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+    return %0 : tensor<?x?xf32>
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
+```
+module  {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
     return %0 : tensor<?x?xf32>
   }
@@ -136,7 +198,7 @@ module  {
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -144,7 +206,7 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 ```
 ### IR Dump After CSE
 ```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -153,18 +215,10 @@ func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> att
 ### IR Dump After mlir::iree_compiler::IREE::Flow::LegalizeInputTypesPass
 ```
 module  {
-  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export} {
+  func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
     return %0 : tensor<?x?xf32>
   }
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::MaterializeReflectionAttrsPass
-```
-func @dot(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {iree.module.export, iree.reflection = {f = "I19!B7!d-1d-1B7!d-1d-1R10!B7!d-1d-1", fv = "1"}} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
 }
 
 ```

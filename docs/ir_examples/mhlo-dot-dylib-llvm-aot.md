@@ -30,73 +30,15 @@ func @dot(%lhs: tensor<32x1024xf32>, %rhs: tensor<1024x64xf32>) -> tensor<32x64x
   return %0 : tensor<32x64xf32>
 }
 ```
-### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After RemoveShapeConstraints
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After TosaToSCF
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After SCFToStandard
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After TosaToStandard
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
-### IR Dump After TosaToLinalgOnTensors
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
-}
-
-```
 ### IR Dump After Canonicalizer
 ```
-module  {
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    return %0 : tensor<32x64xf32>
-  }
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
 }
 
 ```
-### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+### IR Dump After Inliner
 ```
 module  {
   func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
@@ -116,9 +58,119 @@ module  {
 }
 
 ```
+### IR Dump After mlir::iree_compiler::IREE::SIP::MaterializeReflectionAttrsPass
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
 ### IR Dump After Canonicalizer
 ```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After CSE
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After SymbolDCE
+```
+module  {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+### IR Dump After mlir::mhlo::{anonymous}::LegalizeControlFlowPass
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::HLOToHLOPreprocessing
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After RemoveShapeConstraints
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After TosaToSCF
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After SCFToStandard
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After TosaToStandard
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After TosaToLinalgOnTensors
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+
+```
+### IR Dump After Canonicalizer
+```
+module  {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::Shape::{anonymous}::ConvertShapeToShapex
+```
+module  {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
@@ -127,7 +179,17 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ### IR Dump After Inliner
 ```
 module  {
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
+    return %0 : tensor<32x64xf32>
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::Flow::{anonymous}::FlattenTuplesInCFGPass
+```
+module  {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
@@ -136,7 +198,7 @@ module  {
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
@@ -144,7 +206,7 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ```
 ### IR Dump After CSE
 ```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
   %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   return %0 : tensor<32x64xf32>
 }
@@ -153,18 +215,10 @@ func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x6
 ### IR Dump After mlir::iree_compiler::IREE::Flow::LegalizeInputTypesPass
 ```
 module  {
-  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export} {
+  func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
     %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
     return %0 : tensor<32x64xf32>
   }
-}
-
-```
-### IR Dump After mlir::iree_compiler::IREE::Flow::MaterializeReflectionAttrsPass
-```
-func @dot(%arg0: tensor<32x1024xf32>, %arg1: tensor<1024x64xf32>) -> tensor<32x64xf32> attributes {iree.module.export, iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-  return %0 : tensor<32x64xf32>
 }
 
 ```
@@ -1528,6 +1582,244 @@ func @dot_ex_dispatch_0() {
   br ^bb5(%54 : index)
 ^bb25:  // pred: ^bb5
   return
+}
+
+```
+### IR Dump After TensorConstantBufferize
+```
+module  {
+  func @dot_ex_dispatch_0() {
+    %cst = constant 0.000000e+00 : f32
+    %c1024 = constant 1024 : index
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %c4 = constant 4 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+    %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
+    %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+    %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb1(%c0 : index)
+  ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
+    %10 = cmpi slt, %9, %4 : index
+    cond_br %10, ^bb2(%c0 : index), ^bb5(%c0 : index)
+  ^bb2(%11: index):  // 2 preds: ^bb1, ^bb3
+    %12 = cmpi slt, %11, %c64 : index
+    cond_br %12, ^bb3, ^bb4
+  ^bb3:  // pred: ^bb2
+    store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %13 = addi %11, %c1 : index
+    br ^bb2(%13 : index)
+  ^bb4:  // pred: ^bb2
+    %14 = addi %9, %c1 : index
+    br ^bb1(%14 : index)
+  ^bb5(%15: index):  // 2 preds: ^bb1, ^bb24
+    %16 = cmpi slt, %15, %4 : index
+    cond_br %16, ^bb6(%c0 : index), ^bb25
+  ^bb6(%17: index):  // 2 preds: ^bb5, ^bb23
+    %18 = cmpi slt, %17, %c64 : index
+    cond_br %18, ^bb7(%c0 : index), ^bb24
+  ^bb7(%19: index):  // 2 preds: ^bb6, ^bb22
+    %20 = cmpi slt, %19, %c1024 : index
+    cond_br %20, ^bb8, ^bb23
+  ^bb8:  // pred: ^bb7
+    %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
+    %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb9(%c0 : index)
+  ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
+    %26 = cmpi slt, %25, %21 : index
+    cond_br %26, ^bb10(%c0 : index), ^bb22
+  ^bb10(%27: index):  // 2 preds: ^bb9, ^bb20
+    %28 = cmpi slt, %27, %c32 : index
+    cond_br %28, ^bb11(%c0 : index), ^bb21
+  ^bb11(%29: index):  // 2 preds: ^bb10, ^bb19
+    %30 = cmpi slt, %29, %c32 : index
+    cond_br %30, ^bb12, ^bb20
+  ^bb12:  // pred: ^bb11
+    %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
+    %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb13(%c0 : index)
+  ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
+    %36 = cmpi slt, %35, %31 : index
+    cond_br %36, ^bb14(%c0 : index), ^bb19
+  ^bb14(%37: index):  // 2 preds: ^bb13, ^bb17
+    %38 = cmpi slt, %37, %c4 : index
+    cond_br %38, ^bb15(%c0 : index), ^bb18
+  ^bb15(%39: index):  // 2 preds: ^bb14, ^bb16
+    %40 = cmpi slt, %39, %c4 : index
+    cond_br %40, ^bb16, ^bb17
+  ^bb16:  // pred: ^bb15
+    %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %44 = mulf %41, %42 : f32
+    %45 = addf %43, %44 : f32
+    store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %46 = addi %39, %c1 : index
+    br ^bb15(%46 : index)
+  ^bb17:  // pred: ^bb15
+    %47 = addi %37, %c1 : index
+    br ^bb14(%47 : index)
+  ^bb18:  // pred: ^bb14
+    %48 = addi %35, %c1 : index
+    br ^bb13(%48 : index)
+  ^bb19:  // pred: ^bb13
+    %49 = addi %29, %c4 : index
+    br ^bb11(%49 : index)
+  ^bb20:  // pred: ^bb11
+    %50 = addi %27, %c4 : index
+    br ^bb10(%50 : index)
+  ^bb21:  // pred: ^bb10
+    %51 = addi %25, %c4 : index
+    br ^bb9(%51 : index)
+  ^bb22:  // pred: ^bb9
+    %52 = addi %19, %c32 : index
+    br ^bb7(%52 : index)
+  ^bb23:  // pred: ^bb7
+    %53 = addi %17, %c32 : index
+    br ^bb6(%53 : index)
+  ^bb24:  // pred: ^bb6
+    %54 = addi %15, %c32 : index
+    br ^bb5(%54 : index)
+  ^bb25:  // pred: ^bb5
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::{anonymous}::FoldTensorExtractOpPass
+```
+module  {
+  func @dot_ex_dispatch_0() {
+    %cst = constant 0.000000e+00 : f32
+    %c1024 = constant 1024 : index
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %c4 = constant 4 : index
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+    %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
+    %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+    %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb1(%c0 : index)
+  ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
+    %10 = cmpi slt, %9, %4 : index
+    cond_br %10, ^bb2(%c0 : index), ^bb5(%c0 : index)
+  ^bb2(%11: index):  // 2 preds: ^bb1, ^bb3
+    %12 = cmpi slt, %11, %c64 : index
+    cond_br %12, ^bb3, ^bb4
+  ^bb3:  // pred: ^bb2
+    store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %13 = addi %11, %c1 : index
+    br ^bb2(%13 : index)
+  ^bb4:  // pred: ^bb2
+    %14 = addi %9, %c1 : index
+    br ^bb1(%14 : index)
+  ^bb5(%15: index):  // 2 preds: ^bb1, ^bb24
+    %16 = cmpi slt, %15, %4 : index
+    cond_br %16, ^bb6(%c0 : index), ^bb25
+  ^bb6(%17: index):  // 2 preds: ^bb5, ^bb23
+    %18 = cmpi slt, %17, %c64 : index
+    cond_br %18, ^bb7(%c0 : index), ^bb24
+  ^bb7(%19: index):  // 2 preds: ^bb6, ^bb22
+    %20 = cmpi slt, %19, %c1024 : index
+    cond_br %20, ^bb8, ^bb23
+  ^bb8:  // pred: ^bb7
+    %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
+    %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb9(%c0 : index)
+  ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
+    %26 = cmpi slt, %25, %21 : index
+    cond_br %26, ^bb10(%c0 : index), ^bb22
+  ^bb10(%27: index):  // 2 preds: ^bb9, ^bb20
+    %28 = cmpi slt, %27, %c32 : index
+    cond_br %28, ^bb11(%c0 : index), ^bb21
+  ^bb11(%29: index):  // 2 preds: ^bb10, ^bb19
+    %30 = cmpi slt, %29, %c32 : index
+    cond_br %30, ^bb12, ^bb20
+  ^bb12:  // pred: ^bb11
+    %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
+    %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    br ^bb13(%c0 : index)
+  ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
+    %36 = cmpi slt, %35, %31 : index
+    cond_br %36, ^bb14(%c0 : index), ^bb19
+  ^bb14(%37: index):  // 2 preds: ^bb13, ^bb17
+    %38 = cmpi slt, %37, %c4 : index
+    cond_br %38, ^bb15(%c0 : index), ^bb18
+  ^bb15(%39: index):  // 2 preds: ^bb14, ^bb16
+    %40 = cmpi slt, %39, %c4 : index
+    cond_br %40, ^bb16, ^bb17
+  ^bb16:  // pred: ^bb15
+    %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %44 = mulf %41, %42 : f32
+    %45 = addf %43, %44 : f32
+    store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %46 = addi %39, %c1 : index
+    br ^bb15(%46 : index)
+  ^bb17:  // pred: ^bb15
+    %47 = addi %37, %c1 : index
+    br ^bb14(%47 : index)
+  ^bb18:  // pred: ^bb14
+    %48 = addi %35, %c1 : index
+    br ^bb13(%48 : index)
+  ^bb19:  // pred: ^bb13
+    %49 = addi %29, %c4 : index
+    br ^bb11(%49 : index)
+  ^bb20:  // pred: ^bb11
+    %50 = addi %27, %c4 : index
+    br ^bb10(%50 : index)
+  ^bb21:  // pred: ^bb10
+    %51 = addi %25, %c4 : index
+    br ^bb9(%51 : index)
+  ^bb22:  // pred: ^bb9
+    %52 = addi %19, %c32 : index
+    br ^bb7(%52 : index)
+  ^bb23:  // pred: ^bb7
+    %53 = addi %17, %c32 : index
+    br ^bb6(%53 : index)
+  ^bb24:  // pred: ^bb6
+    %54 = addi %15, %c32 : index
+    br ^bb5(%54 : index)
+  ^bb25:  // pred: ^bb5
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
 }
 
 ```
