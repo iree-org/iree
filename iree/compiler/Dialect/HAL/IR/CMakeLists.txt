@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "HALDialect.h"
     "HALOps.h"
     "HALTypes.h"
   TEXTUAL_HDRS

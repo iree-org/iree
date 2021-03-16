@@ -36,6 +36,12 @@ class HALDialect : public Dialect {
 
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
+
+ private:
+  /// Register the attributes of this dialect.
+  void registerAttributes();
+  /// Register the types of this dialect.
+  void registerTypes();
 };
 
 }  // namespace HAL

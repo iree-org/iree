@@ -72,7 +72,7 @@ struct ShapeConstantFoldInterface : public DialectFoldInterface {
 
 ShapeDialect::ShapeDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<ShapeDialect>()) {
-  addTypes<Shape::RankedShapeType>();
+  registerTypes();
   addInterfaces<ShapeConstantFoldInterface, ShapeInlinerInterface>();
 #define GET_OP_LIST
   addOperations<

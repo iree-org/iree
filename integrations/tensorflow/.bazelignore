@@ -14,3 +14,6 @@
 
 # Ignore build files that are intended for other Bazel repositories
 build_tools/overlay
+
+# Ignore build files open-sourced only for reference and usage by Bazel->CMake
+e2e/
