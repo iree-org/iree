@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/signature_mangle.h"
-
+#include "iree/compiler/Bindings/SIP/Utils/SignatureBuilder.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureParser.h"
 #include "iree/testing/gtest.h"
 
-namespace iree {
 namespace {
+
+using namespace mlir::iree_compiler::IREE::SIP;
 
 class SipSignatureTest : public ::testing::Test {
  protected:
-  std::string PrintInputSignature(absl::optional<SignatureBuilder> signature) {
+  std::string PrintInputSignature(llvm::Optional<SignatureBuilder> signature) {
     EXPECT_TRUE(signature);
 
     SipSignatureParser parser;
@@ -32,7 +33,7 @@ class SipSignatureTest : public ::testing::Test {
   }
 
   std::string PrintResultsSignature(
-      absl::optional<SignatureBuilder> signature) {
+      llvm::Optional<SignatureBuilder> signature) {
     EXPECT_TRUE(signature);
 
     SipSignatureParser parser;
@@ -222,8 +223,7 @@ TEST(RawSignatureManglerTest, DefaultBuffer) {
 TEST(RawSignatureManglerTest, FullBuffer) {
   RawSignatureMangler sm;
   std::vector<int> dims = {-1, 128, 64};
-  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat64,
-                       absl::MakeSpan(dims));
+  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat64, dims);
   EXPECT_EQ("B13!t2d-1d128d64", sm.builder().encoded());
 }
 
@@ -259,12 +259,10 @@ TEST(RawSignatureParserTest, EmptySignature) {
 TEST(RawSignatureParserTest, StaticNdArrayBuffer) {
   RawSignatureMangler inputs;
   std::vector<int> dims = {10, 128, 64};
-  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
-                           absl::MakeSpan(dims));
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
   RawSignatureMangler results;
   std::vector<int> dims2 = {32, 8, 64};
-  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32,
-                            absl::MakeSpan(dims2));
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32, dims2);
 
   auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
   EXPECT_EQ("I15!B11!d10d128d64R15!B11!t6d32d8d64", sig.encoded());
@@ -278,12 +276,10 @@ TEST(RawSignatureParserTest, StaticNdArrayBuffer) {
 TEST(RawSignatureParserTest, DynamicNdArrayBuffer) {
   RawSignatureMangler inputs;
   std::vector<int> dims = {-1, 128, 64};
-  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
-                           absl::MakeSpan(dims));
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
   RawSignatureMangler results;
   std::vector<int> dims2 = {-1, 8, 64};
-  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32,
-                            absl::MakeSpan(dims2));
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32, dims2);
 
   auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
   EXPECT_EQ("I15!B11!d-1d128d64R15!B11!t6d-1d8d64", sig.encoded());
@@ -313,13 +309,11 @@ TEST(RawSignatureParserTest, AllTypes) {
   RawSignatureMangler inputs;
   inputs.AddAnyReference();
   std::vector<int> dims = {-1, 128, 64};
-  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
-                           absl::MakeSpan(dims));
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, dims);
   inputs.AddScalar(AbiConstants::ScalarType::kSint32);
   RawSignatureMangler results;
   std::vector<int> dims2 = {32, -1, 64};
-  results.AddShapedNDBuffer(AbiConstants::ScalarType::kUint64,
-                            absl::MakeSpan(dims2));
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kUint64, dims2);
 
   auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
   EXPECT_EQ("I23!O1!B11!d-1d128d64S3!t6R17!B13!t11d32d-1d64", sig.encoded());
@@ -345,7 +339,6 @@ TEST_F(SipSignatureTest, NoInputsResults) {
   SipSignatureMangler results;
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   EXPECT_EQ("I1!R1!", signature->encoded());
 
   auto inputs_string = PrintInputSignature(signature);
@@ -372,7 +365,6 @@ TEST_F(SipSignatureTest, SequentialInputSingleResult) {
   results.SetRawSignatureIndex(0, {});
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
@@ -405,7 +397,6 @@ TEST_F(SipSignatureTest, NestedInputMultiResult) {
   results.SetRawSignatureIndex(1, {{1}});
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
@@ -414,4 +405,3 @@ TEST_F(SipSignatureTest, NestedInputMultiResult) {
 }
 
 }  // namespace
-}  // namespace iree

@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Test coverage across backends for e2e tests is defined directly in the BUILD
-# files. Coverage tables generated from this file can be viewed here:
-#   https://google.github.io/iree/tensorflow-coverage
-# Updates made to test suite names should also be reflected here:
-#   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
+# ***THIS FILE DOES NOT BUILD WITH BAZEL***
+#
+# It is open sourced to enable Bazel->CMake conversion to maintain test coverage
+# of our integration tests in open source while we figure out a long term plan
+# for our integration testing.
 
 load(
-    "//e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
 )
 
@@ -35,6 +35,14 @@ package(
         srcs = [src],
         main = src,
         python_version = "PY3",
+        deps = [
+            "//third_party/py/absl:app",
+            "//third_party/py/absl/flags",
+            "//third_party/py/numpy",
+            "//third_party/py/pyiree:pylib_tf_support",
+            "//third_party/py/tensorflow",
+            "//util/debuginfo:signalsafe_addr2line_installer",
+        ],
     )
     for src in glob(
         ["*_test.py"],
@@ -92,11 +100,14 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "iree_vmla",
         },
         {
-            # Timing out on SwiftShader
             "model": [
+                # Timing out on SwiftShader
                 "att_mh_rnn",
                 "att_rnn",
                 "gru",
+                # Compilation fails
+                "crnn",
+                "lstm",
             ],
             "target_backends": "iree_vulkan",
         },
@@ -124,9 +135,15 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
-    tags = [
-        # Kokoro doesn't have kws_streaming installed
-        "nokokoro",
+    deps = [
+        "//third_party/google_research/google_research/kws_streaming/models:models_lib",
+        "//third_party/google_research/google_research/kws_streaming/train:train_lib",
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
     ],
 )
 
@@ -155,9 +172,15 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
-    tags = [
-        # Kokoro doesn't have kws_streaming installed
-        "nokokoro",
+    deps = [
+        "//third_party/google_research/google_research/kws_streaming/models:models_lib",
+        "//third_party/google_research/google_research/kws_streaming/train:train_lib",
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
     ],
 )
 
@@ -193,7 +216,16 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
-    tags = ["nokokoro"],
+    deps = [
+        "//third_party/google_research/google_research/kws_streaming/models:models_lib",
+        "//third_party/google_research/google_research/kws_streaming/train:train_lib",
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
 )
 
 py_binary(
@@ -201,4 +233,14 @@ py_binary(
     srcs = ["keyword_spotting_streaming_test.py"],
     main = "keyword_spotting_streaming_test.py",
     python_version = "PY3",
+    deps = [
+        "//third_party/google_research/google_research/kws_streaming/models:models_lib",
+        "//third_party/google_research/google_research/kws_streaming/train:train_lib",
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
 )

@@ -25,7 +25,7 @@
 #include "binding.h"
 #include "hal.h"
 #include "host_types.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 #include "vm.h"
 
 namespace iree {

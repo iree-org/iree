@@ -1,4 +1,4 @@
-// RUN: export M=128 && export N=128 && export K=128 && export ITERS=10 &&\
+// RUN: export M=32 && export N=64 && export K=128 && export ITERS=10 && \
 // RUN: cat %p/matmul_f32_base.mlir | sed 's@${M}@'"$M"'@g'| sed 's@${K}@'"$K"'@g' | sed 's@${N}@'"$N"'@g'| sed 's@${ITERS}@'"$ITERS"'@g' |\
 
 // RUN: mlir-proto-opt -linalg-tensor-codegen-strategy="anchor-func=init_and_matmul anchor-op=linalg.matmul tile-sizes=4,8,16 vectorize vector-contract-lowering=false" |\

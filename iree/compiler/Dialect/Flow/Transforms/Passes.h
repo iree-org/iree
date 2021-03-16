@@ -56,15 +56,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 
-// Adds a set of passes to the given pass manager that run the flow transforms
-// to export dispatch functions.
-//
-// The expected usage is to add passes right after
-// buildFlowTransformPassPipieline.
-void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager);
-
-void registerExportDispatchesTransformPassPipeline();
-
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
@@ -92,11 +83,6 @@ std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 // This converts any leftover ops that did not already get converted or outlined
 // to dispatch regions.
 std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
-
-// Materializes reflection metadata on exported function arguments and results.
-// This runs as close to the input processing as possible as it needs to
-// annotate the ABI that the consumer is expecting to interop with.
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
@@ -129,8 +115,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegions2Pass();
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();
 
-// Exports all the dispatch functions to the module.
-std::unique_ptr<OperationPass<ModuleOp>> createCreateBenchmarkFuncs();
+// Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
+std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
 
 //===----------------------------------------------------------------------===//
 // Optimizations
@@ -182,19 +168,17 @@ createStripAndSplatConstantVariablesPass();
 inline void registerFlowPasses() {
   registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
-  registerExportDispatchesTransformPassPipeline();
   createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createPostPartitioningConversionPass();
-  createMaterializeReflectionAttrs();
   createExpandVariableDynamicDimsPass();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegions2Pass();
   createFoldCompatibleDispatchRegionsPass();
   createOutlineDispatchRegionsPass();
-  createCreateBenchmarkFuncs();
+  createExportBenchmarkFuncsPass();
   createOutlineLargeConstantsPass();
   createDeduplicateExecutablesPass();
   createFormStreamsPass();

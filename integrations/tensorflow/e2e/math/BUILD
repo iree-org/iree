@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# ***THIS FILE DOES NOT BUILD WITH BAZEL***
+#
+# It is open sourced to enable Bazel->CMake conversion to maintain test coverage
+# of our integration tests in open source while we figure out a long term plan
+# for our integration testing.
+
 load(
-    "//e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
 )
 
@@ -23,15 +29,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-[
-    py_binary(
-        name = src.replace(".py", "_manual"),
-        srcs = [src],
-        main = src,
-        python_version = "PY3",
-    )
-    for src in glob(["*_test.py"])
-]
+py_binary(
+    name = "math_test_manual",
+    srcs = ["math_test.py"],
+    main = "math_test.py",
+    python_version = "PY3",
+    deps = [
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
+)
 
 # These functions were selected using all of the funcions in the tf.math docs:
 #   https://www.tensorflow.org/api_docs/python/tf/math
@@ -213,9 +224,6 @@ TFLITE_FAILING = [
     "reduce_all",
     "reduce_euclidean_norm",
     "reduce_logsumexp",
-    "reduce_mean",
-    "reduce_std",
-    "reduce_variance",
     "rint",
     "segment_max",
     "segment_mean",
@@ -439,9 +447,6 @@ VULKAN_FAILING = [
     "zeta",
 ]
 
-# These tests allow us to generate coverage tables and give a finer-grained view
-# of the coverage, but are very slow due to bazel overhead, so they are not
-# run on the internal or OSS CI.
 iree_e2e_cartesian_product_test_suite(
     name = "math_tests",
     failing_configurations = [
@@ -480,6 +485,14 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    deps = [
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
 )
 
 # ---- DYNAMIC TESTS ---------------------------------------------- #
@@ -678,9 +691,6 @@ VULKAN_FAILING_DYNAMIC = VULKAN_FAILING + [
     "zero_fraction",
 ]
 
-# These tests allow us to generate coverage tables and give a finer-grained view
-# of the coverage, but are very slow due to bazel overhead, so they are not
-# run on the internal or OSS CI.
 iree_e2e_cartesian_product_test_suite(
     name = "math_dynamic_dims_tests",
     failing_configurations = [
@@ -718,6 +728,14 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    deps = [
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
 )
 
 # ---- COMPLEX TESTS ---------------------------------------------- #
@@ -844,4 +862,12 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    deps = [
+        "//third_party/py/absl:app",
+        "//third_party/py/absl/flags",
+        "//third_party/py/numpy",
+        "//third_party/py/pyiree:pylib_tf_support",
+        "//third_party/py/tensorflow",
+        "//util/debuginfo:signalsafe_addr2line_installer",
+    ],
 )

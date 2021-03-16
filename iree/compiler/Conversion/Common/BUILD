@@ -21,11 +21,11 @@ package(
 cc_library(
     name = "Common",
     srcs = [
+        "BufferAllocViewCleanUpPass.cpp",
         "LaunchConfig.cpp",
         "LinalgBufferizePass.cpp",
         "LinalgRewriteDestructiveUpdatesPass.cpp",
         "Passes.cpp",
-        "RemoveDeadMemAllocsPass.cpp",
         "Transforms.cpp",
         "VectorTransferOptimization.cpp",
     ],

@@ -10,6 +10,15 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    FoldTensorExtractOpIncGen
+  TD_FILE
+    "FoldTensorExtractOp.td"
+  OUTS
+    -gen-rewriters FoldTensorExtractOp.cpp.inc
+)
+
 iree_cc_library(
   NAME
     LinalgToLLVM
@@ -19,6 +28,7 @@ iree_cc_library(
   SRCS
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
+    "FoldTensorExtractOpPass.cpp"
     "KernelDispatch.cpp"
     "LinalgTileAndDistributePass.cpp"
     "LinalgTileAndVectorizePass.cpp"
@@ -43,6 +53,7 @@ iree_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRStandardToSPIRV
+    MLIRTensor
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM
@@ -51,6 +62,7 @@ iree_cc_library(
     iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::LinalgToLLVM::FoldTensorExtractOpIncGen
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

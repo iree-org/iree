@@ -183,7 +183,9 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
+    "convolution.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -191,6 +193,7 @@ iree_check_single_backend_test_suite(
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"
+    "gather.mlir"
     "iota.mlir"
     "log.mlir"
     "log_plus_one.mlir"
@@ -209,6 +212,7 @@ iree_check_single_backend_test_suite(
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
@@ -232,7 +236,9 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
+    "convolution.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -240,6 +246,7 @@ iree_check_single_backend_test_suite(
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"
+    "gather.mlir"
     "iota.mlir"
     "log.mlir"
     "log_plus_one.mlir"
@@ -247,6 +254,7 @@ iree_check_single_backend_test_suite(
     "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
+    "pad.mlir"
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
@@ -257,6 +265,7 @@ iree_check_single_backend_test_suite(
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
@@ -291,7 +300,11 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
   LABELS
-    "notap"
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

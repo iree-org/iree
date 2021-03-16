@@ -37,6 +37,10 @@ class VulkanDialect : public Dialect {
 
   /// Prints an attribute registered to this dialect.
   void printAttribute(Attribute, DialectAsmPrinter &printer) const override;
+
+ private:
+  /// Register the attributes of this dialect.
+  void registerAttributes();
 };
 
 }  // namespace Vulkan

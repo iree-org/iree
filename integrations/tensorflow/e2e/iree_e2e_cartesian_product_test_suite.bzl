@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Macro for building e2e tests from a single source with multiple flags."""
+# ***THIS FILE DOES NOT BUILD WITH BAZEL***
+#
+# It is open sourced for reference for the Bazel->CMake conversion to maintain
+# test coverage of our integration tests in open source while we figure out a
+# long term plan for our integration testing.
+
+"""Macro for building e2e tests by expanding a matrix of test configurations."""
 
 load("@iree//build_tools/bazel:deep_copy.bzl", "deep_copy")
 
@@ -61,7 +67,11 @@ def iree_e2e_cartesian_product_test_suite(
     For example, given the following values
 
         matrix = {
+<<<<<<< HEAD
             "src": "external_model_test.py"
+=======
+            "src": "application_test.py"
+>>>>>>> main
             "use_external_weights": True,
             "model": [
                 "ResNet50",
@@ -85,14 +95,14 @@ def iree_e2e_cartesian_product_test_suite(
 
     the following passing and failing configurations would be generated:
         # Passing
-        {src: external_model_test.py, use_exernal_weights: True, model: MobileBert, target_backends: tf}
-        {src: external_model_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vmla}
+        {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: tf}
+        {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vmla}
 
         # Failing
-        {src: external_model_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: tf}
-        {src: external_model_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vmla}
-        {src: external_model_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vulkan}
-        {src: external_model_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vulkan}
+        {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: tf}
+        {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vmla}
+        {src: application_test.py, use_exernal_weights: True, model: ResNet50,   target_backends: iree_vulkan}
+        {src: application_test.py, use_exernal_weights: True, model: MobileBert, target_backends: iree_vulkan}
 
     Args:
       name:
@@ -188,8 +198,7 @@ def iree_e2e_cartesian_product_test_suite(
             test_name.append(src_name)
 
         # Append the target backend
-        if len(matrix["target_backends"]) > 1:
-            test_name.append(target_backend)
+        test_name.append(target_backend)
 
         # For all other flags, append their key and value if the value isn't
         # always the same.

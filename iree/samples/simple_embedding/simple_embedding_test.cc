@@ -51,6 +51,7 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   // "simple" embedded test. This is a hack to work around its bustedness.
   driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "dylib");
   driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "llvm");
+  driver_names = iree::hal::testing::RemoveDriverByName(driver_names, "cuda");
   for (const auto& driver_name : driver_names) {
     TestParams test_params;
     test_params.driver_name = driver_name;

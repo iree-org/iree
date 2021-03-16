@@ -21,7 +21,7 @@ set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 add_subdirectory(pyiree/rt)
 
 if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler2)
+add_subdirectory(pyiree/compiler)
 add_subdirectory(pyiree/tools/core)
 endif()
 

@@ -224,3 +224,33 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
 // CHECK: scf.for
 // CHECK: scf.for
 // CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+
+// -----
+
+func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32> {
+  %cst = constant 0.000000e+00 : f32
+  %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
+  %1 = linalg.fill(%0, %cst) : tensor<1x225x225x3xf32>, f32 -> tensor<1x225x225x3xf32>
+  %2 = subtensor_insert %arg0 into %1[0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1] : tensor<1x224x224x3xf32> into tensor<1x225x225x3xf32>
+  return %2 : tensor<1x225x225x3xf32>
+}
+
+//      CHECK: func @subtensor_insert
+// CHECK-SAME: (%[[INPUT:.+]]: tensor<1x224x224x3xf32>)
+//
+//      CHECK:   %[[FILL:.+]] = flow.dispatch.workgroups[{{.+}}]() : () -> tensor<1x225x225x3xf32> =
+// CHECK-NEXT:       (%[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x225x225x3xf32>) {
+//      CHECK:     linalg.init_tensor
+// CHECK-NEXT:     %[[TENSOR:.+]] = linalg.fill
+// CHECK-NEXT:     flow.dispatch.tensor.store %[[TENSOR]], %[[OUTPUT]]
+// CHECK-NEXT:     flow.return
+//
+//      CHECK:   %[[PAD:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x224x224x3xf32>, tensor<1x225x225x3xf32>) -> %[[FILL]] =
+// CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {
+// CHECK-NEXT:     %[[SRC_TENSOR:.+]] = flow.dispatch.tensor.load %[[SRC]] : !flow.dispatch.tensor<readonly:1x224x224x3xf32> -> tensor<1x224x224x3xf32>
+// CHECK-NEXT:     %[[DST_TENSOR:.+]] = flow.dispatch.tensor.load %[[DST]] : !flow.dispatch.tensor<readwrite:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
+// CHECK-NEXT:     %[[INSERT:.+]] = subtensor_insert %[[SRC_TENSOR]] into %[[DST_TENSOR]][0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1]
+// CHECK-NEXT:     flow.dispatch.tensor.store %[[INSERT]], %[[DST]] : tensor<1x225x225x3xf32> -> !flow.dispatch.tensor<readwrite:1x225x225x3xf32>
+// CHECK-NEXT:     flow.return
+//
+//      CHECK:   return %[[PAD]] : tensor<1x225x225x3xf32>

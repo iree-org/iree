@@ -109,15 +109,13 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    signature_mangle
+    signature_parser
   HDRS
-    "signature_mangle.h"
+    "signature_parser.h"
   SRCS
-    "signature_mangle.cc"
+    "signature_parser.cc"
   DEPS
-    ::status
     absl::inlined_vector
-    absl::memory
     absl::optional
     absl::span
     absl::strings
@@ -126,11 +124,11 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    signature_mangle_test
+    signature_parser_test
   SRCS
-    "signature_mangle_test.cc"
+    "signature_parser_test.cc"
   DEPS
-    ::signature_mangle
+    ::signature_parser
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -20,7 +20,7 @@ import re
 from absl import logging
 from absl.testing import absltest
 import numpy as np
-from pyiree import compiler2 as compiler
+from pyiree import compiler
 from pyiree import rt
 
 

@@ -95,6 +95,7 @@ linalg::LinalgOp getRootLinalgOp(FuncOp funcOp) {
   SPIRVCodegenOptions options;
   options.enableVectorization = true;
   options.usingLinalgOnTensors = true;
+
   linalg::Aliases aliases;
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
   Optional<LaunchConfig> launchConfigOpt = initGPULaunchConfig(
@@ -159,7 +160,10 @@ getTileSizeAndWorkgroupSize(Operation *rootOp, ArrayRef<Type> inputTypes,
   auto ops = rootOp->getBlock()->getOps<linalg::LinalgOp>();
   linalgOps.assign(ops.begin(), ops.end());
   linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOps);
+
   SPIRVCodegenOptions options;
+  options.enableVectorization = true;
+  options.usingLinalgOnTensors = true;
 
   // NOTE: Launch configuration expects the original input/output type to decide
   // the configuration. But we have already tiled the Linalg ops here. Use an
@@ -234,7 +238,7 @@ class ConcretizeWorkgroupCountOp final
                              SmallVector<int64_t, 4> tileSize,
                              PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        workloadSize(workloadSize),
+        workloadSize(std::move(workloadSize)),
         tileSize(std::move(tileSize)) {}
 
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupCountOp op,
@@ -278,7 +282,7 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
                     SmallVector<int64_t, 4> tileSize,
                     PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
-        workloadSize(workloadSize),
+        workloadSize(std::move(workloadSize)),
         tileSize(std::move(tileSize)) {}
 
   LogicalResult matchAndRewrite(scf::ForOp op,

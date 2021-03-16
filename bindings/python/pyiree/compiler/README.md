@@ -6,7 +6,7 @@ replace the `pyiree.compiler` and `pyiree.tf.compiler` packages.
 ## Core compiler
 
 ```py
-from pyiree.compiler2 import *
+from pyiree.compiler import *
 
 SIMPLE_MUL_ASM = """
 func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
@@ -18,7 +18,7 @@ func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
 
 # Also see compile_file()
 # There are many keyword options available.
-# See pyiree.compiler2.CompilerOptions
+# See pyiree.compiler.CompilerOptions
 binary = compile_str(SIMPLE_MUL_ASM, target_backends=["vulkan-spirv"])
 ```
 
@@ -27,7 +27,7 @@ binary = compile_str(SIMPLE_MUL_ASM, target_backends=["vulkan-spirv"])
 
 ```py
 import tensorflow as tf
-from pyiree.compiler2.tf import *
+from pyiree.compiler.tf import *
 
 class SimpleArithmeticModule(tf.Module):
 
@@ -40,7 +40,7 @@ class SimpleArithmeticModule(tf.Module):
 
 # Also see compile_saved_model to directly compile an on-disk saved model.
 # There are many keyword options available.
-# See: pyiree.compiler2.tf.ImportOptions
+# See: pyiree.compiler.tf.ImportOptions
 binary = compile_module(
     SimpleArithmeticModule(), target_backends=["vulkan-spirv"])
 ```

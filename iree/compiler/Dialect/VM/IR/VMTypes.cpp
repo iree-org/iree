@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 
+#include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -182,6 +183,17 @@ void OrdinalCountsAttr::print(DialectAsmPrinter &p) const {
   os << "rodatas = " << rodatas() << ", ";
   os << "rwdatas = " << rwdatas();
   os << ">";
+}
+
+//===----------------------------------------------------------------------===//
+// VMDialect
+//===----------------------------------------------------------------------===//
+
+void VMDialect::registerAttributes() {
+  addAttributes<IREE::VM::OrdinalCountsAttr>();
+}
+void VMDialect::registerTypes() {
+  addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
 }
 
 }  // namespace VM

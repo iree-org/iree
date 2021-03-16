@@ -47,13 +47,9 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
@@ -208,23 +204,10 @@ Status PrepareModule(std::string target_backend,
   // Translate from MLIR to IREE bytecode.
   IREE_LOG(INFO) << "Compiling for target backend '" << target_backend
                  << "'...";
-  auto hal_target_options =
-      mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
-  hal_target_options.targets = {std::move(target_backend)};
-  auto vm_target_options =
-      mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
-  mlir::iree_compiler::IREE::Flow::buildInputTransformPassPipeline(
-      pass_manager);
-  mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
-  mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
-      pass_manager, hal_target_options);
-  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(
-      pass_manager, vm_target_options);
-  pass_manager.addPass(
-      mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+  mlir::iree_compiler::buildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "conversion from source -> vm failed");

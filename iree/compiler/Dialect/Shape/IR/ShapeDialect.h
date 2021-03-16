@@ -34,6 +34,10 @@ class ShapeDialect : public Dialect {
 
   Operation* materializeConstant(OpBuilder& builder, Attribute value, Type type,
                                  Location loc) override;
+
+ private:
+  /// Register the types of this dialect.
+  void registerTypes();
 };
 
 }  // namespace iree_compiler

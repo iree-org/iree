@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Sequence/IR/SequenceTypes.h"
 
+#include "iree/compiler/Dialect/Sequence/IR/SequenceDialect.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
 
@@ -61,6 +62,7 @@ SequenceType SequenceType::getChecked(
 
 Type SequenceType::getTargetType() { return getImpl()->targetType; }
 
+void SequenceDialect::registerTypes() { addTypes<SequenceType>(); }
 }  // namespace Sequence
 }  // namespace IREE
 }  // namespace iree_compiler

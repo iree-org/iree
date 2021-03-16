@@ -14,8 +14,8 @@
 
 import functools
 
-import pyiree.compiler2 as compiler
-import pyiree.compiler2.xla
+from pyiree import compiler
+import pyiree.compiler.xla
 from pyiree import rt
 
 try:

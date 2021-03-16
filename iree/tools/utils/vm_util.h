@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "absl/types/span.h"
-#include "iree/base/signature_mangle.h"
+#include "iree/base/signature_parser.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"

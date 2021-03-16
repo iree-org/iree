@@ -464,6 +464,14 @@ void VariableOp::build(OpBuilder &builder, OperationState &result,
 // flow.variable.load
 //===----------------------------------------------------------------------===//
 
+void VariableLoadOp::build(OpBuilder &builder, OperationState &state,
+                           VariableOp variableOp,
+                           ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({variableOp.type()});
+  state.addAttribute("variable", builder.getSymbolRefAttr(variableOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
 void VariableLoadOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying
@@ -807,6 +815,31 @@ static bool canDispatchRegionContainOpIssue4897(Operation *op) {
   return false;
 }
 
+// Inline operations that the dispatch region can handle natively.
+static bool canDispatchRegionContainOp(Operation *op) {
+  // Inline constant operations that are splat or small constants.
+  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+    auto constantValueAttr = constantOp.getValue();
+    auto constantType = constantOp.getType();
+    if (constantValueAttr.isa<SplatElementsAttr>()) {
+      return true;
+    } else if (auto denseAttr =
+                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLLVM
+      // side. Uncomment after that is fixed.
+      // auto shapedType = constantOp.getType().cast<ShapedType>();
+      // uint64_t estimatedByteLength =
+      //     (shapedType.getNumElements() * shapedType.getElementTypeBitWidth())
+      //     / 8;
+      return denseAttr
+          .isSplat();  // || estimatedByteLength <= 256;  // or whatever
+    } else if (constantType.isIntOrIndexOrFloat()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool DispatchRegionOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOpIssue4897(op);
 }
@@ -973,7 +1006,7 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 }
 
 bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
-  return canDispatchRegionContainOpIssue4897(op);
+  return canDispatchRegionContainOp(op);
 }
 
 ClosureOpInterface
@@ -987,10 +1020,25 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  SmallVector<int64_t, 4> newTiedOperandIndices =
+
+  auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  // TODO(benvanik): all this offset stuff is confusing and should be reworked.
+  // We should probably have absolute indices and relative indices, or just one
+  // or the other, and not be crossing the streams. The way things are offset
+  // is the same as variadic ODS operands for consistency, but just like ODS
+  // operands half of the code assumes its within a particular ODS operand and
+  // half the code assumes it's within the flattened set of all Operation
+  // operands.
+  unsigned tiedOperandOffset = getTiedOperandsIndexAndLength().first;
+  for (unsigned i = 0; i < newTiedOperandIndices.size(); ++i) {
+    if (newTiedOperandIndices[i] != TiedOpInterface::kUntiedIndex) {
+      newTiedOperandIndices[i] -= tiedOperandOffset;
+    }
+  }
+
   auto newOp = OpBuilder(getContext())
                    .create<DispatchWorkgroupsOp>(
                        getLoc(), workgroup_count(), newResultTypes,
@@ -1496,10 +1544,14 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
                                    excludedOperandIndices, newResultTypes,
                                    newResultDims, excludedResultIndices);
-  SmallVector<int64_t, 4> newTiedOperandIndices =
+
+  auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
   excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
+  assert(getTiedOperandsIndexAndLength().first == 0 &&
+         "operands must be the first ODS group");
+
   auto newOp = OpBuilder(getContext())
                    .create<ExStreamFragmentOp>(
                        getLoc(), newResultTypes, newResultDims,

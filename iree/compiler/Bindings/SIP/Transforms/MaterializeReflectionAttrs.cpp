@@ -14,8 +14,8 @@
 
 #include <limits>
 
-#include "iree/base/signature_mangle.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Bindings/SIP/Transforms/Passes.h"
+#include "iree/compiler/Bindings/SIP/Utils/SignatureBuilder.h"
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -24,14 +24,12 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 
-using iree::RawSignatureMangler;
-using iree::SignatureBuilder;
-using iree::AbiConstants::ScalarType;
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
+namespace SIP {
+
+using AbiConstants::ScalarType;
 
 static llvm::Optional<ScalarType> mapScalarType(Type elementType) {
   // Map ScalarType.
@@ -86,7 +84,7 @@ static LogicalResult mangleTensorType(TensorType t,
   }
 
   // Tensors map to buffers in the ABI.
-  mangler.AddShapedNDBuffer(*scalarType, absl::MakeConstSpan(dims));
+  mangler.AddShapedNDBuffer(*scalarType, dims);
   return success();
 }
 
@@ -153,7 +151,7 @@ class MaterializeReflectionAttrsPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrs() {
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeReflectionAttrsPass() {
   return std::make_unique<MaterializeReflectionAttrsPass>();
 }
 
@@ -162,7 +160,7 @@ static PassRegistration<MaterializeReflectionAttrsPass> pass(
     "Materializes argument/result level reflection metadata for exported "
     "functions.");
 
-}  // namespace Flow
+}  // namespace SIP
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
