@@ -62,6 +62,8 @@ struct FoldReshapeIntoInterfaceTensorLoad
         reshapeOp.src().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!loadOp) return failure();
 
+    // Make sure we are loading the full incoming subspan. Otherwise we cannot
+    // simply adjust the subspan's resultant type later.
     if (!loadOp.offsets().empty() || !loadOp.sizes().empty() ||
         !loadOp.strides().empty())
       return failure();
