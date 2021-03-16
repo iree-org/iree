@@ -695,8 +695,8 @@ func @gather() {
   %2 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
   %4 = flow.dispatch.tensor.load %0 : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %5 = flow.dispatch.tensor.load %1 : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
-  %d0 = dim %5, %c0 : tensor<?xi32>
-  %d1 = dim %4, %c1 : tensor<?x?xf32>
+  %d0 = memref.dim %5, %c0 : tensor<?xi32>
+  %d1 = memref.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
   %7 = linalg.indexed_generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
   ^bb0(%arg0: index, %arg1: index, %arg2: i32, %arg3: f32):  // no predecessors
@@ -717,5 +717,5 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
 //       CHECK:   linalg.indexed_generic
-//       CHECK:     %[[VAL:.+]] = load %[[ARG0]]
+//       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0]]
 //       CHECK:     linalg.yield %[[VAL]]
