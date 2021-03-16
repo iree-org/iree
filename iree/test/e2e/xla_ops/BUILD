@@ -199,8 +199,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         "concatenate.mlir",
         "constant.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "convolution.mlir",
+        "convolution.mlir",
         "cosine.mlir",
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
@@ -260,8 +259,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         "concatenate.mlir",
         "constant.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "convolution.mlir",
+        "convolution.mlir",
         "cosine.mlir",
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
