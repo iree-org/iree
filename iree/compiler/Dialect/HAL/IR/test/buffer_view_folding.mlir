@@ -29,11 +29,11 @@ func @expand_buffer_view_subview(
   // CHECK-SAME:     %[[SUBSPAN]],
   // CHECK-SAME:     element_type = %[[ELEMENT_TYPE]],
   // CHECK-SAME:     shape = [%[[LENGTH0]], %[[LENGTH1]]] : !hal.buffer_view
-  %memref.subview = hal.buffer_view.subview %view,
+  %subview = hal.buffer_view.subview %view,
                                      indices = [%index0, %index1],
                                      lengths = [%length0, %length1] : !hal.buffer_view
   // CHECK-NEXT: return %[[SUBVIEW]]
-  return %memref.subview : !hal.buffer_view
+  return %subview : !hal.buffer_view
 }
 
 // -----
