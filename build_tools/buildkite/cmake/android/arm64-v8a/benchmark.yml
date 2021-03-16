@@ -47,8 +47,7 @@ steps:
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
-      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=5538704950034432 --model=mobile-bert --git_hash=$(git rev-parse HEAD) --phone=Pixel4"
-      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=6338759231537152 --model=mobilenet-v2 --git_hash=$(git rev-parse HEAD) --phone=Pixel4"
+      - "python3 build_tools/mako/benchmark_modules_on_android.py --git_hash=$(git rev-parse HEAD) Pixel4"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=snapdragon-855"
@@ -69,8 +68,7 @@ steps:
       - "adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp/benchmark_tmpdir"
       - "adb push *.vmfb /data/local/tmp/benchmark_tmpdir"
       - "adb push *_flagfile /data/local/tmp/benchmark_tmpdir"
-      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=4699630718681088 --model=mobile-bert --git_hash=$(git rev-parse HEAD) --phone=S20"
-      - "build_tools/mako/benchmark_modules_on_android.sh --targets=vulkan-spirv,vmla,dylib-llvm-aot --benchmark_key=5618403088793600 --model=mobilenet-v2 --git_hash=$(git rev-parse HEAD) --phone=S20"
+      - "python3 build_tools/mako/benchmark_modules_on_android.py --git_hash=$(git rev-parse HEAD) S20"
       - "adb shell rm -rf /data/local/tmp/benchmark_tmpdir"
     agents:
       - "android-soc=exynos-990"
