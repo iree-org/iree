@@ -37,6 +37,8 @@ iree_e2e_cartesian_product_test_suite(
     ",,,att_mh_rnn,iree_vulkan"
     ",,,att_rnn,iree_vulkan"
     ",,,gru,iree_vulkan"
+    ",,,crnn,iree_vulkan"
+    ",,,lstm,iree_vulkan"
     ",,,att_mh_rnn,iree_llvmaot"
     ",,,att_rnn,iree_llvmaot"
     ",,,crnn,iree_llvmaot"

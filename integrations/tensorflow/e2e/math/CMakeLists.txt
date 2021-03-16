@@ -10,7 +10,6 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_TEST_PY LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *_test.py)
 iree_e2e_cartesian_product_test_suite(
   NAME
     math_tests
@@ -74,9 +73,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,reduce_all,,,tflite"
     ",,reduce_euclidean_norm,,,tflite"
     ",,reduce_logsumexp,,,tflite"
-    ",,reduce_mean,,,tflite"
-    ",,reduce_std,,,tflite"
-    ",,reduce_variance,,,tflite"
     ",,rint,,,tflite"
     ",,segment_max,,,tflite"
     ",,segment_mean,,,tflite"
@@ -344,9 +340,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,reduce_all,,,tflite"
     ",,reduce_euclidean_norm,,,tflite"
     ",,reduce_logsumexp,,,tflite"
-    ",,reduce_mean,,,tflite"
-    ",,reduce_std,,,tflite"
-    ",,reduce_variance,,,tflite"
     ",,rint,,,tflite"
     ",,segment_max,,,tflite"
     ",,segment_mean,,,tflite"
