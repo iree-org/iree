@@ -14,7 +14,7 @@
 
 iree_py_library(
   NAME
-    compiler2
+    compiler
   SRCS
     "__init__.py"
     "core.py"
@@ -27,5 +27,5 @@ iree_py_library(
 iree_py_install_package(
   COMPONENT IreePythonPackage-compiler
   PACKAGE_NAME iree_compiler
-  MODULE_PATH pyiree/compiler2
+  MODULE_PATH pyiree/compiler
 )

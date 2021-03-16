@@ -50,12 +50,12 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 std::unique_ptr<OperationPass<FuncOp>>
 createLinalgRewriteDestructiveUpdatesPass();
 
-/// Pass to remove operations that have allocate semantics but have no
-/// uses. These arent removed by CSE.
-std::unique_ptr<OperationPass<>> createRemoveDeadMemAllocsPass();
-
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<FunctionPass> createVectorTransferOptimizationPass();
+
+// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
+// allocations and view operations.
+std::unique_ptr<FunctionPass> createBufferAllocViewCleanUpPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

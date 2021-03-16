@@ -21,7 +21,7 @@ import unittest
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
-from pyiree.compiler2.xla import *
+from pyiree.compiler.xla import *
 
 if not is_available():
   print(f"Skipping test {__file__} because the IREE XLA compiler "

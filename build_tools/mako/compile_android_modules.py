@@ -13,122 +13,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+# Compiles the given model (which is configured in configuration.py) to modules.
+#
+# The scripts is used for benchmarking automation, and it assumes:
+#   1) ANDROID_NDK env is set.
+#   2) IREE is built for the host in `build-host`, e.g. build with
+#      build_tools/cmake/build_android.sh script.
+
 import subprocess
 
+import configuration
 
-class TargetInfo:
-  """Information of a target backend.
-
-  Attributes:
-    name: The target name used in iree-translate, e.g., vulkan-spirv.
-    mako_tag: The value_key in Mako config. This will be used in Mako metric
-      info, which should match to the config.
-    extra_flags: Addition compilation flags. This is useful to target different
-      hardware.
-  """
-
-  def __init__(self, name, mako_tag, extra_flags=[]):
-    self.name = name
-    self.mako_tag = mako_tag
-    self.extra_flags = extra_flags
-
-
-class PhoneInfo:
-  """Information of a phone.
-
-  Attributes:
-    name: The name of the phone.
-    targets: A list of TargetInfo which indicates the target config to benchmark
-      on the phone.
-  """
-
-  def __init__(self, name, targets):
-    self.name = name
-    self.targets = targets
-
-
-class ModelInfo:
-  """Information of a model.
-
-  Attributes:
-    name: The name of the model.
-    model_path: A path to MLIR input file. This can be a relative path.
-  """
-
-  def __init__(self, name, model_path):
-    self.name = name
-    self.model_path = model_path
-
-
-PHONES = [
-    PhoneInfo(
-        name="Pixel4",
-        targets=[
-            TargetInfo(name="vmla", mako_tag="vmla"),
-            TargetInfo(
-                name="dylib-llvm-aot",
-                mako_tag="cpu",
-                extra_flags=[
-                    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-                ]),
-            TargetInfo(
-                name="vulkan-spirv",
-                mako_tag="vlk",
-                extra_flags=[
-                    "--iree-spirv-enable-vectorization",
-                    "--iree-vulkan-target-triple=qualcomm-adreno640-unknown-android10"
-                ])
-        ]),
-    PhoneInfo(
-        name="S20",
-        targets=[
-            TargetInfo(name="vmla", mako_tag="vmla"),
-            TargetInfo(
-                name="dylib-llvm-aot",
-                mako_tag="cpu",
-                extra_flags=[
-                    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-                ]),
-            TargetInfo(
-                name="vulkan-spirv",
-                mako_tag="vlk",
-                extra_flags=[
-                    "--iree-spirv-enable-vectorization",
-                    "--iree-vulkan-target-triple=valhall-g77-unknown-android10"
-                ])
-        ])
-]
-
-MODELS = [
-    ModelInfo(
-        name="mobile-bert",
-        model_path="tmp/iree/modules/MobileBertSquad/iree_input.mlir",
-    ),
-    ModelInfo(
-        name="mobilenet-v2",
-        model_path="mobilenet-v2/iree_input.mlir",
-    )
-]
+IREE_TRANSLATE_PATH = "build-host/iree/tools/iree-translate"
 
 
 def main() -> None:
-  IREE_TRANSLATE_PATH = "build-host/iree/tools/iree-translate"
-  for model in MODELS:
-    for phone in PHONES:
+  for model_benchmark in configuration.MODEL_BENCHMARKS:
+    for phone in model_benchmark.phones:
       for target in phone.targets:
-        module_name = "{}_{}_{}_{}.vmfb".format(model.name, phone.name,
-                                                target.name, target.mako_tag)
-        if module_name.count("_") != 3:
-          raise ValueError(
-              "Expect model name, phone name and target name do not contain '_'"
-          )
-        print("Generating {} ...".format(module_name))
-        subprocess.run([
-            IREE_TRANSLATE_PATH, model.model_path,
-            "--iree-mlir-to-vm-bytecode-module", "--iree-hal-target-backends={}"
-            .format(target.name), "-o", module_name
-        ] + target.extra_flags)
+        module_name = configuration.get_module_name(model_benchmark.name,
+                                                    phone.name, target.mako_tag)
+        print(f"Generating {module_name} ...")
+        subprocess.run(args=[
+            IREE_TRANSLATE_PATH, model_benchmark.model_path,
+            "--iree-mlir-to-vm-bytecode-module",
+            f"--iree-hal-target-backends={target.name}", "-o", module_name
+        ] + target.compilation_flags,
+                       check=True)
 
 
 if __name__ == "__main__":
