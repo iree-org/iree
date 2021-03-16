@@ -43,6 +43,31 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   return %0 : tensor<128xf32>
 }
 
+// ----
+
+// CHECK-LABEL: @tensorSlice
+// CHECK-SAME: (%[[SBUF:.+]]:{{.+}})
+func @tensorSlice(%arg0 : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
+  %c0 = constant 0 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %c24 = constant 24 : index
+  %c48 = constant 48 : index
+  // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
+  %2 = flow.ex.stream.fragment(%arg0, %c0, %c2, %c3, %c24, %c48)
+      : (tensor<5x24x48xf32>, index, index, index, index, index) -> tensor<3x24x48xf32> =
+      (%arg2 : tensor<5x24x48xf32>, %arg3 : index, %arg4 : index, %arg5 : index,
+       %arg6 : index, %arg7 : index) -> tensor<3x24x48xf32> {
+     // CHECK-NEXT: hal.command_buffer.copy_buffer %[[CMD]], %[[SBUF]], %c9216, %[[RET_BUF]], %c0, %c13824
+     %slice = flow.tensor.slice %arg2[%arg4, %arg3, %arg3 for %arg5, %arg6, %arg7]
+         : tensor<5x24x48xf32> -> tensor<3x24x48xf32>
+     flow.return %slice : tensor<3x24x48xf32>
+  }
+  return %2 : tensor<3x24x48xf32>
+}
+
 // -----
 
 // CHECK-LABEL: @tensorUpdate

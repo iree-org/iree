@@ -192,6 +192,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   if (clEnableLinalgOnTensorsDispatch) {
     passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
     addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
+    passManager.addNestedPass<FuncOp>(createConvertToFlowTensorOpsPass());
     passManager.addNestedPass<FuncOp>(
         IREE::Flow::createDispatchLinalgOnTensorsPass());
     passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());

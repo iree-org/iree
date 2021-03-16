@@ -18,6 +18,7 @@ iree_cc_library(
     "DispatchConfig.h"
     "Passes.h"
   SRCS
+    "ConvertToFlowTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"

@@ -60,6 +60,11 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Convert operations to equivalent flow.tensor.* ops. This is run after
+// dispatch region creation to catch operations that were left outside of
+// dispatch regions and could be represented as flow.tensor.* ops.
+std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass();
+
 // Flattens tuple values in function signatures and blocks.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 
@@ -168,6 +173,7 @@ createStripAndSplatConstantVariablesPass();
 inline void registerFlowPasses() {
   registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
+  createConvertToFlowTensorOpsPass();
   createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
