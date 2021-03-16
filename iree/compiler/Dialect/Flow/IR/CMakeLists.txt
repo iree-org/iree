@@ -10,14 +10,13 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_TD LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
     IR
   HDRS
     "FlowDialect.h"
     "FlowEnums.h.inc"
-    "FlowOpInterface.h.inc"
+    "FlowInterfaces.h.inc"
     "FlowOpUtils.h"
     "FlowOps.h"
     "FlowOps.h.inc"
@@ -25,8 +24,8 @@ iree_cc_library(
   SRCS
     "FlowDialect.cpp"
     "FlowEnums.cpp.inc"
+    "FlowInterfaces.cpp.inc"
     "FlowOpFolders.cpp"
-    "FlowOpInterface.cpp.inc"
     "FlowOpUtils.cpp"
     "FlowOps.cpp"
     "FlowOps.cpp.inc"
@@ -58,12 +57,12 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    FlowOpInterfaceGen
+    FlowInterfacesGen
   TD_FILE
-    "FlowBase.td"
+    "FlowInterfaces.td"
   OUTS
-    -gen-op-interface-decls FlowOpInterface.h.inc
-    -gen-op-interface-defs FlowOpInterface.cpp.inc
+    -gen-op-interface-decls FlowInterfaces.h.inc
+    -gen-op-interface-defs FlowInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

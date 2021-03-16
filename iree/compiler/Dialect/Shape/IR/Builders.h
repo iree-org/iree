@@ -25,6 +25,18 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
+// Builds a ranked_shape for the given |shapedValue| with zero or more dynamic
+// dims with the values taken from |dynamicDims|.
+Value buildRankedShapeForValue(Location loc, Value shapedValue,
+                               ValueRange dynamicDims, OpBuilder &builder);
+
+// As with buildRankedShapeForValue but by selecting out the appropriate dims
+// from a flattened set of values and dynamic dims.
+Value buildRankedShapeForValueInList(Location loc, unsigned index,
+                                     ValueRange flatValues,
+                                     ValueRange flatDynamicDims,
+                                     OpBuilder &builder);
+
 // Given an arbitrary list of inputs, builds IR to obtain their shapes and
 // cast them to a given !shapex.ranked_shape. Statically verifiable invariants
 // will be checked within this call and runtime code will be emitted to verify
@@ -60,6 +72,12 @@ Value buildDegenerateBroadcastRankedShape(
 Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
                                      OpBuilder &builder);
 
+// Returns dimension values for each dynamic dimension of the given |value|.
+// |value| must be a ShapedType and may optionally have a ranked_shape tied.
+// The returned value range will be empty if the shape is fully static.
+SmallVector<Value, 4> buildOrFindDynamicDimsForValue(Location loc, Value value,
+                                                     OpBuilder &builder);
+
 // Given a RankedShapeType'd value |rsValue|, populate values for all
 // dimensions. If |createIntermediateOps|, then if the dims cannot be resolved
 // by walking the IR, then a RankedDimsOp is created. If false, then the dims
@@ -68,7 +86,7 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
 LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
                                            bool createIntermediateOps,
                                            SmallVectorImpl<Value> &outDims,
-                                           ConversionPatternRewriter &rewriter);
+                                           OpBuilder &builder);
 
 }  // namespace Shape
 }  // namespace iree_compiler

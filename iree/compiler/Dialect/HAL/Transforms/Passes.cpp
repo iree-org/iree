@@ -137,6 +137,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     // if we serialized things.
     passManager.addPass(createSymbolDCEPass());
   }
+
+  // Final cleanup of IR; cleans up things left behind by CSE/DCE above.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,

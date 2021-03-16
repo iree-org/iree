@@ -20,7 +20,7 @@ import io
 import tempfile
 import unittest
 
-from pyiree import compiler2 as compiler
+from pyiree import compiler
 
 SIMPLE_MUL_ASM = """
 func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>

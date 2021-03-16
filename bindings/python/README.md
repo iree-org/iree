@@ -2,7 +2,7 @@
 
 Top-level packages:
 
-* `pyiree.compiler2` : Main compiler API (soon to be renamed to 'compiler').
+* `pyiree.compiler` : Main compiler API.
 * `pyiree.rt` : Runtime components for executing binaries.
 * `pyiree.tools.core` : Core tools for executing the compiler.
 * `pyiree.tools.tf` : TensorFlow compiler tools (if enabled).

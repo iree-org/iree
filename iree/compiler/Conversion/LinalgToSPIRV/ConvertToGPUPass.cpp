@@ -700,7 +700,7 @@ struct MapLinalgOpToGlobalInvocationId
       // TODO (GH-4901): Only support static shapes on this path. This should be
       // removed when moved to linalg on tensors.
       Optional<SmallVector<int64_t, 4>> staticLoopRange =
-          linalg::getStaticLoopRanges(linalgOp);
+          linalgOp.getStaticLoopRanges();
       if (!staticLoopRange ||
           llvm::any_of(staticLoopRange.getValue(), [](int64_t d) {
             return d == ShapedType::kDynamicSize;

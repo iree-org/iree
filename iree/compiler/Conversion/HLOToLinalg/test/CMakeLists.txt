@@ -10,12 +10,24 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "arithmetic_ops.mlir"
+    "concatenate.mlir"
+    "decompose_hlo_clamp.mlir"
+    "dot.mlir"
+    "dynamic_shape.mlir"
+    "exp.mlir"
+    "fusion.mlir"
+    "linalg_tensor_to_buffer.mlir"
+    "pad_tensor.mlir"
+    "pad_tensor_to_tensor.mlir"
+    "pipeline_test.mlir"
+    "subtensor.mlir"
+    "subtensor_insert.mlir"
+    "torch_index_select.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

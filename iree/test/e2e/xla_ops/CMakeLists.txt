@@ -10,12 +10,56 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_check_single_backend_test_suite(
   NAME
     check_vmla_vmla
   SRCS
-    "${_GLOB_X_MLIR}"
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vmla"
   DRIVER
@@ -139,6 +183,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
     "cosine.mlir"
     "divide.mlir"
@@ -147,6 +192,7 @@ iree_check_single_backend_test_suite(
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"
+    "gather.mlir"
     "iota.mlir"
     "log.mlir"
     "log_plus_one.mlir"
@@ -165,6 +211,7 @@ iree_check_single_backend_test_suite(
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
@@ -188,6 +235,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
+    "concatenate.mlir"
     "constant.mlir"
     "cosine.mlir"
     "divide.mlir"
@@ -196,6 +244,7 @@ iree_check_single_backend_test_suite(
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "floor.mlir"
+    "gather.mlir"
     "iota.mlir"
     "log.mlir"
     "log_plus_one.mlir"
@@ -203,6 +252,7 @@ iree_check_single_backend_test_suite(
     "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
+    "pad.mlir"
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
@@ -213,6 +263,7 @@ iree_check_single_backend_test_suite(
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
@@ -230,15 +281,12 @@ iree_check_single_backend_test_suite(
   SRCS
     "add.mlir"
     "broadcast.mlir"
-    "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
     "constant.mlir"
     "divide.mlir"
     "iota.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
     "select.mlir"
@@ -250,7 +298,11 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-flow-dispatch-linalg-on-tensors"
   LABELS
-    "notap"
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -238,6 +238,7 @@ def HAL_EF_Metal : I32EnumAttrCase<"Metal", 1297370181>;
 def HAL_EF_LLVM : I32EnumAttrCase<"LLVM", 1280071245>;
 def HAL_EF_DyLib : I32EnumAttrCase<"DyLib", 1145850178>;
 def HAL_EF_CUDA : I32EnumAttrCase<"CUDA", 1129661505>;
+def HAL_EF_WASM : I32EnumAttrCase<"WASM", 1463898957>;
 def HAL_ExecutableFormatAttr :
     I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
       HAL_EF_Unspecified,
@@ -247,7 +248,8 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_SpirV,
       HAL_EF_Metal,
       HAL_EF_DyLib,
-      HAL_EF_CUDA
+      HAL_EF_CUDA,
+      HAL_EF_WASM,
     ]> {
   let returnType = "IREE::HAL::ExecutableFormat";
   let convertFromStorage = "static_cast<IREE::HAL::ExecutableFormat>($_self.getInt())";

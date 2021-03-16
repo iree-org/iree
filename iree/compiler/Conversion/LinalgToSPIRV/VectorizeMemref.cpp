@@ -50,7 +50,6 @@ static bool getUsesIfAllTransferOp(Value v,
   return true;
 }
 
-
 /// Returns the bitwidth of a scalar or vector type.
 static Optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
@@ -126,6 +125,7 @@ class MemRefUsageAnalysis {
   void analyzeFunc(FuncOp funcOp);
   void analyzeAlloc(AllocOp allocOp);
   void analyzePlaceholder(IREE::PlaceholderOp placeholderOp);
+  void analyzeInterfaceBinding(IREE::HAL::InterfaceBindingSubspanOp bindingOp);
   llvm::DenseMap<Value, unsigned> vectorization_size;
   llvm::DenseSet<Operation *> transferOps;
 };
@@ -136,6 +136,8 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
     if (auto alloc = dyn_cast<AllocOp>(op)) analyzeAlloc(alloc);
     if (auto placeholder = dyn_cast<IREE::PlaceholderOp>(op))
       analyzePlaceholder(placeholder);
+    if (auto bindingOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op))
+      analyzeInterfaceBinding(bindingOp);
   });
 }
 
@@ -155,6 +157,15 @@ void MemRefUsageAnalysis::analyzePlaceholder(
   if (unsigned vectorSize =
           isMemRefAndVectorizable(placeholderOp, vectorUses)) {
     vectorization_size.insert(std::make_pair(placeholderOp, vectorSize));
+    transferOps.insert(vectorUses.begin(), vectorUses.end());
+  }
+}
+
+void MemRefUsageAnalysis::analyzeInterfaceBinding(
+    IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
+  SmallVector<Operation *, 4> vectorUses;
+  if (unsigned vectorSize = isMemRefAndVectorizable(bindingOp, vectorUses)) {
+    vectorization_size.insert(std::make_pair(bindingOp, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
 }
@@ -358,7 +369,27 @@ class ProcessPlaceHolder final
     auto vecMemRef = getVectorizedMemRefType(rewriter, placeholder.getResult());
     if (!vecMemRef) return failure();
     rewriter.replaceOpWithNewOp<IREE::PlaceholderOp>(
-        placeholder, *vecMemRef, ValueRange(), placeholder.getAttrs());
+        placeholder, *vecMemRef, ValueRange(), placeholder->getAttrs());
+    return success();
+  }
+};
+
+class ProcessInterfaceBinding final
+    : public MemRefConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+ public:
+  using MemRefConversionPattern<
+      IREE::HAL::InterfaceBindingSubspanOp>::MemRefConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::InterfaceBindingSubspanOp bindingOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto memrefType = bindingOp.getType().dyn_cast<MemRefType>();
+    if (!memrefType) return failure();
+    auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.getResult());
+    if (!vecMemRef) return failure();
+    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
+        bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
+        bindingOp.byte_length());
     return success();
   }
 };
@@ -410,8 +441,8 @@ void VectorizeMemRefPass::runOnOperation() {
 
   OwningRewritePatternList patterns;
   patterns.insert<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
-                  ProcessAlloc, ProcessPlaceHolder>(context,
-                                                    *memrefUsageAnalysis);
+                  ProcessAlloc, ProcessPlaceHolder, ProcessInterfaceBinding>(
+      context, *memrefUsageAnalysis);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -425,6 +456,10 @@ void VectorizeMemRefPass::runOnOperation() {
   target.addDynamicallyLegalOp<IREE::PlaceholderOp>(
       [&](IREE::PlaceholderOp placeholder) {
         return !memrefUsageAnalysis->vectorizeMemRef(placeholder);
+      });
+  target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
+      [&](IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
+        return !memrefUsageAnalysis->vectorizeMemRef(bindingOp);
       });
   target.markUnknownOpDynamicallyLegal([&](Operation *op) {
     if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))

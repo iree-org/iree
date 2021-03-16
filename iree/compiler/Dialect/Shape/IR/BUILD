@@ -14,6 +14,7 @@
 
 load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -25,7 +26,14 @@ exports_files(["ShapeBase.td"])
 
 filegroup(
     name = "td_files",
-    srcs = glob(["*.td"]),
+    srcs = enforce_glob(
+        [
+            "ShapeBase.td",
+            "ShapeInterfaces.td",
+            "ShapeOps.td",
+        ],
+        include = ["*.td"],
+    ),
 )
 
 cc_library(
@@ -35,6 +43,7 @@ cc_library(
         "Folders.cpp",
         "ShapeDialect.cpp",
         "ShapeInterface.cpp",
+        "ShapeInterfaces.cpp.inc",
         "ShapeOps.cpp",
         "ShapeOps.cpp.inc",
         "ShapeTypes.cpp",
@@ -43,11 +52,13 @@ cc_library(
         "Builders.h",
         "ShapeDialect.h",
         "ShapeInterface.h",
+        "ShapeInterfaces.h.inc",
         "ShapeOps.h",
         "ShapeOps.h.inc",
         "ShapeTypes.h",
     ],
     deps = [
+        ":ShapeInterfacesGen",
         ":ShapeOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Utils",
@@ -61,6 +72,22 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+gentbl(
+    name = "ShapeInterfacesGen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "ShapeInterfaces.h.inc"),
+        ("-gen-op-interface-defs", "ShapeInterfaces.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ShapeInterfaces.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )
 

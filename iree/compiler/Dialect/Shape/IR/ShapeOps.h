@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_SHAPE_IR_SHAPEOPS_H_
 #define IREE_COMPILER_DIALECT_SHAPE_IR_SHAPEOPS_H_
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"

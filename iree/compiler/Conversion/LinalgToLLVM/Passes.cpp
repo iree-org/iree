@@ -17,11 +17,11 @@
 #include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
-#include "iree/compiler/Conversion/LLVMToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -38,12 +38,6 @@ static llvm::cl::opt<bool> convImg2ColConversion(
     llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
                    "linalg.generic that does img2col buffer packing + "
                    "linag.matmul"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> fastExpConversion(
-    "iree-codegen-linalg-to-llvm-fast-exp",
-    llvm::cl::desc("If true convert llvm.intr.exp into its range reduced "
-                   "polynomial approximation."),
     llvm::cl::init(false));
 
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
@@ -78,18 +72,15 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
 
-  // (HAL, IREE, Linalg, STD) -> LLVM
+  // Handled tensor-type constants.
+  nestedModulePM.addPass(createTensorConstantBufferizePass());
+  nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
-  // OpPassManager& llvmPassManager = nestedModulePM.nest<ModuleOp>();
+  // (HAL, IREE, Linalg, STD) -> LLVM
   nestedModulePM.addPass(createConvertToLLVMPass());
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  // Approximate llvm.intr.exp with a 4-th order ploynmial in range[0, ln2].
-  if (fastExpConversion) {
-    nestedModulePM.addPass(createFastExpApproximationConversionPass());
-  }
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {

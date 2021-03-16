@@ -19,6 +19,7 @@
 # See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -28,7 +29,57 @@ package(
 
 iree_check_single_backend_test_suite(
     name = "check_vmla_vmla",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "abs.mlir",
+            "add.mlir",
+            "batch_norm_inference.mlir",
+            "broadcast.mlir",
+            "broadcast_add.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "exponential.mlir",
+            "exponential_minus_one.mlir",
+            "finite.mlir",
+            "floor.mlir",
+            "gather.mlir",
+            "iota.mlir",
+            "log.mlir",
+            "log_plus_one.mlir",
+            "maximum.mlir",
+            "minimum.mlir",
+            "multiply.mlir",
+            "negate.mlir",
+            "pad.mlir",
+            "reduce.mlir",
+            "reduce_window.mlir",
+            "remainder.mlir",
+            "reshape.mlir",
+            "reverse.mlir",
+            "round.mlir",
+            "rsqrt.mlir",
+            "select.mlir",
+            "sine.mlir",
+            "slice.mlir",
+            "sort.mlir",
+            "sqrt.mlir",
+            "subtract.mlir",
+            "tanh.mlir",
+            "torch_index_select.mlir",
+            "transpose.mlir",
+            "while.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     driver = "vmla",
     target_backend = "vmla",
 )
@@ -146,7 +197,7 @@ iree_check_single_backend_test_suite(
         "clamp.mlir",
         "compare.mlir",
         # https://github.com/google/iree/issues/4079
-        # "concatenate.mlir",
+        "concatenate.mlir",
         "constant.mlir",
         # https://github.com/google/iree/issues/4079
         # "convolution.mlir",
@@ -159,7 +210,7 @@ iree_check_single_backend_test_suite(
         "exponential_minus_one.mlir",
         "floor.mlir",
         # https://github.com/google/iree/issues/4692
-        # "gather.mlir",
+        "gather.mlir",
         "iota.mlir",
         "log.mlir",
         "log_plus_one.mlir",
@@ -183,7 +234,7 @@ iree_check_single_backend_test_suite(
         "subtract.mlir",
         "tanh.mlir",
         # https://github.com/google/iree/issues/4079
-        # "torch_index_select.mlir",
+        "torch_index_select.mlir",
         "transpose.mlir",
         "while.mlir",
     ],
@@ -207,7 +258,7 @@ iree_check_single_backend_test_suite(
         "clamp.mlir",
         "compare.mlir",
         # https://github.com/google/iree/issues/4079
-        # "concatenate.mlir",
+        "concatenate.mlir",
         "constant.mlir",
         # https://github.com/google/iree/issues/4079
         # "convolution.mlir",
@@ -220,7 +271,7 @@ iree_check_single_backend_test_suite(
         "exponential_minus_one.mlir",
         "floor.mlir",
         # https://github.com/google/iree/issues/4692
-        # "gather.mlir",
+        "gather.mlir",
         "iota.mlir",
         "log.mlir",
         "log_plus_one.mlir",
@@ -228,8 +279,7 @@ iree_check_single_backend_test_suite(
         "minimum.mlir",
         "multiply.mlir",
         "negate.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "pad.mlir",
+        "pad.mlir",
         # "reduce.mlir",
         # "reduce_window.mlir",
         "remainder.mlir",
@@ -244,7 +294,7 @@ iree_check_single_backend_test_suite(
         "subtract.mlir",
         "tanh.mlir",
         # https://github.com/google/iree/issues/4079
-        # "torch_index_select.mlir",
+        "torch_index_select.mlir",
         "transpose.mlir",
         "while.mlir",
     ],
@@ -261,15 +311,12 @@ iree_check_single_backend_test_suite(
     srcs = [
         "add.mlir",
         "broadcast.mlir",
-        "broadcast_add.mlir",
         "broadcast_in_dim.mlir",
         "clamp.mlir",
         "compare.mlir",
         "constant.mlir",
         "divide.mlir",
         "iota.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
         "multiply.mlir",
         "negate.mlir",
         "select.mlir",
@@ -279,8 +326,14 @@ iree_check_single_backend_test_suite(
         "-iree-flow-dispatch-linalg-on-tensors",
     ],
     driver = "cuda",
-    # TODO: broken internally
-    tags = ["notap"],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
     target_backend = "cuda",
 )
 

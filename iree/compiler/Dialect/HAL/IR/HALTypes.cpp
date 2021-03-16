@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -421,6 +422,18 @@ void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
 }
 
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
+
+void HALDialect::registerAttributes() {
+  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
+                DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+                MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>();
+}
+void HALDialect::registerTypes() {
+  addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
+           DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
+           ExecutableType, ExecutableLayoutType, RingBufferType,
+           SemaphoreType>();
+}
 
 }  // namespace HAL
 }  // namespace IREE

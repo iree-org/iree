@@ -32,6 +32,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.cpp.inc"
+
 // Used to control inlining behavior.
 struct ShapeInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
@@ -70,7 +72,7 @@ struct ShapeConstantFoldInterface : public DialectFoldInterface {
 
 ShapeDialect::ShapeDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<ShapeDialect>()) {
-  addTypes<Shape::RankedShapeType>();
+  registerTypes();
   addInterfaces<ShapeConstantFoldInterface, ShapeInlinerInterface>();
 #define GET_OP_LIST
   addOperations<

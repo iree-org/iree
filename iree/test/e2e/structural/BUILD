@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -23,7 +24,15 @@ package(
 # TODO(#2395): Enable all the tests for both LLVM and SPIR-V.
 iree_check_single_backend_test_suite(
     name = "check_vmla_vmla",
-    srcs = glob(["*.mlir"]),
+    srcs = enforce_glob(
+        [
+            "fused_dispatch_region.mlir",
+            "gather_add.mlir",
+            "gather_concat.mlir",
+            "matmul_add.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     driver = "vmla",
     target_backend = "vmla",
 )

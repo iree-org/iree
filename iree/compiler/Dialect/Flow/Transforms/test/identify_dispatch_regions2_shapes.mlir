@@ -15,7 +15,7 @@ func @singleDispatchWithShapes(%arg0 : tensor<?x4xf32>,
   // make generic.
   // CHECK: %[[R0:.+]] = flow.dispatch.region[%[[UNUSED_WORKLOAD:.+]] : index](
   // CHECK-SAME: %[[CA2:.+]] = %[[A2]] : !shapex.ranked_shape<[?,4]>,
-  // CHECK-SAME: %[[CA0:.+]] = %[[TS0]] : tensor<?x4xf32>,
+  // CHECK-SAME: %[[CA0:.+]] = %{{.+}} : tensor<?x4xf32>,
   // CHECK-SAME: %[[CA1:.+]] = %[[A1]] : !shapex.ranked_shape<[?,4]>)
     // Dispatch region should contain captured tie_shapes.
     // CHECK: %[[R1:.+]] = shapex.tie_shape %[[CA0]], %[[CA1]]

@@ -32,15 +32,17 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "ConcretizeTileAmongWorkgroupsPass.cpp"
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"
     "FoldGPUProcessorIDUses.cpp"
     "KernelDispatchUtils.cpp"
-    "LinalgTileAndFusePass.cpp"
+    "LinalgTileAndDistributePass.cpp"
     "MatMulVectorizationTest.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
+    "TileAndVectorizeInOneWorkgroupPass.cpp"
     "Utils.cpp"
     "VectorToGPUPass.cpp"
     "VectorizeMemref.cpp"
@@ -74,6 +76,7 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

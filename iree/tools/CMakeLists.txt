@@ -21,7 +21,7 @@ add_subdirectory(utils)
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
-if("${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}")
+if("${IREE_TARGET_BACKEND_LLVM-AOT}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
 endif()
@@ -314,6 +314,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_xla_dialects
       LLVMSupport
       MLIRIR
+      MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
@@ -372,12 +373,8 @@ if(${IREE_BUILD_COMPILER})
       iree::base::internal::flags
       iree::base::status
       iree::base::tracing
-      iree::compiler::Dialect::Flow::Transforms
-      iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::IREEVM
       iree::hal::api
       iree::hal::drivers

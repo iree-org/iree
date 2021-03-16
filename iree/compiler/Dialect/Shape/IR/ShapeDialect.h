@@ -21,6 +21,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.h.inc"
+
 class ShapeDialect : public Dialect {
  public:
   explicit ShapeDialect(MLIRContext* context);
@@ -32,6 +34,10 @@ class ShapeDialect : public Dialect {
 
   Operation* materializeConstant(OpBuilder& builder, Attribute value, Type type,
                                  Location loc) override;
+
+ private:
+  /// Register the types of this dialect.
+  void registerTypes();
 };
 
 }  // namespace iree_compiler

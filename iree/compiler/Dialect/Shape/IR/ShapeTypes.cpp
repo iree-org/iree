@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "llvm/ADT/Twine.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -79,6 +80,10 @@ RankedShapeType RankedShapeType::getChecked(
   return Base::getChecked(emitError, context, dims);
 }
 
+RankedShapeType RankedShapeType::get(ShapedType shapedType) {
+  return Base::get(shapedType.getContext(), shapedType.getShape());
+}
+
 LogicalResult RankedShapeType::verify(
     function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> dims) {
   for (auto dim : dims) {
@@ -119,3 +124,13 @@ int64_t RankedShapeType::getStaticDim(int allDimsIndex) const {
   assert(dim >= 0 && "getStaticDim() called on dynamic dimension");
   return dim;
 }
+
+//===----------------------------------------------------------------------===//
+// ShapeDialect
+//===----------------------------------------------------------------------===//
+
+namespace mlir {
+namespace iree_compiler {
+void ShapeDialect::registerTypes() { addTypes<Shape::RankedShapeType>(); }
+}  // namespace iree_compiler
+}  // namespace mlir

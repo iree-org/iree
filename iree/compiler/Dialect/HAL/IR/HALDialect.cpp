@@ -93,15 +93,8 @@ HALDialect::HALDialect(MLIRContext *context)
   context->loadDialect<IREEDialect>();
 
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
-
-  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
-                DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-                MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>();
-
-  addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
-           DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, ExecutableLayoutType, RingBufferType,
-           SemaphoreType>();
+  registerAttributes();
+  registerTypes();
 
 #define GET_OP_LIST
   addOperations<

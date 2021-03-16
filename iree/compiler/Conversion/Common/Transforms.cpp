@@ -185,7 +185,7 @@ static Optional<linalg::TiledAndFusedLinalgOps> tileAndFuseLinalgOps(
   // over to linalg on tensors.
   linalg::LinalgOp rootOp = fusableOps.back();
   Optional<SmallVector<int64_t, 4>> staticLoopRange =
-      linalg::getStaticLoopRanges(rootOp);
+      rootOp.getStaticLoopRanges();
   if (!staticLoopRange ||
       llvm::any_of(staticLoopRange.getValue(),
                    [](int64_t d) { return d == ShapedType::kDynamicSize; })) {

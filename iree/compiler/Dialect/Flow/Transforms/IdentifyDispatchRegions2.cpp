@@ -248,7 +248,6 @@ LogicalResult fuseInputs(DispatchRegion &dispatchRegion,
     // makes this simple check safe.
     // The dispatch region must be optimized to remove unused arguments
     // resulting from this fusion.
-    DispatchRegionOp::dceOperandsAndResults(dispatchRegion.op);
     if (nextOp->use_empty()) {
       nextOp->erase();
     }
@@ -386,8 +385,11 @@ LogicalResult processBlock(Block &block, OpDispatchPolicy &policy) {
     if (failed(fuseInputs(*dispatchRegion, policy))) return failure();
 
     // Ensure all unused operands and results are dce'd.
-    DispatchRegionOp::dceOperandsAndResults(dispatchRegion->op);
-    hoistDispatchRegionMetadataOps(*dispatchRegion, policy);
+    // Note that this may delete the op itself if it is unused.
+    optimizeClosureOp(dispatchRegion->op);
+    if (dispatchRegion->op) {
+      hoistDispatchRegionMetadataOps(*dispatchRegion, policy);
+    }
   }
   return success();
 }

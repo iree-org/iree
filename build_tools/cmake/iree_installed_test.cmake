@@ -36,20 +36,39 @@ function(iree_add_installed_test)
     ${ARGN}
   )
 
+
   add_test(
-    NAME ${_RULE_TEST_NAME}
-    WORKING_DIRECTORY ${_RULE_WORKING_DIRECTORY}
+    NAME
+      ${_RULE_TEST_NAME}
     COMMAND
-        ${_RULE_COMMAND}
-    WORKING_DIRECTORY
-        "${CMAKE_BINARY_DIR}"
+      ${_RULE_COMMAND}
   )
-  set_property(TEST ${_RULE_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(TEST ${_RULE_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir" ${_RULE_ENVIRONMENT})
+  if (DEFINED _RULE_WORKING_DIRECTORY)
+    set_property(
+      TEST
+        ${_RULE_TEST_NAME}
+      PROPERTY WORKING_DIRECTORY
+        "${_RULE_WORKING_DIRECTORY}"
+    )
+  endif()
+  set_property(
+    TEST
+      ${_RULE_TEST_NAME}
+    PROPERTY LABELS
+      "${_RULE_LABELS}"
+  )
+  set_property(
+    TEST
+      ${_RULE_TEST_NAME}
+    PROPERTY ENVIRONMENT
+      "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_RULE_TEST_NAME}_test_tmpdir"
+      ${_RULE_ENVIRONMENT}
+  )
   iree_add_test_environment_properties(${_RULE_TEST_NAME})
 
   # Write the to the installed ctest file template.
-  set(_installed_ctest_input_file "${CMAKE_BINARY_DIR}/iree_installed_tests.cmake.in")
+  set(_installed_ctest_input_file
+        "${CMAKE_BINARY_DIR}/iree_installed_tests.cmake.in")
   get_property(_has_tests GLOBAL PROPERTY IREE_HAS_INSTALLED_TESTS)
   if(NOT _has_tests)
     # First time.

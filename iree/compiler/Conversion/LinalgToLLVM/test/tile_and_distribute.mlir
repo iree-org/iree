@@ -10,8 +10,8 @@
 //   hal.executable.target @llvm_aot, filter="dylib*" {
 //     hal.executable.entry_point @dynamic_matmul attributes {
 //       interface = @legacy_io, ordinal = 0 : i32,
-//       signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-//         !flow.dispatch.output<?x?xf32>) -> ()}
+//       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+//         !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
 //     module {
 //       func @dynamic_matmul(%lhs: memref<?x?xf32>, %rhs: memref<?x?xf32>, %result: memref<?x?xf32>) {
 //         linalg.matmul ins(%lhs, %rhs : memref<?x?xf32>, memref<?x?xf32>) outs(%result : memref<?x?xf32>)
@@ -58,8 +58,8 @@ hal.executable @static_matmul attributes {sym_visibility = "private"} {
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @static_matmul attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<16x4xf32>, !flow.dispatch.input<4x8xf32>,
-        !flow.dispatch.output<16x8xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:16x4xf32>, !flow.dispatch.tensor<readonly:4x8xf32>,
+        !flow.dispatch.tensor<writeonly:16x8xf32>) -> ()}
     module {
       func @static_matmul(%lhs: memref<16x4xf32>, %rhs: memref<4x8xf32>, %result: memref<16x8xf32>) {
         linalg.matmul ins(%lhs, %rhs : memref<16x4xf32>, memref<4x8xf32>) outs(%result : memref<16x8xf32>)
@@ -84,4 +84,5 @@ hal.executable @static_matmul attributes {sym_visibility = "private"} {
 //     CHECK:    %[[J:.+]] = affine.apply #[[MAP2]]()[%[[THREAD_X_ID]]]
 //     CHECK:    %[[RHS_SUBVIEW:.+]] = subview %[[RHS]][%[[K]], %[[J]]] [1, 4] [1, 1]  : memref<4x8xf32> to memref<1x4xf32, #[[MAP3]]>
 //     CHECK:    %[[RESULT_SUBVIEW:.+]] = subview %[[RESULT]][%[[I]], %[[J]]] [2, 4] [1, 1]  : memref<16x8xf32> to memref<2x4xf32, #[[MAP3]]>
-//     CHECK:    linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]] : memref<2x1xf32, #[[MAP1]]>, memref<1x4xf32, #[[MAP3]]>) outs(%4 : memref<2x4xf32, #[[MAP3]]>)
+//     CHECK:    linalg.matmul
+//CHECK-SAME:      ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]] : memref<2x1xf32, #[[MAP1]]>, memref<1x4xf32, #[[MAP3]]>) outs(%4 : memref<2x4xf32, #[[MAP3]]>)

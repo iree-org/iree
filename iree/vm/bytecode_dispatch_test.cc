@@ -131,6 +131,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
     }
   } else {
     if (expect_failure) {
+      iree_status_ignore(status);
       GTEST_SUCCEED();
     } else {
       GTEST_FAIL() << "Function expected success but failed with error: "

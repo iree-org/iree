@@ -29,8 +29,8 @@ namespace IREE {
 namespace Flow {
 
 static bool isStreamableOp(Operation *op) {
-  if (auto streamableOp = dyn_cast<StreamableOpInterface>(op)) {
-    return streamableOp.isUsableInStream();
+  if (isa<StreamableOpInterface>(op)) {
+    return true;
   }
   if (llvm::isa<Shape::TieShapeOp>(op)) {
     return true;

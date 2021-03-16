@@ -121,8 +121,23 @@ static LogicalResult getMaliSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
-  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
-  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  ShapedType lhsType, rhsType;
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto inputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types")) {
+    lhsType = inputTypeAttr.getValue()[0]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+    rhsType = inputTypeAttr.getValue()[1]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+  } else {
+    lhsType = op.inputs()[0].getType().cast<MemRefType>();
+    rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  }
   assert(lhsType.getElementType() == rhsType.getElementType());
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return failure();
   // Get a vector of best tile size ordered from best to worst.
@@ -292,8 +307,21 @@ static LogicalResult getTargetSpecificConfig(
     std::array<int64_t, 3> &numSubgroups) {
   if (targetEnv.getVendorID() != spirv::Vendor::ARM) return failure();
 
-  auto lhsType = op.inputs()[0].getType().cast<MemRefType>();
-  auto rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  ShapedType lhsType, rhsType;
+  if (auto inputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types")) {
+    lhsType = inputTypeAttr.getValue()[0]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+    rhsType = inputTypeAttr.getValue()[1]
+                  .cast<TypeAttr>()
+                  .getValue()
+                  .cast<ShapedType>();
+  } else {
+    lhsType = op.inputs()[0].getType().cast<MemRefType>();
+    rhsType = op.inputs()[1].getType().cast<MemRefType>();
+  }
   assert(lhsType.getElementType() == rhsType.getElementType());
   // If the shape size is unknonw fall back to none vectorized path.
   if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return failure();
@@ -375,14 +403,34 @@ template <typename ConvOpTy>
 static LogicalResult getMaliSpecificConfig(ConvOpTy op,
                                            TileSizesListType &tileSizes,
                                            LaunchConfigInfo &config) {
-  auto inputType = op.getInput(1).getType().template cast<MemRefType>();
-  auto outputType = op.getOutputBufferTypes()[0].template cast<MemRefType>();
+  Operation *operation = op.getOperation();
+  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(operation)) return failure();
+
+  ShapedType inputType, outputType;
+
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto outputTypeAttr = operation->getAttrOfType<ArrayAttr>(
+          "iree.codegen.original_output_types")) {
+    auto inputTypeAttr = operation->getAttrOfType<ArrayAttr>(
+        "iree.codegen.original_input_types");
+    inputType = inputTypeAttr.getValue()[0]
+                    .template cast<TypeAttr>()
+                    .getValue()
+                    .template cast<ShapedType>();
+    outputType = outputTypeAttr.getValue()[0]
+                     .template cast<TypeAttr>()
+                     .getValue()
+                     .template cast<ShapedType>();
+    LLVM_DEBUG(llvm::dbgs() << "conv input types: " << inputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "conv output types: " << outputType << "\n");
+  } else {
+    inputType = op.getInputs().front().getType().template cast<ShapedType>();
+    outputType = op.getOutputBufferTypes()[0].template cast<ShapedType>();
+  }
+
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
-  // Only support NHWC conv.
-  if (!isa<linalg::ConvInputNHWCFilterHWCFOp>(op.getOperation())) {
-    return failure();
-  }
 
   bool isInputTilable =
       inputType.getDimSize(3) % 4 == 0 || inputType.getDimSize(3) < 4;
@@ -478,8 +526,29 @@ GET_CONV_LAUNCH_CONFIG(linalg::ConvInputNDHWCFilterDHWCFOp)
 static LogicalResult getMaliSpecificConfig(
     linalg::DepthwiseConvInputNHWCFilterHWCOp op, TileSizesListType &tileSizes,
     LaunchConfigInfo &config) {
-  auto inputType = op.getInput(0).getType().cast<MemRefType>();
-  auto outputType = op.getOutputBufferTypes()[0].cast<MemRefType>();
+  ShapedType inputType, outputType;
+
+  // NOTE: Special treatment to let the flow.dispatch.workgroups path to be able
+  // to query launch configurations.
+  if (auto outputTypeAttr =
+          op->getAttrOfType<ArrayAttr>("iree.codegen.original_output_types")) {
+    auto inputTypeAttr =
+        op->getAttrOfType<ArrayAttr>("iree.codegen.original_input_types");
+    inputType = inputTypeAttr.getValue()[0]
+                    .template cast<TypeAttr>()
+                    .getValue()
+                    .template cast<ShapedType>();
+    outputType = outputTypeAttr.getValue()[0]
+                     .template cast<TypeAttr>()
+                     .getValue()
+                     .template cast<ShapedType>();
+    LLVM_DEBUG(llvm::dbgs() << "dwconv input types: " << inputType << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "dwconv output types: " << outputType << "\n");
+  } else {
+    inputType = op.getInput(0).getType().cast<ShapedType>();
+    outputType = op.getOutputBufferTypes()[0].cast<ShapedType>();
+  }
+
   if (!inputType.hasStaticShape() || !outputType.hasStaticShape())
     return failure();
 

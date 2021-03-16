@@ -83,10 +83,16 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     - The Linalg op is kept untouched.
   //
   //===--------------------------------------------------------------------===//
-  if (!options.usingLinalgOnTensors) {
+  if (options.usingLinalgOnTensors) {
+    // flow.dispatch.workgroups performed abstract tiling and distribution. Make
+    // them concrete now since we know the target and settings now.
+    pm.addPass(createConcretizeTileAmongWorkgroupsPass(options));
+  } else {
     pm.addPass(createSplitDispatchFunctionPass());
+    pm.addPass(createTileAndDistributeAmongWorkgroupsPass(options));
   }
-  pm.addPass(createLinalgTileAndFusePass(options));
+
+  pm.addPass(createTileAndVectorizeInOneWorkgroupPass(options));
   if (options.vectorizeMemref) {
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(
         createLoadStoreVectorizationPass());
@@ -166,6 +172,9 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createInlinerPass());
 
   if (options.usingLinalgOnTensors) {
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createBufferAllocViewCleanUpPass());
+
     WorkgroupMemoryAllocationFn allocationFn =
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
            Type elementType, ArrayRef<Value> dynamicSizes) {
@@ -206,7 +215,8 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
     //===--------------------------------------------------------------------===//
     pm.nest<ModuleOp>().addNestedPass<FuncOp>(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(pm.nest<ModuleOp>());
-    pm.nest<ModuleOp>().addNestedPass<FuncOp>(createRemoveDeadMemAllocsPass());
+    pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+        createBufferAllocViewCleanUpPass());
   }
 
   //===--------------------------------------------------------------------===//

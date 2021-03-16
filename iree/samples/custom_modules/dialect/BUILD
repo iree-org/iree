@@ -14,6 +14,7 @@
 
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,7 +24,10 @@ package(
 
 filegroup(
     name = "td_files",
-    srcs = glob(["*.td"]),
+    srcs = enforce_glob(
+        ["custom_ops.td"],
+        include = ["*.td"],
+    ),
 )
 
 cc_library(

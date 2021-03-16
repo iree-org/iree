@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("@iree//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,7 +23,13 @@ package(
 
 filegroup(
     name = "td_files",
-    srcs = glob(["*.td"]),
+    srcs = enforce_glob(
+        [
+            "base.td",
+            "ops.td",
+        ],
+        include = ["*.td"],
+    ),
 )
 
 gentbl(

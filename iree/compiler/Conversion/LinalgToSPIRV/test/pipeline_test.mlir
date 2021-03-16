@@ -9,8 +9,8 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_static_shape attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -68,8 +68,8 @@ hal.executable @matmul_fill_fused attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_fill_fused attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -130,8 +130,8 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
   hal.executable.target @vulkan, filter="dylib*" {
     hal.executable.entry_point @matmul_add_fused attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<?x?xf32>, !flow.dispatch.input<?x?xf32>,
-        !flow.dispatch.output<?x?xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?x?xf32>,
+        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
@@ -156,12 +156,12 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
         %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2, operand_result_index = 2 : i32} : memref<1024x256xf32>
         %4 = alloc() : memref<1024x256xf32>
         linalg.fill(%4, %cst) : memref<1024x256xf32>, f32
-        linalg.matmul ins(%1, %2 : memref<1024x512xf32>, memref<512x256xf32>) 
+        linalg.matmul ins(%1, %2 : memref<1024x512xf32>, memref<512x256xf32>)
         outs(%4 : memref<1024x256xf32>)
-        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, 
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
         affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]} 
-        ins(%4, %3 : memref<1024x256xf32>, memref<1024x256xf32>) 
+        iterator_types = ["parallel", "parallel"]}
+        ins(%4, %3 : memref<1024x256xf32>, memref<1024x256xf32>)
         outs(%0 : memref<1024x256xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
           %5 = addf %arg0, %arg1 : f32

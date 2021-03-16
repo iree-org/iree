@@ -14,9 +14,12 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "llvm/ADT/BitVector.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/TypeSupport.h"
+#include "mlir/Interfaces/CastInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -103,6 +106,156 @@ PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
 
 Type PtrType::getTargetType() { return getImpl()->targetType; }
 
+//===----------------------------------------------------------------------===//
+// TiedOpInterface
+//===----------------------------------------------------------------------===//
+
+llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
+    Operation *op, unsigned resultIndex) {
+  auto storageAttr =
+      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  if (!storageAttr) return llvm::None;
+  auto valueAttrs = storageAttr.getValue();
+  if (valueAttrs.empty()) return llvm::None;
+  int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
+  if (value == TiedOpInterface::kUntiedIndex) return llvm::None;
+  auto tiedOp = cast<TiedOpInterface>(op);
+  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+  return tiedOperandsOffset + static_cast<unsigned>(value);
+}
+
+void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
+                                       llvm::Optional<unsigned> operandIndex) {
+  auto indices = getTiedResultOperandIndices(op);
+  if (indices.empty()) {
+    indices.resize(op->getNumResults(), TiedOpInterface::kUntiedIndex);
+  }
+  indices[resultIndex] = operandIndex.hasValue()
+                             ? operandIndex.getValue()
+                             : TiedOpInterface::kUntiedIndex;
+  auto indexType = IndexType::get(op->getContext());
+  op->setAttr(TiedOpInterface::getStorageAttrName(),
+              ArrayAttr::get(op->getContext(),
+                             llvm::to_vector<8>(llvm::map_range(
+                                 indices, [&](int64_t v) -> Attribute {
+                                   return IntegerAttr::get(indexType, v);
+                                 }))));
+}
+
+SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
+  SmallVector<int64_t, 4> indices;
+  auto storageAttr =
+      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  if (!storageAttr) return indices;
+  auto valueAttrs = storageAttr.getValue();
+  if (valueAttrs.empty()) return indices;
+  auto tiedOp = cast<TiedOpInterface>(op);
+  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+  indices.resize(op->getNumResults());
+  for (unsigned i = 0; i < valueAttrs.size(); ++i) {
+    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
+    indices[i] = index != TiedOpInterface::kUntiedIndex
+                     ? tiedOperandsOffset + index
+                     : TiedOpInterface::kUntiedIndex;
+  }
+  return indices;
+}
+
+Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
+  Value baseValue = derivedValue;
+  while (auto definingOp =
+             dyn_cast_or_null<TiedOpInterface>(baseValue.getDefiningOp())) {
+    auto tiedValue = definingOp.getTiedResultOperand(baseValue);
+    if (!tiedValue) break;
+    baseValue = tiedValue;
+  }
+  return baseValue;
+}
+
+LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
+  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+  auto storageAttr =
+      tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  if (!storageAttr || storageAttr.getValue().empty()) {
+    return success();
+  }
+  auto tiedOperandIndices = storageAttr.getValue();
+  if (tiedOperandIndices.size() != tiedOp->getNumResults()) {
+    return tiedOp.emitError("op results/tied operand indices mismatch");
+  }
+  for (unsigned resultIndex = 0; resultIndex < tiedOp->getNumResults();
+       ++resultIndex) {
+    int64_t tiedOperandIndex =
+        tiedOperandIndices[resultIndex].cast<IntegerAttr>().getInt();
+    if (tiedOperandIndex < 0) continue;
+    auto operandType =
+        tiedOp->getOperand(tiedOperandsOffset + tiedOperandIndex).getType();
+    auto resultType = tiedOp->getResult(resultIndex).getType();
+    if (operandType != resultType) {
+      return tiedOp.emitError(
+                 "tied operand and result type mismatch; operand has ")
+             << operandType << " and result has " << resultType;
+    }
+  }
+  return success();
+}
+
+void excludeTiedOperandAndResultIndices(
+    ArrayRef<unsigned> excludedOperandIndices,
+    ArrayRef<unsigned> excludedResultIndices,
+    SmallVector<int64_t, 4> &tiedOperandIndices) {
+  SmallVector<int64_t, 4> oldTiedOperandIndices = tiedOperandIndices;
+  tiedOperandIndices.clear();
+
+  // To adjust operand indices we need to know the how many operands to offset
+  // the indices by - if 2 operands before operand N were removed then we know
+  // it needs to be -2. This is nasty but that's why we have this helper
+  // function.
+  llvm::BitVector excludedOperands(
+      *std::max_element(excludedOperandIndices.begin(),
+                        excludedOperandIndices.end()) +
+          1,
+      false);
+  for (unsigned i = 0; i < excludedOperandIndices.size(); ++i) {
+    excludedOperands[excludedOperandIndices[i]] = true;
+  }
+
+  for (auto it : llvm::enumerate(oldTiedOperandIndices)) {
+    unsigned resultIndex = it.index();
+    if (llvm::count(excludedResultIndices, resultIndex)) {
+      continue;  // result removed
+    }
+
+    int64_t tiedOperandIndex = it.value();
+    if (tiedOperandIndex != TiedOpInterface::kUntiedIndex) {
+      // Count up the number of removed operands prior to this one.
+      unsigned offset = 0;
+      for (unsigned i = 0; i < tiedOperandIndex; ++i) {
+        if (i < excludedOperands.size() && excludedOperands[i]) ++offset;
+      }
+      tiedOperandIndex -= offset;
+
+      if (llvm::count(excludedOperandIndices, tiedOperandIndex)) {
+        tiedOperandIndex = TiedOpInterface::kUntiedIndex;  // operand removed
+      }
+    }
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  }
+}
+
+// At the end so it can use functions above:
+#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.cpp.inc"
+
 }  // namespace IREE
+
+//===----------------------------------------------------------------------===//
+// IREEDialect
+//===----------------------------------------------------------------------===//
+
+void IREEDialect::registerTypes() {
+  addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
+           IREE::PtrType>();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

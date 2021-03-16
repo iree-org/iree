@@ -10,12 +10,17 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "convert_hlo_to_shape_dialect.mlir"
+    "expand_function_dynamic_dims.mlir"
+    "expand_function_ranked_shape_dims.mlir"
+    "hoist_shape_calculations.mlir"
+    "materialize_shape_calculations.mlir"
+    "tie_dynamic_shapes.mlir"
+    "tie_dynamic_shapes_no_recurse.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

@@ -10,8 +10,8 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_128x128x128 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<128x128xf32>, !flow.dispatch.input<128x128xf32>,
-        !flow.dispatch.output<128x128xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:128x128xf32>, !flow.dispatch.tensor<readonly:128x128xf32>,
+        !flow.dispatch.tensor<writeonly:128x128xf32>) -> ()}
     module {
       func @matmul_128x128x128(%arg0 : memref<128x128xf32>, %arg1: memref<128x128xf32>, %arg2: memref<128x128xf32>) {
         linalg.matmul ins(%arg0, %arg1 : memref<128x128xf32>, memref<128x128xf32>) outs(%arg2 : memref<128x128xf32>)
@@ -91,8 +91,8 @@ hal.executable @dynamic_matmul_i8_i8_i32 attributes {sym_visibility = "private"}
   hal.executable.target @llvm_aot, filter="dylib*" {
     hal.executable.entry_point @matmul_i8_i8_i32_128x128x128 attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.input<128x128xi8>, !flow.dispatch.input<128x128xi8>,
-        !flow.dispatch.output<128x128xi32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:128x128xi8>, !flow.dispatch.tensor<readonly:128x128xi8>,
+        !flow.dispatch.tensor<writeonly:128x128xi32>) -> ()}
     module {
       func @matmul_i8_i8_i32_128x128x128(%arg0 : memref<128x128xi8>, %arg1: memref<128x128xi8>, %arg2: memref<128x128xi32>) {
         linalg.matmul_i8_i8_i32 ins(%arg0, %arg1 : memref<128x128xi8>, memref<128x128xi8>) outs(%arg2 : memref<128x128xi32>)

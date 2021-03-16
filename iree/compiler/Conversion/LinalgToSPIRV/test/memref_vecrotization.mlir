@@ -132,3 +132,24 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
+
+// -----
+
+func @vectorize_binding_subspan() {
+  %cst = constant 0.000000e+00 : f32
+  %c0 = constant 0 : index
+  // CHECK: hal.interface.binding.subspan @legacy_io::@arg0[%c0]
+  // CHECK-SAME: memref<4096x1024xvector<4xf32>>
+  // CHECK: hal.interface.binding.subspan @legacy_io::@ret0[%c0]
+  // CHECK-SAME: memref<4096x1024xvector<4xf32>>
+  %0 = hal.interface.binding.subspan @legacy_io::@arg0[%c0] : memref<4096x4096xf32>
+  %1 = hal.interface.binding.subspan @legacy_io::@ret0[%c0] : memref<4096x4096xf32>
+  %mat = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<32x8xf32>
+  vector.transfer_write %mat, %1[%c0, %c0] : vector<32x8xf32>, memref<4096x4096xf32>
+  return
+}
+
+hal.interface @legacy_io attributes {sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}

@@ -18,30 +18,26 @@ iree_cc_library(
     "DispatchConfig.h"
     "Passes.h"
   SRCS
-    "CreateBenchmarkFuncs.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchConfig.cpp"
     "DispatchLinalgOnTensors.cpp"
     "DispatchabilityAnalysis.cpp"
     "ExpandVariableDynamicDims.cpp"
+    "ExportBenchmarkFuncs.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
-    "IdentifyDispatchRegions.cpp"
     "IdentifyDispatchRegions2.cpp"
     "InjectDispatchTracing.cpp"
     "LegalizeInputTypes.cpp"
-    "MaterializeExportedReflection.cpp"
-    "MergeExportedReflection.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineDispatchRegions2.cpp"
     "OutlineLargeConstants.cpp"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
-    "RematerializeDispatchConstants.cpp"
     "StripAndSplatConstantVariables.cpp"
   DEPS
     LLVMSupport
@@ -61,7 +57,6 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::base::signature_mangle
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::HLOToLinalg::HLOToLinalgOnTensors
