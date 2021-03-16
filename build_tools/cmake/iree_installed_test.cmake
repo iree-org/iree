@@ -54,8 +54,8 @@ function(iree_add_installed_test)
   set_property(
     TEST
       ${_RULE_TEST_NAME}
-      PROPERTY LABELS
-        "${_RULE_LABELS}"
+    PROPERTY LABELS
+      "${_RULE_LABELS}"
   )
   set_property(
     TEST
