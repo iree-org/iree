@@ -39,7 +39,7 @@ jobs:
           excludes: "*/third_party/*"
           # For compatibility with Google's internal source repository, we still
           # use this.
-          warnings: "-native-cc"
+          warnings: "-native-cc,-native-py"
 
   yapf:
     runs-on: ubuntu-18.04
