@@ -67,8 +67,10 @@ def benchmark(module_name, flagfile_name, target) -> str:
       "--benchmark_repetitions=10"
   ] + target.runtime_flags
   print(f"Running cmd: {' '.join(cmd)}")
-  output = subprocess.run(cmd, check=True,
-                          capture_output=True).stdout.strip().decode()
+  output = subprocess.run(cmd,
+                          check=True,
+                          capture_output=True,
+                          universal_newlines=True).stdout
   for line in output.split("\n"):
     m = PATTERN.match(line)
     if m is not None:
