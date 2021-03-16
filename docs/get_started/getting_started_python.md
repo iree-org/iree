@@ -3,7 +3,7 @@
   NOTE: Iree's Python API is currently being reworked. Some of these
   instructions may be in a state of flux as they document the end state.
 
-The IREE compiler API is called `pyiree.compiler2` (naming is for historical
+The IREE compiler API is called `pyiree.compiler` (naming is for historical
 reasons and will be changed to `iree.compiler` soon).
 
 There are additional ancillary modules that are not part of the public API.

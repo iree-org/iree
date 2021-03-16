@@ -25,7 +25,7 @@ from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
-from pyiree.compiler2 import tf as tf_compiler
+from pyiree.compiler import tf as tf_compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
