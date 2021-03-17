@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -75,7 +76,7 @@ struct SubTensorToTensorSlice : OpRewritePattern<SubTensorOp> {
 
     Value source = subTensorOp.source();
     SmallVector<Value, 4> sourceSizesVals = sizesVals;
-    sourceSizesVals[0] = rewriter.createOrFold<DimOp>(loc, source, 0);
+    sourceSizesVals[0] = rewriter.createOrFold<memref::DimOp>(loc, source, 0);
     rewriter.replaceOpWithNewOp<TensorSliceOp>(
         subTensorOp, subTensorOp.getType(), subTensorOp.source(),
         sourceSizesVals, offsetVals, sizesVals, sizesVals);
