@@ -199,13 +199,6 @@ def iree_e2e_cartesian_product_test_suite(
         # For all other flags, append their key and value if the value isn't
         # always the same.
         for k, v in flags.items():
-            # For bazel->cmake support. These characters are reserved.
-            if ";" in str(k):
-                fail("Illegal character `;` in matrix key".format(k))
-            if ";" in str(v):
-                fail("Illegal character `;` in matrix value".format(v))
-            if "," in str(v):
-                fail("Illegal character `,` in matrix value".format(v))
             if len(matrix[k]) > 1:
                 test_name.append(k)
                 test_name.append(str(v))

@@ -135,6 +135,10 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
@@ -172,6 +176,10 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
@@ -216,6 +224,10 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
+    tags = [
+        # Kokoro doesn't have kws_streaming installed
+        "nokokoro",
+    ],
     deps = [
         "//third_party/google_research/google_research/kws_streaming/models:models_lib",
         "//third_party/google_research/google_research/kws_streaming/train:train_lib",
