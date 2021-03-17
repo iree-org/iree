@@ -153,6 +153,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,MaxPool2D,,,,iree_vulkan"
     ",,MaxPool3D,,,,iree_llvmaot"
     ",,MaxPool3D,,,,iree_vulkan"
+    ",,BatchNormalization,,,,iree_vulkan"
 )
 
 iree_e2e_cartesian_product_test_suite(

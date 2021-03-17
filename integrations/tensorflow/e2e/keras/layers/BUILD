@@ -317,6 +317,10 @@ FAILING_FULL_API = [
             "iree_vulkan",
         ],
     },
+    {
+        "layer": "BatchNormalization",
+        "target_backends": "iree_vulkan",
+    },
 ]
 
 iree_e2e_cartesian_product_test_suite(
