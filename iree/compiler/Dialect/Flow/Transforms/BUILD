@@ -23,6 +23,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "ConvertToFlowTensorOps.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
         "DispatchConfig.cpp",

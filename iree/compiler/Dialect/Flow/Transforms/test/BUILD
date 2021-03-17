@@ -25,6 +25,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "convert_to_flow_tensor_ops.mlir",
             "deduplicate_executables.mlir",
             "dispatch_linalg_on_tensors.mlir",
             "dispatch_linalg_on_tensors_dynamic.mlir",
