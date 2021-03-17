@@ -25,9 +25,6 @@ from setuptools import setup, find_namespace_packages
 README = r'''
 # IREE Compiler Python Bindings
 
-Transitional note: These bindings are not complete yet and will ultimately
-replace the `iree.compiler` and `iree.tf.compiler` packages.
-
 ## Core compiler
 
 ```py
