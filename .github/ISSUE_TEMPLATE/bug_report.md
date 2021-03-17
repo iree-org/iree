@@ -7,7 +7,7 @@ assignees: GMNGeoffrey
 
 ---
 
-If you are an IREE team member, consider removing the "help wanted" tag and redirecting the assignee to a more appropriate person.
+If you are an IREE team member, please consider doing further triage: remove the "help wanted" label, add other relevant labels, and redirect to a more appropriate assignee.
 
 **Describe the bug**
 A clear and concise description of what the bug is.
