@@ -317,10 +317,6 @@ FAILING_FULL_API = [
             "iree_vulkan",
         ],
     },
-    {
-        "layer": "BatchNormalization",
-        "target_backends": "iree_vulkan",
-    },
 ]
 
 iree_e2e_cartesian_product_test_suite(
@@ -528,6 +524,12 @@ FAILING_TRAINING = [
             "SimpleRNN",
         ],
         "target_backends": "tflite",
+    },
+    {
+        # Failing in OSS
+        # vk_mem_alloc.h:12318 Check failed: m_pMetadata->IsEmpty() && "Some allocations were not freed before destruction of this memory block!"
+        "layer": "BatchNormalization",
+        "target_backends": "iree_vulkan",
     },
     {
         # Failing on IREE

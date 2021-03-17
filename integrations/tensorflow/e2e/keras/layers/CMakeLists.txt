@@ -153,7 +153,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,MaxPool2D,,,,iree_vulkan"
     ",,MaxPool3D,,,,iree_llvmaot"
     ",,MaxPool3D,,,,iree_vulkan"
-    ",,BatchNormalization,,,,iree_vulkan"
 )
 
 iree_e2e_cartesian_product_test_suite(
@@ -397,6 +396,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,GRU,,,,tflite"
     ",,LSTM,,,,tflite"
     ",,SimpleRNN,,,,tflite"
+    ",,BatchNormalization,,,,iree_vulkan"
     ",,AdditiveAttention,,,,iree_vmla"
     ",,AdditiveAttention,,,,iree_llvmaot"
     ",,AdditiveAttention,,,,iree_vulkan"
