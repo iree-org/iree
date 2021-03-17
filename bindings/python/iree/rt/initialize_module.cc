@@ -14,12 +14,12 @@
 
 #include "iree/base/status.h"
 #include "iree/hal/drivers/init.h"
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/function_abi.h"
-#include "pyiree/rt/hal.h"
-#include "pyiree/rt/host_types.h"
-#include "pyiree/rt/status_utils.h"
-#include "pyiree/rt/vm.h"
+#include "iree/rt/binding.h"
+#include "iree/rt/function_abi.h"
+#include "iree/rt/hal.h"
+#include "iree/rt/host_types.h"
+#include "iree/rt/status_utils.h"
+#include "iree/rt/vm.h"
 
 namespace iree {
 namespace python {

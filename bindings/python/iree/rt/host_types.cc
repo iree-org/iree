@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pyiree/rt/host_types.h"
+#include "iree/rt/host_types.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
 #include "iree/base/signature_parser.h"
 #include "pybind11/numpy.h"
-#include "pyiree/rt/hal.h"
-#include "pyiree/rt/status_utils.h"
+#include "iree/rt/hal.h"
+#include "iree/rt/status_utils.h"
 
 namespace iree {
 namespace python {

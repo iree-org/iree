@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_BINDING_H_
+#define IREE_BINDINGS_PYTHON_IREE_BINDING_H_
 
 #include <vector>
 
@@ -115,4 +115,4 @@ class ApiRefCounted {
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_BINDING_H_

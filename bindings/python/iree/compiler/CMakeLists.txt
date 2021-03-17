@@ -27,5 +27,5 @@ iree_py_library(
 iree_py_install_package(
   COMPONENT IreePythonPackage-compiler
   PACKAGE_NAME iree_compiler
-  MODULE_PATH pyiree/compiler
+  MODULE_PATH iree/compiler
 )

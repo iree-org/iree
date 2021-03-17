@@ -30,7 +30,7 @@ iree_symlink_tool(
 iree_py_install_package(
   COMPONENT IreePythonPackage-tools-tflite
   PACKAGE_NAME iree_tools_tflite
-  MODULE_PATH pyiree/tools/tflite
+  MODULE_PATH iree/tools/tflite
   DEPS
     iree_tf_compiler_iree-import-tflite
 )

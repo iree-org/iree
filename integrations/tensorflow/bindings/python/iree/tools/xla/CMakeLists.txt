@@ -30,7 +30,7 @@ iree_symlink_tool(
 iree_py_install_package(
   COMPONENT IreePythonPackage-tools-xla
   PACKAGE_NAME iree_tools_xla
-  MODULE_PATH pyiree/tools/xla
+  MODULE_PATH iree/tools/xla
   DEPS
     iree_tf_compiler_iree-import-xla
 )

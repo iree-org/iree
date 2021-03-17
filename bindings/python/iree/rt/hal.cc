@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pyiree/rt/hal.h"
+#include "iree/rt/hal.h"
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"

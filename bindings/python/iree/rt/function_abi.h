@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_FUNCTION_ABI_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_RT_FUNCTION_ABI_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_RT_FUNCTION_ABI_H_
+#define IREE_BINDINGS_PYTHON_IREE_RT_FUNCTION_ABI_H_
 
 #include <utility>
 #include <vector>
@@ -130,4 +130,4 @@ void SetupFunctionAbiBindings(pybind11::module m);
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_RT_FUNCTION_ABI_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_RT_FUNCTION_ABI_H_

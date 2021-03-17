@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "pyiree/rt/vm.h"
+#include "iree/rt/vm.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -24,8 +24,8 @@
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/api.h"
-#include "pyiree/rt/function_abi.h"
-#include "pyiree/rt/status_utils.h"
+#include "iree/rt/function_abi.h"
+#include "iree/rt/status_utils.h"
 
 namespace iree {
 namespace python {

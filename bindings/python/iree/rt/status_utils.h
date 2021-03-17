@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_
+#define IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_
 
 #include "iree/base/api.h"
 #include "pybind11/pybind11.h"
@@ -53,4 +53,4 @@ inline void CheckApiNotNull(const void* p, const char* message) {
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_

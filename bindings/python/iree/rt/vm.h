@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_RT_VM_H_
+#define IREE_BINDINGS_PYTHON_IREE_RT_VM_H_
 
 #include "absl/types/optional.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/host_types.h"
+#include "iree/rt/binding.h"
+#include "iree/rt/host_types.h"
 
 namespace iree {
 namespace python {
@@ -159,4 +159,4 @@ void SetupVmBindings(pybind11::module m);
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_RT_VM_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_RT_VM_H_

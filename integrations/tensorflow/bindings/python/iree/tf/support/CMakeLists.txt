@@ -30,5 +30,5 @@ iree_py_install_package(
   AUGMENT_EXISTING_PACKAGE
   COMPONENT IreePythonPackage-tools-tf
   PACKAGE_NAME iree_tools_tf
-  MODULE_PATH pyiree/tf/support
+  MODULE_PATH iree/tf/support
 )

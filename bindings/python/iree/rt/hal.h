@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
+#define IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/status_utils.h"
+#include "iree/rt/binding.h"
+#include "iree/rt/status_utils.h"
 
 namespace iree {
 namespace python {
@@ -120,4 +120,4 @@ void SetupHalBindings(pybind11::module m);
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_

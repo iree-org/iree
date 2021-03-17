@@ -31,7 +31,7 @@ iree_py_install_package(
   AUGMENT_EXISTING_PACKAGE
   COMPONENT IreePythonPackage-compiler
   PACKAGE_NAME iree_compiler
-  MODULE_PATH pyiree/tools/core
+  MODULE_PATH iree/tools/core
   DEPS
     iree_tools_iree-translate
 )

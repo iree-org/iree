@@ -94,13 +94,13 @@ iree_py_test(
 iree_py_install_package(
   COMPONENT IreePythonPackage-rt
   PACKAGE_NAME iree_rt
-  MODULE_PATH pyiree/rt
+  MODULE_PATH iree/rt
   DEPS
-    bindings_python_pyiree_rt_PyExtRt
+    bindings_python_iree_rt_PyExtRt
 )
 
 install(
-  TARGETS bindings_python_pyiree_rt_PyExtRt
+  TARGETS bindings_python_iree_rt_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )

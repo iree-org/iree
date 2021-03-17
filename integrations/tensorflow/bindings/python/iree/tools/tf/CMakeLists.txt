@@ -30,7 +30,7 @@ iree_symlink_tool(
 iree_py_install_package(
   COMPONENT IreePythonPackage-tools-tf
   PACKAGE_NAME iree_tools_tf
-  MODULE_PATH pyiree/tools/tf
+  MODULE_PATH iree/tools/tf
   DEPS
     iree_tf_compiler_iree-tf-import
 )

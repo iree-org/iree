@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_HOST_TYPES_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_RT_HOST_TYPES_H_
+#ifndef IREE_BINDINGS_PYTHON_IREE_RT_HOST_TYPES_H_
+#define IREE_BINDINGS_PYTHON_IREE_RT_HOST_TYPES_H_
 
 #include <array>
 
 #include "absl/types/span.h"
 #include "iree/base/signature_parser.h"
-#include "pyiree/rt/binding.h"
-#include "pyiree/rt/hal.h"
+#include "iree/rt/binding.h"
+#include "iree/rt/hal.h"
 
 namespace iree {
 namespace python {
@@ -57,4 +57,4 @@ void SetupHostTypesBindings(pybind11::module m);
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_RT_HOST_TYPES_H_
+#endif  // IREE_BINDINGS_PYTHON_IREE_RT_HOST_TYPES_H_
