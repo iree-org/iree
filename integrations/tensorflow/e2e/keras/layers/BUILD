@@ -262,16 +262,19 @@ LAYERS_WITH_FULL_API_TESTS = [
 FAILING_FULL_API = [
     {
         # Failing on TFLite
+        # keep sorted
         "layer": [
             "AveragePooling3D",
+            "Conv2DTranspose",
             "Conv3D",
             "Conv3DTranspose",
             "ConvLSTM2D",
             "DepthwiseConv2D",
             "GRU",
+            "LSTM",
             "LocallyConnected1D",
             "LocallyConnected2D",
-            "LSTM",
+            "MaxPool1D",
             "MaxPool3D",
             "SeparableConv1D",  # Failing on Kokoro.
             "SeparableConv2D",
@@ -376,11 +379,13 @@ FAILING_DYNAMIC = [
     },
     {
         # Failing on IREE
+        # keep sorted
         "layer": [
             "AdditiveAttention",
             "AveragePooling1D",
             "AveragePooling2D",
             "AveragePooling3D",
+            "BatchNormalization",
             "Concatenate",
             "Conv1D",
             "Conv1DTranspose",
@@ -398,11 +403,11 @@ FAILING_DYNAMIC = [
             "ELU",
             "Flatten",
             "GRU",
+            "LSTM",  # TODO(silvasean): Get this test working on IREE.
             "LayerNormalization",
             "LeakyReLU",
             "LocallyConnected1D",
             "LocallyConnected2D",
-            "LSTM",  # TODO(silvasean): Get this test working on IREE.
             "Masking",
             "MaxPool1D",
             "MaxPool2D",
@@ -430,23 +435,23 @@ FAILING_DYNAMIC = [
     },
     {
         # Failing on LLVM and Vulkan
+        # keep sorted
         "layer": [
             "Activation",
             "Add",
             "Attention",
             "Average",
-            "BatchNormalization",
             "GlobalAveragePooling1D",
             "GlobalAveragePooling2D",
             "GlobalAveragePooling3D",
             "GlobalMaxPool1D",
             "GlobalMaxPool2D",
             "GlobalMaxPool3D",
-            "Permute",
             "Lambda",
             "Maximum",
             "Minimum",
             "Multiply",
+            "Permute",
             "ReLU",
             "Softmax",
             "Subtract",
@@ -526,22 +531,18 @@ FAILING_TRAINING = [
         "target_backends": "tflite",
     },
     {
-        # Failing in OSS
-        # vk_mem_alloc.h:12318 Check failed: m_pMetadata->IsEmpty() && "Some allocations were not freed before destruction of this memory block!"
-        "layer": "BatchNormalization",
-        "target_backends": "iree_vulkan",
-    },
-    {
         # Failing on IREE
+        # keep sorted
         "layer": [
             "AdditiveAttention",
             "AlphaDropout",
             "Attention",
+            "BatchNormalization",
             "ConvLSTM2D",
             "Dropout",
+            "GRU",
             "GaussianDropout",
             "GaussianNoise",
-            "GRU",
             "LSTM",
             "MultiHeadAttention",
             "SimpleRNN",

@@ -245,7 +245,9 @@ TFLITE_FAILING = [
     "unsorted_segment_prod",
     "unsorted_segment_sqrt_n",
     "unsorted_segment_sum",
+    "xdiv",
     "xlog1py",
+    "xlogy",
     "zeta",
 ]
 
