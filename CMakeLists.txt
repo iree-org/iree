@@ -150,7 +150,8 @@ endforeach()
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   CUDA
-  LLVM-AOT
+  DYLIB-LLVM-AOT
+  WASM-LLVM-AOT
   Metal-SPIRV
   Vulkan-SPIRV
   VMLA
