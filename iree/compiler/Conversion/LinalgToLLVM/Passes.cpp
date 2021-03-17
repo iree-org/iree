@@ -28,29 +28,18 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> clEnableLLVMLinalgOnTensors(
-    "iree-codegen-llvm-experimental-linalg-on-tensors",
-    llvm::cl::desc("Enable the linalg on tensors experimental LLVM path"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> convImg2ColConversion(
-    "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
-    llvm::cl::desc("Enable rewriting linalg.conv_2d_input_nhwc_filter_hwcf "
-                   "linalg.generic that does img2col buffer packing + "
-                   "linag.matmul"),
-    llvm::cl::init(false));
-
-void addLinalgToLLVMPasses(OpPassManager &passManager) {
+void addLinalgToLLVMPasses(OpPassManager &passManager,
+                           LLVMCodegenOptions options) {
   // Distribute linalg op among a 3d grid of parallel threads. Tile each
   // workgroup thread memory then vectorize the linalg op.
-  if (clEnableLLVMLinalgOnTensors) {
+  if (options.usingLinalgOnTensors) {
     passManager.addPass(createMaterializeCPULaunchConfigurationPass());
   } else {
     passManager.addPass(createLinalgTileAndDistributePass());
   }
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  if (convImg2ColConversion) {
+  if (options.useConvImg2Col) {
     // linalg::ConvInputNHWCFilterHWCFOp -> (Img2Col packing + matmul).
     // After convolution is tiled and distributed among workgroups its converted
     // before vectorize workgroup workload.
@@ -77,19 +66,20 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
-  nestedModulePM.addPass(createConvertToLLVMPass());
+  nestedModulePM.addPass(createConvertToLLVMPass(options));
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
 
-void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
+void buildLLVMTransformPassPipeline(OpPassManager &passManager,
+                                    LLVMCodegenOptions options) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   nestedModulePM.addPass(createInlinerPass());
 
   // HLO -> Linalg on buffers.
-  if (clEnableLLVMLinalgOnTensors) {
+  if (options.usingLinalgOnTensors) {
     nestedModulePM.addPass(createLinalgVectorizePass());
     // Use stack allocation on CPU side.
     WorkgroupMemoryAllocationFn allocationFn =
@@ -112,21 +102,23 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
     addHLOToLinalgOnBuffersPasses(nestedModulePM);
   }
   // Linalg -> LLVM passes.
-  addLinalgToLLVMPasses(passManager);
+  addLinalgToLLVMPasses(passManager, options);
 }
 
 static PassPipelineRegistration<> linalgLLVMVPipeline(
     "iree-codegen-linalg-to-llvm-pipeline",
     "Runs the progressive lowering pipeline from Linalg to LLVM",
     [](OpPassManager &passManager) {
-      buildLLVMTransformPassPipeline(passManager);
+      buildLLVMTransformPassPipeline(passManager,
+                                     getLLVMCodegenOptionsFromClOptions());
     });
 
 static PassPipelineRegistration<> hloToLinalgLLVMVPipeline(
     "iree-codegen-hlo-to-llvm-pipeline",
     "Runs the progressive lowering pipeline from XLA HLO to Linalg to LLVM",
     [](OpPassManager &passManager) {
-      buildLLVMTransformPassPipeline(passManager);
+      buildLLVMTransformPassPipeline(passManager,
+                                     getLLVMCodegenOptionsFromClOptions());
     });
 
 }  // namespace iree_compiler

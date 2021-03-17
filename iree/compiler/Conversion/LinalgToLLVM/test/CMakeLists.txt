@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "matmul_vectorization.mlir"
     "plan_conv_loop_order.mlir"
     "tile_and_distribute.mlir"
+    "unfused_fma.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
