@@ -26,30 +26,30 @@ attributes { __inplace_args_attr__ = ["none", "none", "true"] }
 //       CHECK:   constant 0.0
   %v0 = constant 0.0 : f32
 
-//   CHECK-NOT:   alloc
+//   CHECK-NOT:   memref.alloc
 //       CHECK:   linalg.fill(%[[C]], %{{.*}}) : memref<f32>, f32
   %d = linalg.fill(%c, %v0) : tensor<f32>, f32 -> tensor<f32>
 
 //       CHECK:   scf.for %[[I:.*]]
 //       CHECK:     scf.for %[[II:.*]]
-//       CHECK:       %[[PACK_B:.*]] = alloc(%{{.*}}) : memref<?x2xf32>
-//       CHECK:       %[[PACK_A:.*]] = alloc(%{{.*}}) : memref<?x2xf32>
+//       CHECK:       %[[PACK_B:.*]] = memref.alloc(%{{.*}}) : memref<?x2xf32>
+//       CHECK:       %[[PACK_A:.*]] = memref.alloc(%{{.*}}) : memref<?x2xf32>
 //       CHECK:       scf.for %[[III_PACK_B:.*]]
-//       CHECK:         %[[sB:.*]] = subview %[[PACK_B]]
+//       CHECK:         %[[sB:.*]] = memref.subview %[[PACK_B]]
 //       CHECK:         linalg.copy(%{{.*}}, %[[sB]]) : memref<2xf32, #[[$MAP5]]>, memref<2xf32, #[[$MAP1]]>
 //       CHECK:       scf.for %[[III_PACK_A:.*]]
-//       CHECK:         %[[sA:.*]] = subview %[[PACK_A]]
+//       CHECK:         %[[sA:.*]] = memref.subview %[[PACK_A]]
 //       CHECK:         linalg.copy(%{{.*}}, %[[sA]]) : memref<2xf32, #[[$MAP5]]>, memref<2xf32, #[[$MAP1]]>
 //       CHECK:       scf.for %[[III:.*]]
-//       CHECK:         %[[sA:.*]] = subview %[[PACK_A]][%{{.*}}, 0] [1, 2] [1, 1] : memref<?x2xf32> to memref<2xf32, #[[$MAP1]]>
-//       CHECK:         %[[sB:.*]] = subview %[[PACK_B]][%{{.*}}, 0] [1, 2] [1, 1] : memref<?x2xf32> to memref<2xf32, #[[$MAP1]]>
+//       CHECK:         %[[sA:.*]] = memref.subview %[[PACK_A]][%{{.*}}, 0] [1, 2] [1, 1] : memref<?x2xf32> to memref<2xf32, #[[$MAP1]]>
+//       CHECK:         %[[sB:.*]] = memref.subview %[[PACK_B]][%{{.*}}, 0] [1, 2] [1, 1] : memref<?x2xf32> to memref<2xf32, #[[$MAP1]]>
 //       CHECK:         linalg.dot ins(%[[sA]], %[[sB]] : memref<2xf32, #[[$MAP1]]>, memref<2xf32, #[[$MAP1]]>) outs(%[[C]] : memref<f32>)
-//       CHECK:       dealloc %[[PACK_A]] : memref<?x2xf32>
-//       CHECK:       dealloc %[[PACK_B]] : memref<?x2xf32>
+//       CHECK:       memref.dealloc %[[PACK_A]] : memref<?x2xf32>
+//       CHECK:       memref.dealloc %[[PACK_B]] : memref<?x2xf32>
   %e = linalg.dot ins(%a, %b : tensor<?xf32>,tensor<?xf32>)
     outs(%d: tensor<f32>) -> tensor<f32>
 
-//   CHECK-NOT:   alloc
+//   CHECK-NOT:   memref.alloc
 //   CHECK-NOT:   copy
 //       CHECK:   return
   return %e : tensor<f32>
