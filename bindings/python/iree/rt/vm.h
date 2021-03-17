@@ -17,10 +17,10 @@
 
 #include "absl/types/optional.h"
 #include "iree/base/api.h"
-#include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
 #include "iree/rt/binding.h"
 #include "iree/rt/host_types.h"
+#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 
 namespace iree {
 namespace python {

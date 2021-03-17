@@ -17,9 +17,9 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
 #include "iree/base/signature_parser.h"
-#include "pybind11/numpy.h"
 #include "iree/rt/hal.h"
 #include "iree/rt/status_utils.h"
+#include "pybind11/numpy.h"
 
 namespace iree {
 namespace python {

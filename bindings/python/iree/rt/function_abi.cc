@@ -21,10 +21,10 @@
 #include "iree/base/signature_parser.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm/api.h"
 #include "iree/rt/hal.h"
 #include "iree/rt/status_utils.h"
 #include "iree/rt/vm.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace python {

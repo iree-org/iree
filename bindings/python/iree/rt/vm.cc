@@ -23,9 +23,9 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
-#include "iree/vm/api.h"
 #include "iree/rt/function_abi.h"
 #include "iree/rt/status_utils.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace python {
