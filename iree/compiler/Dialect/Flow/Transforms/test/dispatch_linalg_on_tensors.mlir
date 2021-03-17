@@ -281,5 +281,11 @@ func @reduce(%arg0: tensor<1x7x7x1280xf32>) -> tensor<1x1280xf32> {
 // CHECK-NEXT:   linalg.fill
 
 //      CHECK: %[[REDUCE:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x7x7x1280xf32>, tensor<1x1280xf32>) -> %[[FILL]] =
-// CHECK-NEXT:     (%{{.+}}: !flow.dispatch.tensor<readonly:1x7x7x1280xf32>, %{{.+}}: !flow.dispatch.tensor<readwrite:1x1280xf32>) {
-//      CHECK:   linalg.generic
+// CHECK-NEXT:     (%[[ARG1:.+]]: !flow.dispatch.tensor<readonly:1x7x7x1280xf32>, %[[ARG2:.+]]: !flow.dispatch.tensor<readwrite:1x1280xf32>) {
+//      CHECK:   %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+//      CHECK:   %[[OUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
+//      CHECK:   %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:     ins(%[[IN]] : tensor<1x7x7x1280xf32>) outs(%[[OUT]] : tensor<1x1280xf32>)
+//      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]]
+
+//      CHECK: return %[[REDUCE]] : tensor<1x1280xf32>
