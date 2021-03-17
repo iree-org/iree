@@ -67,11 +67,7 @@ def iree_e2e_cartesian_product_test_suite(
     For example, given the following values
 
         matrix = {
-<<<<<<< HEAD
-            "src": "external_model_test.py"
-=======
             "src": "application_test.py"
->>>>>>> main
             "use_external_weights": True,
             "model": [
                 "ResNet50",
