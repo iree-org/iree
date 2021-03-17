@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "bindings/python/iree/rt/binding.h"
+#include "bindings/python/iree/rt/function_abi.h"
+#include "bindings/python/iree/rt/hal.h"
+#include "bindings/python/iree/rt/host_types.h"
+#include "bindings/python/iree/rt/status_utils.h"
+#include "bindings/python/iree/rt/vm.h"
 #include "iree/base/status.h"
 #include "iree/hal/drivers/init.h"
-#include "iree/rt/binding.h"
-#include "iree/rt/function_abi.h"
-#include "iree/rt/hal.h"
-#include "iree/rt/host_types.h"
-#include "iree/rt/status_utils.h"
-#include "iree/rt/vm.h"
 
 namespace iree {
 namespace python {

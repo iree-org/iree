@@ -18,9 +18,9 @@
 #include <array>
 
 #include "absl/types/span.h"
+#include "bindings/python/iree/rt/binding.h"
+#include "bindings/python/iree/rt/hal.h"
 #include "iree/base/signature_parser.h"
-#include "iree/rt/binding.h"
-#include "iree/rt/hal.h"
 
 namespace iree {
 namespace python {
