@@ -14,8 +14,7 @@ A just-in-time compilation decorator similar to `jax.jit` is provided by
 `iree.jax.jit`:
 
 ```python
-import pyiree as iree
-import pyiree.jax
+import iree.jax
 
 import jax
 import jax.numpy as jnp
@@ -53,8 +52,7 @@ export ANDROID_NDK=# NDK install location
 The code below assumes that you have `flax` installed.
 
 ```python
-import pyiree as iree
-import pyiree.jax
+import iree.jax
 
 import jax
 import jax.numpy as jnp

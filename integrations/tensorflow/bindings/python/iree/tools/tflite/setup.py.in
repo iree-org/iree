@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build platform specific wheel files for the pyiree.rt package.
+# Build platform specific wheel files for the iree.rt package.
 # Built artifacts are per-platform and build out of the build tree.
 
 from distutils.command.install import install
@@ -78,9 +78,9 @@ setup(
         "Development Status :: 3 - Alpha",
     ],
     python_requires=">=3.6",
-    packages=find_namespace_packages(include=["pyiree.tools.tflite"]),
+    packages=find_namespace_packages(include=["iree.tools.tflite"]),
     package_data={
-        "pyiree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
+        "iree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
     },
     cmdclass={
         'bdist_wheel': bdist_wheel,
