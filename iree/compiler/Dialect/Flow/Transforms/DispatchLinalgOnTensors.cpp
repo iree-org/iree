@@ -400,6 +400,12 @@ static void tryToTieOperandsAndResults(
           insertOp.dest().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
       if (!loadOp) return nullptr;
       return loadOp.source().cast<BlockArgument>();
+    } else if (auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(tieOp)) {
+      unsigned resultIndex = storeOp.value().cast<OpResult>().getResultNumber();
+      auto loadOp = linalgOp.getOutputTensors()[resultIndex]
+                        .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+      if (!loadOp) return nullptr;
+      return loadOp.source().cast<BlockArgument>();
     }
 
     return nullptr;

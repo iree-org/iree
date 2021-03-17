@@ -243,7 +243,7 @@ endfunction()
 # Parameters:
 # NAME: name of test
 # SRCS: Test source file
-# DEPS: List of deps the test requires
+# ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 function(iree_py_test)
@@ -255,7 +255,7 @@ function(iree_py_test)
     _RULE
     ""
     "NAME;SRCS"
-    "DEPS;LABELS"
+    "ARGS;LABELS"
     ${ARGN}
   )
 
@@ -276,6 +276,7 @@ function(iree_py_test)
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+      ${_RULE_ARGS}
     INSTALLED_COMMAND
       python
       "${_PACKAGE_PATH}/${_RULE_SRCS}"

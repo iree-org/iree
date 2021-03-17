@@ -540,6 +540,54 @@ static LogicalResult recordTensorClone(Value device, Value commandBuffer,
   return success();
 }
 
+/// Convert a flow.tensor.slice to a copy.
+// TODO(benvanik, ravishankarm): The copy is not necessary. If there are no
+// other uses of this buffer you could just return the original buffer with an
+// offset. This should either be handled here, or the `flow.tensor.slice` (or
+// its equivalent `subtensor` op) must be pushed into dispatch regions (see
+// Github issue #5131)
+static LogicalResult recordTensorSlice(Value device, Value commandBuffer,
+                                       IREE::Flow::TensorSliceOp &sliceOp,
+                                       BufferSet &bufferSet,
+                                       ConversionPatternRewriter &rewriter) {
+  auto &sourceBuffer = bufferSet.rangeMap[sliceOp.source()];
+  auto &resultBuffer = bufferSet.rangeMap[sliceOp.result()];
+
+  // TODO(benvanik): use something other than the BufferRange::buffer?
+  // This may require us to subview the buffer first.
+  auto source = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      sliceOp.getLoc(), sliceOp.source(), sourceBuffer.buffer, rewriter);
+  auto result = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      sliceOp.getLoc(), sliceOp.result(), resultBuffer.buffer, rewriter);
+  if (!source.hasValue() || !result.hasValue()) {
+    return sliceOp.emitOpError()
+           << "cannot create adaptors for tensor slice operands/results";
+  }
+
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(sliceOp.getLoc(), 0);
+
+  // Compute the size of the update range.
+  auto startIndices = llvm::to_vector<4>(llvm::map_range(
+      sliceOp.start_indices(),
+      [&](Value value) { return rewriter.getRemappedValue(value); }));
+  auto shapeDims = result->getShapeDims();
+  if (!shapeDims) return failure();
+  auto sourceRange = source->computeRange(startIndices, *shapeDims);
+  if (!sourceRange) return failure();
+
+  // TODO(benvanik): slice left/mid/right, but really just don't do this.
+  rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
+      sliceOp.getLoc(), commandBuffer, source->getBuffer(), sourceRange->offset,
+      result->getBuffer(), zeroOffset, sourceRange->length);
+
+  // Full barriers for now as we aren't scheduling things.
+  // TODO(benvanik): don't add at the end of the command buffer (we could
+  // also do a canonicalization step that removed trailing barriers).
+  recordFullExecutionBarrier(commandBuffer, sliceOp.getLoc(), rewriter);
+  return success();
+}
+
 static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
                                         IREE::Flow::TensorUpdateOp &updateOp,
                                         BufferSet &bufferSet,
@@ -595,6 +643,11 @@ static LogicalResult recordStreamCommands(Value device, Value commandBuffer,
       }
     } else if (auto cloneOp = dyn_cast<IREE::Flow::TensorCloneOp>(op)) {
       if (failed(recordTensorClone(device, commandBuffer, cloneOp, bufferSet,
+                                   rewriter))) {
+        return failure();
+      }
+    } else if (auto sliceOp = dyn_cast<IREE::Flow::TensorSliceOp>(op)) {
+      if (failed(recordTensorSlice(device, commandBuffer, sliceOp, bufferSet,
                                    rewriter))) {
         return failure();
       }

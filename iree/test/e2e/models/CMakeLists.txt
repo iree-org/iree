@@ -40,4 +40,29 @@ iree_check_single_backend_test_suite(
     "vmla"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "bert_encoder_unrolled_fake_weights.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg_on_tensors_dylib-llvm-aot_dylib
+  SRCS
+    "bert_encoder_unrolled_fake_weights.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-llvm-experimental-linalg-on-tensors"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

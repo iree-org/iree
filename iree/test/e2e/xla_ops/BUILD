@@ -199,8 +199,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         "concatenate.mlir",
         "constant.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "convolution.mlir",
+        "convolution.mlir",
         "cosine.mlir",
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
@@ -220,7 +219,7 @@ iree_check_single_backend_test_suite(
         "negate.mlir",
         # https://github.com/google/iree/issues/4079
         "pad.mlir",
-        # "reduce.mlir",
+        "reduce.mlir",
         # "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
@@ -260,8 +259,7 @@ iree_check_single_backend_test_suite(
         # https://github.com/google/iree/issues/4079
         "concatenate.mlir",
         "constant.mlir",
-        # https://github.com/google/iree/issues/4079
-        # "convolution.mlir",
+        "convolution.mlir",
         "cosine.mlir",
         "divide.mlir",
         # https://github.com/google/iree/issues/4079
@@ -280,7 +278,7 @@ iree_check_single_backend_test_suite(
         "multiply.mlir",
         "negate.mlir",
         "pad.mlir",
-        # "reduce.mlir",
+        "reduce.mlir",
         # "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
