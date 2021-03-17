@@ -14,17 +14,16 @@
 
 import functools
 
-from pyiree import compiler
-import pyiree.compiler.xla
-from pyiree import rt
+import iree.compiler.xla
+import iree.rt
 
 try:
   import jax
 except ModuleNotFoundError as e:
-  raise ModuleNotFoundError("pyiree.jax requires 'jax' and 'jaxlib' to be "
+  raise ModuleNotFoundError("iree.jax requires 'jax' and 'jaxlib' to be "
                             "installed in your python environment.") from e
 
-# pytype thinks pyiree.jax is jax.
+# pytype thinks iree.jax is jax.
 # pytype: disable=module-attr
 
 __all__ = [
@@ -48,7 +47,7 @@ _BACKEND_TO_TARGETS = {
 
 def is_available():
   """Determine if the IREE–XLA compiler are available for JAX."""
-  return compiler.xla.is_available()
+  return iree.compiler.xla.is_available()
 
 
 def aot(function, *args, **options):
@@ -65,7 +64,7 @@ def aot(function, *args, **options):
   """
   xla_comp = jax.xla_computation(function)(*args)
   hlo_proto = xla_comp.as_serialized_hlo_module_proto()
-  binary = compiler.xla.compile_str(hlo_proto, **options)
+  binary = iree.compiler.xla.compile_str(hlo_proto, **options)
   return binary
 
 
@@ -79,12 +78,12 @@ class _JittedFunction:
 
   def __init__(self, function, driver: str, **options):
     self._function = function
-    self._driver_config = rt.Config(driver)
+    self._driver_config = iree.rt.Config(driver)
     self._options = options
     self._memoized_signatures = {}
 
   def _get_signature(self, args_flat, in_tree):
-    args_flat = [rt.normalize_value(arg) for arg in args_flat]
+    args_flat = [iree.rt.normalize_value(arg) for arg in args_flat]
     return tuple((arg.shape, arg.dtype) for arg in args_flat) + (in_tree,)
 
   def _wrap_and_compile(self, signature, args_flat, in_tree):
@@ -96,8 +95,8 @@ class _JittedFunction:
 
     # Compile the wrapped_function to IREE.
     binary = aot(wrapped_function, *args_flat, **self._options)
-    cpp_vm_module = rt.VmModule.from_flatbuffer(binary)
-    module = rt.load_module(cpp_vm_module, config=self._driver_config)
+    cpp_vm_module = iree.rt.VmModule.from_flatbuffer(binary)
+    module = iree.rt.load_module(cpp_vm_module, config=self._driver_config)
 
     # Get the output tree so it can be reconstructed from the outputs of the
     # compiled module. Duplicating execution here isn't ideal, and could

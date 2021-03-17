@@ -12,14 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for pyiree.tf.support.module_utils."""
+"""Tests for iree.tf.support.module_utils."""
 
 import os
 import tempfile
 
 from absl import logging
 from absl.testing import parameterized
-from pyiree.tf.support import module_utils
+from iree.tf.support import module_utils
 import tensorflow as tf
 
 

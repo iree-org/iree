@@ -13,14 +13,13 @@
 # limitations under the License.
 
 from absl.testing import absltest
+import iree.jax
+import iree.rt
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pyiree as iree
-import pyiree.jax
-import pyiree.rt
 
-# pytype thinks pyiree.jax is jax.
+# pytype thinks iree.jax is jax.
 # pytype: disable=module-attr
 
 TOLERANCE = {"rtol": 1e-6, "atol": 1e-6}

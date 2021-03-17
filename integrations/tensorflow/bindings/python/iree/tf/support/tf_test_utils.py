@@ -34,9 +34,9 @@ from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
-from pyiree.tf.support import module_utils
-from pyiree.tf.support import tf_utils
-from pyiree.tf.support import trace_utils
+from iree.tf.support import module_utils
+from iree.tf.support import tf_utils
+from iree.tf.support import trace_utils
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string("reference_backend", "tf",

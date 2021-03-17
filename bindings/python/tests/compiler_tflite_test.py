@@ -21,9 +21,9 @@ import unittest
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
-from pyiree.compiler.tflite import *
+import iree.compiler.tflite
 
-if not is_available():
+if not iree.compiler.tflite.is_available():
   print(f"Skipping test {__file__} because the IREE TFLite compiler "
         f"is not installed")
   sys.exit(0)
@@ -34,7 +34,8 @@ class CompilerTest(unittest.TestCase):
   def testImportBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata",
                         "tflite_sample.fb")
-    text = compile_file(path, import_only=True).decode("utf-8")
+    text = iree.compiler.tflite.compile_file(path,
+                                             import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("tosa.mul", text)
 
@@ -42,7 +43,8 @@ class CompilerTest(unittest.TestCase):
   def testCompileBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata",
                         "tflite_sample.fb")
-    binary = compile_file(path, target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.tflite.compile_file(
+        path, target_backends=iree.compiler.tflite.DEFAULT_TESTING_BACKENDS)
     logging.info("Binary length = %d", len(binary))
     self.assertIn(b"main", binary)
 
@@ -52,7 +54,9 @@ class CompilerTest(unittest.TestCase):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
         f.close()
-        output = compile_file(path, import_only=True, output_file=f.name)
+        output = iree.compiler.tflite.compile_file(path,
+                                                   import_only=True,
+                                                   output_file=f.name)
         self.assertIsNone(output)
         with open(f.name, "rt") as f_read:
           text = f_read.read()
@@ -68,9 +72,10 @@ class CompilerTest(unittest.TestCase):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
         f.close()
-        output = compile_file(path,
-                              output_file=f.name,
-                              target_backends=DEFAULT_TESTING_BACKENDS)
+        output = iree.compiler.tflite.compile_file(
+            path,
+            output_file=f.name,
+            target_backends=iree.compiler.tflite.DEFAULT_TESTING_BACKENDS)
         self.assertIsNone(output)
         with open(f.name, "rb") as f_read:
           binary = f_read.read()
@@ -84,7 +89,8 @@ class CompilerTest(unittest.TestCase):
                         "tflite_sample.fb")
     with open(path, "rb") as f:
       content = f.read()
-    text = compile_str(content, import_only=True).decode("utf-8")
+    text = iree.compiler.tflite.compile_str(content,
+                                            import_only=True).decode("utf-8")
     logging.info("%s", text)
     self.assertIn("tosa.mul", text)
 
@@ -94,7 +100,8 @@ class CompilerTest(unittest.TestCase):
                         "tflite_sample.fb")
     with open(path, "rb") as f:
       content = f.read()
-    binary = compile_str(content, target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.tflite.compile_str(
+        content, target_backends=iree.compiler.tflite.DEFAULT_TESTING_BACKENDS)
     logging.info("Binary length = %d", len(binary))
     self.assertIn(b"main", binary)
 

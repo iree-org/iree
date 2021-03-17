@@ -19,13 +19,14 @@ import re
 
 from absl import logging
 from absl.testing import absltest
+import iree.compiler
+import iree.rt
 import numpy as np
-from pyiree import compiler
-from pyiree import rt
 
 
 def create_simple_mul_module():
-  binary = compiler.compile_str("""
+  binary = iree.compiler.compile_str(
+      """
   module @arithmetic {
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
@@ -34,8 +35,9 @@ def create_simple_mul_module():
     }
   }
   """,
-                                target_backends=["vulkan-spirv"])
-  m = rt.VmModule.from_flatbuffer(binary)
+      target_backends=["vulkan-spirv"],
+  )
+  m = iree.rt.VmModule.from_flatbuffer(binary)
   return m
 
 
@@ -44,25 +46,25 @@ class SystemApiTest(absltest.TestCase):
   def test_non_existing_driver(self):
     with self.assertRaisesRegex(RuntimeError,
                                 "Could not create any requested driver"):
-      config = rt.Config("nothere1,nothere2")
+      config = iree.rt.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = rt.Config("nothere1,vmla")
+    config = iree.rt.Config("nothere1,vmla")
 
   def test_empty_dynamic(self):
-    ctx = rt.SystemContext()
+    ctx = iree.rt.SystemContext()
     self.assertTrue(ctx.is_dynamic)
     self.assertIn("hal", ctx.modules)
     self.assertEqual(ctx.modules.hal.name, "hal")
 
   def test_empty_static(self):
-    ctx = rt.SystemContext(modules=())
+    ctx = iree.rt.SystemContext(modules=())
     self.assertFalse(ctx.is_dynamic)
     self.assertIn("hal", ctx.modules)
     self.assertEqual(ctx.modules.hal.name, "hal")
 
   def test_custom_dynamic(self):
-    ctx = rt.SystemContext()
+    ctx = iree.rt.SystemContext()
     self.assertTrue(ctx.is_dynamic)
     ctx.add_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
@@ -75,14 +77,14 @@ class SystemApiTest(absltest.TestCase):
             "(Buffer<float32[4]>, Buffer<float32[4]>) -> (Buffer<float32[4]>)"))
 
   def test_duplicate_module(self):
-    ctx = rt.SystemContext()
+    ctx = iree.rt.SystemContext()
     self.assertTrue(ctx.is_dynamic)
     ctx.add_module(create_simple_mul_module())
     with self.assertRaisesRegex(ValueError, "arithmetic"):
       ctx.add_module(create_simple_mul_module())
 
   def test_static_invoke(self):
-    ctx = rt.SystemContext()
+    ctx = iree.rt.SystemContext()
     self.assertTrue(ctx.is_dynamic)
     ctx.add_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
@@ -93,7 +95,7 @@ class SystemApiTest(absltest.TestCase):
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
 
   def test_serialize_values(self):
-    ctx = rt.SystemContext()
+    ctx = iree.rt.SystemContext()
     self.assertTrue(ctx.is_dynamic)
     ctx.add_module(create_simple_mul_module())
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
@@ -106,7 +108,7 @@ class SystemApiTest(absltest.TestCase):
     self.assertEqual(outputs, ("4xf32=4 10 18 28",))
 
   def test_load_module(self):
-    arithmetic = rt.load_module(create_simple_mul_module())
+    arithmetic = iree.rt.load_module(create_simple_mul_module())
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = arithmetic.simple_mul(arg0, arg1)

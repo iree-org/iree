@@ -23,10 +23,10 @@ from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type, Un
 
 from absl import flags
 from absl import logging
+import iree.compiler.tf
+import iree.rt
+from iree.tf.support import tf_utils
 import numpy as np
-from pyiree import rt
-from pyiree.compiler import tf as tf_compiler
-from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_bool(
@@ -117,7 +117,7 @@ def _incrementally_compile_tf_module(
       backend_info.backend_id,
       needs_temp_saved_model_dir=True,
   ) if artifacts_dir else {})
-  immediate_result = tf_compiler.compile_module(
+  immediate_result = iree.compiler.tf.compile_module(
       module,
       target_backends=backend_info.compiler_targets,
       exported_names=exported_names,
@@ -154,7 +154,7 @@ def _incrementally_compile_tf_signature_def_saved_model(
   """
   output_kwargs = (_get_tf_import_output_kwargs(
       artifacts_dir, backend_info.backend_id) if artifacts_dir else {})
-  immediate_result = tf_compiler.compile_saved_model(
+  immediate_result = iree.compiler.tf.compile_saved_model(
       saved_model_dir,
       import_type="SIGNATURE_DEF",
       target_backends=backend_info.compiler_targets,
@@ -283,7 +283,8 @@ class CompiledModule(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
+  def __init__(self, context: iree.rt.SystemContext,
+               f: iree.rt.system_api.BoundFunction):
     self._context = context
     self._f = f
 
@@ -303,8 +304,8 @@ class IreeCompiledModule(CompiledModule):
       module_name: str,
       backend_info: "BackendInfo",
       compiled_paths: Dict[str, str],
-      vm_module: rt.VmModule,
-      config: rt.Config,
+      vm_module: iree.rt.VmModule,
+      config: iree.rt.Config,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -314,8 +315,8 @@ class IreeCompiledModule(CompiledModule):
       backend_info: BackendInfo with the details about compiling this module.
       compiled_paths: A dictionary mapping compiled method names to file paths
         corresponding to their serialized representations.
-      vm_module: A rt.VmModule containing compilation info to wrap.
-      config: A rt.Config containing compilation info to wrap.
+      vm_module: A iree.rt.VmModule containing compilation info to wrap.
+      config: A iree.rt.Config containing compilation info to wrap.
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._vm_module = vm_module
@@ -364,8 +365,8 @@ class IreeCompiledModule(CompiledModule):
         backend_info=backend_info,
         exported_names=exported_names,
         artifacts_dir=artifacts_dir)
-    vm_module = rt.VmModule.from_flatbuffer(module_blob)
-    config = rt.Config(driver_name=backend_info.driver)
+    vm_module = iree.rt.VmModule.from_flatbuffer(module_blob)
+    config = iree.rt.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -406,8 +407,8 @@ class IreeCompiledModule(CompiledModule):
     module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
-    vm_module = rt.VmModule.from_flatbuffer(module_blob)
-    config = rt.Config(driver_name=backend_info.driver)
+    vm_module = iree.rt.VmModule.from_flatbuffer(module_blob)
+    config = iree.rt.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -420,8 +421,8 @@ class IreeCompiledModule(CompiledModule):
     """Reinitializes all stateful variables."""
     # set_random_seed is not needed here because the model_class.__init__ is not
     # called.
-    self._context = rt.SystemContext(modules=[self._vm_module],
-                                     config=self._config)
+    self._context = iree.rt.SystemContext(modules=[self._vm_module],
+                                          config=self._config)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.

@@ -30,9 +30,9 @@ import textwrap
 from typing import Any, Callable, Dict, Sequence, Tuple, Union
 
 from absl import logging
+from iree.tf.support import module_utils
+from iree.tf.support import tf_utils
 import numpy as np
-from pyiree.tf.support import module_utils
-from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 NUMPY_LINEWIDTH = 120

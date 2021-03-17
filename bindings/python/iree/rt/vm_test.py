@@ -17,48 +17,54 @@
 
 from absl import logging
 from absl.testing import absltest
+import iree.compiler
+import iree.rt
 import numpy as np
-from pyiree import compiler
-from pyiree import rt
 
 
 def create_add_scalar_module():
-  binary = compiler.compile_str("""
+  binary = iree.compiler.compile_str(
+      """
     func @add_scalar(%arg0: i32, %arg1: i32) -> i32 attributes { iree.module.export } {
       %0 = addi %arg0, %arg1 : i32
       return %0 : i32
     }
     """,
-                                target_backends=["vmla"])
-  m = rt.VmModule.from_flatbuffer(binary)
+      target_backends=["vmla"],
+  )
+  m = iree.rt.VmModule.from_flatbuffer(binary)
   return m
 
 
 def create_simple_static_mul_module():
-  binary = compiler.compile_str("""
+  binary = iree.compiler.compile_str(
+      """
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
         %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
         return %0 : tensor<4xf32>
     }
     """,
-                                target_backends=["vmla"])
-  m = rt.VmModule.from_flatbuffer(binary)
+      target_backends=["vmla"],
+  )
+  m = iree.rt.VmModule.from_flatbuffer(binary)
   return m
 
 
 def create_simple_dynamic_abs_module():
   # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
   target_backends = ["vmla"]
-  binary = compiler.compile_str("""
+  binary = iree.compiler.compile_str(
+      """
     func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
           attributes { iree.module.export } {
         %0 = "mhlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
         return %0 : tensor<?x?xf32>
     }
     """,
-                                target_backends=target_backends)
-  m = rt.VmModule.from_flatbuffer(binary)
+      target_backends=target_backends,
+  )
+  m = iree.rt.VmModule.from_flatbuffer(binary)
   return m
 
 
@@ -67,22 +73,22 @@ class VmTest(absltest.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
-    driver_names = rt.HalDriver.query()
+    driver_names = iree.rt.HalDriver.query()
     logging.info("driver_names: %s", driver_names)
-    cls.driver = rt.HalDriver.create("vmla")
+    cls.driver = iree.rt.HalDriver.create("vmla")
     cls.device = cls.driver.create_default_device()
-    cls.hal_module = rt.create_hal_module(cls.device)
-    cls.htf = rt.HostTypeFactory.get_numpy()
+    cls.hal_module = iree.rt.create_hal_module(cls.device)
+    cls.htf = iree.rt.HostTypeFactory.get_numpy()
 
   def test_variant_list(self):
-    l = rt.VmVariantList(5)
+    l = iree.rt.VmVariantList(5)
     logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
 
   def test_context_id(self):
-    instance = rt.VmInstance()
-    context1 = rt.VmContext(instance)
-    context2 = rt.VmContext(instance)
+    instance = iree.rt.VmInstance()
+    context1 = iree.rt.VmContext(instance)
+    context2 = iree.rt.VmContext(instance)
     self.assertGreater(context2.context_id, context1.context_id)
 
   def test_module_basics(self):
@@ -93,31 +99,31 @@ class VmTest(absltest.TestCase):
     self.assertIs(notfound, None)
 
   def test_dynamic_module_context(self):
-    instance = rt.VmInstance()
-    context = rt.VmContext(instance)
+    instance = iree.rt.VmInstance()
+    context = iree.rt.VmContext(instance)
     m = create_simple_static_mul_module()
     context.register_modules([self.hal_module, m])
 
   def test_static_module_context(self):
     m = create_simple_static_mul_module()
     logging.info("module: %s", m)
-    instance = rt.VmInstance()
+    instance = iree.rt.VmInstance()
     logging.info("instance: %s", instance)
-    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_dynamic_shape_compile(self):
     m = create_simple_dynamic_abs_module()
     logging.info("module: %s", m)
-    instance = rt.VmInstance()
+    instance = iree.rt.VmInstance()
     logging.info("instance: %s", instance)
-    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_add_scalar(self):
     m = create_add_scalar_module()
-    instance = rt.VmInstance()
-    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.rt.VmInstance()
+    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)
@@ -138,8 +144,8 @@ class VmTest(absltest.TestCase):
 
   def test_synchronous_dynamic_shape_invoke_function(self):
     m = create_simple_dynamic_abs_module()
-    instance = rt.VmInstance()
-    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.rt.VmInstance()
+    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)
@@ -161,8 +167,8 @@ class VmTest(absltest.TestCase):
 
   def test_synchronous_invoke_function(self):
     m = create_simple_static_mul_module()
-    instance = rt.VmInstance()
-    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.rt.VmInstance()
+    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)
