@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRMemRefDialect
+    MLIRMemRef
     MLIRPass
     MLIRStandard
     MLIRTransforms

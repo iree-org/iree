@@ -34,7 +34,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRInferTypeOpInterface
-    MLIRMemRefDialect
+    MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard

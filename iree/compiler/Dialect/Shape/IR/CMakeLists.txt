@@ -35,7 +35,7 @@ iree_cc_library(
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
-    MLIRMemRefDialect
+    MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
