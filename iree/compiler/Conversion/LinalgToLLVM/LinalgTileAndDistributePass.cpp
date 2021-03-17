@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -40,7 +41,7 @@ class LinalgTileAndDistributePass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect, AffineDialect,
-                    scf::SCFDialect>();
+                    memref::MemRefDialect, scf::SCFDialect>();
   }
 
   LinalgTileAndDistributePass() = default;
@@ -49,7 +50,8 @@ class LinalgTileAndDistributePass
 };
 }  // namespace
 
-Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
+Optional<Value> allocateThreadLocalMemory(OpBuilder &b,
+                                          memref::SubViewOp subview,
                                           ArrayRef<Value> boundingSubViewSize,
                                           OperationFolder *folder) {
   // Allocate the memory into the entry block of the parent FuncOp. This better
@@ -73,7 +75,7 @@ Optional<Value> allocateThreadLocalMemory(OpBuilder &b, SubViewOp subview,
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
   MemRefType allocType =
       MemRefType::get(shape, subview.getType().getElementType());
-  Value buffer = b.create<AllocaOp>(subview.getLoc(), allocType);
+  Value buffer = b.create<memref::AllocaOp>(subview.getLoc(), allocType);
   return buffer;
 }
 

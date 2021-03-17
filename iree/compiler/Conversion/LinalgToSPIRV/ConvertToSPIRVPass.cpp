@@ -34,6 +34,7 @@
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
@@ -511,8 +512,8 @@ LogicalResult ScalarizeVectorTransferRead::matchAndRewrite(
                                 adaptor.indices().end());
   for (int i = 0; i < vectorType.getDimSize(0); ++i) {
     indices.back() = rewriter.createOrFold<ConstantIndexOp>(loc, i);
-    scalars.push_back(
-        rewriter.create<LoadOp>(loc, scalarType, readOp.source(), indices));
+    scalars.push_back(rewriter.create<memref::LoadOp>(
+        loc, scalarType, readOp.source(), indices));
   }
 
   rewriter.replaceOpWithNewOp<spirv::CompositeConstructOp>(readOp, vectorType,
@@ -578,8 +579,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   ///   SPIR-V
   /// - tensor_to_memref can become a no-op since tensors are lowered to
   ///   !spv.array
-  patterns.insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<TensorToMemrefOp>>(
-      typeConverter, context);
+  patterns
+      .insert<FoldAsNoOp<linalg::ReshapeOp>, FoldAsNoOp<memref::BufferCastOp>>(
+          typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);

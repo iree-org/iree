@@ -59,8 +59,8 @@ void DotProdOnVectors() {
   ScopedContext scope(b, func.getLoc());
   Value A = func.getArgument(0), B = func.getArgument(1);
   Value idx_0 = std_constant_index(0);
-  Value A_val = std_load(A, idx_0);
-  Value B_val = std_load(B, idx_0);
+  Value A_val = memref_load(A, idx_0);
+  Value B_val = memref_load(B, idx_0);
   Value flt_0 = std_constant_float(APFloat(0.0f), f32);
   Value res_val = (vector_contract(A_val, B_val, flt_0,
                                    modelBuilder.getAffineMapArrayAttr(accesses),

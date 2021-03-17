@@ -48,7 +48,7 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 
-    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+    MemRefIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
         C(f.getArgument(2));
     auto last = std_constant_index(kNumElements - 1);
     C(last) = A(last) + B(last);
@@ -106,7 +106,7 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 
-    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+    MemRefIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
         C(f.getArgument(2));
     auto last = std_constant_index(kNumElements - 1);
     C(last) = A(last) + B(last);

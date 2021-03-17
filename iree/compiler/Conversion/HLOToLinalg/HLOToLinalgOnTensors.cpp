@@ -29,6 +29,7 @@
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -95,13 +96,16 @@ struct TorchIndexSelectOpConversion
     for (int i = 0; i < rank; ++i) {
       if (!resultType.isDynamicDim(i)) continue;
       if (i < axis) {
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), i));
+        dynSizes.push_back(
+            rewriter.create<memref::DimOp>(loc, adaptor.input(), i));
       } else if (i < (axis + nIndices - batch)) {
         int idx = i - axis + batch;
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.index(), idx));
+        dynSizes.push_back(
+            rewriter.create<memref::DimOp>(loc, adaptor.index(), idx));
       } else {
         int idx = i - (axis + nIndices - batch) + axis + 1;
-        dynSizes.push_back(rewriter.create<DimOp>(loc, adaptor.input(), idx));
+        dynSizes.push_back(
+            rewriter.create<memref::DimOp>(loc, adaptor.input(), idx));
       }
     }
     Value initOp = rewriter.create<linalg::InitTensorOp>(
@@ -188,7 +192,7 @@ struct PadTensorOpConversion : public OpConversionPattern<linalg::PadTensorOp> {
     SmallVector<Value> outputShape;
     for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
       SmallVector<Value> mapValues;
-      Value sourceDim = rewriter.createOrFold<DimOp>(loc, source, dim);
+      Value sourceDim = rewriter.createOrFold<memref::DimOp>(loc, source, dim);
       mapValues.push_back(sourceDim);
       sourceShape.push_back(sourceDim);
       AffineExpr expr = rewriter.getAffineDimExpr(0);
@@ -250,12 +254,12 @@ struct ConcatenateOpConversion
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
       offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
-      sizes.push_back(rewriter.create<DimOp>(loc, args[0], i));
+      sizes.push_back(rewriter.create<memref::DimOp>(loc, args[0], i));
       strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
     }
     Value resultDimSize = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
-      auto size = rewriter.create<DimOp>(loc, arg, dim);
+      auto size = rewriter.create<memref::DimOp>(loc, arg, dim);
       resultDimSize = rewriter.create<AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
@@ -269,7 +273,7 @@ struct ConcatenateOpConversion
     Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       offsets[dim] = accBound;
-      sizes[dim] = rewriter.create<DimOp>(loc, arg, dim);
+      sizes[dim] = rewriter.create<memref::DimOp>(loc, arg, dim);
       result = rewriter.create<SubTensorInsertOp>(loc, arg, result, offsets,
                                                   sizes, strides);
       accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
@@ -287,7 +291,8 @@ struct ConvertHLOToLinalgOnTensorsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, ShapeDialect, math::MathDialect>();
+                    mhlo::MhloDialect, ShapeDialect, math::MathDialect,
+                    memref::MemRefDialect>();
   }
 
   void runOnFunction() override {

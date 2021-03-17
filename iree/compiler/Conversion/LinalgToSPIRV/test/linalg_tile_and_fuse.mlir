@@ -55,9 +55,9 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG1:.+]] = subview %[[ARG1]]
+//       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
 //       CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf
 //  CHECK-SAME:     "workgroup"
@@ -121,10 +121,10 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 //   CHECK-NOT:   scf.parallel
 //   CHECK-NOT:   scf.for
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][%[[LBY]], 0]
+//       CHECK:   %[[SV_ARG0:.+]] = memref.subview %[[ARG0]][%[[LBY]], 0]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG1:.+]] = subview %[[ARG1]][0, %[[LBX]]]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][%[[LBY]], %[[LBX]]]
+//       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]][0, %[[LBX]]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]]
 //       CHECK:   linalg.matmul
 //  CHECK-SAME:     "workgroup"
 //  CHECK-SAME:     ins(%[[SV_ARG0]], %[[SV_ARG1]]
@@ -189,8 +189,8 @@ hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][0, %[[LBY]], %[[LBX]], 0]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][0, %[[LBY]], %[[LBX]], 0]
+//       CHECK:   %[[SV_ARG0:.+]] = memref.subview %[[ARG0]][0, %[[LBY]], %[[LBX]], 0]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][0, %[[LBY]], %[[LBX]], 0]
 //       CHECK:   linalg.pooling_nhwc_max
 //  CHECK-SAME:     "workgroup"
 //  CHECK-SAME:     ins(%[[SV_ARG0]], %[[ARG1]]
@@ -254,10 +254,10 @@ hal.executable @matmul_fusion attributes {sym_visibility = "private"} {
 //   CHECK-NOT:   scf.parallel
 //   CHECK-NOT:   scf.for
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][%[[LBY]], 0]
+//       CHECK:   %[[SV_ARG0:.+]] = memref.subview %[[ARG0]][%[[LBY]], 0]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG1:.+]] = subview %[[ARG1]][0, %[[LBX]]]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][%[[LBY]], %[[LBX]]]
+//       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]][0, %[[LBX]]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]]
 //       CHECK:   linalg.fill(%[[SV_RET0]], %{{.+}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.matmul
@@ -324,9 +324,9 @@ hal.executable @conv_no_padding_fusion attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
 //       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG1:.+]] = subview %[[ARG1]]
+//       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY]], %[[LBX]], 0]
 //       CHECK:   linalg.fill(%[[SV_RET0]], %{{.*}})
 //  CHECK-SAME:     "workgroup"
@@ -365,7 +365,7 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
         %1 = iree.placeholder for "interface buffer"
           {binding = @legacy_io::@arg1, operand_result_index = 1 : i32}
           : memref<50x75xf32>
-        %2 = alloc() : memref<25x75xf32>
+        %2 = memref.alloc() : memref<25x75xf32>
         %3 =  iree.placeholder for "interface buffer"
           {binding = @legacy_io::@arg2, operand_result_index = 2 : i32}
           : memref<75xf32>
@@ -407,7 +407,7 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[C5:.+]] = constant 5
 //       CHECK:   hal.return %[[C5]], %[[C4]], %[[C1]]
 //       CHECK: func @three_op_fusion
-//   CHECK-DAG:   %[[ALLOC:.+]] = alloc() : memref<8x16xf32, 3>
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<8x16xf32, 3>
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} @legacy_io::@arg1
 //   CHECK-DAG:   %[[ARG2:.+]] = iree.placeholder {{.*}} @legacy_io::@arg2
@@ -420,12 +420,12 @@ hal.executable @three_op_fusion attributes {sym_visibility = "private"} {
 //       CHECK:   %[[TILE_M:.+]] = affine.min #[[MAP1]]()[%[[BIDY]]]
 //       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
 //       CHECK:   %[[TILE_N:.+]] = affine.min #[[MAP3]]()[%[[BIDX]]]
-//       CHECK:   %[[SV_ARG2:.+]] = subview %[[ARG2]][%[[LBX]]] [%[[TILE_N]]]
-//       CHECK:   %[[SV_RET0:.+]] = subview %[[RET0]][%[[LBY]], %[[LBX]]
+//       CHECK:   %[[SV_ARG2:.+]] = memref.subview %[[ARG2]][%[[LBX]]] [%[[TILE_N]]]
+//       CHECK:   %[[SV_RET0:.+]] = memref.subview %[[RET0]][%[[LBY]], %[[LBX]]
 //  CHECK-SAME:     [%[[TILE_M]], %[[TILE_N]]]
-//       CHECK:   %[[SV_ARG0:.+]] = subview %[[ARG0]][%[[LBY]], 0] [%[[TILE_M]], 50]
-//       CHECK:   %[[SV_ARG1:.+]] = subview %[[ARG1]][0, %[[LBX]]] [50, %[[TILE_N]]]
-//       CHECK:   %[[SV_ALLOC:.+]] = subview %[[ALLOC]][0, 0] [%[[TILE_M]], %[[TILE_N]]]
+//       CHECK:   %[[SV_ARG0:.+]] = memref.subview %[[ARG0]][%[[LBY]], 0] [%[[TILE_M]], 50]
+//       CHECK:   %[[SV_ARG1:.+]] = memref.subview %[[ARG1]][0, %[[LBX]]] [50, %[[TILE_N]]]
+//       CHECK:   %[[SV_ALLOC:.+]] = memref.subview %[[ALLOC]][0, 0] [%[[TILE_M]], %[[TILE_N]]]
 //       CHECK:   linalg.fill(%[[SV_ALLOC]], %{{.+}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.matmul

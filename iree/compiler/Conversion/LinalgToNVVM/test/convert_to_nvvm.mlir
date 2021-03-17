@@ -11,10 +11,10 @@ func @abs_ex_dispatch_0() {
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
   %6 = muli %3, %4 : index
   %7 = addi %6, %5 : index
-  %9 = load %1[%7] : memref<16xf32>
-  %10 = load %2[%7] : memref<16xf32>
+  %9 = memref.load %1[%7] : memref<16xf32>
+  %10 = memref.load %2[%7] : memref<16xf32>
   %11 = addf %9, %10 : f32
-  store %11, %0[%7] : memref<16xf32>
+  memref.store %11, %0[%7] : memref<16xf32>
   return
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {

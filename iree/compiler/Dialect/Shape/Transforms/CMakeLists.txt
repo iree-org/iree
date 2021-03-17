@@ -29,6 +29,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAnalysis
     MLIRIR
+    MLIRMemRef
     MLIRPass
     MLIRStandard
     MLIRSupport

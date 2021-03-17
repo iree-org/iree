@@ -35,6 +35,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -62,7 +63,7 @@ static MemRefType getMemrefTypeForTensor(RankedTensorType tensorType,
 static void transferShapeOpsToMemref(OpBuilder &b, Value tensor, Value memref,
                                      BlockAndValueMapping &bvm) {
   for (OpOperand &opOperand : llvm::make_early_inc_range(tensor.getUses())) {
-    if (isa<DimOp>(opOperand.getOwner())) {
+    if (isa<memref::DimOp>(opOperand.getOwner())) {
       opOperand.set(memref);
       continue;
     }
@@ -86,7 +87,7 @@ static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
                              ValueRange offsets, ValueRange sizes,
                              ValueRange strides) {
   if (offsets.empty()) return src;
-  return b.create<SubViewOp>(loc, src, offsets, sizes, strides);
+  return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
 }
 
 //===----------------------------------------------------------------------===//
@@ -130,7 +131,7 @@ static LogicalResult allocateBuffersForResults(
         if (!dimTensor) dimTensor = outTensor;
         if (dim.value() == TensorType::kDynamicSize) {
           dynOperands.push_back(
-              b.createOrFold<DimOp>(loc, dimTensor, dim.index()));
+              b.createOrFold<memref::DimOp>(loc, dimTensor, dim.index()));
         }
       }
       alloc = allocationFn(b, loc, tensorShape, tensorType.getElementType(),
@@ -221,7 +222,7 @@ static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
   b.setInsertionPointAfter(constantOp);
   auto memrefType = getMemrefTypeForTensor(tensorType);
   Value memref =
-      b.create<TensorToMemrefOp>(constantOp.getLoc(), memrefType, result);
+      b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
   if (Value resultBuffer = bvm.lookupOrNull(result)) {
     // Since this is already remapped to a buffer, copy the data.
     b.create<linalg::CopyOp>(constantOp.getLoc(), memref, resultBuffer);
@@ -285,7 +286,7 @@ static LogicalResult convertTensorReshapeOp(
   auto reshapeSrcType = getMemrefTypeForTensor(
       srcTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value reshapeSrc =
-      b.createOrFold<MemRefCastOp>(loc, inputBuffer, reshapeSrcType);
+      b.createOrFold<memref::CastOp>(loc, inputBuffer, reshapeSrcType);
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
   Value bufferReshape = b.create<linalg::ReshapeOp>(
@@ -316,12 +317,12 @@ static LogicalResult convertSubTensorOp(
   Value inputBuffer = bvm.lookup(srcTensor);
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
 
-  auto subViewResultType = SubViewOp::inferResultType(
+  auto subViewResultType = memref::SubViewOp::inferResultType(
       inputBufferType, extractFromI64ArrayAttr(op.static_offsets()),
       extractFromI64ArrayAttr(op.static_sizes()),
       extractFromI64ArrayAttr(op.static_strides()));
   auto subViewOp =
-      b.create<SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
+      b.create<memref::SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
                           op.sizes(), op.strides(), op.static_offsets(),
                           op.static_sizes(), op.static_strides());
   // For now special case the constant source case (where sub-tensor can
@@ -358,7 +359,7 @@ static LogicalResult convertSubTensorInsertOp(
   int64_t rank = inputBuffer.getType().cast<ShapedType>().getRank();
   for (auto dim : llvm::seq<int64_t>(0, rank)) {
     allocationDynamicSizes.push_back(
-        b.createOrFold<DimOp>(loc, inputBuffer, dim));
+        b.createOrFold<memref::DimOp>(loc, inputBuffer, dim));
   }
   if (failed(createAliasingBufferOrAllocationForResult(
           b, loc, allocationFn, dest, inputBuffer, op.getResult(),
@@ -370,8 +371,8 @@ static LogicalResult convertSubTensorInsertOp(
   Value outputBuffer = bvm.lookup(op.result());
   Value sourceBuffer = bvm.lookup(source);
   auto subViewOp =
-      b.create<SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
-                          op.getMixedSizes(), op.getMixedStrides());
+      b.create<memref::SubViewOp>(loc, outputBuffer, op.getMixedOffsets(),
+                                  op.getMixedSizes(), op.getMixedStrides());
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
   return success();
 }
@@ -382,7 +383,8 @@ static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Value inputBuffer = bvm.lookup(op.tensor());
-  Value load = b.createOrFold<LoadOp>(op.getLoc(), inputBuffer, op.indices());
+  Value load =
+      b.createOrFold<memref::LoadOp>(op.getLoc(), inputBuffer, op.indices());
   bvm.map(op.result(), load);
   return success();
 }
@@ -407,7 +409,7 @@ static LogicalResult convertTransferOp(OpBuilder &b,
       if (tensorType.isDynamicDim(idx)) {
         Value tensor = bvm.lookupOrNull(outputTensor);
         if (!tensor) tensor = outputTensor;
-        dynOperands.push_back(b.createOrFold<DimOp>(loc, tensor, idx));
+        dynOperands.push_back(b.createOrFold<memref::DimOp>(loc, tensor, idx));
       }
     }
     auto alloc = allocationFn(b, loc, tensorShape, tensorType.getElementType(),
@@ -527,7 +529,7 @@ LogicalResult preProcessLinalgOps(OpBuilder &b, linalg::LinalgOp op,
 // this copy is unnecessary since the output has been updated in place.
 bool isRedundantCopy(Value storeTo, Value storeFrom) {
   if (storeTo == storeFrom) return true;
-  auto storeFromOp = storeFrom.getDefiningOp<SubViewOp>();
+  auto storeFromOp = storeFrom.getDefiningOp<memref::SubViewOp>();
   return storeFromOp && storeFromOp.source() == storeTo;
 }
 
@@ -697,7 +699,7 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
                                  Type elementType,
                                  ArrayRef<Value> dynamicSizes) {
   auto allocationType = MemRefType::get(staticShape, elementType);
-  return builder.create<AllocOp>(loc, allocationType, dynamicSizes);
+  return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(

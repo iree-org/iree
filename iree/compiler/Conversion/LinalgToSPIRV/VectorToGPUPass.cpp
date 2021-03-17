@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -54,8 +55,8 @@ static const int subgroupSize = 32;
 struct ConvertVectorToGPUPass
     : public PassWrapper<ConvertVectorToGPUPass, OperationPass<FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
-                    vector::VectorDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect,
+                    scf::SCFDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -124,7 +125,7 @@ class VectorTransferReadConversion
         loc, rewriter.getIndexType(), rewriter.getStringAttr("x"));
     Value index = rewriter.create<AddIOp>(loc, threadIndex, indices.back());
     indices.back() = index;
-    Value newOp = rewriter.create<LoadOp>(loc, op.source(), indices);
+    Value newOp = rewriter.create<memref::LoadOp>(loc, op.source(), indices);
     rewriter.replaceOp(op, ValueRange(newOp));
     return success();
   }
@@ -148,7 +149,8 @@ class VectorTransferWriteConversion
         loc, rewriter.getIndexType(), rewriter.getStringAttr("x"));
     Value index = rewriter.create<AddIOp>(loc, ThreadIndex, indices.back());
     indices.back() = index;
-    rewriter.replaceOpWithNewOp<StoreOp>(op, operands[0], operands[1], indices);
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, operands[0], operands[1],
+                                                 indices);
     return success();
   }
 };
@@ -217,7 +219,8 @@ class VectorTransferReadToLoad
       return failure();
     }
     auto loc = op.getLoc();
-    Value newOp = rewriter.create<LoadOp>(loc, op.source(), op.indices());
+    Value newOp =
+        rewriter.create<memref::LoadOp>(loc, op.source(), op.indices());
     newOp =
         rewriter.create<vector::BroadcastOp>(loc, op.getVectorType(), newOp);
     rewriter.replaceOp(op, newOp);
@@ -243,7 +246,8 @@ class VectorTransferWriteToStore
     SmallVector<int64_t, 2> zero(op.getVectorType().getRank(), 0);
     Value scalarValue =
         rewriter.create<vector::ExtractOp>(loc, op.vector(), zero);
-    rewriter.create<StoreOp>(loc, scalarValue, op.source(), op.indices());
+    rewriter.create<memref::StoreOp>(loc, scalarValue, op.source(),
+                                     op.indices());
     rewriter.eraseOp(op);
     return success();
   }
@@ -383,6 +387,7 @@ void ConvertVectorToGPUPass::runOnOperation() {
                                                  cooperativeMatrixAnalysis);
   std::unique_ptr<VectorToGPUConversionTarget> target =
       std::make_unique<VectorToGPUConversionTarget>(*context);
+  target->addDynamicallyLegalDialect<memref::MemRefDialect>();
   target->addDynamicallyLegalDialect<StandardOpsDialect>();
   target->addIllegalOp<scf::ParallelOp>();
   target->addLegalOp<scf::YieldOp>();

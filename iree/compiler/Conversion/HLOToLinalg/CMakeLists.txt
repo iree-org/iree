@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMath
+    MLIRMemRef
     MLIRPass
     MLIRStandard
     MLIRSupport
@@ -53,6 +54,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMemRef
     MLIRPass
     MLIRSPIRV
     MLIRStandard

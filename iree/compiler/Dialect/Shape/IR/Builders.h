@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_SHAPE_IR_BUILDERS_H_
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"

@@ -54,10 +54,10 @@
 // //   NOCHECK-DAG:     %[[C1:.+]] = constant 1 : index
 // //   NOCHECK-DAG:     %[[C2:.+]] = constant 2 : index
 // //   NOCHECK-DAG:     %[[C3:.+]] = constant 3 : index
-// //   NOCHECK-DAG:     %[[UB0:.+]] = dim %{{.+}}, %[[C0]]
-// //   NOCHECK-DAG:     %[[UB1:.+]] = dim %{{.+}}, %[[C1]]
-// //   NOCHECK-DAG:     %[[UB2:.+]] = dim %{{.+}}, %[[C2]]
-// //   NOCHECK-DAG:     %[[UB3:.+]] = dim %{{.+}}, %[[C3]]
+// //   NOCHECK-DAG:     %[[UB0:.+]] = memref.dim %{{.+}}, %[[C0]]
+// //   NOCHECK-DAG:     %[[UB1:.+]] = memref.dim %{{.+}}, %[[C1]]
+// //   NOCHECK-DAG:     %[[UB2:.+]] = memref.dim %{{.+}}, %[[C2]]
+// //   NOCHECK-DAG:     %[[UB3:.+]] = memref.dim %{{.+}}, %[[C3]]
 // //       NOCHECK:     %[[T4:.+]] = muli %[[UB3]], %[[UB2]]
 // //       NOCHECK:     %[[T5:.+]] = muli %[[T4]], %[[UB1]]
 // //       NOCHECK:     %[[UB:.+]] = muli %[[T5]], %[[UB0]]
@@ -310,26 +310,26 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
         %c4 = constant 4 : index
         %c0 = constant 0 : index
         %c1 = constant 1 : index
-        %0 = dim %arg0, %c1 : memref<?x?xf32>
+        %0 = memref.dim %arg0, %c1 : memref<?x?xf32>
         %1 = "gpu.block_id"() {dimension = "x"} : () -> index
         %2 = "gpu.block_id"() {dimension = "y"} : () -> index
         scf.for %arg3 = %c0 to %0 step %c4 {
           %3 = affine.apply #map0()[%2]
-          %4 = dim %arg0, %c0 : memref<?x?xf32>
+          %4 = memref.dim %arg0, %c0 : memref<?x?xf32>
           %5 = affine.min #map1()[%2, %4]
           %6 = affine.min #map2(%arg3)[%0]
-          %7 = subview %arg0[%3, %arg3] [%5, %6] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-          %8 = dim %arg1, %c0 : memref<?x?xf32>
+          %7 = memref.subview %arg0[%3, %arg3] [%5, %6] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
+          %8 = memref.dim %arg1, %c0 : memref<?x?xf32>
           %9 = affine.min #map2(%arg3)[%8]
           %10 = affine.apply #map0()[%1]
-          %11 = dim %arg1, %c1 : memref<?x?xf32>
+          %11 = memref.dim %arg1, %c1 : memref<?x?xf32>
           %12 = affine.min #map1()[%1, %11]
-          %13 = subview %arg1[%arg3, %10] [%9, %12] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-          %14 = dim %arg2, %c0 : memref<?x?xf32>
+          %13 = memref.subview %arg1[%arg3, %10] [%9, %12] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
+          %14 = memref.dim %arg2, %c0 : memref<?x?xf32>
           %15 = affine.min #map1()[%2, %14]
-          %16 = dim %arg2, %c1 : memref<?x?xf32>
+          %16 = memref.dim %arg2, %c1 : memref<?x?xf32>
           %17 = affine.min #map1()[%1, %16]
-          %18 = subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
+          %18 = memref.subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
           linalg.matmul {__internal_linalg_transform__ = "workgroup"}
             ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
            outs(%18 : memref<?x?xf32, #map3>)
@@ -379,16 +379,16 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
         %5 = "gpu.block_id"() {dimension = "z"} : () -> index
         %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %7 = affine.min affine_map<()[s0] -> (6, s0 * -4 + 8)>()[%4]
-        %8 = subview %1[%5, %6, 0] [1, %7, 1] [1, 1, 1] : memref<3x8x1xf32> to memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>
+        %8 = memref.subview %1[%5, %6, 0] [1, %7, 1] [1, 1, 1] : memref<3x8x1xf32> to memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>
         %9 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
         %10 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
-        %11 = subview %2[0, 0, %9] [3, 1, %10] [1, 1, 1] : memref<3x1x1xf32> to memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>
+        %11 = memref.subview %2[0, 0, %9] [3, 1, %10] [1, 1, 1] : memref<3x1x1xf32> to memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>
         %12 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %13 = affine.min affine_map<()[s0] -> (4, s0 * -4 + 6)>()[%4]
         %14 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
         %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
-        %16 = subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
-        %17 = subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
+        %16 = memref.subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
+        %17 = memref.subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
         linalg.conv_1d_input_nwc_filter_wcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
@@ -442,11 +442,11 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
         %c0 = constant 0 : index
         %c3 = constant 3 : index
         %c1 = constant 1 : index
-        %0 = dim %arg0, %c0 : memref<?x?x?x?xf32>
-        %1 = dim %arg0, %c1 : memref<?x?x?x?xf32>
-        %2 = dim %arg1, %c0 : memref<?x?x?x?xf32>
-        %3 = dim %arg2, %c1 : memref<?x?x?x?xf32>
-        %4 = dim %arg2, %c2 : memref<?x?x?x?xf32>
+        %0 = memref.dim %arg0, %c0 : memref<?x?x?x?xf32>
+        %1 = memref.dim %arg0, %c1 : memref<?x?x?x?xf32>
+        %2 = memref.dim %arg1, %c0 : memref<?x?x?x?xf32>
+        %3 = memref.dim %arg2, %c1 : memref<?x?x?x?xf32>
+        %4 = memref.dim %arg2, %c2 : memref<?x?x?x?xf32>
         %5 = "gpu.block_id"() {dimension = "x"} : () -> index
         %6 = "gpu.grid_dim"() {dimension = "x"} : () -> index
         %7 = "gpu.block_id"() {dimension = "y"} : () -> index
@@ -459,19 +459,19 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
         %14 = affine.apply #map1()[%6]
         scf.parallel (%arg3, %arg4, %arg5) = (%9, %11, %13) to (%2, %3, %4) step (%10, %12, %14) {
           %15 = affine.min #map2(%arg3)[%2]
-          %16 = dim %arg1, %c1 : memref<?x?x?x?xf32>
+          %16 = memref.dim %arg1, %c1 : memref<?x?x?x?xf32>
           %17 = affine.min #map3(%arg4)[%0, %16]
-          %18 = dim %arg1, %c2 : memref<?x?x?x?xf32>
+          %18 = memref.dim %arg1, %c2 : memref<?x?x?x?xf32>
           %19 = affine.min #map4(%arg5)[%1, %18]
-          %20 = dim %arg1, %c3 : memref<?x?x?x?xf32>
-          %21 = subview %arg1[%arg3, %arg4, %arg5, 0] [%15, %17, %19, %20] [1, 1, 1, 1]
+          %20 = memref.dim %arg1, %c3 : memref<?x?x?x?xf32>
+          %21 = memref.subview %arg1[%arg3, %arg4, %arg5, 0] [%15, %17, %19, %20] [1, 1, 1, 1]
                   : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
-          %22 = dim %arg2, %c0 : memref<?x?x?x?xf32>
+          %22 = memref.dim %arg2, %c0 : memref<?x?x?x?xf32>
           %23 = affine.min #map2(%arg3)[%22]
           %24 = affine.min #map6(%arg4)[%3]
           %25 = affine.min #map7(%arg5)[%4]
-          %26 = dim %arg2, %c3 : memref<?x?x?x?xf32>
-          %27 = subview %arg2[%arg3, %arg4, %arg5, 0] [%23, %24, %25, %26] [1, 1, 1, 1]
+          %26 = memref.dim %arg2, %c3 : memref<?x?x?x?xf32>
+          %27 = memref.subview %arg2[%arg3, %arg4, %arg5, 0] [%23, %24, %25, %26] [1, 1, 1, 1]
                   : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
           linalg.conv_2d_input_nhwc_filter_hwcf {
             __internal_linalg_transform__ = "workgroup",
@@ -500,9 +500,9 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
-//   CHECK-DAG:   %[[N:.+]] = dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[P:.+]] = dim %[[RET0]], %[[C1]]
-//   CHECK-DAG:   %[[Q:.+]] = dim %[[RET0]], %[[C2]]
+//   CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C0]]
+//   CHECK-DAG:   %[[P:.+]] = memref.dim %[[RET0]], %[[C1]]
+//   CHECK-DAG:   %[[Q:.+]] = memref.dim %[[RET0]], %[[C2]]
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
@@ -516,8 +516,8 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //       CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
 //       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
 //       CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
-//       CHECK:         %[[SV1:.+]] = subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//       CHECK:         %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//       CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//       CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
 //   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
@@ -556,13 +556,13 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
         %7 = affine.min affine_map<()[s0] -> (5, s0 * -4 + 8)>()[%4]
         %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
         %9 = affine.min affine_map<()[s0] -> (33, s0 * -32 + 8)>()[%3]
-        %10 = subview %1[%5, %6, %8, 0, 0] [1, %7, %9, 8, 3] [1, 1, 1, 1, 1] : memref<2x8x8x8x3xf32> to memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>
+        %10 = memref.subview %1[%5, %6, %8, 0, 0] [1, %7, %9, 8, 3] [1, 1, 1, 1, 1] : memref<2x8x8x8x3xf32> to memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>
         %11 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %12 = affine.min affine_map<()[s0] -> (4, s0 * -4 + 7)>()[%4]
         %13 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
-        %15 = subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
-        %16 = subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
+        %15 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
+        %16 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
         linalg.conv_3d_input_ndhwc_filter_dhwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
@@ -620,10 +620,10 @@ module  {
           %6 = affine.min #map1()[%4]
           %7 = affine.apply #map2()[%3]
           %8 = affine.min #map3()[%3]
-          %9 = subview %0[0, %5, %7, 0] [2, %6, %8, 6] [1, 1, 1, 1] : memref<2x16x16x6xf32> to memref<2x?x?x6xf32, #map4>
+          %9 = memref.subview %0[0, %5, %7, 0] [2, %6, %8, 6] [1, 1, 1, 1] : memref<2x16x16x6xf32> to memref<2x?x?x6xf32, #map4>
           %10 = affine.min #map5()[%4]
           %11 = affine.min #map6()[%3]
-          %12 = subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
+          %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
           linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
@@ -647,8 +647,8 @@ module  {
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //       CHECK:   %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //       CHECK:   %[[IV2:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//       CHECK:   %[[SV1:.+]] = subview %[[ARG0]][0, %[[IV1]], %[[IV2]], 0]
-//       CHECK:   %[[SV2:.+]] = subview %[[RET0]][0, %[[IV1]], %[[IV2]], 0]
+//       CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]][0, %[[IV1]], %[[IV2]], 0]
+//       CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]][0, %[[IV1]], %[[IV2]], 0]
 //   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}

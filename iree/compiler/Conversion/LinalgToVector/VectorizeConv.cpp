@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -71,9 +72,12 @@ struct VectorizeLinalgConv
       }
     }
 
-    auto inputViewOp = convOp.getInputBuffer(0).getDefiningOp<SubViewOp>();
-    auto filterViewOp = convOp.getInputBuffer(1).getDefiningOp<SubViewOp>();
-    auto outputViewOp = convOp.getOutputBuffer(0).getDefiningOp<SubViewOp>();
+    auto inputViewOp =
+        convOp.getInputBuffer(0).getDefiningOp<memref::SubViewOp>();
+    auto filterViewOp =
+        convOp.getInputBuffer(1).getDefiningOp<memref::SubViewOp>();
+    auto outputViewOp =
+        convOp.getOutputBuffer(0).getDefiningOp<memref::SubViewOp>();
     if (!filterViewOp || !inputViewOp || !outputViewOp) return failure();
 
     // The filter/input/output view should have static sizes to vectorize.
@@ -238,9 +242,9 @@ struct VectorizeLinalgDepthwiseConv
       PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
-    auto inputViewOp = convOp.getInput(0).getDefiningOp<SubViewOp>();
-    auto filterViewOp = convOp.getInput(1).getDefiningOp<SubViewOp>();
-    auto outputViewOp = convOp.getOutput(0).getDefiningOp<SubViewOp>();
+    auto inputViewOp = convOp.getInput(0).getDefiningOp<memref::SubViewOp>();
+    auto filterViewOp = convOp.getInput(1).getDefiningOp<memref::SubViewOp>();
+    auto outputViewOp = convOp.getOutput(0).getDefiningOp<memref::SubViewOp>();
     if (!filterViewOp || !inputViewOp || !outputViewOp) return failure();
 
     // The filter/input/output view should have static sizes to vectorize.

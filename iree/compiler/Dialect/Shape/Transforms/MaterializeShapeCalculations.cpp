@@ -204,8 +204,8 @@ void rewriteRuntimeShape(GetRankedShapeOp getShapeOp,
   SmallVector<Value, 4> dynamicDims;
   for (int64_t i = 0, e = shapeType.getRank(); i < e; ++i) {
     if (!shapeType.isDimDynamic(i)) continue;
-    dynamicDims.push_back(
-        rewriter.create<DimOp>(getShapeOp.getLoc(), operands.operand(), i));
+    dynamicDims.push_back(rewriter.create<memref::DimOp>(
+        getShapeOp.getLoc(), operands.operand(), i));
   }
 
   // TODO(laurenzo): Remove once further along (it is fine to be unsupported

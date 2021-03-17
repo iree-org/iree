@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -43,14 +44,15 @@ class LegalizeTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
 
 // Lowers dim operations against values that were originally tensors but have
 // been converted to HAL buffer types.
-class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
+class BackingBufferBufferViewDimPattern
+    : public OpConversionPattern<memref::DimOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
+      memref::DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    DimOp::Adaptor operands(rawOperands);
+    memref::DimOp::Adaptor operands(rawOperands);
     if (!dimOp.memrefOrTensor().getType().isa<TensorType>() ||
         !IREE::HAL::TensorRewriteAdaptor::isValidNewType(
             operands.memrefOrTensor().getType())) {

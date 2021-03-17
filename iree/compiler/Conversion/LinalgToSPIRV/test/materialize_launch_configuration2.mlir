@@ -54,8 +54,8 @@ hal.executable @add attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg0
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @legacy_io::@arg1
 //   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @legacy_io::@ret0
-//   CHECK-DAG:   %[[M:.+]] = dim %[[LHS]], %[[C0]]
-//   CHECK-DAG:   %[[N:.+]] = dim %[[LHS]], %[[C1]]
+//   CHECK-DAG:   %[[M:.+]] = memref.dim %[[LHS]], %[[C0]]
+//   CHECK-DAG:   %[[N:.+]] = memref.dim %[[LHS]], %[[C1]]
 //       CHECK:   %[[UB:.+]] = muli %[[N]], %[[M]]
 //   CHECK-DAG:   %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
@@ -66,7 +66,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
 //       CHECK:   scf.if %[[COND]] {
 //       CHECK:     %[[IV0:.+]] = divi_signed %[[IV]], %[[N]]
 //       CHECK:     %[[IV1:.+]] = remi_signed %[[IV]], %[[N]]
-//   CHECK-DAG:     %[[V1:.+]] = load %[[LHS]][%[[IV0]], %[[IV1]]]
-//   CHECK-DAG:     %[[V2:.+]] = load %[[RHS]][%[[IV1]]]
+//   CHECK-DAG:     %[[V1:.+]] = memref.load %[[LHS]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:     %[[V2:.+]] = memref.load %[[RHS]][%[[IV1]]]
 //   CHECK-DAG:     %[[STORE:.+]] = addf %[[V1]], %[[V2]]
 //       CHECK:     store %[[STORE]], %[[RESULT]][%[[IV0]], %[[IV1]]]

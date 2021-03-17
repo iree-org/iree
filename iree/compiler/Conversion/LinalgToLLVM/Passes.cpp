@@ -96,7 +96,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
         [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
            Type elementType, ArrayRef<Value> dynamicSizes) {
           MemRefType allocType = MemRefType::get(staticShape, elementType);
-          return builder.create<AllocaOp>(loc, allocType, dynamicSizes);
+          return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
         };
     addLinalgBufferizePasses(nestedModulePM, allocationFn);
     nestedModulePM.addPass(createPromoteBuffersToStackPass(1 << 10, 64, 10));

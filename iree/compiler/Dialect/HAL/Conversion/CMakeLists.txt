@@ -22,6 +22,7 @@ iree_cc_library(
     "TypeConverter.cpp"
   DEPS
     MLIRIR
+    MLIRMemRef
     MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR

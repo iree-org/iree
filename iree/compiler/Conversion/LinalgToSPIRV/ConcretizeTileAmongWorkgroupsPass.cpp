@@ -129,13 +129,13 @@ LogicalResult getInputOutputTypesForAllTiles(
     linalg::LinalgOp rootOp, SmallVectorImpl<Type> &inputTypes,
     SmallVectorImpl<Type> &outputTypes) {
   for (Value inputBuffer : rootOp.getInputBuffers()) {
-    auto subviewOp = inputBuffer.getDefiningOp<SubViewOp>();
+    auto subviewOp = inputBuffer.getDefiningOp<memref::SubViewOp>();
     if (!subviewOp) return failure();
     inputTypes.push_back(subviewOp.getViewSource().getType());
   }
 
   for (Value outputBuffer : rootOp.getOutputBuffers()) {
-    auto subviewOp = outputBuffer.getDefiningOp<SubViewOp>();
+    auto subviewOp = outputBuffer.getDefiningOp<memref::SubViewOp>();
     if (!subviewOp) return failure();
     outputTypes.push_back(subviewOp.getViewSource().getType());
   }

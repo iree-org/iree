@@ -59,8 +59,8 @@ void testVectorAdd1d() {
     OpBuilder b(&kernelFunc.body());
     ScopedContext scope(b, kernelFunc.getLoc());
 
-    StdIndexedValue A(kernelFunc.getArgument(0)), B(kernelFunc.getArgument(1)),
-        C(kernelFunc.getArgument(2));
+    MemRefIndexedValue A(kernelFunc.getArgument(0)),
+        B(kernelFunc.getArgument(1)), C(kernelFunc.getArgument(2));
     auto ThreadIndex = b.create<gpu::ThreadIdOp>(
         modelBuilder.loc, b.getIndexType(), b.getStringAttr("x"));
     auto BlockIndex = b.create<gpu::BlockIdOp>(
