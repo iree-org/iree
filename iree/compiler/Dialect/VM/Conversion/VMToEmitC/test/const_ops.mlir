@@ -4,7 +4,7 @@
 vm.module @my_module {
   // CHECK-LABEL: vm.func @const_i32_zero
   vm.func @const_i32_zero() -> i32 {
-    // CHECK: %zero = "emitc.const"() {value = 0 : i32} : () -> i32
+    // CHECK: %[[ZERO:.+]] = "emitc.const"() {value = 0 : i32} : () -> i32
     %zero = vm.const.i32.zero : i32
     vm.return %zero : i32
   }
