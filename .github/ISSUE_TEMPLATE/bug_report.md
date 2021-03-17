@@ -2,10 +2,12 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: 'bug'
-assignees: ''
+labels: "bug \U0001F41E, help wanted"
+assignees: GMNGeoffrey
 
 ---
+
+If you are an IREE team member, consider removing the "help wanted" tag and redirecting the assignee to a more appropriate person.
 
 **Describe the bug**
 A clear and concise description of what the bug is.
