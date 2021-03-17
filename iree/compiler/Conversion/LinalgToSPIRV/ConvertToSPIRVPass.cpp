@@ -32,6 +32,7 @@
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -544,6 +545,11 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateGPUToSPIRVPatterns(typeConverter, patterns);
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);
+  // TOSA rescale will be lowered to Standard right before SPIRV codegen. Future
+  // lowerings should using specific SPIRV operations to avoid requiring i64
+  // values.
+  tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
+
   // Pull in standard patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(typeConverter, patterns);
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
