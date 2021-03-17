@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRSCFToStandard
