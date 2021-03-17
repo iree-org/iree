@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
@@ -52,6 +53,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/BufferUtils.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "linalg-comprehensive-bufferize-inplace"
@@ -120,13 +122,15 @@ struct LinalgComprehensiveBufferizePass
       : enablingPassPipeline(pass.enablingPassPipeline) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LinalgDialect, scf::SCFDialect, StandardOpsDialect>();
+    registry.insert<LinalgDialect, memref::MemRefDialect, scf::SCFDialect,
+                    StandardOpsDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
 
   void runEnablingTransforms(FuncOp funcOp);
-  void bufferizeFuncOpInternals(FuncOp funcOp, BlockAndValueMapping &bvm);
+  void bufferizeFuncOpInternals(FuncOp funcOp, BlockAndValueMapping &bvm,
+                                GlobalCreator &globals);
   void inPlaceAnalysisFuncOpInternals(FuncOp funcOp,
                                       const DominanceInfo &domInfo);
 
@@ -389,6 +393,20 @@ bool hasInterferingTensorRead(OpOperand &opOperand,
   return false;
 }
 
+/// Return false if either:
+/// 1. `opOperand` is produced by a constant op. For now this is assumed to be
+///    bufferized to a GlobalMemrefOp that cannot be written. Generalize in the
+///    future.
+/// 2.`opOperand` has an interfering tensor rerad.
+/// Return true otherwise.
+bool isBufferizableInPlace(OpOperand &opOperand, const DominanceInfo &domInfo) {
+  // Constant tensors are deemed not bufferizable for now.
+  if (auto constantOp =
+          dyn_cast_or_null<ConstantOp>(opOperand.get().getDefiningOp()))
+    return !constantOp.getResult().getType().isa<RankedTensorType>();
+  return !hasInterferingTensorRead(opOperand, domInfo);
+}
+
 //===----------------------------------------------------------------------===//
 // Bufferization-specific MemRefType support.
 //===----------------------------------------------------------------------===//
@@ -421,7 +439,7 @@ static MemRefType getDynamicMemRefType(RankedTensorType tensorType,
 // Transfer all `dim` ops on `tensor` to `memref`.
 static void transferDimOpsToMemref(Value tensor, Value memref) {
   for (OpOperand &opOperand : llvm::make_early_inc_range(tensor.getUses())) {
-    if (isa<DimOp>(opOperand.getOwner())) {
+    if (isa<memref::DimOp>(opOperand.getOwner())) {
       opOperand.set(memref);
     }
   }
@@ -503,11 +521,12 @@ static Value createNewAllocDeallocPairForShapedValue(
   if (dynOperands.empty()) {
     for (auto dim : llvm::enumerate(memRefType.getShape()))
       if (dim.value() == ShapedType::kDynamicSize)
-        dynOperands.push_back(b.create<DimOp>(loc, shapedValue, dim.index()));
+        dynOperands.push_back(
+            b.create<memref::DimOp>(loc, shapedValue, dim.index()));
   }
-  Value allocated = b.create<AllocOp>(loc, memRefType, dynOperands);
+  Value allocated = b.create<memref::AllocOp>(loc, memRefType, dynOperands);
   b.setInsertionPoint(allocated.getParentBlock()->getTerminator());
-  b.create<DeallocOp>(loc, allocated);
+  b.create<memref::DeallocOp>(loc, allocated);
   return allocated;
 }
 
@@ -846,7 +865,7 @@ static void propagateInPlace(const SmallVector<OpOperand *> &initalWorklist,
     // If the owner turns out to be a CallOp without `kInPlaceArgsAttrName`
     // this will be a noop.
     if (operand.get().getType().isa<RankedTensorType>() &&
-        !hasInterferingTensorRead(operand, domInfo)) {
+        isBufferizableInPlace(operand, domInfo)) {
       LLVM_DEBUG(DBGS() << "no interfering read\n");
       setInPlaceOpResult(getTiedOpResult(operand));
     }
@@ -941,6 +960,12 @@ void LinalgComprehensiveBufferizePass::inPlaceAnalysisFuncOpInternals(
     FuncOp funcOp, const DominanceInfo &domInfo) {
   if (!funcOp || funcOp->getNumRegions() == 0 || funcOp.body().empty()) return;
 
+  // Start propagating from ConstantOps.
+  funcOp.walk<WalkOrder::PreOrder>([&](ConstantOp constantOp) {
+    if (!constantOp.getResult().getType().isa<RankedTensorType>()) return;
+    for (auto &use : constantOp->getUses()) propagateInPlace(use, domInfo);
+  });
+
   // Start propagating from InitTensorOps.
   funcOp.walk<WalkOrder::PreOrder>([&](InitTensorOp initTensorOp) {
     for (auto &use : initTensorOp->getUses()) propagateInPlace(use, domInfo);
@@ -991,9 +1016,9 @@ static void funcArgumentsInPlaceAnalysis(CallOpInterface callOp,
     InPlaceSpec funcInPlace = getInPlace(funcOp.getArgument(idx));
     if (funcInPlace == InPlaceSpec::False) continue;
 
-    InPlaceSpec callInPlace = hasInterferingTensorRead(opOperand, domInfo)
-                                  ? InPlaceSpec::False
-                                  : InPlaceSpec::True;
+    InPlaceSpec callInPlace = isBufferizableInPlace(opOperand, domInfo)
+                                  ? InPlaceSpec::True
+                                  : InPlaceSpec::False;
     setInPlaceCallArgument(opOperand, callInPlace);
     setInPlaceFuncArgument(funcOp.getArgument(idx), callInPlace);
   }
@@ -1172,7 +1197,7 @@ static LogicalResult convertFuncOp(OpBuilder &b, FuncOp funcOp,
     if (!rankedTensorType) continue;
     MemRefType memRefType = getDynamicMemRefType(rankedTensorType);
     Value tensorToMemref =
-        b.create<TensorToMemrefOp>(funcOp.getLoc(), memRefType, bbArg);
+        b.create<memref::BufferCastOp>(funcOp.getLoc(), memRefType, bbArg);
     map(bvm, bbArg, tensorToMemref);
   }
   return success();
@@ -1227,7 +1252,8 @@ static LogicalResult convertScfYieldOp(OpBuilder &b, scf::YieldOp yieldOp,
     if (getInPlace(bbArg) == InPlaceSpec::True)
       operand.set(bbArg);
     else
-      operand.set(b.create<TensorLoadOp>(yieldOp.getLoc(), lookup(bvm, bbArg)));
+      operand.set(
+          b.create<memref::TensorLoadOp>(yieldOp.getLoc(), lookup(bvm, bbArg)));
   }
   return success();
 }
@@ -1244,8 +1270,8 @@ static LogicalResult convertReturnOp(OpBuilder &b, ReturnOp returnOp,
     auto rankedTensorType =
         operand.get().getType().dyn_cast<RankedTensorType>();
     if (!rankedTensorType) continue;
-    operand.set(
-        b.create<TensorLoadOp>(returnOp.getLoc(), lookup(bvm, operand.get())));
+    operand.set(b.create<memref::TensorLoadOp>(returnOp.getLoc(),
+                                               lookup(bvm, operand.get())));
   }
   return success();
 }
@@ -1285,7 +1311,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b, PadTensorOp padTensorOp,
       getContiguousMemRefType(tensorType, sourceMemRefType.getAffineMaps(),
                               sourceMemRefType.getMemorySpaceAsInt());
   Value res =
-      b.create<MemRefCastOp>(padTensorOp.getLoc(), memRefType, sourceMemRef);
+      b.create<memref::CastOp>(padTensorOp.getLoc(), memRefType, sourceMemRef);
   map(bvm, padTensorOp.result(), res);
   return success();
 }
@@ -1316,7 +1342,7 @@ static LogicalResult convertSubTensorInsertOp(
 
   Value srcMemref = lookup(bvm, subTensorInsertOp.source());
   auto subviewMemRefType =
-      SubViewOp::inferRankReducedResultType(
+      memref::SubViewOp::inferRankReducedResultType(
           subTensorInsertOp.getSourceType().getRank(), dstMemrefType,
           subTensorInsertOp.getMixedOffsets(),
           subTensorInsertOp.getMixedSizes(),
@@ -1324,7 +1350,7 @@ static LogicalResult convertSubTensorInsertOp(
           .cast<MemRefType>();
 
   // Take a subview of the dst.
-  Value subView = b.create<SubViewOp>(
+  Value subView = b.create<memref::SubViewOp>(
       loc, subviewMemRefType, dstMemref, subTensorInsertOp.getMixedOffsets(),
       subTensorInsertOp.getMixedSizes(), subTensorInsertOp.getMixedStrides());
 
@@ -1357,12 +1383,12 @@ static LogicalResult convertSubTensorOp(OpBuilder &b, SubTensorOp subTensor,
   auto dstTensorType = subTensor.result().getType().cast<RankedTensorType>();
 
   auto subviewMemRefType =
-      SubViewOp::inferRankReducedResultType(
+      memref::SubViewOp::inferRankReducedResultType(
           dstTensorType.getRank(), srcMemrefType, subTensor.getMixedOffsets(),
           subTensor.getMixedSizes(), subTensor.getMixedStrides())
           .cast<MemRefType>();
 
-  Value subView = b.create<SubViewOp>(
+  Value subView = b.create<memref::SubViewOp>(
       loc, subviewMemRefType, srcMemref, subTensor.getMixedOffsets(),
       subTensor.getMixedSizes(), subTensor.getMixedStrides());
   map(bvm, subTensor.result(), subView);
@@ -1390,11 +1416,32 @@ static LogicalResult convertTensorCastOp(OpBuilder &b, tensor::CastOp castOp,
         getContiguousMemRefType(tensorType, sourceMemRefType.getAffineMaps(),
                                 sourceMemRefType.getMemorySpaceAsInt());
   }
-  Value res = b.create<MemRefCastOp>(castOp.getLoc(), memRefType,
-                                     lookup(bvm, castOp.source()));
+  Value res = b.create<memref::CastOp>(castOp.getLoc(), memRefType,
+                                       lookup(bvm, castOp.source()));
   map(bvm, castOp.getResult(), res);
   return success();
 }
+
+static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
+                                       BlockAndValueMapping &bvm,
+                                       GlobalCreator &globals) {
+  if (!constantOp.getType().dyn_cast<RankedTensorType>()) return failure();
+
+  // Take a guard before anything else.
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(constantOp);
+
+  auto globalMemref = globals.getGlobalFor(constantOp);
+  Value memref = b.create<memref::GetGlobalOp>(
+      constantOp.getLoc(), globalMemref.type(), globalMemref.getName());
+  map(bvm, constantOp, memref);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Functions and calls bufferization support.
+//===----------------------------------------------------------------------===//
 
 /// Return a FuncOp block argument if the `returnOperand` is produced by an
 /// inPlace update pattern. Return the function argument that `returnOperand`
@@ -1427,10 +1474,10 @@ static BlockArgument analyzeTiedFuncOpResults(OpOperand &returnOperand) {
                : BlockArgument();
 
   // Otherwise we look for tensor_load(tensor_to_memref(bbArg)).
-  auto tensorLoadOp = returnValue.getDefiningOp<TensorLoadOp>();
+  auto tensorLoadOp = returnValue.getDefiningOp<memref::TensorLoadOp>();
   if (!tensorLoadOp) return BlockArgument();
   auto tensorToMemRefOp =
-      tensorLoadOp.memref().getDefiningOp<TensorToMemrefOp>();
+      tensorLoadOp.memref().getDefiningOp<memref::BufferCastOp>();
   if (!tensorToMemRefOp) return BlockArgument();
 
   // If returned value is a bbArg, it only folds if it is a function
@@ -1445,7 +1492,7 @@ static BlockArgument analyzeTiedFuncOpResults(OpOperand &returnOperand) {
 
 static bool hasOnlyTensorToMemRefUses(Value v) {
   for (auto &use : v.getUses())
-    if (!isa<TensorToMemrefOp>(use.getOwner())) return false;
+    if (!isa<memref::BufferCastOp>(use.getOwner())) return false;
   return true;
 }
 
@@ -1508,10 +1555,10 @@ static void bufferizeFuncOpBoundary(
 
     // Return value does not fold, add it to the new return op.
     Value unfolded = returnOp->getOperand(en.index());
-    if (auto tensorLoadOp = unfolded.getDefiningOp<TensorLoadOp>()) {
+    if (auto tensorLoadOp = unfolded.getDefiningOp<memref::TensorLoadOp>()) {
       unfolded = tensorLoadOp.memref();
       for (Operation *user : llvm::make_early_inc_range(unfolded.getUsers()))
-        if (isa<DeallocOp>(user)) user->erase();
+        if (isa<memref::DeallocOp>(user)) user->erase();
     }
     returnValues.push_back(unfolded);
     if (unfolded.getType().isa<MemRefType>()) {
@@ -1563,7 +1610,7 @@ static void bufferizeFuncOpBoundary(
       if (hasOnlyTensorToMemRefUses(bbArg)) {
         for (auto &use : llvm::make_early_inc_range(bbArg.getUses())) {
           Value tensorToMemRef = use.getOwner()->getResult(0);
-          tensorToMemRef.replaceAllUsesWith(b.create<MemRefCastOp>(
+          tensorToMemRef.replaceAllUsesWith(b.create<memref::CastOp>(
               funcOp.getLoc(), tensorToMemRef.getType(), memref));
           use.getOwner()->erase();
         }
@@ -1571,7 +1618,7 @@ static void bufferizeFuncOpBoundary(
         // Otherwise, there are uses that are not TensorToMemRefOp, we need to
         // insert a TensorLoadOp. Subsequent canonicalizations that perform:
         // `tensor_to_memref(tensor_load(x)) -> x` will later occur.
-        Value tensor = b.create<TensorLoadOp>(funcOp->getLoc(), memref);
+        Value tensor = b.create<memref::TensorLoadOp>(funcOp->getLoc(), memref);
         bbArg.replaceAllUsesWith(tensor);
       }
     }
@@ -1601,8 +1648,8 @@ static void bufferizeOneFunctionCall(CallOpInterface callOp,
     if (!v.getType().isa<RankedTensorType>()) continue;
     if ((v = bvm.lookupOrNull(v))) continue;
     // TODO: how dangerous is this at this point in spacetime ?
-    if (auto tensorLoadOp = v.getDefiningOp<TensorLoadOp>()) {
-      if (!isa<TensorToMemrefOp>(tensorLoadOp.memref().getDefiningOp())) {
+    if (auto tensorLoadOp = v.getDefiningOp<memref::TensorLoadOp>()) {
+      if (!isa<memref::BufferCastOp>(tensorLoadOp.memref().getDefiningOp())) {
         v = tensorLoadOp.memref();
         continue;
       }
@@ -1648,8 +1695,8 @@ static void bufferizeOneFunctionCall(CallOpInterface callOp,
     // all callers before we can hoist the alloc out of the funcOp.
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(callOp);
-    replacements.push_back(
-        b.create<TensorLoadOp>(callOp.getLoc(), newOperands[operandIndex]));
+    replacements.push_back(b.create<memref::TensorLoadOp>(
+        callOp.getLoc(), newOperands[operandIndex]));
   }
   callOp->replaceAllUsesWith(replacements);
   callOp->erase();
@@ -1694,7 +1741,7 @@ void LinalgComprehensiveBufferizePass::runEnablingTransforms(FuncOp funcOp) {
 }
 
 void LinalgComprehensiveBufferizePass::bufferizeFuncOpInternals(
-    FuncOp funcOp, BlockAndValueMapping &bvm) {
+    FuncOp funcOp, BlockAndValueMapping &bvm, GlobalCreator &globals) {
   if (!funcOp || funcOp->getNumRegions() == 0 || funcOp.body().empty()) return;
 
   LLVM_DEBUG(DBGS() << "Begin BufferizeFuncOpInternals:\n" << funcOp << "\n");
@@ -1710,6 +1757,9 @@ void LinalgComprehensiveBufferizePass::bufferizeFuncOpInternals(
     llvm::TypeSwitch<Operation *, void>(operation)
         .Case([&](scf::ForOp op) {
           (void)succeeded(convertScfForOp(b, op, bvm));
+        })
+        .Case([&](ConstantOp op) {
+          (void)succeeded(convertConstantOp(b, op, bvm, globals));
         })
         .Case([&](InitTensorOp op) {
           (void)succeeded(convertInitTensorOp(b, op, bvm));
@@ -1761,9 +1811,9 @@ static void postTransformSanityChecks(ModuleOp moduleOp,
     op->removeAttr(kInPlaceResultsAttrName);
     op->removeAttr(kInPlaceArgsAttrName);
 
-    assert(!isa<TensorToMemrefOp>(op));
-    if (auto tensorLoadOp = dyn_cast<TensorLoadOp>(op)) {
-      if (tensorLoadOp.memref().getDefiningOp<TensorToMemrefOp>()) {
+    assert(!isa<memref::BufferCastOp>(op));
+    if (auto tensorLoadOp = dyn_cast<memref::TensorLoadOp>(op)) {
+      if (tensorLoadOp.memref().getDefiningOp<memref::BufferCastOp>()) {
         op->getParentOfType<ModuleOp>()->dump();
         op->emitWarning(
             "Most likely incorrect pattern: tensor_load(tensor_to_memref)");
@@ -1803,13 +1853,14 @@ void LinalgComprehensiveBufferizePass::runOnOperation() {
   });
 
   // 2. Bufferize destructive update patterns within function boundaries.
+  GlobalCreator globals(moduleOp);
   BlockAndValueMapping bvm;
   moduleOp.walk([&](FuncOp funcOp) {
     // Perform bufferization within the funcOp boundary. This produces IR
     // in a form on which `bufferizeFuncOpBoundary` can decide whether return
     // values can fold onto operands.
     inPlaceAnalysisFuncOpInternals(funcOp, domInfo);
-    bufferizeFuncOpInternals(funcOp, bvm);
+    bufferizeFuncOpInternals(funcOp, bvm, globals);
   });
 
   // 3. Perform bufferization at each FuncOp boundary and all CallOps.
