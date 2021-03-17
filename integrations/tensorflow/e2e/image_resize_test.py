@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from absl import app
+from iree.tf.support import tf_utils
+from iree.tf.support import tf_test_utils
 import numpy as np
-from pyiree.tf.support import tf_utils
-from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v1 as tf
 
 
