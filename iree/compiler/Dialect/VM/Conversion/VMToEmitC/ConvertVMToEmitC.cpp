@@ -118,6 +118,24 @@ class ConstZeroOpConversion : public OpRewritePattern<ConstZeroOpTy> {
   }
 };
 
+class ConstRefZeroOpConversion
+    : public OpRewritePattern<IREE::VM::ConstRefZeroOp> {
+ public:
+  using OpRewritePattern<IREE::VM::ConstRefZeroOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::VM::ConstRefZeroOp constRefZeroOp,
+                                PatternRewriter &rewriter) const final {
+    StringRef typeString = "iree_vm_ref_t";
+    auto type = emitc::OpaqueType::get(constRefZeroOp.getContext(), typeString);
+
+    StringRef valueString = "{0}";
+    StringAttr value = rewriter.getStringAttr(valueString);
+
+    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constRefZeroOp, type, value);
+    return success();
+  }
+};
+
 template <typename LoadOpTy, typename GlobalOpTy>
 class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
   using OpConversionPattern<LoadOpTy>::OpConversionPattern;
@@ -206,6 +224,7 @@ void populateVMToCPatterns(MLIRContext *context,
   // Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(context);
+  patterns.insert<ConstRefZeroOpConversion>(context);
 
   // Conditional assignment ops
   patterns.insert<CallOpConversion<IREE::VM::SelectI32Op>>(context,
