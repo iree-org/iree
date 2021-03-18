@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build platform specific wheel files for the iree.rt package.
+# Build platform specific wheel files for the iree.runtime package.
 # Built artifacts are per-platform and build out of the build tree.
 
 import os
@@ -43,9 +43,9 @@ setup(
         "Development Status :: 3 - Alpha",
     ],
     python_requires=">=3.6",
-    packages=find_namespace_packages(include=["iree.rt", "iree.rt.*"]),
+    packages=find_namespace_packages(include=["iree.runtime", "iree.runtime.*"]),
     ext_modules=[
-        Extension(name="iree.rt.binding", sources=[]),
+        Extension(name="iree.runtime.binding", sources=[]),
     ],
     # Matching the native extension as a data file keeps setuptools from
     # "building" it (i.e. turning it into a static binary).

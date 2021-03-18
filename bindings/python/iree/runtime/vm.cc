@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/iree/rt/vm.h"
+#include "bindings/python/iree/runtime/vm.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
-#include "bindings/python/iree/rt/function_abi.h"
-#include "bindings/python/iree/rt/status_utils.h"
+#include "bindings/python/iree/runtime/function_abi.h"
+#include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"

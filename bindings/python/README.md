@@ -3,7 +3,7 @@
 Top-level packages:
 
 * `iree.compiler` : Main compiler API.
-* `iree.rt` : Runtime components for executing binaries.
+* `iree.runtime` : Runtime components for executing binaries.
 * `iree.tools.core` : Core tools for executing the compiler.
 * `iree.tools.tf` : TensorFlow compiler tools (if enabled).
 

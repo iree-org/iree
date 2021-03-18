@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/iree/rt/status_utils.h"
+#include "bindings/python/iree/runtime/status_utils.h"
 
 #include "absl/strings/str_cat.h"
 

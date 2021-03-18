@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/iree/rt/hal.h"
+#include "bindings/python/iree/runtime/hal.h"
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"

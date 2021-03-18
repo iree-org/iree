@@ -14,7 +14,7 @@
 
 from absl.testing import absltest
 import iree.jax
-import iree.rt
+import iree.runtime
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -106,8 +106,9 @@ class JAXFrontendTest(absltest.TestCase):
     self.assertNotEqual(binary_1, binary_2)
 
     # Test that the binary gives the same result.
-    cpp_vm_module = iree.rt.VmModule.from_flatbuffer(binary_1)
-    module = iree.rt.load_module(cpp_vm_module, config=iree.rt.Config("vmla"))
+    cpp_vm_module = iree.runtime.VmModule.from_flatbuffer(binary_1)
+    module = iree.runtime.load_module(cpp_vm_module,
+                                      config=iree.runtime.Config("vmla"))
     binary_result_1 = module.main(*inputs_1)
     np.testing.assert_equal(binary_result_1, vmla_result_1)
 

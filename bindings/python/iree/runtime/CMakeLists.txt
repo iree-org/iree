@@ -51,7 +51,7 @@ iree_pyext_module(
 
 iree_py_library(
   NAME
-    rt
+    runtime
   SRCS
     "__init__.py"
     "system_api.py"
@@ -90,15 +90,15 @@ iree_py_test(
 )
 
 iree_py_install_package(
-  COMPONENT IreePythonPackage-rt
-  PACKAGE_NAME iree_rt
-  MODULE_PATH iree/rt
+  COMPONENT IreePythonPackage-runtime
+  PACKAGE_NAME iree_runtime
+  MODULE_PATH iree/runtime
   DEPS
-    bindings_python_iree_rt_PyExtRt
+    bindings_python_iree_runtime_PyExtRt
 )
 
 install(
-  TARGETS bindings_python_iree_rt_PyExtRt
+  TARGETS bindings_python_iree_runtime_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )

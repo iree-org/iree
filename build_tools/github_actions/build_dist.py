@@ -173,7 +173,7 @@ def build_main_dist():
 
 
 def build_py_runtime_pkg():
-  """Builds the iree-install/python_packages/iree_rt package.
+  """Builds the iree-install/python_packages/iree_runtime package.
 
   This includes native, python-version dependent code and is designed to
   be built multiple times.
