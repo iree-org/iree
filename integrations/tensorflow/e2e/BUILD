@@ -18,6 +18,7 @@
 # of our integration tests in open source while we figure out a long term plan
 # for our integration testing.
 
+load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load(
     "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
@@ -39,8 +40,8 @@ package(
         deps = [
             "//third_party/py/absl:app",
             "//third_party/py/absl/flags",
+            "//third_party/py/iree:pylib_tf_support",
             "//third_party/py/numpy",
-            "//third_party/py/pyiree:pylib_tf_support",
             "//third_party/py/tensorflow",
             "//util/debuginfo:signalsafe_addr2line_installer",
         ],
@@ -199,8 +200,8 @@ iree_e2e_cartesian_product_test_suite(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -231,8 +232,8 @@ iree_e2e_cartesian_product_test_suite(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],

@@ -37,8 +37,8 @@ py_binary(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -494,8 +494,8 @@ iree_e2e_cartesian_product_test_suite(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -736,8 +736,8 @@ iree_e2e_cartesian_product_test_suite(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],
@@ -870,8 +870,8 @@ iree_e2e_cartesian_product_test_suite(
     deps = [
         "//third_party/py/absl:app",
         "//third_party/py/absl/flags",
+        "//third_party/py/iree:pylib_tf_support",
         "//third_party/py/numpy",
-        "//third_party/py/pyiree:pylib_tf_support",
         "//third_party/py/tensorflow",
         "//util/debuginfo:signalsafe_addr2line_installer",
     ],

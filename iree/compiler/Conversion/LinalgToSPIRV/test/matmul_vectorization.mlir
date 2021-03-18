@@ -74,7 +74,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //      CHECK:  %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //      CHECK:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //      CHECK:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP0]]()[%[[BIDX]]]
-//      CHECK:    %[[SUBVIEW_RESULT:.+]] = subview %[[RET0]]
+//      CHECK:    %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
 // CHECK-SAME:      [%[[BOFFSET_Y]], %[[BOFFSET_X]]] [64, 64]
 
 //  CHECK-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
@@ -130,9 +130,9 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 // CHECK-SAME:  %[[ACC_3_1:.+]] = %[[READ_INIT_3_1]],
 // CHECK-SAME:  %[[ACC_3_2:.+]] = %[[READ_INIT_3_2]],
 // CHECK-SAME:  %[[ACC_3_3:.+]] = %[[READ_INIT_3_3]])
-//      CHECK:    %[[SUBVIEW_LHS:.+]] = subview %[[ARG0]]
+//      CHECK:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[ARG0]]
 // CHECK-SAME:      [%[[BOFFSET_Y]], %[[IV0]]] [64, 32]
-//      CHECK:    %[[SUBVIEW_RHS:.+]] = subview %[[ARG1]]
+//      CHECK:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:      [%[[IV0]], %[[BOFFSET_X]]] [32, 64]
 
 //  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read
@@ -279,19 +279,19 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 //  PROMOTE-DAG:  %[[C16:.+]] = constant 16
 //  PROMOTE-DAG:  %[[C32:.+]] = constant 32
 //  PROMOTE-DAG:  %[[C48:.+]] = constant 48
-//  PROMOTE-DAG:  %[[ALLOC1:.+]] = alloc() : memref<128x32xf16, 3>
-//  PROMOTE-DAG:  %[[ALLOC2:.+]] = alloc() : memref<32x128xf16, 3>
+//  PROMOTE-DAG:  %[[ALLOC1:.+]] = memref.alloc() : memref<128x32xf16, 3>
+//  PROMOTE-DAG:  %[[ALLOC2:.+]] = memref.alloc() : memref<32x128xf16, 3>
 
-//      PROMOTE:  %[[RESULT_SUBVIEW:.+]] = subview %[[RET0]]
-//      PROMOTE:  %[[WGMEM_LHS_SUBVIEW:.+]] = subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
-//      PROMOTE:  %[[WGMEM_RHS_SUBVIEW:.+]] = subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
+//      PROMOTE:  %[[RESULT_SUBVIEW:.+]] = memref.subview %[[RET0]]
+//      PROMOTE:  %[[WGMEM_LHS_SUBVIEW:.+]] = memref.subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
+//      PROMOTE:  %[[WGMEM_RHS_SUBVIEW:.+]] = memref.subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
 //      PROMOTE:  %[[SG_X:.+]] = gpu.subgroup_id
 //      PROMOTE:  %[[SG_Y:.+]] = divi_signed %[[SG_X]], %[[C2]]
 //      PROMOTE:  %[[SGOFFSET_Y:.+]] = affine.apply #[[MAP4]]()[%[[SG_Y]]]
-//      PROMOTE:  %[[SG_LHS_SUBVIEW:.+]] = subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
+//      PROMOTE:  %[[SG_LHS_SUBVIEW:.+]] = memref.subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
 //      PROMOTE:  %[[SGOFFSET_X:.+]] = affine.apply #[[MAP4]]()[%[[SG_X]]]
-//      PROMOTE:  %[[SG_RHS_SUBVIEW:.+]] = subview %[[WGMEM_RHS_SUBVIEW]][0, %[[SGOFFSET_X]]]
-//      PROMOTE:  %[[SG_RESULT_SUBVIEW:.+]] = subview %[[RESULT_SUBVIEW]][%[[SGOFFSET_Y]], %[[SGOFFSET_X]]]
+//      PROMOTE:  %[[SG_RHS_SUBVIEW:.+]] = memref.subview %[[WGMEM_RHS_SUBVIEW]][0, %[[SGOFFSET_X]]]
+//      PROMOTE:  %[[SG_RESULT_SUBVIEW:.+]] = memref.subview %[[RESULT_SUBVIEW]][%[[SGOFFSET_Y]], %[[SGOFFSET_X]]]
 
 //  PROMOTE-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
 // PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C0]]]
@@ -347,8 +347,8 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 // PROMOTE-SAME:  %[[ACC_3_2:.+]] = %[[READ_INIT_3_2]],
 // PROMOTE-SAME:  %[[ACC_3_3:.+]] = %[[READ_INIT_3_3]])
 
-//      PROMOTE:    %[[LHS_SUBVIEW:.+]] = subview %[[ARG0]]
-//      PROMOTE:    %[[RHS_SUBVIEW:.+]] = subview %[[ARG1]]
+//      PROMOTE:    %[[LHS_SUBVIEW:.+]] = memref.subview %[[ARG0]]
+//      PROMOTE:    %[[RHS_SUBVIEW:.+]] = memref.subview %[[ARG1]]
 //      PROMOTE:    linalg.copy(%[[LHS_SUBVIEW]], %[[WGMEM_LHS_SUBVIEW]])
 //      PROMOTE:    linalg.copy(%[[RHS_SUBVIEW]], %[[WGMEM_RHS_SUBVIEW]])
 

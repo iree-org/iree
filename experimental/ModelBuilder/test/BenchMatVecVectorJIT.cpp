@@ -64,7 +64,8 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   iterator_types.push_back(mb.getStringAttr("reduction"));
 
   // Loop ITERS times over the kernel to reduce the JIT's overhead.
-  StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)), C(f.getArgument(2));
+  MemRefIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+      C(f.getArgument(2));
   loopNestBuilder(std_constant_index(0), std_constant_index(ITERS),
                   std_constant_index(1), [&](Value) {
                     // Compute c += A x b.

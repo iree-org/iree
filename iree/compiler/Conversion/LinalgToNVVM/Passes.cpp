@@ -62,7 +62,7 @@ void buildNVVMTransformPassPipeline(OpPassManager &pm) {
       [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
          Type elementType, ArrayRef<Value> dynamicSizes) {
         MemRefType allocType = MemRefType::get(staticShape, elementType, {}, 3);
-        return builder.create<AllocOp>(loc, allocType, dynamicSizes);
+        return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
       };
   addLinalgBufferizePasses(nestedModulePM, allocationFn);
 

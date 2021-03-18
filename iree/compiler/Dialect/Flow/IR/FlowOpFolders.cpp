@@ -25,6 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -374,10 +375,10 @@ namespace {
 // shapex.ranked_dim(flow.dispatch.shape(%x), %const)
 // ``
 struct ConvertDimOfDispatchInputLoadToDispatchShape
-    : public OpRewritePattern<DimOp> {
+    : public OpRewritePattern<memref::DimOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(DimOp op,
+  LogicalResult matchAndRewrite(memref::DimOp op,
                                 PatternRewriter &rewriter) const override {
     auto loadOp = op.memrefOrTensor().getDefiningOp<DispatchTensorLoadOp>();
     if (!loadOp) return failure();

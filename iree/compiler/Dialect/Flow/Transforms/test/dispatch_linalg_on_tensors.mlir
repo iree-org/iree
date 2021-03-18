@@ -160,8 +160,8 @@ func @tensor5(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   %f12 = constant 12.0 : f32
   //  CHECK-DAG: %[[C0:.+]] = constant 0 : index
   //  CHECK-DAG: %[[C1:.+]] = constant 1 : index
-  //  CHECK-DAG: %[[D0:.+]] = dim %[[ARG2]], %[[C0]]
-  //  CHECK-DAG: %[[D1:.+]] = dim %[[ARG2]], %[[C1]]
+  //  CHECK-DAG: %[[D0:.+]] = memref.dim %[[ARG2]], %[[C0]]
+  //  CHECK-DAG: %[[D1:.+]] = memref.dim %[[ARG2]], %[[C1]]
   //      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]](%[[ARG2]])
   // CHECK-NEXT:   %[[ARG3:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
   //      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG3]]

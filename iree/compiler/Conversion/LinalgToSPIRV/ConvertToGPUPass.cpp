@@ -36,6 +36,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -480,10 +481,10 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
     return {};
   }
 
-  SubViewOp workgroupMemorySubviewOp =
-      dyn_cast_or_null<SubViewOp>(workgroupMemoryView.getDefiningOp());
+  memref::SubViewOp workgroupMemorySubviewOp =
+      dyn_cast_or_null<memref::SubViewOp>(workgroupMemoryView.getDefiningOp());
   if (!workgroupMemorySubviewOp) return {};
-  AllocOp allocOp = dyn_cast_or_null<AllocOp>(
+  memref::AllocOp allocOp = dyn_cast_or_null<memref::AllocOp>(
       workgroupMemorySubviewOp.source().getDefiningOp());
   if (!allocOp) return {};
 

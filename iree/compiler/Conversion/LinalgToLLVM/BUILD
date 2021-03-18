@@ -32,7 +32,7 @@ gentbl(
     td_file = "FoldTensorExtractOp.td",
     td_srcs = [
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
+        "@llvm-project//mlir:MemRefOpsTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
     ],
 )
@@ -79,6 +79,7 @@ cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MathTransforms",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",

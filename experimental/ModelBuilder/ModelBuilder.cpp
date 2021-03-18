@@ -19,6 +19,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -55,6 +56,7 @@ mlir::ModelBuilder::ModelBuilder()
   ctx.getOrLoadDialect<gpu::GPUDialect>();
   ctx.getOrLoadDialect<LLVM::LLVMDialect>();
   ctx.getOrLoadDialect<linalg::LinalgDialect>();
+  ctx.getOrLoadDialect<memref::MemRefDialect>();
   ctx.getOrLoadDialect<scf::SCFDialect>();
   ctx.getOrLoadDialect<omp::OpenMPDialect>();
   ctx.getOrLoadDialect<spirv::SPIRVDialect>();
@@ -231,7 +233,7 @@ void ModelBuilder::call_print_memref_f32(Value v) {
                  .getLoc();
   auto elementType = v.getType().cast<MemRefType>().getElementType();
   auto unrankedType = UnrankedMemRefType::get(elementType, 0);
-  auto castMemRef = builder.create<MemRefCastOp>(loc, v, unrankedType);
+  auto castMemRef = builder.create<memref::CastOp>(loc, v, unrankedType);
   if (elementType.isF32())
     emitCallToRegisteredSymbol("print_memref_f32", {}, {castMemRef});
   else

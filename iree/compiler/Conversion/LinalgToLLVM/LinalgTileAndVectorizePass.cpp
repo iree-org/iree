@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
@@ -94,8 +95,8 @@ namespace {
 
 // TODO(ataei): Refactor this into a common utility with LinalgToSPIRV.
 Optional<Value> allocateWorkgroupMemoryOnStack(
-    OpBuilder &b, SubViewOp subview, ArrayRef<Value> boundingSubViewSize,
-    OperationFolder *folder) {
+    OpBuilder &b, memref::SubViewOp subview,
+    ArrayRef<Value> boundingSubViewSize, OperationFolder *folder) {
   // Allocate the memory into the entry block of the parent FuncOp. This better
   // aligns with the semantics of this memory which is available at the entry of
   // the function.
@@ -117,7 +118,7 @@ Optional<Value> allocateWorkgroupMemoryOnStack(
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
   MemRefType allocType =
       MemRefType::get(shape, subview.getType().getElementType(), {});
-  Value buffer = b.create<AllocaOp>(subview.getLoc(), allocType);
+  Value buffer = b.create<memref::AllocaOp>(subview.getLoc(), allocType);
   return buffer;
 }
 
@@ -143,7 +144,7 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupMarker(), context),
             Identifier::get(getWorkgroupMemoryMarker(), context)));
-    ViewOp::getCanonicalizationPatterns(promotionPatterns, context);
+    memref::ViewOp::getCanonicalizationPatterns(promotionPatterns, context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
   }
 
@@ -196,7 +197,8 @@ void TileAndVectorizeWorkgroups::runOnFunction() {
     AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
     AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-    SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+    memref::SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                                   context);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();

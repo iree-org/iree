@@ -39,7 +39,7 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0}
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1}
 //   CHECK-DAG:   %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2}
-//   CHECK-DAG:   %[[TEMP:.+]] = alloc()
+//   CHECK-DAG:   %[[TEMP:.+]] = memref.alloc()
 //       CHECK:   linalg.fill(%[[TEMP]], %{{.+}})
 //       CHECK:   linalg.matmul ins(%[[ARG0]], %[[ARG1]]
 //  CHECK-SAME:     ) outs(%[[TEMP]]

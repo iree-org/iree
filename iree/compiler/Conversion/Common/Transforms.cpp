@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -49,7 +50,8 @@ void applyCanonicalizationPatternsForTiling(MLIRContext *context,
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  memref::SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                                 context);
   (void)applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
 }
 
@@ -102,8 +104,8 @@ static LogicalResult promoteFusedViews(OpBuilder &builder,
       promotedView = consumerView;
     } else if (dependence.dependenceType ==
                linalg::LinalgDependenceGraph::RAW) {
-      SubViewOp promotedViewProducer =
-          op.getShapedOperand(*producerIdx).getDefiningOp<SubViewOp>();
+      memref::SubViewOp promotedViewProducer =
+          op.getShapedOperand(*producerIdx).getDefiningOp<memref::SubViewOp>();
       assert(promotedViewProducer &&
              "expected producer to be a subview op as well");
       Optional<linalg::PromotionInfo> promotionInfo =

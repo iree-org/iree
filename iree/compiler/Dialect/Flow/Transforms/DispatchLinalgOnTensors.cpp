@@ -537,7 +537,8 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
     if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
       for (unsigned i = 0; i < rt.getRank(); ++i) {
         if (!rt.isDynamicDim(i)) continue;
-        auto dim = builder.createOrFold<DimOp>(dispatchOp.getLoc(), operand, i);
+        auto dim = builder.createOrFold<memref::DimOp>(dispatchOp.getLoc(),
+                                                       operand, i);
         operandDynamicDims.push_back(dim);
       }
     }
@@ -665,9 +666,10 @@ struct TileAndDistributeOnTensorsPattern
 
     tiledLinalgOp.op.getOperation()->removeAttr(kRootOpAttr);
 
-    rewriter.replaceOpWithIf(
-        op, dispatchOp.getResults(),
-        [&](OpOperand &operand) { return !isa<DimOp>(operand.getOwner()); });
+    rewriter.replaceOpWithIf(op, dispatchOp.getResults(),
+                             [&](OpOperand &operand) {
+                               return !isa<memref::DimOp>(operand.getOwner());
+                             });
     return success();
   }
 };
@@ -681,7 +683,7 @@ static Optional<SmallVector<Value, 4>> getResultShape(PatternRewriter &rewriter,
     return llvm::to_vector<4>(llvm::map_range(
         llvm::seq<int64_t>(0, v.getType().cast<ShapedType>().getRank()),
         [&](int64_t dim) -> Value {
-          return rewriter.create<DimOp>(loc, v, dim);
+          return rewriter.create<memref::DimOp>(loc, v, dim);
         }));
   };
   if (op->getNumResults() != 1) return llvm::None;
@@ -715,7 +717,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
         llvm::all_of(op->getUsers(), [](Operation *user) {
           return isDispatchableOp(user) ||
                  user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
-                 isa<IREE::Flow::DispatchWorkgroupsOp, DimOp>(user);
+                 isa<IREE::Flow::DispatchWorkgroupsOp, memref::DimOp>(user);
         })) {
       return failure();
     }
@@ -767,7 +769,7 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     rewriter.replaceOpWithIf(op, dispatchOp.getOperation()->getResults(),
                              [&](OpOperand &operand) {
                                Operation *user = operand.getOwner();
-                               return !isa<DimOp>(user);
+                               return !isa<memref::DimOp>(user);
                              });
     return success();
   }

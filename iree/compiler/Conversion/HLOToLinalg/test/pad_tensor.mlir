@@ -26,7 +26,7 @@ module  {
 //   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
 //   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
 //       CHECK: linalg.fill(%[[OUT]], %[[CST]])
-//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][4, 5] [12, 4] [1, 1]
+//       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[OUT]][4, 5] [12, 4] [1, 1]
 //       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])
 
 // -----
@@ -58,7 +58,7 @@ module  {
 //   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
 //   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
 //   CHECK-DAG: %[[PAD_BUF:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-//       CHECK: %[[PAD_VAL:.+]] = load %[[PAD_BUF]][] : memref<f32>
+//       CHECK: %[[PAD_VAL:.+]] = memref.load %[[PAD_BUF]][] : memref<f32>
 //       CHECK: linalg.fill(%[[OUT]], %[[PAD_VAL]])
-//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][4, 5] [12, 4] [1, 1]
+//       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[OUT]][4, 5] [12, 4] [1, 1]
 //       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])

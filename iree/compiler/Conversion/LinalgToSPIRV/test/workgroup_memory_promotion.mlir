@@ -40,14 +40,14 @@ hal.executable @matmul_tile attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0
-//   CHECK-DAG:   %[[ALLOC1:.+]] = alloc() : memref<8x32xf32, 3>
-//   CHECK-DAG:   %[[ALLOC2:.+]] = alloc() : memref<32x16xf32, 3>
+//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc() : memref<8x32xf32, 3>
+//   CHECK-DAG:   %[[ALLOC2:.+]] = memref.alloc() : memref<32x16xf32, 3>
 //       CHECK:   scf.for
-//       CHECK:     %[[ARG0SV:.+]] = subview %[[ARG0]]
-//       CHECK:     %[[ARG1SV:.+]] = subview %[[ARG1]]
-//       CHECK:     %[[RET0SV:.+]] = subview %[[RET0]]
-//       CHECK:     %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
-//       CHECK:     %[[SUBVIEW2:.+]] = subview %[[ALLOC2]]
+//       CHECK:     %[[ARG0SV:.+]] = memref.subview %[[ARG0]]
+//       CHECK:     %[[ARG1SV:.+]] = memref.subview %[[ARG1]]
+//       CHECK:     %[[RET0SV:.+]] = memref.subview %[[RET0]]
+//       CHECK:     %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC1]]
+//       CHECK:     %[[SUBVIEW2:.+]] = memref.subview %[[ALLOC2]]
 //       CHECK:     linalg.copy(%[[ARG0SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
@@ -99,10 +99,10 @@ hal.executable @conv_no_padding_tile attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0
-//   CHECK-DAG:   %[[ALLOC1:.+]] = alloc() : memref<1x6x35x6xf32, 3>
-//       CHECK:   %[[ARG1SV:.+]] = subview %[[ARG1]]
-//       CHECK:   %[[RET0SV:.+]] = subview %[[RET0]]
-//       CHECK:   %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
+//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc() : memref<1x6x35x6xf32, 3>
+//       CHECK:   %[[ARG1SV:.+]] = memref.subview %[[ARG1]]
+//       CHECK:   %[[RET0SV:.+]] = memref.subview %[[RET0]]
+//       CHECK:   %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC1]]
 //       CHECK:   linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:      "copy_to_workgroup_memory"
 //       CHECK:   linalg.conv_2d_input_nhwc_filter_hwcf

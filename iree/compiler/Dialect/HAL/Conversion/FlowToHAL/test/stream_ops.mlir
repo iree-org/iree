@@ -43,7 +43,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   return %0 : tensor<128xf32>
 }
 
-// ----
+// -----
 
 // CHECK-LABEL: @tensorSlice
 // CHECK-SAME: (%[[SBUF:.+]]:{{.+}})

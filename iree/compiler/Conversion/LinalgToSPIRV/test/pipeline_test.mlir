@@ -154,7 +154,7 @@ hal.executable @matmul_add_fused attributes {sym_visibility = "private"} {
         %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<1024x512xf32>
         %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<512x256xf32>
         %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg2, operand_result_index = 2 : i32} : memref<1024x256xf32>
-        %4 = alloc() : memref<1024x256xf32>
+        %4 = memref.alloc() : memref<1024x256xf32>
         linalg.fill(%4, %cst) : memref<1024x256xf32>, f32
         linalg.matmul ins(%1, %2 : memref<1024x512xf32>, memref<512x256xf32>)
         outs(%4 : memref<1024x256xf32>)

@@ -70,14 +70,14 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //      CHECK:  %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
 //  CHECK-DAG:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //  CHECK-DAG:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
-//      CHECK:  %[[SUBVIEW_RESULT:.+]] = subview %[[RET0]]
+//      CHECK:  %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
 // CHECK-SAME:      [%[[BIDZ]], %[[BOFFSET_Y]], %[[BOFFSET_X]]] [1, 8, 64]
 //      CHECK:  %[[IIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //      CHECK:  %[[IIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //      CHECK:  %[[IIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //  CHECK-DAG:  %[[IOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[IIDY]]]
 //  CHECK-DAG:  %[[IOFFSET_X:.+]] = affine.apply #[[MAP2]]()[%[[IIDX]]]
-//      CHECK:  %[[SUBVIEW_RESULT_2:.+]] = subview %[[SUBVIEW_RESULT]]
+//      CHECK:  %[[SUBVIEW_RESULT_2:.+]] = memref.subview %[[SUBVIEW_RESULT]]
 // CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IOFFSET_X]]] [1, 8, 4]
 //  CHECK-DAG:  %[[READ_INIT_0:.+]] = vector.transfer_read
 // CHECK-SAME:    %[[SUBVIEW_RESULT_2]][%[[C0]], %[[C0]],  %[[C0]]]
@@ -105,11 +105,11 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 // CHECK-SAME:  %[[ACC_5:.+]] = %[[READ_INIT_5]],
 // CHECK-SAME:  %[[ACC_6:.+]] = %[[READ_INIT_6]],
 // CHECK-SAME:  %[[ACC_7:.+]] = %[[READ_INIT_7]])
-//  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = subview %[[ARG0]]
+//  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[ARG0]]
 // CHECK-SAME:      [%[[BIDZ]], %[[BOFFSET_Y]], %[[IV0]]] [1, 8, 4]
-//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = subview %[[ARG1]]
+//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:      [%[[BIDZ]], %[[IV0]], %[[BOFFSET_X]]] [1, 4, 64]
-//  CHECK-DAG:    %[[SUBVIEW_RHS_2:.+]] = subview %[[SUBVIEW_RHS]]
+//  CHECK-DAG:    %[[SUBVIEW_RHS_2:.+]] = memref.subview %[[SUBVIEW_RHS]]
 // CHECK-SAME:      [%[[IIDZ]], 0, %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
 
 //  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read
