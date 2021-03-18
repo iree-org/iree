@@ -20,7 +20,7 @@ import re
 
 from absl import logging
 from absl.testing import absltest
-import iree.rt
+import iree.runtime
 import numpy as np
 
 ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1 = (
@@ -65,7 +65,7 @@ ATTRS_SIP_LINEAR_2ARG = (
 class HostTypeFactory(absltest.TestCase):
 
   def test_baseclass(self):
-    htf = iree.rt.HostTypeFactory()
+    htf = iree.runtime.HostTypeFactory()
     logging.info("HostTypeFactory: %s", htf)
 
 
@@ -74,11 +74,11 @@ class FunctionAbiTest(absltest.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
-    driver_names = iree.rt.HalDriver.query()
+    driver_names = iree.runtime.HalDriver.query()
     for driver_name in driver_names:
       logging.info("Try to create driver: %s", driver_name)
       try:
-        cls.driver = iree.rt.HalDriver.create(driver_name)
+        cls.driver = iree.runtime.HalDriver.create(driver_name)
         cls.device = cls.driver.create_default_device()
       except Exception:
         logging.error("Could not create driver: %s", driver_name)
@@ -87,10 +87,11 @@ class FunctionAbiTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.htf = iree.rt.HostTypeFactory.get_numpy()
+    self.htf = iree.runtime.HostTypeFactory.get_numpy()
 
   def test_sip_dict_arg_result_success(self):
-    fabi = iree.rt.FunctionAbi(self.device, self.htf, ATTRS_SIP_1LEVEL_DICT)
+    fabi = iree.runtime.FunctionAbi(self.device, self.htf,
+                                    ATTRS_SIP_1LEVEL_DICT)
     self.assertEqual(
         "<FunctionAbi (Buffer<sint32[1x384]>, Buffer<sint32[1x384]>, Buffer<sint32[1x384]>) -> (Buffer<float32[1x384]>, Buffer<float32[1x384]>) SIP:'I53!D49!K10!input_ids_1K11!input_mask_2K12!segment_ids_0R39!D35!K11!end_logits_0K13!start_logits_1'>",
         repr(fabi))
@@ -117,7 +118,8 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual((1, 384), end_logits.shape)
 
   def test_sip_linear_success(self):
-    fabi = iree.rt.FunctionAbi(self.device, self.htf, ATTRS_SIP_LINEAR_2ARG)
+    fabi = iree.runtime.FunctionAbi(self.device, self.htf,
+                                    ATTRS_SIP_LINEAR_2ARG)
     self.assertEqual(
         "<FunctionAbi (Buffer<float32[1]>, Buffer<float32[1]>) -> (Buffer<float32[1]>) SIP:'I12!S9!k0_0k1_1R3!_0'>",
         repr(fabi))
@@ -137,7 +139,7 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual((1,), result.shape)
 
   def test_static_arg_success(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     logging.info("fabi: %s", fabi)
@@ -154,7 +156,7 @@ class FunctionAbiTest(absltest.TestCase):
                      repr(packed))
 
   def test_static_result_success(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     arg = np.zeros((10, 128, 64), dtype=np.float32)
@@ -168,7 +170,7 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual((32, 8, 64), py_result.shape)
 
   def test_dynamic_alloc_result_success(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     arg = np.zeros((10, 128, 64), dtype=np.float32)
@@ -178,7 +180,7 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual("<VmVariantList(0): []>", repr(f_results))
 
   def test_dynamic_arg_success(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_DYNX128X64_TO_SINT32_DYNX8X64_V1)
     logging.info("fabi: %s", fabi)
@@ -195,7 +197,7 @@ class FunctionAbiTest(absltest.TestCase):
                      repr(packed))
 
   def test_static_arg_rank_mismatch(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     logging.info("fabi: %s", fabi)
@@ -206,7 +208,7 @@ class FunctionAbiTest(absltest.TestCase):
       fabi.pack_inputs(arg)
 
   def test_static_arg_eltsize_mismatch(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     logging.info("fabi: %s", fabi)
@@ -217,7 +219,7 @@ class FunctionAbiTest(absltest.TestCase):
       fabi.pack_inputs(arg)
 
   def test_static_arg_dtype_mismatch(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     logging.info("fabi: %s", fabi)
@@ -228,7 +230,7 @@ class FunctionAbiTest(absltest.TestCase):
       fabi.pack_inputs(arg)
 
   def test_static_arg_static_dim_mismatch(self):
-    fabi = iree.rt.FunctionAbi(
+    fabi = iree.runtime.FunctionAbi(
         self.device, self.htf,
         ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     logging.info("fabi: %s", fabi)

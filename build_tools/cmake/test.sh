@@ -44,7 +44,7 @@ declare -a label_exclude_args=(
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.
   # For example:
-  #   ^bindings/python/iree/rt$
+  #   ^bindings/python/iree/runtime$
 
   # Exclude all tests in some subdirectories.
   # Put the whole parent directory with only a starting anchor.

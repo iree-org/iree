@@ -15,7 +15,7 @@
 import functools
 
 import iree.compiler.xla
-import iree.rt
+import iree.runtime
 
 try:
   import jax
@@ -78,12 +78,12 @@ class _JittedFunction:
 
   def __init__(self, function, driver: str, **options):
     self._function = function
-    self._driver_config = iree.rt.Config(driver)
+    self._driver_config = iree.runtime.Config(driver)
     self._options = options
     self._memoized_signatures = {}
 
   def _get_signature(self, args_flat, in_tree):
-    args_flat = [iree.rt.normalize_value(arg) for arg in args_flat]
+    args_flat = [iree.runtime.normalize_value(arg) for arg in args_flat]
     return tuple((arg.shape, arg.dtype) for arg in args_flat) + (in_tree,)
 
   def _wrap_and_compile(self, signature, args_flat, in_tree):
@@ -95,8 +95,8 @@ class _JittedFunction:
 
     # Compile the wrapped_function to IREE.
     binary = aot(wrapped_function, *args_flat, **self._options)
-    cpp_vm_module = iree.rt.VmModule.from_flatbuffer(binary)
-    module = iree.rt.load_module(cpp_vm_module, config=self._driver_config)
+    cpp_vm_module = iree.runtime.VmModule.from_flatbuffer(binary)
+    module = iree.runtime.load_module(cpp_vm_module, config=self._driver_config)
 
     # Get the output tree so it can be reconstructed from the outputs of the
     # compiled module. Duplicating execution here isn't ideal, and could
@@ -107,7 +107,7 @@ class _JittedFunction:
     self._memoized_signatures[signature] = (binary, module, out_tree)
 
   def _get_compiled_artifacts(self, args, kwargs):
-    """Returns the binary, loaded rt module and out_tree."""
+    """Returns the binary, loaded runtime module and out_tree."""
     args_flat, in_tree = jax.tree_flatten((args, kwargs))
     signature = self._get_signature(args_flat, in_tree)
 

@@ -20,7 +20,7 @@ import re
 from typing import Any, Callable, Sequence, Set, Tuple, Union
 
 from absl import logging
-import iree.rt
+import iree.runtime
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -90,7 +90,7 @@ def generate_inputs(
 
 def convert_to_numpy(values: Any) -> Any:
   """Converts any tf.Tensor, int, float, bool or list values to numpy."""
-  return apply_function(values, iree.rt.normalize_value)
+  return apply_function(values, iree.runtime.normalize_value)
 
 
 def to_mlir_type(dtype: np.dtype) -> str:

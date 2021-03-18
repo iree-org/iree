@@ -16,8 +16,8 @@
 #define IREE_BINDINGS_PYTHON_IREE_RT_VM_H_
 
 #include "absl/types/optional.h"
-#include "bindings/python/iree/rt/binding.h"
-#include "bindings/python/iree/rt/host_types.h"
+#include "bindings/python/iree/runtime/binding.h"
+#include "bindings/python/iree/runtime/host_types.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"

@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type, Un
 from absl import flags
 from absl import logging
 import iree.compiler.tf
-import iree.rt
+import iree.runtime
 from iree.tf.support import tf_utils
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -283,8 +283,8 @@ class CompiledModule(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: iree.rt.SystemContext,
-               f: iree.rt.system_api.BoundFunction):
+  def __init__(self, context: iree.runtime.SystemContext,
+               f: iree.runtime.system_api.BoundFunction):
     self._context = context
     self._f = f
 
@@ -304,8 +304,8 @@ class IreeCompiledModule(CompiledModule):
       module_name: str,
       backend_info: "BackendInfo",
       compiled_paths: Dict[str, str],
-      vm_module: iree.rt.VmModule,
-      config: iree.rt.Config,
+      vm_module: iree.runtime.VmModule,
+      config: iree.runtime.Config,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -315,8 +315,8 @@ class IreeCompiledModule(CompiledModule):
       backend_info: BackendInfo with the details about compiling this module.
       compiled_paths: A dictionary mapping compiled method names to file paths
         corresponding to their serialized representations.
-      vm_module: A iree.rt.VmModule containing compilation info to wrap.
-      config: A iree.rt.Config containing compilation info to wrap.
+      vm_module: A iree.runtime.VmModule containing compilation info to wrap.
+      config: A iree.runtime.Config containing compilation info to wrap.
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._vm_module = vm_module
@@ -365,8 +365,8 @@ class IreeCompiledModule(CompiledModule):
         backend_info=backend_info,
         exported_names=exported_names,
         artifacts_dir=artifacts_dir)
-    vm_module = iree.rt.VmModule.from_flatbuffer(module_blob)
-    config = iree.rt.Config(driver_name=backend_info.driver)
+    vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
+    config = iree.runtime.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -407,8 +407,8 @@ class IreeCompiledModule(CompiledModule):
     module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
-    vm_module = iree.rt.VmModule.from_flatbuffer(module_blob)
-    config = iree.rt.Config(driver_name=backend_info.driver)
+    vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
+    config = iree.runtime.Config(driver_name=backend_info.driver)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -421,8 +421,8 @@ class IreeCompiledModule(CompiledModule):
     """Reinitializes all stateful variables."""
     # set_random_seed is not needed here because the model_class.__init__ is not
     # called.
-    self._context = iree.rt.SystemContext(modules=[self._vm_module],
-                                          config=self._config)
+    self._context = iree.runtime.SystemContext(modules=[self._vm_module],
+                                               config=self._config)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.

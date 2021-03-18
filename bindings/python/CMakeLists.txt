@@ -18,7 +18,7 @@ set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
 # Namespace packages.
-add_subdirectory(iree/rt)
+add_subdirectory(iree/runtime)
 
 if(${IREE_BUILD_COMPILER})
 add_subdirectory(iree/compiler)

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build platform specific wheel files for the iree.rt package.
+# Build platform specific wheel files for the iree.runtime package.
 # Built artifacts are per-platform and build out of the build tree.
 
 from distutils.command.install import install

@@ -14,16 +14,15 @@
 
 from absl import logging
 from absl.testing import absltest
-
-import iree.rt
+import iree.runtime
 import numpy as np
 
 
 class HalTest(absltest.TestCase):
 
   def testEnums(self):
-    logging.info("MemoryType: %s", iree.rt.MemoryType)
-    logging.info("HOST_VISIBLE: %s", int(iree.rt.MemoryType.HOST_VISIBLE))
+    logging.info("MemoryType: %s", iree.runtime.MemoryType)
+    logging.info("HOST_VISIBLE: %s", int(iree.runtime.MemoryType.HOST_VISIBLE))
 
 
 if __name__ == "__main__":

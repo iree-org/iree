@@ -18,7 +18,7 @@
 from absl import logging
 from absl.testing import absltest
 import iree.compiler
-import iree.rt
+import iree.runtime
 import numpy as np
 
 
@@ -32,7 +32,7 @@ def create_add_scalar_module():
       """,
       target_backends=["vmla"],
   )
-  m = iree.rt.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
 
 
@@ -47,7 +47,7 @@ def create_simple_static_mul_module():
       """,
       target_backends=["vmla"],
   )
-  m = iree.rt.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
 
 
@@ -64,7 +64,7 @@ def create_simple_dynamic_abs_module():
       """,
       target_backends=target_backends,
   )
-  m = iree.rt.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
 
 
@@ -73,22 +73,22 @@ class VmTest(absltest.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
-    driver_names = iree.rt.HalDriver.query()
+    driver_names = iree.runtime.HalDriver.query()
     logging.info("driver_names: %s", driver_names)
-    cls.driver = iree.rt.HalDriver.create("vmla")
+    cls.driver = iree.runtime.HalDriver.create("vmla")
     cls.device = cls.driver.create_default_device()
-    cls.hal_module = iree.rt.create_hal_module(cls.device)
-    cls.htf = iree.rt.HostTypeFactory.get_numpy()
+    cls.hal_module = iree.runtime.create_hal_module(cls.device)
+    cls.htf = iree.runtime.HostTypeFactory.get_numpy()
 
   def test_variant_list(self):
-    l = iree.rt.VmVariantList(5)
+    l = iree.runtime.VmVariantList(5)
     logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
 
   def test_context_id(self):
-    instance = iree.rt.VmInstance()
-    context1 = iree.rt.VmContext(instance)
-    context2 = iree.rt.VmContext(instance)
+    instance = iree.runtime.VmInstance()
+    context1 = iree.runtime.VmContext(instance)
+    context2 = iree.runtime.VmContext(instance)
     self.assertGreater(context2.context_id, context1.context_id)
 
   def test_module_basics(self):
@@ -99,31 +99,31 @@ class VmTest(absltest.TestCase):
     self.assertIs(notfound, None)
 
   def test_dynamic_module_context(self):
-    instance = iree.rt.VmInstance()
-    context = iree.rt.VmContext(instance)
+    instance = iree.runtime.VmInstance()
+    context = iree.runtime.VmContext(instance)
     m = create_simple_static_mul_module()
     context.register_modules([self.hal_module, m])
 
   def test_static_module_context(self):
     m = create_simple_static_mul_module()
     logging.info("module: %s", m)
-    instance = iree.rt.VmInstance()
+    instance = iree.runtime.VmInstance()
     logging.info("instance: %s", instance)
-    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_dynamic_shape_compile(self):
     m = create_simple_dynamic_abs_module()
     logging.info("module: %s", m)
-    instance = iree.rt.VmInstance()
+    instance = iree.runtime.VmInstance()
     logging.info("instance: %s", instance)
-    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_add_scalar(self):
     m = create_add_scalar_module()
-    instance = iree.rt.VmInstance()
-    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.runtime.VmInstance()
+    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)
@@ -144,8 +144,8 @@ class VmTest(absltest.TestCase):
 
   def test_synchronous_dynamic_shape_invoke_function(self):
     m = create_simple_dynamic_abs_module()
-    instance = iree.rt.VmInstance()
-    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.runtime.VmInstance()
+    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)
@@ -167,8 +167,8 @@ class VmTest(absltest.TestCase):
 
   def test_synchronous_invoke_function(self):
     m = create_simple_static_mul_module()
-    instance = iree.rt.VmInstance()
-    context = iree.rt.VmContext(instance, modules=[self.hal_module, m])
+    instance = iree.runtime.VmInstance()
+    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
     logging.info("abi: %s", abi)

@@ -18,8 +18,8 @@
 #include <array>
 
 #include "absl/types/span.h"
-#include "bindings/python/iree/rt/binding.h"
-#include "bindings/python/iree/rt/hal.h"
+#include "bindings/python/iree/runtime/binding.h"
+#include "bindings/python/iree/runtime/hal.h"
 #include "iree/base/signature_parser.h"
 
 namespace iree {
