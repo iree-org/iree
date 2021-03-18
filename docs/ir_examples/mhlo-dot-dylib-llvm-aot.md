@@ -910,14 +910,14 @@ hal.executable.target @llvm_aot, filter="dylib*" {
       %workgroup_id_y = hal.interface.workgroup.id[1] : index
       %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
       %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-      %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-      %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
       %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
       %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-      %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %11 = memref.subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %12 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
       linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%5, %7 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%11 : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
       return
@@ -947,31 +947,31 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %11 = memref.subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %12 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
   scf.for %arg0 = %c0 to %4 step %c32 {
     scf.for %arg1 = %c0 to %c64 step %c32 {
       scf.for %arg2 = %c0 to %c1024 step %c32 {
         %13 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%4]
-        %14 = subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %15 = subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %15 = memref.subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %16 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%9]
-        %17 = subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %17 = memref.subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         scf.for %arg3 = %c0 to %13 step %c4 {
           scf.for %arg4 = %c0 to %c32 step %c4 {
             scf.for %arg5 = %c0 to %c32 step %c4 {
               %18 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%13, %arg3)
-              %19 = subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-              %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %19 = memref.subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %20 = memref.subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
-              %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %22 = memref.subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
             }
           }
@@ -999,31 +999,31 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %11 = memref.subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %12 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   linalg.fill(%12, %cst) {__internal_linalg_transform__ = "workgroup"} : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, f32 
   scf.for %arg0 = %c0 to %4 step %c32 {
     scf.for %arg1 = %c0 to %c64 step %c32 {
       scf.for %arg2 = %c0 to %c1024 step %c32 {
         %13 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%4]
-        %14 = subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %15 = subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %15 = memref.subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %16 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%9]
-        %17 = subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %17 = memref.subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         scf.for %arg3 = %c0 to %13 step %c4 {
           scf.for %arg4 = %c0 to %c32 step %c4 {
             scf.for %arg5 = %c0 to %c32 step %c4 {
               %18 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%13, %arg3)
-              %19 = subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-              %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %19 = memref.subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %20 = memref.subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
-              %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %22 = memref.subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               linalg.matmul {__internal_linalg_transform__ = "vectorize", is_root_op} ins(%19, %20 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>) outs(%22 : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
             }
           }
@@ -1052,44 +1052,44 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %11 = memref.subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %12 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   scf.for %arg0 = %c0 to %4 step %c1 {
     scf.for %arg1 = %c0 to %c64 step %c1 {
-      store %cst, %12[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      memref.store %cst, %12[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     }
   }
   scf.for %arg0 = %c0 to %4 step %c32 {
     scf.for %arg1 = %c0 to %c64 step %c32 {
       scf.for %arg2 = %c0 to %c1024 step %c32 {
         %13 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%4]
-        %14 = subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %15 = subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %15 = memref.subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %16 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%9]
-        %17 = subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %17 = memref.subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         scf.for %arg3 = %c0 to %13 step %c4 {
           scf.for %arg4 = %c0 to %c32 step %c4 {
             scf.for %arg5 = %c0 to %c32 step %c4 {
               %18 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%13, %arg3)
-              %19 = subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-              %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %19 = memref.subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %20 = memref.subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
-              %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %22 = memref.subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               scf.for %arg6 = %c0 to %18 step %c1 {
                 scf.for %arg7 = %c0 to %c4 step %c1 {
                   scf.for %arg8 = %c0 to %c4 step %c1 {
-                    %23 = load %19[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-                    %24 = load %20[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                    %25 = load %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %23 = memref.load %19[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+                    %24 = memref.load %20[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %25 = memref.load %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                     %26 = mulf %23, %24 : f32
                     %27 = addf %25, %26 : f32
-                    store %27, %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    memref.store %27, %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                   }
                 }
               }
@@ -1120,44 +1120,44 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %9 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %11 = subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %12 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %11 = memref.subview %0[%8, %10] [%9, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %12 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   scf.for %arg0 = %c0 to %4 step %c1 {
     scf.for %arg1 = %c0 to %c64 step %c1 {
-      store %cst, %12[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      memref.store %cst, %12[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     }
   }
   scf.for %arg0 = %c0 to %4 step %c32 {
     scf.for %arg1 = %c0 to %c64 step %c32 {
       scf.for %arg2 = %c0 to %c1024 step %c32 {
         %13 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%4]
-        %14 = subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %15 = subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %14 = memref.subview %5[%arg0, %arg2] [%13, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %15 = memref.subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %16 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%9]
-        %17 = subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %17 = memref.subview %11[%arg0, %arg1] [%16, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         scf.for %arg3 = %c0 to %13 step %c4 {
           scf.for %arg4 = %c0 to %c32 step %c4 {
             scf.for %arg5 = %c0 to %c32 step %c4 {
               %18 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%13, %arg3)
-              %19 = subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-              %20 = subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %19 = memref.subview %14[%arg3, %arg5] [%18, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %20 = memref.subview %15[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%16, %arg3)
-              %22 = subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %22 = memref.subview %17[%arg3, %arg4] [%21, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               scf.for %arg6 = %c0 to %18 step %c1 {
                 scf.for %arg7 = %c0 to %c4 step %c1 {
                   scf.for %arg8 = %c0 to %c4 step %c1 {
-                    %23 = load %19[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-                    %24 = load %20[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                    %25 = load %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %23 = memref.load %19[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+                    %24 = memref.load %20[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %25 = memref.load %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                     %26 = mulf %23, %24 : f32
                     %27 = addf %25, %26 : f32
-                    store %27, %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    memref.store %27, %22[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                   }
                 }
               }
@@ -1188,38 +1188,38 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   scf.for %arg0 = %c0 to %4 step %c1 {
     scf.for %arg1 = %c0 to %c64 step %c1 {
-      store %cst, %8[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      memref.store %cst, %8[%arg0, %arg1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     }
   }
   scf.for %arg0 = %c0 to %4 step %c32 {
     scf.for %arg1 = %c0 to %c64 step %c32 {
       scf.for %arg2 = %c0 to %c1024 step %c32 {
         %9 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%arg0)[%4]
-        %10 = subview %5[%arg0, %arg2] [%9, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %11 = subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %12 = subview %8[%arg0, %arg1] [%9, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %10 = memref.subview %5[%arg0, %arg2] [%9, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        %11 = memref.subview %7[%arg2, %arg1] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %12 = memref.subview %8[%arg0, %arg1] [%9, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         scf.for %arg3 = %c0 to %9 step %c4 {
           scf.for %arg4 = %c0 to %c32 step %c4 {
             scf.for %arg5 = %c0 to %c32 step %c4 {
               %13 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%9, %arg3)
-              %14 = subview %10[%arg3, %arg5] [%13, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-              %15 = subview %11[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-              %16 = subview %12[%arg3, %arg4] [%13, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %14 = memref.subview %10[%arg3, %arg5] [%13, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+              %15 = memref.subview %11[%arg5, %arg4] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+              %16 = memref.subview %12[%arg3, %arg4] [%13, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
               scf.for %arg6 = %c0 to %13 step %c1 {
                 scf.for %arg7 = %c0 to %c4 step %c1 {
                   scf.for %arg8 = %c0 to %c4 step %c1 {
-                    %17 = load %14[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-                    %18 = load %15[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-                    %19 = load %16[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %17 = memref.load %14[%arg6, %arg8] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+                    %18 = memref.load %15[%arg8, %arg7] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    %19 = memref.load %16[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                     %20 = mulf %17, %18 : f32
                     %21 = addf %19, %20 : f32
-                    store %21, %16[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+                    memref.store %21, %16[%arg6, %arg7] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
                   }
                 }
               }
@@ -1250,10 +1250,10 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb5
   %10 = cmpi slt, %9, %4 : index
@@ -1264,7 +1264,7 @@ func @dot_ex_dispatch_0() {
   %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb4, ^bb5
 ^bb4:  // pred: ^bb3
-  store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %13 = addi %11, %c1 : index
   br ^bb3(%13 : index)
 ^bb5:  // pred: ^bb3
@@ -1287,9 +1287,9 @@ func @dot_ex_dispatch_0() {
   cond_br %20, ^bb12, ^bb31
 ^bb12:  // pred: ^bb11
   %21 = affine.min affine_map<(d0)[s0] -> (32, -d0 + s0)>(%15)[%4]
-  %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %22 = memref.subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %23 = memref.subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %24 = memref.subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%25: index):  // 2 preds: ^bb12, ^bb29
   %26 = cmpi slt, %25, %21 : index
@@ -1306,9 +1306,9 @@ func @dot_ex_dispatch_0() {
   cond_br %30, ^bb18, ^bb28
 ^bb18:  // pred: ^bb17
   %31 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%21, %25)
-  %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %32 = memref.subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %33 = memref.subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %34 = memref.subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb19(%c0 : index)
 ^bb19(%35: index):  // 2 preds: ^bb18, ^bb26
   %36 = cmpi slt, %35, %31 : index
@@ -1324,12 +1324,12 @@ func @dot_ex_dispatch_0() {
   %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb24, ^bb25
 ^bb24:  // pred: ^bb23
-  %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %41 = memref.load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %42 = memref.load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %43 = memref.load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %44 = mulf %41, %42 : f32
   %45 = addf %43, %44 : f32
-  store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %46 = addi %39, %c1 : index
   br ^bb23(%46 : index)
 ^bb25:  // pred: ^bb23
@@ -1378,10 +1378,10 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
   %10 = cmpi slt, %9, %4 : index
@@ -1390,7 +1390,7 @@ func @dot_ex_dispatch_0() {
   %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb3, ^bb4
 ^bb3:  // pred: ^bb2
-  store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %13 = addi %11, %c1 : index
   br ^bb2(%13 : index)
 ^bb4:  // pred: ^bb2
@@ -1407,9 +1407,9 @@ func @dot_ex_dispatch_0() {
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
   %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
-  %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %22 = memref.subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %23 = memref.subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %24 = memref.subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb9(%c0 : index)
 ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
   %26 = cmpi slt, %25, %21 : index
@@ -1422,9 +1422,9 @@ func @dot_ex_dispatch_0() {
   cond_br %30, ^bb12, ^bb20
 ^bb12:  // pred: ^bb11
   %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
-  %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %32 = memref.subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %33 = memref.subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %34 = memref.subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
   %36 = cmpi slt, %35, %31 : index
@@ -1436,12 +1436,12 @@ func @dot_ex_dispatch_0() {
   %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb16, ^bb17
 ^bb16:  // pred: ^bb15
-  %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %41 = memref.load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %42 = memref.load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %43 = memref.load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %44 = mulf %41, %42 : f32
   %45 = addf %43, %44 : f32
-  store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %46 = addi %39, %c1 : index
   br ^bb15(%46 : index)
 ^bb17:  // pred: ^bb15
@@ -1490,10 +1490,10 @@ func @dot_ex_dispatch_0() {
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
   %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-  %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-  %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb1(%c0 : index)
 ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
   %10 = cmpi slt, %9, %4 : index
@@ -1502,7 +1502,7 @@ func @dot_ex_dispatch_0() {
   %12 = cmpi slt, %11, %c64 : index
   cond_br %12, ^bb3, ^bb4
 ^bb3:  // pred: ^bb2
-  store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %13 = addi %11, %c1 : index
   br ^bb2(%13 : index)
 ^bb4:  // pred: ^bb2
@@ -1519,9 +1519,9 @@ func @dot_ex_dispatch_0() {
   cond_br %20, ^bb8, ^bb23
 ^bb8:  // pred: ^bb7
   %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
-  %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %22 = memref.subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %23 = memref.subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %24 = memref.subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb9(%c0 : index)
 ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
   %26 = cmpi slt, %25, %21 : index
@@ -1534,9 +1534,9 @@ func @dot_ex_dispatch_0() {
   cond_br %30, ^bb12, ^bb20
 ^bb12:  // pred: ^bb11
   %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
-  %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %32 = memref.subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %33 = memref.subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %34 = memref.subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   br ^bb13(%c0 : index)
 ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
   %36 = cmpi slt, %35, %31 : index
@@ -1548,12 +1548,12 @@ func @dot_ex_dispatch_0() {
   %40 = cmpi slt, %39, %c4 : index
   cond_br %40, ^bb16, ^bb17
 ^bb16:  // pred: ^bb15
-  %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-  %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-  %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %41 = memref.load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+  %42 = memref.load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  %43 = memref.load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %44 = mulf %41, %42 : f32
   %45 = addf %43, %44 : f32
-  store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+  memref.store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
   %46 = addi %39, %c1 : index
   br ^bb15(%46 : index)
 ^bb17:  // pred: ^bb15
@@ -1603,10 +1603,10 @@ module  {
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
     %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-    %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb1(%c0 : index)
   ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
     %10 = cmpi slt, %9, %4 : index
@@ -1615,7 +1615,7 @@ module  {
     %12 = cmpi slt, %11, %c64 : index
     cond_br %12, ^bb3, ^bb4
   ^bb3:  // pred: ^bb2
-    store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    memref.store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %13 = addi %11, %c1 : index
     br ^bb2(%13 : index)
   ^bb4:  // pred: ^bb2
@@ -1632,9 +1632,9 @@ module  {
     cond_br %20, ^bb8, ^bb23
   ^bb8:  // pred: ^bb7
     %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
-    %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %22 = memref.subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %23 = memref.subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %24 = memref.subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb9(%c0 : index)
   ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
     %26 = cmpi slt, %25, %21 : index
@@ -1647,9 +1647,9 @@ module  {
     cond_br %30, ^bb12, ^bb20
   ^bb12:  // pred: ^bb11
     %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
-    %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %32 = memref.subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %33 = memref.subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %34 = memref.subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb13(%c0 : index)
   ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
     %36 = cmpi slt, %35, %31 : index
@@ -1661,12 +1661,12 @@ module  {
     %40 = cmpi slt, %39, %c4 : index
     cond_br %40, ^bb16, ^bb17
   ^bb16:  // pred: ^bb15
-    %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %41 = memref.load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %42 = memref.load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %43 = memref.load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %44 = mulf %41, %42 : f32
     %45 = addf %43, %44 : f32
-    store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    memref.store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %46 = addi %39, %c1 : index
     br ^bb15(%46 : index)
   ^bb17:  // pred: ^bb15
@@ -1722,10 +1722,10 @@ module  {
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
     %4 = affine.min affine_map<()[s0] -> (64, s0 * -64 + 32)>()[%workgroup_id_y]
-    %5 = subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %5 = memref.subview %1[%3, 0] [%4, 1024] [1, 1] : memref<32x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %7 = subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %8 = subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %7 = memref.subview %2[0, %6] [1024, 64] [1, 1] : memref<1024x64xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %8 = memref.subview %0[%3, %6] [%4, 64] [1, 1] : memref<32x64xf32> to memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb1(%c0 : index)
   ^bb1(%9: index):  // 2 preds: ^bb0, ^bb4
     %10 = cmpi slt, %9, %4 : index
@@ -1734,7 +1734,7 @@ module  {
     %12 = cmpi slt, %11, %c64 : index
     cond_br %12, ^bb3, ^bb4
   ^bb3:  // pred: ^bb2
-    store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    memref.store %cst, %8[%9, %11] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %13 = addi %11, %c1 : index
     br ^bb2(%13 : index)
   ^bb4:  // pred: ^bb2
@@ -1751,9 +1751,9 @@ module  {
     cond_br %20, ^bb8, ^bb23
   ^bb8:  // pred: ^bb7
     %21 = affine.min affine_map<()[s0, s1] -> (32, s0 - s1)>()[%4, %15]
-    %22 = subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %23 = subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %24 = subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %22 = memref.subview %5[%15, %19] [%21, 32] [1, 1] : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %23 = memref.subview %7[%19, %17] [32, 32] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %24 = memref.subview %8[%15, %17] [%21, 32] [1, 1] : memref<?x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb9(%c0 : index)
   ^bb9(%25: index):  // 2 preds: ^bb8, ^bb21
     %26 = cmpi slt, %25, %21 : index
@@ -1766,9 +1766,9 @@ module  {
     cond_br %30, ^bb12, ^bb20
   ^bb12:  // pred: ^bb11
     %31 = affine.min affine_map<()[s0, s1] -> (4, s0 - s1)>()[%21, %25]
-    %32 = subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %33 = subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %34 = subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %32 = memref.subview %22[%25, %29] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %33 = memref.subview %23[%29, %27] [4, 4] [1, 1] : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %34 = memref.subview %24[%25, %27] [%31, 4] [1, 1] : memref<?x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>> to memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     br ^bb13(%c0 : index)
   ^bb13(%35: index):  // 2 preds: ^bb12, ^bb18
     %36 = cmpi slt, %35, %31 : index
@@ -1780,12 +1780,12 @@ module  {
     %40 = cmpi slt, %39, %c4 : index
     cond_br %40, ^bb16, ^bb17
   ^bb16:  // pred: ^bb15
-    %41 = load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %42 = load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %43 = load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %41 = memref.load %32[%35, %39] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %42 = memref.load %33[%39, %37] : memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %43 = memref.load %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %44 = mulf %41, %42 : f32
     %45 = addf %43, %44 : f32
-    store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    memref.store %45, %34[%35, %37] : memref<?x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %46 = addi %39, %c1 : index
     br ^bb15(%46 : index)
   ^bb17:  // pred: ^bb15
@@ -6867,7 +6867,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+  hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
   }
 }
 
@@ -7098,7 +7098,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -7303,7 +7303,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary @llvm_aot attributes {data = opaque<"", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
+    hal.executable.binary @llvm_aot attributes {data = opaque<"_", "0xDEADBEEF"> : vector<6536xi8>, format = 1145850178 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !hal.buffer attributes {iree.module.export = "dot$raw", noinline} {
@@ -7395,7 +7395,7 @@ module  {
       vm.return %ref_0 : !vm.ref<!hal.executable_layout>
     }
     vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
     vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7551,7 +7551,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 init(@_executable_dot_ex_dispatch_0_initializer) : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -7706,7 +7706,7 @@ vm.module @module {
     vm.return %ref_0 : !vm.ref<!hal.executable_layout>
   }
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
   vm.func private @_executable_dot_ex_dispatch_0_initializer() -> !vm.ref<!hal.executable> {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
@@ -8107,7 +8107,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8266,7 +8266,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8425,7 +8425,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8564,7 +8564,7 @@ vm.module @module {
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
   vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+  vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
   vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
@@ -8703,7 +8703,7 @@ module  {
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
-    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"", "0xDEADBEEF"> : vector<6536xi8>
+    vm.rodata @_dot_ex_dispatch_0_llvm_aot_binary_dylib opaque<"_", "0xDEADBEEF"> : vector<6536xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %ref_0 = vm.call @hal.device.allocator(%ref) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
