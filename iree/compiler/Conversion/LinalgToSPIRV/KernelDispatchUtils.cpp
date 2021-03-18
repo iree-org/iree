@@ -327,12 +327,17 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   ShapedType outputShape = op.getOutputShapedType(0);
 
   SmallVector<int64_t, 4> sizes;
-  // When Vectororization is not enabled the convertToGPU pass assumes that that
-  // tile size is equal to the workgroup size.
+  // When Vectororization is not enabled we skil the second level of tiling and
+  // fall back to convertToGPU which will map one element to one thread. To
+  // avoid a mismatch in the number of workgroup dispatched, we pick a tile size
+  // to have one element per thread.
   if (options.enableVectorization) {
     sizes.append({4 * subgroupSize, 2 * subgroupSize});
   }
   sizes.push_back(subgroupSize);
+  // Use the first tile size that can divide the shape. If the shape is not
+  // aligned on any of the tile sizes pick the smallest tile of one element per
+  // thread.
   int64_t lowerTs = config.workgroupSize[0];
   for (int64_t size : sizes) {
     if (outputShape.getShape().back() % size != 0) continue;
