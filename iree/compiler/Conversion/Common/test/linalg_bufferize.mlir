@@ -752,8 +752,8 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<1x4x6x1xf32>
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<f32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<1x2x2x1xf32>
-//       CHECK:   %[[WINDOW:.+]] = alloc() : memref<2x3xf32>
-//       CHECK:   %[[INIT_VAL:.+]] = load %[[INIT]][] : memref<f32>
+//       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
+//       CHECK:   %[[INIT_VAL:.+]] = memref.load %[[INIT]][] : memref<f32>
 //       CHECK:   linalg.fill(%[[RET0]], %[[INIT_VAL]]) : memref<1x2x2x1xf32>, f32
 //       CHECK:   linalg.pooling_nhwc_sum
 //  CHECK-SAME:     dilations = dense<1> : vector<2xi64>
