@@ -81,28 +81,37 @@ class UnixLinkerTool : public LinkerTool {
 
     SmallVector<std::string, 8> flags = {
         getToolPath(),
-
-        // Avoids including any libc/startup files that initialize the CRT as
-        // we don't use any of that. Our shared libraries must be freestanding.
-        "-nostdlib",  // -nodefaultlibs + -nostartfiles
-
-        // Statically link all dependencies so we don't have any runtime deps.
-        // We cannot have any imports in the module we produce.
-        // "-static",
-
-        // HACK: we insert mallocs and libm calls. This is *not good*.
-        // We need hermetic binaries that pull in no imports; the MLIR LLVM
-        // lowering paths introduce a bunch, though, so this is what we are
-        // stuck with.
-        "-shared",
-        "-undefined suppress",
-
         "-o " + artifacts.libraryFile.path,
     };
 
     if (targetTriple.isOSDarwin() || targetTriple.isiOS()) {
+      // Statically link all dependencies so we don't have any runtime deps.
+      // We cannot have any imports in the module we produce.
+      flags.push_back("-static");
+
+      // Produce a Mach-O dylib file.
       flags.push_back("-dylib");
       flags.push_back("-flat_namespace");
+
+      // HACK: we insert libm calls. This is *not good*.
+      // Until the MLIR LLVM lowering paths no longer introduce these,
+      // we are stuck with this.
+      flags.push_back("-undefined suppress");
+    } else {
+      // Avoids including any libc/startup files that initialize the CRT as
+      // we don't use any of that. Our shared libraries must be freestanding.
+      flags.push_back("-nostdlib");  // -nodefaultlibs + -nostartfiles
+
+      // Statically link all dependencies so we don't have any runtime deps.
+      // We cannot have any imports in the module we produce.
+      // flags.push_back("-static");
+
+      // HACK: we insert mallocs and libm calls. This is *not good*.
+      // We need hermetic binaries that pull in no imports; the MLIR LLVM
+      // lowering paths introduce a bunch, though, so this is what we are
+      // stuck with.
+      flags.push_back("-shared");
+      flags.push_back("-undefined suppress");
     }
 
     // Strip debug information (only, no relocations) when not requested.
