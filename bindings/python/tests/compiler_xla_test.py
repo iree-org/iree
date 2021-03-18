@@ -21,6 +21,7 @@ import unittest
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
+# pytype: disable=module-attr
 import iree.compiler.xla
 
 if not iree.compiler.xla.is_available():
