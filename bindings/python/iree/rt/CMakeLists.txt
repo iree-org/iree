@@ -31,8 +31,6 @@ iree_pyext_module(
     "vm.cc"
   UNIX_LINKER_SCRIPT
     "unix_version.lds"
-  INCLUDES
-    "${CMAKE_CURRENT_SOURCE_DIR}/../.."
   DEPS
     iree::base::api
     iree::base::signature_parser
