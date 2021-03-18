@@ -20,7 +20,7 @@ import io
 import tempfile
 import unittest
 
-from pyiree import compiler
+import iree.compiler
 
 SIMPLE_MUL_ASM = """
 func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
@@ -36,11 +36,11 @@ class CompilerTest(unittest.TestCase):
   def testNoTargetBackends(self):
     with self.assertRaisesRegex(
         ValueError, "Expected a non-empty list for 'target_backends'"):
-      binary = compiler.compile_str(SIMPLE_MUL_ASM)
+      binary = iree.compiler.compile_str(SIMPLE_MUL_ASM)
 
   def testCompileStr(self):
-    binary = compiler.compile_str(
-        SIMPLE_MUL_ASM, target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.compile_str(
+        SIMPLE_MUL_ASM, target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
@@ -48,8 +48,8 @@ class CompilerTest(unittest.TestCase):
   # source file name, which can cause issues on the AOT side. Verify
   # specifically. See: https://github.com/google/iree/issues/4439
   def testCompileStrLLVMAOT(self):
-    binary = compiler.compile_str(SIMPLE_MUL_ASM,
-                                  target_backends=["dylib-llvm-aot"])
+    binary = iree.compiler.compile_str(SIMPLE_MUL_ASM,
+                                       target_backends=["dylib-llvm-aot"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
@@ -57,7 +57,7 @@ class CompilerTest(unittest.TestCase):
   # load bearing.
   # See: https://github.com/google/iree/issues/4436
   def testCompileMultipleBackends(self):
-    binary = compiler.compile_str(
+    binary = iree.compiler.compile_str(
         SIMPLE_MUL_ASM, target_backends=["dylib-llvm-aot", "vulkan-spirv"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
@@ -67,8 +67,8 @@ class CompilerTest(unittest.TestCase):
       try:
         f.write(SIMPLE_MUL_ASM)
         f.close()
-        binary = compiler.compile_file(
-            f.name, target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+        binary = iree.compiler.compile_file(
+            f.name, target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
       finally:
         os.remove(f.name)
     logging.info("Flatbuffer size = %d", len(binary))
@@ -78,10 +78,10 @@ class CompilerTest(unittest.TestCase):
     with tempfile.NamedTemporaryFile("wt", delete=False) as f:
       try:
         f.close()
-        output = compiler.compile_str(
+        output = iree.compiler.compile_str(
             SIMPLE_MUL_ASM,
             output_file=f.name,
-            target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+            target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
         self.assertIsNone(output)
 
         with open(f.name, "rb") as f_read:
@@ -92,10 +92,10 @@ class CompilerTest(unittest.TestCase):
     self.assertIn(b"simple_mul", binary)
 
   def testOutputFbText(self):
-    text = compiler.compile_str(
+    text = iree.compiler.compile_str(
         SIMPLE_MUL_ASM,
-        output_format=compiler.OutputFormat.FLATBUFFER_TEXT,
-        target_backends=compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
+        output_format=iree.compiler.OutputFormat.FLATBUFFER_TEXT,
+        target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
     # Just check for an arbitrary JSON-tag.
     self.assertIn('"exported_functions"', text)
 
@@ -103,38 +103,39 @@ class CompilerTest(unittest.TestCase):
     with self.assertRaisesRegex(
         ValueError, "For output_format= argument, expected one of: "
         "FLATBUFFER_BINARY, FLATBUFFER_TEXT, MLIR_TEXT"):
-      _ = compiler.compile_str(
+      _ = iree.compiler.compile_str(
           SIMPLE_MUL_ASM,
           output_format="foobar",
-          target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+          target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
 
   def testOutputFbTextParsed(self):
-    text = compiler.compile_str(
+    text = iree.compiler.compile_str(
         SIMPLE_MUL_ASM,
         output_format='flatbuffer_text',
-        target_backends=compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
+        target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
     # Just check for an arbitrary JSON-tag.
     self.assertIn('"exported_functions"', text)
 
   def testOutputMlirText(self):
-    text = compiler.compile_str(
+    text = iree.compiler.compile_str(
         SIMPLE_MUL_ASM,
-        output_format=compiler.OutputFormat.MLIR_TEXT,
-        target_backends=compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
+        output_format=iree.compiler.OutputFormat.MLIR_TEXT,
+        target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS).decode("utf-8")
     # Just check for a textual op name.
     self.assertIn("vm.module", text)
 
   def testExtraArgsStderr(self):
     # pass-timing is not special: it just does something and emits to stderr.
     with io.StringIO() as buf, contextlib.redirect_stderr(buf):
-      compiler.compile_str(SIMPLE_MUL_ASM,
-                           extra_args=["--pass-timing"],
-                           target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+      iree.compiler.compile_str(
+          SIMPLE_MUL_ASM,
+          extra_args=["--pass-timing"],
+          target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
       stderr = buf.getvalue()
     self.assertIn("Pass execution timing report", stderr)
 
   def testAllOptions(self):
-    binary = compiler.compile_str(
+    binary = iree.compiler.compile_str(
         SIMPLE_MUL_ASM,
         optimize=False,
         strip_debug_ops=True,
@@ -142,13 +143,14 @@ class CompilerTest(unittest.TestCase):
         strip_symbols=True,
         crash_reproducer_path="foobar.txt",
         enable_benchmark=True,
-        target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+        target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
 
   def testException(self):
-    with self.assertRaisesRegex(compiler.CompilerToolError, "Invoked with"):
-      _ = compiler.compile_str(
+    with self.assertRaisesRegex(iree.compiler.CompilerToolError,
+                                "Invoked with"):
+      _ = iree.compiler.compile_str(
           "I'm a little teapot but not a valid program",
-          target_backends=compiler.DEFAULT_TESTING_BACKENDS)
+          target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
 
 
 if __name__ == "__main__":

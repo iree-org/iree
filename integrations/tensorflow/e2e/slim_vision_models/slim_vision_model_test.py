@@ -18,9 +18,9 @@ import posixpath
 
 from absl import app
 from absl import flags
+from iree.tf.support import tf_test_utils
+from iree.tf.support import tf_utils
 import numpy as np
-from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
 import tensorflow as tf
 import tensorflow_hub as hub
 

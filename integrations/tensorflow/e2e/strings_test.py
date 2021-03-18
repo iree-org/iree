@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from absl import app
-import numpy as np
-from pyiree.tf.support import tf_test_utils
 import string
+
+from absl import app
+from iree.tf.support import tf_test_utils
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 

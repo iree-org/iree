@@ -23,8 +23,8 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 from absl import app
 from absl import flags
 from absl import logging
-from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
+from iree.tf.support import tf_test_utils
+from iree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS

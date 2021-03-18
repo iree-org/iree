@@ -18,15 +18,15 @@ set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
 # Namespace packages.
-add_subdirectory(pyiree/rt)
+add_subdirectory(iree/rt)
 
 if(${IREE_BUILD_COMPILER})
-add_subdirectory(pyiree/compiler)
-add_subdirectory(pyiree/tools/core)
+add_subdirectory(iree/compiler)
+add_subdirectory(iree/tools/core)
 endif()
 
 if(${IREE_BUILD_XLA_COMPILER})
-add_subdirectory(pyiree/jax)
+add_subdirectory(iree/jax)
 endif()
 
 # Tests.

@@ -14,8 +14,8 @@
 # limitations under the License.
 """Test matrix ops via einsum"""
 
-from pyiree.tf.support import tf_test_utils
-from pyiree.tf.support import tf_utils
+from iree.tf.support import tf_test_utils
+from iree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 VECTOR_DIM = 16

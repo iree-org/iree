@@ -2,16 +2,10 @@
 
 Top-level packages:
 
-* `pyiree.compiler` : Main compiler API.
-* `pyiree.rt` : Runtime components for executing binaries.
-* `pyiree.tools.core` : Core tools for executing the compiler.
-* `pyiree.tools.tf` : TensorFlow compiler tools (if enabled).
-
-Deprecated packages:
-
-* `pyiree.compiler`
-* `pyiree.common`
-* `pyiree.tf.compiler`
+* `iree.compiler` : Main compiler API.
+* `iree.rt` : Runtime components for executing binaries.
+* `iree.tools.core` : Core tools for executing the compiler.
+* `iree.tools.tf` : TensorFlow compiler tools (if enabled).
 
 ## Installing
 
