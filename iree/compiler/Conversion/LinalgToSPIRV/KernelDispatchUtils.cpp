@@ -233,9 +233,7 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
         coopMatmulProperties.b_type().getValue() == rhsType &&
         coopMatmulProperties.c_type().getValue() == initType &&
         coopMatmulProperties.result_type().getValue() == resultType &&
-        spirv::symbolizeScope(
-            coopMatmulProperties.scope().getValue().getZExtValue())
-                .getValue() == spirv::Scope::Subgroup) {
+        coopMatmulProperties.scope().getValue() == spirv::Scope::Subgroup) {
       return SmallVector<int64_t, 4>{
           coopMatmulProperties.m_size().getValue().getSExtValue(),
           coopMatmulProperties.n_size().getValue().getSExtValue(),

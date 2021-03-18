@@ -33,9 +33,9 @@ namespace HAL {
 // Enum utilities
 //===----------------------------------------------------------------------===//
 
-template <typename T>
+template <typename AttrType>
 static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
-                                   Attribute &attr) {
+                                   AttrType &attr) {
   Attribute genericAttr;
   auto loc = parser.getCurrentLocation();
   if (failed(parser.parseAttribute(genericAttr,
@@ -48,13 +48,13 @@ static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
     return parser.emitError(loc)
            << "expected " << attrName << " attribute specified as string";
   }
-  auto symbolized = symbolizeEnum<T>(stringAttr.getValue());
+  auto symbolized =
+      symbolizeEnum<typename AttrType::ValueType>(stringAttr.getValue());
   if (!symbolized.hasValue()) {
     return parser.emitError(loc)
            << "failed to parse '" << attrName << "' enum value";
   }
-  attr = parser.getBuilder().getI32IntegerAttr(
-      static_cast<int32_t>(symbolized.getValue()));
+  attr = AttrType::get(parser.getBuilder().getContext(), symbolized.getValue());
   return success();
 }
 
@@ -305,14 +305,13 @@ void ByteRangeAttr::print(DialectAsmPrinter &p) const {
 Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
   auto b = p.getBuilder();
   IntegerAttr bindingAttr;
-  IntegerAttr typeAttr;
-  IntegerAttr accessAttr;
+  DescriptorTypeAttr typeAttr;
+  MemoryAccessBitfieldAttr accessAttr;
   if (failed(p.parseLess()) ||
       failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
+      failed(p.parseComma()) || failed(parseEnumAttr(p, "type", typeAttr)) ||
       failed(p.parseComma()) ||
-      failed(parseEnumAttr<DescriptorType>(p, "type", typeAttr)) ||
-      failed(p.parseComma()) ||
-      failed(parseEnumAttr<MemoryAccessBitfield>(p, "access", accessAttr)) ||
+      failed(parseEnumAttr(p, "access", accessAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
@@ -405,9 +404,9 @@ void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
 
 // static
 Attribute DeviceMatchMemoryModelAttr::parse(DialectAsmParser &p) {
-  IntegerAttr memoryModelAttr;
+  MemoryModelAttr memoryModelAttr;
   if (failed(p.parseLess()) ||
-      failed(parseEnumAttr<MemoryModel>(p, "memory_model", memoryModelAttr)) ||
+      failed(parseEnumAttr(p, "memory_model", memoryModelAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
