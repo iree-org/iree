@@ -44,15 +44,18 @@ cc_library(
         "ConvertToLLVM.cpp",
         "FoldTensorExtractOpPass.cpp",
         "KernelDispatch.cpp",
+        "LLVMCodeGenOptions.cpp",
         "LinalgTileAndDistributePass.cpp",
         "LinalgTileAndVectorizePass.cpp",
         "LinalgVectorizePass.cpp",
         "MaterializeCPULaunchConfigurationPass.cpp",
         "Passes.cpp",
         "PlanConvLoopOrder.cpp",
+        "UnfuseFMAOps.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",
+        "LLVMCodeGenOptions.h",
         "Passes.h",
     ],
     deps = [
