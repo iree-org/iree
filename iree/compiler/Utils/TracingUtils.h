@@ -26,9 +26,9 @@ namespace iree_compiler {
 //
 // Usage:
 //   passManager.addInstrumentation(std::make_unique<PassTracing>());
-class PassTracing : public PassInstrumentation {
+struct PassTracing : public PassInstrumentation {
   PassTracing() {}
-  ~PassTracing() override {}
+  ~PassTracing() override = default;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   // Note: we could also trace pipelines and analyses.
@@ -46,10 +46,9 @@ class PassTracing : public PassInstrumentation {
     IREE_TRACE_ZONE_END(passTraceZonesStack.back());
     passTraceZonesStack.pop_back();
   }
-
- private:
-  llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+  llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;
 };
 
 }  // namespace iree_compiler
