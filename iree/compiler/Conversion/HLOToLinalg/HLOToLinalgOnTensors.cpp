@@ -50,108 +50,6 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// mhlo.torch_index_select conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Converts xla-hlo.torch_index_select op to a linalg.indexed_generic op.
-struct TorchIndexSelectOpConversion
-    : public OpConversionPattern<mhlo::TorchIndexSelectOp> {
-  using OpConversionPattern<mhlo::TorchIndexSelectOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      mhlo::TorchIndexSelectOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const final {
-    mhlo::TorchIndexSelectOp::Adaptor adaptor(args);
-    int axis = op.dim();
-    int batch = op.batch_dims();
-    auto indexShapeType = adaptor.index().getType().cast<ShapedType>();
-    int nIndices = indexShapeType.getRank();
-    auto inputShapeType = adaptor.input().getType().cast<ShapedType>();
-    if (axis < 0) axis += inputShapeType.getRank();
-    if (batch < 0) batch += nIndices;
-
-    Location loc = op.getLoc();
-    ShapedType resultType = op.getResult().getType().cast<ShapedType>();
-    int rank = resultType.getRank();
-
-    SmallVector<AffineMap, 2> indexingMaps;
-    SmallVector<AffineExpr, 4> exprs;
-    for (int i = 0; i < batch; ++i) {
-      exprs.push_back(rewriter.getAffineDimExpr(i));
-    }
-    for (int i = 0, e = nIndices - batch; i < e; ++i) {
-      exprs.push_back(rewriter.getAffineDimExpr(axis + i));
-    }
-    indexingMaps.emplace_back(
-        AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
-    indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
-
-    SmallVector<StringRef, 3> loopTypes(rank, getParallelIteratorTypeName());
-
-    // The output shape is
-    //   `params[:axis] + indices[batch_dims:] + params[axis + 1:]`
-    SmallVector<Value, 4> dynSizes;
-    for (int i = 0; i < rank; ++i) {
-      if (!resultType.isDynamicDim(i)) continue;
-      if (i < axis) {
-        dynSizes.push_back(
-            rewriter.create<memref::DimOp>(loc, adaptor.input(), i));
-      } else if (i < (axis + nIndices - batch)) {
-        int idx = i - axis + batch;
-        dynSizes.push_back(
-            rewriter.create<memref::DimOp>(loc, adaptor.index(), idx));
-      } else {
-        int idx = i - (axis + nIndices - batch) + axis + 1;
-        dynSizes.push_back(
-            rewriter.create<memref::DimOp>(loc, adaptor.input(), idx));
-      }
-    }
-    Value initOp = rewriter.create<linalg::InitTensorOp>(
-        loc, dynSizes, resultType.getShape(), resultType.getElementType());
-    auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-        loc, /*resultTensors=*/ArrayRef<Type>{resultType},
-        /*inputs=*/adaptor.index(),
-        /*outputBuffers=*/initOp, indexingMaps, loopTypes);
-
-    SmallVector<Type, 4> bodyArgTypes, opResultTypes;
-    SmallVector<Value, 2> linalgOpArgs = {adaptor.index()};
-    // Add a block to the region.
-    auto *region = &linalgOp.region();
-    auto *block = rewriter.createBlock(region, region->end());
-    bodyArgTypes.append(rank, rewriter.getIndexType());
-    for (auto blockArgs : linalgOpArgs) {
-      bodyArgTypes.push_back(
-          blockArgs.getType().cast<ShapedType>().getElementType());
-    }
-    block->addArguments(bodyArgTypes);
-    block->addArguments(resultType.getElementType());
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToEnd(block);
-
-    SmallVector<Value, 4> indices;
-    Value castedValue = rewriter.create<IndexCastOp>(
-        loc, block->getArgument(rank), rewriter.getIndexType());
-    for (int i = 0; i < axis; ++i) {
-      indices.push_back(block->getArgument(i));
-    }
-    indices.push_back(castedValue);
-    for (int i = axis + nIndices - batch; i < rank; ++i) {
-      indices.push_back(block->getArgument(i));
-    }
-
-    Value res =
-        rewriter.create<tensor::ExtractOp>(loc, adaptor.input(), indices);
-    rewriter.create<linalg::YieldOp>(loc, res);
-
-    rewriter.replaceOp(op, linalgOp.getResults());
-    return success();
-  }
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
 // linalg.pad_tensor conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -345,8 +243,7 @@ struct ConstOpConversion : public OpRewritePattern<mhlo::ConstOp> {
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<TorchIndexSelectOpConversion, ConstOpConversion,
-                  ConcatenateOpConversion>(context);
+  patterns.insert<ConstOpConversion, ConcatenateOpConversion>(context);
 }
 
 static llvm::cl::opt<bool> clUseLinalgOnTensorsPath(
