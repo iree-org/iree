@@ -74,10 +74,10 @@ ninja
 # TODO(#5162): Handle this more robustly
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 
-# Run only the vulkan tests, since these are the only ones for which running on
-# a machine with a GPU should be different.
+# Only test drivers that use the GPU, since we run all tests on non-GPU machines
+# as well.
 echo "Testing with CTest"
 ctest --output-on-failure \
    --tests-regex "^integrations/tensorflow/" \
-   --label-regex "^driver=vulkan$" \
+   --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"
