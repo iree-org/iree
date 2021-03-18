@@ -24,6 +24,7 @@ iree_py_library(
     "trace_utils.py"
 )
 
+# TODO(#5147): Replace the hack below with something more thought out.
 # Make the base dir that run_test.sh expects to exist. This dir doesn't exist
 # by default because we symlink these python files into bindings/python/iree.
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/integrations/tensorflow/bindings/python/iree/tf/support")
