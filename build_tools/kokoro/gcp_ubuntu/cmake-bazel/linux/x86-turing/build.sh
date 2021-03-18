@@ -78,6 +78,6 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 # a machine with a GPU should be different.
 echo "Testing with CTest"
 ctest --output-on-failure \
-   --tests-regex "^integrations/tensorflow" \
+   --tests-regex "^integrations/tensorflow/" \
    --label-regex "^driver=vulkan$" \
    --label-exclude "^nokokoro$"
