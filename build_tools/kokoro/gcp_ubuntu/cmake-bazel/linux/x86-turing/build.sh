@@ -70,13 +70,14 @@ echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
 
-# Limit parallelism to 8 to avoid exhausting GPU memory
+# Limit parallelism dramatically to avoid exhausting GPU memory
 # TODO(#5162): Handle this more robustly
-DEFAULT_PARALLELISM="$(nproc)"
-if [[ "${DEFAULT_PARALLELISM?}" -gt "8" ]]; then
-   DEFAULT_PARALLELISM=8
-fi
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-${DEFAULT_PARALLELISM?}}
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 
+# Only test drivers that use the GPU, since we run all tests on non-GPU machines
+# as well.
 echo "Testing with CTest"
-ctest --output-on-failure -L 'integrations/tensorflow' --label-exclude "^nokokoro$"
+ctest --output-on-failure \
+   --tests-regex "^integrations/tensorflow/" \
+   --label-regex "^driver=vulkan$|^driver=cuda$" \
+   --label-exclude "^nokokoro$"
