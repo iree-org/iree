@@ -126,6 +126,41 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
   }
 };
 
+/// A pattern to convert hal.interface.workgroup.id/count/size into
+/// corresponding NVVM ops.
+template <typename InterfaceOpTy, typename XOp, typename YOp, typename ZOp>
+struct HALInterfaceWorkgroupOpsConverter final
+    : public OpConversionPattern<InterfaceOpTy> {
+  using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      InterfaceOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Type i32Type = rewriter.getI32Type();
+    Value newOp;
+    int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
+    switch (index) {
+      case 0:
+        newOp = rewriter.create<XOp>(loc, i32Type);
+        break;
+      case 1:
+        newOp = rewriter.create<YOp>(loc, i32Type);
+        break;
+      case 2:
+        newOp = rewriter.create<ZOp>(loc, i32Type);
+        break;
+      default:
+        return failure();
+    }
+
+    newOp =
+        rewriter.create<LLVM::SExtOp>(loc, rewriter.getIntegerType(64), newOp);
+    rewriter.replaceOp(op, {newOp});
+    return success();
+  }
+};
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
 ///
@@ -157,6 +192,16 @@ struct ConvertToNVVMPass
       OwningRewritePatternList llvmPatterns;
       llvmPatterns.insert<ConvertFunc, ConvertIREEBindingOp>(m.getContext(),
                                                              converter);
+      llvmPatterns
+          .insert<HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupIDOp, NVVM::BlockIdXOp,
+                      NVVM::BlockIdYOp, NVVM::BlockIdZOp>,
+                  HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupCountOp, NVVM::GridDimXOp,
+                      NVVM::GridDimYOp, NVVM::GridDimZOp>,
+                  HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupSizeOp, NVVM::BlockDimXOp,
+                      NVVM::BlockDimYOp, NVVM::BlockDimZOp>>(m.getContext());
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
