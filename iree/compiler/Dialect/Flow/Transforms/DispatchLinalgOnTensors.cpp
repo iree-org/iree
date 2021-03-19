@@ -188,7 +188,8 @@ static bool isRootOp(Operation *op) {
     }
   }
   return isa<linalg::ConvInputNHWCFilterHWCFOp,
-             linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
+             linalg::DepthwiseConvInputNHWCFilterHWCOp,
+             linalg::DepthwiseConvInputNHWCFilterHWCFOp>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
