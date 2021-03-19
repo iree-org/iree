@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
     check_vmla_vmla
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "mobilenetv2_fake_weights.mlir"
   TARGET_BACKEND
     "vmla"
   DRIVER
@@ -45,6 +46,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "mobilenetv2_fake_weights.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -53,9 +55,25 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_linalg_on_tensors_vulkan-spirv_vulkan
+  SRCS
+    "mobilenetv2_fake_weights.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-spirv-experimental-linalg-on-tensors"
+    "-iree-spirv-enable-vectorization"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_linalg_on_tensors_dylib-llvm-aot_dylib
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
+    "mobilenetv2_fake_weights.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER

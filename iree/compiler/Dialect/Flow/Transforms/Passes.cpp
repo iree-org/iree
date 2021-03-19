@@ -25,6 +25,7 @@
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -64,7 +65,6 @@ namespace Flow {
 // here, but soon we'll be shifting away from that and only accepting upstream
 // dialects like linalg.
 static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addNestedPass<FuncOp>(IREE::Flow::createHLOPreprocessingPass());
   if (clEnableLinalgOnTensorsDispatch) {
     // TODO(ataei): This should run as part of createHLOPreprocessingPass which
@@ -80,7 +80,6 @@ static void buildHLOInputTransformPassPipeline(OpPassManager &passManager) {
 // Prepare TOSA for use as an input to the Flow dialect.
 static void buildTOSAInputTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
 }
@@ -101,16 +100,23 @@ void registerInputTransformPassPipeline() {
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  //----------------------------------------------------------------------------
+  // Entry dialect cleanup
+  //----------------------------------------------------------------------------
+
+  // Currently we don't handle SCF ops well and have to convert them all to CFG.
+  // In the future it would be nice if we could have all of flow be both scf
+  // and cfg compatible.
+  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+
+  // We also don't handle calls well on the old codepath; until we remove the
+  // use of the CFG we can continue inlining.
+  passManager.addPass(mlir::createInlinerPass());
+
   // Convert `shape` dialect to `shapex` dialect.
   passManager.addPass(Shape::createConvertShapeToShapexPass());
 
-  // Flatten tuples (like tuple<tensor<...>, tensor<...>>) so we can do
-  // fine-grained tensor tracking.
-  // NOTE: FlattenTuplesInCFGPass requires inlining to have run.
-  passManager.addPass(mlir::createInlinerPass());
-  passManager.addPass(IREE::Flow::createFlattenTuplesInCFGPass());
-
-  // Perform cleanup after CFG manipulation.
+  // Perform initial cleanup.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
@@ -188,13 +194,23 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
   if (clEnableLinalgOnTensorsDispatch) {
-    passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-    addHLOToLinalgOnTensorsPasses(passManager, clEnableLinalgOnTensorsDispatch);
+    // TODO(benvanik): move up to input; requires pre-partitioning conversion
+    // to be reworked first.
+    passManager.addNestedPass<FuncOp>(createHLOToLinalgOnTensorsPass(true));
+
+    passManager.addNestedPass<FuncOp>(createLinalgFoldUnitExtentDimsPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
     passManager.addNestedPass<FuncOp>(createConvertToFlowTensorOpsPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+
     passManager.addNestedPass<FuncOp>(
         IREE::Flow::createDispatchLinalgOnTensorsPass());
+    // NOTE: required because the current dispatch-linalg-on-tensors pass
+    // creates a lot of dead IR that needs to be cleaned up.
     passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
     // Outline the dispatch regions into their own functions wrapped in

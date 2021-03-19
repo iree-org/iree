@@ -5,7 +5,7 @@
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -export-all %s -iree-hal-target-backends=vulkan-spirv  -iree-flow-dispatch-linalg-on-tensors -iree-codegen-spirv-experimental-linalg-on-tensors -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @main
-func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5x1x5xf32>>
+func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32>
   attributes {iree.module.export} {
   %0 = "mhlo.reshape"(%arg0) {name = "reshape.3"} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   %1 = "mhlo.transpose"(%0) {name = "transpose.41", permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1x5xf32>) -> tensor<5x1xf32>
@@ -80,8 +80,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %52 = "mhlo.reshape"(%51) {name = "reshape.94"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %53 = "mhlo.select"(%8, %9, %52) {name = "select.95"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %54 = "mhlo.reshape"(%53) {name = "reshape.96"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
-  %55 = "mhlo.tuple"(%54) {name = "tuple.97"} : (tensor<5x1x5xf32>) -> tuple<tensor<5x1x5xf32>>
-  return %55 : tuple<tensor<5x1x5xf32>>
+  return %54 : tensor<5x1x5xf32>
 }
 
 // On separate lines to avoid "[[" which IreeFileCheck interprets as substitutions

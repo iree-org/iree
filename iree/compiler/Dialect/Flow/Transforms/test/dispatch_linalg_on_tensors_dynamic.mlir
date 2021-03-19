@@ -66,6 +66,7 @@ func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
     } -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
+// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: func @generic_op
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?xf32>
@@ -80,13 +81,27 @@ func @generic_op(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
-//  CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]] : !flow.dispatch.tensor<readonly:?x?xf32>
-//  CHECK-DAG:     %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
-//  CHECK-DAG:     %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]] : !flow.dispatch.tensor<readonly:?xf32>
-//      CHECK:     %[[RESULT:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[LOAD2]], %[[LOAD3]] : tensor<?x?xf32>, tensor<?xf32>)
-// CHECK-SAME:       outs(%[[INIT]] : tensor<?x?xf32>)
-//      CHECK:     flow.dispatch.tensor.store %[[RESULT]], %[[ARG6]]
+//  CHECK-DAG:     %[[WGSIZE_X:.+]] = flow.dispatch.workgroup.size[0]
+//  CHECK-DAG:     %[[WGSIZE_Y:.+]] = flow.dispatch.workgroup.size[1]
+//  CHECK-DAG:     %[[WGID_X:.+]] = flow.dispatch.workgroup.id[0]
+//  CHECK-DAG:     %[[WGID_Y:.+]] = flow.dispatch.workgroup.id[1]
+//  CHECK-DAG:     %[[WGCOUNT_X:.+]] = flow.dispatch.workgroup.count[0]
+//  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = flow.dispatch.workgroup.count[1]
+//      CHECK:     %[[OFFSET_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     %[[STEP_Y:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_Y]], %[[WGSIZE_Y]]]
+//      CHECK:     scf.for %[[ARG7:.+]] = %[[OFFSET_Y]]
+// CHECK-SAME:       to %{{.+}} step %[[STEP_Y]]
+//      CHECK:       %[[OFFSET_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGID_X]], %[[WGSIZE_X]]]
+//      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_X]], %[[WGSIZE_X]]]
+//      CHECK:       scf.for %[[ARG8:.+]] = %[[OFFSET_X]]
+// CHECK-SAME:         to %{{.+}} step %[[STEP_X]]
+//  CHECK-DAG:         %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]]
+//  CHECK-DAG:         %[[INIT:.+]] = linalg.init_tensor
+//  CHECK-DAG:         %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]]
+//      CHECK:         %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME:           ins(%[[LOAD2]], %[[LOAD3]] : tensor<?x?xf32>, tensor<?xf32>)
+// CHECK-SAME:           outs(%[[INIT]] : tensor<?x?xf32>)
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %[[ARG6]]
 
 // -----
 
@@ -295,6 +310,8 @@ func @generic_op_4D
     } -> tensor<?x?x?x?xf32>
   return %1 : tensor<?x?x?x?xf32>
 }
+// For ops of rank greater than 3 we serialized the higher dimension. When flow
+// supports larger ranks this can be changed.
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //      CHECK: func @generic_op_4D
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
@@ -306,8 +323,7 @@ func @generic_op_4D
 //  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = memref.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D3:.+]] = memref.dim %[[ARG0]], %[[C3]]
-//      CHECK:   %[[WORKLOAD_Z:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
-//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[WORKLOAD_Z]]]
+//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
 
 // -----
 

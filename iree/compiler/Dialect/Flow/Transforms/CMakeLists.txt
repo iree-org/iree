@@ -26,7 +26,6 @@ iree_cc_library(
     "DispatchabilityAnalysis.cpp"
     "ExpandVariableDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
     "HLOToHLOPreprocessing.cpp"

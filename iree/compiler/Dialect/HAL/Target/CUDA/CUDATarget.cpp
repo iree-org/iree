@@ -28,6 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir {
@@ -64,6 +65,7 @@ class CUDATargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
+    mlir::registerNVVMDialectTranslation(registry);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {

@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "convert_to_gpu.mlir"
     "convert_to_spirv.mlir"
     "dead_alloc.mlir"
+    "elementwise_vectorization.mlir"
     "fold-gpu-procid-uses.mlir"
     "forop_canonicalization.mlir"
     "linalg_tile_and_fuse.mlir"

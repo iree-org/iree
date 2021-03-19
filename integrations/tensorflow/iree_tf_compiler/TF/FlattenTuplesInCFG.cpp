@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
@@ -26,9 +26,8 @@
 #include "mlir/Transforms/Utils.h"
 
 namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace iree_integrations {
+namespace TF {
 
 namespace {
 
@@ -330,10 +329,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass() {
 }
 
 static PassRegistration<FlattenTuplesInCFGPass> pass(
-    "iree-flow-flatten-tuples-in-cfg",
+    "iree-tf-flatten-tuples-in-cfg",
     "Convert functions to remove tuples from method signatures and blocks");
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
+}  // namespace TF
+}  // namespace iree_integrations
 }  // namespace mlir

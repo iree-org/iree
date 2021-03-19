@@ -22,6 +22,7 @@ cc_library(
     name = "TF",
     srcs = [
         "ConvertToMHLO.cpp",
+        "FlattenTuplesInCFG.cpp",
         "LowerExportedFunctions.cpp",
         "LowerGlobalTensors.cpp",
         "Passes.cpp",
@@ -57,7 +58,9 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:all_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo:chlo_legalize_to_hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:lower_tf_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",

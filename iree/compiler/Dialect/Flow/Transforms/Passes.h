@@ -65,9 +65,6 @@ void registerFlowTransformPassPipeline();
 // dispatch regions and could be represented as flow.tensor.* ops.
 std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass();
 
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
-
 // Legalizes the input types to those supported by the flow dialect.
 // This will fail if types that cannot be supported at all are present, however
 // conditionally supported types (based on availability, etc) may still be
@@ -174,7 +171,6 @@ inline void registerFlowPasses() {
   registerInputTransformPassPipeline();
   registerFlowTransformPassPipeline();
   createConvertToFlowTensorOpsPass();
-  createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();

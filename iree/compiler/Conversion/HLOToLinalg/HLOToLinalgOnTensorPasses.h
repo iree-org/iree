@@ -39,11 +39,6 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass(
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
-/// Populated passes to convert from MHLO to Linalg on tensors as well as fusion
-/// of the converted operations.
-void addHLOToLinalgOnTensorsPasses(OpPassManager &pm,
-                                   bool useLinalgOnTensorsPath = false);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

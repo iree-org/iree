@@ -48,7 +48,7 @@ struct ExtractElementOpPromotion
     if (!tensorType) {
       return rewriter.notifyMatchFailure(op, "expected tensor types");
     }
-    if (tensorType.getElementTypeBitWidth() != 1) {
+    if (!tensorType.getElementType().isInteger(1)) {
       return rewriter.notifyMatchFailure(op, "expected i1 type");
     }
     Location loc = op.getLoc();
