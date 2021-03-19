@@ -32,7 +32,6 @@ static void addLinalgToNVVMPasses(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
