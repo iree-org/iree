@@ -321,10 +321,10 @@ static LogicalResult convertSubTensorOp(
       inputBufferType, extractFromI64ArrayAttr(op.static_offsets()),
       extractFromI64ArrayAttr(op.static_sizes()),
       extractFromI64ArrayAttr(op.static_strides()));
-  auto subViewOp =
-      b.create<memref::SubViewOp>(loc, subViewResultType, inputBuffer, op.offsets(),
-                          op.sizes(), op.strides(), op.static_offsets(),
-                          op.static_sizes(), op.static_strides());
+  auto subViewOp = b.create<memref::SubViewOp>(
+      loc, subViewResultType, inputBuffer, op.offsets(), op.sizes(),
+      op.strides(), op.static_offsets(), op.static_sizes(),
+      op.static_strides());
   // For now special case the constant source case (where sub-tensor can
   // directly be replaced by a subview). All this needs to be cleaned up soon.
   // TODO(GH-5013): This should fall out naturally when doing buffer planning.

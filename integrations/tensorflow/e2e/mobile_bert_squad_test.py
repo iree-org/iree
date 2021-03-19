@@ -23,8 +23,8 @@ import posixpath
 
 from absl import app
 from absl import flags
+from iree.tf.support import tf_test_utils
 import numpy as np
-from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS

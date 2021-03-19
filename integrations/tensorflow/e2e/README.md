@@ -40,13 +40,13 @@ Compatible TensorFlow modules can be compiled to specific IREE backends using
 specified directory. These artifacts include MLIR across various lowerings and
 the compiled VM FlatBuffer. A basic example of creating and calling an
 `IreeCompiledModule` can be found in
-[`module_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/pyiree/tf/support/module_utils_test.py)
+[`module_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/iree/tf/support/module_utils_test.py)
 
 When using Keras models or tf.Modules with functions that IREE can't compile,
 `exported_names` should be specified. For example:
 
 ```python
-from pyiree.tf.support import module_utils
+from iree.tf.support import module_utils
 vmla_module = module_utils.IreeCompiledModule(
     module_class=KerasTFModuleClass,
     backend_info=module_utils.BackendInfo('iree_vmla'),

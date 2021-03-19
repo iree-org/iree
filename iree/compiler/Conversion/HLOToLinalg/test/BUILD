@@ -27,12 +27,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "arithmetic_ops.mlir",
             "concatenate.mlir",
             "decompose_hlo_clamp.mlir",
             "dot.mlir",
             "dynamic_shape.mlir",
-            "exp.mlir",
             "fusion.mlir",
             "linalg_tensor_to_buffer.mlir",
             "pad_tensor.mlir",
@@ -40,7 +38,6 @@ iree_lit_test_suite(
             "pipeline_test.mlir",
             "subtensor.mlir",
             "subtensor_insert.mlir",
-            "torch_index_select.mlir",
         ],
         include = ["*.mlir"],
     ),

@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from absl import app
+from iree.tf.support import tf_test_utils
 import numpy as np
-from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 TIME_SIZE = 3

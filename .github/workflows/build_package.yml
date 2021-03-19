@@ -167,7 +167,7 @@ jobs:
         shell: bash
         run: |
           # Just need to build for one examplar python3 variant.
-          package_dir="./iree-install/python_packages/iree_rt"
+          package_dir="./iree-install/python_packages/iree_runtime"
           export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( Make source packages.

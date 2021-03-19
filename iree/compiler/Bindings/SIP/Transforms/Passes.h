@@ -30,7 +30,7 @@ namespace SIP {
 //===----------------------------------------------------------------------===//
 
 // Adds a set of passes to the given pass manager that setup a module for use
-// with an IREE SIP-compatible runtime binding implementation (pyiree, etc).
+// with an IREE SIP-compatible runtime binding implementation (python, etc).
 void buildTransformPassPipeline(OpPassManager &passManager);
 
 void registerTransformPassPipeline();

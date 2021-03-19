@@ -20,9 +20,9 @@ import unittest
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
-from pyiree.compiler.tf import *
+import iree.compiler.tf
 
-if not is_available():
+if not iree.compiler.tf.is_available():
   print(f"Skipping test {__file__} because the IREE TensorFlow compiler "
         f"is not installed")
   sys.exit(0)
@@ -52,19 +52,20 @@ class SimpleArithmeticModule(tf.Module):
 class TfCompilerTest(tf.test.TestCase):
 
   def testImportSavedModel(self):
-    import_mlir = compile_saved_model(self.smdir,
-                                      import_only=True).decode("utf-8")
+    import_mlir = iree.compiler.tf.compile_saved_model(
+        self.smdir, import_only=True).decode("utf-8")
     self.assertIn("sym_name = \"simple_matmul\"", import_mlir)
 
   def testCompileSavedModel(self):
-    binary = compile_saved_model(self.smdir,
-                                 target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.tf.compile_saved_model(
+        self.smdir, target_backends=iree.compiler.tf.DEFAULT_TESTING_BACKENDS)
     logging.info("Compiled len: %d", len(binary))
     self.assertIn(b"simple_matmul", binary)
     self.assertIn(b"simple_mul", binary)
 
   def testCompileModule(self):
-    binary = compile_module(self.m, target_backends=DEFAULT_TESTING_BACKENDS)
+    binary = iree.compiler.tf.compile_module(
+        self.m, target_backends=iree.compiler.tf.DEFAULT_TESTING_BACKENDS)
     logging.info("Compiled len: %d", len(binary))
     self.assertIn(b"simple_matmul", binary)
     self.assertIn(b"simple_mul", binary)

@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOLLVM_PASSES_H_
 
+#include "iree/compiler/Conversion/LinalgToLLVM/LLVMCodeGenOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -36,16 +37,20 @@ createLinalgTileAndDistributePass();
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<FunctionPass> createLinalgTileAndVectorizeWorkgroupsPass();
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createFastExpApproximationConversionPass();
+/// Replaces llvm.intr.fma with its unfused mul and add ops.
+std::unique_ptr<FunctionPass> createUnfusedFMAOpsPass();
 
 /// Populates patterns to rewrite linalg::ConvInputNHWCFilterHWCFOp into packed
 /// img2col operation followed by linalg::MatmulOp.
 void populateConvImg2ColMatmulConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
+void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
+                                       OwningRewritePatternList &patterns);
+
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    LLVMCodegenOptions options);
 
 /// Pass to convert Linalg ops into vector operations.
 std::unique_ptr<FunctionPass> createLinalgVectorizePass();
@@ -63,7 +68,8 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.
-void buildLLVMTransformPassPipeline(OpPassManager &passManager);
+void buildLLVMTransformPassPipeline(OpPassManager &passManager,
+                                    LLVMCodegenOptions options);
 
 }  // namespace iree_compiler
 }  // namespace mlir

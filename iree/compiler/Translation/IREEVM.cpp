@@ -40,7 +40,7 @@ namespace iree_compiler {
 // whole end-to-end with options for bindings/targets/etc.
 struct BindingOptions {
   // Whether to include runtime support functions and metadata required for
-  // SIP-compatible bindings (like pyiree).
+  // SIP-compatible bindings (like bindings/python/iree).
   bool sip = true;
   // Whether to include runtime support functions required for the IREE TFLite
   // API compatibility bindings.
