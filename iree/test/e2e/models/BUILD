@@ -24,7 +24,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
+CHECK_FRAMEWORK_TESTS = [
+    "bert_encoder_unrolled_fake_weights.mlir",
+    "mobilenetv2_fake_weights.mlir",
+]
 
 iree_lit_test_suite(
     name = "lit",
@@ -63,6 +66,15 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = CHECK_FRAMEWORK_TESTS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
+    srcs = [
+        "mobilenetv2_fake_weights.mlir",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
