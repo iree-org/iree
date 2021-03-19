@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRNVVMIR
+    MLIRNVVMToLLVMIRTranslation
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport

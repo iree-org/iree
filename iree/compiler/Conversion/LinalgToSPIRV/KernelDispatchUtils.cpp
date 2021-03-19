@@ -312,6 +312,51 @@ static LogicalResult getConfigForCooperativeMatmul(
   return success();
 }
 
+/// Launch config for element-wise linalg.generic.
+template <>
+LogicalResult getOpLaunchConfig(linalg::GenericOp op,
+                                const spirv::TargetEnv &targetEnv,
+                                const SPIRVCodegenOptions &options,
+                                TileSizesListType &tileSizes,
+                                LaunchConfigInfo &config) {
+  int64_t subgroupSize =
+      targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
+  config.workgroupSize[0] = subgroupSize;
+  config.workgroupSize[1] = 1;
+  config.workgroupSize[2] = 1;
+  ShapedType outputShape = op.getOutputShapedType(0);
+
+  SmallVector<int64_t, 4> sizes;
+  // When Vectororization is not enabled we skil the second level of tiling and
+  // fall back to convertToGPU which will map one element to one thread. To
+  // avoid a mismatch in the number of workgroup dispatched, we pick a tile size
+  // to have one element per thread.
+  // TODO: Remove this once we switch to linalg on tensor path.
+  if (options.enableVectorization) {
+    sizes.append({4 * subgroupSize, 2 * subgroupSize});
+  }
+  sizes.push_back(subgroupSize);
+  // Use the first tile size that can divide the shape. If the shape is not
+  // aligned on any of the tile sizes pick the smallest tile of one element per
+  // thread.
+  int64_t lowerTs = config.workgroupSize[0];
+  for (int64_t size : sizes) {
+    if (outputShape.getShape().back() % size != 0) continue;
+    lowerTs = size;
+    break;
+  }
+  SmallVector<int64_t, 4> ts;
+  size_t numLoops = getNumOuterParallelLoops(op);
+  ts.resize(numLoops, 1);
+  ts.back() = lowerTs;
+  tileSizes.emplace_back(ts);
+  tileSizes.emplace_back();
+  ts.back() = lowerTs / subgroupSize;
+  tileSizes.emplace_back(ts);
+  config.vectorize = options.enableVectorization;
+  return success();
+}
+
 /// Launch configuration for different known GPU configuration.
 static LogicalResult getTargetSpecificConfig(
     linalg::MatmulOp op, const spirv::TargetEnv &targetEnv,
@@ -706,6 +751,27 @@ Optional<LaunchConfig> initGPULaunchConfig(
     DISPATCH(linalg::PoolingNHWCSumOp)
 
 #undef DISPATCH
+  }
+
+  if (!rootOperation) {
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      if (auto op = dyn_cast<linalg::GenericOp>(linalgOp.getOperation())) {
+        if (getNumOuterParallelLoops(linalgOp) == 0 ||
+            llvm::any_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
+              return !map.isProjectedPermutation();
+            })) {
+          continue;
+        }
+        TileSizesListType tileSizesInfo;
+        if (failed(getOpLaunchConfig(op, targetEnv, options, tileSizesInfo,
+                                     config))) {
+          continue;
+        }
+        launchConfig.setTileSizes(op, tileSizesInfo);
+        launchConfig.setRootOperation(op);
+        break;
+      }
+    }
   }
 
   launchConfig.setWorkgroupSize(config.workgroupSize);
