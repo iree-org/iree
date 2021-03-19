@@ -103,6 +103,35 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
 
+    // Private symbols (i.e. llvm dialect private symbols) get deduped
+    // incorrectly by the link executables pass even though they should be
+    // treated as different symbols. For now just change the names of the
+    // private symbols to avoid conflicts.
+    unsigned moduleNumber = 0;
+    for (auto sourceExecutableOp : enumerate(sourceExecutableOps)) {
+      auto targetOps = llvm::to_vector<4>(
+          sourceExecutableOp.value().getOps<IREE::HAL::ExecutableTargetOp>());
+      for (auto targetOp : targetOps) {
+        if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
+          continue;
+        }
+
+        auto sourceModuleOp = targetOp.getInnerModule();
+        for (auto globalOp : sourceModuleOp.getOps<LLVM::GlobalOp>()) {
+          if (globalOp.linkage() != LLVM::Linkage::Private) {
+            continue;
+          }
+          auto disambiguateName =
+              llvm::formatv("{0}_{1}", globalOp.sym_name(), moduleNumber).str();
+          SymbolTableCollection symbolTable;
+          SymbolUserMap symbolUsers(symbolTable, sourceModuleOp);
+          symbolUsers.replaceAllUsesWith(globalOp, disambiguateName);
+          SymbolTable::setSymbolName(globalOp, disambiguateName);
+        }
+        moduleNumber++;
+      }
+    }
+
     // Guess a module name, if needed, to make the output files readable.
     auto moduleName = guessModuleName(moduleOp);
 

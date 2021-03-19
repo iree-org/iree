@@ -827,12 +827,11 @@ static bool canDispatchRegionContainOp(Operation *op) {
                    constantValueAttr.dyn_cast<DenseElementsAttr>()) {
       // TODO(GH-4897): Non-splat constants seems to have an issue on the LLLVM
       // side. Uncomment after that is fixed.
-      // auto shapedType = constantOp.getType().cast<ShapedType>();
-      // uint64_t estimatedByteLength =
-      //     (shapedType.getNumElements() * shapedType.getElementTypeBitWidth())
-      //     / 8;
-      return denseAttr
-          .isSplat();  // || estimatedByteLength <= 256;  // or whatever
+      auto shapedType = constantOp.getType().cast<ShapedType>();
+      uint64_t estimatedByteLength =
+          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
+          8;
+      return denseAttr.isSplat() || estimatedByteLength <= 256;  // or whatever
     } else if (constantType.isIntOrIndexOrFloat()) {
       return true;
     }
