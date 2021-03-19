@@ -63,7 +63,7 @@ spirv::PointerType getPushConstantStorageType(unsigned elementCount,
   auto arrayType = spirv::ArrayType::get(
       SPIRVTypeConverter::getIndexType(builder.getContext()), elementCount,
       /*stride=*/4);
-  auto structType = spirv::StructType::get({arrayType}, /*LayoutInfo=*/0);
+  auto structType = spirv::StructType::get({arrayType}, /*offsetInfo=*/0);
   return spirv::PointerType::get(structType, spirv::StorageClass::PushConstant);
 }
 
@@ -392,7 +392,7 @@ void TransferToCoopMatLoadStore<vector::TransferReadOp>::replaceTransferOp(
     Value strideValue, Value coloumnMajor,
     ConversionPatternRewriter &rewriter) const {
   Value load = rewriter.create<spirv::CooperativeMatrixLoadNVOp>(
-      loc, matType, ptr, strideValue, coloumnMajor, IntegerAttr());
+      loc, matType, ptr, strideValue, coloumnMajor, spirv::MemoryAccessAttr());
   rewriter.replaceOp(op, load);
 }
 
@@ -403,7 +403,7 @@ void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
     ConversionPatternRewriter &rewriter) const {
   rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
       loc, ptr, rewriter.getRemappedValue(op.vector()), strideValue,
-      coloumnMajor, IntegerAttr());
+      coloumnMajor, spirv::MemoryAccessAttr());
   rewriter.eraseOp(op);
 }
 
