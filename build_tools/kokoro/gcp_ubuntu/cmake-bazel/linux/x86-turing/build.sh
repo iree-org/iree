@@ -78,6 +78,6 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 # as well.
 echo "Testing with CTest"
 ctest --output-on-failure \
-   --tests-regex "^integrations/tensorflow/" \
+   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"
