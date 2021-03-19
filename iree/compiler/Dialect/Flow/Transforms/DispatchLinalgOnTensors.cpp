@@ -612,13 +612,11 @@ struct TileAndDistributeOnTensorsPattern
     SmallVector<Value, 4> count = llvm::to_vector<4>(
         llvm::map_range(linalgOp.createLoopRanges(rewriter, loc),
                         [](Range r) { return r.size; }));
-    // NOTE: Special treatment for convolution, which have more than 3 parallel
-    // dimensions. We want to ignore the batch dimension and tile along the
-    // next three.
-    // TODO(#5048): figure out a better way to avoid this special case.
-    if (isa<linalg::ConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
-      count.erase(count.begin());
+    size_t numParrallelLoops = getNumOuterParallelLoops(op);
+    if (numParrallelLoops > kNumMaxParallelDims) {
+      count.erase(
+          count.begin(),
+          std::next(count.begin(), numParrallelLoops - kNumMaxParallelDims));
     }
     count.resize(getNumTilableLoops(op));
     auto workload = convertToWorkload(rewriter, loc, count);
@@ -849,6 +847,23 @@ static void decideFusableLinalgOps(FuncOp funcOp) {
                             builder.getI64ArrayAttr(fusionGroups));
       }
     }
+
+    // As a second step mark all the element-wise linalg ops not fused as roots
+    // so that they get tiled and distributed.
+    for (linalg::LinalgOp linalgOp : linalgOps) {
+      Operation *op = linalgOp.getOperation();
+      if (!isa<linalg::GenericOp>(op) ||
+          getNumOuterParallelLoops(linalgOp) == 0 ||
+          llvm::any_of(linalgOp.getIndexingMaps(), [](AffineMap &map) {
+            return !map.isProjectedPermutation();
+          })) {
+        continue;
+      }
+
+      if (op->hasAttr(kRootOpAttr) || op->hasAttr(kFusionGroupsAttr)) continue;
+      unsigned currGroupNum = numRootOps++;
+      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(currGroupNum));
+    }
   }
 }
 
@@ -902,15 +917,10 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           }));
     }
 
-    // NOTE: Special treatment for convolution, which have more than 3
-    // parallel dimensions. We want to ignore the batch dimension and tile
-    // along the next three. That means setting the first position to zero.
-    // TODO(#5048): figure out a better way to avoid this special case.
-    bool isConvOp = isa<linalg::ConvInputNHWCFilterHWCFOp,
-                        linalg::DepthwiseConvInputNHWCFilterHWCOp>(op);
-
+    // For ops with more than 3 parallel dimensions, we want to ignore the
+    // higher dimension and tile along last three dimensions.
     for (size_t dim = 0; dim < numTiledLoops; ++dim) {
-      useTileSizes[(isConvOp ? numParallelDims : numTiledLoops) - dim - 1] =
+      useTileSizes[numParallelDims - dim - 1] =
           buildFlowWorkgroupInfoOp<Flow::DispatchWorkgroupSizeOp>(builder, dim);
     }
     return useTileSizes;
