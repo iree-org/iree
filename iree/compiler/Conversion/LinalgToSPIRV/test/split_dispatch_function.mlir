@@ -465,15 +465,15 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
   hal.executable.target @vulkan, filter="vulkan*" {
     hal.executable.entry_point @subview_interleaved attributes {
       interface = @legacy_io, ordinal = 0 : i32,
-      signature = (!flow.dispatch.tensor<readonly:18x12xf32>, !flow.dispatch.tensor<writeonly:12x4xf32>) -> ()}
+      signature = (!flow.dispatch.tensor<readonly:18x12xf32>, !flow.dispatch.tensor<writeonly:18x12xf32>) -> ()}
     module {
       func @subview_interleaved() {
         %cst = constant 0.000000e+00 : f32
         %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
-        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+        %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<18x12xf32>
         linalg.fill(%0, %cst) : memref<18x12xf32>, f32
         %2 = memref.subview %0[4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #map0>
-        linalg.copy(%1, %2) : memref<12x4xf32>, memref<18x12xf32, #map0>
+        linalg.copy(%1, %2) : memref<18x12xf32>, memref<18x12xf32, #map0>
         return
       }
       hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -491,9 +491,9 @@ hal.executable @subview_interleaved attributes {sym_visiblity = "private"} {
 // CHECK-SAME:   [@subview_interleaved_dispatch_0, @subview_interleaved_dispatch_1]}
 //      CHECK: func @subview_interleaved_dispatch_1()
 //  CHECK-DAG:   %[[DST:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
-//  CHECK-DAG:   %[[SRC:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+//  CHECK-DAG:   %[[SRC:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<18x12xf32>
 //      CHECK:   %[[SUB:.+]] = memref.subview %[[DST]][4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #[[MAP0]]>
-//      CHECK:   linalg.copy(%[[SRC]], %[[SUB]]) : memref<12x4xf32>, memref<18x12xf32, #[[MAP0]]>
+//      CHECK:   linalg.copy(%[[SRC]], %[[SUB]]) : memref<18x12xf32>, memref<18x12xf32, #[[MAP0]]>
 //      CHECK:   return
 //      CHECK: func @subview_interleaved_dispatch_0()
 //      CHECK:   %[[CST:.+]] = constant
