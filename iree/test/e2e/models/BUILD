@@ -25,8 +25,8 @@ package(
 )
 
 CHECK_FRAMEWORK_TESTS = [
+    "bert_encoder_unrolled_fake_weights.mlir",
     "mobilenetv2_fake_weights.mlir",
-    "bert_encoder_unrolled_fake_weights.mlir"
 ]
 
 iree_lit_test_suite(
