@@ -43,7 +43,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
+    check_linalg_on_tensors_vulkan-spirv_vulkan
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv2_fake_weights.mlir"
@@ -62,6 +62,9 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "-iree-flow-dispatch-linalg-on-tensors"
+    "-iree-codegen-spirv-experimental-linalg-on-tensors"
 )
 
 iree_check_single_backend_test_suite(

@@ -64,8 +64,12 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan",
+    name = "check_linalg_on_tensors_vulkan-spirv_vulkan",
     srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = [
+        "-iree-flow-dispatch-linalg-on-tensors",
+        "-iree-codegen-spirv-experimental-linalg-on-tensors",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
