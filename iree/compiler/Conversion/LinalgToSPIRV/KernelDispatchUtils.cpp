@@ -349,10 +349,10 @@ LogicalResult getOpLaunchConfig(linalg::GenericOp op,
   size_t numLoops = getNumOuterParallelLoops(op);
   ts.resize(numLoops, 1);
   ts.back() = lowerTs;
-  tileSizes.emplace_back(ts); // Workgroup level.
-  tileSizes.emplace_back();   // Subgroup level.
+  tileSizes.emplace_back(ts);  // Workgroup level.
+  tileSizes.emplace_back();    // Subgroup level.
   ts.back() = lowerTs / subgroupSize;
-  tileSizes.emplace_back(ts); // Thread level.
+  tileSizes.emplace_back(ts);  // Thread level.
   // Vectorize only if we are processing more than one element per thread.
   config.vectorize = options.enableVectorization && (ts.back() > 1);
   return success();
